@@ -43,12 +43,15 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use itertools::Either;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
+use std::borrow::Cow;
+pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
@@ -90,60 +93,6 @@ struct TypeAndRange<'db> {
     range: TextRange,
 }
 
-/// Compact immutable key-value entries stored in key order.
-///
-/// This keeps the mutable construction path on [`FxHashMap`], then switches to a denser retained
-/// representation for cached inference results that only need iteration and keyed lookup.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(super) struct FrozenMap<K, V>(Box<[(K, V)]>);
-
-impl<K, V> FrozenMap<K, V> {
-    pub(super) fn iter(&self) -> std::slice::Iter<'_, (K, V)> {
-        self.0.iter()
-    }
-}
-
-impl<K: Ord, V> From<FxHashMap<K, V>> for FrozenMap<K, V> {
-    fn from(map: FxHashMap<K, V>) -> Self {
-        let mut entries = map.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        Self(entries.into_boxed_slice())
-    }
-}
-
-impl<K: Ord, V> FrozenMap<K, V> {
-    pub(super) fn get(&self, key: &K) -> Option<&V> {
-        self.0
-            .binary_search_by(|(candidate, _)| candidate.cmp(key))
-            .ok()
-            .map(|index| &self.0[index].1)
-    }
-}
-
-impl<K, V> Default for FrozenMap<K, V> {
-    fn default() -> Self {
-        Self(Box::default())
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a FrozenMap<K, V> {
-    type Item = &'a (K, V);
-    type IntoIter = std::slice::Iter<'a, (K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
-    }
-}
-
-impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
-    type Item = &'a mut (K, V);
-    type IntoIter = std::slice::IterMut<'a, (K, V)>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter_mut()
-    }
-}
-
 /// Infer all types for a [`Definition`] (including sub-expressions).
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
@@ -175,13 +124,37 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition()
 }
 
+/// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
+///
+/// For example, inference synthesizes an `x["a"] = "bad"` binding for:
+/// ```python
+/// def f(x: dict[str, int]):
+///     x = {"a": "bad"}  # invalid-assignment
+/// ```
+/// Since the enclosing assignment was rejected, place resolution must ignore that binding and fall
+/// back to the declared value type of `x`.
+pub(crate) fn is_discarded_dict_key_assignment<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> bool {
+    let DefinitionKind::DictKeyAssignment(dict_key_assignment) = definition.kind(db) else {
+        return false;
+    };
+
+    infer_definition_types(db, dict_key_assignment.assignment()).discards_dict_key_assignments()
+}
+
 /// Infer decorator expression types for a function definition.
 ///
 /// This is a lightweight query that avoids the cycle risk of calling
 /// `infer_definition_types` when we need to check decorators while
 /// already inside definition inference (e.g. checking `Self` in a
 /// `@staticmethod`).
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    returns(ref),
+    cycle_initial=|_, _, _| FunctionDecoratorInference::default(),
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
@@ -211,7 +184,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// Unlike [`DefinitionInference`], this stores only decorator expression types and
 /// diagnostics, plus the expression-side state that needs to be merged back into
 /// function-definition inference.
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
     expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
@@ -621,13 +594,24 @@ impl<'db> TypeContext<'db> {
     }
 
     /// If the type annotation is a union, returns the target elements that it can be narrowed to.
-    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<&[Type<'db>]> {
-        self.annotation
-            .and_then(|ty| ty.as_union_like(db))
-            // TODO: We could theoretically attempt to narrow to every element of
-            // the power set of this union. However, this leads to an exponential
-            // explosion of inference attempts, and is rarely needed in practice.
-            .map(|union| union.elements(db))
+    pub(crate) fn narrow_targets(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
+        let union = self.annotation?.as_union_like(db)?;
+
+        let targets = if union.has_aliases(db) {
+            let expanded = union.expand_aliases(db);
+            if let Some(union) = expanded.as_union_like(db) {
+                Cow::Borrowed(union.elements(db))
+            } else {
+                Cow::Owned(vec![expanded])
+            }
+        } else {
+            Cow::Borrowed(union.elements(db))
+        };
+
+        // TODO: We could theoretically attempt to narrow to every element of
+        // the power set of this union. However, this leads to an exponential
+        // explosion of inference attempts, and is rarely needed in practice.
+        Some(targets)
     }
 }
 
@@ -775,13 +759,13 @@ pub(crate) struct ScopeInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -872,6 +856,27 @@ impl<'db> ScopeInference<'db> {
     }
 }
 
+/// The result of inferring a declaration recorded by the semantic index.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum InferredDeclaration<'db> {
+    /// A valid declaration with an inferred declared type.
+    Declared(TypeAndQualifiers<'db>),
+    /// An invalid declaration that should not participate in declaration resolution.
+    ///
+    /// For example, `obj.attr: int` when `obj` is not a valid implicit receiver, or
+    /// `items[0]: int`, which is never a valid annotation target.
+    Rejected,
+}
+
+impl<'db> InferredDeclaration<'db> {
+    pub(crate) fn declared(self) -> Option<TypeAndQualifiers<'db>> {
+        match self {
+            InferredDeclaration::Declared(declared) => Some(declared),
+            InferredDeclaration::Rejected => None,
+        }
+    }
+}
+
 /// The inferred types for a definition region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
@@ -882,36 +887,193 @@ pub(crate) struct DefinitionInference<'db> {
     #[cfg(debug_assertions)]
     scope: ScopeId<'db>,
 
-    /// The types of every binding in this region.
-    ///
-    /// Almost all definition regions have less than 10 bindings. There are very few with more than 10 (but still less than 20).
-    /// Because of that, use a slice with linear search over a hash map.
-    pub(crate) bindings: Box<[(Definition<'db>, Type<'db>)]>,
-
-    /// The types and type qualifiers of every declaration in this region.
-    ///
-    /// About 50% of the definition inference regions have no declarations.
-    /// The other 50% have less than 10 declarations. Because of that, use a
-    /// slice with linear search over a hash map.
-    declarations: Box<[(Definition<'db>, TypeAndQualifiers<'db>)]>,
+    /// The binding and declaration types inferred in this region.
+    types: DefinitionTypes<'db>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<DefinitionInferenceExtra<'db>>>,
 }
 
+/// The binding and declaration types inferred for a definition region.
+///
+/// Almost all regions contain a single binding, optionally paired with a declaration for the same
+/// definition and type. Keep those cases in a single allocation instead of retaining two separate
+/// allocations.
+#[derive(Debug, Default, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+enum DefinitionTypes<'db> {
+    #[default]
+    Empty,
+    Binding(Box<DefinitionBinding<'db>>),
+    Declaration(Box<DefinitionDeclaration<'db>>),
+    BindingAndDeclaration(Box<DefinitionDeclaration<'db>>),
+    Other(Box<OtherDefinitionTypes<'db>>),
+}
+
+type DefinitionBinding<'db> = (Definition<'db>, Type<'db>);
+type DefinitionDeclaration<'db> = (Definition<'db>, TypeAndQualifiers<'db>);
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct OtherDefinitionTypes<'db> {
+    bindings: Box<[DefinitionBinding<'db>]>,
+    declarations: Box<[DefinitionDeclaration<'db>]>,
+}
+
+impl<'db> DefinitionTypes<'db> {
+    fn from_parts(
+        bindings: Vec<DefinitionBinding<'db>>,
+        declarations: Vec<DefinitionDeclaration<'db>>,
+    ) -> Self {
+        match (&*bindings, &*declarations) {
+            ([], []) => Self::Empty,
+            ([binding], []) => Self::Binding(Box::new(*binding)),
+            ([], [declaration]) => Self::Declaration(Box::new(*declaration)),
+            ([(binding, binding_ty)], [(declaration, declaration_ty)])
+                if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
+            {
+                Self::BindingAndDeclaration(Box::new((*declaration, *declaration_ty)))
+            }
+            _ => Self::Other(Box::new(OtherDefinitionTypes {
+                bindings: bindings.into_boxed_slice(),
+                declarations: declarations.into_boxed_slice(),
+            })),
+        }
+    }
+
+    fn binding_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
+        self.bindings()
+            .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
+    }
+
+    fn declaration_type(&self, definition: Definition<'db>) -> Option<TypeAndQualifiers<'db>> {
+        self.declarations()
+            .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
+    }
+
+    fn normalize_binding(
+        db: &'db dyn Db,
+        previous: &DefinitionTypes<'db>,
+        cycle: &salsa::Cycle,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+    ) -> Type<'db> {
+        if let Some(previous_ty) = previous.binding_type(definition) {
+            ty.cycle_normalized(db, previous_ty, cycle)
+        } else {
+            ty.recursive_type_normalized(db, cycle)
+        }
+    }
+
+    fn normalize_declaration(
+        db: &'db dyn Db,
+        previous: &DefinitionTypes<'db>,
+        cycle: &salsa::Cycle,
+        definition: Definition<'db>,
+        ty: TypeAndQualifiers<'db>,
+    ) -> TypeAndQualifiers<'db> {
+        if let Some(previous_ty) = previous.declaration_type(definition) {
+            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+        } else {
+            ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
+        }
+    }
+
+    fn cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        previous: &DefinitionTypes<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        match self {
+            Self::Empty => Self::Empty,
+            Self::Binding(mut binding) => {
+                let (definition, ty) = &mut *binding;
+                *ty = Self::normalize_binding(db, previous, cycle, *definition, *ty);
+                Self::Binding(binding)
+            }
+            Self::Declaration(mut declaration) => {
+                let (definition, ty) = &mut *declaration;
+                *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
+                Self::Declaration(declaration)
+            }
+            Self::BindingAndDeclaration(mut declaration) => {
+                let (definition, declaration_ty) = *declaration;
+                let binding_ty = Self::normalize_binding(
+                    db,
+                    previous,
+                    cycle,
+                    definition,
+                    declaration_ty.inner_type(),
+                );
+                let declaration_ty =
+                    Self::normalize_declaration(db, previous, cycle, definition, declaration_ty);
+
+                if binding_ty == declaration_ty.inner_type() {
+                    declaration.1 = declaration_ty;
+                    Self::BindingAndDeclaration(declaration)
+                } else {
+                    Self::Other(Box::new(OtherDefinitionTypes {
+                        bindings: Box::new([(definition, binding_ty)]),
+                        declarations: Box::new([(definition, declaration_ty)]),
+                    }))
+                }
+            }
+            Self::Other(mut other) => {
+                for (definition, ty) in &mut other.bindings {
+                    *ty = Self::normalize_binding(db, previous, cycle, *definition, *ty);
+                }
+                for (definition, ty) in &mut other.declarations {
+                    *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
+                }
+
+                match (&*other.bindings, &*other.declarations) {
+                    ([(binding, binding_ty)], [(declaration, declaration_ty)])
+                        if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
+                    {
+                        Self::BindingAndDeclaration(Box::new((*declaration, *declaration_ty)))
+                    }
+                    _ => Self::Other(other),
+                }
+            }
+        }
+    }
+
+    fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
+        match self {
+            Self::Binding(binding) => Either::Left(std::iter::once(**binding)),
+            Self::BindingAndDeclaration(declaration) => {
+                Either::Left(std::iter::once((declaration.0, declaration.1.inner_type())))
+            }
+            Self::Other(other) => Either::Right(other.bindings.iter().copied()),
+            Self::Empty | Self::Declaration(..) => Either::Right([].iter().copied()),
+        }
+    }
+
+    fn declarations(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
+        match self {
+            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
+                Either::Left(std::iter::once(**declaration))
+            }
+            Self::Other(other) => Either::Right(other.declarations.iter().copied()),
+            Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
+        }
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -928,9 +1090,13 @@ struct DefinitionInferenceExtra<'db> {
     /// For decorated function or class definitions, the type before applying decorators.
     undecorated_type: Option<Type<'db>>,
 
+    /// Whether synthesized dictionary-key assignments derived from the right-hand side should be
+    /// discarded.
+    discards_dict_key_assignments: bool,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
-    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -939,7 +1105,7 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
         cycle_recovery: Type<'db>,
     ) -> Self {
-        let mut bindings: Box<[_]> = Box::new([]);
+        let mut types = DefinitionTypes::Empty;
 
         // Eagerly store more precise types for collection literals to avoid an extra
         // cycle iteration, i.e., by inferring `list[Divergent]` instead of `Divergent`.
@@ -960,14 +1126,16 @@ impl<'db> DefinitionInference<'db> {
                         generic_context.repeat_specialization(db, cycle_recovery)
                     });
 
-                bindings = Box::new([(definition, Type::instance(db, divergent_collection))]);
+                types = DefinitionTypes::Binding(Box::new((
+                    definition,
+                    Type::instance(db, divergent_collection),
+                )));
             }
         }
 
         Self {
-            bindings,
             expressions: FrozenMap::default(),
-            declarations: Box::default(),
+            types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
             extra: Some(Box::new(DefinitionInferenceExtra {
@@ -987,31 +1155,8 @@ impl<'db> DefinitionInference<'db> {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
-        for (binding, binding_ty) in &mut self.bindings {
-            if let Some((_, previous_binding)) = previous_inference
-                .bindings
-                .iter()
-                .find(|(previous_binding, _)| previous_binding == binding)
-            {
-                *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
-            } else {
-                *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
-            }
-        }
-        for (declaration, declaration_ty) in &mut self.declarations {
-            if let Some((_, previous_declaration)) = previous_inference
-                .declarations
-                .iter()
-                .find(|(previous_declaration, _)| previous_declaration == declaration)
-            {
-                *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
-                });
-            } else {
-                *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
-            }
-        }
+        self.types =
+            std::mem::take(&mut self.types).cycle_normalized(db, &previous_inference.types, cycle);
 
         self
     }
@@ -1062,13 +1207,9 @@ impl<'db> DefinitionInference<'db> {
 
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
-        self.bindings
-            .iter()
-            .find_map(
-                |(def, ty)| {
-                    if def == &definition { Some(*ty) } else { None }
-                },
-            )
+        self.types
+            .bindings()
+            .find_map(|(def, ty)| if def == definition { Some(ty) } else { None })
             .or_else(|| self.fallback_type())
             .expect(
                 "definition should belong to this TypeInference region and \
@@ -1077,39 +1218,48 @@ impl<'db> DefinitionInference<'db> {
     }
 
     fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
-        self.bindings.iter().copied()
+        self.types.bindings()
     }
 
-    #[track_caller]
-    pub(crate) fn declaration_type(&self, definition: Definition<'db>) -> TypeAndQualifiers<'db> {
-        self.declarations
-            .iter()
-            .find_map(|(def, qualifiers)| {
-                if def == &definition {
-                    Some(*qualifiers)
+    pub(crate) fn inferred_declaration(
+        &self,
+        definition: Definition<'db>,
+    ) -> InferredDeclaration<'db> {
+        self.types
+            .declarations()
+            .find_map(|(def, declaration)| {
+                if def == definition {
+                    Some(InferredDeclaration::Declared(declaration))
                 } else {
                     None
                 }
             })
-            .or_else(|| self.fallback_type().map(TypeAndQualifiers::declared))
-            .expect(
-                "definition should belong to this TypeInference region and \
-                TypeInferenceBuilder should have inferred a type for it",
-            )
+            .or_else(|| {
+                self.fallback_type()
+                    .map(TypeAndQualifiers::declared)
+                    .map(InferredDeclaration::Declared)
+            })
+            .unwrap_or(InferredDeclaration::Rejected)
     }
 
     fn declarations(
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
-        self.declarations.iter().copied()
+        self.types.declarations()
     }
 
     fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.declarations.iter().map(|(_, qualifiers)| *qualifiers)
+        self.declarations().map(|(_, qualifiers)| qualifiers)
     }
 
     pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
+    }
+
+    pub(crate) fn discards_dict_key_assignments(&self) -> bool {
+        self.extra
+            .as_deref()
+            .is_some_and(|extra| extra.discards_dict_key_assignments)
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
@@ -1117,9 +1267,15 @@ impl<'db> DefinitionInference<'db> {
     }
 
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
-        self.undecorated_type()
-            .unwrap_or_else(|| self.declaration_type(definition).inner_type())
-            .as_function_literal()
+        let ty = if let Some(undecorated) = self.undecorated_type() {
+            undecorated
+        } else {
+            self.inferred_declaration(definition)
+                .declared()?
+                .inner_type()
+        };
+
+        ty.as_function_literal()
     }
 }
 
@@ -1140,13 +1296,13 @@ pub(crate) struct ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize, Default)]
 struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -1297,10 +1453,10 @@ pub(crate) struct StatementInferenceInner<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
 struct StatementInferenceInnerExtra<'db> {
     /// String annotations found in this region
-    string_annotations: FxHashSet<ExpressionNodeKey>,
+    string_annotations: FrozenSet<ExpressionNodeKey>,
 
     /// Expected types for expression nodes tracked for IDE completion.
-    expected_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Functions called while inferring this statement.
     called_functions: Box<[FunctionType<'db>]>,
@@ -1309,7 +1465,7 @@ struct StatementInferenceInnerExtra<'db> {
     return_types_and_ranges: Box<[TypeAndRange<'db>]>,
 
     /// Metadata for type expressions in this region.
-    type_expression_flags: FxHashMap<ExpressionNodeKey, TypeExpressionFlags>,
+    type_expression_flags: FrozenMap<ExpressionNodeKey, TypeExpressionFlags>,
 
     /// The constraints on any collection literals that are accessed in this region.
     collection_use_constraints: FxHashMap<Definition<'db>, FxIndexSet<Type<'db>>>,
@@ -1325,7 +1481,7 @@ struct StatementInferenceInnerExtra<'db> {
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
-    qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> StatementInferenceInner<'db> {

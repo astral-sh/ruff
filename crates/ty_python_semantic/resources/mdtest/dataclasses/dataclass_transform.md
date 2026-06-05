@@ -1210,10 +1210,6 @@ class ConverterClass:
 class Model(ModelBase):
     field3: ConverterClass = model_field(converter=ConverterClass)
     field4: int = model_field(converter=overloaded_converter)
-    # TODO: This should be accepted once overloaded class callables with richer signatures are
-    # modeled in callable assignability.
-    # error: [invalid-assignment]
-    # error: [invalid-argument-type]
     field5: dict[str, str] = model_field(converter=dict, default=())
 ```
 
@@ -2005,14 +2001,15 @@ class WithGenericClassConverter:
     a: list[str] = field(converter=list)
     b: tuple[int, int] = field(converter=duplicate)
 
-# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
-# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+# TODO: The input type for `b` should ideally be `int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[str], b: Unknown) -> None
 reveal_type(WithGenericClassConverter.__init__)
 
 WithGenericClassConverter(("a", "b", "c"), 1)
 
-# TODO: these should ideally be errors
+# error: [invalid-argument-type]
 WithGenericClassConverter((1, 2, 3), 1)
+# TODO: this should ideally be an error
 WithGenericClassConverter(("a", "b", "c"), "foo")
 ```
 

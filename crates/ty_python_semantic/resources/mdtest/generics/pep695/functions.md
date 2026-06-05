@@ -626,8 +626,7 @@ be able to unify the two assignments to `A`.
 ```py
 from functions import invoke, Covariant, head_covariant, lift_covariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_covariant, Covariant[int]()))
 # revealed: Covariant[Literal[1]]
 reveal_type(invoke(lift_covariant, 1))
@@ -1006,16 +1005,15 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
 
-# TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
-# we confuse with "R has no lower bound".
 # revealed: (...) -> Never
 reveal_type(into_regular_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: (...) -> Never
-# revealed: (...) -> Unknown
+# revealed: (...) -> Never
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: Never
-# revealed: Unknown
-reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+# Keep this in a function so the top-level mdtest block remains reachable after revealing `Never`.
+def _():
+    # revealed: Never
+    reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
 class Proxy: ...
 

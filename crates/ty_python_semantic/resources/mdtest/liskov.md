@@ -81,6 +81,33 @@ info: incompatible return types: `str` is not assignable to `int`
 info: This violates the Liskov Substitution Principle
 ```
 
+Generic class typevars bounded by the parent return type should still be valid covariant overrides.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```pyi
+class Root: ...
+
+class Base:
+    def get_parent_id(self) -> Base | Root: ...
+
+class Child[PT: Base | Root](Base):
+    parent_id: PT
+
+    def get_parent_id(self) -> PT: ...
+
+class DataArray: ...
+
+class Coordinates:
+    def __getitem__(self, key: object) -> DataArray: ...
+
+class DataArrayCoordinates[T_DataArray: DataArray](Coordinates):
+    def __getitem__(self, key: object) -> T_DataArray: ...
+```
+
 ## Method parameters
 
 A subclass method may provide a different parameter list to the superclass method, but all

@@ -496,6 +496,14 @@ reveal_type(x16)  # revealed: list[int | None]
 
 x17: EitherList = ["1", "2", "3"]
 reveal_type(x17)  # revealed: list[int | str]
+
+type SelfOp[T] = Mapping[Literal["$eq", "$ne"], T]
+type ListOp[T] = Mapping[Literal["$in", "$nin"], Sequence[T]]
+type Ops[T] = SelfOp[T] | ListOp[T]
+type NestedOp[T] = T | Ops[T]
+
+x18: NestedOp[str] = {"$in": ["a", "b"]}
+reveal_type(x18)  # revealed: dict[Literal["$in", "$nin"], list[str]]
 ```
 
 ## Annotations influence generic call argument inference
@@ -508,13 +516,22 @@ python-version = "3.13"
 A function's arguments are also inferred using the type context:
 
 ```py
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 class TD(TypedDict):
     x: int
 
 def first[T](x: list[T]) -> T:
     return x[0]
+
+type ObjectCallback = Callable[[object], None]
+type IntCallback = Callable[[int], None]
+
+def make_callback[T](callback: Callable[[T], None]) -> Callable[[T], None]:
+    return callback
+
+def consume(value: int) -> None:
+    pass
 
 x1: TD = first([{"x": 0}, {"x": 1}])
 reveal_type(x1)  # revealed: TD
@@ -531,6 +548,10 @@ x3: TD = first([{"y": 0}, {"x": 1}])
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
+
+# `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
+# target to `IntCallback`.
+x5: ObjectCallback | IntCallback = make_callback(lambda value: consume(value.bit_length()))
 ```
 
 But not in a way that leads to assignability errors:
@@ -792,8 +813,10 @@ Similarly, if the inferred type is a subtype of the declared type, we prefer dec
 assignments that are in non-covariant position.
 
 ```py
+import builtins
 from collections import defaultdict
-from typing import Any, Iterable, Literal, MutableSequence, Sequence
+from collections.abc import Mapping
+from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
 reveal_type(x1)  # revealed: list[int]
@@ -864,6 +887,56 @@ reveal_type(x18)  # revealed: list[list[Any]]
 
 x19: dict[int, dict[str, int]] = defaultdict(dict)
 reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
+
+x20: Mapping[str, list[str]] = reveal_type(defaultdict(list))  # revealed: defaultdict[str, list[str]]
+x20["key"].append(1)  # error: [invalid-argument-type]
+
+factory: Callable[[], list[str]] = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(factory())  # revealed: list[str]
+
+optional_factory: Callable[[], list[str]] | None = reveal_type(list)  # revealed: <class 'list[str]'>
+
+qualified_factory: Callable[[], list[str]] = reveal_type(builtins.list)  # revealed: <class 'list[str]'>
+reveal_type(qualified_factory())  # revealed: list[str]
+
+type ListFactory = Callable[[], list[str]]
+
+alias_factory: ListFactory = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(alias_factory())  # revealed: list[str]
+
+gradual_factory: Callable[..., Any] = reveal_type(list)  # revealed: <class 'list'>
+dynamic_factory: Callable[[Any], Any] = reveal_type(list)  # revealed: <class 'list'>
+
+class Wrapped[T]:
+    value: T
+
+    def __new__(cls, value: T) -> "Wrapped[tuple[T]]":
+        raise NotImplementedError
+
+wrapped_factory: Callable[[str], Wrapped[tuple[str]]] = reveal_type(Wrapped)  # revealed: <class 'Wrapped[str]'>
+reveal_type(wrapped_factory("x"))  # revealed: Wrapped[tuple[str]]
+
+class M[T]:
+    value: T
+
+    def __new__[S](cls, value: S) -> "M[tuple[S]]":
+        raise NotImplementedError
+
+m_factory: Callable[[str], M[tuple[str]]] = reveal_type(M)  # revealed: <class 'M'>
+reveal_type(m_factory("x"))  # revealed: M[tuple[str]]
+
+class MultiPath[T]:
+    value: T
+
+    @overload
+    def __init__(self, value: T) -> None: ...
+    @overload
+    def __init__(self, value: list[T]) -> None: ...
+    def __init__(self, value: object) -> None: ...
+
+# fmt: off
+multi_path_factory: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
+# fmt: on
 ```
 
 ## Narrow union declared type for generic calls

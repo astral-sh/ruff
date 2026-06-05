@@ -1,5 +1,105 @@
 # Changelog
 
+## 0.15.16
+
+Released on 2026-06-04.
+
+### Preview features
+
+- \[`flake8-async`\] Implement `yield-in-context-manager-in-async-generator` (`ASYNC119`) ([#24644](https://github.com/astral-sh/ruff/pull/24644))
+- \[`pylint`\] Narrow diagnostic range and exclude cases without exception handlers (`PLW0717`) ([#25440](https://github.com/astral-sh/ruff/pull/25440))
+- \[`ruff`\] Treat `yield` before `break` from a terminal loop as terminal (`RUF075`) ([#25447](https://github.com/astral-sh/ruff/pull/25447))
+
+### Bug fixes
+
+- \[`eradicate`\] Avoid flagging `ruff:ignore` comments as code (`ERA001`) ([#25537](https://github.com/astral-sh/ruff/pull/25537))
+- \[`eradicate`\] Fix `ERA001`/`RUF100` conflict when `noqa` is on commented-out code ([#25414](https://github.com/astral-sh/ruff/pull/25414))
+- \[`pyflakes`\] Avoid removing the `format` call when it would change behavior (`F523`) ([#25320](https://github.com/astral-sh/ruff/pull/25320))
+- \[`pylint`\] Avoid syntax errors in invalid character replacements in f-strings before Python 3.12 (`PLE2510`, `PLE2512`, `PLE2513`, `PLE2514`, `PLE2515`) ([#25544](https://github.com/astral-sh/ruff/pull/25544))
+- \[`pyupgrade`\] Avoid converting `format` calls with more kinds of side effects (`UP032`) ([#25484](https://github.com/astral-sh/ruff/pull/25484))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Avoid fixes for ambiguous `argnames` and `argvalues` combinations (`PT006`) ([#24776](https://github.com/astral-sh/ruff/pull/24776))
+
+### Performance
+
+- Drop excess capacity from statement suites during parsing ([#25368](https://github.com/astral-sh/ruff/pull/25368))
+
+### Documentation
+
+- \[`pydocstyle`\] Improve discoverability of rules enabled for each convention ([#24973](https://github.com/astral-sh/ruff/pull/24973))
+- \[`ruff`\] Restore example code for Python versions before 3.15 (`RUF017`) ([#25439](https://github.com/astral-sh/ruff/pull/25439))
+- Fix typo `bin/active` → `bin/activate` in tutorial ([#25473](https://github.com/astral-sh/ruff/pull/25473))
+
+### Other changes
+
+- Shrink additional parser AST collections ([#25465](https://github.com/astral-sh/ruff/pull/25465))
+
+### Contributors
+
+- [@Redslayer112](https://github.com/Redslayer112)
+- [@koriyoshi2041](https://github.com/koriyoshi2041)
+- [@George-Ogden](https://github.com/George-Ogden)
+- [@TejasAmle](https://github.com/TejasAmle)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@ntBre](https://github.com/ntBre)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@loganrosen](https://github.com/loganrosen)
+- [@RafaelJohn9](https://github.com/RafaelJohn9)
+- [@adityasingh2400](https://github.com/adityasingh2400)
+
+## 0.15.15
+
+Released on 2026-05-28.
+
+### Preview features
+
+- Fix Markdown closing fence handling ([#25310](https://github.com/astral-sh/ruff/pull/25310))
+- \[`pyflakes`\] Report duplicate imports in `typing.TYPE_CHECKING` block (`F811`) ([#22560](https://github.com/astral-sh/ruff/pull/22560))
+
+### Bug fixes
+
+- \[`pyflakes`\] Treat function-scope bare annotations as locals per PEP 526 (`F821`) ([#21540](https://github.com/astral-sh/ruff/pull/21540))
+
+### Performance
+
+- Avoid redundant `TokenValue` drops in the lexer ([#25300](https://github.com/astral-sh/ruff/pull/25300))
+- Reduce memory usage by dropping token-excess capacity and improve performance by approximating the initial tokens `Vec` size ([#25354](https://github.com/astral-sh/ruff/pull/25354))
+- Use `ThinVec` in AST to shrink `Stmt` ([#25361](https://github.com/astral-sh/ruff/pull/25361))
+
+### Documentation
+
+- Fix `line-length` example for `--config` option ([#25389](https://github.com/astral-sh/ruff/pull/25389))
+- \[`flake8-comprehensions`\] Document `RecursionError` edge case in `__len__` (`C416`) ([#25286](https://github.com/astral-sh/ruff/pull/25286))
+- \[`mccabe`\] Improve example (`C901`) ([#25287](https://github.com/astral-sh/ruff/pull/25287))
+- \[`pyupgrade`\] Clarify fix safety docs (`UP007`, `UP045`) ([#25288](https://github.com/astral-sh/ruff/pull/25288))
+- \[`refurb`\] Document `FURB192` exception change for empty sequences ([#25317](https://github.com/astral-sh/ruff/pull/25317))
+- \[`ruff`\] Document false negative for user-defined types (`RUF013`) ([#25289](https://github.com/astral-sh/ruff/pull/25289))
+
+### Formatter
+
+- Fix formatting of lambdas nested within f-strings ([#25398](https://github.com/astral-sh/ruff/pull/25398))
+
+### Server
+
+- Return code action for `codeAction/resolve` requests that contain no or no valid URL ([#25365](https://github.com/astral-sh/ruff/pull/25365))
+
+### Other changes
+
+- Expand semantic syntax errors for invalid walruses ([#25415](https://github.com/astral-sh/ruff/pull/25415))
+
+### Contributors
+
+- [@chirizxc](https://github.com/chirizxc)
+- [@ntBre](https://github.com/ntBre)
+- [@adityasingh2400](https://github.com/adityasingh2400)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@fallintoplace](https://github.com/fallintoplace)
+- [@martin-schlossarek](https://github.com/martin-schlossarek)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@Ruchir28](https://github.com/Ruchir28)
+
 ## 0.15.14
 
 Released on 2026-05-21.

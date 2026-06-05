@@ -4,11 +4,11 @@ use std::time::Instant;
 use lsp_types::request::Completion;
 use lsp_types::{
     CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
-    CompletionParams, CompletionResponse, Documentation, TextEdit, Url,
+    CompletionParams, CompletionResponse, Documentation, InsertTextFormat, TextEdit, Url,
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionKind, completion};
+use ty_ide::{CompletionCapabilities, CompletionInsertTextFormat, CompletionKind, completion};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -56,8 +56,15 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         ) else {
             return Ok(None);
         };
-        let settings = snapshot.workspace_settings().completions();
-        let completions = completion(db, settings, file, offset);
+        let client_capabilities = snapshot.resolved_client_capabilities();
+        let completions = completion(
+            db,
+            snapshot.workspace_settings().completions(),
+            CompletionCapabilities::default()
+                .snippets(client_capabilities.supports_completion_item_snippets()),
+            file,
+            offset,
+        );
         if completions.is_empty() {
             return Ok(None);
         }
@@ -81,7 +88,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let label = comp.label.to_string();
                 let import_suffix = comp
                     .module_name
                     .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
@@ -93,11 +100,11 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         detail: import_suffix,
                         description: type_display.clone(),
                     };
-                    (name, Some(label_details))
+                    (label, Some(label_details))
                 } else {
                     let label = import_suffix
-                        .map(|suffix| format!("{name}{suffix}"))
-                        .unwrap_or_else(|| name);
+                        .map(|suffix| format!("{label}{suffix}"))
+                        .unwrap_or(label);
                     (label, None)
                 };
 
@@ -116,6 +123,11 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
 
                     Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
                 });
+                let insert_text = comp.insert.map(String::from);
+                let insert_text_format = match comp.insert_text_format {
+                    CompletionInsertTextFormat::PlainText => None,
+                    CompletionInsertTextFormat::Snippet => Some(InsertTextFormat::SNIPPET),
+                };
 
                 CompletionItem {
                     label,
@@ -123,7 +135,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     sort_text: Some(format!("{i:-max_index_len$}")),
                     detail: type_display,
                     label_details,
-                    insert_text: comp.insert.map(String::from),
+                    insert_text,
+                    insert_text_format,
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
                     documentation,
                     ..Default::default()

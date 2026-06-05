@@ -691,6 +691,9 @@ reveal_type(p)  # revealed: partial[bool]
 
 ### Kwargs splat with TypedDict
 
+An open `TypedDict` may contain hidden extra items, so it cannot be normalized to a precise partial
+signature.
+
 ```py
 from functools import partial
 from typing import TypedDict
@@ -703,7 +706,47 @@ def f(a: int, b: str) -> bool:
 
 kwargs: MyKwargs = {"b": "hello"}
 p = partial(f, **kwargs)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = ...) -> bool]
+reveal_type(p)  # revealed: partial[bool]
+```
+
+Known items are still checked against their corresponding parameters, even when the partial
+signature cannot be represented precisely.
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class MyKwargs(TypedDict):
+    b: int
+
+def f(*, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": 1}
+# error: [invalid-argument-type] "Argument to class `partial` is incorrect: Expected `str`, found `int`"
+p = partial(f, **kwargs)
+reveal_type(p)  # revealed: partial[bool]
+```
+
+### Kwargs splat with closed TypedDict
+
+A closed `TypedDict` has no hidden extra items, so we should still be able to normalize it to a
+precise partial signature.
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class MyKwargs(TypedDict, closed=True):
+    b: str
+
+def f(a: int, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": "hello"}
+p = partial(f, **kwargs)
+# TODO: should be `partial[(a: int, *, b: str = ...) -> bool]`
+reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Kwargs splat with union of TypedDicts
@@ -723,7 +766,28 @@ def f(*, b: str) -> bool:
 
 def make(kwargs: KwargsA | KwargsB) -> None:
     p = partial(f, **kwargs)
-    reveal_type(p)  # revealed: partial[(*, b: str = ...) -> bool]
+    reveal_type(p)  # revealed: partial[bool]
+```
+
+### Kwargs splat with union of closed TypedDicts
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class KwargsA(TypedDict, closed=True):
+    b: str
+
+class KwargsB(TypedDict, closed=True):
+    b: str
+
+def f(*, b: str) -> bool:
+    return True
+
+def make(kwargs: KwargsA | KwargsB) -> None:
+    p = partial(f, **kwargs)
+    # TODO: should be `partial[(*, b: str = ...) -> bool]`
+    reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Mixed keywords and kwargs splat
@@ -740,7 +804,25 @@ def f(a: int, b: str, c: float) -> bool:
 
 kwargs: MyKwargs = {"c": 3.14}
 p = partial(f, b="hello", **kwargs)
-reveal_type(p)  # revealed: partial[(a: int, *, b: str = "hello", c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[bool]
+```
+
+### Mixed keywords and closed TypedDict splat
+
+```py
+from functools import partial
+from typing_extensions import TypedDict
+
+class MyKwargs(TypedDict, closed=True):
+    c: float
+
+def f(a: int, b: str, c: float) -> bool:
+    return True
+
+kwargs: MyKwargs = {"c": 3.14}
+p = partial(f, b="hello", **kwargs)
+# TODO: should be `partial[(a: int, *, b: str = "hello", c: int | float = ...) -> bool]`
+reveal_type(p)  # revealed: partial[bool]
 ```
 
 ### Fallback for kwargs splat with dict

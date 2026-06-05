@@ -24,14 +24,26 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// mdtests. In theory, that means there's no need for this to be interned; being tracked would be
 /// sufficient. However, we currently think that tracked structs are unsound w.r.t. salsa cycles,
 /// so out of an abundance of caution, we are interning the struct.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
+
+    pub(super) detailed_display: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
+
+impl<'db> InternedConstraintSet<'db> {
+    pub(super) fn new(db: &'db dyn Db, constraints: OwnedConstraintSet<'db>) -> Self {
+        Self::new_internal(db, constraints, false)
+    }
+
+    pub(super) fn with_detailed_display(self, db: &'db dyn Db) -> Self {
+        Self::new_internal(db, self.constraints(db), true)
+    }
+}
 
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -290,6 +302,43 @@ impl<'db> KnownInstanceType<'db> {
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
     pub(super) fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
         self.class(db).to_instance(db)
+    }
+
+    /// Return the type denoted by this retained runtime type-expression object.
+    ///
+    /// This is the scope-independent subset of `Type::in_type_expression` used when a value
+    /// reaches a `TypeForm` position after it has already been inferred in value context.
+    pub(crate) fn type_form_argument(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Self::TypeAliasType(alias) => Some(Type::TypeAlias(alias)),
+            Self::UnionType(instance) => instance.union_type(db).as_ref().ok().copied(),
+            Self::Literal(ty) | Self::Annotated(ty) | Self::LiteralStringAlias(ty) => {
+                Some(ty.inner(db))
+            }
+            Self::TypeGenericAlias(instance) => Some(instance.inner(db).to_meta_type(db)),
+            Self::Callable(callable) => Some(Type::Callable(callable)),
+            Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
+            Self::Sentinel(sentinel) => {
+                Some(Type::KnownInstance(KnownInstanceType::Sentinel(sentinel)))
+            }
+            _ => None,
+        }
+    }
+
+    /// Return whether this known instance can represent a type expression at runtime.
+    pub(crate) fn is_type_form_value(self) -> bool {
+        matches!(
+            self,
+            Self::TypeAliasType(_)
+                | Self::UnionType(_)
+                | Self::Literal(_)
+                | Self::Annotated(_)
+                | Self::TypeGenericAlias(_)
+                | Self::Callable(_)
+                | Self::LiteralStringAlias(_)
+                | Self::NewType(_)
+                | Self::Sentinel(_)
+        )
     }
 
     /// Return `true` if this symbol is an instance of `class`.

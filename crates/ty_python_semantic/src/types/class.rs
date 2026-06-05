@@ -31,7 +31,7 @@ use crate::types::generics::{
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
@@ -347,6 +347,29 @@ impl<'db> ClassLiteral<'db> {
             .to_class_literal(db)
             .as_class_literal()
             .expect("`object` should always be a non-generic class in typeshed")
+    }
+
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(
+                dynamic.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
+                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
+                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
+                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Static(_) => Some(self),
+        }
     }
 
     /// Returns the name of the class.
@@ -854,7 +877,9 @@ impl<'db> ClassType<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::NonGeneric(_) => Some(self),
+            Self::NonGeneric(class) => Some(Self::NonGeneric(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
             Self::Generic(generic) => Some(Self::Generic(
                 generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
@@ -1165,6 +1190,8 @@ impl<'db> ClassType<'db> {
             }
         }
 
+        abstract_methods.shrink_to_fit();
+
         abstract_methods
     }
 
@@ -1228,6 +1255,33 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        self.could_exist_in_mro_of_impl(db, other, |this, other| {
+            this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        })
+    }
+
+    /// Like [`ClassType::could_exist_in_mro_of`], but reuses an active disjointness checker for
+    /// nested specialization checks so recursive class graphs keep the same cycle guard.
+    pub(super) fn could_exist_in_mro_of_with_disjointness_checker<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        checker: &DisjointnessChecker<'_, 'c, 'db>,
+    ) -> bool {
+        self.could_exist_in_mro_of_impl(db, other, |this, other| {
+            checker
+                .check_specialization_pair(db, this, other)
+                .is_always_satisfied(db)
+        })
+    }
+
+    fn could_exist_in_mro_of_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+    ) -> bool {
         other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1237,18 +1291,39 @@ impl<'db> ClassType<'db> {
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
                     this_alias.origin(db) == other_alias.origin(db)
-                        && !this_alias
-                            .specialization(db)
-                            .is_disjoint_from(
-                                db,
-                                other_alias.specialization(db),
-                                constraints,
-                                InferableTypeVars::None,
-                            )
-                            .is_always_satisfied(db)
+                        && !specializations_are_disjoint(
+                            this_alias.specialization(db),
+                            other_alias.specialization(db),
+                        )
                 }
                 (ClassType::NonGeneric(_), ClassType::Generic(_))
                 | (ClassType::Generic(_), ClassType::NonGeneric(_)) => false,
+            })
+    }
+
+    fn has_incompatible_generic_base(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+    ) -> bool {
+        let other_generic_bases: Vec<_> = other
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .collect();
+
+        self.iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .filter_map(ClassType::into_generic_alias)
+            .any(|self_alias| {
+                other_generic_bases.iter().any(|other_alias| {
+                    self_alias.origin(db) == other_alias.origin(db)
+                        && specializations_are_disjoint(
+                            self_alias.specialization(db),
+                            other_alias.specialization(db),
+                        )
+                })
             })
     }
 
@@ -1263,16 +1338,69 @@ impl<'db> ClassType<'db> {
         other: Self,
         constraints: &ConstraintSetBuilder<'db>,
     ) -> bool {
+        self.could_coexist_in_mro_with_impl(
+            db,
+            other,
+            |this, other| this.could_exist_in_mro_of(db, other, constraints),
+            |this, other| {
+                this.is_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(db)
+            },
+            |this, other| {
+                this.when_disjoint_from(db, other, constraints, InferableTypeVars::None)
+                    .is_always_satisfied(db)
+            },
+        )
+    }
+
+    pub(super) fn could_coexist_in_mro_with_disjointness_checker<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        checker: &DisjointnessChecker<'_, 'c, 'db>,
+    ) -> bool {
+        // Reuse the active disjointness checker for nested specialization and
+        // metaclass checks so recursive class graphs keep the same cycle guard.
+        self.could_coexist_in_mro_with_impl(
+            db,
+            other,
+            |this, other| this.could_exist_in_mro_of_with_disjointness_checker(db, other, checker),
+            |this, other| {
+                checker
+                    .check_specialization_pair(db, this, other)
+                    .is_always_satisfied(db)
+            },
+            |this, other| {
+                checker
+                    .check_type_pair(db, this, other)
+                    .is_always_satisfied(db)
+            },
+        )
+    }
+
+    fn could_coexist_in_mro_with_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        could_exist_in_mro_of: impl Fn(Self, Self) -> bool,
+        specializations_are_disjoint: impl Fn(Specialization<'db>, Specialization<'db>) -> bool,
+        types_are_disjoint: impl Fn(Type<'db>, Type<'db>) -> bool,
+    ) -> bool {
         if self == other {
             return true;
         }
 
         if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self, constraints);
+            return could_exist_in_mro_of(other, self);
         }
 
         if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other, constraints);
+            return could_exist_in_mro_of(self, other);
+        }
+
+        // A class cannot implement two incompatible specializations of an invariant base.
+        if self.has_incompatible_generic_base(db, other, specializations_are_disjoint) {
+            return false;
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1309,15 +1437,7 @@ impl<'db> ClassType<'db> {
         let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
             return true;
         };
-        if self_metaclass_instance
-            .when_disjoint_from(
-                db,
-                other_metaclass_instance,
-                constraints,
-                InferableTypeVars::None,
-            )
-            .is_always_satisfied(db)
-        {
+        if types_are_disjoint(self_metaclass_instance, other_metaclass_instance) {
             return false;
         }
 
@@ -1562,12 +1682,12 @@ impl<'db> ClassType<'db> {
                         // Fallback overloads: for `tuple[int, str]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> int | str
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[int | str, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | str, ...]
                         //
                         // and for `tuple[str, *tuple[float, ...], bytes]`, we will generate the following overloads:
                         //
                         //    __getitem__(self, index: int, /) -> str | float | bytes
-                        //    __getitem__(self, index: slice[Any, Any, Any], /) -> tuple[str | float | bytes, ...]
+                        //    __getitem__(self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[str | float | bytes, ...]
                         //
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
@@ -1575,9 +1695,16 @@ impl<'db> ClassType<'db> {
                             all_elements_unioned,
                         ));
 
+                        let slice_bound = UnionType::from_elements(
+                            db,
+                            [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                        );
                         overload_signatures.push(synthesize_getitem_overload_signature(
                             db,
-                            KnownClass::Slice.to_instance(db),
+                            KnownClass::Slice.to_specialized_instance(
+                                db,
+                                &[slice_bound, slice_bound, slice_bound],
+                            ),
                             Type::homogeneous_tuple(db, all_elements_unioned),
                         ));
 

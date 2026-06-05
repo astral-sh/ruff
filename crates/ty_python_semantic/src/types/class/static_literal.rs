@@ -32,7 +32,7 @@ use crate::{
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
-        declaration_type, definition_expression_type, determine_upper_bound,
+        definition_expression_type, determine_upper_bound,
         diagnostic::INVALID_DATACLASS_OVERRIDE,
         enums::{enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value},
         function::{
@@ -41,12 +41,12 @@ use crate::{
         },
         generics::Specialization,
         infer::infer_unpack_types,
-        infer_expression_type,
+        infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
         signatures::CallableSignature,
-        tuple::{FixedLengthTuple, Tuple, TupleSpec, TupleType},
+        tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
         variance::VarianceInferable,
         visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -1746,7 +1746,8 @@ impl<'db> StaticClassLiteral<'db> {
             "Collecting `fields` for NamedTuples should short-circuit in `fields()`"
         );
 
-        self.iter_mro(db, specialization)
+        let mut map: FxIndexMap<_, _> = self
+            .iter_mro(db, specialization)
             .rev()
             .filter_map(|superclass| {
                 let class = superclass.into_class()?;
@@ -1792,7 +1793,10 @@ impl<'db> StaticClassLiteral<'db> {
             // they cannot shadow an inherited field with the same name.
             .filter(|(_, field)| !field.is_kw_only_sentinel(db))
             // We collect into a FxOrderMap here to deduplicate attributes
-            .collect()
+            .collect();
+
+        map.shrink_to_fit();
+        map
     }
 
     pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
@@ -2035,6 +2039,8 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
+        attributes.shrink_to_fit();
+
         attributes
     }
 
@@ -2179,7 +2185,9 @@ impl<'db> StaticClassLiteral<'db> {
                 //     self.name: <annotation>
                 //     self.name: <annotation> = …
 
-                let annotation = declaration_type(db, declaration);
+                let Some(annotation) = inferred_declaration(db, declaration).declared() else {
+                    continue;
+                };
                 let annotation = Place::declared(annotation.inner).with_qualifiers(
                     annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
                 );
@@ -2727,36 +2735,26 @@ impl<'db> StaticClassLiteral<'db> {
     }
 }
 
-/// A single semantic class-base entry after expanding starred tuple bases and synthetic bases.
+/// A single semantic class-base entry after expanding starred tuple bases.
 #[derive(Clone, Copy)]
-pub(crate) enum ExpandedClassBaseEntry<'a, 'db> {
-    /// A base that comes from a concrete expression in the class header.
-    SourceBacked { node: &'a ast::Expr, ty: Type<'db> },
-    /// A base introduced by semantic expansion with no corresponding source expression.
-    Synthetic(Type<'db>),
+pub(crate) struct ExpandedClassBaseEntry<'a, 'db> {
+    source_node: &'a ast::Expr,
+    ty: Type<'db>,
 }
 
 impl<'a, 'db> ExpandedClassBaseEntry<'a, 'db> {
-    /// Returns the source expression for this base entry, if it has one.
-    pub(crate) const fn source_node(self) -> Option<&'a ast::Expr> {
-        match self {
-            Self::SourceBacked { node, .. } => Some(node),
-            Self::Synthetic(_) => None,
-        }
+    /// Returns the source expression for this base entry.
+    pub(crate) const fn source_node(self) -> &'a ast::Expr {
+        self.source_node
     }
 
     /// Returns the semantic type of this base entry.
     pub(crate) const fn ty(self) -> Type<'db> {
-        match self {
-            Self::SourceBacked { ty, .. } | Self::Synthetic(ty) => ty,
-        }
+        self.ty
     }
 }
 
 /// Expands a class's bases into the semantic entries used by [`StaticClassLiteral::explicit_bases`].
-///
-/// Entries are source-backed when they originate from a concrete base expression in the class
-/// header, and synthetic when semantic expansion adds a base with no corresponding source span.
 pub(crate) fn expanded_class_base_entries<'a, 'db>(
     db: &'db dyn Db,
     known_class: Option<KnownClass>,
@@ -2764,18 +2762,6 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
     class_definition: Definition<'db>,
 ) -> Vec<ExpandedClassBaseEntry<'a, 'db>> {
     match known_class {
-        Some(KnownClass::VersionInfo) => {
-            let tuple_type = TupleType::new(db, &TupleSpec::version_info_spec(db))
-                .expect("sys.version_info tuple spec should always be a valid tuple");
-
-            vec![
-                ExpandedClassBaseEntry::SourceBacked {
-                    node: &class_stmt.bases()[0],
-                    ty: definition_expression_type(db, class_definition, &class_stmt.bases()[0]),
-                },
-                ExpandedClassBaseEntry::Synthetic(Type::from(tuple_type.to_class_type(db))),
-            ]
-        }
         // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
         // but this causes more problems than it fixes.
         Some(KnownClass::NotImplementedType) => vec![],
@@ -2797,8 +2783,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                             tuple_literal
                                 .iter()
                                 .zip(tuple.owned_elements().into_vec())
-                                .map(|(node, ty)| ExpandedClassBaseEntry::SourceBacked {
-                                    node,
+                                .map(|(source_node, ty)| ExpandedClassBaseEntry {
+                                    source_node,
                                     ty,
                                 }),
                         );
@@ -2806,8 +2792,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                     }
 
                     expanded_bases.extend(tuple.owned_elements().into_vec().into_iter().map(
-                        |ty| ExpandedClassBaseEntry::SourceBacked {
-                            node: base_node,
+                        |ty| ExpandedClassBaseEntry {
+                            source_node: base_node,
                             ty,
                         },
                     ));
@@ -2819,8 +2805,8 @@ pub(crate) fn expanded_class_base_entries<'a, 'db>(
                 } else {
                     definition_expression_type(db, class_definition, base_node)
                 };
-                expanded_bases.push(ExpandedClassBaseEntry::SourceBacked {
-                    node: base_node,
+                expanded_bases.push(ExpandedClassBaseEntry {
+                    source_node: base_node,
                     ty,
                 });
             }

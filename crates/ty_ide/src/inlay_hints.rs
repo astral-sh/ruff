@@ -4552,6 +4552,82 @@ Source with applied edits:
     }
 
     #[test]
+    fn instance_method_overload_self_type() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing import overload
+
+            class Parent:
+                @overload
+                def choose(self: "Child", child_value: int) -> None: ...
+                @overload
+                def choose(self: "Parent", parent_value: int) -> None: ...
+                def choose(self, value: int) -> None: ...
+
+            class Child(Parent): pass
+
+            def f(parent: Parent, child: Child):
+                parent.choose(1)
+                child.choose(2)"#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        from typing import overload
+
+        class Parent:
+            @overload
+            def choose(self: "Child", child_value: int) -> None: ...
+            @overload
+            def choose(self: "Parent", parent_value: int) -> None: ...
+            def choose(self, value: int) -> None: ...
+
+        class Child(Parent): pass
+
+        def f(parent: Parent, child: Child):
+            parent.choose([parent_value=]1)
+            child.choose([child_value=]2)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:8:32
+          |
+        8 |     def choose(self: "Parent", parent_value: int) -> None: ...
+          |                                ^^^^^^^^^^^^
+          |
+        info: Source
+          --> main2.py:14:20
+           |
+        14 |     parent.choose([parent_value=]1)
+           |                    ^^^^^^^^^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:6:31
+          |
+        6 |     def choose(self: "Child", child_value: int) -> None: ...
+          |                               ^^^^^^^^^^^
+          |
+        info: Source
+          --> main2.py:15:19
+           |
+        15 |     child.choose([child_value=]2)
+           |                   ^^^^^^^^^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        11 | class Child(Parent): pass
+        12 |
+        13 | def f(parent: Parent, child: Child):
+           -     parent.choose(1)
+           -     child.choose(2)
+        14 +     parent.choose(parent_value=1)
+        15 +     child.choose(child_value=2)
+        "#);
+    }
+
+    #[test]
     fn test_class_method_call() {
         let mut test = inlay_hint_test(
             "
@@ -5291,10 +5367,10 @@ Source with applied edits:
         my_func(x="hello")
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:914:7
+           --> stdlib/typing_extensions.pyi:549:9
             |
-        914 | class str(Sequence[str]):
-            |       ^^^
+        549 |         LiteralString as LiteralString,
+            |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
             |
         info: Source
          --> main2.py:4:9

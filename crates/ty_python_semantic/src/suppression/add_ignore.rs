@@ -221,14 +221,8 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> TextRange {
 }
 
 fn line_start(tokens: &ruff_python_ast::token::Tokens, offset: TextSize) -> TextSize {
-    let token_range = match tokens.at_offset(offset) {
-        ruff_python_ast::token::TokenAt::None => TextRange::empty(offset),
-        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
-        ruff_python_ast::token::TokenAt::Between(..) => TextRange::empty(offset),
-    };
-
     tokens
-        .before(token_range.start())
+        .before(tokens.token_range(offset).start())
         .iter()
         .rfind(|token| {
             matches!(

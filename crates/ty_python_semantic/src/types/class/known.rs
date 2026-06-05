@@ -140,9 +140,14 @@ pub enum KnownClass {
     // functools
     FunctoolsPartial,
     // ty_extensions
+    ExactlySized,
     ConstraintSet,
     GenericContext,
     Specialization,
+    TyExtensionsAsyncIterable,
+    TyExtensionsAsyncIterator,
+    TyExtensionsIterable,
+    TyExtensionsIterator,
 }
 
 impl KnownClass {
@@ -236,7 +241,11 @@ impl KnownClass {
             | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -254,6 +263,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -333,7 +343,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -349,6 +363,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -428,7 +443,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -444,6 +463,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -523,7 +543,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -538,6 +562,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
@@ -566,10 +591,15 @@ impl KnownClass {
         match self {
             Self::SupportsIndex
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::AsyncGenerator
             | Self::Generator => true,
 
@@ -732,7 +762,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -745,6 +779,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
@@ -832,7 +867,11 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::TyExtensionsAsyncIterable => "AsyncIterable",
+            Self::TyExtensionsAsyncIterator => "AsyncIterator",
+            Self::TyExtensionsIterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::TyExtensionsIterator => "Iterator",
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
@@ -850,6 +889,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
+            Self::ExactlySized => "ExactlySized",
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
@@ -1206,9 +1246,14 @@ impl KnownClass {
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
-            | Self::Specialization => KnownModule::TyExtensions,
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
@@ -1222,7 +1267,6 @@ impl KnownClass {
         match self {
             Self::NoneType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType => Some(true),
 
@@ -1267,6 +1311,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::VersionInfo
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1293,12 +1338,17 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1322,7 +1372,6 @@ impl KnownClass {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::NotImplementedType => true,
 
             Self::Bool
@@ -1338,6 +1387,7 @@ impl KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::List
+            | Self::VersionInfo
             | Self::Type
             | Self::Slice
             | Self::Property
@@ -1394,12 +1444,17 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1462,9 +1517,10 @@ impl KnownClass {
             "NewType" => &[Self::NewType],
             "TypeAliasType" => &[Self::TypeAliasType],
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
-            "Iterable" => &[Self::Iterable],
-            "Iterator" => &[Self::Iterator],
-            "AsyncIterator" => &[Self::AsyncIterator],
+            "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
+            "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
+            "AsyncIterable" => &[Self::TyExtensionsAsyncIterable],
+            "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
@@ -1504,6 +1560,7 @@ impl KnownClass {
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
+            "ExactlySized" => &[Self::ExactlySized],
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
@@ -1590,9 +1647,14 @@ impl KnownClass {
             | Self::ExtensionsParamSpec
             | Self::Sentinel
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator

@@ -1084,7 +1084,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in the lambda body scope.
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter_with_default: &'ast ast::ParameterWithDefault,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1114,7 +1114,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter: &'ast ast::Parameter,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1150,7 +1150,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// lambda expression, based on a `Callable` type annotation, if present.
     fn annotated_lambda_parameter_type(
         &mut self,
-        index: usize,
+        index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
@@ -1163,7 +1163,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index].annotated_type();
+        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown() || parameter_type.has_unspecialized_type_var(self.db()) {
             None
         } else {

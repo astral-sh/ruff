@@ -58,7 +58,7 @@ Found 1 error.
 !!! note
 
     As an alternative to `uv run`, you can also run Ruff by activating the project's virtual
-    environment (`source .venv/bin/active` on Linux and macOS, or `.venv\Scripts\activate` on
+    environment (`source .venv/bin/activate` on Linux and macOS, or `.venv\Scripts\activate` on
     Windows) and running `ruff check` directly.
 
 Ruff identified an unused import, which is a common error in Python code. Ruff considers this a
@@ -369,7 +369,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.14
+  rev: v0.15.16
   hooks:
     # Run the linter.
     - id: ruff-check
