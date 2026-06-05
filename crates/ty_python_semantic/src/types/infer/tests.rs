@@ -68,7 +68,7 @@ fn diagnostic_signature(diagnostics: &[Diagnostic]) -> Vec<(String, String)> {
 }
 
 #[test]
-fn loop_header_untracked_cache_is_query_order_independent() -> anyhow::Result<()> {
+fn loop_header_cache_is_query_order_and_revision_independent() -> anyhow::Result<()> {
     const SOURCE: &str = r#"
 from typing import NoReturn
 
@@ -134,9 +134,18 @@ def process(flag: bool, items: list[str]) -> None:
     assert_eq!(y_then_x, x_then_y);
     assert_eq!(reverse, baseline);
 
+    warmed_db.clear_salsa_events();
     salsa::Database::synthetic_write(&mut warmed_db, salsa::Durability::LOW);
     let next_revision = diagnostic_signature(&check_types(&warmed_db, warmed_file));
     assert_eq!(next_revision, baseline);
+    let events = warmed_db.take_salsa_events();
+    assert!(!events.iter().any(|event| {
+        let salsa::EventKind::WillExecute { database_key } = event.kind else {
+            return false;
+        };
+        salsa::Database::ingredient_debug_name(&warmed_db, database_key.ingredient_index())
+            == "loop_header_predicate_truthinesses"
+    }));
 
     Ok(())
 }
