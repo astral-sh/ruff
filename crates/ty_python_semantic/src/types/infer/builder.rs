@@ -9095,6 +9095,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         place_expr: PlaceExprRef,
         expr_ref: ast::ExprRef,
     ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
+        let result = self.infer_place_load_without_deprecation_diagnostic(place_expr, expr_ref);
+        self.report_place_deprecation(expr_ref, &result.0);
+        result
+    }
+
+    fn infer_place_load_without_deprecation_diagnostic(
+        &self,
+        place_expr: PlaceExprRef,
+        expr_ref: ast::ExprRef,
+    ) -> (PlaceAndQualifiers<'db>, Vec<(FileScopeId, ConstraintKey)>) {
         let db = self.db();
         let scope = self.scope();
         let file_scope_id = scope.file_scope_id(db);
@@ -9374,27 +9384,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
         });
 
-        if let Some(ty) = place.place().ignore_possibly_undefined() {
-            match place.deprecation_policy_for_type(db, ty) {
-                DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
-                    if let Some(name) = match expr_ref {
-                        ast::ExprRef::Name(name) => Some(name.id.as_str()),
-                        ast::ExprRef::Attribute(attribute) => Some(attribute.attr.as_str()),
-                        _ => None,
-                    } {
-                        self.report_deprecated_function(expr_ref, name, deprecated);
-                    } else {
-                        self.check_deprecated(expr_ref, ty);
-                    }
-                }
-                DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
+        (place, constraint_keys)
+    }
+
+    fn report_place_deprecation(&self, expr_ref: ast::ExprRef, place: &PlaceAndQualifiers<'db>) {
+        let db = self.db();
+        let Some(ty) = place.place().ignore_possibly_undefined() else {
+            return;
+        };
+        match place.deprecation_policy_for_type(db, ty) {
+            DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
+                if let Some(name) = match expr_ref {
+                    ast::ExprRef::Name(name) => Some(name.id.as_str()),
+                    ast::ExprRef::Attribute(attribute) => Some(attribute.attr.as_str()),
+                    _ => None,
+                } {
+                    self.report_deprecated_function(expr_ref, name, deprecated);
+                } else {
                     self.check_deprecated(expr_ref, ty);
                 }
-                DeprecationPolicy::Suppress | DeprecationPolicy::Deprecated(_) => {}
             }
+            DeprecationPolicy::Inherit | DeprecationPolicy::Alternatives(_) => {
+                self.check_deprecated(expr_ref, ty);
+            }
+            DeprecationPolicy::Suppress | DeprecationPolicy::Deprecated(_) => {}
         }
-
-        (place, constraint_keys)
     }
 
     pub(super) fn report_unresolved_reference(&self, expr_name_node: &ast::ExprName) {
