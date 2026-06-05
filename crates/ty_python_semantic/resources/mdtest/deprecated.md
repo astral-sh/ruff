@@ -249,6 +249,18 @@ def mixed_nested_binding():
     if is_replacement(old):
         old()  # error: [deprecated] "mixed nested binding"
 
+@replace_with(replacement)
+def rebound_global() -> None: ...
+@deprecated("rebound global")
+@replace_with(replacement)
+def rebound_global() -> None: ...
+def use_rebound_global():
+    # TODO: Public types merge all reachable global bindings, including bindings before this
+    # function was defined. This also loses deprecation for ordinary decorated functions.
+    rebound_global()
+
+rebound_global()  # error: [deprecated] "rebound global"
+
 if True:
     @deprecated("reachable binding")
     @replace_with(replacement)
