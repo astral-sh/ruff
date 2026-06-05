@@ -2339,6 +2339,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     inner_ty
                 } else {
+                    self.store_type_expression_flags(
+                        ast::ExprRef::from(subscript),
+                        TypeExpressionFlags::INVALID_UNPACK,
+                    );
                     Type::homogeneous_tuple(self.db(), Type::unknown())
                 }
             }

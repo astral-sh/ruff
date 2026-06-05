@@ -82,6 +82,9 @@ bitflags::bitflags! {
     pub(crate) struct TypeExpressionFlags: u8 {
         /// The expression is syntactically an `Unpack[...]` type expression.
         const UNPACK = 1 << 0;
+
+        /// The operand of an `Unpack[...]` expression is neither a tuple nor a `TypeVarTuple`.
+        const INVALID_UNPACK = 1 << 1;
     }
 }
 

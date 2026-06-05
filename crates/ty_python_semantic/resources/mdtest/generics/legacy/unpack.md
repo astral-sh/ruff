@@ -105,7 +105,7 @@ accept(True, b"ok")
 accept(True, 1, b"bad")
 ```
 
-## Defaults and validation
+## Defaults
 
 A type variable tuple default can use `Unpack`, and an explicit specialization overrides it.
 
@@ -126,16 +126,17 @@ reveal_type(WithDefault().value)  # revealed: tuple[int, str]
 reveal_type(WithDefault[bool, bytes]().value)  # revealed: tuple[bool, bytes]
 ```
 
+## Validation
+
 `Unpack` requires a tuple operand, and a tuple specialization can contain only one variadic unpack.
 
 ```py
 from typing import Generic, TypeVar, TypeVarTuple, Unpack
 
-T = TypeVar("T")
 U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
 
-class Pair(Generic[T, U]): ...
+class Pair(Generic[Unpack[Ts], U]): ...
 
 def invalid(
     # error: [invalid-type-form] "`Unpack` can only be used with a fixed tuple type in this context"
@@ -143,5 +144,5 @@ def invalid(
     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
     multiple: tuple[Unpack[Ts], Unpack[tuple[str, ...]]],
 ) -> None:
-    reveal_type(non_tuple)  # revealed: Pair[tuple[Unknown, ...], str]
+    reveal_type(non_tuple)  # revealed: Pair[*tuple[Unknown, ...], str]
 ```

@@ -621,9 +621,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             inferred_type_arguments[source_index] = Some(provided_type);
 
-            let is_unpack = self
-                .type_expression_flags(expr)
-                .contains(TypeExpressionFlags::UNPACK);
+            let type_expression_flags = self.type_expression_flags(expr);
+            let is_unpack = type_expression_flags.contains(TypeExpressionFlags::UNPACK);
 
             if is_unpack
                 && let Some(tuple) = provided_type.exact_tuple_instance_spec(db)
@@ -649,7 +648,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     && !self
                         .inference_flags()
                         .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && typevartuple_index.is_none()
+                    && (typevartuple_index.is_none()
+                        || type_expression_flags.contains(TypeExpressionFlags::INVALID_UNPACK))
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, expr)
                 {
                     builder.into_diagnostic(
