@@ -148,6 +148,10 @@ class EnumLike:
 
 def nested():
     def not_a_method(value: int): ...
+
+class HasNestedFunction:
+    def outer(self):
+        def __new__(value: int): ...
 ```
 
 ## TypedDict defaults use annotation context

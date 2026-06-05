@@ -8,7 +8,7 @@ use crate::{
             INVALID_TYPE_VARIABLE_DEFAULT,
         },
         function::OverloadLiteral,
-        infer::nearest_enclosing_class,
+        infer::original_class_type,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -22,7 +22,7 @@ use ruff_db::{
 };
 use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_core::{definition::Definition, semantic_index};
+use ty_python_core::definition::Definition;
 
 pub(crate) fn check_function_definition<'db>(
     context: &InferContext<'db, '_>,
@@ -39,7 +39,7 @@ pub(crate) fn check_function_definition<'db>(
     let last_definition = function_type.literal(db).last_definition;
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
-    check_method_receiver(context, definition, last_definition, &signature);
+    check_method_receiver(context, last_definition, &signature);
     check_legacy_positional_only_convention(context, last_definition, &signature);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
@@ -47,7 +47,6 @@ pub(crate) fn check_function_definition<'db>(
 
 fn check_method_receiver<'db>(
     context: &InferContext<'db, '_>,
-    definition: Definition<'db>,
     last_definition: OverloadLiteral<'db>,
     signature: &Signature<'db>,
 ) {
@@ -62,8 +61,12 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let index = semantic_index(db, definition.file(db));
-    let Some(enclosing_class) = nearest_enclosing_class(db, index, definition.scope(db)) else {
+    let Some(enclosing_class) = last_definition
+        .body_scope(db)
+        .class_definition_of_method(db)
+        .and_then(|class_definition| original_class_type(db, class_definition))
+        .and_then(|class| class.as_static())
+    else {
         return;
     };
 
