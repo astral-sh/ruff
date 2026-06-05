@@ -2312,13 +2312,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
-        let mapping_when = self.constraints.load(self.db, mapping_when);
+        let mapping_when = self.constraints.load(self.db, &mapping_when);
         typed_dicts
             .into_iter()
             .all(|element| {
                 let element_when = self.constraints.load(
                     self.db,
-                    element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
                 );
                 element_when
                     .iff(self.db, self.constraints, mapping_when)
@@ -2839,7 +2839,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                        let when = self.constraints.load(self.db, when);
+                        let when = self.constraints.load(self.db, &when);
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate
                         // specialization error. This matches the previous behavior (where
@@ -2904,7 +2904,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                let when = self.constraints.load(self.db, when);
+                let when = self.constraints.load(self.db, &when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.

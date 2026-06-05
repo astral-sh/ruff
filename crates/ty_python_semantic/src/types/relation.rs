@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -448,7 +450,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-    ) -> &'db OwnedConstraintSet<'db> {
+    ) -> Cow<'db, OwnedConstraintSet<'db>> {
         #[salsa::tracked(
             returns(ref),
             cycle_initial=|_, _, _, _| OwnedConstraintSet::default(),
@@ -472,10 +474,12 @@ impl<'db> Type<'db> {
         }
 
         if self.is_trivially_constraint_set_assignable_to(db, target) {
-            return OwnedConstraintSet::always();
+            return Cow::Owned(OwnedConstraintSet::always());
         }
 
-        when_constraint_set_assignable_to_owned_impl(db, self, target)
+        Cow::Borrowed(when_constraint_set_assignable_to_owned_impl(
+            db, self, target,
+        ))
     }
 
     pub(super) fn when_constraint_set_assignable_to<'c>(
