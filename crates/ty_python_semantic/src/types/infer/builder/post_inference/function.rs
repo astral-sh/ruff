@@ -207,7 +207,9 @@ fn variadic_receiver_type<'db>(
         ast::Expr::Starred(starred) => &*starred.value,
         _ => return None,
     };
-    let tuple = file_expression_type(tuple_annotation).exact_tuple_instance_spec(db)?;
+    let tuple = file_expression_type(tuple_annotation)
+        .resolve_type_alias(db)
+        .exact_tuple_instance_spec(db)?;
     Some(match tuple.as_ref() {
         Tuple::Variable(tuple)
             if tuple.prefix_elements().is_empty() && tuple.suffix_elements().is_empty() =>
