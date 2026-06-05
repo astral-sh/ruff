@@ -528,6 +528,10 @@ second_alias()
 annotated_alias: Callable[..., Any] = depr_func  # error: [deprecated] "Use other_func instead"
 annotated_alias()
 
+separate_alias: TypeOf[depr_func]  # ty: ignore[deprecated]
+separate_alias = depr_func  # error: [deprecated] "Use other_func instead"
+separate_alias()
+
 ExplicitAlias: TypeAlias = DeprType  # error: [deprecated] "Use OtherType instead"
 explicit_value: ExplicitAlias
 
