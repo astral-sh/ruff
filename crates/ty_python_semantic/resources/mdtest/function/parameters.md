@@ -75,7 +75,7 @@ python-version = "3.13"
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
+from typing import Any, Generic, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -135,6 +135,13 @@ class GenericClass[T]:
     # Class-scoped type variables nested in unions are erased during signature normalization.
     def invalid_union(self: T | int): ...
     def valid_union(self: T | GenericClass[T]): ...
+
+T_Default = TypeVar("T_Default", bound=Parent, default=Parent, covariant=True)
+
+class DefaultGenericClass(Generic[T_Default]):
+    def restricted(self: DefaultGenericClass[Foo]): ...
+    @classmethod
+    def restricted_classmethod(cls: type[DefaultGenericClass[Foo]]): ...
 
 class OuterGenericClass[T]:
     class Inner:

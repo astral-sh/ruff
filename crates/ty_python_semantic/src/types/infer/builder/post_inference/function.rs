@@ -125,7 +125,9 @@ fn check_method_receiver<'db>(
         return;
     };
 
-    let class_object = Type::from(enclosing_class);
+    // A receiver annotation can restrict a method to a particular specialization of its generic
+    // owner, so defaults must not constrain the expected receiver.
+    let class_object = Type::from(enclosing_class.unknown_specialization(db));
     let instance_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
     let is_class_receiver = last_definition.is_classmethod(db) || method_name == "__new__";
     let expected_receiver = if is_class_receiver {
