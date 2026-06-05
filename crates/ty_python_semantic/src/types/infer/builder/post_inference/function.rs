@@ -14,7 +14,7 @@ use crate::{
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
-        visitor::find_over_type,
+        visitor::{any_over_type, find_over_type},
     },
 };
 use itertools::Itertools;
@@ -23,6 +23,8 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast as ast;
+use ruff_python_codegen::{Generator, Indentation};
+use ruff_source_file::LineEnding;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -158,9 +160,13 @@ fn check_method_receiver<'db>(
     }
 
     if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
+        let receiver = if any_over_type(db, receiver_type, false, |ty| ty.is_todo()) {
+            Generator::new(&Indentation::default(), LineEnding::default()).expr(annotation)
+        } else {
+            receiver_type.display(db).to_string()
+        };
         builder.into_diagnostic(format_args!(
             "Method receiver type `{receiver}` cannot accept `{expected}`",
-            receiver = receiver_type.display(db),
             expected = expected_receiver.display(db),
         ));
     }

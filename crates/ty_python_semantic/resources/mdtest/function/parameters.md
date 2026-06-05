@@ -183,7 +183,7 @@ class SecondReceiverProtocol(Protocol):
 
 class InvalidProtocolClassReceiver:
     @classmethod
-    # error: [invalid-method-receiver]
+    # error: [invalid-method-receiver] "Method receiver type `type[FirstReceiverProtocol] | type[SecondReceiverProtocol]`"
     def method(cls: type[FirstReceiverProtocol] | type[SecondReceiverProtocol]): ...
 
 class ValidProtocolClassReceiver:
