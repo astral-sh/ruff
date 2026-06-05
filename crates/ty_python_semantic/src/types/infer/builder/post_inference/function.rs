@@ -1,8 +1,8 @@
 use crate::{
     diagnostic::format_enumeration,
     types::{
-        ClassLiteral, KnownClass, KnownInstanceType, Signature, Type, TypeVarBoundOrConstraints,
-        TypeVarKind,
+        ClassLiteral, KnownClass, KnownInstanceType, ParamSpecAttrKind, Signature, Type,
+        TypeVarBoundOrConstraints, TypeVarKind,
         context::InferContext,
         diagnostic::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
@@ -12,7 +12,7 @@ use crate::{
         function::{FunctionDecorators, OverloadLiteral},
         infer::original_class_type,
         infer_definition_types,
-        signatures::{Parameter, ReturnCallableTypeVarScope},
+        signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
         visitor::find_over_type,
     },
@@ -58,11 +58,17 @@ fn check_method_receiver<'db>(
 ) {
     let db = context.db();
     let method_name = last_definition.name(db);
+    let Some(receiver_parameter) = signature.parameters().get(0) else {
+        return;
+    };
 
     if last_definition.is_overload(db)
         || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
-        || !signature.has_explicit_positional_receiver_annotation()
+        || receiver_parameter.inferred_annotation
+        || !(receiver_parameter.is_positional()
+            || receiver_parameter.is_variadic()
+            || receiver_parameter.is_keyword_variadic())
     {
         return;
     }
@@ -83,11 +89,45 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let Some(annotated_receiver_type) =
-        signature.parameters().get(0).map(Parameter::annotated_type)
+    let annotated_receiver_type = receiver_parameter.annotated_type();
+
+    if receiver_parameter.is_variadic()
+        && (receiver_parameter.has_starred_annotation()
+            || matches!(
+                annotated_receiver_type,
+                Type::TypeVar(typevar)
+                    if typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args)
+            ))
+    {
+        return;
+    }
+
+    let node = last_definition.node(db, context.file(), context.module());
+    let Some(annotation) = node
+        .parameters
+        .iter()
+        .next()
+        .and_then(ast::AnyParameterRef::annotation)
     else {
         return;
     };
+
+    let class_object = Type::from(enclosing_class);
+    let expected_receiver = if last_definition.is_classmethod(db) || method_name == "__new__" {
+        class_object
+    } else {
+        class_object.to_instance(db).unwrap_or_else(Type::unknown)
+    };
+
+    if receiver_parameter.is_keyword_variadic() {
+        if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
+            builder.into_diagnostic(format_args!(
+                "Method receiver `**kwargs` cannot accept positional `{expected}`",
+                expected = expected_receiver.display(db),
+            ));
+        }
+        return;
+    }
 
     if matches!(annotated_receiver_type, Type::TypeAlias(_)) {
         return;
@@ -101,7 +141,6 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let class_object = Type::from(enclosing_class);
     let typing_self_type = class_object.to_instance(db).unwrap_or_else(Type::unknown);
     let concrete_receiver_type = receiver_type
         .bind_self_typevars(db, typing_self_type)
@@ -122,11 +161,6 @@ fn check_method_receiver<'db>(
         return;
     }
 
-    let expected_receiver = if last_definition.is_classmethod(db) || method_name == "__new__" {
-        class_object
-    } else {
-        class_object.to_instance(db).unwrap_or_else(Type::unknown)
-    };
     let concrete_receiver_type = match concrete_receiver_type {
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.top_materialization(db),
@@ -142,21 +176,12 @@ fn check_method_receiver<'db>(
         && (is_protocol_receiver_type(db, receiver_type)
             || is_protocol_receiver_type(db, concrete_receiver_type)
             || expected_receiver.is_assignable_to(db, concrete_receiver_type)
-            || (!matches!(receiver_type, Type::TypeVar(_))
+            || (receiver_parameter.is_positional()
+                && !matches!(receiver_type, Type::TypeVar(_))
                 && signature.can_bind_self_to(db, expected_receiver)))
     {
         return;
     }
-
-    let node = last_definition.node(db, context.file(), context.module());
-    let Some(annotation) = node
-        .parameters
-        .iter()
-        .next()
-        .and_then(ast::AnyParameterRef::annotation)
-    else {
-        return;
-    };
 
     if let Some(builder) = context.report_lint(&INVALID_METHOD_RECEIVER, annotation) {
         builder.into_diagnostic(format_args!(
