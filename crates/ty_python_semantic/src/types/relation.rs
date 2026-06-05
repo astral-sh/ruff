@@ -354,6 +354,18 @@ impl<'db> Type<'db> {
     ///
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_never()
+            || matches!(target, Type::NominalInstance(target) if target.is_object())
+            || self.is_dynamic()
+            || target.is_dynamic()
+        {
+            return true;
+        }
+
+        if self == target {
+            return true;
+        }
+
         let constraints = ConstraintSetBuilder::new();
         self.when_assignable_to(db, target, &constraints, InferableTypeVars::None)
             .is_always_satisfied(db)
@@ -393,6 +405,18 @@ impl<'db> Type<'db> {
     /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
     /// reasoning depending on inferable typevars.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        if self.is_never()
+            || matches!(target, Type::NominalInstance(target) if target.is_object())
+            || self.is_dynamic()
+            || target.is_dynamic()
+        {
+            return true;
+        }
+
+        if self == target {
+            return true;
+        }
+
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_assignable_to(db, target, &constraints)
             .is_always_satisfied(db)
@@ -405,6 +429,18 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if self.is_never()
+            || matches!(target, Type::NominalInstance(target) if target.is_object())
+            || self.is_dynamic()
+            || target.is_dynamic()
+        {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        if self == target {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
         self.has_relation_to(
             db,
             target,
@@ -452,6 +488,18 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if self.is_never()
+            || matches!(target, Type::NominalInstance(target) if target.is_object())
+            || self.is_dynamic()
+            || target.is_dynamic()
+        {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
+        if self == target {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
         self.has_relation_to(
             db,
             target,
@@ -913,6 +961,18 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
         if let Some(target) = target.materialized_divergent_fallback() {
             return self.check_type_pair(db, source, target);
+        }
+
+        if source.is_never()
+            || matches!(target, Type::NominalInstance(target) if target.is_object())
+        {
+            return self.always();
+        }
+
+        if (self.relation.is_assignability() || self.relation.is_constraint_set_assignability())
+            && (source.is_dynamic() || target.is_dynamic())
+        {
+            return self.always();
         }
 
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
