@@ -217,6 +217,14 @@ class InvalidAliasedProtocolClassReceiver:
     # error: [invalid-method-receiver]
     def method(cls: ProtocolClassReceiverAlias): ...
 
+class InvalidRepeatedProtocolClassAliasReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def pep604(cls: ProtocolClassReceiverAlias | ProtocolClassReceiverAlias): ...
+    @classmethod
+    # error: [invalid-method-receiver]
+    def typing_union(cls: Union[ProtocolClassReceiverAlias, ProtocolClassReceiverAlias]): ...
+
 class InvalidNestedAnnotatedProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver]

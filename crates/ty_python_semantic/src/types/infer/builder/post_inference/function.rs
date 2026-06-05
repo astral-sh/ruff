@@ -334,22 +334,13 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             | Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => Some(alias),
             _ => None,
         };
-        if let Some(alias) = alias
-            && self.seen_aliases.insert(alias)
-        {
-            let definition = alias.definition(self.db);
-            let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
-            let DefinitionKind::TypeAlias(type_alias) = definition.kind(self.db) else {
+        if let Some(alias) = alias {
+            if !self.seen_aliases.insert(alias) {
                 return None;
-            };
-            let value = &type_alias.node(&module).value;
-            return self.member_compatibility(
-                value,
-                ReceiverAnnotationResolver::Definition {
-                    definition,
-                    alias: Some(alias),
-                },
-            );
+            }
+            let compatibility = self.alias_compatibility(alias);
+            self.seen_aliases.remove(&alias);
+            return compatibility;
         }
 
         let typevar = match annotation_type {
@@ -357,40 +348,69 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(typevar),
             _ => None,
         };
-        if let Some(typevar) = typevar
-            && self.seen_typevars.insert(typevar)
-        {
-            let definition = typevar.definition(self.db)?;
-            let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
-            let resolver = ReceiverAnnotationResolver::Definition {
-                definition,
-                alias: None,
-            };
-            return match definition.kind(self.db) {
-                DefinitionKind::TypeVar(typevar) => {
-                    let bound = typevar.node(&module).bound.as_ref()?;
-                    self.member_compatibility(bound, resolver)
-                }
-                DefinitionKind::Assignment(assignment) => {
-                    let call = assignment.value(&module).as_call_expr()?;
-                    if let Some(bound) = call.arguments.find_keyword("bound") {
-                        self.member_compatibility(&bound.value, resolver)
-                    } else {
-                        let mut constraints = call.arguments.args.iter().skip(1);
-                        let mut compatibility =
-                            self.member_compatibility(constraints.next()?, resolver)?;
-                        for constraint in constraints {
-                            compatibility = compatibility
-                                .union(self.member_compatibility(constraint, resolver)?);
-                        }
-                        Some(compatibility)
-                    }
-                }
-                _ => None,
-            };
+        if let Some(typevar) = typevar {
+            if !self.seen_typevars.insert(typevar) {
+                return None;
+            }
+            let compatibility = self.typevar_compatibility(typevar);
+            self.seen_typevars.remove(&typevar);
+            return compatibility;
         }
 
         None
+    }
+
+    fn alias_compatibility(
+        &mut self,
+        alias: TypeAliasType<'db>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        let definition = alias.definition(self.db);
+        let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
+        let DefinitionKind::TypeAlias(type_alias) = definition.kind(self.db) else {
+            return None;
+        };
+        let value = &type_alias.node(&module).value;
+        self.member_compatibility(
+            value,
+            ReceiverAnnotationResolver::Definition {
+                definition,
+                alias: Some(alias),
+            },
+        )
+    }
+
+    fn typevar_compatibility(
+        &mut self,
+        typevar: TypeVarInstance<'db>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        let definition = typevar.definition(self.db)?;
+        let module = parsed_module(self.db, definition.file(self.db)).load(self.db);
+        let resolver = ReceiverAnnotationResolver::Definition {
+            definition,
+            alias: None,
+        };
+        match definition.kind(self.db) {
+            DefinitionKind::TypeVar(typevar) => {
+                let bound = typevar.node(&module).bound.as_ref()?;
+                self.member_compatibility(bound, resolver)
+            }
+            DefinitionKind::Assignment(assignment) => {
+                let call = assignment.value(&module).as_call_expr()?;
+                if let Some(bound) = call.arguments.find_keyword("bound") {
+                    self.member_compatibility(&bound.value, resolver)
+                } else {
+                    let mut constraints = call.arguments.args.iter().skip(1);
+                    let mut compatibility =
+                        self.member_compatibility(constraints.next()?, resolver)?;
+                    for constraint in constraints {
+                        compatibility =
+                            compatibility.union(self.member_compatibility(constraint, resolver)?);
+                    }
+                    Some(compatibility)
+                }
+            }
+            _ => None,
+        }
     }
 
     fn member_compatibility(
