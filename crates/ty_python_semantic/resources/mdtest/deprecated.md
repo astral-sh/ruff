@@ -476,7 +476,7 @@ redundant and annoying.
 
 ```py
 from collections.abc import Callable
-from typing import Any
+from typing import Any, TypeAlias
 from typing_extensions import deprecated
 
 @deprecated("Use OtherType instead")
@@ -502,6 +502,9 @@ second_alias()
 
 annotated_alias: Callable[..., Any] = depr_func  # error: [deprecated] "Use other_func instead"
 annotated_alias()
+
+ExplicitAlias: TypeAlias = DeprType  # error: [deprecated] "Use OtherType instead"
+explicit_value: ExplicitAlias
 
 (named_alias := depr_func)  # error: [deprecated] "Use other_func instead"
 named_alias()

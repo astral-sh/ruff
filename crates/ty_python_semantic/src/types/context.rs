@@ -14,7 +14,7 @@ use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::reachability::is_range_reachable;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
+use crate::types::diagnostic::{DEPRECATED, INVALID_TYPE_FORM, UNBOUND_TYPE_VARIABLE};
 use crate::types::function::FunctionDecorators;
 use crate::types::infer::InferenceFlags;
 use crate::{
@@ -439,11 +439,11 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
         let lint_id = LintId::of(lint);
 
-        // Suppress all `invalid-type-form` errors during the first pass of
-        // inferring a PEP-613 type alias. These errors are emitted during the
-        // second pass, post-inference.
+        // Suppress diagnostics that are emitted during the second, post-inference pass of
+        // inferring a PEP-613 type alias.
         if (lint_id == LintId::of(&INVALID_TYPE_FORM)
-            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE))
+            || lint_id == LintId::of(&UNBOUND_TYPE_VARIABLE)
+            || lint_id == LintId::of(&DEPRECATED))
             && ctx
                 .inference_flags
                 .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)

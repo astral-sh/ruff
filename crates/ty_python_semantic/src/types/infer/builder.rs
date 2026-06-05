@@ -4672,7 +4672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::AreTheSame(TypeAndQualifiers::declared(inferred_ty)),
+                    &DeclaredAndInferredType::AreTheSame(declared.map_type(|_| inferred_ty)),
                 );
             } else {
                 // Check for annotated enum members. The typing spec states that enum
