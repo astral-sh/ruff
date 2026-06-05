@@ -2636,10 +2636,7 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        known_class
-                            if known_class == Some(KnownClass::Property)
-                                || class.is_known(db, KnownClass::EnumProperty) =>
-                        {
+                        Some(KnownClass::Property | KnownClass::EnumProperty) => {
                             if let [getter, setter, deleter, ..] = overload.parameter_types() {
                                 let getter = getter.filter(|ty| !ty.is_none(db));
                                 let setter = setter.filter(|ty| !ty.is_none(db));
