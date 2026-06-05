@@ -2167,7 +2167,7 @@ impl<'db> StaticClassLiteral<'db> {
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
-            name.to_string(),
+            Name::new(name),
             target_method_decorator,
         )
     }
@@ -2182,9 +2182,11 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn implicit_attribute_inner(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
-        name: String,
+        name: Name,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        let name = name.as_str();
+
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
@@ -2493,7 +2495,16 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    #[salsa::tracked(
+        cycle_fn=own_instance_member_cycle_recover,
+        cycle_initial=|_, id, _, _| Member {
+            inner: Place::bound(Type::divergent(id)).into(),
+        },
+        heap_size=ruff_memory_usage::heap_size,
+    )]
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: Name) -> Member<'db> {
+        let name = name.as_str();
+
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -3017,7 +3028,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
 
         let attribute_variances = attribute_names
             .map(|name| {
-                let place_and_quals = self.own_instance_member(db, &name).inner;
+                let place_and_quals = self.own_instance_member(db, Name::new(&name)).inner;
                 (name, place_and_quals)
             })
             .chain(attribute_places_and_qualifiers)
@@ -3132,8 +3143,22 @@ fn implicit_attribute_cycle_recover<'db>(
     previous_member: &Member<'db>,
     member: Member<'db>,
     _class_body_scope: ScopeId<'db>,
-    _name: String,
+    _name: Name,
     _target_method_decorator: MethodDecorator,
+) -> Member<'db> {
+    let inner = member
+        .inner
+        .cycle_normalized(db, previous_member.inner, cycle);
+    Member { inner }
+}
+
+fn own_instance_member_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_member: &Member<'db>,
+    member: Member<'db>,
+    _class_literal: StaticClassLiteral<'db>,
+    _name: Name,
 ) -> Member<'db> {
     let inner = member
         .inner

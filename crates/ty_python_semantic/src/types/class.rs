@@ -39,7 +39,7 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionAccumulator,
     VarianceInferable,
 };
 use crate::{
@@ -1878,13 +1878,13 @@ impl<'db> ClassType<'db> {
                 enum_lit.own_instance_member(db, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
-                class_literal.own_instance_member(db, name)
+                class_literal.own_instance_member(db, Name::new(name))
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
                 generic
                     .origin(db)
-                    .own_instance_member(db, name)
+                    .own_instance_member(db, Name::new(name))
                     .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
@@ -2467,7 +2467,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// allowing the caller to handle this case specially.
     pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
         let db = self.db;
-        let mut union = UnionBuilder::new(db);
+        let mut union: Option<UnionAccumulator<'db>> = None;
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
 
@@ -2507,7 +2507,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // If the attribute is not definitely declared on this class, keep looking
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
-                        union = union.add(ty);
+                        if let Some(union) = &mut union {
+                            union.add(db, ty);
+                        } else {
+                            union = Some(UnionAccumulator::new(ty));
+                        }
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
                         // qualifiers
@@ -2520,9 +2524,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             }
         }
 
-        let result = if union.is_empty() {
-            Place::Undefined.with_qualifiers(TypeQualifiers::empty())
-        } else {
+        let result = if let Some(union) = union {
             let boundness = if is_definitely_bound {
                 Definedness::AlwaysDefined
             } else {
@@ -2530,12 +2532,14 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
             };
 
             Place::Defined(DefinedPlace {
-                ty: union.build(),
+                ty: union.into_type(db),
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,
             })
             .with_qualifiers(union_qualifiers)
+        } else {
+            Place::Undefined.with_qualifiers(TypeQualifiers::empty())
         };
 
         InstanceMemberResult::Done(result)
