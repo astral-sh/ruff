@@ -959,7 +959,7 @@ pub struct UpdatedFunctionSignatures<'db> {
     /// Contains a potentially modified signature for this function literal, in case certain
     /// operations (like type mappings) have been applied to it.
     ///
-    /// See also: [`FunctionLiteral::updated_signature`].
+    /// See also: [`FunctionLiteral::signature`].
     signature: Option<CallableSignature<'db>>,
 
     /// Contains a potentially modified signature for the implementation of an overloaded function,
