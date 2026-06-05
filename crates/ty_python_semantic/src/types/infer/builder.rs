@@ -3546,14 +3546,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
-        if target_ty.is_deprecated(self.db()) {
+        self.suppress_transitive_deprecation(definition, target_ty);
+        add.insert(self, target_ty);
+    }
+
+    fn suppress_transitive_deprecation(&mut self, definition: Definition<'db>, ty: Type<'db>) {
+        if ty.is_deprecated(self.db()) {
             self.declarations.insert(
                 definition,
-                TypeAndQualifiers::new(target_ty, TypeOrigin::Inferred, TypeQualifiers::empty())
+                TypeAndQualifiers::new(ty, TypeOrigin::Inferred, TypeQualifiers::empty())
                     .suppress_type_deprecation(),
             );
         }
-        add.insert(self, target_ty);
     }
 
     fn stub_placeholder_binding_type(&self, value: &ast::Expr) -> Option<Type<'db>> {
@@ -7605,6 +7609,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ty = self.infer_expression(value, add.type_context());
         self.store_expression_type(target, ty);
+        self.suppress_transitive_deprecation(definition, ty);
         add.insert(self, ty)
     }
 
