@@ -199,7 +199,7 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionType, enum_metadata, infer_expression_type, infer_narrowing_constraint,
+        TypeContext, UnionType, enum_metadata, infer_expression_type, infer_narrowing_constraints,
     },
 };
 use ruff_index::IndexSlice;
@@ -877,14 +877,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let predicate = self.predicates[predicate_id];
-        let pos_constraint = infer_narrowing_constraint(self.db, predicate, self.place);
-        let neg_predicate = Predicate {
-            node: predicate.node,
-            is_positive: !predicate.is_positive,
-        };
-        let neg_constraint = infer_narrowing_constraint(self.db, neg_predicate, self.place);
-        let constraints = (pos_constraint, neg_constraint);
+        let constraints =
+            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());

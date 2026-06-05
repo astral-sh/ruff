@@ -144,7 +144,7 @@ fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'d
     }
 }
 
-/// Return the type constraint that `test` (if true) would place on `symbol`, if any.
+/// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
 /// For example, if we have this code:
 ///
@@ -159,32 +159,40 @@ fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'d
 /// `x`, so in that case we'd return `Some(Type::Intersection(negative=[Type::None]))`.
 ///
 /// But if we called this with the same `test` expression, but the `symbol` of `y`, no
-/// constraint is applied to that symbol, so we'd just return `None`.
-pub(crate) fn infer_narrowing_constraint<'db>(
+/// constraint is applied to that symbol, so we'd just return `(None, None)`.
+pub(crate) fn infer_narrowing_constraints<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
-) -> Option<NarrowingConstraint<'db>> {
+) -> (
+    Option<NarrowingConstraint<'db>>,
+    Option<NarrowingConstraint<'db>>,
+) {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
-            if predicate.is_positive {
-                all_narrowing_constraints_for_expression(db, expression)
-            } else {
-                all_negative_narrowing_constraints_for_expression(db, expression)
-            }
+            let constraints = all_narrowing_constraints_for_expression(db, expression);
+            (
+                constraints.get(place, true).cloned(),
+                constraints.get(place, false).cloned(),
+            )
         }
         PredicateNode::Pattern(pattern) => {
-            if predicate.is_positive {
-                all_narrowing_constraints_for_pattern(db, pattern)
-            } else {
-                all_negative_narrowing_constraints_for_pattern(db, pattern)
-            }
+            let positive = all_narrowing_constraints_for_pattern(db, pattern)
+                .and_then(|constraints| constraints.get(&place).cloned());
+            let negative = all_negative_narrowing_constraints_for_pattern(db, pattern)
+                .and_then(|constraints| constraints.get(&place).cloned());
+            (positive, negative)
         }
-        PredicateNode::IsNonTerminalCall(_) => return None,
-        PredicateNode::StarImportPlaceholder(_) => return None,
+        PredicateNode::IsNonTerminalCall(_) | PredicateNode::StarImportPlaceholder(_) => {
+            (None, None)
+        }
     };
 
-    constraints.and_then(|constraints| constraints.get(&place).cloned())
+    if predicate.is_positive {
+        constraints
+    } else {
+        (constraints.1, constraints.0)
+    }
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
@@ -197,31 +205,20 @@ fn all_narrowing_constraints_for_pattern<'db>(
 }
 
 #[salsa::tracked(
-    returns(as_ref),
-    cycle_initial=|_, _, _| None,
+    returns(ref),
+    cycle_initial=|_, _, _| ExpressionNarrowingConstraints::default(),
     heap_size=ruff_memory_usage::heap_size,
 )]
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> ExpressionNarrowingConstraints<'db> {
     let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
-        .finish()
-}
-
-#[salsa::tracked(
-    returns(as_ref),
-    cycle_initial=|_, _, _| None,
-    heap_size=ruff_memory_usage::heap_size,
-)]
-fn all_negative_narrowing_constraints_for_expression<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
-        .finish()
+    let predicate = PredicateNode::Expression(expression);
+    ExpressionNarrowingConstraints {
+        positive: NarrowingConstraintsBuilder::new(db, &module, predicate, true).finish(),
+        negative: NarrowingConstraintsBuilder::new(db, &module, predicate, false).finish(),
+    }
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
@@ -582,6 +579,22 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
 }
 
 type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+
+#[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct ExpressionNarrowingConstraints<'db> {
+    positive: Option<NarrowingConstraints<'db>>,
+    negative: Option<NarrowingConstraints<'db>>,
+}
+
+impl<'db> ExpressionNarrowingConstraints<'db> {
+    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
+        if is_positive {
+            self.positive.as_ref()?.get(&place)
+        } else {
+            self.negative.as_ref()?.get(&place)
+        }
+    }
+}
 
 fn insert_narrowing_constraint<'db>(
     constraints: &mut NarrowingConstraints<'db>,
