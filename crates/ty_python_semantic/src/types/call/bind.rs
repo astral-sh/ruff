@@ -7035,9 +7035,19 @@ impl<'db> BindingError<'db> {
                         .map(|description| format!(" to {description}"))
                         .unwrap_or_default()
                 ));
-                diag.set_primary_message(format_args!(
-                    "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
-                ));
+                if matches!(
+                    provenance,
+                    InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
+                ) {
+                    diag.set_primary_message(format_args!(
+                        "Possible extra items in unpacked open `TypedDict` have type \
+                         `{provided_ty_display}`, expected `{expected_ty_display}`"
+                    ));
+                } else {
+                    diag.set_primary_message(format_args!(
+                        "Expected `{expected_ty_display}`, found `{provided_ty_display}`"
+                    ));
+                }
 
                 let error_context =
                     provided_ty.assignability_error_context(context.db(), *expected_ty);
@@ -7097,15 +7107,6 @@ impl<'db> BindingError<'db> {
 
                 if let Some(compound_diag) = compound_diag {
                     compound_diag.add_context(context.db(), &mut diag);
-                }
-
-                if matches!(
-                    provenance,
-                    InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
-                ) {
-                    diag.info(
-                        "Possible extra items in the unpacked open `TypedDict` have type `object`",
-                    );
                 }
 
                 // If the type comes from first-party code, the user may have some control over

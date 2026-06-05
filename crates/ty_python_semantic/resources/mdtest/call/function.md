@@ -1350,7 +1350,7 @@ def _(kwargs: dict[str, int]) -> None:
 
 f(**{"foo": 1})
 f(**dict(foo=1))
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `object`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo(a=1, b=2))
 ```
 
@@ -1461,7 +1461,7 @@ def f(**kwargs: int) -> None: ...
 # snapshot: invalid-argument-type
 f(**Foo1(a=1, b="b"))
 # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
-# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `object`"
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
 f(**Foo2(a=1))
 ```
 
@@ -1470,7 +1470,7 @@ error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:15:3
    |
 15 | f(**Foo1(a=1, b="b"))
-   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `object`
+   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
    |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
@@ -1478,14 +1478,13 @@ info: Function defined here
 11 | def f(**kwargs: int) -> None: ...
    |     ^ ------------- Parameter declared here
    |
-info: Possible extra items in the unpacked open `TypedDict` have type `object`
 
 
 error[invalid-argument-type]: Argument to function `f` is incorrect
   --> src/mdtest_snippet.py:15:3
    |
 15 | f(**Foo1(a=1, b="b"))
-   |   ^^^^^^^^^^^^^^^^^^ Expected `int`, found `str`
+   |   ^^^^^^^^^^^^^^^^^^ Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`
    |
 info: Function defined here
   --> src/mdtest_snippet.py:11:5
@@ -1523,7 +1522,7 @@ def _(good: GoodA | GoodB, bad: BadA | BadB) -> None:
     needs_known_keys(**good)
 
     # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `str`"
-    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Expected `int`, found `object`"
+    # error: [invalid-argument-type] "Argument to function `takes_int_kwargs` is incorrect: Possible extra items in unpacked open `TypedDict` have type `object`, expected `int`"
     takes_int_kwargs(**bad)
 ```
 
