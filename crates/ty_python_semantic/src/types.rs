@@ -989,7 +989,11 @@ impl<'db> Type<'db> {
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
-            Type::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_))
+            Type::Dynamic(
+                DynamicType::Unknown
+                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::AmbiguousOverload
+            )
         )
     }
 
