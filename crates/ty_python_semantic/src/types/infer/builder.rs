@@ -11221,40 +11221,6 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                     ],
                 );
             }
-            ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-                let db = self.builder.db();
-                let mut done = false;
-                return DeprecationPolicy::from_alternatives(
-                    db,
-                    values.iter().enumerate().map(|(index, value)| {
-                        let ty = self.expression_type(value);
-                        let is_last = index == values.len() - 1;
-                        let result_ty = if is_last {
-                            if done { Type::Never } else { ty }
-                        } else if done {
-                            Type::Never
-                        } else {
-                            match (ty.bool(db), op) {
-                                (Truthiness::AlwaysTrue, ast::BoolOp::And)
-                                | (Truthiness::AlwaysFalse, ast::BoolOp::Or) => Type::Never,
-                                (Truthiness::AlwaysFalse, ast::BoolOp::And)
-                                | (Truthiness::AlwaysTrue, ast::BoolOp::Or) => {
-                                    done = true;
-                                    ty
-                                }
-                                (Truthiness::Ambiguous, _) => IntersectionBuilder::new(db)
-                                    .add_positive(ty)
-                                    .add_negative(match op {
-                                        ast::BoolOp::And => Type::AlwaysTruthy,
-                                        ast::BoolOp::Or => Type::AlwaysFalsy,
-                                    })
-                                    .build(),
-                            }
-                        };
-                        (result_ty, self.policy(value))
-                    }),
-                );
-            }
             ast::Expr::Named(ast::ExprNamed { value, .. }) => return self.policy(value),
             ast::Expr::Call(call)
                 if matches!(
