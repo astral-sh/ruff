@@ -179,9 +179,9 @@ Memory report:
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
-`ModuleResolveModeIngredient`                      metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`dynamic_resolution_paths::interned_arguments`     metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA QUERIES=======
-`dynamic_resolution_paths -> alloc::vec::Vec<ty_module_resolver::path::SearchPath>`
+`dynamic_resolution_paths -> ty_module_resolver::resolve::DynamicSearchPaths`
     metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]

@@ -400,14 +400,12 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::assert_const_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
-    use crate::resolve::{
-        ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
-    };
+    use crate::resolve::dynamic_resolution_paths;
     use crate::settings::SearchPathSettings;
     use crate::strategy::FallibleStrategy;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
@@ -1384,12 +1382,7 @@ not_a_directory
         );
 
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(
-            &db,
-            dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
-            &events,
-        );
+        assert_const_function_query_was_not_run(&db, dynamic_resolution_paths, &events);
     }
 
     #[test]

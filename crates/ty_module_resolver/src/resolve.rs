@@ -155,12 +155,6 @@ pub enum ModuleResolveMode {
     StubsNotAllowedSomeShadowingAllowed,
 }
 
-#[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-#[derive(Debug)]
-pub(crate) struct ModuleResolveModeIngredient<'db> {
-    mode: ModuleResolveMode,
-}
-
 impl ModuleResolveMode {
     fn stubs_allowed(self) -> bool {
         matches!(self, Self::StubsAllowed)
@@ -722,7 +716,7 @@ impl SearchPaths {
             static_paths: self.static_paths.iter(),
             stdlib_path,
             dynamic_paths: None,
-            mode: ModuleResolveModeIngredient::new(db, mode),
+            mode,
         }
     }
 
@@ -789,20 +783,36 @@ impl fmt::Display for DisplaySearchPaths<'_> {
 /// The editable-install search paths for the first `site-packages` directory
 /// should come between the two `site-packages` directories when it comes to
 /// module-resolution priority.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn dynamic_resolution_paths<'db>(
-    db: &'db dyn Db,
-    mode: ModuleResolveModeIngredient<'db>,
-) -> Vec<SearchPath> {
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn dynamic_resolution_paths(db: &dyn Db) -> DynamicSearchPaths {
     tracing::debug!("Resolving dynamic module resolution paths");
 
+    let search_paths = db.search_paths();
+
+    DynamicSearchPaths {
+        stubs_allowed: collect_dynamic_resolution_paths(
+            db,
+            search_paths,
+            search_paths.stdlib_path.as_ref(),
+        ),
+        stubs_not_allowed: collect_dynamic_resolution_paths(
+            db,
+            search_paths,
+            search_paths.real_stdlib_path.as_ref(),
+        ),
+    }
+}
+
+fn collect_dynamic_resolution_paths(
+    db: &dyn Db,
+    search_paths: &SearchPaths,
+    stdlib_path: Option<&SearchPath>,
+) -> Vec<SearchPath> {
     let SearchPaths {
         static_paths,
-        stdlib_path,
         site_packages,
-        typeshed_versions: _,
-        real_stdlib_path,
-    } = db.search_paths();
+        ..
+    } = search_paths;
 
     let mut dynamic_paths = Vec::new();
 
@@ -816,13 +826,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         .map(Cow::Borrowed)
         .collect();
 
-    // Use the `ModuleResolveMode` to determine which stdlib (if any) to mark as existing
-    let stdlib = match mode.mode(db) {
-        ModuleResolveMode::StubsAllowed => stdlib_path,
-        ModuleResolveMode::StubsNotAllowed
-        | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => real_stdlib_path,
-    };
-    if let Some(path) = stdlib.as_ref().and_then(SearchPath::as_system_path) {
+    if let Some(path) = stdlib_path.and_then(SearchPath::as_system_path) {
         existing_paths.insert(Cow::Borrowed(path));
     }
 
@@ -912,6 +916,26 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     dynamic_paths
 }
 
+/// Dynamic search paths deduplicated against the stdlib used by each resolution mode.
+///
+/// The ordered paths must be collected separately because skipping a duplicate `site-packages`
+/// path also skips any editable installations from its `.pth` files.
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct DynamicSearchPaths {
+    stubs_allowed: Vec<SearchPath>,
+    stubs_not_allowed: Vec<SearchPath>,
+}
+
+impl DynamicSearchPaths {
+    fn for_mode(&self, mode: ModuleResolveMode) -> &[SearchPath] {
+        match mode {
+            ModuleResolveMode::StubsAllowed => &self.stubs_allowed,
+            ModuleResolveMode::StubsNotAllowed
+            | ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => &self.stubs_not_allowed,
+        }
+    }
+}
+
 /// Iterate over the available module-resolution search paths,
 /// following the invariants maintained by [`sys.path` at runtime]:
 /// "No item is added to `sys.path` more than once."
@@ -924,7 +948,7 @@ pub struct SearchPathIterator<'db> {
     static_paths: std::slice::Iter<'db, SearchPath>,
     stdlib_path: Option<&'db SearchPath>,
     dynamic_paths: Option<std::slice::Iter<'db, SearchPath>>,
-    mode: ModuleResolveModeIngredient<'db>,
+    mode: ModuleResolveMode,
 }
 
 impl<'db> Iterator for SearchPathIterator<'db> {
@@ -944,7 +968,7 @@ impl<'db> Iterator for SearchPathIterator<'db> {
             .or_else(|| stdlib_path.take())
             .or_else(|| {
                 dynamic_paths
-                    .get_or_insert_with(|| dynamic_resolution_paths(*db, *mode).iter())
+                    .get_or_insert_with(|| dynamic_resolution_paths(*db).for_mode(*mode).iter())
                     .next()
             })
     }
@@ -1782,7 +1806,9 @@ mod tests {
     use ruff_db::Db;
     use ruff_db::files::{File, FilePath, system_path_to_file};
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{
+        assert_const_function_query_was_not_run, assert_function_query_was_not_run,
+    };
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
@@ -2757,12 +2783,7 @@ not_a_directory
             &FilePath::system("/y/src/bar.py")
         );
         let events = db.take_salsa_events();
-        assert_function_query_was_not_run(
-            &db,
-            dynamic_resolution_paths,
-            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
-            &events,
-        );
+        assert_const_function_query_was_not_run(&db, dynamic_resolution_paths, &events);
     }
 
     #[test]
