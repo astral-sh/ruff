@@ -310,6 +310,11 @@ impl<'db> ProtocolClassUnionChecker<'db> {
         annotation_type: Type<'db>,
         resolver: ReceiverAnnotationResolver<'db, '_>,
     ) -> Option<ProtocolClassUnionCompatibility> {
+        if matches!(annotation, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && let Some(compatibility) = self.semantic_union_compatibility(annotation_type)
+        {
+            return Some(compatibility);
+        }
         if let ast::Expr::BinOp(binary) = annotation
             && binary.op == ast::Operator::BitOr
         {
@@ -450,6 +455,11 @@ impl<'db> ProtocolClassUnionChecker<'db> {
         {
             return Some(compatibility);
         }
+        if matches!(annotation, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+            && let Some(compatibility) = self.semantic_union_compatibility(annotation_type)
+        {
+            return Some(compatibility);
+        }
 
         if let ast::Expr::Subscript(subscript) = annotation {
             let is_type_subscript = match resolver.expression_type(self.db, &subscript.value) {
@@ -477,6 +487,60 @@ impl<'db> ProtocolClassUnionChecker<'db> {
             accepts_receiver: self
                 .expected_receiver
                 .is_assignable_to(self.db, annotation_type.resolve_type_alias(self.db)),
+        })
+    }
+
+    fn semantic_union_compatibility(
+        &self,
+        annotation_type: Type<'db>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        let annotation_type = annotation_type.resolve_type_alias(self.db);
+        if let Type::Union(union) = annotation_type {
+            let mut elements = union.elements(self.db).iter().copied();
+            let mut compatibility = self.semantic_member_compatibility(elements.next()?)?;
+            for element in elements {
+                compatibility =
+                    compatibility.union(self.semantic_member_compatibility(element)?);
+            }
+            return compatibility.contains_protocol_class.then_some(compatibility);
+        }
+        let compatibility = self.semantic_member_compatibility(annotation_type)?;
+        compatibility.contains_protocol_class.then_some(compatibility)
+    }
+
+    fn semantic_member_compatibility(
+        &self,
+        annotation_type: Type<'db>,
+    ) -> Option<ProtocolClassUnionCompatibility> {
+        let protocol_instance = match annotation_type {
+            Type::SubclassOf(subclass_of)
+                if subclass_of
+                    .subclass_of()
+                    .into_class(self.db)
+                    .is_some_and(|class| class.class_literal(self.db).is_protocol(self.db)) =>
+            {
+                Some(subclass_of.to_instance(self.db))
+            }
+            Type::ClassLiteral(class) if class.is_protocol(self.db) => {
+                Type::from(class).to_instance(self.db)
+            }
+            _ => None,
+        };
+        Some(if let Some(protocol_instance) = protocol_instance {
+            ProtocolClassUnionCompatibility {
+                contains_protocol_class: true,
+                accepts_receiver: self.receiver_is_class_object
+                    && self
+                        .expected_instance
+                        .is_assignable_to(self.db, protocol_instance),
+            }
+        } else {
+            ProtocolClassUnionCompatibility {
+                contains_protocol_class: false,
+                accepts_receiver: self
+                    .expected_receiver
+                    .is_assignable_to(self.db, annotation_type),
+            }
         })
     }
 

@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Annotated, Any, LiteralString, Never, Optional, ParamSpec, Protocol, Self, TypeVar, Union, Unpack, overload
+from typing import Annotated, Any, LiteralString, Never, Optional, ParamSpec, Protocol, Self, TypeAlias, TypeVar, Union, Unpack, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -211,11 +211,22 @@ class InvalidAnnotatedProtocolClassReceiver:
 type ProtocolClassReceiverAlias = type[FirstReceiverProtocol] | type[SecondReceiverProtocol]
 type FirstProtocolClass = type[FirstReceiverProtocol]
 type GenericProtocolClassReceiverAlias[T] = type[GenericReceiverProtocol[T]] | type[int]
+LegacyProtocolClassReceiverAlias: TypeAlias = type[FirstReceiverProtocol] | type[int]
 
 class InvalidAliasedProtocolClassReceiver:
     @classmethod
     # error: [invalid-method-receiver]
     def method(cls: ProtocolClassReceiverAlias): ...
+
+class InvalidLegacyAliasedProtocolClassReceiver:
+    @classmethod
+    # error: [invalid-method-receiver]
+    def method(cls: LegacyProtocolClassReceiverAlias): ...
+
+class ValidLegacyAliasedProtocolClassReceiver:
+    def first(self) -> None: ...
+    @classmethod
+    def method(cls: LegacyProtocolClassReceiverAlias): ...
 
 class InvalidRepeatedProtocolClassAliasReceiver:
     @classmethod
