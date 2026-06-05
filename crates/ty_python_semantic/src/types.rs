@@ -7472,6 +7472,11 @@ impl<'db> TypeAndQualifiers<'db> {
         }
     }
 
+    pub(crate) fn resolved_deprecation_policy(&self, db: &'db dyn Db) -> DeprecationPolicy<'db> {
+        self.deprecation_policy()
+            .resolve_for_type(db, self.inner_type())
+    }
+
     pub(crate) fn into_parts(
         self,
     ) -> (

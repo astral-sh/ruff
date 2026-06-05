@@ -434,40 +434,32 @@ impl<'db> LookupError<'db> {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
             (LookupError::PossiblyUndefined(ty), Ok(ty2)) => {
-                let policy = DeprecationPolicy::from_alternatives(
-                    db,
-                    [
-                        (ty.inner_type(), ty.deprecation_policy()),
-                        (ty2.inner_type(), ty2.deprecation_policy()),
-                    ],
-                );
-                Ok(TypeAndQualifiers::new(
-                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
-                    ty.origin().merge(ty2.origin()),
-                    ty.qualifiers().union(ty2.qualifiers()),
-                )
-                .with_deprecation_policy(policy))
+                Ok(union_type_and_qualifiers(db, ty, ty2))
             }
-            (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
-                Err(LookupError::PossiblyUndefined(
-                    TypeAndQualifiers::new(
-                        UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
-                        ty.origin().merge(ty2.origin()),
-                        ty.qualifiers().union(ty2.qualifiers()),
-                    )
-                    .with_deprecation_policy(
-                        DeprecationPolicy::from_alternatives(
-                            db,
-                            [
-                                (ty.inner_type(), ty.deprecation_policy()),
-                                (ty2.inner_type(), ty2.deprecation_policy()),
-                            ],
-                        ),
-                    ),
-                ))
-            }
+            (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => Err(
+                LookupError::PossiblyUndefined(union_type_and_qualifiers(db, ty, ty2)),
+            ),
         }
     }
+}
+
+fn union_type_and_qualifiers<'db>(
+    db: &'db dyn Db,
+    left: &TypeAndQualifiers<'db>,
+    right: &TypeAndQualifiers<'db>,
+) -> TypeAndQualifiers<'db> {
+    TypeAndQualifiers::new(
+        UnionType::from_two_elements(db, left.inner_type(), right.inner_type()),
+        left.origin().merge(right.origin()),
+        left.qualifiers().union(right.qualifiers()),
+    )
+    .with_deprecation_policy(DeprecationPolicy::from_alternatives(
+        db,
+        [
+            (left.inner_type(), left.deprecation_policy()),
+            (right.inner_type(), right.deprecation_policy()),
+        ],
+    ))
 }
 
 pub(crate) fn merge_deprecation_policy<'db>(
@@ -929,6 +921,14 @@ impl<'db> PlaceAndQualifiers<'db> {
             Self::WithoutDeprecation { .. } => DeprecationPolicy::Inherit,
             Self::WithDeprecation(deprecated) => deprecated.deprecation,
         }
+    }
+
+    pub(crate) fn deprecation_policy_for_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> DeprecationPolicy<'db> {
+        self.deprecation_policy().resolve_for_type(db, ty)
     }
 
     pub(crate) fn into_parts(self) -> (Place<'db>, TypeQualifiers, DeprecationPolicy<'db>) {

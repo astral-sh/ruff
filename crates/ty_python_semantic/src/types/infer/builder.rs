@@ -9367,7 +9367,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place().ignore_possibly_undefined() {
-            match place.deprecation_policy().resolve_for_type(db, ty) {
+            match place.deprecation_policy_for_type(db, ty) {
                 DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
                     if let Some(name) = match expr_ref {
                         ast::ExprRef::Name(name) => Some(name.id.as_str()),
@@ -9813,10 +9813,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             });
 
-        let deprecation = resolved_type.deprecation_policy();
+        let deprecation = resolved_type.resolved_deprecation_policy(db);
         let resolved_type = resolved_type.inner_type();
 
-        match deprecation.resolve_for_type(db, resolved_type) {
+        match deprecation {
             DeprecationPolicy::Deprecated(deprecated) => {
                 self.report_deprecated_function(attr, attr.id.as_str(), deprecated);
             }
@@ -11221,8 +11221,7 @@ impl<'builder, 'db, 'ast> ExpressionDeprecationPolicy<'builder, 'db, 'ast> {
                                 ast::ExprRef::from(expression),
                             )
                             .0
-                            .deprecation_policy()
-                            .resolve_for_type(self.builder.db(), expression_ty)
+                            .deprecation_policy_for_type(self.builder.db(), expression_ty)
                     })
                     .unwrap_or(DeprecationPolicy::Inherit);
                 if place_deprecation != DeprecationPolicy::Inherit {
