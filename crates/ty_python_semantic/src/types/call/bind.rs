@@ -802,11 +802,12 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
         call_arguments: &CallArguments<'a, 'db>,
-    ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>)> {
+    ) -> Option<(CallArguments<'a, 'db>, Bindings<'db>, bool)> {
         // We can only infer bound-argument context from an actual callable.
         wrapped_callable_ty.try_upcast_to_callable(db)?;
 
-        let bound_call_arguments = call_arguments.functools_partial_bound_arguments(db)?;
+        let (bound_call_arguments, can_synthesize_signature) =
+            call_arguments.functools_partial_bound_arguments(db)?;
 
         let mut partial_bindings = wrapped_callable_ty
             .bindings(db)
@@ -819,7 +820,11 @@ impl<'db> Bindings<'db> {
                 downstream.clear_deferred_constructor_errors_for_partial_application();
             }
         }
-        Some((bound_call_arguments, partial_bindings))
+        Some((
+            bound_call_arguments,
+            partial_bindings,
+            can_synthesize_signature,
+        ))
     }
 
     /// Synthesizes the precise `functools.partial(...)` type for the already-matched bindings.
@@ -6233,10 +6238,11 @@ impl<'db> Binding<'db> {
             [Some(func_ty), ..] => *func_ty,
             _ => return None,
         };
-        let fallback_return_type =
+        let imprecise_return_type = self.return_ty;
+        let failed_synthesis_return_type =
             KnownClass::FunctoolsPartial.to_specialized_instance(db, &[Type::unknown()]);
 
-        let (bound_call_arguments, partial_bindings) =
+        let (bound_call_arguments, partial_bindings, can_synthesize_signature) =
             Bindings::functools_partial_matched_bindings(db, func_ty, call_arguments)?;
 
         // Reuse call-binding machinery to resolve which wrapped overloads are compatible with
@@ -6254,8 +6260,10 @@ impl<'db> Binding<'db> {
         let new_return_type =
             partial_bindings.functools_partial_type(db, func_ty, self, &bound_call_arguments);
 
-        Some(if new_return_type.is_never() {
-            fallback_return_type
+        Some(if !can_synthesize_signature {
+            imprecise_return_type
+        } else if new_return_type.is_never() {
+            failed_synthesis_return_type
         } else {
             new_return_type
         })

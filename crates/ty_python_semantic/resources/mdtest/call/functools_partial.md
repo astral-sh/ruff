@@ -709,6 +709,25 @@ p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[bool]
 ```
 
+Known items are still checked against their corresponding parameters, even when the partial
+signature cannot be represented precisely.
+
+```py
+from functools import partial
+from typing import TypedDict
+
+class MyKwargs(TypedDict):
+    b: int
+
+def f(*, b: str) -> bool:
+    return True
+
+kwargs: MyKwargs = {"b": 1}
+# error: [invalid-argument-type] "Argument to class `partial` is incorrect: Expected `str`, found `int`"
+p = partial(f, **kwargs)
+reveal_type(p)  # revealed: partial[bool]
+```
+
 ### Kwargs splat with closed TypedDict
 
 A closed `TypedDict` has no hidden extra items, so we should still be able to normalize it to a

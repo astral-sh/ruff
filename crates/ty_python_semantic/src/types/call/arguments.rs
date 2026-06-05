@@ -8,6 +8,7 @@ use rustc_hash::FxHashMap;
 use crate::Db;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::{KnownClass, Type, TypeContext};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
@@ -280,32 +281,40 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
-    /// concrete enough for partial-application analysis.
-    pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
+    /// Returns the `functools.partial(...)` bound-argument slice and whether it is concrete enough
+    /// to synthesize a precise partial signature.
+    pub(crate) fn functools_partial_bound_arguments(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(Self, bool)> {
         let bound_call_arguments = self.start_from(1);
+        let mut can_synthesize_signature = true;
 
-        // We only handle variadics and keyword-maps that can be normalized to concrete argument
-        // positions for overload matching.
-        if bound_call_arguments.iter().any(|(argument, argument_ty)| {
+        for (argument, argument_ty) in bound_call_arguments.iter() {
             let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
             match argument {
-                Argument::Variadic => !matches!(
-                    argument_ty
-                        .as_nominal_instance()
-                        .and_then(|nominal| nominal.tuple_spec(db)),
-                    Some(spec) if spec.as_fixed_length().is_some()
-                ),
-                // Keyword splats cannot be normalized to concrete partial arguments. Mappings
-                // may have arbitrary keys, and ordinary `TypedDict`s are implicitly open.
-                Argument::Keywords => true,
-                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
+                Argument::Variadic => {
+                    if !matches!(
+                        argument_ty
+                            .as_nominal_instance()
+                            .and_then(|nominal| nominal.tuple_spec(db)),
+                        Some(spec) if spec.as_fixed_length().is_some()
+                    ) {
+                        return None;
+                    }
+                }
+                Argument::Keywords => {
+                    // Known `TypedDict` items can still be checked against their target
+                    // parameters, even though possible hidden items prevent us from synthesizing
+                    // a precise partial signature.
+                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty)?;
+                    can_synthesize_signature = false;
+                }
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => {}
             }
-        }) {
-            return None;
         }
 
-        Some(bound_call_arguments)
+        Some((bound_call_arguments, can_synthesize_signature))
     }
 
     /// Returns an iterator on performing [argument type expansion].
