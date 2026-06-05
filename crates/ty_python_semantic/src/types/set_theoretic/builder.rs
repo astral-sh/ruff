@@ -37,7 +37,10 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use super::RecursivelyDefined;
+use crate::types::class_base::ClassBase;
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::enums::{EnumComplement, enum_metadata};
+use crate::types::generics::SpecializationBuilder;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
@@ -136,8 +139,11 @@ fn simplify_invariant_generic_intersection<'db>(
 ) -> Option<Type<'db>> {
     let (left_class, left_specialization) = left.class_specialization(db)?;
     let (right_class, right_specialization) = right.class_specialization(db)?;
-    if left_class != right_class
-        || left_specialization.generic_context(db) != right_specialization.generic_context(db)
+    if left_class != right_class {
+        return simplify_invariant_generic_subclass_intersection(db, left, right)
+            .or_else(|| simplify_invariant_generic_subclass_intersection(db, right, left));
+    }
+    if left_specialization.generic_context(db) != right_specialization.generic_context(db)
         || left_specialization.materialization_kind(db).is_some()
         || right_specialization.materialization_kind(db).is_some()
         || left_specialization.tuple(db).is_some()
@@ -175,6 +181,70 @@ fn simplify_invariant_generic_intersection<'db>(
         (false, true) => Some(right),
         _ => None,
     }
+}
+
+fn simplify_invariant_generic_subclass_intersection<'db>(
+    db: &'db dyn Db,
+    ancestor: Type<'db>,
+    subclass: Type<'db>,
+) -> Option<Type<'db>> {
+    let (ancestor_class, ancestor_specialization) = ancestor.class_specialization(db)?;
+    let (subclass_literal, subclass_specialization) = subclass.class_specialization(db)?;
+    let ancestor_context = ancestor_specialization.generic_context(db);
+    let subclass_context = subclass_specialization.generic_context(db);
+
+    if ancestor_specialization.materialization_kind(db).is_some()
+        || subclass_specialization.materialization_kind(db).is_some()
+        || ancestor_specialization.tuple(db).is_some()
+        || subclass_specialization.tuple(db).is_some()
+        || ancestor_context
+            .variables(db)
+            .any(|typevar| typevar.variance(db) != TypeVarVariance::Invariant)
+        || subclass_context
+            .variables(db)
+            .any(|typevar| typevar.variance(db) != TypeVarVariance::Invariant)
+        || ancestor_specialization
+            .types(db)
+            .iter()
+            .any(|ty| ty.has_dynamic(db))
+    {
+        return None;
+    }
+
+    let identity_subclass = subclass_literal.identity_specialization(db);
+    let identity_ancestor = identity_subclass
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|base| base.class_literal(db) == ClassLiteral::Static(ancestor_class))?;
+
+    let constraints = ConstraintSetBuilder::new();
+    let mut builder =
+        SpecializationBuilder::new(db, &constraints, subclass_context.inferable_typevars(db));
+    builder
+        .infer(Type::instance(db, identity_ancestor), ancestor)
+        .ok()?;
+    let inferred = builder.build_with(subclass_context, |typevar, bounds| {
+        bounds
+            .is_none()
+            .then(|| subclass_specialization.get(db, typevar))
+            .flatten()
+    });
+
+    let mut changed = false;
+    for (original, inferred) in subclass_specialization
+        .types(db)
+        .iter()
+        .zip(inferred.types(db))
+    {
+        if original == inferred {
+            continue;
+        }
+        if !matches!(original, Type::Dynamic(_)) || inferred.has_dynamic(db) {
+            return None;
+        }
+        changed = true;
+    }
+    changed.then(|| Type::instance(db, subclass_literal.apply_specialization(db, |_| inferred)))
 }
 
 fn is_invariant_generic_specialization_covered_by<'db>(
