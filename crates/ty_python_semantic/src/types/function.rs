@@ -952,23 +952,35 @@ impl AbstractMethodKind {
 
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct UpdatedFunctionSignatures<'db> {
+    signature: Option<CallableSignature<'db>>,
+    implementation_signature: Option<Signature<'db>>,
+}
+
+impl<'db> UpdatedFunctionSignatures<'db> {
+    fn new(
+        signature: Option<CallableSignature<'db>>,
+        implementation_signature: Option<Signature<'db>>,
+    ) -> Option<Box<Self>> {
+        (signature.is_some() || implementation_signature.is_some()).then(|| {
+            Box::new(Self {
+                signature,
+                implementation_signature,
+            })
+        })
+    }
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    /// Contains a potentially modified signature for this function literal, in case certain operations
-    /// (like type mappings) have been applied to it.
-    ///
-    /// See also: [`FunctionLiteral::updated_signature`].
+    /// Contains potentially modified signatures for this function literal, in case certain
+    /// operations like type mappings have been applied to it. Keep this uncommon payload boxed so
+    /// ordinary function types only retain the literal and one optional pointer.
     #[returns(as_ref)]
-    updated_signature: Option<CallableSignature<'db>>,
-
-    /// Contains a potentially modified signature for the implementation of an overloaded function,
-    /// in case certain operations (like type mappings) have been applied to it.
-    ///
-    /// See also: [`FunctionLiteral::last_definition_signature`].
-    #[returns(as_ref)]
-    updated_implementation_signature: Option<Signature<'db>>,
+    updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -991,6 +1003,16 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+        self.updated_signatures(db)
+            .and_then(|updated| updated.signature.as_ref())
+    }
+
+    fn updated_implementation_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
+        self.updated_signatures(db)
+            .and_then(|updated| updated.implementation_signature.as_ref())
+    }
+
     pub(crate) fn with_inherited_generic_context(
         self,
         db: &'db dyn Db,
@@ -1008,8 +1030,10 @@ impl<'db> FunctionType<'db> {
         Self::new(
             db,
             literal,
-            Some(updated_signature),
-            updated_implementation_signature,
+            UpdatedFunctionSignatures::new(
+                Some(updated_signature),
+                updated_implementation_signature,
+            ),
         )
     }
 
@@ -1064,8 +1088,7 @@ impl<'db> FunctionType<'db> {
             Self::new(
                 db,
                 literal,
-                updated_signature,
-                updated_implementation_signature,
+                UpdatedFunctionSignatures::new(updated_signature, updated_implementation_signature),
             )
         }
     }
@@ -1082,7 +1105,7 @@ impl<'db> FunctionType<'db> {
             .last_definition
             .with_dataclass_transformer_params(db, params);
         let literal = FunctionLiteral { last_definition };
-        Self::new(db, literal, None, None)
+        Self::new(db, literal, None)
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -1429,8 +1452,10 @@ impl<'db> FunctionType<'db> {
                 Some(Self::new(
                     db,
                     literal,
-                    updated_signature,
-                    updated_implementation_signature,
+                    UpdatedFunctionSignatures::new(
+                        updated_signature,
+                        updated_implementation_signature,
+                    ),
                 ))
             },
         )
