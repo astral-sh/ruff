@@ -162,6 +162,30 @@ else:
 
 same_message()  # error: [deprecated] "same message"
 
+@deprecated("loop binding")
+@replace_with(replacement)
+def loop_binding() -> None: ...
+
+for _ in range(1):
+    loop_binding()  # error: [deprecated] "loop binding"
+
+    @deprecated("loop binding")
+    @replace_with(replacement)
+    def loop_binding() -> None: ...
+
+def nested_binding():
+    @deprecated("nested binding")
+    @replace_with(replacement)
+    def old() -> None: ...
+    def rebind():
+        nonlocal old
+
+        @deprecated("nested binding")
+        @replace_with(replacement)
+        def old() -> None: ...
+
+    old()  # error: [deprecated] "nested binding"
+
 if True:
     @deprecated("reachable binding")
     @replace_with(replacement)
@@ -516,6 +540,21 @@ def union_alias(flag: bool):
     optional_alias = depr_func if flag else None  # error: [deprecated] "Use other_func instead"
     if optional_alias is not None:
         optional_alias()
+
+def loop_alias():
+    alias = depr_func  # error: [deprecated] "Use other_func instead"
+    for _ in range(1):
+        alias()
+        alias = depr_func  # error: [deprecated] "Use other_func instead"
+
+def nested_alias():
+    alias = depr_func  # error: [deprecated] "Use other_func instead"
+
+    def rebind():
+        nonlocal alias
+        alias = depr_func  # error: [deprecated] "Use other_func instead"
+
+    alias()
 ```
 
 ## Dunders

@@ -29,11 +29,12 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, DeprecationPolicy, LookupError, Place,
-    PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin, builtins_module_scope,
-    builtins_symbol, class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    ConsideredDefinitions, DefinedPlace, Definedness, DeprecationBuilder, DeprecationPolicy,
+    LookupError, Place, PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin,
+    builtins_module_scope, builtins_symbol, class_body_implicit_symbol, explicit_global_symbol,
+    loop_header_reachability, module_type_implicit_global_declaration,
+    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
+    typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -2105,17 +2106,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place = loop_header_kind.place();
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        let mut deprecation = DeprecationBuilder::default();
 
         for reachable_binding in &loop_header.reachable_bindings {
-            let binding_ty = binding_type(db, reachable_binding.definition);
+            let inference = infer_definition_types(db, reachable_binding.definition);
+            let binding_ty = inference.binding_type(reachable_binding.definition);
             let narrowed_ty = use_def
                 .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, binding_ty, place);
 
             union.add_in_place(narrowed_ty);
+            deprecation.add_policy(
+                inference
+                    .inferred_declaration(reachable_binding.definition)
+                    .declared()
+                    .map_or(DeprecationPolicy::Inherit, |declaration| {
+                        declaration.deprecation_policy()
+                    }),
+            );
         }
 
-        self.bindings.insert(definition, union.build());
+        let ty = union.build();
+        self.bindings.insert(definition, ty);
+        self.set_binding_deprecation_policy(definition, ty, deprecation.build_policy());
     }
 
     fn infer_nested_bindings_definition(
@@ -2198,6 +2211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        let mut deprecation = DeprecationBuilder::default();
         for declaration in visible_nested_declarations {
             assert!(
                 declaration.is_bound,
@@ -2208,16 +2222,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .symbol_id(&nested_bindings_kind.name)
                 .unwrap();
             let use_def = self.index.use_def_map(declaration.file_scope_id);
-            let Some(ty) =
+            let nested_place =
                 place_from_bindings(db, use_def.reachable_bindings(nested_symbol_id.into()))
-                    .place
-                    .raw_type()
-            else {
+                    .into_place_and_qualifiers();
+            let Some(ty) = nested_place.place().raw_type() else {
                 continue;
             };
             union.add_in_place(ty);
+            deprecation.add_policy(nested_place.deprecation_policy());
         }
-        self.bindings.insert(definition, union.build());
+        let ty = union.build();
+        self.bindings.insert(definition, ty);
+        self.set_binding_deprecation_policy(definition, ty, deprecation.build_policy());
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {
@@ -3552,10 +3568,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn suppress_transitive_deprecation(&mut self, definition: Definition<'db>, ty: Type<'db>) {
         if ty.is_deprecated(self.db()) {
+            self.set_binding_deprecation_policy(definition, ty, DeprecationPolicy::Suppress);
+        }
+    }
+
+    fn set_binding_deprecation_policy(
+        &mut self,
+        definition: Definition<'db>,
+        ty: Type<'db>,
+        policy: DeprecationPolicy<'db>,
+    ) {
+        if policy != DeprecationPolicy::Inherit {
             self.declarations.insert(
                 definition,
                 TypeAndQualifiers::new(ty, TypeOrigin::Inferred, TypeQualifiers::empty())
-                    .suppress_type_deprecation(),
+                    .with_deprecation_policy(policy),
             );
         }
     }
