@@ -157,15 +157,9 @@ class DefaultGenericClass(Generic[T_Default]):
     @classmethod
     def restricted_classmethod(cls: type[DefaultGenericClass[Foo]]): ...
 
-T_Class = TypeVar("T_Class", bound=type[Any])
-T_Value = TypeVar("T_Value")
-
-class classproperty(Generic[T_Class, T_Value]):
-    def __init__(self, getter: Callable[[T_Class], T_Value]) -> None:
-        self.getter = getter
-
-    def __get__(self, instance: object, owner: T_Class) -> T_Value:
-        return self.getter(owner)
+class classproperty:
+    def __init__(self, getter: Any) -> None: ...
+    def __get__(self, instance: object, owner: type[Any]) -> object: ...
 
 class CustomDescriptor:
     @classproperty

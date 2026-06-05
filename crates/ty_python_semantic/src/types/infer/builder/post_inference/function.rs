@@ -89,6 +89,7 @@ fn check_method_receiver<'db>(
         || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
         || !has_explicit_receiver_annotation
+        || !decorated_type_has_method_binding(db, decorated_type)
     {
         return;
     }
@@ -123,10 +124,6 @@ fn check_method_receiver<'db>(
     }
 
     let node = last_definition.node(db, context.file(), context.module());
-    if !decorated_type_has_method_binding(db, decorated_type) {
-        return;
-    }
-
     let Some(annotation) = node
         .parameters
         .iter()
@@ -179,24 +176,22 @@ fn check_method_receiver<'db>(
     );
 
     // Methods on metaclasses can restrict their receiver to a particular class object.
-    if !receiver_is_class_typevar
-        && is_metaclass_receiver_type(db, receiver_type)
+    if !is_class_receiver
+        && !receiver_is_class_typevar
         && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
-        && !is_class_receiver
+        && is_metaclass_receiver_type(db, receiver_type)
     {
         return;
     }
 
     let concrete_receiver_type = match concrete_receiver_type {
-        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.top_materialization(db),
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                constraints.as_type(db).top_materialization(db)
-            }
-            None => Type::object(),
-        },
-        _ => concrete_receiver_type.top_materialization(db),
-    };
+        Type::TypeVar(typevar) => typevar
+            .typevar(db)
+            .bound_or_constraints(db)
+            .map_or_else(Type::object, |bound| bound.as_type(db)),
+        _ => concrete_receiver_type,
+    }
+    .top_materialization(db);
 
     if !receiver_is_class_typevar
         && (is_protocol_receiver_type(db, receiver_type)
