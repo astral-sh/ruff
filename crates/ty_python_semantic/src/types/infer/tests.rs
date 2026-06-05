@@ -142,6 +142,60 @@ def process(flag: bool, items: list[str]) -> None:
 }
 
 #[test]
+fn loop_header_cache_does_not_affect_nested_module_queries() -> anyhow::Result<()> {
+    const MODULE: &str = r#"
+from . import missing_a, missing_b
+
+def flag() -> bool:
+    return True
+"#;
+    const USER: &str = r#"
+from .module import flag
+
+def process() -> int:
+    value = 0
+    while flag():
+        value = 1
+    return value
+"#;
+
+    let mut baseline_db = setup_db();
+    baseline_db.write_dedented("/src/pkg/__init__.py", "")?;
+    baseline_db.write_dedented("/src/pkg/module.py", MODULE)?;
+    baseline_db.write_dedented("/src/pkg/user.py", USER)?;
+    let baseline_file = system_path_to_file(&baseline_db, "/src/pkg/module.py").unwrap();
+    let baseline = diagnostic_signature(&check_types(&baseline_db, baseline_file));
+    assert_eq!(baseline.len(), 2);
+
+    let mut warmed_db = setup_db();
+    warmed_db.write_dedented("/src/pkg/__init__.py", "")?;
+    warmed_db.write_dedented("/src/pkg/module.py", MODULE)?;
+    warmed_db.write_dedented("/src/pkg/user.py", USER)?;
+    let warmed_file = system_path_to_file(&warmed_db, "/src/pkg/module.py").unwrap();
+    let user_file = system_path_to_file(&warmed_db, "/src/pkg/user.py").unwrap();
+    let user_index = semantic_index(&warmed_db, user_file);
+    let user_scope = user_index
+        .child_scopes(FileScopeId::global())
+        .next()
+        .unwrap()
+        .0
+        .to_scope_id(&warmed_db, user_file);
+    let user_use_def = use_def_map(&warmed_db, user_scope);
+    let module_scope = global_scope(&warmed_db, warmed_file);
+    let module_use_def = use_def_map(&warmed_db, module_scope);
+
+    let cache = crate::Db::loop_header_predicate_cache(&warmed_db);
+    let warmed = cache.with_scope(user_use_def.predicates(), || {
+        assert!(cache.is_active_for(user_use_def.predicates()));
+        assert!(!cache.is_active_for(module_use_def.predicates()));
+        diagnostic_signature(&check_types(&warmed_db, warmed_file))
+    });
+    assert_eq!(warmed, baseline);
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

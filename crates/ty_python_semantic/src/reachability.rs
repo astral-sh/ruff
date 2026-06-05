@@ -582,7 +582,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        if db.loop_header_predicate_cache().is_active() {
+        if db.loop_header_predicate_cache().is_active_for(predicates) {
             evaluate_constraint(self, id, |predicate| {
                 analyze_single_with_loop_header_cache(db, predicates, None, None, predicate)
             })
@@ -849,7 +849,11 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[predicate_id];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    let truthiness = if self.db.loop_header_predicate_cache().is_active() {
+                    let truthiness = if self
+                        .db
+                        .loop_header_predicate_cache()
+                        .is_active_for(self.predicates)
+                    {
                         analyze_single_with_loop_header_cache(
                             self.db,
                             self.predicates,
@@ -1084,11 +1088,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
-fn with_loop_header_predicate_cache<T>(db: &dyn Db, f: impl FnOnce() -> T) -> T {
+fn with_loop_header_predicate_cache<T>(
+    db: &dyn Db,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+    f: impl FnOnce() -> T,
+) -> T {
     // This cache may only change the evaluation order, not the converged fixed-point result.
     // Reporting the outer scope as untracked prevents Salsa from reusing it across revisions.
     db.report_untracked_read();
-    db.loop_header_predicate_cache().with_scope(f)
+    db.loop_header_predicate_cache().with_scope(predicates, f)
 }
 
 fn analyze_single_with_loop_header_cache<'db>(
@@ -1690,7 +1698,7 @@ fn loop_header_predicate_truthinesses<'db>(
     let place_table = place_table(db, scope);
     let mut analyses = FxHashMap::default();
 
-    with_loop_header_predicate_cache(db, || {
+    with_loop_header_predicate_cache(db, use_def.predicates(), || {
         for binding in loop_header.bindings_for_place(place) {
             evaluate_constraint(
                 constraints,

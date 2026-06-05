@@ -59,7 +59,9 @@ impl LoopHeaderPredicateCachePersistence {
 pub struct LoopHeaderPredicateCache {
     entries: RefCell<Option<FxHashMap<LoopHeaderPredicateCacheKey, LoopHeaderPredicateCacheEntry>>>,
     generation: Cell<u64>,
-    active: Cell<bool>,
+    // Nested semantic queries can evaluate unrelated predicate tables while loop analysis is
+    // active. Only tables explicitly entered through `with_scope` may observe this cache.
+    active_predicate_tables: RefCell<Vec<usize>>,
 }
 
 impl Clone for LoopHeaderPredicateCache {
@@ -73,19 +75,39 @@ impl RefUnwindSafe for LoopHeaderPredicateCache {}
 impl UnwindSafe for LoopHeaderPredicateCache {}
 
 impl LoopHeaderPredicateCache {
-    pub(crate) fn with_scope<T>(&self, f: impl FnOnce() -> T) -> T {
-        let owner = !self.active.replace(true);
+    pub(crate) fn with_scope<T>(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+        f: impl FnOnce() -> T,
+    ) -> T {
+        let predicate_table = predicate_table_key(predicates);
+        let owner = {
+            let mut active_predicate_tables = self.active_predicate_tables.borrow_mut();
+            let owner = active_predicate_tables.is_empty();
+            active_predicate_tables.push(predicate_table);
+            owner
+        };
         if owner {
             let mut entries = self.entries.borrow_mut();
             debug_assert!(entries.is_none());
             *entries = Some(FxHashMap::default());
         }
-        let _guard = LoopHeaderPredicateCacheGuard { cache: self, owner };
+        let _guard = LoopHeaderPredicateCacheGuard {
+            cache: self,
+            predicate_table,
+            owner,
+        };
         f()
     }
 
-    pub(crate) fn is_active(&self) -> bool {
-        self.active.get()
+    pub(crate) fn is_active_for(
+        &self,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
+    ) -> bool {
+        let predicate_table = predicate_table_key(predicates);
+        self.active_predicate_tables
+            .borrow()
+            .contains(&predicate_table)
     }
 
     pub(crate) fn get_globally_persistent(
@@ -95,7 +117,7 @@ impl LoopHeaderPredicateCache {
     ) -> Option<Truthiness> {
         let entries = self.entries.borrow();
         let entry = entries.as_ref()?.get(&LoopHeaderPredicateCacheKey {
-            predicates: predicates.raw.as_ptr() as usize,
+            predicates: predicate_table_key(predicates),
             predicate,
         })?;
         (entry.persistence == LoopHeaderPredicateCachePersistence::Global)
@@ -112,7 +134,7 @@ impl LoopHeaderPredicateCache {
     ) -> Option<Truthiness> {
         let generation = self.generation.get();
         let predicate_key = LoopHeaderPredicateCacheKey {
-            predicates: predicates.raw.as_ptr() as usize,
+            predicates: predicate_table_key(predicates),
             predicate,
         };
         let mut entries = self.entries.borrow_mut();
@@ -138,7 +160,7 @@ impl LoopHeaderPredicateCache {
         if let Some(entries) = self.entries.borrow_mut().as_mut() {
             let generation = self.generation.get();
             let predicate_key = LoopHeaderPredicateCacheKey {
-                predicates: predicates.raw.as_ptr() as usize,
+                predicates: predicate_table_key(predicates),
                 predicate,
             };
             insert_cache_entry(
@@ -163,7 +185,7 @@ impl LoopHeaderPredicateCache {
             return;
         };
         let predicate_key = LoopHeaderPredicateCacheKey {
-            predicates: predicates.raw.as_ptr() as usize,
+            predicates: predicate_table_key(predicates),
             predicate,
         };
         if let Some(entry) = entries.get_mut(&predicate_key) {
@@ -238,16 +260,23 @@ fn insert_cache_entry(
 
 struct LoopHeaderPredicateCacheGuard<'db> {
     cache: &'db LoopHeaderPredicateCache,
+    predicate_table: usize,
     owner: bool,
 }
 
 impl Drop for LoopHeaderPredicateCacheGuard<'_> {
     fn drop(&mut self) {
+        let predicate_table = self.cache.active_predicate_tables.borrow_mut().pop();
+        debug_assert_eq!(predicate_table, Some(self.predicate_table));
         if self.owner {
+            debug_assert!(self.cache.active_predicate_tables.borrow().is_empty());
             self.cache.entries.borrow_mut().take();
-            self.cache.active.set(false);
         }
     }
+}
+
+fn predicate_table_key(predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>) -> usize {
+    predicates.raw.as_ptr() as usize
 }
 
 /// Database giving access to semantic information about a Python program.
