@@ -68,3 +68,18 @@ not_suppressed = [
 ][0]
 # ruff:enable[RUF015]
 ```
+
+## Make sure the code actually matches
+
+```toml
+[lint]
+preview = true
+select = ["RUF015"]
+```
+
+```py
+# error: [unnecessary-iterable-allocation-for-first-element]
+not_suppressed = [  # ruff:ignore[F401]
+    *range(10)
+][0]
+```
