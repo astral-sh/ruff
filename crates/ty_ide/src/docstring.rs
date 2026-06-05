@@ -9,11 +9,11 @@
 mod markdown;
 mod rest;
 
+use indexmap::IndexMap;
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::MarkupKind;
@@ -69,8 +69,8 @@ impl Docstring {
 
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
-    pub fn parameter_documentation(&self) -> HashMap<String, String> {
-        let mut param_docs = HashMap::new();
+    pub fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut param_docs = IndexMap::new();
 
         // Google-style docstrings
         param_docs.extend(extract_google_style_params(&self.0));
@@ -495,8 +495,8 @@ fn render_markdown(docstring: &str) -> String {
 }
 
 /// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_google_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut in_args_section = false;
     let mut current_param: Option<String> = None;
@@ -588,8 +588,8 @@ fn get_indentation_level(line: &str) -> usize {
 }
 
 /// Extract parameter documentation from NumPy-style docstrings.
-fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_numpy_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut lines = docstring
         .universal_newlines()
@@ -755,8 +755,8 @@ fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
 }
 
 /// Extract parameter documentation from reST/Sphinx-style docstrings.
-fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_rest_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     for parameter in rest::Docstring::parse(docstring).parameter_documentation() {
         param_docs.insert(parameter.name.into_string(), parameter.description);

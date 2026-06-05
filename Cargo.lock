@@ -4553,6 +4553,7 @@ dependencies = [
  "camino",
  "compact_str",
  "get-size2",
+ "indexmap",
  "insta",
  "itertools 0.14.0",
  "memchr",
