@@ -1372,8 +1372,21 @@ impl LoopCarriedTerminalPredicates {
     }
 }
 
+fn loop_carried_terminal_predicates_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    _previous: &LoopCarriedTerminalPredicates,
+    result: LoopCarriedTerminalPredicates,
+    _scope: ScopeId<'db>,
+    _loop_token: LoopToken<'db>,
+) -> LoopCarriedTerminalPredicates {
+    result
+}
+
 #[salsa::tracked(
     returns(ref),
+    cycle_initial = |_, _, _, _| LoopCarriedTerminalPredicates::default(),
+    cycle_fn = loop_carried_terminal_predicates_cycle_recover,
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn loop_carried_terminal_predicates<'db>(

@@ -744,6 +744,19 @@ async def process(items: list[bool]) -> None:
             await resolve(("too", "many", "items"))  # error: [invalid-argument-type]
 ```
 
+### Loop-carried local functions converge with outer definitions
+
+```py
+def process(flag: bool) -> None:
+    callback()  # error: [unresolved-reference]
+    while flag:
+        if flag:
+            context = 1
+
+        def callback() -> context:  # error: [invalid-type-form]
+            return 1
+```
+
 ### Inner-loop predicates track outer loop headers
 
 A predicate that does not depend on the inner loop can still change as an outer loop header widens.
