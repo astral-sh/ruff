@@ -91,6 +91,7 @@ use std::cmp::Ordering;
 use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Range;
+use std::sync::OnceLock;
 
 use indexmap::map::Entry;
 use itertools::Itertools;
@@ -257,6 +258,15 @@ impl Default for OwnedConstraintSet<'_> {
 }
 
 impl<'db> OwnedConstraintSet<'db> {
+    pub(crate) fn always() -> &'static OwnedConstraintSet<'static> {
+        static ALWAYS: OnceLock<OwnedConstraintSet<'static>> = OnceLock::new();
+
+        ALWAYS.get_or_init(|| {
+            let builder = ConstraintSetBuilder::new();
+            builder.into_owned(|builder| ConstraintSet::always(builder))
+        })
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
