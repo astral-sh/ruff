@@ -16,18 +16,18 @@ use crate::types::constraints::{
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberVisitors,
+    TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, ReturnCallableTypeVarScope};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
     BoundTypeVarIdentity, TypeVarIdentity, TypeVarInstance, walk_type_var_bounds,
 };
 use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+    TypeCollector, TypeVisitor, any_over_type, any_over_type_expanding_aliases,
+    walk_type_with_recursion_guard,
 };
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypes,
@@ -1071,6 +1071,31 @@ pub struct Specialization<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub(super) enum RecursiveSpecializationRelation {
+    Exact,
+    Growing,
+    Unrelated,
+}
+
+impl RecursiveSpecializationRelation {
+    pub(super) const fn combine(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Unrelated, _) | (_, Self::Unrelated) => Self::Unrelated,
+            (Self::Growing, _) | (_, Self::Growing) => Self::Growing,
+            (Self::Exact, Self::Exact) => Self::Exact,
+        }
+    }
+
+    pub(super) const fn is_recursive_match(self) -> bool {
+        matches!(self, Self::Exact | Self::Growing)
+    }
+
+    pub(super) const fn is_growing(self) -> bool {
+        matches!(self, Self::Growing)
+    }
+}
+
 pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
@@ -1086,6 +1111,38 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Classifies how `self` relates to `previous` for recursive specialization guards.
+    pub(super) fn recursive_relation_from(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+    ) -> RecursiveSpecializationRelation {
+        if self.generic_context(db) != previous.generic_context(db) {
+            return RecursiveSpecializationRelation::Unrelated;
+        }
+
+        if self == previous {
+            return RecursiveSpecializationRelation::Exact;
+        }
+
+        let mut growing = false;
+        for (current_ty, previous_ty) in self.types(db).iter().zip(previous.types(db)) {
+            if current_ty == previous_ty {
+                continue;
+            }
+            if !any_over_type_expanding_aliases(db, *current_ty, |ty| ty == *previous_ty) {
+                return RecursiveSpecializationRelation::Unrelated;
+            }
+            growing = true;
+        }
+
+        if growing {
+            RecursiveSpecializationRelation::Growing
+        } else {
+            RecursiveSpecializationRelation::Unrelated
+        }
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1369,14 +1426,14 @@ impl<'db> Specialization<'db> {
     ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(
             constraints,
             inferable,
             &relation_visitor,
             &disjointness_visitor,
-            &signature_relation_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
         checker.check_specialization_pair(db, self, other)
@@ -2335,7 +2392,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
     ) -> Result<(), ()> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
 
-        for actual_callable in actual_callables.as_slice() {
+        for actual_callable in actual_callables.iter() {
             if formal_is_single_paramspec {
                 let when = actual_callable
                     .signatures(self.db)

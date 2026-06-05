@@ -13,7 +13,7 @@ use crate::{Db, FxOrderSet};
 
 pub(crate) mod builder;
 
-pub(crate) use builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use builder::{IntersectionBuilder, UnionBuilder, UnionSimplification};
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct UnionType<'db> {
@@ -152,31 +152,29 @@ impl<'db> UnionType<'db> {
     }
 
     /// A version of [`UnionType::map`] that does not unpack type aliases.
+    #[cfg(test)]
     pub(crate) fn map_leave_aliases(
         self,
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let elements = self.elements(db);
-        let mut iter = elements.iter().enumerate();
-        while let Some((i, ty)) = iter.next() {
-            let new_ty = transform_fn(ty);
-            if &new_ty != ty {
-                let mut builder = UnionBuilder::new(db).unpack_aliases(false);
-                for prev in &elements[..i] {
-                    builder = builder.add(*prev);
-                }
-                builder = builder.add(new_ty);
-                for (_, element) in iter {
-                    builder = builder.add(transform_fn(element));
-                }
-                return builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build();
-            }
-        }
+        self.map_leave_aliases_with_simplification(
+            db,
+            UnionSimplification::TypeRelations,
+            |element| transform_fn(element),
+        )
+    }
 
-        Type::Union(self)
+    pub(crate) fn map_leave_aliases_with_simplification(
+        self,
+        db: &'db dyn Db,
+        simplification: UnionSimplification,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let Ok(mapped) = self.try_map_leave_aliases_impl(db, simplification, |element| {
+            Ok::<_, Infallible>(transform_fn(element))
+        });
+        mapped
     }
 
     /// A fallible version of [`UnionType::map`].
@@ -209,6 +207,36 @@ impl<'db> UnionType<'db> {
                     .iter()
                     .copied()
                     .fold(UnionBuilder::new(db), UnionBuilder::add);
+                builder = builder.add(new_ty);
+                for (_, element) in iter {
+                    builder = builder.add(transform_fn(element)?);
+                }
+                return Ok(builder
+                    .recursively_defined(self.recursively_defined(db))
+                    .build());
+            }
+        }
+
+        Ok(Type::Union(self))
+    }
+
+    fn try_map_leave_aliases_impl<E>(
+        self,
+        db: &'db dyn Db,
+        simplification: UnionSimplification,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        let elements = self.elements(db);
+        let mut iter = elements.iter().enumerate();
+        while let Some((i, ty)) = iter.next() {
+            let new_ty = transform_fn(ty)?;
+            if &new_ty != ty {
+                let mut builder = elements[..i].iter().copied().fold(
+                    UnionBuilder::new(db)
+                        .unpack_aliases(false)
+                        .simplification(simplification),
+                    UnionBuilder::add,
+                );
                 builder = builder.add(new_ty);
                 for (_, element) in iter {
                     builder = builder.add(transform_fn(element)?);

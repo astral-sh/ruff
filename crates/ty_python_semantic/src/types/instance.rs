@@ -21,13 +21,14 @@ use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberVisitors,
+    TypeRelationChecker,
 };
-use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
+    class::ClassMemberKey,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -527,19 +528,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         }
 
         let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                ty,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
+            self.check_protocol_interface_pair(db, source_protocol, protocol)
         } else {
             protocol
                 .inner
                 .interface(db)
                 .members(db)
                 .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
+                    let target_key = ClassMemberKey::from_type_member(
+                        db,
+                        Type::ProtocolInstance(protocol),
+                        member.name(),
+                    );
+                    self.type_satisfies_protocol_member(db, ty, target_key, &member)
                 })
         };
         if structurally_satisfied.is_never_satisfied(db) {
@@ -763,14 +764,14 @@ impl<'db> ProtocolInstanceType<'db> {
             let constraints = ConstraintSetBuilder::new();
             let relation_visitor = HasRelationToVisitor::default(&constraints);
             let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
+            let protocol_member_visitors = ProtocolMemberVisitors::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(
                 &constraints,
                 InferableTypeVars::None,
                 &relation_visitor,
                 &disjointness_visitor,
-                &signature_relation_visitor,
+                &protocol_member_visitors,
                 &materialization_visitor,
             );
             checker

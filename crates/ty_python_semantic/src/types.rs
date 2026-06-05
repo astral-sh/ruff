@@ -36,7 +36,7 @@ pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{
-    IntersectionBuilder, UnionAccumulator, UnionBuilder,
+    IntersectionBuilder, UnionAccumulator, UnionBuilder, UnionSimplification,
 };
 pub use self::set_theoretic::{
     IntersectionType, NegativeIntersectionElements, NegativeIntersectionElementsIterator, UnionType,
@@ -249,6 +249,35 @@ struct ApplyMaterializationEquivalence;
 type MaterializationEquivalenceVisitor<'db> =
     Rc<CycleDetector<ApplyMaterializationEquivalence, (Type<'db>, Type<'db>), bool>>;
 
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    struct TypeMappingFlags: u8 {
+        /// Union rebuilding during this mapping may ask the type-relation layer for redundancy and
+        /// subtype checks.
+        const SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS = 1 << 0;
+    }
+}
+
+impl TypeMappingFlags {
+    fn for_protocol_interface() -> Self {
+        Self::empty()
+    }
+
+    const fn union_simplification(self) -> UnionSimplification {
+        if self.contains(Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS) {
+            UnionSimplification::TypeRelations
+        } else {
+            UnionSimplification::Structural
+        }
+    }
+}
+
+impl Default for TypeMappingFlags {
+    fn default() -> Self {
+        Self::SIMPLIFY_UNIONS_WITH_TYPE_RELATIONS
+    }
+}
+
 /// A [`TypeTransformer`] that is used in `apply_type_mapping` methods.
 ///
 /// Materialization is the only mapping mode that needs to visit the same type under two different
@@ -259,9 +288,21 @@ pub(crate) struct ApplyTypeMappingVisitor<'db> {
     top_materialization: OnceCell<TypeTransformer<'db, ApplyTopMaterialization>>,
     bottom_materialization: OnceCell<TypeTransformer<'db, ApplyBottomMaterialization>>,
     materialization_equivalence: OnceCell<MaterializationEquivalenceVisitor<'db>>,
+    flags: TypeMappingFlags,
 }
 
 impl<'db> ApplyTypeMappingVisitor<'db> {
+    fn with_flags(flags: TypeMappingFlags) -> Self {
+        Self {
+            flags,
+            ..Self::default()
+        }
+    }
+
+    const fn flags(&self) -> TypeMappingFlags {
+        self.flags
+    }
+
     fn materialization_equivalence(&self) -> &MaterializationEquivalenceVisitor<'db> {
         self.materialization_equivalence
             .get_or_init(|| Rc::new(CycleDetector::new(true)))
@@ -312,6 +353,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
             materialization_equivalence,
+            flags: self.flags,
         }
     }
 }
@@ -323,6 +365,7 @@ impl Default for ApplyTypeMappingVisitor<'_> {
             top_materialization: OnceCell::new(),
             bottom_materialization: OnceCell::new(),
             materialization_equivalence: OnceCell::new(),
+            flags: TypeMappingFlags::default(),
         }
     }
 }
@@ -5750,23 +5793,51 @@ impl<'db> Type<'db> {
         }
     }
 
+    pub(super) fn apply_optional_specialization_for_protocol_interface(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+    ) -> Type<'db> {
+        // Protocol interfaces are a structural view of declarations. Using relation-based union
+        // simplification here can recursively force interfaces for ever-growing generic protocol
+        // specializations before protocol-member recursion guards are active.
+        if let Some(specialization) = specialization {
+            self.apply_specialization_inner(
+                db,
+                specialization,
+                TypeMappingFlags::for_protocol_interface(),
+            )
+        } else {
+            self
+        }
+    }
+
     /// Applies a specialization to this type, replacing any typevars with the types that they are
     /// specialized to.
     ///
     /// Note that this does not specialize generic classes, functions, or type aliases! That is a
     /// different operation that is performed explicitly (via a subscript operation), or implicitly
     /// via a call to the generic object.
-    #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
-        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
-            value.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     pub(crate) fn apply_specialization(
         self,
         db: &'db dyn Db,
         specialization: Specialization<'db>,
+    ) -> Type<'db> {
+        self.apply_specialization_inner(db, specialization, TypeMappingFlags::default())
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn apply_specialization_inner(
+        self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        flags: TypeMappingFlags,
     ) -> Type<'db> {
         let type_mapping = match specialization.materialization_kind(db) {
             None => TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
@@ -5778,7 +5849,8 @@ impl<'db> Type<'db> {
             },
         };
 
-        self.apply_type_mapping(db, &type_mapping, TypeContext::default())
+        let visitor = ApplyTypeMappingVisitor::with_flags(flags);
+        self.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), &visitor)
     }
 
     fn apply_type_mapping<'a>(
@@ -5931,9 +6003,11 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => union.map_leave_aliases(db, |element| {
-                element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-            }),
+            Type::Union(union) => union.map_leave_aliases_with_simplification(
+                db,
+                visitor.flags().union_simplification(),
+                |element| element.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            ),
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
@@ -6036,7 +6110,16 @@ impl<'db> Type<'db> {
 
                         // If the type mapping does not result in any change to this type alias, keep the
                         // alias node instead of eagerly expanding it.
-                        if alias.value_type(db) == mapped {
+                        let contains_recursive_alias = any_over_type(db, mapped, false, |ty| {
+                            match ty {
+                                Type::TypeAlias(nested)
+                                | Type::KnownInstance(KnownInstanceType::TypeAliasType(nested)) => {
+                                    nested.definition(db) == alias.definition(db)
+                                }
+                                _ => false,
+                            }
+                        });
+                        if !contains_recursive_alias && alias.value_type(db) == mapped {
                             self
                         } else {
                             mapped
@@ -6163,7 +6246,7 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => {}
 
             Type::FunctionLiteral(function) => {
-                visitor.visit(self, || {
+                visitor.visit_type(db, self, || {
                     function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 });
             }
@@ -6275,7 +6358,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeAlias(alias) => {
-                visitor.visit(self, || {
+                visitor.visit_type(db, self, || {
                     alias.value_type(db).find_legacy_typevars_impl(
                         db,
                         binding_context,

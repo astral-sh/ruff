@@ -6,7 +6,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
         TypeMapping, TypeVarVariance, definition_expression_type,
         display::qualified_name_components_from_scope,
-        generics::{ApplySpecialization, Specialization},
+        generics::{ApplySpecialization, RecursiveSpecializationRelation, Specialization},
+        signatures::ParameterForm,
         variance::VarianceInferable,
         visitor,
     },
@@ -214,7 +215,7 @@ pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: TypeAliasType<'db>,
     visitor: &V,
 ) {
-    if !visitor.should_visit_lazy_type_attributes() {
+    if !visitor.should_visit_type_aliases() {
         return;
     }
     match type_alias {
@@ -278,6 +279,29 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
+    /// Classifies this alias relative to a possible recursive ancestor.
+    pub(super) fn recursive_relation_from(
+        self,
+        db: &'db dyn Db,
+        previous: Self,
+    ) -> RecursiveSpecializationRelation {
+        if self == previous {
+            return RecursiveSpecializationRelation::Exact;
+        }
+
+        if self.definition(db) != previous.definition(db) {
+            return RecursiveSpecializationRelation::Unrelated;
+        }
+
+        let (Some(previous), Some(current)) =
+            (previous.specialization(db), self.specialization(db))
+        else {
+            return RecursiveSpecializationRelation::Unrelated;
+        };
+
+        current.recursive_relation_from(db, previous)
+    }
+
     pub(super) fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
@@ -311,7 +335,102 @@ impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        let definition = self.definition(db);
+        let raw_value_type = self.raw_value_type(db);
+        if contains_type_alias_definition(db, raw_value_type, definition) {
+            return variance_of_type_ignoring_alias(
+                db,
+                raw_value_type,
+                typevar,
+                definition,
+                TypeVarVariance::Covariant,
+            );
+        }
+
         self.value_type(db).variance_of(db, typevar)
+    }
+}
+
+fn contains_type_alias_definition<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    definition: Definition<'db>,
+) -> bool {
+    visitor::any_over_type(db, ty, false, |ty| {
+        type_alias_from_type(ty).is_some_and(|alias| alias.definition(db) == definition)
+    })
+}
+
+fn type_alias_from_type(ty: Type<'_>) -> Option<TypeAliasType<'_>> {
+    match ty {
+        Type::TypeAlias(alias) => Some(alias),
+        Type::KnownInstance(crate::types::KnownInstanceType::TypeAliasType(alias)) => Some(alias),
+        _ => None,
+    }
+}
+
+fn variance_of_type_ignoring_alias<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    typevar: BoundTypeVarInstance<'db>,
+    definition: Definition<'db>,
+    polarity: TypeVarVariance,
+) -> TypeVarVariance {
+    if !contains_type_alias_definition(db, ty, definition) {
+        return ty.with_polarity(polarity).variance_of(db, typevar);
+    }
+
+    match ty {
+        Type::TypeAlias(alias) if alias.definition(db) == definition => TypeVarVariance::Bivariant,
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .map(|ty| variance_of_type_ignoring_alias(db, *ty, typevar, definition, polarity))
+            .collect(),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .map(|ty| variance_of_type_ignoring_alias(db, *ty, typevar, definition, polarity))
+            .chain(intersection.negative(db).iter().map(|ty| {
+                variance_of_type_ignoring_alias(
+                    db,
+                    *ty,
+                    typevar,
+                    definition,
+                    polarity.compose(TypeVarVariance::Contravariant),
+                )
+            }))
+            .collect(),
+        Type::Callable(callable) => callable
+            .signatures(db)
+            .iter()
+            .map(|signature| {
+                let parameter_variances = signature
+                    .parameters()
+                    .iter()
+                    .filter(|parameter| parameter.form == ParameterForm::Value)
+                    .map(|parameter| {
+                        variance_of_type_ignoring_alias(
+                            db,
+                            parameter.annotated_type(),
+                            typevar,
+                            definition,
+                            polarity.compose(TypeVarVariance::Contravariant),
+                        )
+                    });
+
+                parameter_variances
+                    .chain(std::iter::once(variance_of_type_ignoring_alias(
+                        db,
+                        signature.return_ty,
+                        typevar,
+                        definition,
+                        polarity,
+                    )))
+                    .collect::<TypeVarVariance>()
+            })
+            .collect(),
+        _ => TypeVarVariance::Bivariant,
     }
 }
 

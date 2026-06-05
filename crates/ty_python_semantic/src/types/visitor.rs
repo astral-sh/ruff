@@ -1,5 +1,3 @@
-use rustc_hash::FxHashSet;
-
 use crate::{
     Db,
     types::{
@@ -9,12 +7,14 @@ use crate::{
         TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
-        class::walk_generic_alias,
+        class::{ClassMemberKey, walk_generic_alias},
+        cyclic::ActiveRecursionDetector,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         known_instance::walk_known_instance_type,
         method::{walk_bound_method_type, walk_method_wrapper_type},
         newtype::{NewType, walk_newtype_instance_type},
+        protocol_class::walk_protocol_members_with_guard,
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
@@ -23,6 +23,7 @@ use crate::{
         walk_property_instance_type, walk_typeform_type, walk_typeguard_type, walk_typeis_type,
     },
 };
+use rustc_hash::FxHashSet;
 use std::cell::{Cell, RefCell};
 
 /// A visitor trait that recurses into nested types.
@@ -33,6 +34,11 @@ use std::cell::{Cell, RefCell};
 pub(crate) trait TypeVisitor<'db> {
     /// Should the visitor trigger inference of and visit lazily-inferred type attributes?
     fn should_visit_lazy_type_attributes(&self) -> bool;
+
+    /// Should the visitor expand type aliases?
+    fn should_visit_type_aliases(&self) -> bool {
+        self.should_visit_lazy_type_attributes()
+    }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>);
 
@@ -312,6 +318,7 @@ fn any_over_type_impl<'db, F, T>(
     db: &'db dyn Db,
     ty: Type<'db>,
     should_visit_lazy_type_attributes: bool,
+    should_visit_type_aliases: bool,
     query: F,
 ) -> T
 where
@@ -321,8 +328,56 @@ where
     struct AnyOverTypeVisitor<'db, 'a, U> {
         query: &'a dyn Fn(Type<'db>) -> U,
         recursion_guard: TypeCollector<'db>,
+        protocol_member_guard: ActiveRecursionDetector<ClassMemberKey<'db>>,
         found_matching_type: Cell<U>,
         should_visit_lazy_type_attributes: bool,
+        should_visit_type_aliases: bool,
+        visit_lazy_type_attributes: Cell<bool>,
+    }
+
+    impl<'db, U> AnyOverTypeVisitor<'db, '_, U>
+    where
+        U: Copy + Default + PartialEq,
+    {
+        fn found_matching_type(&self) -> bool {
+            self.found_matching_type.get() != U::default()
+        }
+
+        fn walk_lazy_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            walk_protocol_members_with_guard(
+                db,
+                protocol,
+                self,
+                &self.protocol_member_guard,
+                || self.found_matching_type(),
+                |protocol| self.walk_protocol_specialization(db, protocol),
+            );
+        }
+
+        fn walk_protocol_specialization(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            if let Some(class) = Type::ProtocolInstance(protocol).nominal_class(db)
+                && let Some((_, Some(specialization))) = class.static_class_literal(db)
+            {
+                // Only inspect the explicit specialization arguments. Lazy type-var metadata is
+                // not part of the recursive protocol member type that reached this cycle.
+                let previous = self.visit_lazy_type_attributes.replace(false);
+                for ty in specialization.types(db) {
+                    if self.found_matching_type() {
+                        break;
+                    }
+                    self.visit_type(db, *ty);
+                }
+                self.visit_lazy_type_attributes.set(previous);
+            }
+        }
     }
 
     impl<'db, U> TypeVisitor<'db> for AnyOverTypeVisitor<'db, '_, U>
@@ -330,7 +385,11 @@ where
         U: Copy + Default + PartialEq,
     {
         fn should_visit_lazy_type_attributes(&self) -> bool {
-            self.should_visit_lazy_type_attributes
+            self.should_visit_lazy_type_attributes && self.visit_lazy_type_attributes.get()
+        }
+
+        fn should_visit_type_aliases(&self) -> bool {
+            self.should_visit_type_aliases
         }
 
         fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
@@ -346,13 +405,28 @@ where
             }
             walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
+
+        fn visit_protocol_instance_type(
+            &self,
+            db: &'db dyn Db,
+            protocol: ProtocolInstanceType<'db>,
+        ) {
+            if self.should_visit_lazy_type_attributes() {
+                self.walk_lazy_protocol_instance_type(db, protocol);
+            } else {
+                walk_protocol_instance_type(db, protocol, self);
+            }
+        }
     }
 
     let visitor = AnyOverTypeVisitor {
         query: &query,
         recursion_guard: TypeCollector::default(),
+        protocol_member_guard: ActiveRecursionDetector::default(),
         found_matching_type: Cell::default(),
         should_visit_lazy_type_attributes,
+        should_visit_type_aliases,
+        visit_lazy_type_attributes: Cell::new(true),
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
@@ -372,7 +446,25 @@ pub(super) fn any_over_type<'db>(
     should_visit_lazy_type_attributes: bool,
     query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(
+        db,
+        ty,
+        should_visit_lazy_type_attributes,
+        should_visit_lazy_type_attributes,
+        query,
+    )
+}
+
+/// Return `true` if `ty`, or any type contained in `ty`, matches the closure passed in.
+///
+/// This expands type aliases without triggering other lazy attributes such as protocol members or
+/// typevar bounds.
+pub(super) fn any_over_type_expanding_aliases<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    query: impl Fn(Type<'db>) -> bool,
+) -> bool {
+    any_over_type_impl(db, ty, false, true, query)
 }
 
 /// Recurse into a type and calls the passed-in closure on every nested type
@@ -397,5 +489,11 @@ pub(super) fn find_over_type<'db, T>(
 where
     T: Copy + PartialEq,
 {
-    any_over_type_impl(db, ty, should_visit_lazy_type_attributes, query)
+    any_over_type_impl(
+        db,
+        ty,
+        should_visit_lazy_type_attributes,
+        should_visit_lazy_type_attributes,
+        query,
+    )
 }

@@ -2893,6 +2893,60 @@ static_assert(not is_assignable_to(TypeOf[doesnt_satisfy_foo], Foo))
 static_assert(not is_subtype_of(TypeOf[doesnt_satisfy_foo], Foo))
 ```
 
+Recursive callable protocols also need member guards for non-class sources:
+
+```py
+from typing import TypeVar
+
+TCall = TypeVar("TCall")
+
+class RecFn(Protocol[TCall]):
+    def __call__(self) -> "RecFn[list[TCall]]": ...
+
+def rec_fn() -> "TypeOf[rec_fn]":
+    return rec_fn
+
+static_assert(is_assignable_to(TypeOf[rec_fn], RecFn[int]))
+
+class RecFnPayload(Protocol[TCall]):
+    def __call__(self) -> tuple["RecFnPayload[list[TCall]]", TCall]: ...
+
+def rec_fn_payload() -> "tuple[TypeOf[rec_fn_payload], int]":
+    raise NotImplementedError
+
+static_assert(not is_assignable_to(TypeOf[rec_fn_payload], RecFnPayload[int]))
+```
+
+Recursive callable aliases use the alias specialization as the source key:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Protocol
+from ty_extensions import TypeOf, is_assignable_to, static_assert
+
+class AP[T](Protocol):
+    def __call__(self) -> "AP[list[T]]": ...
+
+type RecAlias[T] = Callable[[], RecAlias[list[T]]]
+
+static_assert(is_assignable_to(RecAlias[int], AP[int]))
+
+def check_value_source(c: RecAlias[int]) -> None:
+    static_assert(is_assignable_to(TypeOf[c], AP[int]))
+
+class APayload[T](Protocol):
+    def __call__(self) -> tuple["APayload[list[T]]", T]: ...
+
+type RecAliasPayload[T] = Callable[[], tuple[RecAliasPayload[list[T]], int]]
+
+static_assert(not is_assignable_to(RecAliasPayload[int], APayload[int]))
+```
+
 Class-literals and generic aliases can also be subtypes of callback protocols:
 
 ```py
@@ -3105,12 +3159,11 @@ static_assert(is_equivalent_to(Foo, Bar))
 T = TypeVar("T", bound="TypeVarRecursive")
 
 class TypeVarRecursive(Protocol):
-    # TODO: commenting this out will cause a stack overflow.
-    # x: T
+    x: T  # error: [unbound-type-variable]
     y: "TypeVarRecursive"
 
 def _(t: TypeVarRecursive):
-    # reveal_type(t.x)  # revealed: T
+    reveal_type(t.x)  # revealed: Unknown
     reveal_type(t.y)  # revealed: TypeVarRecursive
 ```
 
@@ -3415,6 +3468,167 @@ def f(c: C[int]) -> None:
     # The cycle detection assumes compatibility when it detects potential
     # infinite recursion between protocol specializations.
     takes_c(c)
+```
+
+### Recursive generic protocol unions
+
+Union simplification must not force ever-growing protocol interfaces.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Callable
+from typing import Protocol, TypeVar
+
+from ty_extensions import is_assignable_to, static_assert
+
+class U[T](Protocol):
+    a: "U[list[T]] | None"
+
+class V[T](Protocol):
+    a: "V[list[T]] | None"
+
+static_assert(is_assignable_to(U[int], V[int]))
+
+class MU[T](Protocol):
+    def a(self) -> "MU[list[T]] | None": ...
+
+class MV[T](Protocol):
+    def a(self) -> "MV[list[T]] | None": ...
+
+static_assert(is_assignable_to(MU[int], MV[int]))
+
+T = TypeVar("T")
+
+class LegacyU(Protocol[T]):
+    a: "LegacyU[list[T]] | None"
+
+def takes_legacy_u(u: LegacyU[list[int]] | None) -> None: ...
+def use_legacy_u(u: LegacyU[int]) -> None:
+    takes_legacy_u(u.a)
+
+class NestedU[T](Protocol):
+    tuple_member: tuple["NestedU[list[T]]"] | tuple[int]
+    list_member: list["NestedU[list[T]]"] | list[int]
+    callable_member: Callable[[], "NestedU[list[T]]"] | Callable[[], int]
+
+def use_nested_u(u: NestedU[int]) -> None:
+    u.tuple_member
+    u.list_member
+    u.callable_member
+```
+
+### Recursive generic protocol relations
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+from ty_extensions import (
+    is_assignable_to,
+    is_disjoint_from,
+    is_equivalent_to,
+    is_subtype_of,
+    static_assert,
+)
+
+class DP[T](Protocol):
+    child: "DP[list[T]]"
+
+class DN[T]:
+    child: "DN[list[T]]"
+
+static_assert(not is_disjoint_from(DN[int], DP[int]))
+
+class PayloadP[T](Protocol):
+    child: "PayloadP[list[T]]"
+    payload: int
+
+class PayloadN[T]:
+    child: "PayloadN[list[T]]"
+    payload: str
+
+static_assert(is_disjoint_from(PayloadN[int], PayloadP[int]))
+
+class TupleP[T](Protocol):
+    child: tuple["TupleP[list[T]]", T]
+
+class TupleN[T]:
+    child: tuple["TupleN[list[T]]", int]
+
+static_assert(is_disjoint_from(TupleN[int], TupleP[int]))
+
+class P[T](Protocol):
+    a: "P[list[T]]"
+
+class Q[T](Protocol):
+    a: "Q[list[T]]"
+
+static_assert(is_assignable_to(P[int], Q[int]))
+static_assert(is_subtype_of(P[int], Q[int]))
+static_assert(is_equivalent_to(P[int], Q[int]))
+
+type Alias[T] = list[T]
+
+class AP[T](Protocol):
+    a: "AP[Alias[T]]"
+
+class AQ[T](Protocol):
+    a: "AQ[Alias[T]]"
+
+static_assert(is_assignable_to(AP[int], AQ[int]))
+
+class SP[T](Protocol):
+    a: "SP[list[T]]"
+    x: list[T]
+
+class SQ[T](Protocol):
+    a: "SQ[list[T]]"
+    x: list[int]
+
+static_assert(not is_assignable_to(SP[int], SQ[int]))
+
+class TP[T](Protocol):
+    a: tuple[T, "TP[int]"]
+
+class TQ[T](Protocol):
+    a: tuple[T, "TQ[str]"]
+
+static_assert(not is_assignable_to(TP[str], TQ[str]))
+
+class XP[T](Protocol):
+    a: "XP[list[T]]"
+    x: T
+
+class XQ[T](Protocol):
+    a: "XQ[tuple[T]]"
+    x: T
+
+static_assert(not is_assignable_to(XP[int], XQ[int]))
+
+class MP[T](Protocol):
+    def a(self) -> tuple["MP[list[T]]", T]: ...
+
+class MQ[T](Protocol):
+    def a(self) -> tuple["MQ[tuple[T]]", T]: ...
+
+static_assert(not is_assignable_to(MP[int], MQ[int]))
+
+class MutP[T](Protocol):
+    child: "MutN[list[T]]"
+
+class MutN[T]:
+    child: "MutP[list[T]]"
+
+static_assert(not is_assignable_to(MutN[int], MutP[int]))
+static_assert(not is_subtype_of(MutN[int], MutP[int]))
+static_assert(not is_equivalent_to(MutN[int], MutP[int]))
 ```
 
 ### Recursive legacy generic protocol

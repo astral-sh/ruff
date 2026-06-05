@@ -382,7 +382,7 @@ r2: RecursiveList[int] = [1, [1, 2, 3]]
 r3: RecursiveList[int] = "a"
 # error: [invalid-assignment]
 r4: RecursiveList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[RecursiveList[int]] | str]]` is not assignable to `RecursiveList[int]`"
+# error: [invalid-assignment] "Object of type `list[int | list[RecursiveList[int]] | list[int | list[int | list[int | list[RecursiveList[int]]]] | str]]` is not assignable to `RecursiveList[int]`"
 r5: RecursiveList[int] = [1, ["a"]]
 
 def _(x: RecursiveList[int]):
@@ -422,7 +422,7 @@ d1: DivergentList[int] = []
 d2: DivergentList[int] = [1]
 # error: [invalid-assignment]
 d3: DivergentList[int] = ["a"]
-# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[DivergentList[int]] | int]]` is not assignable to `DivergentList[int]`"
+# error: [invalid-assignment] "Object of type `list[list[DivergentList[int]] | list[list[list[list[DivergentList[int]]]] | int]]` is not assignable to `DivergentList[int]`"
 d4: DivergentList[int] = [[1]]
 
 def _(x: DivergentList[int]):

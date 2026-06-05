@@ -26,16 +26,16 @@ use crate::types::constraints::{
 use crate::types::enums::enum_metadata;
 use crate::types::function::{AbstractMethodKind, DataclassTransformerParams};
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_specialization,
+    GenericContext, InferableTypeVars, RecursiveSpecializationRelation, Specialization,
+    walk_specialization,
 };
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
 use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, ProtocolMemberVisitors,
+    TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
@@ -852,6 +852,56 @@ pub enum ClassType<'db> {
     Generic(GenericAlias<'db>),
 }
 
+/// The identity of a member on a statement-defined class under a specific specialization.
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub(super) struct ClassMemberKey<'db> {
+    class: StaticClassLiteral<'db>,
+    specialization: Option<Specialization<'db>>,
+    member_name: Name,
+}
+
+impl<'db> ClassMemberKey<'db> {
+    pub(super) fn new(
+        class: StaticClassLiteral<'db>,
+        specialization: Option<Specialization<'db>>,
+        member_name: &str,
+    ) -> Self {
+        Self {
+            class,
+            specialization,
+            member_name: Name::new(member_name),
+        }
+    }
+
+    /// Create a member key for a type whose members come from a statement-defined class.
+    pub(super) fn from_type_member(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        member_name: &str,
+    ) -> Option<Self> {
+        let class = ty.nominal_class(db).or_else(|| ty.to_class_type(db))?;
+        let (class, specialization) = class.static_class_literal(db)?;
+        Some(Self::new(class, specialization, member_name))
+    }
+
+    /// Classifies this member key relative to a possible recursive ancestor.
+    pub(super) fn recursive_relation_from(
+        &self,
+        db: &'db dyn Db,
+        previous: &Self,
+    ) -> RecursiveSpecializationRelation {
+        if self.class != previous.class || self.member_name != previous.member_name {
+            return RecursiveSpecializationRelation::Unrelated;
+        }
+
+        match (previous.specialization, self.specialization) {
+            (Some(previous), Some(current)) => current.recursive_relation_from(db, previous),
+            (None, None) => RecursiveSpecializationRelation::Exact,
+            _ => RecursiveSpecializationRelation::Unrelated,
+        }
+    }
+}
+
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
@@ -1209,14 +1259,14 @@ impl<'db> ClassType<'db> {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
         let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-        let signature_relation_visitor = SignatureRelationVisitor::default();
+        let protocol_member_visitors = ProtocolMemberVisitors::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
             &constraints,
             InferableTypeVars::None,
             &relation_visitor,
             &disjointness_visitor,
-            &signature_relation_visitor,
+            &protocol_member_visitors,
             &materialization_visitor,
         );
         checker

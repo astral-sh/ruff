@@ -97,6 +97,26 @@ def f(x: RecursiveAlias):
     cast(RecursiveAlias, x)
 ```
 
+Recursive protocol walks should still inspect guarded members.
+
+```py
+from typing import Protocol, cast
+from ty_extensions import Unknown
+
+class Proto[T](Protocol):
+    def next(self) -> "Proto[Unknown]": ...
+    payload: T
+
+def f(x: Proto[int]):
+    cast(Proto[int], x)
+
+class RecursiveMemberProto[T](Protocol):
+    def next(self) -> tuple["RecursiveMemberProto[tuple[T, Unknown]]", T]: ...
+
+def g(x: RecursiveMemberProto[int]):
+    cast(RecursiveMemberProto[int], x)
+```
+
 ## Diagnostic snapshots
 
 ```py
