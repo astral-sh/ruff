@@ -35,3 +35,36 @@ select = ["W292"]
 ```py
 suppressed = 1  # ruff:ignore[W292]
 ```
+
+## Block suppression boundaries
+
+A block suppression should not apply to a diagnostic that starts inside the disabled range but ends
+after the matching `ruff:enable` comment:
+
+```toml
+[lint]
+preview = true
+select = ["RUF015"]
+```
+
+```py
+# ruff:disable[RUF015]
+# error: [unnecessary-iterable-allocation-for-first-element]
+not_suppressed = [
+# ruff:enable[RUF015]
+    *range(10)
+][0]
+```
+
+This isn't _strictly_ a problem because the formatter will indent and invalidate the `ruff:enable`
+comment here, raising `RUF103`, but it seems better for this not to work regardless of formatting.
+
+This is how the comments should look instead:
+
+```py
+# ruff:disable[RUF015]
+not_suppressed = [
+    *range(10)
+][0]
+# ruff:enable[RUF015]
+```

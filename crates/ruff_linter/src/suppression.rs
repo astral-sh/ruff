@@ -103,6 +103,17 @@ impl Suppression {
     fn codes(&self) -> &[TextRange] {
         &self.comments.first().codes
     }
+
+    /// Returns whether or not the suppression is a standalone `ruff:ignore` comment.
+    fn is_ignore(&self) -> bool {
+        matches!(
+            self.comments,
+            SuppressionComments::Single(SuppressionComment {
+                action: SuppressionAction::Ignore,
+                ..
+            })
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -209,18 +220,38 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
-    /// Check if a diagnostic is suppressed by any known range suppressions
+    /// Check if a diagnostic is suppressed by any known range suppressions.
     ///
-    /// A suppression applies for the given diagnostic if it contains the diagnostic's start offset.
-    /// This means the suppression is on the same line as the diagnostic's start, as in:
+    /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
+    /// For example, noting that the `RUF015` diagnostic spans from the opening `[` to the end of
+    /// the subscript expression:
     ///
-    /// ```python
-    /// suppressed = [  # ruff:disable[RUF015]
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    ///     *range(10)
+    /// ][0]
+    /// # ruff:enable[RUF015]
+    /// ```
+    ///
+    /// is suppressed, but
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    /// # ruff:enable[RUF015]
     ///     *range(10)
     /// ][0]
     /// ```
     ///
-    /// where the diagnostic starts at the `[`.
+    /// is not. For `ruff:ignore`, this rule is augmented to check whether the diagnostic's start
+    /// offset is contained instead, meaning that this _will_ be suppressed:
+    ///
+    /// ```python
+    /// suppressed = [  # ruff:ignore[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
@@ -242,7 +273,11 @@ impl Suppressions {
 
             // Note that `contains_inclusive` is used here for diagnostics with an empty range, such
             // as missing-newline-at-end-of-file (W292) that would otherwise be unsuppressible.
-            if *code == suppression_code && suppression.range.contains_inclusive(range.start()) {
+            if *code == suppression_code
+                && (suppression.range.contains_range(range)
+                    || suppression.is_ignore()
+                        && suppression.range.contains_inclusive(range.start()))
+            {
                 suppression.used.set(true);
                 return true;
             }
