@@ -175,7 +175,7 @@ fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bo
             .elements(db)
             .iter()
             .copied()
-            .all(|element| is_metaclass_receiver_type(db, element)),
+            .any(|element| is_metaclass_receiver_type(db, element)),
         Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 is_metaclass_receiver_bound(db, bound)
@@ -184,7 +184,7 @@ fn is_metaclass_receiver_type(db: &dyn crate::Db, receiver_type: Type<'_>) -> bo
                 .elements(db)
                 .iter()
                 .copied()
-                .all(|constraint| is_metaclass_receiver_bound(db, constraint)),
+                .any(|constraint| is_metaclass_receiver_bound(db, constraint)),
             None => false,
         },
         _ => false,
@@ -198,7 +198,7 @@ fn is_metaclass_receiver_bound(db: &dyn crate::Db, bound: Type<'_>) -> bool {
             .elements(db)
             .iter()
             .copied()
-            .all(|element| is_metaclass_receiver_bound(db, element)),
+            .any(|element| is_metaclass_receiver_bound(db, element)),
         _ => false,
     }
 }
