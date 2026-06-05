@@ -7,7 +7,7 @@ use crate::{
             INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_METHOD_RECEIVER,
             INVALID_TYPE_VARIABLE_DEFAULT,
         },
-        function::OverloadLiteral,
+        function::{FunctionDecorators, OverloadLiteral},
         infer::original_class_type,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
@@ -54,6 +54,7 @@ fn check_method_receiver<'db>(
     let method_name = last_definition.name(db);
 
     if last_definition.is_overload(db)
+        || last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK)
         || method_name == "_generate_next_value_"
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
         || !signature.has_explicit_positional_receiver_annotation()

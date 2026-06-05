@@ -87,6 +87,16 @@ def test() -> Undefined:
     return x + 5
 ```
 
+## Invalid method receiver
+
+```py
+from typing import no_type_check
+
+class C:
+    @no_type_check
+    def method(self: int): ...
+```
+
 ## `no_type_check` on classes isn't supported
 
 ty does not support decorating classes with `no_type_check`. The behavior of `no_type_check` when
