@@ -9,6 +9,7 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
+mod enum_property;
 
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -1198,33 +1199,6 @@ impl<'db> Bindings<'db> {
                 // TODO: emit a diagnostic if we receive `bool`
                 default
             }
-        };
-
-        let enum_property_instance = |overload: &Binding<'db>| {
-            let accessor = |parameter_index| {
-                call_arguments
-                    .iter()
-                    .zip(overload.argument_matches())
-                    .find_map(|((_, argument_types), argument_matches)| {
-                        argument_matches
-                            .parameters
-                            .iter()
-                            .find(|parameter| parameter.index == parameter_index)
-                            .map(|parameter| {
-                                parameter
-                                    .argument_type
-                                    .or_else(|| argument_types.get_default())
-                            })
-                    })
-                    .flatten()
-                    .filter(|ty| !ty.is_none(db))
-            };
-            Type::PropertyInstance(PropertyInstanceType::new(
-                db,
-                accessor(0),
-                accessor(1),
-                accessor(2),
-            ))
         };
 
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
@@ -2636,7 +2610,7 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
-                        Some(KnownClass::Property | KnownClass::EnumProperty) => {
+                        Some(KnownClass::Property) => {
                             if let [getter, setter, deleter, ..] = overload.parameter_types() {
                                 let getter = getter.filter(|ty| !ty.is_none(db));
                                 let setter = setter.filter(|ty| !ty.is_none(db));
@@ -2685,24 +2659,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        for constructor in self.iter_constructor_items_mut() {
-            if constructor
-                .constructed_instance_type()
-                .is_instance_of(db, KnownClass::EnumProperty)
-            {
-                let property = {
-                    constructor
-                        .callable()
-                        .matching_overloads()
-                        .exactly_one()
-                        .ok()
-                        .map(|(_, overload)| enum_property_instance(overload))
-                };
-                if let Some(property) = property {
-                    constructor.set_constructed_instance_type(property);
-                }
-            }
-        }
+        self.evaluate_enum_property_calls(db, call_arguments);
     }
 }
 

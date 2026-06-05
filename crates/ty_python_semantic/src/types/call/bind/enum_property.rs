@@ -1,0 +1,73 @@
+use itertools::Itertools;
+
+use super::Bindings;
+use crate::db::Db;
+use crate::types::call::CallArguments;
+use crate::types::{KnownClass, PropertyInstanceType, Type};
+
+impl<'db> Bindings<'db> {
+    /// Updates both the callable return and the constructed instance, which are tracked separately
+    /// for constructor bindings.
+    pub(super) fn evaluate_enum_property_calls(
+        &mut self,
+        db: &'db dyn Db,
+        call_arguments: &CallArguments<'_, 'db>,
+    ) {
+        let property_instance =
+            |getter: Option<Type<'db>>, setter: Option<Type<'db>>, deleter: Option<Type<'db>>| {
+                Type::PropertyInstance(PropertyInstanceType::new(
+                    db,
+                    getter.filter(|ty| !ty.is_none(db)),
+                    setter.filter(|ty| !ty.is_none(db)),
+                    deleter.filter(|ty| !ty.is_none(db)),
+                ))
+            };
+
+        for binding in self.iter_flat_mut() {
+            if !matches!(
+                binding.callable_type,
+                Type::ClassLiteral(class) if class.is_known(db, KnownClass::EnumProperty)
+            ) {
+                continue;
+            }
+
+            for (_, overload) in binding.matching_overloads_mut() {
+                if let [getter, setter, deleter, ..] = overload.parameter_types() {
+                    overload.set_return_type(property_instance(*getter, *setter, *deleter));
+                }
+            }
+        }
+
+        for constructor in self.iter_constructor_items_mut() {
+            if !constructor
+                .constructed_instance_type()
+                .is_instance_of(db, KnownClass::EnumProperty)
+            {
+                continue;
+            }
+
+            let property = {
+                let Ok((_, overload)) = constructor.callable().matching_overloads().exactly_one()
+                else {
+                    continue;
+                };
+                let accessor = |parameter_index| {
+                    call_arguments
+                        .iter()
+                        .zip(overload.argument_matches())
+                        .find_map(|((_, argument_types), argument_matches)| {
+                            let parameter = argument_matches
+                                .parameters
+                                .iter()
+                                .find(|parameter| parameter.index == parameter_index)?;
+                            parameter
+                                .argument_type
+                                .or_else(|| argument_types.get_default())
+                        })
+                };
+                property_instance(accessor(0), accessor(1), accessor(2))
+            };
+            constructor.set_constructed_instance_type(property);
+        }
+    }
+}
