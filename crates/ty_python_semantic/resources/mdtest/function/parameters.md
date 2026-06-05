@@ -74,7 +74,7 @@ python-version = "3.13"
 ```py
 from __future__ import annotations
 
-from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, overload
+from typing import Any, LiteralString, Never, Protocol, Self, TypeVar, Unpack, final, overload
 
 class Parent: ...
 class Unrelated: ...
@@ -193,6 +193,7 @@ class HasNestedFunction:
 
 class RestrictedMeta(type):
     def restricted(cls: type[int]): ...
+    def restricted_to_final(cls: type[FinalClass]): ...
     @classmethod
     # error: [invalid-method-receiver]
     def invalid_classmethod(cls: type[int]): ...
@@ -202,6 +203,9 @@ class RestrictedMeta(type):
         bases: tuple[type, ...],
         namespace: dict[str, Any],
     ): ...
+
+@final
+class FinalClass(metaclass=RestrictedMeta): ...
 
 class VariadicReceiver:
     # TODO: error: [invalid-method-receiver]

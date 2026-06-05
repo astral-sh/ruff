@@ -97,7 +97,7 @@ fn check_method_receiver<'db>(
 
     let class_object = Type::from(enclosing_class);
     // Methods on metaclasses can restrict their receiver to a particular class object.
-    if matches!(receiver_type, Type::SubclassOf(_))
+    if matches!(receiver_type, Type::ClassLiteral(_) | Type::SubclassOf(_))
         && class_object.is_subtype_of(db, KnownClass::Type.to_subclass_of(db))
         && !last_definition.is_classmethod(db)
         && method_name != "__new__"
