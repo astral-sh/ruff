@@ -5061,8 +5061,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
-        let tcx = if ret.value.is_some() {
+    fn return_statement_type_context(&self, has_value: bool) -> TypeContext<'db> {
+        if has_value {
             nearest_enclosing_function(self.db(), self.index, self.scope())
                 .map(|func| {
                     // When inferring expressions within a function body,
@@ -5093,7 +5093,136 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_default()
         } else {
             TypeContext::default()
+        }
+    }
+
+    fn return_call_collection_use_constraints(
+        &mut self,
+        statement: Statement<'db>,
+        use_expression: ExpressionNodeKey,
+    ) -> Option<FxIndexSet<Type<'db>>> {
+        fn add_overloads_from_binding<'a, 'db>(
+            overloads_with_binding: &mut Vec<(&'a Binding<'db>, &'a CallableBinding<'db>)>,
+            binding: &'a CallableBinding<'db>,
+        ) {
+            match binding.matching_overload_index() {
+                MatchingOverloadIndex::Single(_) | MatchingOverloadIndex::Multiple(_) => {
+                    overloads_with_binding.extend(
+                        binding
+                            .matching_overloads()
+                            .map(|(_, overload)| (overload, binding)),
+                    );
+                }
+
+                // If there is a single overload that does not match, normal argument inference still
+                // uses its parameter context for better diagnostics, so do the same here.
+                MatchingOverloadIndex::None => {
+                    if let [overload] = binding.overloads() {
+                        overloads_with_binding.push((overload, binding));
+                    }
+                }
+            }
+        }
+
+        let Statement::Other(statement) = statement else {
+            return None;
         };
+
+        let ast::Stmt::Return(ret) = statement.node_ref(self.db()).node(self.module()) else {
+            return None;
+        };
+
+        let ast::StmtReturn {
+            value: Some(value), ..
+        } = ret
+        else {
+            return None;
+        };
+
+        let ast::Expr::Call(call_expression) = value.as_ref() else {
+            return None;
+        };
+
+        let ast::ExprCall {
+            func,
+            arguments,
+            range: _,
+            node_index: _,
+        } = call_expression;
+
+        // Starred arguments need their expression types to bind the call shape. Fall back to the
+        // full statement query rather than duplicating that logic here.
+        if arguments
+            .args
+            .iter()
+            .any(|argument| argument.is_starred_expr())
+            || arguments
+                .keywords
+                .iter()
+                .any(|keyword| keyword.arg.is_none())
+        {
+            return None;
+        }
+
+        let argument_index =
+            arguments
+                .iter_source_order()
+                .enumerate()
+                .find_map(|(index, argument)| {
+                    (ExpressionNodeKey::from(argument.value()) == use_expression).then_some(index)
+                })?;
+
+        let mut speculative_builder = self.speculate();
+        let callable_type =
+            speculative_builder.infer_maybe_standalone_expression(func, TypeContext::default());
+        let call_arguments = CallArguments::from_arguments(arguments, |_, _| Type::unknown());
+        let bindings = callable_type
+            .bindings(self.db())
+            .match_parameters(self.db(), &call_arguments);
+
+        if matches!(
+            bindings.argument_forms().get(argument_index),
+            Some(Some(ParameterForm::Type))
+        ) {
+            return None;
+        }
+
+        let mut overloads_with_binding = Vec::new();
+        bindings.visit_type_context_callables(&mut |binding| {
+            add_overloads_from_binding(&mut overloads_with_binding, binding);
+        });
+
+        let constraints = ConstraintSetBuilder::new();
+        let call_expression_tcx = self.return_statement_type_context(true);
+        let mut collection_constraints = FxIndexSet::default();
+
+        for (overload, binding) in overloads_with_binding {
+            let Some(parameter_context) = overload.argument_type_context(
+                self.db(),
+                &constraints,
+                binding,
+                &call_arguments,
+                argument_index,
+                call_expression_tcx,
+            ) else {
+                continue;
+            };
+
+            if let Some(parameter_type) = parameter_context.type_context().annotation {
+                if parameter_type.has_unspecialized_type_var(self.db()) {
+                    return None;
+                }
+
+                collection_constraints.insert(parameter_type);
+            }
+        }
+
+        (!collection_constraints.is_empty()).then_some(collection_constraints)
+    }
+
+    fn infer_return_statement(&mut self, ret: &ast::StmtReturn) {
+        let tcx = self.return_statement_type_context(ret.value.is_some());
+
         if let Some(ty) = self.infer_optional_expression(ret.value.as_deref(), tcx) {
             let range = ret
                 .value
@@ -6931,9 +7060,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // For unconstrained collection literals, collect any constraints created by later uses
             // of this definition in the scope.
+            let mut seen_constraints = FxIndexSet::default();
             for (statement, use_expression) in
                 self.index.constraining_collection_uses(collection_def)
             {
+                if let Some(constraints) =
+                    self.return_call_collection_use_constraints(statement, use_expression)
+                {
+                    for constraint in constraints {
+                        if seen_constraints.insert(constraint) {
+                            builder.infer(identity_instance, constraint).ok()?;
+                        }
+                    }
+                    continue;
+                }
+
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
                 if let Some(divergent) = statement_use_types
@@ -6947,13 +7088,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             generic_context
                                 .repeat_specialization(self.db(), Type::Divergent(divergent))
                         });
+                    let constraint = Type::instance(self.db(), divergent_instance);
 
-                    builder
-                        .infer(
-                            identity_instance,
-                            Type::instance(self.db(), divergent_instance),
-                        )
-                        .ok()?;
+                    if seen_constraints.insert(constraint) {
+                        builder.infer(identity_instance, constraint).ok()?;
+                    }
                 } else if let Some(constraints) =
                     statement_use_types.collection_use_constraints(collection_def)
                 {
@@ -6962,7 +7101,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         }
 
-                        builder.infer(identity_instance, *constraint).ok()?;
+                        if seen_constraints.insert(*constraint) {
+                            builder.infer(identity_instance, *constraint).ok()?;
+                        }
                     }
                 }
             }
