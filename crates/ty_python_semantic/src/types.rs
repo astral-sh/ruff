@@ -1007,7 +1007,11 @@ impl<'db> Type<'db> {
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
-            Type::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_))
+            Type::Dynamic(
+                DynamicType::Unknown
+                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::AmbiguousOverload
+            )
         )
     }
 
@@ -1085,7 +1089,19 @@ impl<'db> Type<'db> {
         // result directly. We still ensure monotonicity after the first couple iterations, which
         // still ensures convergence in cases that are prone to oscillation.
         if cycle.iteration() <= crate::TAINTED_CYCLES {
-            self
+            let self_degraded_by_overload =
+                any_over_type(db, self, false, |ty| {
+                    matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
+                }) && !any_over_type(db, self, false, |ty| ty.is_divergent())
+                    && any_over_type(db, previous, false, |ty| ty.is_divergent());
+            // Generally, the precision of type inference improves with each iteration.
+            // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
+            // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
+            if self_degraded_by_overload {
+                UnionType::from_elements_cycle_recovery(db, [previous, self])
+            } else {
+                self
+            }
         } else {
             // The current type is unioned to the previous type. Unioning in the reverse order can
             // cause the fixed-point iterations to converge slowly or even fail. Consider the case
@@ -1152,7 +1168,8 @@ impl<'db> Type<'db> {
             | DynamicType::Unknown
             | DynamicType::InvalidConcatenateUnknown
             | DynamicType::UnknownGeneric(_)
-            | DynamicType::UnspecializedTypeVar => false,
+            | DynamicType::UnspecializedTypeVar
+            | DynamicType::AmbiguousOverload => false,
             DynamicType::Todo(_)
             | DynamicType::TodoStarredExpression
             | DynamicType::TodoUnpack
@@ -1907,7 +1924,8 @@ impl<'db> Type<'db> {
                 | DynamicType::TodoTypeVarTuple
                 | DynamicType::Todo(_)
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::TodoStarredExpression => false,
+                | DynamicType::TodoStarredExpression
+                | DynamicType::AmbiguousOverload => false,
             },
         }
     }
@@ -6551,9 +6569,11 @@ impl<'db> Type<'db> {
             Self::Dynamic(DynamicType::Any) => {
                 Type::SpecialForm(SpecialFormType::Any).definition(db)
             }
-            Self::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => {
-                Type::SpecialForm(SpecialFormType::Unknown).definition(db)
-            }
+            Self::Dynamic(
+                DynamicType::Unknown
+                | DynamicType::UnknownGeneric(_)
+                | DynamicType::AmbiguousOverload,
+            ) => Type::SpecialForm(SpecialFormType::Unknown).definition(db),
             Self::AlwaysTruthy => Type::SpecialForm(SpecialFormType::AlwaysTruthy).definition(db),
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
@@ -7197,6 +7217,9 @@ pub enum DynamicType<'db> {
     /// TODO: this is a bit of a hack. `infer_type_expression` should really return a `Result`;
     /// if it did, this variant wouldn't be necessary.
     InvalidConcatenateUnknown,
+    /// A special variant that indicates the result of overload matching is ambiguous.
+    /// Ref: <https://typing.python.org/en/latest/spec/overload.html#step-5>
+    AmbiguousOverload,
     /// Temporary type for symbols that can't be inferred yet because of missing implementations.
     ///
     /// This variant should eventually be removed once ty is spec-compliant.
@@ -7231,7 +7254,8 @@ impl std::fmt::Display for DynamicType<'_> {
             DynamicType::Any => f.write_str("Any"),
             DynamicType::Unknown
             | DynamicType::UnknownGeneric(_)
-            | DynamicType::InvalidConcatenateUnknown => f.write_str("Unknown"),
+            | DynamicType::InvalidConcatenateUnknown
+            | DynamicType::AmbiguousOverload => f.write_str("Unknown"),
             DynamicType::UnspecializedTypeVar => f.write_str("UnspecializedTypeVar"),
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
