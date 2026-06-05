@@ -4715,7 +4715,6 @@ dependencies = [
  "ruff_macros",
  "ruff_memory_usage",
  "ruff_python_ast",
- "ruff_python_codegen",
  "ruff_python_literal",
  "ruff_python_parser",
  "ruff_python_stdlib",
