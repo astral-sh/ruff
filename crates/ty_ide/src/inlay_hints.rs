@@ -7002,7 +7002,7 @@ Source with applied edits:
     }
 
     #[test]
-    fn hover_narrowed_type_with_top_materialization() {
+    fn hover_narrowed_type_with_dynamic_specialization() {
         let mut test = inlay_hint_test(
             r#"
                 def f(xyxy: object):
@@ -7015,22 +7015,9 @@ Source with applied edits:
 
         def f(xyxy: object):
             if isinstance(xyxy, list):
-                x[: Top[list[Unknown]]] = xyxy
+                x[: list[Any]] = xyxy
 
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
-           |
-        LL | Top: _SpecialForm
-           | ^^^
-           |
-        info: Source
-          --> main2.py:LL:13
-           |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |             ^^^
-           |
-
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/builtins.pyi:LL:7
            |
@@ -7038,35 +7025,34 @@ Source with applied edits:
            |       ^^^^
            |
         info: Source
-          --> main2.py:LL:17
+          --> main2.py:LL:13
            |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |                 ^^^^
+        LL |         x[: list[Any]] = xyxy
+           |             ^^^^
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/typing.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | ^^^^^^^
+        LL | class Any:
+           |       ^^^
            |
         info: Source
-          --> main2.py:LL:22
+          --> main2.py:LL:18
            |
-        LL |         x[: Top[list[Unknown]]] = xyxy
-           |                      ^^^^^^^
+        LL |         x[: list[Any]] = xyxy
+           |                  ^^^
            |
 
         ---------------------------------------------
         info[inlay-hint-edit]: Inlay hint edits
         --> main.py:1:1
-        1 + from ty_extensions import Top
-        2 + from ty_extensions import Unknown
-        3 |
-        4 | def f(xyxy: object):
-        5 |     if isinstance(xyxy, list):
+        1 + from typing import Any
+        2 |
+        3 | def f(xyxy: object):
+        4 |     if isinstance(xyxy, list):
           -         x = xyxy
-        6 +         x: Top[list[Unknown]] = xyxy
+        5 +         x: list[Any] = xyxy
         ");
     }
 
