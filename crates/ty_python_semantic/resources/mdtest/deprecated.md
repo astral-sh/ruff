@@ -320,6 +320,47 @@ if is_replacement_class(MetaBindingWithFallback.binding):
     # error: [possibly-missing-attribute]
     MetaBindingWithFallback.binding()  # error: [deprecated] "metaclass replacement"
 
+class ReplacementDescriptor:
+    def __call__(self) -> str:
+        return "replacement"
+
+    def __get__(
+        self,
+        instance: object | None,
+        owner: type,
+    ) -> TypeOf[replacement]:
+        return replacement
+
+class OtherDescriptor:
+    def __call__(self) -> str:
+        return "other"
+
+    def __get__(
+        self,
+        instance: object | None,
+        owner: type,
+    ) -> TypeOf[other]:
+        return other
+
+replacement_descriptor = ReplacementDescriptor()
+other_descriptor = OtherDescriptor()
+
+class MixedDescriptor:
+    if flag:
+        @deprecated("descriptor replacement")
+        @replace_with(replacement_descriptor)
+        def binding(self) -> None: ...
+    else:
+        binding = other_descriptor
+
+def use_mixed_descriptor(instance: MixedDescriptor) -> None:
+    if is_replacement(instance.binding):
+        instance.binding()  # error: [deprecated] "descriptor replacement"
+
+    alias = instance.binding
+    if is_replacement(alias):
+        alias()  # error: [deprecated] "descriptor replacement"
+
 class DecoratedUnionMember:
     @deprecated("union replacement")
     @replace_with(ReplacementClass)

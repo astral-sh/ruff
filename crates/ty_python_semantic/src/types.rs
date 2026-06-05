@@ -3074,19 +3074,20 @@ impl<'db> Type<'db> {
                 definedness: boundness,
                 public_type_policy,
             }) => (
-                union
-                    .map_with_boundness(db, |elem| {
-                        Place::Defined(DefinedPlace {
-                            ty: elem
-                                .try_call_dunder_get(db, instance, owner)
-                                .map_or(*elem, |(ty, _)| ty),
-                            origin,
-                            definedness: boundness,
-                            public_type_policy,
-                        })
+                union.map_with_boundness_and_qualifiers(db, |elem| {
+                    let elem_deprecation = deprecation.resolve_for_alternative_type(db, *elem);
+                    let mapped = elem
+                        .try_call_dunder_get(db, instance, owner)
+                        .map_or(*elem, |(ty, _)| ty);
+                    Place::Defined(DefinedPlace {
+                        ty: mapped,
+                        origin,
+                        definedness: boundness,
+                        public_type_policy,
                     })
                     .with_qualifiers(qualifiers)
-                    .with_deprecation_policy(deprecation),
+                    .with_deprecation_policy(elem_deprecation)
+                }),
                 // TODO: avoid the duplication here:
                 if union.elements(db).iter().all(|elem| {
                     elem.try_call_dunder_get(db, instance, owner)

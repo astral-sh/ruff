@@ -122,6 +122,47 @@ impl<'db> DeprecationPolicy<'db> {
         }
         deprecation.build_policy()
     }
+
+    pub(crate) fn resolve_for_alternative_type(self, db: &'db dyn Db, ty: Type<'db>) -> Self {
+        let Self::Alternatives(alternatives) = self else {
+            return self;
+        };
+
+        let mut deprecation = BindingDeprecationBuilder::default();
+        let mut has_matching_alternative = false;
+        for (alternative_ty, policy) in alternatives.alternatives(db) {
+            if deprecation_types_share_single_value(db, *alternative_ty, ty) {
+                has_matching_alternative = true;
+                deprecation.add_policy(policy.resolve_for_type(db, ty), ty.is_deprecated(db));
+            }
+        }
+        if has_matching_alternative {
+            deprecation.build_policy()
+        } else {
+            self.resolve_for_type(db, ty)
+        }
+    }
+}
+
+fn deprecation_types_share_single_value<'db>(
+    db: &'db dyn Db,
+    original: Type<'db>,
+    narrowed: Type<'db>,
+) -> bool {
+    match (original, narrowed) {
+        (Type::Union(union), narrowed) => union
+            .elements(db)
+            .iter()
+            .any(|element| deprecation_types_share_single_value(db, *element, narrowed)),
+        (original, Type::Union(union)) => union
+            .elements(db)
+            .iter()
+            .any(|element| deprecation_types_share_single_value(db, original, *element)),
+        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+            left.literal(db) == right.literal(db)
+        }
+        _ => original == narrowed,
+    }
 }
 
 fn deprecation_alternative_is_eliminated<'db>(
@@ -129,28 +170,7 @@ fn deprecation_alternative_is_eliminated<'db>(
     original: Type<'db>,
     narrowed: Type<'db>,
 ) -> bool {
-    fn has_same_single_value<'db>(
-        db: &'db dyn Db,
-        original: Type<'db>,
-        narrowed: Type<'db>,
-    ) -> bool {
-        match (original, narrowed) {
-            (Type::Union(union), narrowed) => union
-                .elements(db)
-                .iter()
-                .any(|element| has_same_single_value(db, *element, narrowed)),
-            (original, Type::Union(union)) => union
-                .elements(db)
-                .iter()
-                .any(|element| has_same_single_value(db, original, *element)),
-            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
-                left.literal(db) == right.literal(db)
-            }
-            _ => original == narrowed,
-        }
-    }
-
-    !has_same_single_value(db, original, narrowed)
+    !deprecation_types_share_single_value(db, original, narrowed)
         && (original.is_disjoint_from(db, narrowed)
             || (original.is_single_valued(db) && narrowed.is_single_valued(db)))
 }
