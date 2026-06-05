@@ -324,7 +324,7 @@ impl<'db> TypedDictType<'db> {
         for field in self.items(db).values() {
             builder = builder.add(field.declared_ty);
         }
-        if let Some(extra_items) = openness.effective_extra_items() {
+        if let Some(extra_items) = openness.explicit_extra_items() {
             builder = builder.add(extra_items.declared_ty);
         }
         builder.build()
@@ -1163,22 +1163,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         .negate(db, self.constraints)
                 }
                 (TypedDictOpenness::Extra(mutable_extra), other)
-                    if !mutable_extra.is_read_only() =>
-                {
-                    other.effective_extra_items().map_or_else(
-                        || self.always(),
-                        |other_extra| {
-                            relation_checker
-                                .check_type_pair(
-                                    db,
-                                    mutable_extra.declared_ty,
-                                    other_extra.declared_ty,
-                                )
-                                .negate(db, self.constraints)
-                        },
-                    )
-                }
-                (other, TypedDictOpenness::Extra(mutable_extra))
+                | (other, TypedDictOpenness::Extra(mutable_extra))
                     if !mutable_extra.is_read_only() =>
                 {
                     other.effective_extra_items().map_or_else(
@@ -2157,14 +2142,15 @@ fn validate_extracted_typed_dict_openness<'db, 'ast>(
         return true;
     };
     let extra_items_ty = extra_items.declared_ty;
+    let target_openness = typed_dict.openness(db);
 
-    if typed_dict.openness(db).is_open() && source_openness.is_open() {
+    if target_openness.is_open() && source_openness.is_open() {
         return true;
     }
 
     let typed_dict_ty = Type::TypedDict(typed_dict);
 
-    if let Some(target_extra_items) = typed_dict.explicit_extra_items(db) {
+    if let Some(target_extra_items) = target_openness.explicit_extra_items() {
         if let Some((target_name, target_field)) =
             typed_dict.items(db).iter().find(|(name, field)| {
                 !source_keys.contains_key(*name)
