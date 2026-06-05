@@ -236,7 +236,7 @@ fn create_parameters<'db>(
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
     } else {
-        std::collections::HashMap::new()
+        indexmap::IndexMap::new()
     };
 
     parameters

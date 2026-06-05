@@ -7,12 +7,13 @@
 //! logic needs to be tolerant of variations.
 
 mod markdown;
+mod rest;
 
+use indexmap::IndexMap;
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::MarkupKind;
@@ -34,11 +35,6 @@ static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 static NUMPY_UNDERLINE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*-+\s*$").expect("NumPy underline regex should be valid"));
-
-static REST_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*:param\s+(?:(\w+)\s+)?(\w+)\s*:\s*(.+)")
-        .expect("reST parameter regex should be valid")
-});
 
 /// A docstring which hasn't yet been interpreted or rendered
 ///
@@ -73,8 +69,8 @@ impl Docstring {
 
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
-    pub fn parameter_documentation(&self) -> HashMap<String, String> {
-        let mut param_docs = HashMap::new();
+    pub fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut param_docs = IndexMap::new();
 
         // Google-style docstrings
         param_docs.extend(extract_google_style_params(&self.0));
@@ -499,8 +495,8 @@ fn render_markdown(docstring: &str) -> String {
 }
 
 /// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_google_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut in_args_section = false;
     let mut current_param: Option<String> = None;
@@ -592,8 +588,8 @@ fn get_indentation_level(line: &str) -> usize {
 }
 
 /// Extract parameter documentation from NumPy-style docstrings.
-fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_numpy_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut lines = docstring
         .universal_newlines()
@@ -759,71 +755,11 @@ fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
 }
 
 /// Extract parameter documentation from reST/Sphinx-style docstrings.
-fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_rest_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
-    let mut current_param: Option<String> = None;
-    let mut current_doc = String::new();
-
-    for line_obj in docstring.universal_newlines() {
-        let line = line_obj.as_str();
-        if let Some(captures) = REST_PARAM_REGEX.captures(line) {
-            // Save previous parameter if exists
-            if let Some(param_name) = current_param.take() {
-                param_docs.insert(param_name, current_doc.trim().to_string());
-                current_doc.clear();
-            }
-
-            // Extract parameter name and description
-            if let (Some(param_match), Some(desc_match)) = (captures.get(2), captures.get(3)) {
-                current_param = Some(param_match.as_str().to_string());
-                current_doc = desc_match.as_str().to_string();
-            }
-        } else if current_param.is_some() {
-            let trimmed = line.trim();
-
-            // Check if this is a new section - stop processing if we hit section headers
-            if trimmed == "Parameters" || trimmed == "Args" || trimmed == "Arguments" {
-                // Save current param and stop processing
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                break;
-            }
-
-            // Check if this is another directive line starting with ':'
-            if trimmed.starts_with(':') {
-                // This is a new directive, save current param
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                // Let the next iteration handle this directive
-                continue;
-            }
-
-            // Check if this is a continuation line (indented)
-            if line.starts_with("    ") && !trimmed.is_empty() {
-                // This is a continuation line
-                if !current_doc.is_empty() {
-                    current_doc.push('\n');
-                }
-                current_doc.push_str(trimmed);
-            } else if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                // This is a non-indented line - likely end of the current parameter
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                break;
-            }
-        }
-    }
-
-    // Don't forget the last parameter
-    if let Some(param_name) = current_param {
-        param_docs.insert(param_name, current_doc.trim().to_string());
+    for parameter in rest::Docstring::parse(docstring).parameter_documentation() {
+        param_docs.insert(parameter.name.into_string(), parameter.description);
     }
 
     param_docs
