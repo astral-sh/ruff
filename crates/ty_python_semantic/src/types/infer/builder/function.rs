@@ -319,11 +319,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
         let mut deprecated = None;
-        let mut outermost_deprecation = None;
+        let mut binding_deprecation = None;
+        let mut outer_decorators_preserve_binding_deprecation = true;
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
-        for (index, decorator) in decorator_list.iter().enumerate() {
+        for decorator in decorator_list {
             let decorator_type = decorator_inference
                 .as_ref()
                 .and_then(|decorator_inference| {
@@ -350,14 +351,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 },
                 Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
                     deprecated = Some(deprecated_inst);
-                    if index == 0 {
-                        outermost_deprecation = Some(deprecated_inst);
+                    if binding_deprecation.is_none()
+                        && outer_decorators_preserve_binding_deprecation
+                    {
+                        binding_deprecation = Some(deprecated_inst);
                     }
                 }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
                 _ => {}
+            }
+            if binding_deprecation.is_none() {
+                outer_decorators_preserve_binding_deprecation &=
+                    decorator_function_decorator == FunctionDecorators::STATICMETHOD;
             }
             if !decorator_function_decorator.is_empty() {
                 continue;
@@ -456,9 +463,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
         }
 
-        // An outermost `@deprecated` applies to the final decorator result. If that result is a
-        // supported callable that loses the original function, preserve it on the binding.
-        let deprecation = outermost_deprecation.filter(|_| {
+        // An outermost `@deprecated`, optionally wrapped by `@staticmethod`, applies to the final
+        // decorator result. If that result loses the original function, preserve it on the binding.
+        let deprecation = binding_deprecation.filter(|_| {
             !function_decorators.contains(FunctionDecorators::OVERLOAD)
                 && function_type_loses_definition(db, definition, inferred_ty) == Some(true)
         });

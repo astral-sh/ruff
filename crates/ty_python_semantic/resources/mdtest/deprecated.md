@@ -143,6 +143,16 @@ deprecated_callable_instance_binding()  # error: [deprecated] "use callable_repl
 callable_replacement()
 deprecated_overload_binding()  # error: [deprecated] "deprecated replacement"
 
+class StaticMethodReplacement:
+    @staticmethod
+    @deprecated("use replacement directly")
+    @replace_with(replacement)
+    def old() -> None: ...
+
+StaticMethodReplacement.old()  # error: [deprecated] "use replacement directly"
+static_method_alias = StaticMethodReplacement.old  # error: [deprecated] "use replacement directly"
+static_method_alias()
+
 copy_of_deprecated_binding = deprecated_binding  # error: [deprecated] "use replacement directly"
 copy_of_deprecated_binding()
 
