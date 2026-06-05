@@ -68,7 +68,9 @@ fn check_method_receiver<'db>(
         || method_name == "_generate_next_value_"
         || (!last_definition.has_implicit_receiver(db) && method_name != "__new__")
         || receiver_parameter.inferred_annotation
-        || !(receiver_parameter.is_positional() || receiver_parameter.is_variadic())
+        || !(receiver_parameter.is_positional()
+            || receiver_parameter.is_variadic()
+            || receiver_parameter.is_keyword_variadic())
     {
         return;
     }
