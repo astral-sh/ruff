@@ -433,15 +433,21 @@ impl<'db> LookupError<'db> {
         match (&self, &fallback) {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
-            (LookupError::PossiblyUndefined(ty), Ok(ty2)) => Ok(TypeAndQualifiers::new(
-                UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
-                ty.origin().merge(ty2.origin()),
-                ty.qualifiers().union(ty2.qualifiers()),
-            )
-            .with_deprecation_policy(merge_deprecation_policy(
-                ty.deprecation_policy(),
-                ty2.deprecation_policy(),
-            ))),
+            (LookupError::PossiblyUndefined(ty), Ok(ty2)) => {
+                let policy = DeprecationPolicy::from_alternatives(
+                    db,
+                    [
+                        (ty.inner_type(), ty.deprecation_policy()),
+                        (ty2.inner_type(), ty2.deprecation_policy()),
+                    ],
+                );
+                Ok(TypeAndQualifiers::new(
+                    UnionType::from_two_elements(db, ty.inner_type(), ty2.inner_type()),
+                    ty.origin().merge(ty2.origin()),
+                    ty.qualifiers().union(ty2.qualifiers()),
+                )
+                .with_deprecation_policy(policy))
+            }
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(
                     TypeAndQualifiers::new(
@@ -449,10 +455,15 @@ impl<'db> LookupError<'db> {
                         ty.origin().merge(ty2.origin()),
                         ty.qualifiers().union(ty2.qualifiers()),
                     )
-                    .with_deprecation_policy(merge_deprecation_policy(
-                        ty.deprecation_policy(),
-                        ty2.deprecation_policy(),
-                    )),
+                    .with_deprecation_policy(
+                        DeprecationPolicy::from_alternatives(
+                            db,
+                            [
+                                (ty.inner_type(), ty.deprecation_policy()),
+                                (ty2.inner_type(), ty2.deprecation_policy()),
+                            ],
+                        ),
+                    ),
                 ))
             }
         }

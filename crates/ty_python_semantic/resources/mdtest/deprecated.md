@@ -72,6 +72,10 @@ def is_callable(value: object) -> TypeGuard[Callable[..., Any]]:
     return True
 
 class ReplacementClass: ...
+class OtherReplacementClass: ...
+
+def is_replacement_class(value: object) -> TypeGuard[TypeOf[ReplacementClass]]:
+    return True
 
 class CallableReplacement:
     def __call__(self) -> str:
@@ -268,6 +272,31 @@ C().deprecated_binding  # error: [deprecated] "use replacement directly"
 
 class D(C): ...
 class E(C): ...
+
+class BaseWithFallback:
+    binding = other
+
+class ChildWithFallback(BaseWithFallback):
+    if flag:
+        @deprecated("child replacement")
+        @replace_with(replacement)
+        def binding() -> None: ...
+
+if is_replacement(ChildWithFallback.binding):
+    # TODO: This requires preserving function-literal identity through descriptor binding.
+    ChildWithFallback.binding()  # TODO: error: [deprecated] "child replacement"
+
+class ClassBaseWithFallback:
+    binding = OtherReplacementClass
+
+class ClassChildWithFallback(ClassBaseWithFallback):
+    if flag:
+        @deprecated("child class replacement")
+        @replace_with(ReplacementClass)
+        def binding() -> None: ...
+
+if is_replacement_class(ClassChildWithFallback.binding):
+    ClassChildWithFallback.binding()  # error: [deprecated] "child class replacement"
 
 T = TypeVar("T", D, E)
 
