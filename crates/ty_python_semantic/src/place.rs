@@ -58,6 +58,18 @@ pub(crate) enum TypeOrigin {
     Inferred,
 }
 
+/// Controls how deprecation is reported when a place is loaded.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum DeprecationPolicy<'db> {
+    /// Inspect the inferred type for deprecation.
+    #[default]
+    Inherit,
+    /// The binding operation already reported the deprecation.
+    Suppress,
+    /// Report deprecation attached directly to this binding.
+    Deprecated(DeprecatedInstance<'db>),
+}
+
 impl TypeOrigin {
     pub(crate) const fn is_declared(self) -> bool {
         matches!(self, TypeOrigin::Declared)
@@ -243,7 +255,7 @@ impl<'db> Place<'db> {
         PlaceAndQualifiers {
             place: self,
             qualifiers,
-            deprecation: None,
+            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
@@ -306,7 +318,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                     .with_origin(type_and_qualifiers.origin()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers())
-            .with_deprecation(type_and_qualifiers.deprecation()),
+            .with_deprecation_policy(type_and_qualifiers.deprecation_policy()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
@@ -314,7 +326,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                     .with_definedness(Definedness::PossiblyUndefined),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers())
-            .with_deprecation(type_and_qualifiers.deprecation()),
+            .with_deprecation_policy(type_and_qualifiers.deprecation_policy()),
         }
     }
 }
@@ -342,7 +354,10 @@ impl<'db> LookupError<'db> {
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )
-            .with_deprecation(merge_deprecation(ty.deprecation(), ty2.deprecation()))),
+            .with_deprecation_policy(merge_deprecation_policy(
+                ty.deprecation_policy(),
+                ty2.deprecation_policy(),
+            ))),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(
                     TypeAndQualifiers::new(
@@ -350,40 +365,45 @@ impl<'db> LookupError<'db> {
                         ty.origin().merge(ty2.origin()),
                         ty.qualifiers().union(ty2.qualifiers()),
                     )
-                    .with_deprecation(merge_deprecation(ty.deprecation(), ty2.deprecation())),
+                    .with_deprecation_policy(merge_deprecation_policy(
+                        ty.deprecation_policy(),
+                        ty2.deprecation_policy(),
+                    )),
                 ))
             }
         }
     }
 }
 
-/// Retain a binding deprecation only if both alternatives have the same message.
-pub(crate) fn merge_deprecation<'db>(
-    left: Option<DeprecatedInstance<'db>>,
-    right: Option<DeprecatedInstance<'db>>,
-) -> Option<DeprecatedInstance<'db>> {
-    (left == right).then_some(left).flatten()
+pub(crate) fn merge_deprecation_policy<'db>(
+    left: DeprecationPolicy<'db>,
+    right: DeprecationPolicy<'db>,
+) -> DeprecationPolicy<'db> {
+    if left == right {
+        left
+    } else {
+        DeprecationPolicy::default()
+    }
 }
 
 /// Accumulates deprecation metadata across alternatives, retaining only a shared message.
 #[derive(Default)]
 pub(crate) struct DeprecationBuilder<'db> {
-    deprecation: Option<DeprecatedInstance<'db>>,
+    deprecation: DeprecationPolicy<'db>,
     has_candidate: bool,
 }
 
 impl<'db> DeprecationBuilder<'db> {
-    /// Adds a viable alternative. `None` represents an alternative that is not deprecated.
-    pub(crate) fn add(&mut self, candidate: Option<DeprecatedInstance<'db>>) {
+    pub(crate) fn add_policy(&mut self, candidate: DeprecationPolicy<'db>) {
         self.deprecation = if self.has_candidate {
-            merge_deprecation(self.deprecation, candidate)
+            merge_deprecation_policy(self.deprecation, candidate)
         } else {
             self.has_candidate = true;
             candidate
         };
     }
 
-    pub(crate) fn build(self) -> Option<DeprecatedInstance<'db>> {
+    pub(crate) fn build_policy(self) -> DeprecationPolicy<'db> {
         self.deprecation
     }
 }
@@ -697,8 +717,7 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
-    /// Deprecation attached to the place rather than its inferred type.
-    pub(crate) deprecation: Option<DeprecatedInstance<'db>>,
+    pub(crate) deprecation: DeprecationPolicy<'db>,
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
@@ -740,7 +759,7 @@ impl<'db> PlaceAndQualifiers<'db> {
     }
 
     #[must_use]
-    pub(crate) fn with_deprecation(mut self, deprecation: Option<DeprecatedInstance<'db>>) -> Self {
+    pub(crate) fn with_deprecation_policy(mut self, deprecation: DeprecationPolicy<'db>) -> Self {
         self.deprecation = deprecation;
         self
     }
@@ -788,7 +807,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
-                    .with_deprecation(deprecation);
+                    .with_deprecation_policy(deprecation);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -853,7 +872,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         let deprecation = if cycle.iteration() <= 1 {
             self.deprecation
         } else {
-            merge_deprecation(previous_place.deprecation, self.deprecation)
+            merge_deprecation_policy(previous_place.deprecation, self.deprecation)
         };
         let place = match (previous_place.place, self.place) {
             // In fixed-point iteration of type inference, the member result must be monotonically
@@ -958,7 +977,7 @@ pub(crate) fn place_by_id<'db>(
         return inferred
             .place
             .with_qualifiers(qualifiers)
-            .with_deprecation(inferred.deprecation);
+            .with_deprecation_policy(inferred.deprecation);
     }
 
     match declared {
@@ -990,7 +1009,7 @@ pub(crate) fn place_by_id<'db>(
                     public_type_policy: PublicTypePolicy::Raw,
                 })
                 .with_qualifiers(qualifiers)
-                .with_deprecation(inferred.deprecation),
+                .with_deprecation_policy(inferred.deprecation),
                 Place::Undefined => Place::Defined(DefinedPlace {
                     ty: Type::unknown(),
                     origin,
@@ -1060,7 +1079,7 @@ pub(crate) fn place_by_id<'db>(
             PlaceAndQualifiers {
                 place,
                 qualifiers,
-                deprecation: merge_deprecation(declared_deprecation, inferred.deprecation),
+                deprecation: merge_deprecation_policy(declared_deprecation, inferred.deprecation),
             }
         }
         // Place is undeclared, infer the type from bindings
@@ -1122,7 +1141,7 @@ pub(crate) fn place_by_id<'db>(
             {
                 place
                     .with_qualifiers(TypeQualifiers::empty())
-                    .with_deprecation(deprecation)
+                    .with_deprecation_policy(deprecation)
             } else {
                 // Public inferred types should expose a promoted view rather than their raw
                 // inferred literal form. The adjustment is applied lazily when converting to
@@ -1130,7 +1149,7 @@ pub(crate) fn place_by_id<'db>(
                 place
                     .with_public_type_policy(PublicTypePolicy::Promote)
                     .with_qualifiers(TypeQualifiers::empty())
-                    .with_deprecation(deprecation)
+                    .with_deprecation_policy(deprecation)
             }
         }
     }
@@ -1554,8 +1573,10 @@ fn place_from_bindings_impl<'db>(
             let binding_deprecation = inference
                 .inferred_declaration(binding)
                 .declared()
-                .and_then(|declaration| declaration.deprecation());
-            deprecation.add(binding_deprecation);
+                .map_or(DeprecationPolicy::Inherit, |declaration| {
+                    declaration.deprecation_policy()
+                });
+            deprecation.add_policy(binding_deprecation);
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
                 static_reachability,
@@ -1614,9 +1635,9 @@ fn place_from_bindings_impl<'db>(
         Place::Undefined
     };
     let deprecation = if place.is_undefined() {
-        None
+        DeprecationPolicy::Inherit
     } else {
-        deprecation.build()
+        deprecation.build_policy()
     };
 
     PlaceWithDefinition {
@@ -1629,14 +1650,16 @@ fn place_from_bindings_impl<'db>(
 pub(super) struct PlaceWithDefinition<'db> {
     pub(super) place: Place<'db>,
     pub(super) first_definition: Option<Definition<'db>>,
-    deprecation: Option<DeprecatedInstance<'db>>,
+    deprecation: DeprecationPolicy<'db>,
 }
 
 impl<'db> PlaceWithDefinition<'db> {
     pub(super) fn into_place_and_qualifiers(self) -> PlaceAndQualifiers<'db> {
-        self.place
-            .with_qualifiers(TypeQualifiers::empty())
-            .with_deprecation(self.deprecation)
+        PlaceAndQualifiers {
+            place: self.place,
+            qualifiers: TypeQualifiers::empty(),
+            deprecation: self.deprecation,
+        }
     }
 }
 
@@ -1760,13 +1783,13 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
 
         self.qualifiers = self.qualifiers.union(element.qualifiers());
-        self.deprecation.add(element.deprecation());
+        self.deprecation.add_policy(element.deprecation_policy());
     }
 
     fn build(mut self) -> DeclaredTypeAndConflictingTypes<'db> {
         let type_and_quals =
             TypeAndQualifiers::new(self.inner.build(), TypeOrigin::Declared, self.qualifiers)
-                .with_deprecation(self.deprecation.build());
+                .with_deprecation_policy(self.deprecation.build_policy());
         if self.conflicting_types.is_empty() {
             (type_and_quals, None)
         } else {
@@ -1871,7 +1894,7 @@ fn place_from_declarations_impl<'db>(
                 .with_definedness(boundness),
         )
         .with_qualifiers(declared.qualifiers())
-        .with_deprecation(declared.deprecation());
+        .with_deprecation_policy(declared.deprecation_policy());
 
         if let Some(conflicting) = conflicting {
             PlaceFromDeclarationsResult::conflict(place_and_quals, conflicting, first_declaration)

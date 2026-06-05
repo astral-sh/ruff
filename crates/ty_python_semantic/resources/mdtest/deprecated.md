@@ -112,6 +112,9 @@ deprecated_callable_binding()  # error: [deprecated] "callable replacement"
 deprecated_class_binding  # TODO: error: [deprecated] "use ReplacementClass directly"
 deprecated_overload_binding()  # error: [deprecated] "deprecated replacement"
 
+copy_of_deprecated_binding = deprecated_binding  # error: [deprecated] "use replacement directly"
+copy_of_deprecated_binding()
+
 static_assert(is_equivalent_to(TypeOf[deprecated_binding], TypeOf[replacement]))  # error: [deprecated]
 
 if deprecated_binding is not replacement:  # error: [deprecated] "use replacement directly"
@@ -461,6 +464,8 @@ the deprecated symbol to assign it to something else. These kinds of diagnostics
 redundant and annoying.
 
 ```py
+from collections.abc import Callable
+from typing import Any
 from typing_extensions import deprecated
 
 @deprecated("Use OtherType instead")
@@ -472,9 +477,14 @@ def depr_func(): ...
 alias_func = depr_func  # error: [deprecated] "Use other_func instead"
 AliasClass = DeprType  # error: [deprecated] "Use OtherType instead"
 
-# TODO: these diagnostics ideally shouldn't fire
-alias_func()  # error: [deprecated] "Use other_func instead"
-AliasClass()  # error: [deprecated] "Use OtherType instead"
+alias_func()
+AliasClass()
+
+second_alias = alias_func
+second_alias()
+
+annotated_alias: Callable[..., Any] = depr_func  # error: [deprecated] "Use other_func instead"
+annotated_alias()
 ```
 
 ## Dunders

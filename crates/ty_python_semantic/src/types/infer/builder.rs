@@ -29,9 +29,9 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
-    class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
+    ConsideredDefinitions, DefinedPlace, Definedness, DeprecationPolicy, LookupError, Place,
+    PlaceAndQualifiers, RequiresExplicitReExport, TypeOrigin, builtins_module_scope,
+    builtins_symbol, class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
     place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
@@ -3575,6 +3575,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
+        if target_ty.is_deprecated(self.db()) {
+            self.declarations.insert(
+                definition,
+                TypeAndQualifiers::new(target_ty, TypeOrigin::Inferred, TypeQualifiers::empty())
+                    .suppress_type_deprecation(),
+            );
+        }
         add.insert(self, target_ty);
     }
 
@@ -4668,6 +4675,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 inferred_ty
             };
+            if inferred_ty.is_deprecated(self.db()) {
+                declared = declared.suppress_type_deprecation();
+            }
 
             if is_pep_613_type_alias {
                 let inferred_ty =
@@ -9296,17 +9306,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if let Some(ty) = place.place.ignore_possibly_undefined() {
-            if !ty.is_never()
-                && let Some(deprecated) = place.deprecation
-                && let Some(name) = match expr_ref {
-                    ast::ExprRef::Name(name) => Some(name.id.as_str()),
-                    ast::ExprRef::Attribute(attribute) => Some(attribute.attr.as_str()),
-                    _ => None,
+            match place.deprecation {
+                DeprecationPolicy::Deprecated(deprecated) if !ty.is_never() => {
+                    if let Some(name) = match expr_ref {
+                        ast::ExprRef::Name(name) => Some(name.id.as_str()),
+                        ast::ExprRef::Attribute(attribute) => Some(attribute.attr.as_str()),
+                        _ => None,
+                    } {
+                        self.report_deprecated_function(expr_ref, name, deprecated);
+                    } else {
+                        self.check_deprecated(expr_ref, ty);
+                    }
                 }
-            {
-                self.report_deprecated_function(expr_ref, name, deprecated);
-            } else {
-                self.check_deprecated(expr_ref, ty);
+                DeprecationPolicy::Inherit => self.check_deprecated(expr_ref, ty),
+                DeprecationPolicy::Suppress | DeprecationPolicy::Deprecated(_) => {}
             }
         }
 
@@ -9737,13 +9750,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             });
 
-        let deprecation = resolved_type.deprecation();
+        let deprecation = resolved_type.deprecation_policy();
         let resolved_type = resolved_type.inner_type();
 
-        if let Some(deprecated) = deprecation {
-            self.report_deprecated_function(attr, attr.id.as_str(), deprecated);
-        } else {
-            self.check_deprecated(attr, resolved_type);
+        match deprecation {
+            DeprecationPolicy::Deprecated(deprecated) => {
+                self.report_deprecated_function(attr, attr.id.as_str(), deprecated);
+            }
+            DeprecationPolicy::Inherit => self.check_deprecated(attr, resolved_type),
+            DeprecationPolicy::Suppress => {}
         }
 
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference

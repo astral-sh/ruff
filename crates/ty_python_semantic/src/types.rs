@@ -46,8 +46,8 @@ pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
-    imported_symbol, known_module_symbol, merge_deprecation,
+    DefinedPlace, Definedness, DeprecationPolicy, Place, PlaceAndQualifiers, TypeOrigin,
+    builtins_module_scope, imported_symbol, known_module_symbol, merge_deprecation_policy,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -3044,7 +3044,7 @@ impl<'db> Type<'db> {
                     public_type_policy,
                 })
                 .with_qualifiers(qualifiers)
-                .with_deprecation(deprecation),
+                .with_deprecation_policy(deprecation),
                 instance,
                 owner,
             );
@@ -3092,7 +3092,7 @@ impl<'db> Type<'db> {
                         })
                     })
                     .with_qualifiers(qualifiers)
-                    .with_deprecation(deprecation),
+                    .with_deprecation_policy(deprecation),
                 // TODO: avoid the duplication here:
                 if union.elements(db).iter().all(|elem| {
                     elem.try_call_dunder_get(db, instance, owner)
@@ -3130,7 +3130,7 @@ impl<'db> Type<'db> {
                             })
                         })
                         .with_qualifiers(qualifiers)
-                        .with_deprecation(deprecation)
+                        .with_deprecation_policy(deprecation)
                 },
                 // TODO: Discover data descriptors in intersections.
                 AttributeKind::NormalOrNonDataDescriptor,
@@ -3158,7 +3158,7 @@ impl<'db> Type<'db> {
                             public_type_policy,
                         })
                         .with_qualifiers(TypeQualifiers::empty())
-                        .with_deprecation(deprecation),
+                        .with_deprecation_policy(deprecation),
                         attribute_kind,
                     )
                 } else {
@@ -3259,7 +3259,7 @@ impl<'db> Type<'db> {
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
             (meta_attr @ Place::Defined(_), _, Place::Undefined) => meta_attr
                 .with_qualifiers(meta_attr_qualifiers)
-                .with_deprecation(meta_attr_deprecation),
+                .with_deprecation_policy(meta_attr_deprecation),
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
@@ -3272,7 +3272,7 @@ impl<'db> Type<'db> {
                 _,
             ) => meta_attr
                 .with_qualifiers(meta_attr_qualifiers)
-                .with_deprecation(meta_attr_deprecation),
+                .with_deprecation_policy(meta_attr_deprecation),
 
             // `meta_attr` is the return type of a data descriptor, but the attribute on the
             // meta-type is possibly-unbound. This means that we "fall through" to the next
@@ -3298,7 +3298,7 @@ impl<'db> Type<'db> {
                 public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
-            .with_deprecation(merge_deprecation(
+            .with_deprecation_policy(merge_deprecation_policy(
                 meta_attr_deprecation,
                 fallback_deprecation,
             )),
@@ -3320,7 +3320,7 @@ impl<'db> Type<'db> {
                 }),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => fallback
                 .with_qualifiers(fallback_qualifiers)
-                .with_deprecation(fallback_deprecation),
+                .with_deprecation_policy(fallback_deprecation),
 
             // `meta_attr` is *not* a data descriptor. The `fallback` symbol is either possibly
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
@@ -3346,7 +3346,7 @@ impl<'db> Type<'db> {
                 public_type_policy: fallback_public_type_policy,
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers))
-            .with_deprecation(merge_deprecation(
+            .with_deprecation_policy(merge_deprecation_policy(
                 meta_attr_deprecation,
                 fallback_deprecation,
             )),
@@ -3354,7 +3354,7 @@ impl<'db> Type<'db> {
             // If the attribute is not found on the meta-type, we simply return the fallback.
             (Place::Undefined, _, fallback) => fallback
                 .with_qualifiers(fallback_qualifiers)
-                .with_deprecation(fallback_deprecation),
+                .with_deprecation_policy(fallback_deprecation),
         }
     }
 
@@ -7436,8 +7436,7 @@ pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
-    /// Deprecation attached to the place rather than its inferred type.
-    deprecation: Option<DeprecatedInstance<'db>>,
+    deprecation: DeprecationPolicy<'db>,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -7446,7 +7445,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin,
             qualifiers,
-            deprecation: None,
+            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
@@ -7455,7 +7454,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
-            deprecation: None,
+            deprecation: DeprecationPolicy::Inherit,
         }
     }
 
@@ -7479,13 +7478,26 @@ impl<'db> TypeAndQualifiers<'db> {
         self.qualifiers
     }
 
-    pub(crate) fn deprecation(&self) -> Option<DeprecatedInstance<'db>> {
+    pub(crate) fn deprecation_policy(&self) -> DeprecationPolicy<'db> {
         self.deprecation
     }
 
     #[must_use]
     pub(crate) fn with_deprecation(mut self, deprecation: Option<DeprecatedInstance<'db>>) -> Self {
+        self.deprecation =
+            deprecation.map_or(DeprecationPolicy::Inherit, DeprecationPolicy::Deprecated);
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn with_deprecation_policy(mut self, deprecation: DeprecationPolicy<'db>) -> Self {
         self.deprecation = deprecation;
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn suppress_type_deprecation(mut self) -> Self {
+        self.deprecation = DeprecationPolicy::Suppress;
         self
     }
 
@@ -8016,7 +8028,7 @@ impl<'db> ModuleLiteralType<'db> {
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
-                    deprecation: None,
+                    deprecation: DeprecationPolicy::Inherit,
                 };
             }
         }

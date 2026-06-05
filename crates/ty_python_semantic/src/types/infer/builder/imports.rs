@@ -6,7 +6,7 @@ use ty_module_resolver::{
 
 use crate::{
     Program, TypeQualifiers, add_inferred_python_version_hint_to_diagnostic,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin},
+    place::{DefinedPlace, Definedness, DeprecationPolicy, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         Type, TypeAndQualifiers,
         diagnostic::{
@@ -240,14 +240,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if definition.kind(db).as_star_import().is_none() {
                     // In the initial cycle, `declaration_types()` is empty, so no deprecation check is performed.
                     for ty in inferred.declaration_types() {
-                        if let Some(deprecated) = ty.deprecation() {
-                            self.report_deprecated_function(
-                                alias,
-                                alias.name.id.as_str(),
-                                deprecated,
-                            );
-                        } else {
-                            self.check_deprecated(alias, ty.inner);
+                        match ty.deprecation_policy() {
+                            DeprecationPolicy::Deprecated(deprecated) => {
+                                self.report_deprecated_function(
+                                    alias,
+                                    alias.name.id.as_str(),
+                                    deprecated,
+                                );
+                            }
+                            DeprecationPolicy::Inherit => {
+                                self.check_deprecated(alias, ty.inner);
+                            }
+                            DeprecationPolicy::Suppress => {}
                         }
                     }
                 }

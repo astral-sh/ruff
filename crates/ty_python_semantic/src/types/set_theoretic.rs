@@ -308,7 +308,7 @@ impl<'db> UnionType<'db> {
                 deprecation: new_deprecation,
             } = transform_fn(ty);
             qualifiers |= new_qualifiers;
-            deprecation.add(new_deprecation);
+            deprecation.add_policy(new_deprecation);
             match ty_member {
                 Place::Undefined => {
                     possibly_unbound = true;
@@ -347,7 +347,7 @@ impl<'db> UnionType<'db> {
                 })
             },
             qualifiers,
-            deprecation: deprecation.build(),
+            deprecation: deprecation.build_policy(),
         }
     }
 
@@ -897,7 +897,7 @@ impl<'db> IntersectionType<'db> {
                         any_definitely_bound = true;
                     }
 
-                    deprecation.add(new_deprecation);
+                    deprecation.add_policy(new_deprecation);
                     builder = builder.add_positive(ty_member);
                 }
             }
@@ -919,7 +919,7 @@ impl<'db> IntersectionType<'db> {
                 })
             },
             qualifiers,
-            deprecation: deprecation.build(),
+            deprecation: deprecation.build_policy(),
         }
     }
 
