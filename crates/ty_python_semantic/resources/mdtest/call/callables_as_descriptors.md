@@ -328,6 +328,21 @@ class C:
     def f2(cls, x: int) -> str:
         return "a"
 
+class GenericC[T]:
+    @callable_identity
+    def instance_method(self) -> T:
+        raise NotImplementedError
+
+    @callable_identity
+    @staticmethod
+    def static_method(value: T) -> T:
+        return value
+
+    @callable_identity
+    @classmethod
+    def class_method(cls, value: T) -> T:
+        return value
+
 # error: [too-many-positional-arguments]
 # error: [invalid-argument-type]
 C.f1(C, 1)
@@ -335,6 +350,11 @@ C.f1(1)
 C().f1(1)
 C.f2(1)
 C().f2(1)
+
+generic = GenericC[str]()
+reveal_type(generic.instance_method())  # revealed: str
+reveal_type(GenericC[str].static_method("a"))  # revealed: str
+reveal_type(GenericC[str].class_method("a"))  # revealed: str
 ```
 
 ## Types are not bound-method descriptors

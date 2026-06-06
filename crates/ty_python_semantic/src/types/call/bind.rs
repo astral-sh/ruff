@@ -4619,6 +4619,7 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
+    potentially_escaping_callable_typevars: FxHashSet<BoundTypeVarIdentity<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -4697,6 +4698,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            potentially_escaping_callable_typevars: FxHashSet::default(),
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -4987,6 +4989,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let specialization = builder.build_with(generic_context, choose_solution);
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
+        self.potentially_escaping_callable_typevars
+            .extend(builder.potentially_escaping_callable_typevars());
         self.specialization = Some(specialization);
     }
 
@@ -5311,6 +5315,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         match callable_binding.matching_overload_index() {
             MatchingOverloadIndex::None => {
                 if let [binding] = callable_binding.overloads() {
+                    self.return_ty = self
+                        .return_ty
+                        .apply_optional_specialization(self.db, binding.specialization);
                     // This is not an overloaded function, so we can propagate its errors to the
                     // outer bindings.
                     extend_errors(&binding.errors);
@@ -5326,9 +5333,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
             MatchingOverloadIndex::Single(index) => {
-                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
-                // matching overload here.
-                extend_errors(&callable_binding.overloads()[index].errors);
+                let binding = &callable_binding.overloads()[index];
+                self.return_ty = self
+                    .return_ty
+                    .apply_optional_specialization(self.db, binding.specialization);
+                extend_errors(&binding.errors);
             }
             MatchingOverloadIndex::Multiple(_) => {
                 if !matches!(
@@ -5454,7 +5463,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn finish(
-        self,
+        mut self,
     ) -> (
         InferableTypeVars<'db>,
         Option<Specialization<'db>>,
@@ -5469,6 +5478,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 *parameter_ty = Some(builder.build());
             }
         }
+
+        self.return_ty = self
+            .return_ty
+            .replace_escaping_typevars(self.db, &self.potentially_escaping_callable_typevars);
 
         (self.inferable_typevars, self.specialization, self.return_ty)
     }

@@ -7,7 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::types::callable::walk_callable_type;
+use crate::types::callable::{CallableTypeKind, walk_callable_type};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -1826,6 +1826,7 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+    potentially_escaping_callable_typevars: FxHashSet<BoundTypeVarIdentity<'db>>,
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
@@ -1841,7 +1842,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
+            potentially_escaping_callable_typevars: FxHashSet::default(),
         }
+    }
+
+    pub(crate) fn potentially_escaping_callable_typevars(
+        &self,
+    ) -> &FxHashSet<BoundTypeVarIdentity<'db>> {
+        &self.potentially_escaping_callable_typevars
     }
 
     /// Build a specialization, using a caller-provided hook to select the solution for each
@@ -2336,20 +2344,38 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
 
         for actual_callable in actual_callables.as_slice() {
+            let db = self.db;
+            let constraints = self.constraints;
+            let actual_signatures = actual_callable.signatures(db);
+            self.potentially_escaping_callable_typevars.extend(
+                actual_signatures
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| signature.generic_context)
+                    .flat_map(|context| context.variables(db))
+                    .map(|typevar| typevar.identity(db)),
+            );
+            let preserve_source_transitive = matches!(
+                actual_callable.kind(db),
+                CallableTypeKind::FunctionLike
+                    | CallableTypeKind::StaticMethodLike
+                    | CallableTypeKind::ClassMethodLike
+            );
+
             if formal_is_single_paramspec {
-                let when = actual_callable
-                    .signatures(self.db)
-                    .when_constraint_set_assignable_to(self.db, formal_signature, self.constraints);
+                let when = actual_signatures.when_constraint_set_assignable_to(
+                    db,
+                    formal_signature,
+                    constraints,
+                    preserve_source_transitive,
+                );
                 self.add_type_mappings_from_constraint_set(when)?;
-                self.pending.intersect(self.db, self.constraints, when);
+                self.pending.intersect(db, constraints, when);
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
                 // least one of its overloads is. We collect type mappings from all satisfiable
                 // overloads, and only report an error if none of them are satisfiable.
-                let db = self.db;
-                let constraints = self.constraints;
-                let combined = actual_callable
-                    .signatures(db)
+                let combined = actual_signatures
                     .overloads
                     .iter()
                     .filter_map(|actual_signature| {
@@ -2357,6 +2383,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             db,
                             formal_signature,
                             constraints,
+                            preserve_source_transitive,
                         );
                         self.add_type_mappings_from_constraint_set(when)
                             .ok()

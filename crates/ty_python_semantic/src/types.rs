@@ -1,7 +1,7 @@
 use compact_str::ToCompactString;
 use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use std::borrow::Cow;
 use std::cell::OnceCell;
@@ -82,6 +82,7 @@ use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
+use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
     BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
@@ -5859,6 +5860,22 @@ impl<'db> Type<'db> {
         self.apply_type_mapping_impl(db, type_mapping, tcx, &ApplyTypeMappingVisitor::default())
     }
 
+    pub(crate) fn replace_escaping_typevars(
+        self,
+        db: &'db dyn Db,
+        typevars: &FxHashSet<BoundTypeVarIdentity<'db>>,
+    ) -> Type<'db> {
+        if typevars.is_empty() {
+            return self;
+        }
+
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::ReplaceEscapingTypevars(typevars),
+            TypeContext::default(),
+        )
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -6122,6 +6139,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::ReplaceEscapingTypevars(_) |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
@@ -6137,6 +6155,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Promote(..) |
                 TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::ReplaceEscapingTypevars(_) |
                 TypeMapping::EagerExpansion |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -7129,6 +7148,8 @@ pub enum TypeMapping<'a, 'db> {
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
+    /// Replace callable-owned type variables that escape their generic callable with `Unknown`.
+    ReplaceEscapingTypevars(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
@@ -7169,6 +7190,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
             | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ReplaceEscapingTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
@@ -7214,6 +7236,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::ReplaceEscapingTypevars(_)
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
