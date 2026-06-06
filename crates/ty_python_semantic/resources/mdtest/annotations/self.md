@@ -378,6 +378,9 @@ class Value:
     def choose[T = Self](self) -> tuple[T, Self]:
         raise NotImplementedError
 
+    def choose_default[T = Self](self) -> T:
+        raise NotImplementedError
+
 class Extra: ...
 
 def _(value: Intersection[Value, Extra], plain: Value):
@@ -385,6 +388,7 @@ def _(value: Intersection[Value, Extra], plain: Value):
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: Value & Extra
     reveal_type(value.choose())  # revealed: tuple[Value & Extra, Value & Extra]
+    reveal_type(value.choose_default())  # revealed: Value & Extra
 
 class MixedRefinementMarker(Protocol):
     marker: int

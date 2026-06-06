@@ -1226,6 +1226,13 @@ impl<'db> Signature<'db> {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
+            || self.generic_context.is_some_and(|generic_context| {
+                generic_context.variables(db).any(|typevar| {
+                    typevar
+                        .default_type(db)
+                        .is_some_and(|default| default.contains_self(db))
+                })
+            })
             || self
                 .parameters
                 .iter()
