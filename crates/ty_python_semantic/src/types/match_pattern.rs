@@ -228,24 +228,8 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
         return sequence_pattern_type_builder(db).build();
     }
 
-    if kind.is_exact_length() {
-        let element_types: Vec<_> = kind
-            .patterns
-            .iter()
-            .map(|pattern| definite_match_pattern_type(db, pattern))
-            .collect();
-
-        if element_types.iter().any(Type::is_never) {
-            Type::Never
-        } else {
-            exact_sequence_pattern_type(db, element_types.into_iter())
-        }
-    } else {
-        let Some((prefix, suffix)) = kind.split_around_star() else {
-            return Type::Never;
-        };
-
-        Type::tuple(TupleType::mixed(
+    if let Some((prefix, suffix)) = kind.split_around_star() {
+        return Type::tuple(TupleType::mixed(
             db,
             prefix
                 .iter()
@@ -254,6 +238,18 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
             suffix
                 .iter()
                 .map(|pattern| definite_match_pattern_type(db, pattern)),
-        ))
+        ));
+    }
+
+    let element_types: Vec<_> = kind
+        .patterns
+        .iter()
+        .map(|pattern| definite_match_pattern_type(db, pattern))
+        .collect();
+
+    if element_types.iter().any(Type::is_never) {
+        Type::Never
+    } else {
+        exact_sequence_pattern_type(db, element_types.into_iter())
     }
 }
