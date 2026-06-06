@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, PythonVersion};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -13,8 +13,8 @@ use crate::rules::flake8_comprehensions::helpers;
 
 /// ## What it does
 /// Checks for `tuple` calls that take unnecessary list or tuple literals as
-/// arguments. In [preview], this also includes unnecessary list comprehensions
-/// within tuple calls.
+/// arguments. In [preview], when targeting Python 3.14+, this also includes
+/// unnecessary list comprehensions within tuple calls.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,
@@ -24,9 +24,9 @@ use crate::rules::flake8_comprehensions::helpers;
 /// literal. Otherwise, if a tuple literal was passed, then the outer call
 /// to `tuple()` should be removed.
 ///
-/// In [preview], this rule also checks for list comprehensions within `tuple()`
-/// calls. If a list comprehension is found, it should be rewritten as a
-/// generator expression.
+/// In [preview], when targeting Python 3.14+, this rule also checks for list
+/// comprehensions within `tuple()` calls. If a list comprehension is found,
+/// it should be rewritten as a generator expression.
 ///
 /// ## Example
 /// ```python
@@ -104,7 +104,10 @@ pub(crate) fn unnecessary_literal_within_tuple_call(
     let argument_kind = match argument {
         Expr::Tuple(_) => TupleLiteralKind::Tuple,
         Expr::List(_) => TupleLiteralKind::List,
-        Expr::ListComp(_) if is_check_comprehensions_in_tuple_call_enabled(checker.settings()) => {
+        Expr::ListComp(_)
+            if is_check_comprehensions_in_tuple_call_enabled(checker.settings())
+                && checker.target_version() >= PythonVersion::PY314 =>
+        {
             TupleLiteralKind::ListComp
         }
         _ => return,
