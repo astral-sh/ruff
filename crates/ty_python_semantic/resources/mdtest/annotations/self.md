@@ -387,6 +387,8 @@ def _(value: Intersection[MethodAlias, MethodExtra]):
 ## Intersection receivers bind `Self` before inferring arguments
 
 ```py
+from collections import defaultdict
+from collections.abc import Iterable
 from enum import Enum
 from typing import Literal, Protocol, Self, TypeVar, cast
 from ty_extensions import AlwaysTruthy, Intersection
@@ -486,6 +488,19 @@ def union_bounded_self[T: UnionSelfA | UnionSelfB](
     reveal_type(value.copy_from(value))  # revealed: T@union_bounded_self & UnionSelfExtra
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: T@union_bounded_self & UnionSelfExtra
+
+type DefaultdictSpec = None | int | Iterable[int] | dict[str, int]
+
+def is_mapping(value: object) -> bool:
+    return isinstance(value, dict)
+
+def copy_defaultdict(value: DefaultdictSpec) -> DefaultdictSpec:
+    if is_mapping(value) and isinstance(value, defaultdict):
+        copied = value.copy()
+        # revealed: (Iterable[int] & Top[defaultdict[Unknown, Unknown]]) | (dict[str, int] & Top[defaultdict[Unknown, Unknown]])
+        reveal_type(copied)
+        value = copied
+    return value
 ```
 
 ## typing_extensions

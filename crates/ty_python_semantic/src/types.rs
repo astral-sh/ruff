@@ -1088,6 +1088,30 @@ impl<'db> Type<'db> {
         let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
             !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
         });
+        // A generic protocol can constrain a nominal class's unknown type arguments. If the
+        // class's bottom materialization satisfies it, preserve it as a class constraint.
+        let protocol_is_nominal_class_constraint = |protocol: Type<'db>| {
+            if protocol.class_specialization(db).is_none() {
+                return false;
+            }
+
+            intersection.positive(db).iter().any(|positive| {
+                let Some(class) = positive.nominal_class(db) else {
+                    return false;
+                };
+                let Some(alias) = class.into_generic_alias() else {
+                    return false;
+                };
+                let bottom = GenericAlias::new(
+                    db,
+                    alias.origin(db),
+                    alias
+                        .specialization(db)
+                        .with_materialization_kind(db, Some(MaterializationKind::Bottom)),
+                );
+                Type::instance(db, bottom.into()).is_assignable_to(db, protocol)
+            })
+        };
         let tuple_shape = Type::homogeneous_tuple(db, Type::object());
         let has_tuple_refinement = intersection
             .positive(db)
@@ -1125,6 +1149,7 @@ impl<'db> Type<'db> {
                                 !class_mro_literals(db, class.class_literal(db)).contains(&owner)
                             }))
                             && !class.is_known(db, KnownClass::NamedTupleLike)
+                            && !protocol_is_nominal_class_constraint(*positive)
                 );
             if !is_value_refinement {
                 builder = builder
