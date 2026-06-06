@@ -51,11 +51,9 @@ impl<'db> BoundMethodType<'db> {
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
         let mut self_instance = self.self_instance(db);
         if self.function(db).is_classmethod(db) {
-            self_instance = match self_instance {
-                Type::Intersection(intersection) => intersection.to_instance_for_class_receiver(db),
-                _ => self_instance.to_instance(db),
-            }
-            .unwrap_or_else(Type::unknown);
+            self_instance = self_instance
+                .to_instance_for_class_receiver(db)
+                .unwrap_or_else(Type::unknown);
         }
         self_instance
     }
@@ -87,56 +85,6 @@ impl<'db> BoundMethodType<'db> {
 
     #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
-        CallableSignature::from_overloads(
-            self.indexed_bound_signatures(db)
-                .into_iter()
-                .map(|(_, signature)| signature),
-        )
-    }
-
-    /// Returns bound signatures paired with their positions in the original overload list.
-    pub(crate) fn indexed_bound_signatures(
-        self,
-        db: &'db dyn Db,
-    ) -> SmallVec<[(usize, Signature<'db>); 1]> {
-        let function_signature = self.function(db).signature(db);
-        let typing_self_type = self.typing_self_type(db);
-        let self_instance = self.self_instance(db);
-
-        let [signature] = function_signature.overloads.as_slice() else {
-            if !function_signature
-                .overloads
-                .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation)
-            {
-                return function_signature
-                    .overloads
-                    .iter()
-                    .enumerate()
-                    .map(|(index, signature)| {
-                        (index, signature.bind_self(db, Some(typing_self_type)))
-                    })
-                    .collect();
-            }
-
-            return function_signature
-                .overloads
-                .iter()
-                .enumerate()
-                .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
-                .map(|(index, signature)| (index, signature.bind_self(db, Some(typing_self_type))))
-                .collect();
-        };
-
-        smallvec::smallvec![(0, signature.bind_self(db, Some(typing_self_type)))]
-    }
-
-    /// Returns signatures for direct calls, preserving receivers for argument checking and
-    /// inference while pairing retained overloads with their original indexes.
-    pub(crate) fn indexed_call_signatures(
-        self,
-        db: &'db dyn Db,
-    ) -> SmallVec<[(usize, Signature<'db>); 1]> {
         let function_signature = self.function(db).signature(db);
         let typing_self_type = self.typing_self_type(db);
 
@@ -147,29 +95,56 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .any(Signature::has_explicit_positional_receiver_annotation);
 
-            let filtered: SmallVec<_> = function_signature
-                .overloads
-                .iter()
-                .enumerate()
-                .filter(|(_, signature)| {
-                    !filter_explicit_receivers || signature.can_bind_self_to(db, self_instance)
-                })
-                .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
-                .collect();
-
-            if !filtered.is_empty() || !filter_explicit_receivers {
-                return filtered;
-            }
-
-            return function_signature
-                .overloads
-                .iter()
-                .enumerate()
-                .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
-                .collect();
+            return CallableSignature::from_overloads(
+                function_signature
+                    .overloads
+                    .iter()
+                    .filter(|signature| {
+                        !filter_explicit_receivers || signature.can_bind_self_to(db, self_instance)
+                    })
+                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
+            );
         };
 
-        smallvec::smallvec![(0, signature.apply_self(db, typing_self_type))]
+        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+    }
+
+    /// Returns signatures for direct calls, preserving receivers for argument checking and
+    /// inference while pairing retained overloads with their original indexes.
+    pub(crate) fn indexed_call_signatures(
+        self,
+        db: &'db dyn Db,
+    ) -> SmallVec<[(usize, Signature<'db>); 1]> {
+        let function_signature = self.function(db).signature(db);
+        let typing_self_type = self.typing_self_type(db);
+        let self_instance = self.self_instance(db);
+        let filter_explicit_receivers = function_signature.overloads.len() > 1
+            && function_signature
+                .overloads
+                .iter()
+                .any(Signature::has_explicit_positional_receiver_annotation);
+
+        let mut signatures: SmallVec<_> = function_signature
+            .overloads
+            .iter()
+            .enumerate()
+            .filter(|(_, signature)| {
+                !filter_explicit_receivers || signature.can_bind_self_to(db, self_instance)
+            })
+            .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
+            .collect();
+
+        if signatures.is_empty() && filter_explicit_receivers {
+            signatures.extend(
+                function_signature
+                    .overloads
+                    .iter()
+                    .enumerate()
+                    .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type))),
+            );
+        }
+
+        signatures
     }
 
     pub(super) fn recursive_type_normalized_impl(

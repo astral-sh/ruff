@@ -2940,12 +2940,7 @@ impl<'db> Type<'db> {
                     } else {
                         let self_type = instance.unwrap_or_else(|| {
                             // For classmethod-like callables, bind to the owner class.
-                            match owner {
-                                Type::Intersection(intersection) => intersection
-                                    .to_instance_for_class_receiver(db)
-                                    .unwrap_or(owner),
-                                _ => owner.to_instance(db).unwrap_or(owner),
-                            }
+                            owner.to_instance_for_class_receiver(db).unwrap_or(owner)
                         });
 
                         Some((
@@ -3859,12 +3854,9 @@ impl<'db> Type<'db> {
                     let self_instance = this
                         .to_instance(db)
                         .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
-                    let self_instance = match receiver {
-                        Type::Intersection(intersection) => intersection
-                            .to_instance_for_class_receiver(db)
-                            .unwrap_or(self_instance),
-                        _ => receiver.to_instance(db).unwrap_or(self_instance),
-                    };
+                    let self_instance = receiver
+                        .to_instance_for_class_receiver(db)
+                        .unwrap_or(self_instance);
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
@@ -5519,6 +5511,14 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_)
             | Type::EnumComplement(_)
             | Type::NewTypeInstance(_) => None,
+        }
+    }
+
+    /// Returns the instance type used to bind `Self` for a class-object receiver.
+    pub(crate) fn to_instance_for_class_receiver(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::Intersection(intersection) => intersection.to_instance_for_class_receiver(db),
+            _ => self.to_instance(db),
         }
     }
 

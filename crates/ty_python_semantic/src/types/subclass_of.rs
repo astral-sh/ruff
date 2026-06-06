@@ -101,33 +101,26 @@ impl<'db> SubclassOfType<'db> {
     /// Class-object, `NewType`, and `TypedDict` constraints instead project to their concrete
     /// runtime classes.
     fn try_from_positive_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        if matches!(
-            ty,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-        ) {
-            return Some(ty.to_meta_type(db));
+        match ty {
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
+                Some(ty.to_meta_type(db))
+            }
+            Type::NewTypeInstance(newtype) => Some(newtype.concrete_base_type(db).to_meta_type(db)),
+            Type::TypedDict(_) => Self::try_from_type(db, ty.dunder_class(db)),
+            _ => SubclassOfInner::try_from_instance(db, ty)
+                .map(|subclass_of| Self::from(db, subclass_of)),
         }
-
-        if let Type::NewTypeInstance(newtype) = ty {
-            return Some(newtype.concrete_base_type(db).to_meta_type(db));
-        }
-
-        if ty.is_typed_dict() {
-            return Self::try_from_type(db, ty.dunder_class(db));
-        }
-
-        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
     /// Projects a negative instance constraint into the class-object domain.
     ///
     /// Excluding a structural `TypedDict` shape does not exclude its runtime `dict` class.
     fn try_from_negative_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        if ty.is_typed_dict() {
-            return None;
+        match ty {
+            Type::TypedDict(_) => None,
+            _ => SubclassOfInner::try_from_instance(db, ty)
+                .map(|subclass_of| Self::from(db, subclass_of)),
         }
-
-        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.

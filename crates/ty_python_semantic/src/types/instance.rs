@@ -137,23 +137,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Is `self` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
-    ///
-    /// This does not include all subtypes of `builtins.type`. `type[C]` constrains class objects in
-    /// the regular-class domain through the instances they create. A metaclass instance such as
-    /// `ABCMeta` instead constrains them in the metaclass domain.
-    pub(crate) fn is_metaclass_instance(self, db: &'db dyn Db) -> bool {
-        self.as_nominal_instance().is_some_and(|instance| {
-            KnownClass::Type
-                .try_to_class_literal(db)
-                .is_some_and(|type_class| {
-                    instance
-                        .class(db)
-                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
-                })
-        })
-    }
-
     /// Return `true` if `self` is a nominal instance of the given known class.
     pub(crate) fn is_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         match self {
