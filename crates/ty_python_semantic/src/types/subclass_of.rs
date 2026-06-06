@@ -97,9 +97,13 @@ impl<'db> SubclassOfType<'db> {
     /// Projects a positive instance constraint into the class-object domain.
     ///
     /// Unlike [`Self::try_from_instance`], this excludes structural protocol instances: a
-    /// protocol can describe only the current value without constraining its runtime class. A
-    /// positive `TypedDict` constraint does constrain the runtime class to `dict`.
+    /// protocol can describe only the current value without constraining its runtime class.
+    /// `NewType` and `TypedDict` constraints instead project to their concrete runtime classes.
     fn try_from_positive_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        if let Type::NewTypeInstance(newtype) = ty {
+            return Some(newtype.concrete_base_type(db).to_meta_type(db));
+        }
+
         if ty.is_typed_dict() {
             return Self::try_from_type(db, ty.dunder_class(db));
         }
