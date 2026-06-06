@@ -67,6 +67,26 @@ match x:
         pass
 
 reveal_type(x)  # revealed: object
+
+def mixed_guarded_and_unguarded_patterns(x: A | B, first_flag: bool, second_flag: bool) -> None:
+    match x:
+        case A():
+            pass
+        case B() if first_flag:
+            pass
+        case B() if second_flag:
+            pass
+        case B():
+            # The guarded `B` patterns are not exclusions, but the earlier
+            # unguarded `A` pattern is still excluded.
+            reveal_type(x)  # revealed: B & ~A
+
+def exhaustive_pattern_with_guard(x: A, flag: bool) -> None:
+    match x:
+        case A() if flag:
+            pass
+        case _:
+            reveal_type(x)  # revealed: A
 ```
 
 ## Class patterns with generic classes
@@ -156,6 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
     match x:
@@ -176,6 +197,150 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
             reveal_type(x)  # revealed: list[int]
         case _:
             reveal_type(x)  # revealed: str | bytes | bytearray
+
+def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: str
+
+def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytes
+
+def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytearray
+
+def test_match_exact_object_sequence(value: object) -> None:
+    match value:
+        case int(), str():
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[2]
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: str
+
+def test_match_empty_object_sequence(value: object) -> None:
+    match value:
+        case []:
+            # revealed: Sequence[object] & <Protocol with members '__len__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[0]
+
+def test_match_singleton_object_sequence(value: object) -> None:
+    match value:
+        case [int()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__', '__len__'> & ~bytearray & ~bytes
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: Literal[1]
+            reveal_type(value[0])  # revealed: int
+
+def test_match_prefix_star_object_sequence(value: object) -> None:
+    match value:
+        case [int(), *rest]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(len(value))  # revealed: int
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: object
+
+def test_match_prefix_and_suffix_star_object_sequence(value: object) -> None:
+    match value:
+        case [int(), *rest, str()]:
+            # revealed: Sequence[object] & <Protocol with members '__getitem__'> & ~str & ~bytes & ~bytearray
+            reveal_type(value)
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[-1])  # revealed: str
+            reveal_type(value[1])  # revealed: object
+
+def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
+    match value:
+        case [int(), *rest]:
+            reveal_type(value[0])  # revealed: int
+            reveal_type(value[1])  # revealed: int | str
+
+def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
+    match subj:
+        case x, str():
+            # TODO: This should simplify to `tuple[int | str, str]`.
+            # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            reveal_type(subj[1])  # revealed: str
+            first, second = subj
+            reveal_type(first)  # revealed: int | str
+            # TODO: This should reveal `str`.
+            reveal_type(second)  # revealed: int | str
+        case y:
+            # TODO: This should simplify to `tuple[int | str, int]`.
+            # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(subj)
+            reveal_type(subj[0])  # revealed: int | str
+            # TODO: This should reveal `int` once we simplify the negative
+            # intersection above.
+            reveal_type(subj[1])  # revealed: int | str
+
+def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
+    match value:
+        case int(value):
+            return value
+        case (left, right):
+            return left + right
+        case _:
+            assert_never(value)
+
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+    match x:
+        case [int()]:
+            return 42
+        case [str()]:
+            return 42
+        case _:
+            # TODO: The previous cases are exhaustive, so this should simplify
+            # to `tuple[Never]`, and therefore `Never`.
+            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(x)
+
+def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
+    match value:
+        case [int()]:
+            pass
+        case _:
+            # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+
+def normalize_nested_record(value: object) -> tuple[None, int, int] | None:
+    match value:
+        case [None, [int()], {}]:
+            ret = value[0], value[1][0], len(value[2])
+            reveal_type(ret)  # revealed: tuple[None, int, int]
+            return ret
+    return None
+
+def unwrap_number_or_label(value: object) -> int | str | None:
+    match value:
+        case [(int() | str()) as item]:
+            reveal_type(value[0])  # revealed: int | str
+            return value[0]
+    return None
+
+def test_match_value_sequence(value: object) -> None:
+    match value:
+        case [1]:
+            # Value patterns use equality, so matching `1` does not prove that
+            # the element is an `int`.
+            reveal_type(value[0])  # revealed: object
 ```
 
 ## Value patterns

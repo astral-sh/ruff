@@ -41,7 +41,8 @@ use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
+    StarImportPlaceholderPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1936,15 +1937,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
-                // `case [*rest]` matches every sequence, while all other sequence patterns
-                // are refutable because they impose a minimum and/or exact length.
-                PatternPredicateKind::Sequence(
-                    if matches!(pattern.patterns.as_slice(), [ast::Pattern::MatchStar(_)]) {
-                        ClassPatternKind::Irrefutable
-                    } else {
-                        ClassPatternKind::Refutable
-                    },
-                )
+                let mut has_star = false;
+                let patterns = pattern
+                    .patterns
+                    .iter()
+                    .map(|pattern| {
+                        if matches!(pattern, ast::Pattern::MatchStar(_)) {
+                            has_star = true;
+                        }
+                        self.predicate_kind(pattern)
+                    })
+                    .collect();
+                PatternPredicateKind::Sequence(SequencePatternPredicateKind { patterns, has_star })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
@@ -1961,7 +1965,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .map(|p| Box::new(self.predicate_kind(p))),
                 pattern.name.as_ref().map(|name| name.id.clone()),
             ),
-            ast::Pattern::MatchStar(_) => PatternPredicateKind::Unsupported,
+            ast::Pattern::MatchStar(_) => PatternPredicateKind::MatchStar,
         }
     }
 
