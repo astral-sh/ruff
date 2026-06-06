@@ -378,6 +378,10 @@ class Factory:
     def choose_constrained[T: (Factory, Extra)](cls: type[T], other: T) -> T:
         return other
 
+    @classmethod
+    def identity_type[T](cls: type[T]) -> type[T]:
+        return cls
+
     @overload
     @classmethod
     def overloaded_make[T](cls: type[T], value: int) -> T: ...
@@ -398,6 +402,8 @@ def _(cls: Intersection[type[Factory], type[Extra]]):
     reveal_type(cls.make())  # revealed: Factory & Extra
     reveal_type(cls.choose(Factory()))  # revealed: Factory
     reveal_type(cls.choose_constrained(FactoryChild()))  # revealed: Factory
+    reveal_type(cls.identity_type())  # revealed: type[Factory | Extra]
+    bad: type[str] = cls.identity_type()  # error: [invalid-assignment]
     reveal_type(cls.overloaded_make(1))  # revealed: Factory & Extra
     # revealed: tuple[Factory & Extra, Factory & Extra]
     reveal_type(cls.overloaded_make("one"))

@@ -160,7 +160,17 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                mapped.to_meta_type(db)
+                match mapped {
+                    // Until intersection meta-types are supported, use the union of the positive
+                    // class constraints as a sound over-approximation of `type[A & B]`.
+                    Type::Intersection(intersection) => UnionType::from_elements(
+                        db,
+                        intersection
+                            .positive_elements_or_object(db)
+                            .map(|element| element.to_meta_type(db)),
+                    ),
+                    _ => mapped.to_meta_type(db),
+                }
             }
         }
     }
