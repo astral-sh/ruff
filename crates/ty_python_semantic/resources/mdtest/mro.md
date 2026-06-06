@@ -704,6 +704,68 @@ class Sub(Intermediate[T], Base): ...
 reveal_mro(Sub)
 ```
 
+## Specializing generic ancestors
+
+Specializing a generic class also specializes type variables used by indirect ancestors:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+class A(Generic[T]): ...
+class B(A[list[U]], Generic[U]): ...
+class C(B[V], Generic[V]): ...
+
+reveal_mro(C[int])  # revealed: (<class 'C[int]'>, <class 'B[int]'>, <class 'A[list[int]]'>, typing.Generic, <class 'object'>)
+reveal_mro(C[str])  # revealed: (<class 'C[str]'>, <class 'B[str]'>, <class 'A[list[str]]'>, typing.Generic, <class 'object'>)
+```
+
+Specialization can change both the entries in an MRO and their C3 ordering. When an MRO contains
+multiple aliases of the same generic class, it must be recomputed rather than produced by
+substituting type variables in an existing MRO:
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+
+class GenericBase(Generic[T]): ...
+class Left(GenericBase[T]): ...
+class Combined(Left, GenericBase[T]): ...  # error: [missing-type-argument]
+class Outer(Combined, object): ...  # error: [missing-type-argument]
+
+# revealed: (<class 'Combined[int]'>, <class 'Left[Unknown]'>, <class 'GenericBase[Unknown]'>, <class 'GenericBase[int]'>, typing.Generic, <class 'object'>)
+reveal_mro(Combined[int])
+
+# revealed: (<class 'Outer'>, <class 'Combined[Unknown]'>, <class 'Left[Unknown]'>, <class 'GenericBase[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Outer)
+```
+
+```py
+from typing import Generic, TypeVar
+from ty_extensions import reveal_mro
+
+T = TypeVar("T")
+
+class PredictionModel(Generic[T]): ...
+class RegressionModel(PredictionModel[T]): ...
+class JavaPredictionModel(PredictionModel[T]): ...
+class JavaRegressionModel(RegressionModel, JavaPredictionModel[T]): ...  # error: [missing-type-argument]
+class DecisionTreeModel(JavaPredictionModel[T]): ...
+
+# error: 16 [missing-type-argument]
+# error: 37 [missing-type-argument]
+class Combined(JavaRegressionModel, DecisionTreeModel): ...
+
+# revealed: (<class 'Combined'>, <class 'JavaRegressionModel[Unknown]'>, <class 'RegressionModel[Unknown]'>, <class 'DecisionTreeModel[Unknown]'>, <class 'JavaPredictionModel[Unknown]'>, <class 'PredictionModel[Unknown]'>, typing.Generic, <class 'object'>)
+reveal_mro(Combined)
+```
+
 ## Unresolvable MROs involving generics have the original bases reported in the error message, not the resolved bases
 
 <!-- snapshot-diagnostics -->

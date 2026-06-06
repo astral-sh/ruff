@@ -44,7 +44,7 @@ use crate::{
         infer_expression_type, inferred_declaration,
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
-        mro::{Mro, MroIterator},
+        mro::{Mro, MroIterator, MroTemplate},
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, typed_dict_params_from_class_def},
@@ -655,6 +655,28 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Result<Mro<'db>, StaticMroError<'db>> {
         tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
         Mro::of_static_class(db, self, specialization)
+    }
+
+    /// Return an MRO template that maps the class's type variables to themselves.
+    #[salsa::tracked(
+        returns(as_ref),
+        cycle_initial=|db, _, self_: StaticClassLiteral<'db>| {
+            Err(StaticMroError::cycle(db, self_.identity_specialization(db)))
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn try_mro_template(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<MroTemplate<'db>, StaticMroError<'db>> {
+        tracing::trace!("StaticClassLiteral::try_mro_template: {}", self.name(db));
+        Mro::of_static_class(
+            db,
+            self,
+            self.generic_context(db)
+                .map(|generic_context| generic_context.identity_specialization(db)),
+        )
+        .map(MroTemplate::new)
     }
 
     /// Iterate over the [method resolution order] ("MRO") of the class.

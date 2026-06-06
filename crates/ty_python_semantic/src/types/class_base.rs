@@ -1,11 +1,10 @@
 use crate::types::class::CodeGeneratorKind;
-use crate::types::generics::{ApplySpecialization, Specialization};
+use crate::types::generics::Specialization;
 use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
-    KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    ClassLiteral, ClassType, DivergentType, DynamicType, GenericAlias, KnownClass,
+    KnownInstanceType, SpecialFormType, StaticMroError, Type, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -309,18 +308,26 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    fn apply_type_mapping_impl<'a>(
+    pub(crate) fn apply_optional_specialization(
         self,
         db: &'db dyn Db,
-        type_mapping: &TypeMapping<'a, 'db>,
-        tcx: TypeContext<'db>,
-        visitor: &ApplyTypeMappingVisitor<'db>,
+        specialization: Option<Specialization<'db>>,
     ) -> Self {
+        let Some(specialization) = specialization else {
+            return self;
+        };
         match self {
-            Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            Self::Class(ClassType::Generic(alias)) => {
+                Self::Class(ClassType::Generic(GenericAlias::new(
+                    db,
+                    alias.origin(db),
+                    alias
+                        .specialization(db)
+                        .apply_specialization(db, specialization),
+                )))
             }
-            Self::Dynamic(_)
+            Self::Class(ClassType::NonGeneric(_))
+            | Self::Dynamic(_)
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
@@ -328,42 +335,10 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(crate) fn apply_optional_specialization(
-        self,
-        db: &'db dyn Db,
-        specialization: Option<Specialization<'db>>,
-    ) -> Self {
-        if let Some(specialization) = specialization {
-            let new_self = self.apply_type_mapping_impl(
-                db,
-                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
-                    specialization,
-                )),
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
-            );
-            match specialization.materialization_kind(db) {
-                None => new_self,
-                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
-            }
-        } else {
-            self
-        }
-    }
-
-    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
-        self.apply_type_mapping_impl(
-            db,
-            &TypeMapping::Materialize(kind),
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        )
-    }
-
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+                let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
                     // Dynamic classes can't have cyclic MRO since their bases must
                     // already exist at creation time. Unlike statement classes, we do not
                     // permit dynamic classes to have forward references in their
@@ -371,7 +346,7 @@ impl<'db> ClassBase<'db> {
                     return false;
                 };
                 class_literal
-                    .try_mro(db, specialization)
+                    .try_mro(db, None)
                     .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Dynamic(_)

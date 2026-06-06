@@ -37,6 +37,18 @@ use itertools::Itertools;
 pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
+    /// Return whether this MRO can be specialized lazily without a meaningful runtime cost.
+    fn can_specialize_lazily(&self) -> bool {
+        // Specialization can only change the C3 ordering if multiple aliases have the same origin.
+        // Even with distinct origins, repeatedly specializing several aliases is slower than
+        // loading the specialization-specific MRO, so keep the lazy path to at most one alias.
+        self.iter()
+            .filter(|base| matches!(base, ClassBase::Class(ClassType::Generic(_))))
+            .take(2)
+            .count()
+            <= 1
+    }
+
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
     /// literal][StaticClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
@@ -46,8 +58,7 @@ impl<'db> Mro<'db> {
     /// In the event that a possible list of bases would (or could) lead to a `TypeError` being
     /// raised at runtime due to an unresolvable MRO, we infer the MRO of the class as being `[<the
     /// class in question>, Unknown, object]`. This seems most likely to reduce the possibility of
-    /// cascading errors elsewhere. (For a generic class, the first entry in this fallback MRO uses
-    /// the default specialization of the class's type variables.)
+    /// cascading errors elsewhere.
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::infer_scope_types`].)
@@ -516,6 +527,22 @@ impl<'db> Mro<'db> {
     }
 }
 
+#[derive(PartialEq, Eq, Clone, Debug, salsa::Update, get_size2::GetSize)]
+pub(super) struct MroTemplate<'db> {
+    mro: Mro<'db>,
+    can_specialize_lazily: bool,
+}
+
+impl<'db> MroTemplate<'db> {
+    pub(super) fn new(mro: Mro<'db>) -> Self {
+        let can_specialize_lazily = mro.can_specialize_lazily();
+        Self {
+            mro,
+            can_specialize_lazily,
+        }
+    }
+}
+
 impl<'db, const N: usize> From<[ClassBase<'db>; N]> for Mro<'db> {
     fn from(value: [ClassBase<'db>; N]) -> Self {
         Self(Box::from(value))
@@ -567,7 +594,7 @@ pub(crate) struct MroIterator<'db> {
     /// The class whose MRO we're iterating over
     class: ClassLiteral<'db>,
 
-    /// The specialization to apply to each MRO element, if any
+    /// The specialization to use when computing the MRO, if any.
     specialization: Option<Specialization<'db>>,
 
     /// Whether or not we've already yielded the first element of the MRO
@@ -578,7 +605,69 @@ pub(crate) struct MroIterator<'db> {
     /// The full MRO is expensive to materialize, so this field is `None`
     /// unless we actually *need* to iterate past the first element of the MRO,
     /// at which point it is lazily materialized.
-    subsequent_elements: Option<std::slice::Iter<'db, ClassBase<'db>>>,
+    subsequent_elements: Option<MroElements<'db>>,
+}
+
+#[derive(Clone)]
+enum MroElements<'db> {
+    Cached(std::slice::Iter<'db, ClassBase<'db>>),
+    Template {
+        elements: std::slice::Iter<'db, ClassBase<'db>>,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    },
+}
+
+impl<'db> MroElements<'db> {
+    fn cached(mro: &'db Mro<'db>) -> Self {
+        let mut elements = mro.iter();
+        elements.next();
+        Self::Cached(elements)
+    }
+
+    fn template(mro: &'db Mro<'db>, db: &'db dyn Db, specialization: Specialization<'db>) -> Self {
+        let mut elements = mro.iter();
+        elements.next();
+        Self::Template {
+            elements,
+            db,
+            specialization,
+        }
+    }
+}
+
+impl<'db> Iterator for MroElements<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Cached(elements) => elements.next().copied(),
+            Self::Template {
+                elements,
+                db,
+                specialization,
+            } => elements
+                .next()
+                .copied()
+                .map(|base| base.apply_optional_specialization(*db, Some(*specialization))),
+        }
+    }
+}
+
+impl DoubleEndedIterator for MroElements<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Cached(elements) => elements.next_back().copied(),
+            Self::Template {
+                elements,
+                db,
+                specialization,
+            } => elements
+                .next_back()
+                .copied()
+                .map(|base| base.apply_optional_specialization(*db, Some(*specialization))),
+        }
+    }
 }
 
 impl<'db> MroIterator<'db> {
@@ -618,42 +707,50 @@ impl<'db> MroIterator<'db> {
 
     /// Materialize the full MRO of the class.
     /// Return an iterator over that MRO which skips the first element of the MRO.
-    fn full_mro_except_first_element(&mut self) -> &mut std::slice::Iter<'db, ClassBase<'db>> {
+    fn full_mro_except_first_element(&mut self) -> &mut MroElements<'db> {
         self.subsequent_elements
             .get_or_insert_with(|| match self.class {
                 ClassLiteral::Static(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.db, self.specialization) {
-                        Ok(mro) => mro.iter(),
-                        Err(error) => error.fallback_mro().iter(),
-                    };
-                    full_mro_iter.next();
-                    full_mro_iter
+                    if let Some(specialization) = self.specialization {
+                        match literal.try_mro_template(self.db) {
+                            Ok(template) if template.can_specialize_lazily => {
+                                MroElements::template(&template.mro, self.db, specialization)
+                            }
+                            Ok(_) | Err(_) => {
+                                let mro = match literal.try_mro(self.db, Some(specialization)) {
+                                    Ok(mro) => mro,
+                                    Err(error) => error.fallback_mro(),
+                                };
+                                MroElements::cached(mro)
+                            }
+                        }
+                    } else {
+                        let mro = match literal.try_mro(self.db, None) {
+                            Ok(mro) => mro,
+                            Err(error) => error.fallback_mro(),
+                        };
+                        MroElements::cached(mro)
+                    }
                 }
                 ClassLiteral::Dynamic(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.db) {
-                        Ok(mro) => mro.iter(),
-                        Err(error) => error.fallback_mro().iter(),
+                    let mro = match literal.try_mro(self.db) {
+                        Ok(mro) => mro,
+                        Err(error) => error.fallback_mro(),
                     };
-                    full_mro_iter.next();
-                    full_mro_iter
+                    MroElements::cached(mro)
                 }
                 ClassLiteral::DynamicNamedTuple(literal) => {
-                    let mut full_mro_iter = literal.mro(self.db).iter();
-                    full_mro_iter.next();
-                    full_mro_iter
+                    MroElements::cached(literal.mro(self.db))
                 }
                 ClassLiteral::DynamicTypedDict(literal) => {
-                    let mut full_mro_iter = literal.mro(self.db).iter();
-                    full_mro_iter.next();
-                    full_mro_iter
+                    MroElements::cached(literal.mro(self.db))
                 }
                 ClassLiteral::DynamicEnum(literal) => {
-                    let mut full_mro_iter = match literal.try_mro(self.db) {
-                        Ok(mro) => mro.iter(),
-                        Err(error) => error.fallback_mro().iter(),
+                    let mro = match literal.try_mro(self.db) {
+                        Ok(mro) => mro,
+                        Err(error) => error.fallback_mro(),
                     };
-                    full_mro_iter.next();
-                    full_mro_iter
+                    MroElements::cached(mro)
                 }
             })
     }
@@ -667,7 +764,7 @@ impl<'db> Iterator for MroIterator<'db> {
             self.first_element_yielded = true;
             return Some(self.first_element());
         }
-        self.full_mro_except_first_element().next().copied()
+        self.full_mro_except_first_element().next()
     }
 }
 
@@ -677,7 +774,6 @@ impl DoubleEndedIterator for MroIterator<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.full_mro_except_first_element()
             .next_back()
-            .copied()
             .or_else(|| {
                 if self.first_element_yielded {
                     None
