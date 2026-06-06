@@ -1908,13 +1908,21 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let pending = self
             .pending
             .remove_noninferable(self.db, self.constraints, self.inferable);
+        let mut default_solution_cache = FxHashMap::default();
         let solutions =
             match pending.solutions_with(self.db, self.constraints, |typevar, _variance, bounds| {
                 if let Some(ty) = choose(typevar, Some(bounds)) {
                     return Ok(Some(ty));
                 }
 
-                PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
+                if let Some(solution) = default_solution_cache.get(&(typevar, bounds)) {
+                    return *solution;
+                }
+
+                let solution =
+                    PathBounds::default_solve(self.db, self.constraints, typevar, bounds);
+                default_solution_cache.insert((typevar, bounds), solution);
+                solution
             }) {
                 Solutions::Unsatisfiable | Solutions::Unconstrained => {
                     return self.solve_hash_map_with(generic_context, choose);
