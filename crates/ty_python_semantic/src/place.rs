@@ -1203,11 +1203,10 @@ pub(crate) fn loop_header_reachability<'db>(
     loop_header_reachability_impl(db, definition, false)
 }
 
-// These budgets were chosen by benchmarking real isort to keep loop analysis
-// overhead minimal while preserving diagnostics.
-const MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES: usize = 2048;
+const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+pub(crate) const MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES: usize = 4096;
 
-/// Return whether exact loop-header analysis would require too much work across `scope`.
+/// Return whether inferring concrete loop-header types would require too much work across `scope`.
 ///
 /// This counts every loop-back binding and conservatively bounds the TDD work reachable from their
 /// reachability and narrowing roots because the real-world regression that motivated the limits
@@ -1226,7 +1225,7 @@ pub(crate) fn loop_header_scope_is_too_complex<'db>(db: &'db dyn Db, scope: Scop
     if constraints.was_truncated() {
         return true;
     }
-    if constraints.used_interiors().len() <= MAX_UNCONDITIONALLY_EXACT_LOOP_HEADER_SCOPE_NODES {
+    if constraints.used_interiors().len() <= MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES {
         return false;
     }
 
@@ -1286,7 +1285,12 @@ fn loop_header_reachability_impl<'db>(
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
     let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
-    let use_exact_reachability = !loop_header_scope_is_too_complex(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let scope_nodes = constraints.used_interiors().len();
+    let use_exact_reachability = !constraints.was_truncated()
+        && (scope_nodes <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES
+            || (scope_nodes > MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES
+                && !loop_header_scope_is_too_complex(db, scope)));
 
     for live_binding in live_bindings {
         let reachability = if is_cycle_initial {

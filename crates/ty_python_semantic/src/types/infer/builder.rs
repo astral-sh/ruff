@@ -29,7 +29,8 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
+    ConsideredDefinitions, DefinedPlace, Definedness, LookupError,
+    MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     loop_header_scope_is_too_complex, module_type_implicit_global_declaration,
@@ -2085,19 +2086,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
+        let use_def = self
+            .index
+            .use_def_map(self.scope().file_scope_id(self.db()));
+        let constraints = use_def.reachability_constraints();
 
         // Loop-header types are an approximation point for loop fixpoint analysis. Bound the
         // aggregate binding-inference and TDD work across the scope's loop headers.
-        if loop_header_scope_is_too_complex(db, definition.scope(db)) {
+        if constraints.was_truncated()
+            || (constraints.used_interiors().len()
+                > MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES
+                && loop_header_scope_is_too_complex(db, definition.scope(db)))
+        {
             self.bindings.insert(definition, Type::unknown());
             return;
         }
 
         let loop_header = loop_header_reachability(db, definition);
         let place = loop_header_kind.place();
-        let use_def = self
-            .index
-            .use_def_map(self.scope().file_scope_id(self.db()));
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
