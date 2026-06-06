@@ -50,6 +50,46 @@ use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
+fn add_and_constraint(
+    reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    a: ScopedReachabilityConstraintId,
+    b: ScopedReachabilityConstraintId,
+) -> ScopedReachabilityConstraintId {
+    if a == b {
+        return a;
+    }
+
+    match (a, b) {
+        (ScopedReachabilityConstraintId::ALWAYS_FALSE, _)
+        | (_, ScopedReachabilityConstraintId::ALWAYS_FALSE) => {
+            ScopedReachabilityConstraintId::ALWAYS_FALSE
+        }
+        (ScopedReachabilityConstraintId::ALWAYS_TRUE, other)
+        | (other, ScopedReachabilityConstraintId::ALWAYS_TRUE) => other,
+        _ => reachability_constraints.add_and_constraint(a, b),
+    }
+}
+
+fn add_or_constraint(
+    reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    a: ScopedReachabilityConstraintId,
+    b: ScopedReachabilityConstraintId,
+) -> ScopedReachabilityConstraintId {
+    if a == b {
+        return a;
+    }
+
+    match (a, b) {
+        (ScopedReachabilityConstraintId::ALWAYS_TRUE, _)
+        | (_, ScopedReachabilityConstraintId::ALWAYS_TRUE) => {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+        }
+        (ScopedReachabilityConstraintId::ALWAYS_FALSE, other)
+        | (other, ScopedReachabilityConstraintId::ALWAYS_FALSE) => other,
+        _ => reachability_constraints.add_or_constraint(a, b),
+    }
+}
+
 /// A newtype-index for a definition in a particular scope.
 #[newtype_index]
 #[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
@@ -164,9 +204,16 @@ impl Declarations {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
     ) {
+        if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            return;
+        }
+
         for declaration in &mut self.live_declarations {
-            declaration.reachability_constraint = reachability_constraints
-                .add_and_constraint(declaration.reachability_constraint, constraint);
+            declaration.reachability_constraint = add_and_constraint(
+                reachability_constraints,
+                declaration.reachability_constraint,
+                constraint,
+            );
         }
     }
 
@@ -176,6 +223,10 @@ impl Declarations {
     }
 
     fn merge(&mut self, b: Self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+        if *self == b {
+            return;
+        }
+
         let a = std::mem::take(self);
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -188,8 +239,11 @@ impl Declarations {
         for zipped in a.merge_join_by(b, |a, b| a.declaration.cmp(&b.declaration)) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
-                    let reachability_constraint = reachability_constraints
-                        .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+                    let reachability_constraint = add_or_constraint(
+                        reachability_constraints,
+                        a.reachability_constraint,
+                        b.reachability_constraint,
+                    );
                     self.live_declarations.push(LiveDeclaration {
                         declaration: a.declaration,
                         reachability_constraint,
@@ -339,9 +393,16 @@ impl Bindings {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
     ) {
+        if constraint == ScopedNarrowingConstraint::ALWAYS_TRUE {
+            return;
+        }
+
         for binding in &mut self.live_bindings {
-            binding.narrowing_constraint = reachability_constraints
-                .add_and_constraint(binding.narrowing_constraint, constraint);
+            binding.narrowing_constraint = add_and_constraint(
+                reachability_constraints,
+                binding.narrowing_constraint,
+                constraint,
+            );
         }
     }
 
@@ -351,9 +412,16 @@ impl Bindings {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
     ) {
+        if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            return;
+        }
+
         for binding in &mut self.live_bindings {
-            binding.reachability_constraint = reachability_constraints
-                .add_and_constraint(binding.reachability_constraint, constraint);
+            binding.reachability_constraint = add_and_constraint(
+                reachability_constraints,
+                binding.reachability_constraint,
+                constraint,
+            );
         }
     }
 
@@ -367,6 +435,10 @@ impl Bindings {
         b: Self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        if *self == b {
+            return;
+        }
+
         let a = std::mem::take(self);
 
         if let Some((a, b)) = a
@@ -374,7 +446,7 @@ impl Bindings {
             .zip(b.unbound_narrowing_constraint)
         {
             self.unbound_narrowing_constraint =
-                Some(reachability_constraints.add_or_constraint(a, b));
+                Some(add_or_constraint(reachability_constraints, a, b));
         }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -389,12 +461,18 @@ impl Bindings {
                 EitherOrBoth::Both(a, b) => {
                     // If the same definition is visible through both paths, we OR the narrowing
                     // constraints: the type should be narrowed by whichever path was taken.
-                    let narrowing_constraint = reachability_constraints
-                        .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
+                    let narrowing_constraint = add_or_constraint(
+                        reachability_constraints,
+                        a.narrowing_constraint,
+                        b.narrowing_constraint,
+                    );
 
                     // For reachability constraints, we also merge using a ternary OR operation:
-                    let reachability_constraint = reachability_constraints
-                        .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+                    let reachability_constraint = add_or_constraint(
+                        reachability_constraints,
+                        a.reachability_constraint,
+                        b.reachability_constraint,
+                    );
 
                     debug_assert_eq!(a.can_be_shadowed, b.can_be_shadowed);
                     self.live_bindings.push(LiveBinding {
@@ -465,6 +543,10 @@ impl PlaceState {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
         constraint: ScopedReachabilityConstraintId,
     ) {
+        if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+            return;
+        }
+
         self.bindings
             .record_reachability_constraint(reachability_constraints, constraint);
         self.declarations
@@ -490,6 +572,10 @@ impl PlaceState {
         b: PlaceState,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        if *self == b {
+            return;
+        }
+
         self.bindings.merge(b.bindings, reachability_constraints);
         self.declarations
             .merge(b.declarations, reachability_constraints);
