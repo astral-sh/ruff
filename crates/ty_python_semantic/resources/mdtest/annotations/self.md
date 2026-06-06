@@ -359,6 +359,22 @@ class Both(Factory[ConcreteOwner], Owner): ...
 ConcreteOwner().inspect(Both)
 ```
 
+## Classmethods preserve generic receiver inference
+
+```py
+from ty_extensions import Intersection
+
+class Factory:
+    @classmethod
+    def make[T](cls: type[T]) -> T:
+        return cls()
+
+class Extra: ...
+
+def _(cls: Intersection[type[Factory], type[Extra]]):
+    reveal_type(cls.make())  # revealed: Factory & Extra
+```
+
 ## typing_extensions
 
 ```toml

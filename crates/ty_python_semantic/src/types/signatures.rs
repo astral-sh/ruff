@@ -1079,6 +1079,39 @@ impl<'db> Signature<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Binds a classmethod whose explicit receiver is `type[T]` to an intersection of class
+    /// objects, specializing `T` to the corresponding intersection of instance types.
+    pub(crate) fn bind_self_to_class_intersection(
+        &self,
+        db: &'db dyn Db,
+        typing_self_type: Type<'db>,
+    ) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.bind_self(db, Some(typing_self_type));
+        };
+        let Some(receiver_typevar) = self.parameters.get(0).and_then(|parameter| {
+            let Type::SubclassOf(subclass_of) = parameter.annotated_type() else {
+                return None;
+            };
+            subclass_of.subclass_of().into_type_var()
+        }) else {
+            return self.bind_self(db, Some(typing_self_type));
+        };
+
+        let specialization = generic_context.specialize_recursive(
+            db,
+            generic_context.variables(db).map(|typevar| {
+                Some(if typevar.identity(db) == receiver_typevar.identity(db) {
+                    typing_self_type
+                } else {
+                    Type::TypeVar(typevar)
+                })
+            }),
+        );
+        self.apply_specialization(db, specialization)
+            .bind_self(db, Some(typing_self_type))
+    }
+
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {
         self.parameters
             .get(0)

@@ -113,7 +113,14 @@ impl<'db> BoundMethodType<'db> {
             );
         };
 
-        CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+        let self_instance = self.self_instance(db);
+        if self.function(db).is_classmethod(db) && matches!(self_instance, Type::Intersection(_)) {
+            CallableSignature::single(
+                signature.bind_self_to_class_intersection(db, typing_self_type),
+            )
+        } else {
+            CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
+        }
     }
 
     pub(super) fn recursive_type_normalized_impl(
