@@ -2244,7 +2244,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, &name)
+            attribute_declarations(db, class_body_scope, name)
         {
             let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
@@ -2300,7 +2300,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
-            attribute_assignments(db, class_body_scope, &name)
+            attribute_assignments(db, class_body_scope, name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
             if !is_valid_scope(binding_scope) {
@@ -2352,10 +2352,6 @@ impl<'db> StaticClassLiteral<'db> {
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
-
-                if !is_method_reachable.is_always_false() {
-                    is_attribute_bound = true;
-                }
 
                 let inferred_ty = match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
@@ -2473,6 +2469,9 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
+                    if !is_method_reachable.is_always_false() {
+                        is_attribute_bound = true;
+                    }
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }

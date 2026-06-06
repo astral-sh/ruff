@@ -47,3 +47,23 @@ def f() -> None:
     box = StrBox()
     reveal_type(box.attr)  # revealed: str
 ```
+
+## Dynamic attribute proxy with augmented assignment
+
+An augmented assignment to a dynamic instance attribute should not make the attribute's inferred
+write type `Never`.
+
+```py
+class RegisterProxy:
+    def __getattr__(self, name):
+        return 0
+
+    def __setattr__(self, name, value):
+        pass
+
+    def push(self):
+        self.STACK -= 8
+
+proxy = RegisterProxy()
+proxy.STACK = 0x1337
+```
