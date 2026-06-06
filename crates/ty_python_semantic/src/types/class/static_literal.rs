@@ -88,6 +88,12 @@ pub struct StaticClassLiteral<'db> {
 
     /// Whether this class is decorated with `@functools.total_ordering`
     pub(crate) total_ordering: bool,
+
+    /// Whether this class has any decorators.
+    pub(crate) has_decorators: bool,
+
+    /// Whether this class has PEP 695 type parameters.
+    pub(crate) has_type_params: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -153,6 +159,8 @@ impl<'db> StaticClassLiteral<'db> {
             dataclass_params,
             self.dataclass_transformer_params(db),
             self.total_ordering(db),
+            self.has_decorators(db),
+            self.has_type_params(db),
         )
     }
 
@@ -258,11 +266,18 @@ impl<'db> StaticClassLiteral<'db> {
         self.pep695_generic_context(db).is_some()
     }
 
+    pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+        if !self.has_type_params(db) {
+            return None;
+        }
+        self.pep695_generic_context_inner(db)
+    }
+
     #[salsa::tracked(
         cycle_initial=|_, _, _| None,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn pep695_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    fn pep695_generic_context_inner(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         let scope = self.body_scope(db);
         let file = scope.file(db);
         let parsed = parsed_module(db, file).load(db);
@@ -518,8 +533,15 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Return the types of the decorators on this class
+    fn decorators(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        if !self.has_decorators(db) {
+            return &[];
+        }
+        self.decorators_inner(db)
+    }
+
     #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
-    fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+    fn decorators_inner(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
         tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
         let module = parsed_module(db, self.file(db)).load(db);

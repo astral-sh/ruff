@@ -129,6 +129,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
+                    !class_node.decorator_list.is_empty(),
+                    class_node.type_params.is_some(),
                 )),
             }
         };
