@@ -1,0 +1,104 @@
+---
+source: crates/mdtest/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: classes.md - Generic classes: Legacy syntax - Generic static method inference across definition regions
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from __future__ import annotations
+ 2 | 
+ 3 | from collections.abc import Mapping
+ 4 | from typing import Any, Generic, TypeVar
+ 5 | from typing_extensions import TypeAliasType
+ 6 | 
+ 7 | class Base: ...
+ 8 | 
+ 9 | T = TypeVar("T", bound=Base, default=Base)
+10 | 
+11 | class Container(Generic[T]):
+12 |     @staticmethod
+13 |     def from_value(value: ContainerInitializer[T]) -> Container[T]:
+14 |         if value is None:
+15 |             # error: [invalid-return-type]
+16 |             return Container[T]()
+17 | 
+18 |         if isinstance(value, Base):
+19 |             # error: [invalid-return-type]
+20 |             return Container[T](default=value)
+21 | 
+22 |         if isinstance(value, Container):
+23 |             return value
+24 | 
+25 |         if not isinstance(value, Mapping):
+26 |             raise ValueError
+27 | 
+28 |         # error: [invalid-return-type]
+29 |         return Container[T](values=value)
+30 | 
+31 |     def __init__(
+32 |         self,
+33 |         values: Mapping[Any, T] | None = None,
+34 |         *,
+35 |         default: T | None = None,
+36 |     ) -> None: ...
+37 | 
+38 | ContainerInitializer = TypeAliasType(
+39 |     "ContainerInitializer",
+40 |     T | Container[T] | None | Mapping[Any, T],
+41 |     type_params=(T,),
+42 | )
+```
+
+# Diagnostics
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:13:55
+   |
+13 |     def from_value(value: ContainerInitializer[T]) -> Container[T]:
+   |                                                       ------------ Expected `Container[T@Container]` because of return type
+14 |         if value is None:
+15 |             # error: [invalid-return-type]
+16 |             return Container[T]()
+   |                    ^^^^^^^^^^^^^^ expected `Container[T@Container]`, found `Container[T@from_value]`
+   |
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:20:20
+   |
+20 |             return Container[T](default=value)
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Container[T@Container]`, found `Container[T@from_value]`
+   |
+  ::: src/mdtest_snippet.py:13:55
+   |
+13 |     def from_value(value: ContainerInitializer[T]) -> Container[T]:
+   |                                                       ------------ Expected `Container[T@Container]` because of return type
+   |
+
+```
+
+```
+error[invalid-return-type]: Return type does not match returned value
+  --> src/mdtest_snippet.py:29:16
+   |
+29 |         return Container[T](values=value)
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Container[T@Container]`, found `Container[T@from_value]`
+   |
+  ::: src/mdtest_snippet.py:13:55
+   |
+13 |     def from_value(value: ContainerInitializer[T]) -> Container[T]:
+   |                                                       ------------ Expected `Container[T@Container]` because of return type
+   |
+
+```

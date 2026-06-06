@@ -230,12 +230,10 @@ fn definition_expression_type<'db>(
     if scope == definition.scope(db) {
         // expression is in the definition scope
         let inference = infer_definition_types(db, definition);
-        if inference.has_deferred() {
-            inference
-                .try_expression_type(expression)
-                .unwrap_or_else(|| infer_deferred_types(db, definition).expression_type(expression))
+        if let Some(ty) = inference.try_expression_type(expression) {
+            ty
         } else {
-            inference.expression_type(expression)
+            infer_deferred_types(db, definition).expression_type(expression)
         }
     } else {
         // expression is in a type-params sub-scope

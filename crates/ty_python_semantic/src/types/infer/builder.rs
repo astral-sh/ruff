@@ -526,6 +526,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
         self.expressions
             .extend(inference.expressions.iter().copied());
+        self.expressions.extend(
+            inference
+                .unknown_expressions
+                .iter()
+                .map(|expression| (*expression, Type::unknown())),
+        );
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -10477,7 +10483,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -10504,12 +10510,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let _ = scope;
         let diagnostics = context.finish();
-
-        // Absence selects deferred inference, so only omit `Unknown` when this result is complete.
-        // Cycle recovery also gives missing entries a non-`Unknown` fallback.
-        if cycle_recovery.is_none() && deferred.is_empty() {
-            expressions.retain(|_, ty| !ty.is_unknown());
-        }
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()
@@ -10604,11 +10604,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        // Missing entries resolve to `Unknown`. Keep explicit entries during cycle recovery,
-        // where a missing entry instead resolves to the cycle fallback.
-        if cycle_recovery.is_none() {
-            expressions.retain(|_, ty| !ty.is_unknown());
-        }
+        let unknown_expressions = if cycle_recovery.is_none() {
+            let mut unknown_expressions = FxHashSet::default();
+            expressions.retain(|expression, ty| {
+                if ty.is_unknown() {
+                    unknown_expressions.insert(*expression);
+                    false
+                } else {
+                    true
+                }
+            });
+            FrozenSet::from(unknown_expressions)
+        } else {
+            FrozenSet::default()
+        };
 
         let extra = (!string_annotations.is_empty()
             || !expected_types.is_empty()
@@ -10630,6 +10639,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         ScopeInference {
             expressions: FrozenMap::from(expressions),
+            unknown_expressions,
             extra,
         }
     }

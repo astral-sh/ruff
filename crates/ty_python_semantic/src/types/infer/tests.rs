@@ -595,14 +595,12 @@ fn unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
     assert!(expression_inference.expressions.get(&value_key).is_none());
     assert!(expression_inference.expression_type(value).is_unknown());
 
-    let definition = index.expect_single_definition(assignment.targets[0].as_name_expr().unwrap());
-    let definition_inference = infer_definition_types(&db, definition);
-    assert!(definition_inference.expressions.get(&value_key).is_none());
-    assert!(definition_inference.expression_type(value).is_unknown());
-
+    let target = &assignment.targets[0];
+    let target_key = target.into();
     let scope_inference = infer_complete_scope_types(&db, global_scope(&db, file));
-    assert!(scope_inference.expressions.get(&value_key).is_none());
-    assert!(scope_inference.expression_type(value).is_unknown());
+    assert!(scope_inference.expressions.get(&target_key).is_none());
+    assert!(scope_inference.unknown_expressions.contains(&target_key));
+    assert!(scope_inference.expression_type(target).is_unknown());
 
     Ok(())
 }

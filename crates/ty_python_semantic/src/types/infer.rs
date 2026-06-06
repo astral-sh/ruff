@@ -749,8 +749,13 @@ impl<'db> InferenceRegion<'db> {
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
-    /// The types of every expression in this region.
+    /// Expression types retained as key-value entries.
+    ///
+    /// Completed results store exact `Unknown` types in `unknown_expressions` instead.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+
+    /// Expressions whose inferred type is exactly `Unknown` in a completed result.
+    unknown_expressions: FrozenSet<ExpressionNodeKey>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -785,6 +790,7 @@ impl<'db> ScopeInference<'db> {
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenMap::default(),
+            unknown_expressions: FrozenSet::default(),
         }
     }
 
@@ -794,6 +800,18 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
+        if self.unknown_expressions.iter().next().is_some() {
+            let mut expressions: FxHashMap<_, _> =
+                std::mem::take(&mut self.expressions).into_iter().collect();
+            expressions.extend(
+                self.unknown_expressions
+                    .iter()
+                    .map(|expression| (*expression, Type::unknown())),
+            );
+            self.expressions = FrozenMap::from(expressions);
+            self.unknown_expressions = FrozenSet::default();
+        }
+
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
@@ -811,10 +829,19 @@ impl<'db> ScopeInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        let expression = expression.into();
         self.expressions
-            .get(&expression.into())
+            .get(&expression)
             .copied()
+            .or_else(|| {
+                self.unknown_expressions
+                    .contains(&expression)
+                    .then(Type::unknown)
+            })
             .or_else(|| self.fallback_type())
     }
 
@@ -1243,13 +1270,6 @@ impl<'db> DefinitionInference<'db> {
         &self,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         self.types.declarations()
-    }
-
-    /// Returns `true` if some expression types are stored in deferred inference.
-    pub(crate) fn has_deferred(&self) -> bool {
-        self.extra
-            .as_ref()
-            .is_some_and(|extra| !extra.deferred.is_empty())
     }
 
     fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
