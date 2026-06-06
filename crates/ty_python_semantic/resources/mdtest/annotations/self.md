@@ -459,6 +459,17 @@ def literal_refinement(value: LiteralEnum):
         reveal_type(value.other())  # revealed: LiteralEnum
         # error: [invalid-argument-type]
         accepts_literal_a(value.other())
+
+LiteralReceiver = TypeVar(
+    "LiteralReceiver",
+    Literal[LiteralEnum.A],
+    Literal[LiteralEnum.B],
+)
+
+def constrained_literal_refinement(value: LiteralReceiver) -> LiteralReceiver:
+    reveal_type(value.other())  # revealed: LiteralEnum
+    # error: [invalid-return-type]
+    return value.other()
 ```
 
 ## typing_extensions

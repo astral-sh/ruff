@@ -1075,8 +1075,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         self_typevar: Option<BoundTypeVarInstance<'db>>,
     ) -> Self {
-        if let Type::LiteralValue(literal) = self.resolve_type_alias(db) {
-            return literal.fallback_instance(db);
+        if let Some(fallback) = literal_runtime_class_type(db, self) {
+            return fallback;
         }
 
         let Type::Intersection(intersection) = self else {
@@ -1127,10 +1127,8 @@ impl<'db> Type<'db> {
                             && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
             if !is_value_refinement {
-                builder = builder.add_positive(match positive.resolve_type_alias(db) {
-                    Type::LiteralValue(literal) => literal.fallback_instance(db),
-                    _ => *positive,
-                });
+                builder = builder
+                    .add_positive(literal_runtime_class_type(db, *positive).unwrap_or(*positive));
             }
         }
         for negative in intersection.negative(db) {
@@ -4181,8 +4179,8 @@ impl<'db> Type<'db> {
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let typing_self_type = bound_method.typing_self_type(db);
-                let prebind_self =
-                    matches!(self_instance, Type::Intersection(_) | Type::LiteralValue(_));
+                let prebind_self = matches!(self_instance, Type::Intersection(_))
+                    || literal_runtime_class_type(db, self_instance).is_some();
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
@@ -7284,6 +7282,30 @@ fn type_is_truthiness_refinement<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                 })
         }
         _ => false,
+    }
+}
+
+fn literal_runtime_class_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    match ty.resolve_type_alias(db) {
+        Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
+        Type::Union(union) => UnionType::try_from_elements(
+            db,
+            union
+                .elements(db)
+                .iter()
+                .map(|element| literal_runtime_class_type(db, *element)),
+        ),
+        Type::TypeVar(typevar) => match typevar.typevar(db).bound_or_constraints(db)? {
+            TypeVarBoundOrConstraints::UpperBound(bound) => literal_runtime_class_type(db, bound),
+            TypeVarBoundOrConstraints::Constraints(constraints) => UnionType::try_from_elements(
+                db,
+                constraints
+                    .elements(db)
+                    .iter()
+                    .map(|constraint| literal_runtime_class_type(db, *constraint)),
+            ),
+        },
+        _ => None,
     }
 }
 
