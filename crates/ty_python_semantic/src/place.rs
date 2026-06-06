@@ -8,7 +8,7 @@ use ty_module_resolver::{
 
 use crate::dunder_all::dunder_all_names;
 use crate::reachability::{
-    ReachabilityConstraintsExtension, evaluate_loop_header_reachability,
+    LoopHeaderPredicateState, ReachabilityConstraintsExtension, evaluate_loop_header_reachability,
     loop_header_requires_recursive_collection_analysis,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
@@ -1231,6 +1231,7 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
+    let mut predicate_state = LoopHeaderPredicateState::default();
 
     for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if is_cycle_initial {
@@ -1240,7 +1241,9 @@ fn loop_header_reachability_impl<'db>(
                 db,
                 scope,
                 loop_header_definition.loop_token(),
+                place,
                 recursive_collection,
+                &mut predicate_state,
                 live_binding.reachability_constraint(),
             )
         };

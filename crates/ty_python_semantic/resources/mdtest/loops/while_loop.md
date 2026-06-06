@@ -772,6 +772,34 @@ def process(flag: bool) -> None:
         value = 1
 ```
 
+### Nested loop fixed points do not leak impossible branches
+
+The inner and outer loop headers for the same place can participate in one Salsa cycle. They must
+retain independent fixed points so that an unreachable assignment in the outer loop does not widen
+the result.
+
+```py
+def process(flag: bool, nested: bool) -> None:
+    value = None
+    condition = 1
+
+    while flag:
+        if not condition:
+            value = "bad"
+        else:
+            value = 1
+
+        while nested:
+            if not value:
+                condition = 2
+            break
+
+        if value is condition:
+            break
+
+    expected: int | None = value
+```
+
 ### Recursive reachability preserves unconstrained collection element types
 
 ```py
