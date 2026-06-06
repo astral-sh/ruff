@@ -7309,6 +7309,36 @@ fn literal_runtime_class_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Typ
     }
 }
 
+fn type_inherits_from_owner<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    owner_class: ClassLiteral<'db>,
+) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| type_inherits_from_owner(db, *element, owner_class)),
+        Type::TypeVar(typevar) => {
+            typevar
+                .typevar(db)
+                .bound_or_constraints(db)
+                .is_some_and(|bound_or_constraints| match bound_or_constraints {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        type_inherits_from_owner(db, bound, owner_class)
+                    }
+                    TypeVarBoundOrConstraints::Constraints(constraints) => constraints
+                        .elements(db)
+                        .iter()
+                        .all(|constraint| type_inherits_from_owner(db, *constraint, owner_class)),
+                })
+        }
+        _ => ty.nominal_class(db).is_some_and(|class| {
+            class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
+        }),
+    }
+}
+
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
@@ -7399,11 +7429,10 @@ impl<'db> SelfBinding<'db> {
             let Type::Intersection(intersection) = self.ty else {
                 return false;
             };
-            intersection.positive(db).iter().any(|positive| {
-                positive.nominal_class(db).is_some_and(|class| {
-                    class_mro_literals(db, class.class_literal(db)).contains(&owner_class)
-                })
-            })
+            intersection
+                .positive(db)
+                .iter()
+                .any(|positive| type_inherits_from_owner(db, *positive, owner_class))
         };
 
         // Fast path for the common method-signature case where the bound `Self`

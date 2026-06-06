@@ -470,6 +470,22 @@ def constrained_literal_refinement(value: LiteralReceiver) -> LiteralReceiver:
     reveal_type(value.other())  # revealed: LiteralEnum
     # error: [invalid-return-type]
     return value.other()
+
+class UnionSelfBase:
+    def copy_from(self, other: Self) -> Self:
+        raise NotImplementedError
+
+class UnionSelfA(UnionSelfBase): ...
+class UnionSelfB(UnionSelfBase): ...
+class UnionSelfExtra: ...
+
+def union_bounded_self[T: UnionSelfA | UnionSelfB](
+    value: Intersection[T, UnionSelfExtra],
+    plain: UnionSelfBase,
+):
+    reveal_type(value.copy_from(value))  # revealed: T@union_bounded_self & UnionSelfExtra
+    # error: [invalid-argument-type]
+    reveal_type(value.copy_from(plain))  # revealed: T@union_bounded_self & UnionSelfExtra
 ```
 
 ## typing_extensions
