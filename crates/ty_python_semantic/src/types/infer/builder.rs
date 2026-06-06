@@ -5254,7 +5254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'db dyn Db,
             ty: Type<'db>,
         ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
-            let callable = ty.as_callable()?;
+            let callable = ty.resolve_type_alias(db).as_callable()?;
             if callable.kind(db) != CallableTypeKind::Regular {
                 return None;
             }

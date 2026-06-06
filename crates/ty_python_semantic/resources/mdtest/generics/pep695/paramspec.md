@@ -958,6 +958,31 @@ reveal_type(increment)  # revealed: (value: int) -> int
 reveal_type(increment(1))  # revealed: int
 ```
 
+### Transparent decorator type aliases
+
+A type alias for `Callable[P, R]` can also be used to type a transparent decorator.
+
+```py
+from typing import Callable, overload
+
+type Fn[**P, R] = Callable[P, R]
+
+def transparent[**P, R](func: Fn[P, R]) -> Fn[P, R]:
+    return func
+
+@overload
+def alias_decorated(x: int) -> int: ...
+@overload
+def alias_decorated(*, y: str) -> str: ...
+@transparent
+def alias_decorated(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(alias_decorated)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(alias_decorated(1))  # revealed: int
+reveal_type(alias_decorated(y="x"))  # revealed: str
+```
+
 ### Transparent decorator factories
 
 A transparent decorator returned by a decorator factory also preserves overload signatures.
