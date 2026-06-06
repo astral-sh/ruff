@@ -1075,6 +1075,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         self_typevar: Option<BoundTypeVarInstance<'db>>,
     ) -> Self {
+        if let Type::LiteralValue(literal) = self.resolve_type_alias(db) {
+            return literal.fallback_instance(db);
+        }
+
         let Type::Intersection(intersection) = self else {
             return self;
         };
@@ -1112,18 +1116,21 @@ impl<'db> Type<'db> {
                             && typevar_is_protocol_refinement(db, *typevar, owner)
                 )
                 || matches!(
-                    positive,
-                    Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(class),
-                        ..
-                    }) if ((owner.is_none() && has_nominal_class_constraint)
-                        || owner.is_some_and(|owner| {
-                            !class_mro_literals(db, class.class_literal(db)).contains(&owner)
-                        }))
-                        && !class.is_known(db, KnownClass::NamedTupleLike)
+                        positive,
+                        Type::ProtocolInstance(ProtocolInstanceType {
+                            inner: Protocol::FromClass(class),
+                            ..
+                        }) if ((owner.is_none() && has_nominal_class_constraint)
+                            || owner.is_some_and(|owner| {
+                                !class_mro_literals(db, class.class_literal(db)).contains(&owner)
+                            }))
+                            && !class.is_known(db, KnownClass::NamedTupleLike)
                 );
             if !is_value_refinement {
-                builder = builder.add_positive(*positive);
+                builder = builder.add_positive(match positive.resolve_type_alias(db) {
+                    Type::LiteralValue(literal) => literal.fallback_instance(db),
+                    _ => *positive,
+                });
             }
         }
         for negative in intersection.negative(db) {
@@ -4174,11 +4181,12 @@ impl<'db> Type<'db> {
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let typing_self_type = bound_method.typing_self_type(db);
-                let intersection_self = matches!(self_instance, Type::Intersection(_));
+                let prebind_self =
+                    matches!(self_instance, Type::Intersection(_) | Type::LiteralValue(_));
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
-                        if intersection_self {
+                        if prebind_self {
                             signature.apply_self_for_bound_call(db, typing_self_type)
                         } else {
                             signature.apply_self_to_generic_defaults(db, typing_self_type)

@@ -387,7 +387,8 @@ def _(value: Intersection[MethodAlias, MethodExtra]):
 ## Intersection receivers bind `Self` before inferring arguments
 
 ```py
-from typing import Protocol, Self, TypeVar
+from enum import Enum
+from typing import Literal, Protocol, Self, TypeVar, cast
 from ty_extensions import AlwaysTruthy, Intersection
 
 class Value:
@@ -444,6 +445,20 @@ def classmethod_intersection(
     # error: [invalid-argument-type]
     cls.copy_from(plain)
     reveal_type(cls.choose_default())  # revealed: ClassmethodValue & ClassmethodExtra
+
+class LiteralEnum(Enum):
+    A = 1
+    B = 2
+
+    def other(self) -> Self:
+        return cast(Self, LiteralEnum.B)
+
+def accepts_literal_a(value: Literal[LiteralEnum.A]) -> None: ...
+def literal_refinement(value: LiteralEnum):
+    if value is LiteralEnum.A:
+        reveal_type(value.other())  # revealed: LiteralEnum
+        # error: [invalid-argument-type]
+        accepts_literal_a(value.other())
 ```
 
 ## typing_extensions

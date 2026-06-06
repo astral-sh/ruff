@@ -424,7 +424,7 @@ class Answer(Enum):
 Answer.YES.is_yes_through_class_member()
 
 try:
-    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
+    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Answer
 except ValueError:
     pass
 ```
