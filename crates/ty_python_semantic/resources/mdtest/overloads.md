@@ -188,6 +188,42 @@ def _(value: Value):
         reveal_type(value.select(""))  # revealed: Value
 ```
 
+## Protocol overloads preserve `Self` owners during callable conversion
+
+`copyable.pyi`:
+
+```pyi
+from typing import Protocol, overload
+from typing_extensions import Self
+
+class Copyable(Protocol):
+    marker: int
+
+    @overload
+    def copy(self: "Copyable", value: int) -> int: ...
+    @overload
+    def copy(self, value: str) -> Self: ...
+```
+
+`main.py`:
+
+```py
+from typing import Callable
+from copyable import Copyable
+from ty_extensions import Intersection, RegularCallableTypeOf
+
+class Nominal:
+    copy = Copyable.copy
+
+def takes_copy(callback: Callable[[str], Copyable]) -> None: ...
+def _(value: Intersection[Nominal, Copyable]):
+    reveal_type(value.copy(""))  # revealed: Nominal & Copyable
+    copy: RegularCallableTypeOf[value.copy] = value.copy
+    # revealed: Overload[(value: int) -> int, (value: str) -> Nominal & Copyable]
+    reveal_type(copy)
+    takes_copy(copy)
+```
+
 ## Specialized generic receivers
 
 An explicit receiver annotation can also select overloads based on a generic class specialization.

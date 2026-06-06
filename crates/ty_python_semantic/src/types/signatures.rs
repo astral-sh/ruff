@@ -182,6 +182,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
         self.overloads
             .iter()
+            .filter(|signature| signature.needs_self_mapping(db, false))
             .map(|signature| signature.self_binding_type(db, self_type))
             .find(|binding_type| *binding_type != self_type)
             .unwrap_or(self_type)
