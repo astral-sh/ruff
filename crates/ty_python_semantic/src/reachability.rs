@@ -219,6 +219,8 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -507,6 +509,49 @@ fn accumulate_constraint<'db>(
     }
 }
 
+const MIN_CACHED_PROJECTED_NODES: usize = 30;
+const MIN_REPEATED_NARROWING_BRANCHES: usize = 4;
+
+fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'db> {
+    match predicate.node {
+        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::IsNonTerminalCall(call) => call.callable.scope(db),
+        PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+    }
+}
+
+/// Cache the final narrowed type for large projected graphs that are reused by many place loads.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_large_projected_constraint<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+) -> Type<'db> {
+    let use_def = use_def_map(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let predicates = use_def.predicates();
+    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let projected_root = projector.project(id);
+
+    let mut context = ProjectedNarrowingContext {
+        db,
+        base_ty,
+        graph: &projector.graph,
+        joins: projector.graph.joins(projected_root),
+        join_cache: FxHashMap::default(),
+    };
+    context.narrow(projected_root, None)
+}
+
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
     /// Narrow a type by walking a TDD narrowing constraint.
     fn narrow_by_constraint(
@@ -559,6 +604,13 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
+
+        if projector.graph.nodes.len() >= MIN_CACHED_PROJECTED_NODES {
+            let node = self.get_interior_node(id);
+            let scope = predicate_scope(db, predicates[node.atom()]);
+            return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
+        }
+
         let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
@@ -884,6 +936,101 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         result
     }
 
+    /// Find a chain where every predicate branch reaches the same anchor subgraph.
+    ///
+    /// For complementary predicates, a chain such as
+    /// `(P1 & A) | (~P1 & ((P2 & A) | (~P2 & R)))` is equivalent to
+    /// `((P1 | P2) & A) | (~(P1 | P2) & R)`.
+    fn repeated_branch_chain(
+        &self,
+        id: ProjectedNarrowingNodeId,
+        anchor_is_true: bool,
+    ) -> Option<(
+        ProjectedNarrowingNodeId,
+        ProjectedNarrowingNodeId,
+        Type<'db>,
+    )> {
+        let first = self.graph.node(id);
+        let anchor = if anchor_is_true {
+            first.if_true
+        } else {
+            first.if_false
+        };
+        if anchor == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return None;
+        }
+
+        let mut current = id;
+        let mut anchor_constraints = vec![];
+        while !current.is_terminal() {
+            let node = self.graph.node(current);
+            let (anchor_child, tail_child) = if anchor_is_true {
+                (node.if_true, node.if_false)
+            } else {
+                (node.if_false, node.if_true)
+            };
+            if anchor_child != anchor {
+                break;
+            }
+
+            let (positive, negative) = &self.graph.predicate_constraints_cache[&node.atom];
+            let (anchor_constraint, tail_constraint) = if anchor_is_true {
+                (positive.as_ref()?, negative.as_ref()?)
+            } else {
+                (negative.as_ref()?, positive.as_ref()?)
+            };
+            if !anchor_constraint.is_direct_complement_of(self.db, tail_constraint) {
+                break;
+            }
+            anchor_constraints.push(anchor_constraint.single_intersection_type()?);
+            current = tail_child;
+        }
+
+        (anchor_constraints.len() >= MIN_REPEATED_NARROWING_BRANCHES).then(|| {
+            (
+                anchor,
+                current,
+                UnionType::from_elements(self.db, anchor_constraints),
+            )
+        })
+    }
+
+    fn narrow_repeated_branch_chain(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Option<Type<'db>> {
+        // Replacement narrowing does not distribute over this rewrite.
+        if accumulated
+            .as_ref()
+            .is_some_and(|constraint| !constraint.is_intersection_only())
+        {
+            return None;
+        }
+
+        let (anchor, tail, anchor_constraint) = self
+            .repeated_branch_chain(id, true)
+            .or_else(|| self.repeated_branch_chain(id, false))?;
+        let tail_constraint = anchor_constraint.negate(self.db);
+
+        let anchor_ty = self.narrow(
+            anchor,
+            accumulate_constraint(
+                accumulated.clone(),
+                Some(NarrowingConstraint::intersection(anchor_constraint)),
+            ),
+        );
+        let tail_ty = self.narrow(
+            tail,
+            accumulate_constraint(
+                accumulated,
+                Some(NarrowingConstraint::intersection(tail_constraint)),
+            ),
+        );
+
+        Some(UnionType::from_two_elements(self.db, anchor_ty, tail_ty))
+    }
+
     /// Recursively evaluates a projected path while accumulating narrowing constraints.
     fn narrow(
         &mut self,
@@ -913,6 +1060,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
             apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
         } else {
+            if let Some(narrowed) = self.narrow_repeated_branch_chain(id, accumulated.clone()) {
+                return narrowed;
+            }
+
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
