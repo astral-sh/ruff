@@ -446,15 +446,13 @@ impl RetainedBindingsBuilder {
     }
 
     fn finish(
-        mut self,
+        self,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) -> RetainedBindings {
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint());
             reachability_constraints.mark_used(binding.narrowing_constraint());
         }
-        self.ranges.shrink_to_fit();
-        self.live_bindings.shrink_to_fit();
         RetainedBindings {
             ranges: self.ranges.into(),
             live_bindings: self.live_bindings.into_boxed_slice(),
