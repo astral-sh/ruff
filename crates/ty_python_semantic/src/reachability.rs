@@ -193,7 +193,7 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 
 use crate::{
     Db,
@@ -1251,17 +1251,14 @@ pub(crate) fn evaluate_reachability(
 
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
-    primary_constraints: Cell<Option<ReachabilityConstraintsId>>,
     primary_entries: RefCell<FxHashMap<ScopedReachabilityConstraintId, Truthiness>>,
-    other_entries:
-        RefCell<FxHashMap<(ReachabilityConstraintsId, ScopedReachabilityConstraintId), Truthiness>>,
+    other_entries: RefCell<FxHashMap<(ScopeId<'db>, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
 impl<'db> ReachabilityEvaluationCache<'db> {
     pub(crate) fn new(primary_scope: ScopeId<'db>) -> Self {
         Self {
             primary_scope,
-            primary_constraints: Cell::new(None),
             primary_entries: RefCell::new(FxHashMap::default()),
             other_entries: RefCell::new(FxHashMap::default()),
         }
@@ -1281,30 +1278,19 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             _ => {}
         }
 
-        let constraints_id = ReachabilityConstraintsId::new(reachability_constraints);
-        let is_primary = if let Some(primary_constraints) = self.primary_constraints.get() {
-            primary_constraints == constraints_id
-        } else {
-            let predicate = predicates[reachability_constraints
-                .get_interior_node(reachability)
-                .atom()];
-            let scope = match predicate.node {
-                PredicateNode::Expression(expression) => expression.scope(db),
-                PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
-                    callable.scope(db)
-                }
-                PredicateNode::Pattern(pattern) => pattern.scope(db),
-                PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
-            };
-
-            let is_primary = scope == self.primary_scope;
-            if is_primary {
-                self.primary_constraints.set(Some(constraints_id));
+        let predicate = predicates[reachability_constraints
+            .get_interior_node(reachability)
+            .atom()];
+        let scope = match predicate.node {
+            PredicateNode::Expression(expression) => expression.scope(db),
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(db)
             }
-            is_primary
+            PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
         };
 
-        if is_primary {
+        if scope == self.primary_scope {
             if let Some(cached) = self.primary_entries.borrow().get(&reachability) {
                 return *cached;
             }
@@ -1316,30 +1302,15 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             return result;
         }
 
-        if let Some(cached) = self
-            .other_entries
-            .borrow()
-            .get(&(constraints_id, reachability))
-        {
+        if let Some(cached) = self.other_entries.borrow().get(&(scope, reachability)) {
             return *cached;
         }
 
         let result = reachability_constraints.evaluate(db, predicates, reachability);
         self.other_entries
             .borrow_mut()
-            .insert((constraints_id, reachability), result);
+            .insert((scope, reachability), result);
         result
-    }
-}
-
-#[derive(Copy, Clone, Eq, Hash, PartialEq)]
-struct ReachabilityConstraintsId(*const ReachabilityConstraints);
-
-impl ReachabilityConstraintsId {
-    fn new(constraints: &ReachabilityConstraints) -> Self {
-        // The cache is scoped to one inference region over an immutable database revision, so
-        // semantic-index values cannot be replaced while their addresses are used as identities.
-        Self(std::ptr::from_ref(constraints))
     }
 }
 
