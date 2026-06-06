@@ -94,11 +94,27 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    /// Projects an instance constraint into the class-object domain.
+    /// Projects a positive instance constraint into the class-object domain.
     ///
     /// Unlike [`Self::try_from_instance`], this excludes structural protocol instances: a
-    /// protocol can describe only the current value without constraining its runtime class.
-    fn try_from_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    /// protocol can describe only the current value without constraining its runtime class. A
+    /// positive `TypedDict` constraint does constrain the runtime class to `dict`.
+    fn try_from_positive_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        if ty.is_typed_dict() {
+            return Self::try_from_type(db, ty.dunder_class(db));
+        }
+
+        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
+    }
+
+    /// Projects a negative instance constraint into the class-object domain.
+    ///
+    /// Excluding a structural `TypedDict` shape does not exclude its runtime `dict` class.
+    fn try_from_negative_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        if ty.is_typed_dict() {
+            return None;
+        }
+
         SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
@@ -174,7 +190,7 @@ impl<'db> SubclassOfType<'db> {
                         let mut found_positive = false;
                         for element in intersection.positive(db) {
                             if let Some(meta_type) =
-                                Self::try_from_instance_constraint(db, *element)
+                                Self::try_from_positive_instance_constraint(db, *element)
                             {
                                 builder = builder.add_positive(meta_type);
                                 found_positive = true;
@@ -185,7 +201,7 @@ impl<'db> SubclassOfType<'db> {
                         }
                         for element in intersection.negative(db) {
                             if let Some(meta_type) =
-                                Self::try_from_instance_constraint(db, *element)
+                                Self::try_from_negative_instance_constraint(db, *element)
                             {
                                 builder = builder.add_negative(meta_type);
                             }

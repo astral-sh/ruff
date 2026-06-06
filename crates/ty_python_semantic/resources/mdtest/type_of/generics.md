@@ -319,7 +319,7 @@ def _[T](x: X[type[T]]):
 ## Generic Type Inference
 
 ```py
-from typing import Callable, Protocol, runtime_checkable
+from typing import Callable, Protocol, TypedDict, runtime_checkable
 from ty_extensions import Intersection, Not
 
 def f1[T](x: type[T]) -> type[T]:
@@ -360,6 +360,18 @@ def _(x: A):
     if isinstance(x, HasMarker):
         reveal_type(x)  # revealed: A & HasMarker
         reveal_type(runtime_type(x))  # revealed: type[A]
+
+class Left(TypedDict):
+    left: int
+
+class Right(TypedDict):
+    right: str
+
+def _(x: Intersection[Left, Right]):
+    reveal_type(runtime_type(x))  # revealed: type[dict[str, object]]
+
+def _(x: Intersection[dict[str, object], Not[Left]]):
+    reveal_type(runtime_type(x))  # revealed: type[dict[str, object]]
 
 def foo() -> int:
     return 1
