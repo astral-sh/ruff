@@ -8,6 +8,11 @@
 
 mod markdown;
 mod rest;
+#[cfg_attr(
+    not(test),
+    expect(dead_code, reason = "wired into reST rendering in a follow-up change")
+)]
+mod sections;
 
 use indexmap::IndexMap;
 use regex::Regex;
