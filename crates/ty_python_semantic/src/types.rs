@@ -1091,26 +1091,19 @@ impl<'db> Type<'db> {
         // A generic protocol can constrain a nominal class's unknown type arguments. If the
         // class's bottom materialization satisfies it, preserve it as a class constraint.
         let protocol_is_nominal_class_constraint = |protocol: Type<'db>| {
-            if protocol.class_specialization(db).is_none() {
-                return false;
-            }
-
-            intersection.positive(db).iter().any(|positive| {
-                let Some(class) = positive.nominal_class(db) else {
-                    return false;
-                };
-                let Some(alias) = class.into_generic_alias() else {
-                    return false;
-                };
-                let bottom = GenericAlias::new(
-                    db,
-                    alias.origin(db),
-                    alias
-                        .specialization(db)
-                        .with_materialization_kind(db, Some(MaterializationKind::Bottom)),
-                );
-                Type::instance(db, bottom.into()).is_assignable_to(db, protocol)
-            })
+            protocol.is_specialized_generic(db)
+                && intersection.positive(db).iter().any(|positive| {
+                    let Some((class, specialization)) = positive.class_specialization(db) else {
+                        return false;
+                    };
+                    let bottom = GenericAlias::new(
+                        db,
+                        class,
+                        specialization
+                            .with_materialization_kind(db, Some(MaterializationKind::Bottom)),
+                    );
+                    Type::instance(db, bottom.into()).is_assignable_to(db, protocol)
+                })
         };
         let tuple_shape = Type::homogeneous_tuple(db, Type::object());
         let has_tuple_refinement = intersection

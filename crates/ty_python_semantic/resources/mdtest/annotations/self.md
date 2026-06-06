@@ -489,17 +489,13 @@ def union_bounded_self[T: UnionSelfA | UnionSelfB](
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: T@union_bounded_self & UnionSelfExtra
 
-type DefaultdictSpec = None | int | Iterable[int] | dict[str, int]
-
-def is_mapping(value: object) -> bool:
-    return isinstance(value, dict)
+type DefaultdictSpec = Iterable[int] | dict[str, int]
 
 def copy_defaultdict(value: DefaultdictSpec) -> DefaultdictSpec:
-    if is_mapping(value) and isinstance(value, defaultdict):
-        copied = value.copy()
+    if isinstance(value, defaultdict):
         # revealed: (Iterable[int] & Top[defaultdict[Unknown, Unknown]]) | (dict[str, int] & Top[defaultdict[Unknown, Unknown]])
-        reveal_type(copied)
-        value = copied
+        reveal_type(value.copy())
+        value = value.copy()
     return value
 ```
 
