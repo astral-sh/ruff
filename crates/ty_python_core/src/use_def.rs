@@ -434,15 +434,14 @@ impl RetainedBindingsBuilder {
         }
     }
 
-    #[expect(clippy::cast_possible_truncation)]
     fn push(&mut self, bindings: &Bindings) -> InternedBindingsId {
         // Definition IDs are also 32-bit and a single scope cannot practically approach this
         // limit. Keeping offsets at the same width halves the retained range size.
-        debug_assert!(u32::try_from(self.live_bindings.len()).is_ok());
-        let start = self.live_bindings.len() as u32;
+        let start = u32::try_from(self.live_bindings.len())
+            .expect("Expected live-bindings length to fit into a u32");
         self.live_bindings.extend_from_slice(bindings.as_slice());
-        debug_assert!(u32::try_from(self.live_bindings.len()).is_ok());
-        let end = self.live_bindings.len() as u32;
+        let end = u32::try_from(self.live_bindings.len())
+            .expect("Expected live-bindings length to fit into a u32");
         self.ranges.push(start..end)
     }
 
