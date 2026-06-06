@@ -918,7 +918,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                 if binding.should_bind(db, self) {
                     binding.self_type_for(db, self)
                 } else {
-                    Type::TypeVar(self)
+                    binding
+                        .unbound_self_type_for(db, self)
+                        .unwrap_or(Type::TypeVar(self))
                 }
             }
             TypeMapping::ReplaceSelf { new_upper_bound } => {

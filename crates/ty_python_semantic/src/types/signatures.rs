@@ -948,8 +948,10 @@ impl<'db> Signature<'db> {
         if let Some(self_type) = self_type
             && self.needs_self_mapping(db, removed_receiver)
         {
-            let self_mapping =
-                TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
+            let self_mapping = TypeMapping::BindSelf(
+                SelfBinding::new(db, self_type, binding_context)
+                    .with_unbound_method_self_fallback(),
+            );
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,

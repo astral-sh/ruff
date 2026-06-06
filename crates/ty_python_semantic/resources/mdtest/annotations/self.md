@@ -362,7 +362,7 @@ class MethodExtra:
     extra: int
 
 def _(value: Intersection[MethodAlias, MethodExtra]):
-    value.copy().extra  # error: [unresolved-attribute]
+    reveal_type(value.copy())  # revealed: Unknown
 ```
 
 ## Intersection receivers bind `Self` before inferring arguments

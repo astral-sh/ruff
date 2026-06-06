@@ -7288,6 +7288,7 @@ pub struct SelfBinding<'db> {
     ty: Type<'db>,
     class_literal: Option<ClassLiteral<'db>>,
     binding_context: Option<BindingContext<'db>>,
+    unbound_method_self_to_unknown: bool,
 }
 
 impl<'db> SelfBinding<'db> {
@@ -7305,6 +7306,25 @@ impl<'db> SelfBinding<'db> {
 
     pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
         self.binding_context
+    }
+
+    fn unbound_self_type_for(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
+        // A `Self` carried by the receiver is an unrelated specialization, but a method-owned
+        // `Self` that cannot bind to the receiver must not escape the bound signature.
+        (self.unbound_method_self_to_unknown
+            && self.binding_context == Some(bound_typevar.binding_context(db))
+            && bound_typevar
+                .binding_context(db)
+                .definition()
+                .is_some_and(|definition| definition.kind(db).is_function_def())
+            && !self
+                .ty
+                .references_typevar(db, bound_typevar.typevar(db).identity(db)))
+        .then(Type::unknown)
     }
 }
 
@@ -7328,7 +7348,13 @@ impl<'db> SelfBinding<'db> {
             ty: self_type,
             class_literal,
             binding_context,
+            unbound_method_self_to_unknown: false,
         }
+    }
+
+    pub(crate) fn with_unbound_method_self_fallback(mut self) -> Self {
+        self.unbound_method_self_to_unknown = true;
+        self
     }
 
     /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
