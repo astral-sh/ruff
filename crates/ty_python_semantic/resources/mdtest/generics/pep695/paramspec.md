@@ -958,6 +958,32 @@ reveal_type(increment)  # revealed: (value: int) -> int
 reveal_type(increment(1))  # revealed: int
 ```
 
+### Transparent decorator factories
+
+A transparent decorator returned by a decorator factory also preserves overload signatures.
+
+```py
+from typing import Callable, overload
+
+def transparent_factory[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        return func
+
+    return decorator
+
+@overload
+def decorated_factory(x: int) -> int: ...
+@overload
+def decorated_factory(*, y: str) -> str: ...
+@transparent_factory()
+def decorated_factory(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(decorated_factory)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(decorated_factory(1))  # revealed: int
+reveal_type(decorated_factory(y="x"))  # revealed: str
+```
+
 ### Overloads
 
 #### Return type filtering

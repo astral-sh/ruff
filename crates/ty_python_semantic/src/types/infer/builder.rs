@@ -5273,11 +5273,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
                 return false;
             }
-            let Type::FunctionLiteral(decorator_function) = decorator_ty else {
-                return false;
+            let decorator_signatures = match decorator_ty {
+                Type::FunctionLiteral(decorator_function) => decorator_function.signature(db),
+                Type::Callable(decorator_callable) => decorator_callable.signatures(db),
+                _ => return false,
             };
-            let [decorator_signature] = decorator_function.signature(db).overloads.as_slice()
-            else {
+            let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
                 return false;
             };
             let [parameter] = decorator_signature.parameters().as_slice() else {
