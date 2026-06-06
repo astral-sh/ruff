@@ -23,6 +23,9 @@ class Project(NamedTuple):
 
     python_version: Literal["3.13", "3.14", "3.12", "3.11", "3.10", "3.9", "3.8"]
 
+    omitted_requirement_lines: list[tuple[str, str]] = []
+    """Requirement lines to remove from files in the cloned checkout."""
+
     skip: str | None = None
     """The project is skipped from benchmarking if not `None`."""
 
@@ -37,6 +40,7 @@ class Project(NamedTuple):
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if (checkout_dir / ".git").exists():
+            self.prepare(checkout_dir)
             return
 
         logging.debug(f"Cloning {self.repository} to {checkout_dir}")
@@ -95,6 +99,18 @@ class Project(NamedTuple):
             raise RuntimeError(f"Failed to clone {self.name}:\n\n{e.stderr}") from e
 
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
+        self.prepare(checkout_dir)
+
+    def prepare(self, checkout_dir: Path) -> None:
+        for relative_path, omitted_line in self.omitted_requirement_lines:
+            requirements_path = checkout_dir / relative_path
+            if not requirements_path.exists():
+                continue
+
+            lines = requirements_path.read_text().splitlines()
+            requirements_path.write_text(
+                "\n".join(line for line in lines if line.strip() != omitted_line) + "\n"
+            )
 
 
 class IncrementalEdit(NamedTuple):
@@ -131,7 +147,7 @@ ALL: Final = [
     Project(
         name="black",
         repository="https://github.com/psf/black",
-        revision="45b4087976b7880db9dabacc992ee142f2d6c7c7",
+        revision="ce1897a8f20d0f64844dd666d07f4003500d0e09",
         python_version="3.10",
         include=["src"],
         install_arguments=[
@@ -155,7 +171,7 @@ ALL: Final = [
     Project(
         name="discord.py",
         repository="https://github.com/Rapptz/discord.py.git",
-        revision="9be91cb093402f54a44726c7dc4c04ff3b2c5a63",
+        revision="2fbed9362422dad4f7850eb6c5d9b1f8bff7c71a",
         python_version="3.8",
         include=["discord"],
         install_arguments=[
@@ -177,15 +193,20 @@ ALL: Final = [
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
-        revision="7b6df1a8a074afefff6a50b3495dafd5954b6dac",
+        revision="a0162d2ff0ed061501405a617961be149b15bd1f",
         python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
         install_arguments=[
             "-r",
-            "requirements_test_all.txt",
+            "requirements_all.txt",
             "-r",
-            "requirements.txt",
+            "requirements_test.txt",
+        ],
+        # Home Assistant's pytradfri async extra pulls in dtlssocket, which
+        # requires local autoconf support to build from source.
+        omitted_requirement_lines=[
+            ("requirements_all.txt", "pytradfri[async]==9.0.1"),
         ],
         edit=IncrementalEdit(
             edited_file="homeassistant/core.py",
@@ -197,7 +218,7 @@ ALL: Final = [
     Project(
         name="isort",
         repository="https://github.com/pycqa/isort",
-        revision="ed501f10cb5c1b17aad67358017af18cf533c166",
+        revision="87adfe4732548abff5010336f2fc4b5e8237407d",
         python_version="3.11",
         include=["isort"],
         install_arguments=["types-colorama", "colorama"],
@@ -237,7 +258,7 @@ ALL: Final = [
     Project(
         name="pandas",
         repository="https://github.com/pandas-dev/pandas",
-        revision="4d8348341bc4de2f0f90782ecef1b092b9418a19",
+        revision="e3a56513f27849f12265a14c814e02f4f408fb3d",
         include=["pandas", "typings"],
         exclude=["pandas/tests"],
         python_version="3.11",
@@ -255,31 +276,21 @@ ALL: Final = [
     Project(
         name="pandas-stubs",
         repository="https://github.com/pandas-dev/pandas-stubs",
-        revision="ad8cae5bc1f0bc87ce22b4d445e0700976c9dfb4",
+        revision="1352ba3daa86f1c47a3cce5ad212a770cc693cb4",
         include=["pandas-stubs"],
-        python_version="3.10",
-        # Uses poetry :(
+        python_version="3.11",
         install_arguments=[
-            "types-pytz >=2022.1.1",
-            "types-python-dateutil>=2.8.19",
-            "numpy >=1.23.5",
-            "pyarrow >=10.0.1",
-            "matplotlib >=3.10.1",
-            "xarray>=22.6.0",
-            "SQLAlchemy>=2.0.39",
-            "odfpy >=1.4.1",
-            "pyxlsb >=1.0.10",
-            "jinja2 >=3.1",
-            "scipy >=1.9.1",
-            "scipy-stubs >=1.15.3.0",
+            "-r",
+            "pyproject.toml",
+            "--group",
+            "dev",
         ],
         edit=None,  # Tricky in a stubs only project as there are no actual method calls.
     ),
     Project(
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
-        revision="a3db33d4f9ee7a665430ae6017c649d057139bd3",
-        # See https://github.com/PrefectHQ/prefect/blob/a3db33d4f9ee7a665430ae6017c649d057139bd3/.pre-commit-config.yaml#L33-L39
+        revision="db66b14dbaea18e726fc4ea0100fd194383c6c59",
         include=[
             "src/prefect/server/models",
             "src/prefect/concurrency",
@@ -313,7 +324,7 @@ ALL: Final = [
     Project(
         name="pytorch",
         repository="https://github.com/pytorch/pytorch.git",
-        revision="be33b7faf685560bb618561b44b751713a660337",
+        revision="29d6170e7c79f2c71943692985a1546fb2bed28c",
         include=["torch", "caffe2"],
         # see https://github.com/pytorch/pytorch/blob/c56655268b4ae575ee4c89c312fd93ca2f5b3ba9/pyrefly.toml#L23
         exclude=[
@@ -353,28 +364,18 @@ ALL: Final = [
             "*/__pycache__/**",
             "*/.*",
         ],
-        # See https://github.com/pytorch/pytorch/blob/be33b7faf685560bb618561b44b751713a660337/.lintrunner.toml#L141
         install_arguments=[
-            'numpy==1.26.4 ; python_version >= "3.10" and python_version <= "3.11"',
-            'numpy==2.1.0 ; python_version >= "3.12" and python_version <= "3.13"',
-            'numpy==2.3.4 ; python_version >= "3.14"',
-            "expecttest==0.3.0",
-            "pyrefly==0.36.2",
-            "sympy==1.13.3",
-            "types-requests==2.27.25",
-            "types-pyyaml==6.0.2",
-            "types-tabulate==0.8.8",
-            "types-protobuf==5.29.1.20250403",
-            "types-setuptools==79.0.0.20250422",
-            "types-jinja2==2.11.9",
-            "types-colorama==0.4.6",
-            "filelock==3.18.0",
-            "junitparser==2.1.1",
-            "rich==14.1.0",
-            "optree==0.17.0",
-            "types-openpyxl==3.1.5.20250919",
-            "types-python-dateutil==2.9.0.20251008",
-            "mypy==1.16.0",  # pytorch pins mypy,
+            "-r",
+            "requirements.txt",
+            "types-requests",
+            "types-pyyaml",
+            "types-tabulate",
+            "types-protobuf",
+            "types-setuptools",
+            "types-jinja2",
+            "types-colorama",
+            "types-openpyxl",
+            "types-python-dateutil",
         ],
         python_version="3.11",
         edit=IncrementalEdit(
