@@ -1084,33 +1084,20 @@ impl<'db> Type<'db> {
         let has_nominal_class_constraint = intersection.positive(db).iter().any(|positive| {
             !matches!(positive, Type::ProtocolInstance(_)) && positive.nominal_class(db).is_some()
         });
-        let has_named_tuple_like_constraint =
-            intersection
-                .positive(db)
-                .iter()
-                .any(|positive| match positive {
-                    Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(class),
-                        ..
-                    }) => class.is_known(db, KnownClass::NamedTupleLike),
-                    _ => false,
-                });
-        let named_tuple_shape =
-            has_named_tuple_like_constraint.then(|| Type::homogeneous_tuple(db, Type::object()));
+        let tuple_shape = Type::homogeneous_tuple(db, Type::object());
+        let has_tuple_refinement = intersection
+            .positive(db)
+            .iter()
+            .any(|positive| type_is_tuple_refinement(db, *positive) && *positive != tuple_shape);
         let mut builder = IntersectionBuilder::new(db);
-        if let Some(named_tuple_shape) = named_tuple_shape
-            && intersection.positive(db).iter().any(|positive| {
-                type_is_tuple_refinement(db, *positive) && *positive != named_tuple_shape
-            })
-        {
-            builder = builder.add_positive(named_tuple_shape);
+        if has_tuple_refinement {
+            builder = builder.add_positive(tuple_shape);
         }
         for positive in intersection.positive(db) {
             // `NamedTupleLike` is deliberately combined with a tuple type to describe
             // `typing.NamedTuple`; unlike a user protocol, it is not a flow refinement.
             let is_value_refinement = type_is_truthiness_refinement(db, *positive)
-                || (type_is_tuple_refinement(db, *positive)
-                    && named_tuple_shape != Some(*positive))
+                || (type_is_tuple_refinement(db, *positive) && tuple_shape != *positive)
                 || matches!(
                     positive,
                     Type::ProtocolInstance(ProtocolInstanceType {

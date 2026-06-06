@@ -780,6 +780,7 @@ See also: <https://typing.python.org/en/latest/spec/generics.html#use-in-protoco
 
 ```py
 from typing import Self, Protocol
+from ty_extensions import Intersection
 
 class Copyable(Protocol):
     def copy(self) -> Self: ...
@@ -807,6 +808,14 @@ def copy_concrete(x: CopyableImpl) -> None:
 
 def copy_sub(x: SubCopyable) -> None:
     reveal_type(x.copy())  # revealed: SubCopyable
+
+def copy_tuple(x: Intersection[tuple[int, int], Copyable]) -> None:
+    copied = x.copy()
+    reveal_type(copied)  # revealed: tuple[object, ...] & Copyable
+
+    def accept_tuple(value: tuple[object, ...]) -> None: ...
+
+    accept_tuple(copied)
 ```
 
 ## Annotations
