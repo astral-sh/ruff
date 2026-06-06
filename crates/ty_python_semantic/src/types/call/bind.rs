@@ -49,7 +49,7 @@ use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::infer::original_class_type;
-use crate::types::known_instance::FieldInstance;
+use crate::types::known_instance::{FieldDefault, FieldDefaultKind, FieldInstance};
 use crate::types::signatures::{
     CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
@@ -398,34 +398,26 @@ pub(crate) fn field_converter_types<'db>(
                     .map(|ctx| ctx.default_specialization(db, None))
             });
 
-            if let Some(first_param) = params.get_positional(first_index) {
-                let mut input_ty = first_param.annotated_type();
-                if let Some(specialization) = default_specialization {
-                    input_ty = input_ty.apply_specialization(db, specialization);
-                }
-                input_types = input_types.add(input_ty);
-                if let Some(specialization) = default_specialization {
-                    return_ty = return_ty.apply_specialization(db, specialization);
-                }
-                output_types = output_types.add(return_ty);
-                found_any = true;
-            } else if let Some((_, variadic)) = params.variadic() {
-                let mut input_ty = variadic.annotated_type();
-                if let Some(specialization) = default_specialization {
-                    input_ty = input_ty.apply_specialization(db, specialization);
-                    return_ty = return_ty.apply_specialization(db, specialization);
-                }
-                input_types = input_types.add(input_ty);
-                output_types = output_types.add(return_ty);
-                found_any = true;
-            } else if params.is_gradual() {
-                input_types = input_types.add(Type::unknown());
-                if let Some(specialization) = default_specialization {
-                    return_ty = return_ty.apply_specialization(db, specialization);
-                }
-                output_types = output_types.add(return_ty);
-                found_any = true;
+            let input_ty = params
+                .get_positional(first_index)
+                .map(Parameter::annotated_type)
+                .or_else(|| {
+                    params
+                        .variadic()
+                        .map(|(_, variadic)| variadic.annotated_type())
+                })
+                .or_else(|| params.is_gradual().then(Type::unknown));
+            let Some(mut input_ty) = input_ty else {
+                continue;
+            };
+
+            if let Some(specialization) = default_specialization {
+                input_ty = input_ty.apply_specialization(db, specialization);
+                return_ty = return_ty.apply_specialization(db, specialization);
             }
+            input_types = input_types.add(input_ty);
+            output_types = output_types.add(return_ty);
+            found_any = true;
         }
     }
 
@@ -1417,6 +1409,7 @@ impl<'db> Bindings<'db> {
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
         for binding in self.iter_flat_mut() {
             let binding_type = binding.callable_type;
+            let has_bound_receiver = binding.bound_type.is_some();
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
@@ -1868,27 +1861,70 @@ impl<'db> Bindings<'db> {
                             })
                         };
 
-                        let has_default_value = get_argument_type("default", false).is_some()
-                            || get_argument_type("default_factory", false).is_some()
-                            || get_argument_type("factory", false).is_some();
-
                         let init = get_argument_type("init", true);
                         let kw_only = get_argument_type("kw_only", true);
                         let alias = get_argument_type("alias", true);
                         let converter = get_argument_type("converter", true);
 
-                        let default_ty = get_argument_type("default", false).or_else(|| {
-                            ["default_factory", "factory"].into_iter().find_map(|name| {
-                                get_argument_type(name, false).and_then(|factory_ty| {
-                                    factory_ty
-                                        .try_call(db, &CallArguments::none())
+                        let source_argument = |name| {
+                            call_arguments.iter().enumerate().find_map(
+                                |(argument_index, (argument, argument_types))| {
+                                    let argument_name = match argument {
+                                        Argument::Keyword(name) => Some(name),
+                                        Argument::Positional | Argument::Synthetic => overload
+                                            .parameter_name_for_call_argument(
+                                                has_bound_receiver,
+                                                argument_index,
+                                            )
+                                            .map(Name::as_str),
+                                        Argument::Variadic | Argument::Keywords => None,
+                                    };
+                                    if argument_name != Some(name) {
+                                        return None;
+                                    }
+                                    overload
+                                        .parameter_type_by_name(name, false)
                                         .ok()
-                                        .map(|bindings| bindings.return_type(db))
-                                })
+                                        .flatten()
+                                        .or_else(|| argument_types.get_default())
+                                        .map(|ty| (argument_index, ty))
+                                },
+                            )
+                        };
+
+                        let default = [
+                            ("default", FieldDefaultKind::Value),
+                            ("default_factory", FieldDefaultKind::Factory),
+                            ("factory", FieldDefaultKind::Factory),
+                        ]
+                        .into_iter()
+                        .find_map(|(name, kind)| {
+                            let (argument_index, argument_ty) = source_argument(name)?;
+                            let ty = match kind {
+                                FieldDefaultKind::Value => argument_ty,
+                                FieldDefaultKind::Factory => argument_ty
+                                    .try_call(db, &CallArguments::none())
+                                    .map_or_else(
+                                        |error| error.return_type(db),
+                                        |bindings| bindings.return_type(db),
+                                    ),
+                            };
+                            let argument_has_type_error = overload.errors().iter().any(|error| {
+                                matches!(
+                                    error,
+                                    BindingError::InvalidArgumentType {
+                                        argument_index: Some(error_index),
+                                        ..
+                                    } if *error_index == argument_index
+                                )
+                            });
+                            Some(FieldDefault {
+                                ty,
+                                kind,
+                                argument_index,
+                                argument_has_type_error,
                             })
                         });
-
-                        let default_ty = has_default_value.then_some(default_ty).flatten();
 
                         let init = init
                             .map(|init| !init.bool(db).is_always_false())
@@ -1928,7 +1964,7 @@ impl<'db> Bindings<'db> {
                         // the default value and converter is handled at the annotated-assignment
                         // site, where we have access to the declared field type.
                         overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
-                            FieldInstance::new(db, default_ty, init, kw_only, alias, converter),
+                            FieldInstance::new(db, default, init, kw_only, alias, converter),
                         )));
                     }
 
@@ -5743,17 +5779,17 @@ pub(crate) enum ArgumentTypeContext<'db> {
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct ArgumentTypeContextInput<'db> {
     call_expression_tcx: TypeContext<'db>,
-    field_default_target_ty: Option<Type<'db>>,
+    parameter_type_override: Option<Type<'db>>,
 }
 
 impl<'db> ArgumentTypeContextInput<'db> {
     pub(crate) fn new(
         call_expression_tcx: TypeContext<'db>,
-        field_default_target_ty: Option<Type<'db>>,
+        parameter_type_override: Option<Type<'db>>,
     ) -> Self {
         Self {
             call_expression_tcx,
-            field_default_target_ty,
+            parameter_type_override,
         }
     }
 }
@@ -5935,6 +5971,22 @@ impl<'db> Binding<'db> {
     ) -> Option<&MatchedArgument<'db>> {
         self.argument_matches
             .get(argument_index + usize::from(binding.bound_type.is_some()))
+    }
+
+    pub(crate) fn parameter_name_for_call_argument(
+        &self,
+        has_bound_receiver: bool,
+        argument_index: usize,
+    ) -> Option<&Name> {
+        let [parameter] = self
+            .argument_matches
+            .get(argument_index + usize::from(has_bound_receiver))?
+            .parameters
+            .as_slice()
+        else {
+            return None;
+        };
+        self.signature.parameters()[parameter.index].name()
     }
 
     /// Returns source argument indices matched to the `ParamSpec` component.
@@ -6160,7 +6212,7 @@ impl<'db> Binding<'db> {
     ) -> Option<ArgumentTypeContext<'db>> {
         let ArgumentTypeContextInput {
             call_expression_tcx,
-            field_default_target_ty,
+            parameter_type_override,
         } = input;
         let argument_matches = self.matched_argument_for_call_argument(binding, argument_index)?;
         let [parameter] = argument_matches.parameters.as_slice() else {
@@ -6282,24 +6334,11 @@ impl<'db> Binding<'db> {
             parameter_type = parameter_type.apply_specialization(db, specialization);
         }
 
-        if let Some(field_default_target_ty) = field_default_target_ty
-            && let Some(parameter_name) = parameter.name().map(Name::as_str)
-        {
-            let field_parameter_type = match parameter_name {
-                "default" => Some(field_default_target_ty),
-                "default_factory" | "factory" => Some(Type::Callable(CallableType::single(
-                    db,
-                    Signature::new(Parameters::empty(), field_default_target_ty),
-                ))),
-                _ => None,
-            };
-
-            if let Some(field_parameter_type) = field_parameter_type {
-                return Some(ArgumentTypeContext::standard(
-                    original_parameter_type,
-                    field_parameter_type,
-                ));
-            }
+        if let Some(parameter_type_override) = parameter_type_override {
+            return Some(ArgumentTypeContext::standard(
+                original_parameter_type,
+                parameter_type_override,
+            ));
         }
 
         Some(ArgumentTypeContext::standard(
@@ -6620,6 +6659,7 @@ impl<'db> Binding<'db> {
 
         let index = parameters
             .keyword_by_name(parameter_name)
+            .or_else(|| parameters.positional_only_by_name(parameter_name))
             .map(|(i, _)| i)
             .ok_or(UnknownParameterNameError)?;
 

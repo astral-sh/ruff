@@ -296,7 +296,7 @@ type, even for `init=False` fields and even for custom field specifiers annotate
 
 ```py
 from dataclasses import dataclass, field
-from typing import Any, Literal, TypeVar
+from typing import Any, Literal, Protocol, TypeVar
 from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
@@ -304,15 +304,26 @@ T = TypeVar("T")
 def make_foo() -> Literal["foo"]:
     return "foo"
 
+class ImmutableListProtocol(Protocol[T]):
+    def __contains__(self, item: T) -> bool: ...
+
 @dataclass
 class DC:
     # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
     with_default: int = field(init=False, default="foo")
     # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
     with_default_factory: int = field(init=False, default_factory=make_foo)
+    # error: [invalid-assignment] "Object of type `EllipsisType` is not assignable to `int`"
+    ellipsis_default: int = field(default=...)
+    gradual_factory: ImmutableListProtocol[str] = field(default_factory=list)
 
 def xfield(**kwargs: Any) -> Any: ...
-@dataclass_transform(field_specifiers=(xfield,))
+def positional_field(metadata: Any, default: Any) -> Any: ...
+def positional_factory(metadata: Any, default_factory: Any) -> Any: ...
+def str_to_int(value: str) -> int:
+    return int(value)
+
+@dataclass_transform(field_specifiers=(xfield, positional_field, positional_factory))
 def xmodel(cls: type[T]) -> type[T]:
     return cls
 
@@ -322,6 +333,27 @@ class XC:
     with_default: int = xfield(init=False, default="foo")
     # error: [invalid-assignment] "Object of type `Literal["foo"]` is not assignable to `int`"
     with_default_factory: int = xfield(init=False, default_factory=make_foo)
+    compatible_default: list[int | None] = xfield(default=[1])
+    compatible_factory: list[int | None] = xfield(default_factory=lambda: [1])
+    sentinel_default: int = xfield(default=...)
+    converted: int = xfield(converter=str_to_int, default="0")
+    # error: [invalid-assignment] "Object of type `Literal[0]` is not assignable to `str`"
+    bad_converted_default: int = xfield(converter=str_to_int, default=0)
+    # error: [invalid-assignment] "Object of type `Literal[0]` is not assignable to `str`"
+    bad_converted_factory: int = xfield(converter=str_to_int, factory=lambda: 0)
+
+@xmodel
+class FailedFactoryCall:
+    value: int = xfield(default_factory=lambda required: 1)
+
+FailedFactoryCall()
+
+@xmodel
+class PositionalDefault:
+    # error: [invalid-assignment] "Object of type `Literal["bad"]` is not assignable to `int`"
+    value: int = positional_field(..., "bad")
+    compatible: list[int | None] = positional_field(..., [1])
+    compatible_factory: list[int | None] = positional_factory(..., lambda: [1])
 ```
 
 ## Contextual inference for `default` and `default_factory`
@@ -333,7 +365,7 @@ a field-info object rather than the field type itself.
 
 ```py
 from dataclasses import dataclass, field
-from typing import Callable, Generic, TypeVar
+from typing import Callable, Generic, Literal, TypeVar
 from typing_extensions import dataclass_transform
 
 T = TypeVar("T")
@@ -356,6 +388,7 @@ def xmodel(cls: type[T]) -> type[T]:
 class DC:
     values: list[int | None] = field(default=[1])
     other_values: list[int | None] = field(default_factory=list)
+    literal_values: list[Literal["a", "b", "c"]] = field(default_factory=lambda: ["a"])
 
 @xmodel
 class XC:
