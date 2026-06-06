@@ -984,7 +984,35 @@ impl<'db> StaticClassLiteral<'db> {
                     callable.is_classmethod_like(db)
                         || (name != "__new__" && callable.is_staticmethod_like(db))
                 }
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|element| is_class_or_static_method(db, name, *element)),
                 ty => name != "__new__" && ty.is_instance_of(db, KnownClass::Staticmethod),
+            }
+        }
+
+        fn with_inherited_generic_context<'d>(
+            db: &'d dyn Db,
+            ty: Type<'d>,
+            generic_context: GenericContext<'d>,
+        ) -> Type<'d> {
+            match ty {
+                Type::FunctionLiteral(function) => Type::FunctionLiteral(
+                    function.with_inherited_generic_context(db, generic_context),
+                ),
+                Type::Callable(callable) => Type::Callable(CallableType::new(
+                    db,
+                    callable
+                        .signatures(db)
+                        .with_inherited_generic_context(db, generic_context),
+                    callable.kind(db),
+                    callable.provenance(db),
+                )),
+                Type::Union(union) => union.map(db, |element| {
+                    with_inherited_generic_context(db, *element, generic_context)
+                }),
+                _ => ty,
             }
         }
 
@@ -1020,20 +1048,7 @@ impl<'db> StaticClassLiteral<'db> {
                     name,
                     policy,
                 )
-                .map_type(|ty| match ty {
-                    Type::FunctionLiteral(function) => Type::FunctionLiteral(
-                        function.with_inherited_generic_context(db, generic_context),
-                    ),
-                    Type::Callable(callable) => Type::Callable(CallableType::new(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, generic_context),
-                        callable.kind(db),
-                        callable.provenance(db),
-                    )),
-                    _ => ty,
-                });
+                .map_type(|ty| with_inherited_generic_context(db, ty, generic_context));
         }
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.

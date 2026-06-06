@@ -522,6 +522,22 @@ reveal_type(GenericFactory.make())  # revealed: GenericFactory[Unknown]
 
 def check_factory(value: GenericFactory[int]) -> None:
     reveal_type(GenericFactory.copy(value))  # revealed: GenericFactory[int]
+
+def flag() -> bool:
+    return True
+
+class ConditionalBox[T]:
+    if flag():
+        @classmethod
+        def from_value(cls, value: T) -> "ConditionalBox[T]":
+            raise NotImplementedError
+
+    else:
+        @classmethod
+        def from_value(cls, value: T) -> tuple[T]:
+            raise NotImplementedError
+
+reveal_type(ConditionalBox.from_value(1))  # revealed: ConditionalBox[int] | tuple[Literal[1]]
 ```
 
 The class type parameter can also be inferred through a specialized generic base class. This is a
@@ -1061,6 +1077,22 @@ class LegacyStaticBox(Generic[LegacyT]):
         raise NotImplementedError
 
 reveal_type(LegacyStaticBox.from_value(1))  # revealed: LegacyStaticBox[int]
+
+def flag() -> bool:
+    return True
+
+class ConditionalStaticBox[T]:
+    if flag():
+        @staticmethod
+        def from_value(value: T) -> "ConditionalStaticBox[T]":
+            raise NotImplementedError
+
+    else:
+        @staticmethod
+        def from_value(value: T) -> tuple[T]:
+            raise NotImplementedError
+
+reveal_type(ConditionalStaticBox.from_value(1))  # revealed: ConditionalStaticBox[int] | tuple[Literal[1]]
 ```
 
 ### Staticmethod assigned in class body
