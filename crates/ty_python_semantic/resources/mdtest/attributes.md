@@ -1928,6 +1928,12 @@ def _(value: Value):
         reveal_type(value.other)  # revealed: Value
         reveal_type(value.property)  # revealed: Value
 
+class Excluded: ...
+
+def _(value: Value):
+    if not isinstance(value, Excluded):
+        reveal_type(value.copy())  # revealed: Value & ~Excluded
+
 @runtime_checkable
 class VariableTruthProtocol(Protocol):
     def __bool__(self) -> bool: ...

@@ -1066,9 +1066,10 @@ impl<'db> Type<'db> {
 
     /// Return the part of a receiver type that describes its runtime class for `Self` binding.
     ///
-    /// Negative constraints and flow refinements describe the current value, but do not necessarily
-    /// apply to another instance returned as `Self`. When known, `self_typevar` identifies the
-    /// protocol that owns `Self`, so other structural constraints can be treated as refinements.
+    /// Value-level negative constraints and flow refinements describe the current value, but do not
+    /// necessarily apply to another instance returned as `Self`. Nominal exclusions describe the
+    /// receiver's runtime class and remain valid. When known, `self_typevar` identifies the protocol
+    /// that owns `Self`, so other structural constraints can be treated as refinements.
     pub(crate) fn self_binding_type_for(
         self,
         db: &'db dyn Db,
@@ -1136,6 +1137,11 @@ impl<'db> Type<'db> {
                 );
             if !is_value_refinement {
                 builder = builder.add_positive(*positive);
+            }
+        }
+        for negative in intersection.negative(db) {
+            if matches!(negative.resolve_type_alias(db), Type::NominalInstance(_)) {
+                builder = builder.add_negative(*negative);
             }
         }
         builder.build()
