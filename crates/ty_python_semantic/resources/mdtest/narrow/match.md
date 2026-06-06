@@ -198,6 +198,30 @@ def test_match_star_excludes_text_and_bytes(x: str | bytes | bytearray | list[in
         case _:
             reveal_type(x)  # revealed: str | bytes | bytearray
 
+def test_match_exact_sequence_excludes_str(x: str | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: str
+
+def test_match_exact_sequence_excludes_bytes(x: bytes | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytes
+
+def test_match_exact_sequence_excludes_bytearray(x: bytearray | tuple[int, int]) -> None:
+    match x:
+        case (a, b):
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(b)  # revealed: @Todo(`match` pattern definition types)
+        case _:
+            reveal_type(x)  # revealed: bytearray
+
 def test_match_exact_object_sequence(value: object) -> None:
     match value:
         case int(), str():
