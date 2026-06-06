@@ -139,6 +139,7 @@ pub enum KnownClass {
     Path,
     // functools
     FunctoolsPartial,
+    CachedProperty,
     // ty_extensions
     ExactlySized,
     ConstraintSet,
@@ -269,6 +270,7 @@ impl KnownClass {
             | Self::Specialization
             | Self::ProtocolMeta
             | Self::FunctoolsPartial
+            | Self::CachedProperty
             | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
@@ -372,7 +374,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::CachedProperty => false,
         }
     }
 
@@ -472,7 +475,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::CachedProperty => false,
         }
     }
 
@@ -571,7 +575,8 @@ impl KnownClass {
             | KnownClass::ProtocolMeta
             | KnownClass::Template
             | KnownClass::Path
-            | KnownClass::FunctoolsPartial => false,
+            | KnownClass::FunctoolsPartial
+            | KnownClass::CachedProperty => false,
         }
     }
 
@@ -682,6 +687,7 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::FunctoolsPartial
+            | Self::CachedProperty
             | Self::Mapping
             | Self::Sequence => false,
         }
@@ -783,6 +789,7 @@ impl KnownClass {
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
+            | KnownClass::CachedProperty
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization => false,
@@ -897,6 +904,7 @@ impl KnownClass {
             Self::Template => "Template",
             Self::Path => "Path",
             Self::FunctoolsPartial => "partial",
+            Self::CachedProperty => "cached_property",
             Self::ProtocolMeta => "_ProtocolMeta",
         }
     }
@@ -1256,7 +1264,7 @@ impl KnownClass {
             | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
-            Self::FunctoolsPartial => KnownModule::Functools,
+            Self::FunctoolsPartial | Self::CachedProperty => KnownModule::Functools,
         }
     }
 
@@ -1358,7 +1366,8 @@ impl KnownClass {
             | Self::Template
             | Self::Path
             | Self::UnionType
-            | Self::FunctoolsPartial => Some(false),
+            | Self::FunctoolsPartial
+            | Self::CachedProperty => Some(false),
 
             Self::Tuple => None,
         }
@@ -1463,7 +1472,8 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
-            | Self::FunctoolsPartial => false,
+            | Self::FunctoolsPartial
+            | Self::CachedProperty => false,
         }
     }
 
@@ -1568,6 +1578,7 @@ impl KnownClass {
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
             "partial" => &[Self::FunctoolsPartial],
+            "cached_property" => &[Self::CachedProperty],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
             _ => return None,
         };
@@ -1660,7 +1671,8 @@ impl KnownClass {
             | Self::AsyncGenerator
             | Self::Template
             | Self::Path
-            | Self::FunctoolsPartial => module == self.canonical_module(db),
+            | Self::FunctoolsPartial
+            | Self::CachedProperty => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType

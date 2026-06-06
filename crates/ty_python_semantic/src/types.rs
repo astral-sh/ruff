@@ -2918,6 +2918,27 @@ impl<'db> Type<'db> {
                 return fallback.try_call_dunder_get(db, instance, owner);
             }
 
+            if let Type::NominalInstance(nominal) = ty
+                && nominal.has_known_class(db, KnownClass::CachedProperty)
+            {
+                let descriptor_kind = if ty.is_data_descriptor(db) {
+                    AttributeKind::DataDescriptor
+                } else {
+                    AttributeKind::NormalOrNonDataDescriptor
+                };
+
+                if instance.is_none_or(|instance_ty| instance_ty.is_none(db)) {
+                    return Some((ty, descriptor_kind));
+                }
+
+                let specialization = nominal.class(db).class_literal_and_specialization(db).1?;
+                let [return_ty] = specialization.types(db) else {
+                    return None;
+                };
+
+                return Some((*return_ty, descriptor_kind));
+            }
+
             match ty {
                 Type::Callable(callable) if callable.is_staticmethod_like(db) => {
                     // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
