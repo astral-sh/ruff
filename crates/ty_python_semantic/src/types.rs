@@ -4091,9 +4091,9 @@ impl<'db> Type<'db> {
                 let function = bound_method.function(db);
                 let self_instance = bound_method.self_instance(db);
                 if function.is_classmethod(db) && matches!(self_instance, Type::Intersection(_)) {
-                    CallableBinding::from_overloads(
+                    CallableBinding::from_indexed_overloads(
                         self,
-                        bound_method.bound_signatures(db).iter().cloned(),
+                        bound_method.indexed_bound_signatures(db),
                     )
                     .into()
                 } else {

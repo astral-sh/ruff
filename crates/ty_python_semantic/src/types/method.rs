@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_python_ast::name::Name;
+use smallvec::SmallVec;
 
 use crate::{
     Db,
@@ -86,6 +87,18 @@ impl<'db> BoundMethodType<'db> {
 
     #[salsa::tracked(cycle_initial=|_, _, _| CallableSignature::bottom(), heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn bound_signatures(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        CallableSignature::from_overloads(
+            self.indexed_bound_signatures(db)
+                .into_iter()
+                .map(|(_, signature)| signature),
+        )
+    }
+
+    /// Returns bound signatures paired with their positions in the original overload list.
+    pub(crate) fn indexed_bound_signatures(
+        self,
+        db: &'db dyn Db,
+    ) -> SmallVec<[(usize, Signature<'db>); 1]> {
         let function_signature = self.function(db).signature(db);
         let typing_self_type = self.typing_self_type(db);
 
@@ -95,32 +108,35 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .any(Signature::has_explicit_positional_receiver_annotation)
             {
-                return CallableSignature::from_overloads(
-                    function_signature
-                        .overloads
-                        .iter()
-                        .map(|signature| signature.bind_self(db, Some(typing_self_type))),
-                );
+                return function_signature
+                    .overloads
+                    .iter()
+                    .enumerate()
+                    .map(|(index, signature)| {
+                        (index, signature.bind_self(db, Some(typing_self_type)))
+                    })
+                    .collect();
             }
 
             let self_instance = self.self_instance(db);
-            return CallableSignature::from_overloads(
-                function_signature
-                    .overloads
-                    .iter()
-                    .filter(|signature| signature.can_bind_self_to(db, self_instance))
-                    .map(|signature| signature.bind_self(db, Some(typing_self_type))),
-            );
+            return function_signature
+                .overloads
+                .iter()
+                .enumerate()
+                .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
+                .map(|(index, signature)| (index, signature.bind_self(db, Some(typing_self_type))))
+                .collect();
         };
 
         let self_instance = self.self_instance(db);
-        if self.function(db).is_classmethod(db) && matches!(self_instance, Type::Intersection(_)) {
-            CallableSignature::single(
-                signature.bind_self_to_class_intersection(db, typing_self_type),
-            )
+        let signature = if self.function(db).is_classmethod(db)
+            && matches!(self_instance, Type::Intersection(_))
+        {
+            signature.bind_self_to_class_intersection(db, typing_self_type)
         } else {
-            CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
-        }
+            signature.bind_self(db, Some(typing_self_type))
+        };
+        smallvec::smallvec![(0, signature)]
     }
 
     pub(super) fn recursive_type_normalized_impl(
