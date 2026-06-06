@@ -22,6 +22,9 @@ class Shape:
     def make[T = Self](self) -> T:
         raise NotImplementedError
 
+    def make_pair[U = Self, T = U](self) -> tuple[U, T]:
+        raise NotImplementedError
+
     def nested_type(self: Self) -> list[Self]:
         return [self]
 
@@ -44,6 +47,8 @@ class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
         reveal_type(self)  # revealed: Self@set_scale
         return self
+
+reveal_type(Circle().make_pair())  # revealed: tuple[Circle, Circle]
 
 class ClassmethodBase:
     @classmethod

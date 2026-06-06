@@ -7325,6 +7325,7 @@ impl<'db> SelfBinding<'db> {
         // A `Self` carried by the receiver is an unrelated specialization, but a method-owned
         // `Self` that cannot bind to the receiver must not escape the bound signature.
         (self.unbound_method_self_to_unknown
+            && bound_typevar.typevar(db).is_self(db)
             && self.binding_context == Some(bound_typevar.binding_context(db))
             && bound_typevar
                 .binding_context(db)
