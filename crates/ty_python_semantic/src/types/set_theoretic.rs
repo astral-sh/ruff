@@ -813,6 +813,12 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
+        for element in self.negative(db) {
+            if let Some(instance) = element.to_instance(db) {
+                builder = builder.add_negative(instance);
+            }
+        }
+
         found_instance.then(|| builder.build())
     }
 

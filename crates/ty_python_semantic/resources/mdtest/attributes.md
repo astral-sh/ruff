@@ -1901,6 +1901,23 @@ def _(cls: Intersection[type[A], type[Unknown]]):
     reveal_type(cls.classmethod())  # revealed: A & Unknown
 ```
 
+### Classmethod binding preserves negative class constraints
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection, Not
+
+class A:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class B: ...
+
+def _(cls: Intersection[type[A], Not[type[B]]]):
+    reveal_type(cls.make())  # revealed: A & ~B
+```
+
 ### Descriptor owner for an intersection
 
 ```py
