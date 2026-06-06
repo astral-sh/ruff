@@ -425,6 +425,22 @@ def test_match_capture_enum_custom_ne_todo() -> None:
             # TODO: Preserve enum-member identity when equality is overridden.
             reveal_type(item)  # revealed: Literal["actual"]
 
+class AlwaysEqualEnum(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+def test_match_capture_preserves_custom_equal_enum_arm() -> int:
+    value = (AlwaysEqualEnum.B, "actual")
+    match value:
+        case [AlwaysEqualEnum.A, item]:
+            reveal_type(item)  # revealed: Literal["actual"]
+            return item  # error: [invalid-return-type]
+        case _:
+            return 0
+
 class AlwaysEqualMeta(type):
     def __eq__(cls, other: object) -> Literal[True]:
         return True
