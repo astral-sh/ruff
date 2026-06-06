@@ -2028,17 +2028,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Return a type that contains every value that can match `pattern`.
     ///
-    /// For example, consider:
+    /// For example, given:
     ///
     /// ```python
-    /// case [int(real=0)]:
+    /// def f(x: list[object]):
+    ///     match x:
+    ///         case [int(real=0)]:
+    ///             reveal_type(x)
     /// ```
     ///
-    /// Every match is a one-element sequence containing an `int`, so the
-    /// returned type records those facts. It does not record the nested
-    /// `real=0` check, so it can also contain values such as `[1]` that fail
-    /// the pattern at runtime. This is intentional for positive narrowing:
-    /// the result may retain extra values, but cannot exclude a possible match.
+    /// Every `x` that matches `[int(real=0)]` must be a one-element sequence
+    /// containing an `int`. We can represent this information in the returned
+    /// type; however, that type omits the `real=0` constraint, and so includes
+    /// values like as `[1]`, which do not match the pattern. In other words,
+    /// the returned type may include values that do not match, but it must include
+    /// every value that does.
     fn necessary_match_pattern_type(&self, pattern: &PatternPredicateKind<'db>) -> Type<'db> {
         match pattern {
             PatternPredicateKind::Singleton(singleton) => {
