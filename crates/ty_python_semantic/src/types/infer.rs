@@ -751,11 +751,11 @@ impl<'db> InferenceRegion<'db> {
 pub(crate) struct ScopeInference<'db> {
     /// Expression types retained as key-value entries.
     ///
-    /// Completed results store exact `Unknown` types in `unknown_expressions` instead.
+    /// Completed results store exact `Unknown` types in `unknowns` instead.
     expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
     /// Expressions whose inferred type is exactly `Unknown` in a completed result.
-    unknown_expressions: FrozenSet<ExpressionNodeKey>,
+    unknowns: FrozenSet<ExpressionNodeKey>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -790,7 +790,7 @@ impl<'db> ScopeInference<'db> {
                 ..ScopeInferenceExtra::default()
             })),
             expressions: FrozenMap::default(),
-            unknown_expressions: FrozenSet::default(),
+            unknowns: FrozenSet::default(),
         }
     }
 
@@ -800,16 +800,16 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        if self.unknown_expressions.iter().next().is_some() {
+        if self.unknowns.iter().next().is_some() {
             self.expressions = std::mem::take(&mut self.expressions)
                 .into_iter()
                 .chain(
-                    self.unknown_expressions
+                    self.unknowns
                         .iter()
                         .map(|expression| (*expression, Type::unknown())),
                 )
                 .collect();
-            self.unknown_expressions = FrozenSet::default();
+            self.unknowns = FrozenSet::default();
         }
 
         for (expr, ty) in &mut self.expressions {
@@ -837,11 +837,7 @@ impl<'db> ScopeInference<'db> {
         self.expressions
             .get(&expression)
             .copied()
-            .or_else(|| {
-                self.unknown_expressions
-                    .contains(&expression)
-                    .then(Type::unknown)
-            })
+            .or_else(|| self.unknowns.contains(&expression).then(Type::unknown))
             .or_else(|| self.fallback_type())
     }
 

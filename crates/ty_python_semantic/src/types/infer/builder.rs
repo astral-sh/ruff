@@ -528,7 +528,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .extend(inference.expressions.iter().copied());
         self.expressions.extend(
             inference
-                .unknown_expressions
+                .unknowns
                 .iter()
                 .map(|expression| (*expression, Type::unknown())),
         );
@@ -10592,17 +10592,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let unknown_expressions = if cycle_recovery.is_none() {
-            let mut unknown_expressions = FxHashSet::default();
+        let unknowns = if cycle_recovery.is_none() {
+            let mut unknowns = FxHashSet::default();
             expressions.retain(|expression, ty| {
                 if ty.is_unknown() {
-                    unknown_expressions.insert(*expression);
+                    unknowns.insert(*expression);
                     false
                 } else {
                     true
                 }
             });
-            FrozenSet::from(unknown_expressions)
+            FrozenSet::from(unknowns)
         } else {
             FrozenSet::default()
         };
@@ -10627,7 +10627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         ScopeInference {
             expressions: FrozenMap::from(expressions),
-            unknown_expressions,
+            unknowns,
             extra,
         }
     }

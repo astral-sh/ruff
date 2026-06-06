@@ -586,7 +586,7 @@ fn scope_unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
     let scope_inference = infer_complete_scope_types(&db, global_scope(&db, file));
 
     assert!(scope_inference.expressions.get(&target_key).is_none());
-    assert!(scope_inference.unknown_expressions.contains(&target_key));
+    assert!(scope_inference.unknowns.contains(&target_key));
     assert_eq!(
         scope_inference.try_expression_type(target),
         Some(Type::unknown())
