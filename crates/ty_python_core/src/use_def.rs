@@ -240,7 +240,7 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
-use std::ops::Range;
+use std::ops::{Index, Range};
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -460,9 +460,11 @@ impl RetainedBindingsBuilder {
     }
 }
 
-impl RetainedBindings {
-    fn get(&self, id: InternedBindingsId) -> &[LiveBinding] {
-        let Range { start, end } = self.ranges[id];
+impl Index<InternedBindingsId> for RetainedBindings {
+    type Output = [LiveBinding];
+
+    fn index(&self, index: InternedBindingsId) -> &Self::Output {
+        let Range { start, end } = self.ranges[index];
         &self.live_bindings[start as usize..end as usize]
     }
 }
@@ -635,7 +637,7 @@ impl<'db> UseDefMap<'db> {
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings_id = self.bindings_by_use[use_id];
         self.bindings_iterator(
-            self.interned_bindings.get(bindings_id),
+            &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -728,7 +730,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.symbol_states[symbol].end_of_scope;
         self.bindings_iterator(
-            self.interned_bindings.get(place_state_id.bindings_id()),
+            &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -739,7 +741,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.member_states[member].end_of_scope;
         self.bindings_iterator(
-            self.interned_bindings.get(place_state_id.bindings_id()),
+            &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -759,7 +761,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.symbol_states[symbol].reachable;
-        let bindings = self.interned_bindings.get(place_state_id.bindings_id());
+        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -768,7 +770,7 @@ impl<'db> UseDefMap<'db> {
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.member_states[member].reachable;
-        let bindings = self.interned_bindings.get(place_state_id.bindings_id());
+        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -789,10 +791,12 @@ impl<'db> UseDefMap<'db> {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
-                EnclosingSnapshotResult::FoundBindings(self.bindings_iterator(
-                    self.interned_bindings.get(*bindings_id),
-                    boundness_analysis,
-                ))
+                EnclosingSnapshotResult::FoundBindings(
+                    self.bindings_iterator(
+                        &self.interned_bindings[*bindings_id],
+                        boundness_analysis,
+                    ),
+                )
             }
             None => EnclosingSnapshotResult::NotFound,
         }
@@ -804,7 +808,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings_id = self.definitions_by_definition[&definition].bindings;
         self.bindings_iterator(
-            self.interned_bindings.get(bindings_id),
+            &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -908,7 +912,7 @@ impl<'db> UseDefMap<'db> {
                     BoundnessAnalysis::AssumeBound,
                 );
                 let bindings = self.bindings_iterator(
-                    self.interned_bindings.get(reachable.bindings_id()),
+                    &self.interned_bindings[reachable.bindings_id()],
                     BoundnessAnalysis::AssumeBound,
                 );
                 (symbol_id, declarations, bindings)
