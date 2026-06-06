@@ -482,7 +482,6 @@ from typing import TypeVar, overload
 from typing_extensions import TypeIs, final
 
 class Base: ...
-
 class Derived(Base): ...
 
 @final
@@ -498,19 +497,14 @@ def is_exact_instance_of_collection(
     value: object,
     classinfo: type[T],
 ) -> TypeIs[T]: ...
-
 @overload
 def is_exact_instance_of_collection(
     value: object,
     classinfo: tuple[type[T], ...] | list[type[T]] | set[type[T]],
 ) -> TypeIs[T]: ...
-
 def is_exact_instance_of_collection(
     value: object,
-    classinfo: type[object]
-    | tuple[type[object], ...]
-    | list[type[object]]
-    | set[type[object]],
+    classinfo: type[object] | tuple[type[object], ...] | list[type[object]] | set[type[object]],
 ) -> bool:
     if isinstance(classinfo, (tuple, list, set)):
         return type(value) in classinfo
