@@ -709,6 +709,10 @@ struct ProjectedNarrowingNode {
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
     nodes: Vec<ProjectedNarrowingNode>,
+    node_constraints: Vec<(
+        Option<NarrowingConstraint<'db>>,
+        Option<NarrowingConstraint<'db>>,
+    )>,
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
@@ -738,7 +742,9 @@ impl ProjectedNarrowingGraph<'_> {
         }
 
         let id = ProjectedNarrowingNodeId(self.nodes.len());
+        let constraints = self.predicate_constraints_cache[&node.atom].clone();
         self.nodes.push(node);
+        self.node_constraints.push(constraints);
         self.node_cache.insert(node, id);
         id
     }
@@ -988,19 +994,21 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
         } else {
             let node = self.graph.node(id);
-            let (pos_constraint, neg_constraint) =
-                self.graph.predicate_constraints_cache[&node.atom].clone();
 
             if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                let neg_constraint = self.graph.node_constraints[id.0].1.clone();
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 self.narrow(node.if_false, false_accumulated)
             } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                let pos_constraint = self.graph.node_constraints[id.0].0.clone();
                 let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                 self.narrow(node.if_true, true_accumulated)
             } else {
+                let pos_constraint = self.graph.node_constraints[id.0].0.clone();
                 let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
+                let neg_constraint = self.graph.node_constraints[id.0].1.clone();
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
