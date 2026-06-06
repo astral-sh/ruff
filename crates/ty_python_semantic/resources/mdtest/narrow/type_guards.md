@@ -471,6 +471,107 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
             reveal_type(a)  # revealed: Bar
 ```
 
+## Exact runtime-class predicates
+
+An exact runtime-class predicate can return `False` for an instance of a non-final class when the
+instance belongs to a subclass. Its negative branch therefore cannot apply the usual `TypeIs`
+narrowing. Negative narrowing is still valid when the narrowed class is final.
+
+```py
+from typing import TypeVar, overload
+from typing_extensions import TypeIs, final
+
+class Base: ...
+
+class Derived(Base): ...
+
+@final
+class Final: ...
+
+T = TypeVar("T")
+
+def is_exact_instance(value: object, classinfo: type[T]) -> TypeIs[T]:
+    return type(value) is classinfo
+
+@overload
+def is_exact_instance_of_collection(
+    value: object,
+    classinfo: type[T],
+) -> TypeIs[T]: ...
+
+@overload
+def is_exact_instance_of_collection(
+    value: object,
+    classinfo: tuple[type[T], ...] | list[type[T]] | set[type[T]],
+) -> TypeIs[T]: ...
+
+def is_exact_instance_of_collection(
+    value: object,
+    classinfo: type[object]
+    | tuple[type[object], ...]
+    | list[type[object]]
+    | set[type[object]],
+) -> bool:
+    if isinstance(classinfo, (tuple, list, set)):
+        return type(value) in classinfo
+    return type(value) is classinfo
+
+def non_final(value: Base):
+    if is_exact_instance(value, Base):
+        reveal_type(value)  # revealed: Base
+    else:
+        reveal_type(value)  # revealed: Base
+
+def object_input(value: object):
+    if is_exact_instance(value, Base):
+        reveal_type(value)  # revealed: Base
+    else:
+        reveal_type(value)  # revealed: object
+
+def union_input(value: Base | int):
+    if is_exact_instance(value, Base):
+        reveal_type(value)  # revealed: Base
+    else:
+        reveal_type(value)  # revealed: Base | int
+
+def final_class(value: Final):
+    if is_exact_instance(value, Final):
+        reveal_type(value)  # revealed: Final
+    else:
+        reveal_type(value)  # revealed: Never
+
+def collection_form(value: Base):
+    if is_exact_instance_of_collection(value, [Base]):
+        reveal_type(value)  # revealed: Base
+    else:
+        reveal_type(value)  # revealed: Base
+```
+
+## Shadowed exact-class lookalikes
+
+Lookalike functions using shadowed builtins retain normal `TypeIs` semantics.
+
+```py
+import builtins
+from typing_extensions import TypeIs
+
+class A: ...
+
+def fake_type(value: object) -> builtins.type[A]:
+    return A
+
+type = fake_type
+
+def is_a(value: object, classinfo: builtins.type[A]) -> TypeIs[A]:
+    return type(value) is classinfo
+
+def f(value: A):
+    if is_a(value, A):
+        reveal_type(value)  # revealed: A
+    else:
+        reveal_type(value)  # revealed: Never
+```
+
 ## TypeGuard overrides normal constraints
 
 TypeGuard constraints override any previous narrowing, but additional "regular" constraints can be
