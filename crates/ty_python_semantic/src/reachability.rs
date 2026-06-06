@@ -631,6 +631,17 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
+        if base_ty.is_never() {
+            return Type::Never;
+        }
+
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+            | ScopedReachabilityConstraintId::AMBIGUOUS => return base_ty,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Type::Never,
+            _ => {}
+        }
+
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
         let mut context = ProjectedNarrowingContext {

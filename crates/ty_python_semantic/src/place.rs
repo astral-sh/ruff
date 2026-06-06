@@ -1472,10 +1472,13 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed_ty =
+                if narrowing_constraint.constraint() == ScopedNarrowingConstraint::ALWAYS_TRUE {
+                    binding_ty
+                } else {
+                    narrowing_constraint.narrow(db, binding_ty, binding.place(db))
+                };
+            Some((narrowed_ty, static_reachability))
         },
     );
 
