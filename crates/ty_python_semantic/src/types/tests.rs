@@ -3,7 +3,6 @@ use crate::db::tests::{TestDbBuilder, setup_db};
 use crate::place::{typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
 use ruff_db::system::DbWithWritableSystem as _;
-use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 
@@ -87,64 +86,30 @@ fn divergent_type() {
     let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
+    // `Divergent` is the α-binder variable of a μ-type: materialization leaves the bound
+    // variable untouched (materializing `μα.body` materializes `body`, not `α` itself).
     let visitor = ApplyTypeMappingVisitor::default();
-    let top_div = div.materialize(&db, MaterializationKind::Top, &visitor);
-    let bottom_div = div.materialize(&db, MaterializationKind::Bottom, &visitor);
+    assert_eq!(
+        div.materialize(&db, MaterializationKind::Top, &visitor),
+        div
+    );
+    assert_eq!(
+        div.materialize(&db, MaterializationKind::Bottom, &visitor),
+        div
+    );
 
-    assert!(top_div.is_divergent());
-    assert!(bottom_div.is_divergent());
-    assert!(!top_div.is_dynamic());
-    assert!(!bottom_div.is_dynamic());
-    assert!(!top_div.has_dynamic(&db));
-    assert!(!bottom_div.has_dynamic(&db));
-    assert!(top_div.is_object());
-    assert!(!top_div.is_never());
-    assert!(!bottom_div.is_object());
-    assert!(bottom_div.is_never());
-    assert_eq!(top_div.negate(&db), bottom_div);
-    assert_eq!(bottom_div.negate(&db), top_div);
+    // A divergent marker is a gradual leaf: it is neither `object` nor `Never`, its negation is
+    // itself (like `~Any == Any`), and it is assignable both to and from any type.
+    assert!(!div.is_object());
+    assert!(!div.is_never());
+    assert_eq!(div.negate(&db), div);
+    let int = KnownClass::Int.to_instance(&db);
+    assert!(div.is_assignable_to(&db, int));
+    assert!(int.is_assignable_to(&db, div));
     assert_eq!(IntersectionBuilder::new(&db).add_negative(div).build(), div);
-    assert_eq!(
-        IntersectionBuilder::new(&db).add_negative(top_div).build(),
-        bottom_div
-    );
-    assert_eq!(
-        IntersectionBuilder::new(&db)
-            .add_negative(bottom_div)
-            .build(),
-        top_div
-    );
-    assert!(
-        KnownClass::Int
-            .to_instance(&db)
-            .is_assignable_to(&db, top_div)
-    );
-    assert!(!top_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
-    assert!(bottom_div.is_assignable_to(&db, KnownClass::Int.to_instance(&db)));
-    assert!(
-        !KnownClass::Int
-            .to_instance(&db)
-            .is_assignable_to(&db, bottom_div)
-    );
-    assert_eq!(
-        top_div.member(&db, "__str__").place.expect_type(),
-        Type::object().member(&db, "__str__").place.expect_type()
-    );
-    assert_eq!(
-        top_div.member(&db, "__class__").place.expect_type(),
-        Type::object().dunder_class(&db)
-    );
-    assert!(top_div.try_upcast_to_callable(&db).is_none());
-    assert!(
-        top_div
-            .subscript(&db, Type::int_literal(0), ast::ExprContext::Load)
-            .is_err()
-    );
-    assert_eq!(top_div.recursive_type_normalized_impl(&db, div, true), None);
-    assert_eq!(
-        bottom_div.recursive_type_normalized_impl(&db, div, true),
-        None
-    );
+
+    // Normalizing the bare α-marker at a nested position propagates `None` (it collapses).
+    assert_eq!(div.recursive_type_normalized_impl(&db, div, true), None);
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.

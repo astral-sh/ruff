@@ -8,10 +8,7 @@ use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
-use super::{
-    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
-};
+use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -43,10 +40,6 @@ impl<'db> Type<'db> {
         matches!(
             self,
             Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
-                    ..
-                })
         )
     }
 

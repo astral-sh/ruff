@@ -1030,35 +1030,6 @@ impl<'db> Type<'db> {
         })
     }
 
-    /// If `self` is a materialized `Divergent` type, returns the concrete type it should
-    /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
-    /// Returns `None` if `self` is not `Divergent` or has not been materialized.
-    fn materialized_divergent_fallback(self) -> Option<Type<'db>> {
-        let Type::Divergent(divergent) = self else {
-            return None;
-        };
-
-        match divergent.materialization_kind() {
-            Some(MaterializationKind::Top) => Some(Type::object()),
-            Some(MaterializationKind::Bottom) => Some(Type::Never),
-            None => None,
-        }
-    }
-
-    /// Negating a divergent marker preserves the marker and flips its materialization, if any.
-    fn negated_divergent(self) -> Option<Type<'db>> {
-        let Type::Divergent(divergent) = self else {
-            return None;
-        };
-
-        Some(match divergent.materialization_kind() {
-            Some(materialization_kind) => {
-                Type::Divergent(divergent.materialized(materialization_kind.flip()))
-            }
-            None => Type::Divergent(divergent),
-        })
-    }
-
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
@@ -1067,14 +1038,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_never(&self) -> bool {
-        matches!(
-            self,
-            Type::Never
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Bottom),
-                    ..
-                })
-        )
+        matches!(self, Type::Never)
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -1258,14 +1222,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_dynamic(&self) -> bool {
-        matches!(
-            self,
-            Type::Dynamic(_)
-                | Type::Divergent(DivergentType {
-                    materialization: None,
-                    ..
-                })
-        )
+        matches!(self, Type::Dynamic(_) | Type::Divergent(_))
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
@@ -1837,13 +1794,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => *self,
 
-            Type::Divergent(_) => (*self)
-                .negated_divergent()
-                .expect("matched `Type::Divergent` above"),
+            // A divergent marker is a gradual leaf; its negation is itself (like `~Any == Any`).
+            Type::Divergent(_) => *self,
 
-            Type::Recursive(r) => Type::divergent(r.binder_id(db))
-                .negated_divergent()
-                .expect("Divergent always negates"),
+            Type::Recursive(r) => Type::divergent(r.binder_id(db)),
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
@@ -2542,10 +2496,6 @@ impl<'db> Type<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> Option<PlaceAndQualifiers<'db>> {
-        if let Some(fallback) = (*self).materialized_divergent_fallback() {
-            return fallback.find_name_in_mro_with_policy(db, name, policy);
-        }
-
         match self {
             Type::Union(union) => Some(union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.find_name_in_mro_with_policy(db, name, policy)
@@ -2894,9 +2844,6 @@ impl<'db> Type<'db> {
             instance.unwrap_or_else(|| Type::none(db)).display(db),
             owner.display(db)
         );
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.try_call_dunder_get(db, instance, owner);
-        }
 
         match self {
             Type::Callable(callable) if callable.is_staticmethod_like(db) => {
@@ -2991,32 +2938,6 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
-        if let PlaceAndQualifiers {
-            place:
-                Place::Defined(DefinedPlace {
-                    ty,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                }),
-            qualifiers,
-        } = attribute
-            && let Some(fallback) = ty.materialized_divergent_fallback()
-        {
-            return Self::try_call_dunder_get_on_attribute(
-                db,
-                Place::Defined(DefinedPlace {
-                    ty: fallback,
-                    origin,
-                    definedness,
-                    public_type_policy,
-                })
-                .with_qualifiers(qualifiers),
-                instance,
-                owner,
-            );
-        }
-
         match attribute {
             // This branch is not strictly needed, but it short-circuits the lookup of various dunder
             // methods and calls that would otherwise be made.
@@ -3334,9 +3255,6 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.member_lookup_with_policy(db, name, policy);
-        }
 
         if name == "__class__" {
             return Place::bound(self.dunder_class(db)).into();
@@ -3948,10 +3866,6 @@ impl<'db> Type<'db> {
     /// elements. It's usually best to only worry about "callability" relative to a particular
     /// argument list, via [`try_call`][Self::try_call] and [`CallErrorKind::NotCallable`].
     fn bindings(self, db: &'db dyn Db) -> Bindings<'db> {
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.bindings(db);
-        }
-
         match self {
             Type::Callable(callable) => {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
@@ -6142,15 +6056,11 @@ impl<'db> Type<'db> {
                     MaterializationKind::Bottom => Type::Never,
                 }
             }
-            // `Divergent` is an internal cycle marker rather than a gradual type like `Any` or
-            // `Unknown`. Preserve the marker across materialization, while recording whether this
-            // occurrence should behave like the top (`object`) or bottom (`Never`) bound.
+            // `Divergent` is the α-binder variable of an enclosing `Type::Recursive`, not a
+            // standalone gradual type: materialization leaves the bound variable untouched
+            // (materializing `μα.body` materializes `body`, leaving `α` bound). `ReplaceDivergent`
+            // substitutes a specific binder's marker (used by unfold and display).
             Type::Divergent(divergent) => match type_mapping {
-                TypeMapping::Materialize(materialization_kind) => {
-                    Type::Divergent(divergent.materialized(*materialization_kind))
-                }
-                // Replace a specific Divergent (matching binder_id) with the replacement.
-                // Used by display to substitute the α-binder marker with the source alias.
                 TypeMapping::ReplaceDivergent {
                     binder_id,
                     replacement,
@@ -7205,18 +7115,16 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-/// A type that is determined to be divergent during recursive type inference.
-/// This type must never be eliminated by dynamic type reduction
-/// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
-/// Otherwise, type inference cannot converge properly.
-/// For detailed properties of this type, see the unit test at the end of the file.
+/// The α-binder variable of a recursive (μ) type, minted during recursive type inference.
+///
+/// A `Divergent` is **only** the bound variable of an enclosing [`Type::Recursive`]: it is
+/// reached by unfolding that μ-binder, never operated on as a standalone type. It must never be
+/// eliminated by dynamic type reduction (e.g. `Divergent` is assignable to `@Todo`, but
+/// `@Todo | Divergent` must not be reduced to `@Todo`); otherwise type inference cannot converge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
 pub struct DivergentType {
     /// The query ID that caused the cycle.
     id: salsa::Id,
-    /// If this divergent marker has been materialized, preserve whether it should behave like the
-    /// top (`object`) or bottom (`Never`) bound while still remaining recognizable as divergent.
-    materialization: Option<MaterializationKind>,
 }
 
 // The Salsa heap is tracked separately.
@@ -7224,29 +7132,15 @@ impl get_size2::GetSize for DivergentType {}
 
 impl DivergentType {
     pub(crate) const fn new(id: salsa::Id) -> Self {
-        Self {
-            id,
-            materialization: None,
-        }
+        Self { id }
     }
 
-    pub(crate) const fn id(&self) -> salsa::Id {
+    pub(crate) const fn id(self) -> salsa::Id {
         self.id
     }
 
     fn same_marker(self, other: Self) -> bool {
         self.id == other.id
-    }
-
-    const fn materialized(self, kind: MaterializationKind) -> Self {
-        Self {
-            id: self.id,
-            materialization: Some(kind),
-        }
-    }
-
-    const fn materialization_kind(self) -> Option<MaterializationKind> {
-        self.materialization
     }
 }
 

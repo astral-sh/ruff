@@ -286,11 +286,14 @@ impl<'db> Type<'db> {
             // `T` is always a subtype of itself,
             // and `T` is always a subtype of `T | None`
             | Type::TypeVar(_)
+            // The α-binder variable of a μ-type is reflexively a subtype of itself, like a typevar.
+            // (Unlike `Dynamic`/`Any`, which is deliberately *not* reflexive so that `list[Any]` is
+            // not a subtype of `list[Any]`.)
+            | Type::Divergent(_)
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_)
              => true,
             Type::Dynamic(_)
-            | Type::Divergent(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -930,14 +933,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source: Type<'db>,
         target: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let Some(source) = source.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
-        if let Some(target) = target.materialized_divergent_fallback() {
-            return self.check_type_pair(db, source, target);
-        }
-
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -2324,14 +2319,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if let Some(left) = left.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
-        }
-
-        if let Some(right) = right.materialized_divergent_fallback() {
-            return self.check_type_pair(db, left, right);
-        }
-
         match (left, right) {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 

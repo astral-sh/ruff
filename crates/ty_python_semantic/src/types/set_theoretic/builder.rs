@@ -1450,9 +1450,10 @@ impl<'db> InnerIntersectionBuilder<'db> {
             return;
         }
 
-        if let Some(negated_divergent) = new_negative.negated_divergent() {
+        // `T & ~Divergent` -> `Divergent` (a divergent marker is gradual, so `~Divergent` is itself).
+        if new_negative.is_divergent() {
             *self = Self::default();
-            self.positive.insert(negated_divergent);
+            self.positive.insert(new_negative);
             return;
         }
 
