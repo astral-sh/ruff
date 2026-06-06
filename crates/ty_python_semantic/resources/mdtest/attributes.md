@@ -1918,6 +1918,26 @@ def _(cls: Intersection[type[A], Not[type[B]]]):
     reveal_type(cls.make())  # revealed: A & ~B
 ```
 
+### Classmethod binding skips exact class exclusions
+
+```py
+from typing_extensions import Self
+
+class A:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class Child(A): ...
+
+def _(cls: type[A]):
+    if cls is not A:
+        reveal_type(cls)  # revealed: type[A] & ~<class 'A'>
+        reveal_type(cls.make())  # revealed: A
+
+_(Child)
+```
+
 ### Classmethod binding skips negative metaclass constraints
 
 ```py

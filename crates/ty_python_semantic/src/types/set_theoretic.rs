@@ -814,11 +814,11 @@ impl<'db> IntersectionType<'db> {
         }
 
         for element in self.negative(db) {
-            if element.is_metaclass_instance(db) {
-                continue;
-            }
-            if let Some(instance) = element.to_instance(db) {
-                builder = builder.add_negative(instance);
+            // `~type[B]` excludes `B` and all of its subclasses, so their instances can be
+            // excluded from `Self`. An exact class exclusion such as `~<class 'B'>` does not
+            // exclude subclasses of `B`, and therefore does not exclude instances of `B`.
+            if let Type::SubclassOf(subclass_of) = element {
+                builder = builder.add_negative(subclass_of.to_instance(db));
             }
         }
 
