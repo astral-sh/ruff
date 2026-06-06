@@ -6,9 +6,9 @@ use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    TypedDictType, UnionType, todo_type,
+    FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownClass, MaterializationKind,
+    MemberLookupPolicy, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::definition::Definition;
@@ -161,14 +161,16 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
                 match mapped {
-                    // Until intersection meta-types are supported, use the union of the positive
-                    // class constraints as a sound over-approximation of `type[A & B]`.
-                    Type::Intersection(intersection) => UnionType::from_elements(
-                        db,
-                        intersection
-                            .positive_elements_or_object(db)
-                            .map(|element| element.to_meta_type(db)),
-                    ),
+                    Type::Intersection(intersection) => {
+                        let mut builder = IntersectionBuilder::new(db);
+                        for element in intersection.positive_elements_or_object(db) {
+                            builder = builder.add_positive(element.to_meta_type(db));
+                        }
+                        for element in intersection.negative(db) {
+                            builder = builder.add_negative(element.to_meta_type(db));
+                        }
+                        builder.build()
+                    }
                     _ => mapped.to_meta_type(db),
                 }
             }
