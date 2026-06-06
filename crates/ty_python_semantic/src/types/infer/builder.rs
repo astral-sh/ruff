@@ -8938,7 +8938,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // reveal_type(c.x)  # revealed: int
                 // ```
                 ApplicableConstraints::ConstrainedBindings(bindings) => {
-                    let scope = bindings.scope();
                     let reachability_constraints = bindings.reachability_constraints();
                     let predicates = bindings.predicates();
                     let mut union = UnionBuilder::new(db);
@@ -8946,7 +8945,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let static_reachability = evaluate_reachability_with_cache(
                             db,
                             Some(&self.reachability_cache),
-                            scope,
                             reachability_constraints,
                             predicates,
                             binding.reachability_constraint,

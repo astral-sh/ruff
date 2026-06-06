@@ -258,7 +258,7 @@ use crate::predicate::{PredicateOrLiteral, Predicates, PredicatesBuilder, Scoped
 use crate::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
 };
-use crate::scope::{FileScopeId, ScopeId, ScopeKind, ScopeLaziness};
+use crate::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::symbol::ScopedSymbolId;
 use crate::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
@@ -493,9 +493,6 @@ enum InternedEnclosingSnapshotId {
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct UseDefMap<'db> {
-    /// The scope this use-def map describes.
-    scope: ScopeId<'db>,
-
     /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
     /// this represents the implicit "unbound"/"undeclared" definition of every place.
     all_definitions: FrozenIndexVec<ScopedDefinitionId, DefinitionState<'db>>,
@@ -615,10 +612,6 @@ pub enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
-    pub fn scope(&self) -> ScopeId<'db> {
-        self.scope
-    }
-
     pub fn reachability_constraints(&self) -> &ReachabilityConstraints {
         &self.reachability_constraints
     }
@@ -943,7 +936,6 @@ impl<'db> UseDefMap<'db> {
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
-            scope: self.scope,
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             narrowing_constraints: &self.narrowing_constraints,
@@ -959,7 +951,6 @@ impl<'db> UseDefMap<'db> {
         boundness_analysis: BoundnessAnalysis,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
-            scope: self.scope,
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
             reachability_constraints: &self.reachability_constraints,
@@ -1001,7 +992,6 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
-    scope: ScopeId<'db>,
     all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
     predicates: &'map Predicates<'db>,
     narrowing_constraints: &'map NarrowingConstraints,
@@ -1011,10 +1001,6 @@ pub struct BindingWithConstraintsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
-    pub const fn scope(&self) -> ScopeId<'db> {
-        self.scope
-    }
-
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         self.predicates
     }
@@ -1079,7 +1065,6 @@ impl<'map, 'db> NarrowingEvaluator<'map, 'db> {
 
 #[derive(Clone)]
 pub struct DeclarationsIterator<'map, 'db> {
-    scope: ScopeId<'db>,
     all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
     predicates: &'map Predicates<'db>,
     reachability_constraints: &'map ReachabilityConstraints,
@@ -1088,10 +1073,6 @@ pub struct DeclarationsIterator<'map, 'db> {
 }
 
 impl<'map, 'db> DeclarationsIterator<'map, 'db> {
-    pub const fn scope(&self) -> ScopeId<'db> {
-        self.scope
-    }
-
     pub const fn predicates(&self) -> &'map Predicates<'db> {
         self.predicates
     }
@@ -1163,9 +1144,6 @@ pub(super) struct SingleSymbolSnapshot {
 
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
-    /// The scope this use-def map describes.
-    scope: ScopeId<'db>,
-
     /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
@@ -1225,9 +1203,8 @@ pub(super) struct UseDefMapBuilder<'db> {
 }
 
 impl<'db> UseDefMapBuilder<'db> {
-    pub(super) fn new(scope: ScopeId<'db>, is_class_scope: bool) -> Self {
+    pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
-            scope,
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             used_bindings: IndexVec::from_iter([false]),
             predicates: PredicatesBuilder::default(),
@@ -2051,7 +2028,6 @@ impl<'db> UseDefMapBuilder<'db> {
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
 
         UseDefMap {
-            scope: self.scope,
             all_definitions: self.all_definitions.into(),
             used_bindings: self.used_bindings.into(),
             predicates: self.predicates.build(),
