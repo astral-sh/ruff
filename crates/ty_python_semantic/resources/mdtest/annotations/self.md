@@ -362,6 +362,7 @@ ConcreteOwner().inspect(Both)
 ## Classmethods preserve generic receiver inference
 
 ```py
+from typing import overload
 from ty_extensions import Intersection
 
 class Factory:
@@ -369,10 +370,23 @@ class Factory:
     def make[T](cls: type[T]) -> T:
         return cls()
 
+    @overload
+    @classmethod
+    def overloaded_make[T](cls: type[T], value: int) -> T: ...
+    @overload
+    @classmethod
+    def overloaded_make[T](cls: type[T], value: str) -> tuple[T, T]: ...
+    @classmethod
+    def overloaded_make(cls, value: int | str):
+        raise NotImplementedError
+
 class Extra: ...
 
 def _(cls: Intersection[type[Factory], type[Extra]]):
     reveal_type(cls.make())  # revealed: Factory & Extra
+    reveal_type(cls.overloaded_make(1))  # revealed: Factory & Extra
+    # revealed: tuple[Factory & Extra, Factory & Extra]
+    reveal_type(cls.overloaded_make("one"))
 ```
 
 ## typing_extensions

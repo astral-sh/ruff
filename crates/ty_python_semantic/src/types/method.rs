@@ -101,6 +101,16 @@ impl<'db> BoundMethodType<'db> {
     ) -> SmallVec<[(usize, Signature<'db>); 1]> {
         let function_signature = self.function(db).signature(db);
         let typing_self_type = self.typing_self_type(db);
+        let self_instance = self.self_instance(db);
+        let bind_signature = |signature: &Signature<'db>| {
+            if self.function(db).is_classmethod(db)
+                && matches!(self_instance, Type::Intersection(_))
+            {
+                signature.bind_self_to_class_intersection(db, typing_self_type)
+            } else {
+                signature.bind_self(db, Some(typing_self_type))
+            }
+        };
 
         let [signature] = function_signature.overloads.as_slice() else {
             if !function_signature
@@ -112,31 +122,20 @@ impl<'db> BoundMethodType<'db> {
                     .overloads
                     .iter()
                     .enumerate()
-                    .map(|(index, signature)| {
-                        (index, signature.bind_self(db, Some(typing_self_type)))
-                    })
+                    .map(|(index, signature)| (index, bind_signature(signature)))
                     .collect();
             }
 
-            let self_instance = self.self_instance(db);
             return function_signature
                 .overloads
                 .iter()
                 .enumerate()
                 .filter(|(_, signature)| signature.can_bind_self_to(db, self_instance))
-                .map(|(index, signature)| (index, signature.bind_self(db, Some(typing_self_type))))
+                .map(|(index, signature)| (index, bind_signature(signature)))
                 .collect();
         };
 
-        let self_instance = self.self_instance(db);
-        let signature = if self.function(db).is_classmethod(db)
-            && matches!(self_instance, Type::Intersection(_))
-        {
-            signature.bind_self_to_class_intersection(db, typing_self_type)
-        } else {
-            signature.bind_self(db, Some(typing_self_type))
-        };
-        smallvec::smallvec![(0, signature)]
+        smallvec::smallvec![(0, bind_signature(signature))]
     }
 
     pub(super) fn recursive_type_normalized_impl(
