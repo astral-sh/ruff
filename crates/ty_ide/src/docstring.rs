@@ -194,8 +194,12 @@ fn render_markdown(docstring: &str) -> String {
     } else {
         Cow::Borrowed(docstring)
     };
-    let docstring = structured::Docstring::parse(rest_rendered.as_ref(), structured::Style::Google)
-        .render_markdown();
+    let google_rendered =
+        structured::Docstring::parse(rest_rendered.as_ref(), structured::Style::Google)
+            .render_markdown();
+    let docstring =
+        structured::Docstring::parse(google_rendered.as_ref(), structured::Style::Numpy)
+            .render_markdown();
 
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
@@ -1226,6 +1230,242 @@ Returns:
         ");
     }
 
+    #[test]
+    fn structured_sections_preserve_doctest_closing_blanks() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(
+            "\
+Args:
+    value: Example.
+        >>> value
+        1
+
+After."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `value`: Example.<HB>
+        ```````````python
+            >>> value
+            1
+        ```````````<HB>
+        After.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+value : int
+    Example.
+    >>> value
+    1
+
+Returns
+-------
+bool
+    Done."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `value` (`int`): Example.<HB>
+        ```````````python
+            >>> value
+            1
+        ```````````<HB>
+        ## Returns<HB>
+        `bool`: Done.
+        ");
+    }
+
+    #[test]
+    fn numpy_sections_render_attributes_and_raises() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(
+            "\
+Attributes
+----------
+name : str
+    Display name.
+
+Raises
+------
+ValueError
+    If invalid.
+TypeError : If wrong type.
+RuntimeError : If unavailable.
+    Retry later.
+This paragraph is not an exception."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Attributes<HB>
+        `name` (`str`): Display name.<HB>
+        <HB>
+        ## Raises<HB>
+        `ValueError`: If invalid.<HB>
+        `TypeError`: If wrong type.<HB>
+        `RuntimeError`: If unavailable.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Retry later.<HB>
+        This paragraph is not an exception.
+        ");
+    }
+
+    #[test]
+    fn numpy_sections_stop_before_following_paragraph() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+name : str
+    Display name.
+    if name:
+        return name
+This paragraph is not a parameter.
+
+Returns
+-------
+str
+    Display result.
+This paragraph is not a return."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `name` (`str`): Display name.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;if name:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return name<HB>
+        This paragraph is not a parameter.<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: Display result.<HB>
+        This paragraph is not a return.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+str
+This paragraph is not a type-only return."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Returns<HB>
+        `str`<HB>
+        This paragraph is not a type-only return.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+The created object"
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Returns<HB>
+        -------<HB>
+        The created object
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Parameters
+    ----------
+name : str
+    Display name."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Parameters<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;----------<HB>
+        name : str<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Display name.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+    The created object."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Returns<HB>
+        -------<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The created object.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+    The created object"
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        Returns<HB>
+        -------<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The created object
+        ");
+    }
+
+    #[test]
+    fn numpy_sections_preserve_anonymous_return_paragraph_breaks() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(
+            "\
+Summary.
+
+Returns
+-------
+Literal[\"header : value\", \"http://\"]
+    First paragraph.
+
+    Second paragraph."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Summary.<HB>
+        <HB>
+        ## Returns<HB>
+        `Literal["header : value", "http://"]`: First paragraph.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Second paragraph.
+        "#);
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+int
+    First value.
+str
+    Second value."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Returns<HB>
+        `int`: First value.<HB>
+        `str`: Second value.
+        ");
+    }
+
     // A literal block where the `::`  with the paragraph
     // and should be erased
     #[test]
@@ -1853,10 +2093,14 @@ Returns:
         let docstring = r#"
         This is a function description
 
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
+        >>> help(thing.do_thing)
+        Args:
+            value: from help output
+        >>> help(thing.do_other_thing)
+        Parameters
+        ----------
+        value : int
+            from help output
 
         As you can see it did the thing!
         "#;
@@ -1867,10 +2111,14 @@ Returns:
         This is a function description<HB>
         <HB>
         ```````````python
-        >>> thing.do_thing()
-        wow it did the thing
-        >>> thing.do_other_thing()
-        it sure did the thing
+        >>> help(thing.do_thing)
+        Args:
+            value: from help output
+        >>> help(thing.do_other_thing)
+        Parameters
+        ----------
+        value : int
+            from help output
         ```````````<HB>
         As you can see it did the thing!
         ");
@@ -2044,16 +2292,21 @@ Returns:
         ----------
         param1 : str
             The first parameter description
+
         param2 : int
             The second parameter description
             This is a continuation of param2 description.
+
         param3
             A parameter without type annotation
 
         Returns
         -------
-        str
+        result : str
             The return value description
+
+        warnings : list[str]
+            Warnings that were collected.
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
@@ -2080,35 +2333,35 @@ Returns:
         ----------
         param1 : str
             The first parameter description
+
         param2 : int
             The second parameter description
             This is a continuation of param2 description.
+
         param3
             A parameter without type annotation
 
         Returns
         -------
-        str
+        result : str
             The return value description
+
+        warnings : list[str]
+            Warnings that were collected.
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        `param3`: A parameter without type annotation<HB>
         <HB>
-        Returns<HB>
-        -------<HB>
-        str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        ## Returns<HB>
+        `result` (`str`): The return value description<HB>
+        `warnings` (`list[str]`): Warnings that were collected.
         ");
     }
 
@@ -2238,10 +2491,8 @@ Returns:
         `param1` (`str`): Google-style parameter<HB>
         `param2` (`int`): Another Google-style parameter<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param3 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters<HB>
+        `param3` (`bool`): NumPy-style parameter
         ");
     }
 
@@ -2365,10 +2616,8 @@ Returns:
         `param2` (`int`): reST-style parameter<HB>
         `param3`: Another reST-style parameter<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param4 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters<HB>
+        `param4` (`bool`): NumPy-style parameter
         ");
     }
 
@@ -2433,20 +2682,14 @@ Returns:
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        `param3`: A parameter without type annotation<HB>
         <HB>
-        Returns<HB>
-        -------<HB>
-        str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -2502,15 +2745,11 @@ Returns:
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        `param3`: A parameter without type annotation
         ");
     }
 
