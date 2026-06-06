@@ -163,7 +163,7 @@ impl<'db> SequencePatternPredicateKind<'db> {
         self.patterns.len() == 1 && self.has_star
     }
 
-    pub fn is_exact_length(&self) -> bool {
+    pub const fn is_exact_length(&self) -> bool {
         !self.has_star
     }
 
