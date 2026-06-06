@@ -167,7 +167,9 @@ impl<'db> SubclassOfType<'db> {
                             builder = builder.add_positive(element.to_meta_type(db));
                         }
                         for element in intersection.negative(db) {
-                            builder = builder.add_negative(element.to_meta_type(db));
+                            if let Some(meta_type) = Self::try_from_instance(db, *element) {
+                                builder = builder.add_negative(meta_type);
+                            }
                         }
                         builder.build()
                     }

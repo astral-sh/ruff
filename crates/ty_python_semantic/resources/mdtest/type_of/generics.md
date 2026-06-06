@@ -320,6 +320,7 @@ def _[T](x: X[type[T]]):
 
 ```py
 from typing import Callable
+from ty_extensions import Intersection, Not
 
 def f1[T](x: type[T]) -> type[T]:
     return x
@@ -335,6 +336,21 @@ reveal_type(f2(object()))  # revealed: type
 
 reveal_type(f2(1))  # revealed: <class 'int'>
 reveal_type(f2(type))  # revealed: <class 'type'>
+
+def runtime_type[T](x: T) -> type[T]:
+    return type(x)
+
+def _(x: int):
+    if x != 1:
+        reveal_type(runtime_type(x))  # revealed: type[int]
+        if runtime_type(x) is int:
+            reveal_type(x)  # revealed: int & ~Literal[1]
+
+class A: ...
+class B: ...
+
+def _(x: Intersection[A, Not[B]]):
+    reveal_type(runtime_type(x))  # revealed: type[A] & ~type[B]
 
 def foo() -> int:
     return 1
