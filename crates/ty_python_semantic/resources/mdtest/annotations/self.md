@@ -375,12 +375,16 @@ class Value:
     def copy_from(self, other: Self) -> Self:
         raise NotImplementedError
 
+    def choose[T = Self](self) -> tuple[T, Self]:
+        raise NotImplementedError
+
 class Extra: ...
 
 def _(value: Intersection[Value, Extra], plain: Value):
     reveal_type(value.copy_from(value))  # revealed: Value & Extra
     # error: [invalid-argument-type]
     reveal_type(value.copy_from(plain))  # revealed: Value & Extra
+    reveal_type(value.choose())  # revealed: tuple[Value & Extra, Value & Extra]
 
 class MixedRefinementMarker(Protocol):
     marker: int

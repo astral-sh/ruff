@@ -1059,8 +1059,16 @@ impl<'db> Signature<'db> {
         let return_ty =
             self.return_ty
                 .apply_type_mapping(db, &self_mapping, TypeContext::default());
+        let generic_context = self.generic_context.map(|generic_context| {
+            GenericContext::from_typevar_instances(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| typevar.apply_type_mapping_to_default(db, &self_mapping)),
+            )
+        });
         Self {
-            generic_context: self.generic_context,
+            generic_context,
             definition: self.definition,
             parameters,
             return_ty,

@@ -819,6 +819,34 @@ impl<'db> BoundTypeVarInstance<'db> {
         )
     }
 
+    pub(crate) fn apply_type_mapping_to_default<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+    ) -> Self {
+        let Some(default) = self.default_type(db) else {
+            return self;
+        };
+        let mapped_default = default.apply_type_mapping(db, type_mapping, TypeContext::default());
+        if mapped_default == default {
+            return self;
+        }
+
+        let typevar = TypeVarInstance::new(
+            db,
+            self.typevar(db).identity(db),
+            self.typevar(db)._bound_or_constraints(db),
+            self.typevar(db).explicit_variance(db),
+            Some(TypeVarDefaultEvaluation::Eager(mapped_default)),
+        );
+        Self::new(
+            db,
+            typevar,
+            self.binding_context(db),
+            self.paramspec_attr(db),
+        )
+    }
+
     pub(crate) fn variance_with_polarity(
         self,
         db: &'db dyn Db,
