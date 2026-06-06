@@ -240,6 +240,7 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
+use std::ops::Range;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -416,19 +417,13 @@ impl PlaceStateInterner {
 /// ranges into one contiguous array instead.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct RetainedBindings {
-    ranges: FrozenIndexVec<InternedBindingsId, RetainedBindingsRange>,
+    ranges: FrozenIndexVec<InternedBindingsId, Range<u32>>,
     live_bindings: Box<[LiveBinding]>,
 }
 
 struct RetainedBindingsBuilder {
-    ranges: IndexVec<InternedBindingsId, RetainedBindingsRange>,
+    ranges: IndexVec<InternedBindingsId, Range<u32>>,
     live_bindings: Vec<LiveBinding>,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct RetainedBindingsRange {
-    start: u32,
-    end: u32,
 }
 
 impl RetainedBindingsBuilder {
@@ -448,7 +443,7 @@ impl RetainedBindingsBuilder {
         self.live_bindings.extend_from_slice(bindings.as_slice());
         debug_assert!(u32::try_from(self.live_bindings.len()).is_ok());
         let end = self.live_bindings.len() as u32;
-        self.ranges.push(RetainedBindingsRange { start, end })
+        self.ranges.push(start..end)
     }
 
     fn finish(
@@ -470,7 +465,7 @@ impl RetainedBindingsBuilder {
 
 impl RetainedBindings {
     fn get(&self, id: InternedBindingsId) -> &[LiveBinding] {
-        let RetainedBindingsRange { start, end } = self.ranges[id];
+        let Range { start, end } = self.ranges[id];
         &self.live_bindings[start as usize..end as usize]
     }
 }
