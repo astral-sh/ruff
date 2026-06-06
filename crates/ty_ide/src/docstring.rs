@@ -8,10 +8,6 @@
 
 mod markdown;
 mod rest;
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "wired into reST rendering in a follow-up change")
-)]
 mod sections;
 
 use indexmap::IndexMap;
@@ -191,6 +187,13 @@ fn render_markdown(docstring: &str) -> String {
     // break out of it, even if they're writing python documentation about markdown
     // code fences and are showing off how you can use more than 3 backticks.
     const FENCE: &str = "```````````";
+
+    let docstring = if rest::may_contain_top_level_field_list(docstring) {
+        rest::Docstring::parse(docstring).render_markdown()
+    } else {
+        Cow::Borrowed(docstring)
+    };
+
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
     // While rendering this we should make note of all the `singletick` locations
@@ -1972,12 +1975,14 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        :param str param1: The first parameter description<HB>
-        :param int param2: The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        :param param3: A parameter without type annotation<HB>
-        :returns: The return value description<HB>
-        :rtype: str
+        `param3`: A parameter without type annotation<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -2041,8 +2046,9 @@ mod tests {
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
         <HB>
-        :param int param2: reST-style parameter<HB>
-        :param param3: Another reST-style parameter<HB>
+        ## Parameters<HB>
+        `param2` (`int`): reST-style parameter<HB>
+        `param3`: Another reST-style parameter<HB>
         <HB>
         Parameters<HB>
         ----------<HB>
