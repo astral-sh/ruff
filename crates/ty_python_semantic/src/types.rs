@@ -1064,6 +1064,31 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Adds an inherited generic context to callable elements of this type.
+    fn with_inherited_generic_context(
+        self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Self {
+        match self {
+            Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function.with_inherited_generic_context(db, generic_context))
+            }
+            Type::Callable(callable) => Type::Callable(CallableType::new(
+                db,
+                callable
+                    .signatures(db)
+                    .with_inherited_generic_context(db, generic_context),
+                callable.kind(db),
+                callable.provenance(db),
+            )),
+            Type::Union(union) => union.map(db, |element| {
+                element.with_inherited_generic_context(db, generic_context)
+            }),
+            _ => self,
+        }
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -2986,16 +3011,8 @@ impl<'db> Type<'db> {
                 let return_ty = if ty.is_instance_of(db, KnownClass::Staticmethod)
                     && let Type::ClassLiteral(class) = owner
                     && let Some(generic_context) = class.generic_context(db)
-                    && let Type::Callable(callable) = return_ty
                 {
-                    Type::Callable(CallableType::new(
-                        db,
-                        callable
-                            .signatures(db)
-                            .with_inherited_generic_context(db, generic_context),
-                        callable.kind(db),
-                        callable.provenance(db),
-                    ))
+                    return_ty.with_inherited_generic_context(db, generic_context)
                 } else {
                     return_ty
                 };

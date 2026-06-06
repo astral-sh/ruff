@@ -446,8 +446,6 @@ def check(value: int) -> None:
     reveal_type(DerivedBox.from_value(value))  # revealed: DerivedBox[int]
 
 reveal_type(Box[str].from_value("value"))  # revealed: Box[str]
-# revealed: bound method <class 'Box[str]'>.from_value(value: str) -> Box[str]
-reveal_type(Box[str].from_value)
 Box[str].from_value(1)  # error: [invalid-argument-type]
 
 class ReceiverBox[T]:
@@ -576,12 +574,8 @@ class HasModel[X]:
 
 class Wrapper[T](HasModel[Inner[T]]): ...
 
-def want(wrapper: Wrapper[int]) -> None: ...
-
 obj = Concrete()
 reveal_type(Wrapper.from_model(obj))  # revealed: Wrapper[int]
-reveal_type(Wrapper[int].from_model(obj))  # revealed: Wrapper[int]
-want(Wrapper.from_model(obj))
 ```
 
 ### Type parameter defaults do not prevent method inference

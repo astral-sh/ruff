@@ -992,30 +992,6 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        fn with_inherited_generic_context<'d>(
-            db: &'d dyn Db,
-            ty: Type<'d>,
-            generic_context: GenericContext<'d>,
-        ) -> Type<'d> {
-            match ty {
-                Type::FunctionLiteral(function) => Type::FunctionLiteral(
-                    function.with_inherited_generic_context(db, generic_context),
-                ),
-                Type::Callable(callable) => Type::Callable(CallableType::new(
-                    db,
-                    callable
-                        .signatures(db)
-                        .with_inherited_generic_context(db, generic_context),
-                    callable.kind(db),
-                    callable.provenance(db),
-                )),
-                Type::Union(union) => union.map(db, |element| {
-                    with_inherited_generic_context(db, *element, generic_context)
-                }),
-                _ => ty,
-            }
-        }
-
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
                 Type::Callable(callable_ty) => Type::Callable(CallableType::new(
@@ -1048,7 +1024,7 @@ impl<'db> StaticClassLiteral<'db> {
                     name,
                     policy,
                 )
-                .map_type(|ty| with_inherited_generic_context(db, ty, generic_context));
+                .map_type(|ty| ty.with_inherited_generic_context(db, generic_context));
         }
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
