@@ -152,7 +152,7 @@ impl ClassPatternKind {
 /// whether the pattern accepts additional sequence elements.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
-    pub patterns: Vec<PatternPredicateKind<'db>>,
+    pub patterns: Box<[PatternPredicateKind<'db>]>,
     pub has_star: bool,
 }
 
