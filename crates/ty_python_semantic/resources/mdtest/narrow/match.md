@@ -372,10 +372,11 @@ def test_match_sequence_alias_preserves_constrained_typevar(
 
 def test_match_sequence_alias_narrows_constrained_typevar(
     value: PartiallyMatchedSequenceT,
-) -> tuple[int]:
+) -> PartiallyMatchedSequenceT:
     match value:
         case [_] as whole:
-            reveal_type(whole)  # revealed: tuple[int]
+            # revealed: PartiallyMatchedSequenceT@test_match_sequence_alias_narrows_constrained_typevar & tuple[int]
+            reveal_type(whole)
             return whole
         case _:
             raise ValueError
