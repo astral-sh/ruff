@@ -7,7 +7,7 @@ use crate::suppression::{
     IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
 };
 use crate::types::check_types;
-pub use db::{Db, LoopHeaderPredicateCache};
+pub use db::Db;
 pub use diagnostic::{
     add_inferred_python_version_hint_to_diagnostic, inferred_python_version_source_annotation,
 };

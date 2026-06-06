@@ -1240,7 +1240,6 @@ fn loop_header_reachability_impl<'db>(
                 db,
                 scope,
                 loop_header_definition.loop_token(),
-                place,
                 recursive_collection,
                 live_binding.reachability_constraint(),
             )

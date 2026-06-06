@@ -582,15 +582,9 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
         id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        if db.loop_header_predicate_cache().is_active_for(predicates) {
-            evaluate_constraint(self, id, |predicate| {
-                analyze_single_with_loop_header_cache(db, predicates, None, None, predicate)
-            })
-        } else {
-            evaluate_constraint(self, id, |predicate| {
-                analyze_single(db, &predicates[predicate])
-            })
-        }
+        evaluate_constraint(self, id, |predicate| {
+            analyze_single(db, &predicates[predicate])
+        })
     }
 }
 
@@ -849,22 +843,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[predicate_id];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    let truthiness = if self
-                        .db
-                        .loop_header_predicate_cache()
-                        .is_active_for(self.predicates)
-                    {
-                        analyze_single_with_loop_header_cache(
-                            self.db,
-                            self.predicates,
-                            None,
-                            None,
-                            predicate_id,
-                        )
-                    } else {
-                        analyze_single(self.db, &predicate)
-                    };
-                    match truthiness {
+                    match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => self.project(node.if_true()),
                         Truthiness::AlwaysFalse => self.project(node.if_false()),
                         Truthiness::Ambiguous => {
@@ -1088,43 +1067,15 @@ fn analyze_single_pattern_predicate_kind<'db>(
     }
 }
 
-fn with_loop_header_predicate_cache<T>(
-    db: &dyn Db,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'_>>,
-    f: impl FnOnce() -> T,
-) -> T {
-    db.loop_header_predicate_cache().with_scope(predicates, f)
-}
-
-fn analyze_single_with_loop_header_cache<'db>(
+fn analyze_loop_header_predicate<'db>(
     db: &'db dyn Db,
-    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    terminal_predicates: Option<&LoopCarriedTerminalPredicates>,
-    loop_token: Option<LoopToken<'db>>,
-    predicate: ScopedPredicateId,
+    predicate_node: &Predicate<'db>,
+    type_truthinesses: &mut FxHashMap<Type<'db>, Truthiness>,
 ) -> Truthiness {
-    let cache = db.loop_header_predicate_cache();
-    let predicate_node = &predicates[predicate];
-    if loop_token.is_some()
-        && let Some(truthiness) = cache.get_globally_persistent(predicates, predicate)
-    {
-        return truthiness;
-    }
-
-    let persistent = matches!(predicate_node.node, PredicateNode::IsNonTerminalCall(_));
-    let cycle_initial = match predicate_node.node {
-        PredicateNode::IsNonTerminalCall(_)
-            if terminal_predicates.is_some_and(|terminal| terminal.contains(predicate)) =>
-        {
-            Truthiness::AlwaysFalse.negate_if(!predicate_node.is_positive)
-        }
-        PredicateNode::IsNonTerminalCall(_) => Truthiness::AlwaysTrue,
-        _ => Truthiness::Ambiguous,
-    };
-    if let Some(truthiness) =
-        cache.get_or_prepare(predicates, loop_token, predicate, cycle_initial, persistent)
-    {
-        return truthiness;
+    if let PredicateNode::Expression(expression) = predicate_node.node {
+        let ty = infer_expression_type(db, expression, TypeContext::default());
+        let truthiness = *type_truthinesses.entry(ty).or_insert_with(|| ty.bool(db));
+        return truthiness.negate_if(!predicate_node.is_positive);
     }
 
     if let PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) =
@@ -1142,15 +1093,12 @@ fn analyze_single_with_loop_header_cache<'db>(
                 ExplicitFunctionReturn::Unknown => None,
             };
             if let Some(truthiness) = truthiness {
-                cache.insert(predicates, None, predicate, truthiness, true);
                 return truthiness;
             }
         }
     }
 
-    let result = analyze_single(db, predicate_node);
-    cache.insert(predicates, loop_token, predicate, result, persistent);
-    result
+    analyze_single(db, predicate_node)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1460,27 +1408,22 @@ fn loop_carried_function_return_type<'db>(
     Some(definition_expression_type(db, definition, returns))
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct LoopHeaderPredicateTruthinesses {
+    analyses: FxHashMap<ScopedPredicateId, LoopHeaderPredicateAnalysis>,
+    complete_places: FxHashSet<ScopedPlaceId>,
+    complete: bool,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 struct LoopHeaderPredicateAnalysis {
     truthiness: Truthiness,
     stable: bool,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct LoopHeaderPredicateTruthinesses {
-    analyses: FxHashMap<ScopedPredicateId, LoopHeaderPredicateAnalysis>,
-    complete: bool,
-}
-
 impl LoopHeaderPredicateTruthinesses {
-    fn get(&self, predicate: ScopedPredicateId) -> LoopHeaderPredicateAnalysis {
-        self.analyses
-            .get(&predicate)
-            .copied()
-            .unwrap_or(LoopHeaderPredicateAnalysis {
-                truthiness: Truthiness::Ambiguous,
-                stable: true,
-            })
+    fn get(&self, predicate: ScopedPredicateId) -> Option<LoopHeaderPredicateAnalysis> {
+        self.analyses.get(&predicate).copied()
     }
 }
 
@@ -1637,6 +1580,82 @@ fn scope_loop_header_places<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> ScopeL
     )
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct ScopeLoopPredicateMetadata {
+    bare_name_places: FxHashMap<ScopedPredicateId, ScopedPlaceId>,
+    loop_dependent: FxHashSet<ScopedPredicateId>,
+}
+
+#[salsa::tracked(
+    returns(ref),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn scope_loop_predicate_metadata<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+) -> ScopeLoopPredicateMetadata {
+    let use_def = use_def_map(db, scope);
+    let place_table = place_table(db, scope);
+    let loop_places = scope_loop_header_places(db, scope);
+    let mut metadata = ScopeLoopPredicateMetadata::default();
+
+    for node in use_def.reachability_constraints().used_interiors() {
+        let predicate = node.atom();
+        let predicate_node = &use_def.predicates()[predicate];
+        let PredicateNode::Expression(expression) = predicate_node.node else {
+            continue;
+        };
+        if let Some(place) = bare_name_place(db, scope, predicate_node) {
+            metadata.bare_name_places.insert(predicate, place);
+        }
+        if expression_depends_on_loop(db, place_table, loop_places.as_set(), expression) {
+            metadata.loop_dependent.insert(predicate);
+        }
+    }
+
+    metadata.bare_name_places.shrink_to_fit();
+    metadata.loop_dependent.shrink_to_fit();
+    metadata
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct LoopDeletedPlaces(FxHashSet<ScopedPlaceId>);
+
+impl LoopDeletedPlaces {
+    fn contains(&self, place: ScopedPlaceId) -> bool {
+        self.0.contains(&place)
+    }
+}
+
+#[salsa::tracked(
+    returns(ref),
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn loop_deleted_places<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    loop_token: LoopToken<'db>,
+) -> LoopDeletedPlaces {
+    let use_def = use_def_map(db, scope);
+    let loop_header = get_loop_header(db, loop_token);
+    LoopDeletedPlaces(
+        loop_header
+            .definitions()
+            .filter_map(|(place, _)| {
+                loop_header
+                    .bindings_for_place(place)
+                    .any(|binding| {
+                        matches!(
+                            use_def.definition(binding.binding()),
+                            DefinitionState::Deleted
+                        )
+                    })
+                    .then_some(place)
+            })
+            .collect(),
+    )
+}
+
 /// Returns `true` for collection accumulators whose initial element type cannot be inferred until
 /// their loop-back bindings have been evaluated.
 pub(crate) fn loop_header_requires_recursive_collection_analysis<'db>(
@@ -1651,28 +1670,26 @@ pub(crate) fn loop_header_requires_recursive_collection_analysis<'db>(
     recursive_collection_places(db, scope, loop_header.loop_token()).contains(loop_header.place())
 }
 
-/// Analyze the predicates used by one loop-header place.
+/// Analyze the predicates used by one loop header.
 ///
-/// Once a non-name expression is ambiguous, widening its input types cannot make it statically true
-/// or false. An ambiguous bare name normally has the same property, except when a `del` binding for
-/// that place is part of the loop: the name can become definitely bound after reachability settles.
-/// Those names remain part of the outer loop-header cycle until reachability settles.
+/// The self-dependency forms a fixed point local to one syntactic loop. Predicates that cannot
+/// change as loop-carried types widen are retained between iterations; loop-dependent predicates
+/// remain part of the outer Salsa cycle. Batching all places avoids rescanning the scope per place,
+/// while the loop token keeps sequential and nested loops in separate fixed points.
 fn loop_header_predicate_truthinesses_cycle_recover<'db>(
-    db: &'db dyn Db,
+    _db: &'db dyn Db,
     _cycle: &salsa::Cycle,
     _previous: &LoopHeaderPredicateTruthinesses,
     result: LoopHeaderPredicateTruthinesses,
     _scope: ScopeId<'db>,
     _loop_token: LoopToken<'db>,
-    _place: ScopedPlaceId,
 ) -> LoopHeaderPredicateTruthinesses {
-    db.loop_header_predicate_cache().next_cycle_iteration();
     result
 }
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _, _| LoopHeaderPredicateTruthinesses::default(),
+    cycle_initial = |_, _, _, _| LoopHeaderPredicateTruthinesses::default(),
     cycle_fn = loop_header_predicate_truthinesses_cycle_recover,
     heap_size = get_size2::GetSize::get_heap_size
 )]
@@ -1680,9 +1697,8 @@ fn loop_header_predicate_truthinesses<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     loop_token: LoopToken<'db>,
-    place: ScopedPlaceId,
 ) -> LoopHeaderPredicateTruthinesses {
-    let previous = loop_header_predicate_truthinesses(db, scope, loop_token, place);
+    let previous = loop_header_predicate_truthinesses(db, scope, loop_token);
     if previous.complete {
         return previous.clone();
     }
@@ -1690,107 +1706,89 @@ fn loop_header_predicate_truthinesses<'db>(
     let use_def = use_def_map(db, scope);
     let constraints = use_def.reachability_constraints();
     let loop_header = get_loop_header(db, loop_token);
-    let terminal_predicates = loop_carried_terminal_predicates(db, scope, loop_token);
-    let loop_places = scope_loop_header_places(db, scope);
-    let place_table = place_table(db, scope);
-    let mut analyses = FxHashMap::default();
+    let predicate_metadata = scope_loop_predicate_metadata(db, scope);
+    let deleted_places = loop_deleted_places(db, scope, loop_token);
+    let mut analyses: FxHashMap<_, _> = previous
+        .analyses
+        .iter()
+        .filter(|(_, analysis)| analysis.stable)
+        .map(|(&predicate, &analysis)| (predicate, analysis))
+        .collect();
+    let mut complete_places = previous.complete_places.clone();
+    let mut type_truthinesses = FxHashMap::default();
 
-    with_loop_header_predicate_cache(db, use_def.predicates(), || {
+    for (place, _) in loop_header.definitions() {
+        if complete_places.contains(&place) {
+            continue;
+        }
+
+        let mut place_is_stable = true;
         for binding in loop_header.bindings_for_place(place) {
             evaluate_constraint(
                 constraints,
                 binding.reachability_constraint(),
                 |predicate| {
-                    analyses
-                        .entry(predicate)
-                        .or_insert_with(|| {
-                            if let Some(previous) = previous.analyses.get(&predicate)
-                                && previous.stable
-                            {
-                                return *previous;
-                            }
-
-                            let predicate_node = &use_def.predicates()[predicate];
-                            let truthiness = analyze_single_with_loop_header_cache(
-                                db,
-                                use_def.predicates(),
-                                Some(terminal_predicates),
-                                Some(loop_token),
-                                predicate,
-                            );
-                            let nonterminal_call_is_globally_stable =
-                                matches!(predicate_node.node, PredicateNode::IsNonTerminalCall(_))
-                                    && truthiness.is_always_true();
-                            let (expression_is_globally_stable, expression_is_loop_stable) =
-                                if let PredicateNode::Expression(expression) = predicate_node.node {
-                                    let can_become_bound = bare_name_place(
-                                        db,
-                                        scope,
-                                        predicate_node,
-                                    )
-                                    .is_some_and(|place| {
-                                        loop_header.bindings_for_place(place).any(|binding| {
-                                            matches!(
-                                                use_def.definition(binding.binding()),
-                                                DefinitionState::Deleted
-                                            )
-                                        })
-                                    });
-                                    if truthiness.is_ambiguous() {
-                                        if !can_become_bound {
-                                            (true, false)
-                                        } else {
-                                            let previous_was_ambiguous =
-                                                previous.analyses.get(&predicate).is_some_and(
-                                                    |analysis| analysis.truthiness.is_ambiguous(),
-                                                );
-                                            (false, previous_was_ambiguous)
-                                        }
+                    let analysis = analyses.entry(predicate).or_insert_with(|| {
+                        let predicate_node = &use_def.predicates()[predicate];
+                        let truthiness = analyze_loop_header_predicate(
+                            db,
+                            predicate_node,
+                            &mut type_truthinesses,
+                        );
+                        let nonterminal_call_is_globally_stable =
+                            matches!(predicate_node.node, PredicateNode::IsNonTerminalCall(_))
+                                && truthiness.is_always_true();
+                        let (expression_is_globally_stable, expression_is_loop_stable) =
+                            if matches!(predicate_node.node, PredicateNode::Expression(_)) {
+                                let can_become_bound = predicate_metadata
+                                    .bare_name_places
+                                    .get(&predicate)
+                                    .is_some_and(|&place| deleted_places.contains(place));
+                                if truthiness.is_ambiguous() {
+                                    if !can_become_bound {
+                                        (true, false)
                                     } else {
-                                        (
-                                            false,
-                                            !expression_depends_on_loop(
-                                                db,
-                                                place_table,
-                                                loop_places.as_set(),
-                                                expression,
-                                            ),
-                                        )
+                                        let previous_was_ambiguous =
+                                            previous.analyses.get(&predicate).is_some_and(
+                                                |analysis| analysis.truthiness.is_ambiguous(),
+                                            );
+                                        (false, previous_was_ambiguous)
                                     }
                                 } else {
-                                    (false, false)
-                                };
+                                    (
+                                        false,
+                                        !predicate_metadata.loop_dependent.contains(&predicate),
+                                    )
+                                }
+                            } else {
+                                (false, false)
+                            };
 
-                            let globally_stable = nonterminal_call_is_globally_stable
-                                || expression_is_globally_stable;
-                            let stable = globally_stable || expression_is_loop_stable;
-                            if globally_stable {
-                                db.loop_header_predicate_cache().insert(
-                                    use_def.predicates(),
-                                    None,
-                                    predicate,
-                                    truthiness,
-                                    true,
-                                );
-                            } else if stable {
-                                db.loop_header_predicate_cache().mark_persistent(
-                                    use_def.predicates(),
-                                    Some(loop_token),
-                                    predicate,
-                                );
-                            }
-
-                            LoopHeaderPredicateAnalysis { truthiness, stable }
-                        })
-                        .truthiness
+                        LoopHeaderPredicateAnalysis {
+                            truthiness,
+                            stable: nonterminal_call_is_globally_stable
+                                || expression_is_globally_stable
+                                || expression_is_loop_stable,
+                        }
+                    });
+                    place_is_stable &= analysis.stable;
+                    analysis.truthiness
                 },
             );
         }
-    });
+        if place_is_stable {
+            complete_places.insert(place);
+        }
+    }
 
-    analyses.shrink_to_fit();
-    let complete = analyses.values().all(|analysis| analysis.stable);
-    LoopHeaderPredicateTruthinesses { analyses, complete }
+    let complete = loop_header
+        .definitions()
+        .all(|(place, _)| complete_places.contains(&place));
+    LoopHeaderPredicateTruthinesses {
+        analyses,
+        complete_places,
+        complete,
+    }
 }
 
 /// Check whether a diagnostic emitted at `range` is in reachable code, considering both
@@ -1845,7 +1843,6 @@ pub(crate) fn evaluate_loop_header_reachability<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     loop_token: LoopToken<'db>,
-    place: ScopedPlaceId,
     recursive_collection: bool,
     reachability: ScopedReachabilityConstraintId,
 ) -> Truthiness {
@@ -1857,7 +1854,6 @@ pub(crate) fn evaluate_loop_header_reachability<'db>(
     }
 
     let use_def = use_def_map(db, scope);
-    let truthinesses = loop_header_predicate_truthinesses(db, scope, loop_token, place);
     if recursive_collection {
         // The loop fixed point has now inferred the element types introduced by `+=`.
         evaluate_constraint(
@@ -1866,10 +1862,28 @@ pub(crate) fn evaluate_loop_header_reachability<'db>(
             |predicate| analyze_single(db, &use_def.predicates()[predicate]),
         )
     } else {
+        let truthinesses = loop_header_predicate_truthinesses(db, scope, loop_token);
+        let terminal_predicates = loop_carried_terminal_predicates(db, scope, loop_token);
         evaluate_constraint(
             use_def.reachability_constraints(),
             reachability,
-            |predicate| truthinesses.get(predicate).truthiness,
+            |predicate| {
+                truthinesses.get(predicate).map_or_else(
+                    || {
+                        let predicate_node = &use_def.predicates()[predicate];
+                        match predicate_node.node {
+                            PredicateNode::IsNonTerminalCall(_)
+                                if terminal_predicates.contains(predicate) =>
+                            {
+                                Truthiness::AlwaysFalse.negate_if(!predicate_node.is_positive)
+                            }
+                            PredicateNode::IsNonTerminalCall(_) => Truthiness::AlwaysTrue,
+                            _ => Truthiness::Ambiguous,
+                        }
+                    },
+                    |analysis| analysis.truthiness,
+                )
+            },
         )
     }
 }
