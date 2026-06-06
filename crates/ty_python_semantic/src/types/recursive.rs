@@ -127,6 +127,18 @@ impl<'db> RecursiveType<'db> {
         };
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
+
+    /// Whether this μ-binder is *non-contractive*: its body is the bare α-binder marker itself
+    /// (`μα. α`), with no constructor around the recursive position.
+    ///
+    /// Unfolding such a type makes no progress (`μα.α → μα.α`), so structural operations that
+    /// recurse on the one-step unfold (subscript, iteration) must not unfold it — they treat it
+    /// as a gradual leaf (returning the marker itself) instead, exactly as they would a bare
+    /// `Divergent`. This only arises as a not-yet-converged cycle provisional; a converged,
+    /// structureless cycle is resolved away rather than wrapped.
+    pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
+        *self.body(db) == Type::divergent(self.binder_id(db))
+    }
 }
 
 /// Folds a Type by replacing self-references to the given alias definition with
