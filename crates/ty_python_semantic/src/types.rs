@@ -28,8 +28,8 @@ pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
-    infer_definition_types, infer_expression_type, infer_expression_types, infer_scope_types,
-    is_discarded_dict_key_assignment,
+    infer_definition_types, infer_expression_type, infer_expression_types,
+    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;

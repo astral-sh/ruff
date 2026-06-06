@@ -199,7 +199,8 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionType, enum_metadata, infer_expression_type, infer_narrowing_constraints,
+        TypeContext, UnionType, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -251,7 +252,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
-            let ty = infer_expression_type(db, *value, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             // Only return the type if it's single-valued. For non-single-valued types
             // (like `str`), we can't definitively exclude any specific type from
             // subsequent patterns because the pattern could match any value of that type.
@@ -263,7 +264,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr, TypeContext::default())
+                infer_same_file_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
@@ -532,7 +533,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
-    let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+    let subject_ty =
+        infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
         analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
@@ -1017,7 +1019,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_expression_type(db, *value, TypeContext::default());
+            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             if subject_ty.is_single_valued(db) {
                 Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -1068,7 +1070,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+            let class_ty = infer_same_file_expression_type(db, *class_expr, TypeContext::default())
                 .as_class_literal()
                 .map(|class| Type::instance(db, class.top_materialization(db)));
 
@@ -1130,7 +1132,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_expression_type(db, test_expr, TypeContext::default())
+            infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
@@ -1146,7 +1148,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // selection algorithm).
             // Avoiding this on the happy-path is important because these constraints can be
             // very large in number, since we add them on all statement level function calls.
-            let ty = infer_expression_type(db, callable, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
             // Short-circuit for well known types that are known not to return `Never` when called.
             // Without the short-circuit, we've seen that threads keep blocking each other
@@ -1184,7 +1186,8 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                let call_expr_ty =
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {
