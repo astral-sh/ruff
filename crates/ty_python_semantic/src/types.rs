@@ -4091,11 +4091,24 @@ impl<'db> Type<'db> {
                 let function = bound_method.function(db);
                 let self_instance = bound_method.self_instance(db);
                 if function.is_classmethod(db) && matches!(self_instance, Type::Intersection(_)) {
-                    CallableBinding::from_indexed_overloads(
-                        self,
-                        bound_method.indexed_bound_signatures(db),
-                    )
-                    .into()
+                    let signatures = function.signature(db);
+                    if let [signature] = signatures.overloads.as_slice()
+                        && signature.has_explicit_positional_receiver_annotation()
+                        && !signature.can_bind_self_to(db, self_instance)
+                    {
+                        CallableBinding::from_overloads(
+                            self,
+                            [signature.apply_self(db, bound_method.typing_self_type(db))],
+                        )
+                        .with_bound_type(self_instance)
+                        .into()
+                    } else {
+                        CallableBinding::from_indexed_overloads(
+                            self,
+                            bound_method.indexed_bound_signatures(db),
+                        )
+                        .into()
+                    }
                 } else {
                     let signatures = function.signature(db);
                     CallableBinding::from_overloads(self, signatures.overloads.iter().cloned())

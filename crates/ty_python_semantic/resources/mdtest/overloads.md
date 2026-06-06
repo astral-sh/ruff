@@ -249,6 +249,27 @@ info: Overload implementation defined here
    |
 ```
 
+## Non-overloaded explicit classmethod receivers
+
+Intersection-bound classmethods should still validate an explicit receiver annotation.
+
+```py
+from __future__ import annotations
+
+from ty_extensions import Intersection
+
+class Base:
+    @classmethod
+    def only_c(cls: type[C]) -> None: ...
+
+class A(Base): ...
+class B: ...
+class C(Base): ...
+
+def _(cls: Intersection[type[A], type[B]]):
+    cls.only_c()  # error: [invalid-argument-type]
+```
+
 ## Nominal receiver mismatches
 
 `BaseForAny[Any]` has a dynamic type argument, but it is not necessarily an instance of its subclass
