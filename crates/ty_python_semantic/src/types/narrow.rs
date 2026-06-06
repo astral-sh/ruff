@@ -1278,10 +1278,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         }
                     }
 
-                    if all_matched && original_subject_ty.has_typevar(self.db) {
-                        original_subject_ty
+                    let matched_types = matched_types.build();
+                    if original_subject_ty.has_typevar(self.db) {
+                        if all_matched {
+                            original_subject_ty
+                        } else {
+                            self.intersect_types(original_subject_ty, matched_types)
+                        }
                     } else {
-                        matched_types.build()
+                        matched_types
                     }
                 }),
         )
