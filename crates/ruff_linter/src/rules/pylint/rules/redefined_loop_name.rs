@@ -113,6 +113,7 @@ enum InnerBindingKind {
     For,
     With,
     Assignment,
+    AugAssignment,
 }
 
 impl fmt::Display for InnerBindingKind {
@@ -121,6 +122,7 @@ impl fmt::Display for InnerBindingKind {
             InnerBindingKind::For => fmt.write_str("`for` loop"),
             InnerBindingKind::With => fmt.write_str("`with` statement"),
             InnerBindingKind::Assignment => fmt.write_str("assignment"),
+            InnerBindingKind::AugAssignment => fmt.write_str("assignment"),
         }
     }
 }
@@ -142,6 +144,7 @@ struct ExprWithOuterBindingKind<'a> {
 
 struct ExprWithInnerBindingKind<'a> {
     expr: &'a Expr,
+    value: Option<&'a Expr>,
     binding_kind: InnerBindingKind,
 }
 
@@ -160,6 +163,7 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
+                            value: None,
                             binding_kind: InnerBindingKind::For,
                         }
                     }),
@@ -170,6 +174,7 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
                             expr,
+                            value: None,
                             binding_kind: InnerBindingKind::With,
                         },
                     ),
@@ -188,17 +193,19 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     assignment_targets_from_assign_targets(targets, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
                             expr,
+                            value: Some(value),
                             binding_kind: InnerBindingKind::Assignment,
                         },
                     ),
                 );
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
-                            binding_kind: InnerBindingKind::Assignment,
+                            value: Some(value),
+                            binding_kind: InnerBindingKind::AugAssignment,
                         }
                     }),
                 );
@@ -211,6 +218,7 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
+                            value: value.as_deref(),
                             binding_kind: InnerBindingKind::Assignment,
                         }
                     }),
@@ -348,6 +356,26 @@ fn assignment_targets_from_assign_targets<'a>(
         .flat_map(|target| assignment_targets_from_expr(target, dummy_variable_rgx))
 }
 
+/// Returns `true` if the expression appears to be an in-place mutation (e.g., `x += [1]`).
+///
+/// Since we lack full type inference, this uses a heuristic: if it is an augmented
+/// assignment (`+=`, `|=`) and the right side is a mutable type (list, set, dict),
+/// we assume the loop variable is being mutated in-place rather than overwritten.
+fn is_mutable_type_update(value: Option<&Expr>, assignment: InnerBindingKind) -> bool {
+    let is_mutable = matches!(
+        value,
+        Some(
+            Expr::Dict(_)
+                | Expr::List(_)
+                | Expr::Set(_)
+                | Expr::DictComp(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+        )
+    );
+    is_mutable && assignment == InnerBindingKind::AugAssignment
+}
+
 /// PLW2901
 pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
@@ -396,14 +424,19 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
             if ComparableExpr::from(outer_assignment_target.expr)
                 .eq(&(ComparableExpr::from(inner_assignment_target.expr)))
             {
-                checker.report_diagnostic(
-                    RedefinedLoopName {
-                        name: checker.generator().expr(outer_assignment_target.expr),
-                        outer_kind: outer_assignment_target.binding_kind,
-                        inner_kind: inner_assignment_target.binding_kind,
-                    },
-                    inner_assignment_target.expr.range(),
-                );
+                if !is_mutable_type_update(
+                    inner_assignment_target.value,
+                    inner_assignment_target.binding_kind,
+                ) {
+                    checker.report_diagnostic(
+                        RedefinedLoopName {
+                            name: checker.generator().expr(outer_assignment_target.expr),
+                            outer_kind: outer_assignment_target.binding_kind,
+                            inner_kind: inner_assignment_target.binding_kind,
+                        },
+                        inner_assignment_target.expr.range(),
+                    );
+                }
             }
         }
     }

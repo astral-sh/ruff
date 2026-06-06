@@ -178,3 +178,43 @@ for a.i in []:
     a. i = 2  # error
 for a. i in []:
     a.i = 2  # error
+
+# For -> augmented assignment with list (in-place update)
+for i in []:
+    i += [1]  # no error
+
+# For -> normal assignment with list (not an in-place update)
+for i in []:
+    i = [1]  # error
+
+# For -> augmented assignment with dict (in-place update)
+for i in []:
+    i |= {"a": 1}  # no error
+
+# For -> augmented assignment with set (in-place update)
+for i in []:
+    i |= {1}  # no error
+
+# For -> augmented assignment with list comprehension (in-place update)
+for i in []:
+    i += [x for x in ()]  # no error
+
+# For -> augmented assignment with dict comprehension (in-place update)
+for i in []:
+    i |= {x: x for x in ()}  # no error
+
+# For -> augmented assignment with set comprehension (in-place update)
+for i in []:
+    i |= {x for x in ()}  # no error
+
+# For -> normal assignment with set comprehension (not an in-place update)
+for i in []:
+    i = {x for x in ()}  # error
+
+# For -> augmented assignment with immutable type (tuple)
+for i in []:
+    i += (1,)  # error
+
+# For -> augmented assignment with immutable type (string)
+for i in []:
+    i += "a"  # error

@@ -274,4 +274,48 @@ PLW2901 `for` loop variable `a.i` overwritten by assignment target
 179 | for a. i in []:
 180 |     a.i = 2  # error
     |     ^^^
+181 |
+182 | # For -> augmented assignment with list (in-place update)
+    |
+
+PLW2901 `for` loop variable `i` overwritten by assignment target
+   --> redefined_loop_name.py:188:5
+    |
+186 | # For -> normal assignment with list (not an in-place update)
+187 | for i in []:
+188 |     i = [1]  # error
+    |     ^
+189 |
+190 | # For -> augmented assignment with dict (in-place update)
+    |
+
+PLW2901 `for` loop variable `i` overwritten by assignment target
+   --> redefined_loop_name.py:212:5
+    |
+210 | # For -> normal assignment with set comprehension (not an in-place update)
+211 | for i in []:
+212 |     i = {x for x in ()}  # error
+    |     ^
+213 |
+214 | # For -> augmented assignment with immutable type (tuple)
+    |
+
+PLW2901 `for` loop variable `i` overwritten by assignment target
+   --> redefined_loop_name.py:216:5
+    |
+214 | # For -> augmented assignment with immutable type (tuple)
+215 | for i in []:
+216 |     i += (1,)  # error
+    |     ^
+217 |
+218 | # For -> augmented assignment with immutable type (string)
+    |
+
+PLW2901 `for` loop variable `i` overwritten by assignment target
+   --> redefined_loop_name.py:220:5
+    |
+218 | # For -> augmented assignment with immutable type (string)
+219 | for i in []:
+220 |     i += "a"  # error
+    |     ^
     |
