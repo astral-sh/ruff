@@ -925,6 +925,82 @@ def f(env: dict[str, int]) -> None:
 reveal_type(f)
 ```
 
+### Transparent decorator passthrough
+
+A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overload signatures.
+
+```py
+from typing import Callable, overload
+
+def transparent[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(*, y: str) -> str: ...
+@transparent
+def test(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(test)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(test(1))  # revealed: int
+reveal_type(test(y="x"))  # revealed: str
+
+# error: [no-matching-overload]
+reveal_type(test(1, y="x"))  # revealed: Unknown
+
+@transparent
+def increment(value: int) -> int:
+    return value + 1
+
+reveal_type(increment)  # revealed: (value: int) -> int
+reveal_type(increment(1))  # revealed: int
+```
+
+A type alias for `Callable[P, R]` can also be used to type a transparent decorator.
+
+```py
+type Fn[**P, R] = Callable[P, R]
+
+def transparent[**P, R](func: Fn[P, R]) -> Fn[P, R]:
+    return func
+
+@overload
+def alias_decorated(x: int) -> int: ...
+@overload
+def alias_decorated(*, y: str) -> str: ...
+@transparent
+def alias_decorated(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(alias_decorated)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(alias_decorated(1))  # revealed: int
+reveal_type(alias_decorated(y="x"))  # revealed: str
+```
+
+A transparent decorator returned by a decorator factory also preserves overload signatures.
+
+```py
+def transparent_factory[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        return func
+
+    return decorator
+
+@overload
+def decorated_factory(x: int) -> int: ...
+@overload
+def decorated_factory(*, y: str) -> str: ...
+@transparent_factory()
+def decorated_factory(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(decorated_factory)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(decorated_factory(1))  # revealed: int
+reveal_type(decorated_factory(y="x"))  # revealed: str
+```
+
 ### Overloads
 
 #### Return type filtering

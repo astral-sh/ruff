@@ -5250,6 +5250,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn callable_paramspec_and_return_typevar<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+        ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
+            let callable = ty.resolve_type_alias(db).as_callable()?;
+            if callable.kind(db) != CallableTypeKind::Regular {
+                return None;
+            }
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return None;
+            };
+            let paramspec = signature.parameters().as_paramspec()?;
+            Some((paramspec, signature.return_ty.as_typevar()?))
+        }
+
+        fn is_transparent_callable_decorator<'d>(
+            db: &'d dyn Db,
+            decorator_ty: Type<'d>,
+            decorated_ty: Type<'d>,
+        ) -> bool {
+            if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
+                return false;
+            }
+            let decorator_signatures = match decorator_ty {
+                Type::FunctionLiteral(decorator_function) => decorator_function.signature(db),
+                Type::Callable(decorator_callable) => decorator_callable.signatures(db),
+                _ => return false,
+            };
+            let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
+                return false;
+            };
+            let [parameter] = decorator_signature.parameters().as_slice() else {
+                return false;
+            };
+
+            let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
+                callable_paramspec_and_return_typevar(db, parameter.annotated_type())
+            else {
+                return false;
+            };
+            let Some((return_callable_paramspec, return_callable_typevar)) =
+                callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
+            else {
+                return false;
+            };
+            parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+                && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
+        }
+
         // For FunctionLiteral, get the kind directly without computing the full signature.
         // This avoids a query cycle when the function has default parameter values, since
         // computing the signature requires evaluating those defaults which may trigger
@@ -5275,13 +5324,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let call_arguments = CallArguments::positional([decorated_ty]);
+        let mut decorator_call_succeeded = true;
         let return_ty = decorator_ty
             .try_call(self.db(), &call_arguments)
             .map(|bindings| bindings.return_type(self.db()))
             .unwrap_or_else(|CallError(_, bindings)| {
+                decorator_call_succeeded = false;
                 bindings.report_diagnostics(&self.context, decorator_node.into());
                 bindings.return_type(self.db())
             });
+
+        // TODO: Remove this special case once the new constraint solver can preserve
+        // per-overload ParamSpec/return correlations for `Callable[P, R] -> Callable[P, R]`.
+        if decorator_call_succeeded
+            && is_transparent_callable_decorator(self.db(), decorator_ty, decorated_ty)
+            && let Some(callable) = decorated_ty
+                .try_upcast_to_callable(self.db())
+                .and_then(CallableTypes::exactly_one)
+        {
+            return Type::Callable(callable);
+        }
 
         // When a method on a class is decorated with a function that returns a
         // `Callable`, assume that the returned callable is also function-like (or
