@@ -1573,11 +1573,13 @@ reveal_type(p.__call__("hello"))  # revealed: bool
 
 ### Attribute access on partial results
 
-Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible:
+Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. Runtime
+protocol narrowing can add a refinement to the concrete `partial` object, but attributes provided by
+`partial` must remain precise when looked up through that intersection.
 
 ```py
 from functools import partial
-from typing import Callable
+from typing import Protocol, runtime_checkable
 
 def f(a: int, b: str) -> bool:
     return True
@@ -1587,6 +1589,14 @@ reveal_type(p.func)  # revealed: def f(a: int, b: str) -> bool
 reveal_type(p.func(2, "hello"))  # revealed: bool
 reveal_type(p.args)  # revealed: tuple[Any, ...]
 reveal_type(p.keywords)  # revealed: dict[str, Any]
+
+@runtime_checkable
+class PartialMarker(Protocol):
+    def __call__(self, value: str) -> bool: ...
+
+if isinstance(p, PartialMarker):
+    reveal_type(p.args)  # revealed: tuple[Any, ...]
+    reveal_type(p.keywords)  # revealed: dict[str, Any]
 ```
 
 ### `partial.func` keeps the original callable type
