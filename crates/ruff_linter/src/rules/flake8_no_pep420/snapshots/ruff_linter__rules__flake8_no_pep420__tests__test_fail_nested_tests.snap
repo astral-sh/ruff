@@ -1,0 +1,5 @@
+---
+source: crates/ruff_linter/src/rules/flake8_no_pep420/mod.rs
+---
+INP001 File `./resources/test/fixtures/flake8_no_pep420/test_fail_nested_tests/package/tests/test_foo.py` is part of an implicit namespace package. Add an `__init__.py`.
+--> test_foo.py:1:1

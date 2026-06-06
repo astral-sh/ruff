@@ -15,6 +15,10 @@ mod tests {
     use crate::test::{test_path, test_resource_path};
 
     #[test_case(Path::new("test_fail_empty"), Path::new("example.py"))]
+    #[test_case(
+        Path::new("test_fail_nested_tests"),
+        Path::new("package/tests/test_foo.py")
+    )]
     #[test_case(Path::new("test_fail_nonempty"), Path::new("example.py"))]
     #[test_case(Path::new("test_ignored"), Path::new("example.py"))]
     #[test_case(Path::new("test_pass_init"), Path::new("example.py"))]
@@ -41,6 +45,26 @@ mod tests {
         )?;
         insta::with_settings!({filters => vec![(r"\\", "/")]}, {
             assert_diagnostics!(snapshot, diagnostics);
+        });
+        Ok(())
+    }
+
+    #[test_case(Path::new("tests/test_foo.py"))]
+    #[test_case(Path::new("tests/unit/test_bar.py"))]
+    fn top_level_tests(filename: &Path) -> Result<()> {
+        let project_root =
+            test_resource_path("fixtures/flake8_no_pep420/test_pass_top_level_tests");
+        let p = project_root.join(filename);
+        let diagnostics = test_path(
+            p.strip_prefix(test_resource_path("fixtures"))?,
+            &LinterSettings {
+                project_root: project_root.clone(),
+                src: vec![project_root.clone(), project_root.join("src")],
+                ..LinterSettings::for_rule(Rule::ImplicitNamespacePackage)
+            },
+        )?;
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+            assert_diagnostics!(format!("top_level_tests_{}", filename.display()), diagnostics);
         });
         Ok(())
     }
