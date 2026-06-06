@@ -249,6 +249,63 @@ info: Overload implementation defined here
    |
 ```
 
+## Rejected classmethod receiver overload diagnostics
+
+When receiver filtering rejects every overload, calls should still report `no-matching-overload`
+instead of treating the empty filtered overload set as non-callable.
+
+```py
+from __future__ import annotations
+
+from typing import overload
+from ty_extensions import Intersection
+
+class Base:
+    @overload
+    @classmethod
+    def choose(cls: type[C], value: int) -> int: ...
+    @overload
+    @classmethod
+    def choose(cls: type[D], value: str) -> str: ...
+    @classmethod
+    def choose(cls: type[Base], value: object) -> object:
+        return value
+
+class A(Base): ...
+class B: ...
+class C(Base): ...
+class D(Base): ...
+
+def _(cls: Intersection[type[A], type[B]]):
+    cls.choose(1.0)  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Base.choose` matches arguments
+  --> src/mdtest_snippet.py:23:5
+   |
+23 |     cls.choose(1.0)  # snapshot: no-matching-overload
+   |     ^^^^^^^^^^^^^^^
+   |
+info: First overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | /     @overload
+8 | |     @classmethod
+9 | |     def choose(cls: type[C], value: int) -> int: ...
+  | |____________________________________________________^ First overload defined here
+  |
+info: Possible overloads for bound method `choose`:
+info:   (cls: type[C], value: int) -> int
+info:   (cls: type[D], value: str) -> str
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:14:9
+   |
+14 |     def choose(cls: type[Base], value: object) -> object:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
 ## Non-overloaded explicit classmethod receivers
 
 Intersection-bound classmethods should still validate an explicit receiver annotation.

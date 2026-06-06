@@ -147,13 +147,24 @@ impl<'db> BoundMethodType<'db> {
                 .iter()
                 .any(Signature::has_explicit_positional_receiver_annotation);
 
-            return function_signature
+            let filtered: SmallVec<_> = function_signature
                 .overloads
                 .iter()
                 .enumerate()
                 .filter(|(_, signature)| {
                     !filter_explicit_receivers || signature.can_bind_self_to(db, self_instance)
                 })
+                .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
+                .collect();
+
+            if !filtered.is_empty() || !filter_explicit_receivers {
+                return filtered;
+            }
+
+            return function_signature
+                .overloads
+                .iter()
+                .enumerate()
                 .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
                 .collect();
         };
