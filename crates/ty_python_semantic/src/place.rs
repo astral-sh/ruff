@@ -849,8 +849,15 @@ impl<'db> PlaceAndQualifiers<'db> {
             }),
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
+            // A structureless value cycle is finalized to `Never` (see `wrap_structural_recursive`):
+            // the cyclically-defined binding exists but its value type is uninhabited. Keep it
+            // `Defined` as `Never` rather than treating the (unreachable, `Never`-valued) current
+            // iteration as making the place unbound — so a purely-cyclic attribute reads cleanly as
+            // `Never` instead of spuriously "possibly missing".
             (Place::Defined(prev), Place::Undefined) => {
-                if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
+                if prev.ty.is_never() {
+                    Place::Defined(prev)
+                } else if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {

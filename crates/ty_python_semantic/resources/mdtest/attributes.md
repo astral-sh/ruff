@@ -2634,14 +2634,18 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
-If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
+If the only assignment to a name is cyclic — the attribute is defined solely in terms of itself,
+with no base case — then it has no inhabitant, so we infer `Never`. Because the right-hand side of
+the cyclic assignment is then itself `Never`, that assignment is unreachable and the
+self-referential write is additionally reported as unresolved:
 
 ```py
 class D:
     def copy(self, other: "D"):
+        # error: [unresolved-attribute] "Unresolved attribute `x` on type `Self@copy`"
         self.x = other.x
 
-reveal_type(D().x)  # revealed: Divergent
+reveal_type(D().x)  # revealed: Never
 ```
 
 If there is an annotation for a name, we don't try to infer any type from the RHS of assignments to

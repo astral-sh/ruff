@@ -1014,16 +1014,27 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Wrap `self` in an implicit `Type::Recursive` μ-binder for each cycle head whose `Divergent`
-    /// marker survives at a *structural* position (see [`has_structural_divergent`]). This is what
-    /// turns a recursively-defined cycle result (implicit attribute, attribute access through an
-    /// instance, loop-carried local, …) into a true recursive type that unfolds on demand.
+    /// Finalize a recursively-defined value/attribute cycle result for each cycle head:
+    ///
+    /// - If the head's `Divergent` marker survives at a *structural* position (see
+    ///   [`has_structural_divergent`]) — e.g. `tuple[Divergent, int]`, `list[Divergent]` — wrap in an
+    ///   implicit `Type::Recursive` μ-binder, turning it into a true recursive type that unfolds on
+    ///   demand.
+    /// - If the result *is* the bare head marker itself (a structureless `μα.α` cycle, e.g.
+    ///   `self.x = other.x` with no base case), resolve it to `Never`: no value inhabits an infinite
+    ///   self-reference that carries no structure, so the cyclically-defined binding has no inhabitant
+    ///   and the bare `Divergent` marker does not escape as a standalone type. (A purely-cyclic
+    ///   attribute then reads as effectively unbound, which is the intended consequence.)
+    /// - Otherwise (the marker did not survive — e.g. `int | Divergent` already normalized to `int`),
+    ///   leave the result unchanged.
     ///
     /// [`has_structural_divergent`]: Type::has_structural_divergent
     pub(crate) fn wrap_structural_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
             if ty.has_structural_divergent(db, id) {
                 Type::recursive(db, id, None, ty)
+            } else if ty == Type::divergent(id) {
+                Type::Never
             } else {
                 ty
             }
