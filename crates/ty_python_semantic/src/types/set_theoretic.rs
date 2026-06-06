@@ -814,6 +814,9 @@ impl<'db> IntersectionType<'db> {
         }
 
         for element in self.negative(db) {
+            if element.is_metaclass_instance(db) {
+                continue;
+            }
             if let Some(instance) = element.to_instance(db) {
                 builder = builder.add_negative(instance);
             }

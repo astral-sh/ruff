@@ -16,10 +16,10 @@ use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassType, CycleDetector, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
+    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
+    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -864,36 +864,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             .visit((source, target, self.relation), work)
     }
 
-    /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
-    ///
-    /// This does not include all types that are subtypes of `builtins.type`! The semantic
-    /// distinction that matters here is not whether `target` is a subtype of `type`, but whether
-    /// it constrains the class or the metaclass of its inhabitants.
-    ///
-    /// The type `type[C]` and the type `ABCMeta` are both subtypes of `builtins.type`, but they
-    /// constrain their inhabitants in different domains. `type[C]` constrains in the regular-class
-    /// domain (it describes a regular class object and all its subclasses). A metaclass instance
-    /// like `ABCMeta` constrains in the metaclass domain: its inhabitants can be class objects
-    /// that are unrelated to each other in the regular-class domain (they do not inherit each
-    /// other or any other common base), but they are all constrained to have a metaclass that
-    /// inherits from `ABCMeta`.
-    fn is_metaclass_instance(db: &'db dyn Db, target: Type<'db>) -> bool {
-        target.as_nominal_instance().is_some_and(|instance| {
-            KnownClass::Type
-                .try_to_class_literal(db)
-                .is_some_and(|type_class| {
-                    instance
-                        .class(db)
-                        .is_subclass_of(db, ClassType::NonGeneric(ClassLiteral::Static(type_class)))
-                })
-        })
-    }
-
     /// Can we check `target`s relation to a `type[T]` in either the metaclass-instance domain (it
     /// must pass `is_metaclass_instance`) or the regular instance domain (it must have Some
     /// `.to_instance()`)?
     fn can_check_typevar_subclass_relation_to_target(db: &'db dyn Db, target: Type<'db>) -> bool {
-        Self::is_metaclass_instance(db, target) || target.to_instance(db).is_some()
+        target.is_metaclass_instance(db) || target.to_instance(db).is_some()
     }
 
     /// Check the relation between a `type[T]` and a target type `A` when `A` can either be
@@ -924,7 +899,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         source_subclass
             .into_type_var()
             .when_some_and(db, self.constraints, |source_i| {
-                if Self::is_metaclass_instance(db, target) {
+                if target.is_metaclass_instance(db) {
                     self.check_type_pair(db, source_subclass.to_metaclass_instance(db), target)
                 } else {
                     target

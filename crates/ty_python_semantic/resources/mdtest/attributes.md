@@ -1918,6 +1918,23 @@ def _(cls: Intersection[type[A], Not[type[B]]]):
     reveal_type(cls.make())  # revealed: A & ~B
 ```
 
+### Classmethod binding skips negative metaclass constraints
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection, Not
+
+class Meta(type): ...
+
+class A:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+def _(cls: Intersection[type[A], Not[Meta]]):
+    reveal_type(cls.make())  # revealed: A
+```
+
 ### Descriptor owner for an intersection
 
 ```py
