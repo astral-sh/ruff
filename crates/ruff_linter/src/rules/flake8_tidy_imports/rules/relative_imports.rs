@@ -44,6 +44,11 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// ## Options
 /// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
+/// ## Fix safety
+/// This fix is marked as unsafe if it may remove comments associated
+/// with the import statement. The fix is only applied when the absolute module
+/// path can be reliably determined.
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.169")]
