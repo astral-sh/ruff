@@ -7,6 +7,7 @@ use ty_python_core::predicate::{
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, ClassBase, ClassLiteral, IntersectionBuilder, KnownClass, Parameter, Parameters,
     Signature, SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
@@ -264,8 +265,26 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
         return sequence_pattern_type_builder(db).build();
     }
 
-    if kind.split_around_star().is_some() {
-        return Type::Never;
+    if let Some((prefix, suffix)) = kind.split_around_star() {
+        let prefix_types: Vec<_> = prefix
+            .iter()
+            .map(|pattern| definite_match_pattern_type(db, pattern))
+            .collect();
+        let suffix_types: Vec<_> = suffix
+            .iter()
+            .map(|pattern| definite_match_pattern_type(db, pattern))
+            .collect();
+
+        if prefix_types.iter().chain(&suffix_types).any(Type::is_never) {
+            return Type::Never;
+        }
+
+        return Type::tuple(TupleType::mixed(
+            db,
+            prefix_types,
+            Type::object(),
+            suffix_types,
+        ));
     }
 
     let element_types: Vec<_> = kind
