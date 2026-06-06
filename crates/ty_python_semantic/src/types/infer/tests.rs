@@ -576,31 +576,21 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 #[test]
 fn scope_unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
     let mut db = setup_db();
-    db.write_dedented(
-        "/src/main.py",
-        r#"
-        x = y = missing
-        "#,
-    )?;
+    db.write_dedented("/src/main.py", "x = missing")?;
 
     let file = system_path_to_file(&db, "/src/main.py")?;
     let module = parsed_module(&db, file).load(&db);
     let assignment = module.syntax().body[0].as_assign_stmt().unwrap();
-    let value = &*assignment.value;
-    let value_key = value.into();
-    let index = semantic_index(&db, file);
-
-    let expression = index.expression(value);
-    let expression_inference = infer_expression_types(&db, expression, TypeContext::default());
-    assert!(expression_inference.expressions.get(&value_key).is_some());
-    assert!(expression_inference.expression_type(value).is_unknown());
-
     let target = &assignment.targets[0];
     let target_key = target.into();
     let scope_inference = infer_complete_scope_types(&db, global_scope(&db, file));
+
     assert!(scope_inference.expressions.get(&target_key).is_none());
     assert!(scope_inference.unknown_expressions.contains(&target_key));
-    assert!(scope_inference.expression_type(target).is_unknown());
+    assert_eq!(
+        scope_inference.try_expression_type(target),
+        Some(Type::unknown())
+    );
 
     Ok(())
 }

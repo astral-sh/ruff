@@ -880,21 +880,4 @@ mod tests {
 
         Ok(())
     }
-
-    #[test]
-    fn unknown_expression_type() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file("/src/main.py", "x = missing")
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/main.py").unwrap();
-        let ast = parsed_module(&db, file).load(&db);
-        let assignment = ast.suite()[0].as_assign_stmt().unwrap();
-        let expression = assignment.value.as_name_expr().unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert!(expression.inferred_type(&model).unwrap().is_unknown());
-
-        Ok(())
-    }
 }

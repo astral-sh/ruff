@@ -801,14 +801,14 @@ impl<'db> ScopeInference<'db> {
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
         if self.unknown_expressions.iter().next().is_some() {
-            let mut expressions: FxHashMap<_, _> =
-                std::mem::take(&mut self.expressions).into_iter().collect();
-            expressions.extend(
-                self.unknown_expressions
-                    .iter()
-                    .map(|expression| (*expression, Type::unknown())),
-            );
-            self.expressions = FrozenMap::from(expressions);
+            self.expressions = std::mem::take(&mut self.expressions)
+                .into_iter()
+                .chain(
+                    self.unknown_expressions
+                        .iter()
+                        .map(|expression| (*expression, Type::unknown())),
+                )
+                .collect();
             self.unknown_expressions = FrozenSet::default();
         }
 
@@ -1386,7 +1386,10 @@ impl<'db> ExpressionInference<'db> {
         self
     }
 
-    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
+    pub(crate) fn try_expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
