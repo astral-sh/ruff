@@ -1228,26 +1228,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let sequence_ty = self.necessary_sequence_pattern_type(kind);
         let subject_arms = self.sequence_pattern_subject_arms(subject_ty);
+        let grouped_arms = subject_arms
+            .into_iter()
+            .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
 
         UnionType::from_elements(
             self.db,
-            subject_arms.iter().copied().filter_map(
-                |(original_subject_ty, filtering_subject_ty)| {
-                    self.matching_sequence_pattern_arm(
-                        kind,
-                        filtering_subject_ty,
-                        target_len,
-                        sequence_ty,
-                    )
-                    .map(|(narrowed_subject_ty, _)| {
-                        if original_subject_ty.has_typevar(self.db) {
-                            original_subject_ty
+            (&grouped_arms)
+                .into_iter()
+                .map(|(original_subject_ty, arms)| {
+                    let mut all_matched = true;
+                    let mut matched_types = UnionBuilder::new(self.db);
+
+                    for (_, filtering_subject_ty) in arms {
+                        if let Some((narrowed_subject_ty, _)) = self.matching_sequence_pattern_arm(
+                            kind,
+                            filtering_subject_ty,
+                            target_len,
+                            sequence_ty,
+                        ) {
+                            matched_types.add_in_place(narrowed_subject_ty);
                         } else {
-                            narrowed_subject_ty
+                            all_matched = false;
                         }
-                    })
-                },
-            ),
+                    }
+
+                    if all_matched && original_subject_ty.has_typevar(self.db) {
+                        original_subject_ty
+                    } else {
+                        matched_types.build()
+                    }
+                }),
         )
     }
 

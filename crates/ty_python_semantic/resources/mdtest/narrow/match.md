@@ -347,6 +347,11 @@ ConstrainedSequenceT = TypeVar(
     tuple[int],
     tuple[str],
 )
+PartiallyMatchedSequenceT = TypeVar(
+    "PartiallyMatchedSequenceT",
+    tuple[int],
+    tuple[int, int],
+)
 
 def test_match_sequence_alias_preserves_bound_typevar(
     value: BoundSequenceT,
@@ -364,6 +369,16 @@ def test_match_sequence_alias_preserves_constrained_typevar(
             # revealed: ConstrainedSequenceT@test_match_sequence_alias_preserves_constrained_typevar
             reveal_type(whole)
             return whole
+
+def test_match_sequence_alias_narrows_constrained_typevar(
+    value: PartiallyMatchedSequenceT,
+) -> tuple[int]:
+    match value:
+        case [_] as whole:
+            reveal_type(whole)  # revealed: tuple[int]
+            return whole
+        case _:
+            raise ValueError
 
 def test_match_sequence_alias_preserves_typevar_union_arm(
     value: BoundSequenceT | str,
