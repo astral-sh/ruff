@@ -388,9 +388,14 @@ def _(x: Callable[[int], int]):
 
 class Meta(type): ...
 class Base(metaclass=Meta): ...
+class Other: ...
 
 reveal_type(f2(Base))  # revealed: <class 'Meta'>
 reveal_type(type(Base))  # revealed: <class 'Meta'>
+
+def _(cls: Intersection[type[Base], type[Other]]):
+    reveal_type(runtime_type(cls))  # revealed: type[Meta]
+    meta: type[Meta] = runtime_type(cls)
 
 class MetaWithAttr(type):
     meta_attr: int
