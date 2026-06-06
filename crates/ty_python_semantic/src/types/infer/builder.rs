@@ -592,7 +592,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|params| SmallVec::from(params.field_specifiers(db)))
                 .or_else(|| {
                     Some(SmallVec::from(
-                        CodeGeneratorKind::from_class(db, class_literal.into(), None)?
+                        CodeGeneratorKind::from_class(db, class_literal.into())?
                             .dataclass_transformer_params()?
                             .field_specifiers(db),
                     ))
@@ -4498,7 +4498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let nearest_enclosing_class =
                     nearest_enclosing_class(self.db(), self.index, self.scope());
                 let class_kind = nearest_enclosing_class.and_then(|class| {
-                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class), None)
+                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class))
                 });
 
                 match class_kind {

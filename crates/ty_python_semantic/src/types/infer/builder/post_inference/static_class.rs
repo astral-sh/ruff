@@ -111,7 +111,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let class_kind = CodeGeneratorKind::from_class(db, class.into(), None);
+    let class_kind = CodeGeneratorKind::from_class(db, class.into());
 
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
@@ -878,7 +878,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(db, class.into(), None)
+        CodeGeneratorKind::from_class(db, class.into())
     {
         let specialization = None;
 
@@ -1346,7 +1346,7 @@ fn check_class_final_without_value<'db>(
 
     // In dataclasses (and similar code-generated classes), Final fields without
     // defaults are initialized by the synthesized __init__, so they are valid.
-    if CodeGeneratorKind::from_class(db, class.into(), None).is_some() {
+    if CodeGeneratorKind::from_class(db, class.into()).is_some() {
         return;
     }
 

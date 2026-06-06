@@ -167,6 +167,29 @@ class CustomerModel(ModelBase):
 CustomerModel(id=1, name="Test")
 ```
 
+The dataclass-like behavior of a generic class does not depend on its specialization, but the types
+of its synthesized fields do:
+
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelBase[T]: ...
+
+class GenericModel[T](ModelBase[T]):
+    value: T
+
+GenericModel[int](value=1)
+GenericModel[str](value="one")
+
+# error: [too-many-positional-arguments]
+GenericModel[int](1, value=1)
+
+# error: [invalid-argument-type]
+GenericModel[int](value="one")
+
+# error: [invalid-argument-type]
+GenericModel[str](value=1)
+```
+
 ## Arguments to `dataclass_transform`
 
 ### `eq_default`

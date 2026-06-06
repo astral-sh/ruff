@@ -4774,7 +4774,7 @@ impl<'db> Type<'db> {
             })
         }
 
-        let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
+        let class_literal = class.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
 
         // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
@@ -4795,7 +4795,7 @@ impl<'db> Type<'db> {
         // We don't want to use the synthesized binding for type inference, so here we just
         // return a permissive fallback binding.
         if class_literal.is_typed_dict(db)
-            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
+            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal)
         {
             return fallback_bindings();
         }
