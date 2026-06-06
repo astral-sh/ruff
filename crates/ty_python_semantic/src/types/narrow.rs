@@ -697,6 +697,16 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
     if [left_ty, right_ty].into_iter().any(|ty| {
         if ty.as_enum_literal().is_some() || ty.is_enum(db) {
             ty.has_custom_eq(db)
+        } else if let Some(instance) = ty.as_nominal_instance()
+            && instance.tuple_spec(db).is_some()
+            && instance.known_class(db) != Some(KnownClass::Tuple)
+        {
+            instance
+                .class(db)
+                .iter_mro(db)
+                .filter_map(ClassBase::into_class)
+                .take_while(|class| class.class_literal(db).known(db) != Some(KnownClass::Tuple))
+                .any(|class| !class.own_class_member(db, None, "__eq__").is_undefined())
         } else {
             ty.is_single_valued(db) && ty.equality_may_not_be_reflexive(db)
         }
@@ -1099,12 +1109,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 else {
                     return subject_ty;
                 };
-                let narrowed_ty = self.intersect_types(subject_ty, constraint);
+                let narrow_subject_ty = |subject_ty| {
+                    let narrowed_ty = self.intersect_types(subject_ty, constraint);
+                    if narrowed_ty.is_never() && could_compare_equal(self.db, subject_ty, value_ty)
+                    {
+                        subject_ty
+                    } else {
+                        narrowed_ty
+                    }
+                };
 
-                if narrowed_ty.is_never() && could_compare_equal(self.db, subject_ty, value_ty) {
-                    subject_ty
+                if let Type::Union(union) = subject_ty {
+                    UnionType::from_elements(
+                        self.db,
+                        union
+                            .elements(self.db)
+                            .iter()
+                            .copied()
+                            .map(narrow_subject_ty),
+                    )
                 } else {
-                    narrowed_ty
+                    narrow_subject_ty(subject_ty)
                 }
             }
             PatternPredicateKind::As(Some(pattern), _) => {
