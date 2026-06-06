@@ -45,6 +45,15 @@ class Circle(Shape):
         reveal_type(self)  # revealed: Self@set_scale
         return self
 
+class ClassmethodBase:
+    @classmethod
+    def make[T = Self](cls) -> T:
+        raise NotImplementedError
+
+class ClassmethodSubclass(ClassmethodBase): ...
+
+reveal_type(ClassmethodSubclass.make())  # revealed: ClassmethodSubclass
+
 class Outer:
     class Inner:
         def foo(self: Self) -> Self:
