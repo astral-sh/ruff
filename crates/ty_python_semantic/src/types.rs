@@ -1030,15 +1030,29 @@ impl<'db> Type<'db> {
     ///
     /// [`has_structural_divergent`]: Type::has_structural_divergent
     pub(crate) fn wrap_structural_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
-            if ty.has_structural_divergent(db, id) {
-                Type::recursive(db, id, None, ty)
-            } else if ty == Type::divergent(id) {
-                Type::Never
-            } else {
-                ty
-            }
-        })
+        cycle
+            .head_ids()
+            .fold(self, |ty, id| {
+                if ty.has_structural_divergent(db, id) {
+                    Type::recursive(db, id, None, ty)
+                } else {
+                    ty
+                }
+            })
+            .resolve_structureless_cycle_to_never(cycle)
+    }
+
+    /// Resolve a converged *structureless* cycle — a value that is exactly the bare `Divergent`
+    /// α-marker for one of `cycle`'s heads (`μα.α`, e.g. `self.x = other.x` or `A = A` with no base
+    /// case) — to `Never`: such a cycle has no inhabitant, and the bare marker must not escape as a
+    /// standalone type. All other types (including structural recursion already wrapped in
+    /// `Type::Recursive`) are returned unchanged. Used by value/place cycle recovery.
+    pub(crate) fn resolve_structureless_cycle_to_never(self, cycle: &salsa::Cycle) -> Self {
+        if cycle.head_ids().any(|id| self == Type::divergent(id)) {
+            Type::Never
+        } else {
+            self
+        }
     }
 
     pub const fn is_unknown(&self) -> bool {

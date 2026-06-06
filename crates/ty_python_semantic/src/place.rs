@@ -903,7 +903,12 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 #[salsa::tracked(
     cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        place.cycle_normalized(db, *previous, cycle)
+        // A structureless place cycle (e.g. a cyclic import `A = A`, or a loop-carried local with
+        // no base case) has no inhabitant; resolve it to `Never` rather than exposing the bare
+        // `Divergent` marker. Structural recursion is unaffected.
+        place
+            .cycle_normalized(db, *previous, cycle)
+            .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle))
     },
     heap_size=ruff_memory_usage::heap_size
 )]

@@ -37,8 +37,8 @@ See: <https://github.com/astral-sh/ty/issues/113>
 ```py
 from pkg.sub import A
 
-# TODO: This should be `<class 'A'>`
-reveal_type(A)  # revealed: Divergent
+# TODO: This should be `<class 'A'>`. The cyclic import has no base case, so it resolves to `Never`.
+reveal_type(A)  # revealed: Never
 ```
 
 `pkg/outer.py`:
