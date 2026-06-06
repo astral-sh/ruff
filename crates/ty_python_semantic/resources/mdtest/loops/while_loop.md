@@ -657,11 +657,144 @@ while True:
     break
 ```
 
-### A large surrounding scope does not discard a cheap loop header
+### Unrelated loop headers have independent fixed points
 
-The scope-wide reachability graph is large, but its loop headers only have a few loop-back bindings
-with cheap reachability and narrowing roots. Inferring their exact types does not require traversing
-the entire graph, so its size should not cause us to fall back to `Unknown`.
+Sequential and nested loops that bind the same place should not widen each other's types.
+
+```py
+from typing import Literal
+
+def f(a: bool, b: bool):
+    x = 0
+    y = "y"
+    while a:
+        if b:
+            x = b"b"
+        y = x
+        if b:
+            x = 3
+        else:
+            x = "e"
+        x, y = y, x
+        if not b:
+            break
+    while a:
+        while b:
+            x = y
+            break
+        y = x
+
+    expected: Literal[0, 3, b"b", "y", "e"] = x
+```
+
+### Collection detection does not widen unrelated loop headers
+
+Checking whether a loop accumulates an unconstrained collection must not add dependencies to the
+loop-header fixed point for unrelated places.
+
+```py
+class Cell: ...
+
+class Table:
+    count: int
+
+    def cell(self, index: int) -> Cell | None:
+        return None
+
+def f(table: Table) -> None:
+    cells = [table.cell(i) for i in range(table.count)]
+    flags = [cell is not None for cell in cells]
+    flags.append(False)
+
+    i = 0
+    while i < table.count:
+        i += flags[i:].index(False) + 1
+        while i < table.count and flags[i] is False:
+            reveal_type(cells[i])  # revealed: Cell | None
+            i += 1
+```
+
+### Recursive reachability preserves terminal calls
+
+```py
+import re
+from typing import NoReturn
+
+def process(items: list[str]) -> None:
+    for item in items:
+        def fail(message: str) -> NoReturn:
+            raise AssertionError(message)
+
+        match = re.match(r"(.*)\.([0-9]+)$", item)
+        if match is None:
+            fail(f"Invalid item {item!r}")
+        int(match.group(2))
+```
+
+### Recursive reachability preserves awaited non-terminal calls
+
+```py
+async def process(items: list[bool]) -> None:
+    for item in items:
+        async def resolve(value: tuple[str, int]) -> tuple[str, int]:
+            return value
+
+        await resolve(("ok", 80))
+        if item:
+            await resolve(("too", "many", "items"))  # error: [invalid-argument-type]
+```
+
+### Loop-carried local functions converge with outer definitions
+
+```py
+def process(flag: bool) -> None:
+    callback()  # error: [unresolved-reference]
+    while flag:
+        if flag:
+            context = 1
+
+        def callback() -> context:  # error: [invalid-type-form]
+            return 1
+```
+
+### Inner-loop predicates track outer loop headers
+
+A predicate that does not depend on the inner loop can still change as an outer loop header widens.
+
+```py
+def process(flag: bool) -> None:
+    value = 0
+    while flag:
+        while flag:
+            if value:
+                expected: str = value  # error: [invalid-assignment]
+            break
+        value = 1
+```
+
+### Recursive reachability preserves unconstrained collection element types
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def collect(items: list[int]) -> None:
+    values = []
+    extra_values_added = False
+    for _ in items:
+        if not extra_values_added:
+            values += [B()]
+            values.append(C())
+            extra_values_added = True
+        values.append(A())
+```
+
+### Loop headers remain precise in large scopes
+
+Loop-header reachability and type inference should remain exact regardless of the size of the
+scope-wide reachability graph. The statically unreachable assignment below must remain excluded, and
+narrowing must still apply after enough surrounding control flow to exceed the previous cutoffs.
 
 ```py
 from typing import Any

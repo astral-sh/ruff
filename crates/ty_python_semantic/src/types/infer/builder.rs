@@ -29,13 +29,11 @@ use super::{
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
-    ConsideredDefinitions, DefinedPlace, Definedness, LookupError,
-    MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES, Place, PlaceAndQualifiers,
+    ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
-    loop_header_scope_is_too_complex, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place_by_id, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -2086,23 +2084,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
+        let loop_header = loop_header_reachability(db, definition);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
-        let constraints = use_def.reachability_constraints();
 
-        // Loop-header types are an approximation point for loop fixpoint analysis. Bound the
-        // aggregate binding-inference and TDD work across the scope's loop headers.
-        if constraints.was_truncated()
-            || (constraints.used_interiors().len()
-                > MAX_UNCONDITIONALLY_INFERRED_LOOP_HEADER_SCOPE_NODES
-                && loop_header_scope_is_too_complex(db, definition.scope(db)))
-        {
-            self.bindings.insert(definition, Type::unknown());
-            return;
-        }
-
-        let loop_header = loop_header_reachability(db, definition);
         let place = loop_header_kind.place();
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
@@ -2192,8 +2178,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .len()
                 > MAX_EXACT_NESTED_BINDING_REACHABILITY_NODES
         {
-            // As with loop header definitions above, use a reachability cutoff to avoid excessive
-            // perf costs in complicated projects like `isort`.
+            // Use a reachability cutoff to avoid excessive costs from nested bindings in
+            // complicated projects like `isort`.
             self.bindings.insert(definition, Type::unknown());
             return;
         }

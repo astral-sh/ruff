@@ -137,14 +137,23 @@ pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'
 /// that they refer to. See `LoopToken` below for how we work around that.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
 pub struct LoopHeader {
+    definitions: FxHashMap<ScopedPlaceId, ScopedDefinitionId>,
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
 }
 
 impl LoopHeader {
-    pub fn new() -> Self {
+    pub fn new(definitions: FxHashMap<ScopedPlaceId, ScopedDefinitionId>) -> Self {
         Self {
+            definitions,
             bindings: FxHashMap::default(),
         }
+    }
+
+    /// Return the synthetic loop-header definition for each place bound by this loop.
+    pub fn definitions(&self) -> impl Iterator<Item = (ScopedPlaceId, ScopedDefinitionId)> + '_ {
+        self.definitions
+            .iter()
+            .map(|(&place, &definition)| (place, definition))
     }
 
     pub fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {

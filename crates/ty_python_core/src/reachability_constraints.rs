@@ -147,8 +147,6 @@ pub struct ReachabilityConstraints {
     ///
     /// If all interior nodes were retained, the original ID can be used directly instead.
     used_indices: Option<Box<RankBitBox>>,
-    /// Whether any operation fell back to `AMBIGUOUS` after reaching [`MAX_INTERIOR_NODES`].
-    was_truncated: bool,
 }
 
 impl ReachabilityConstraints {
@@ -170,11 +168,6 @@ impl ReachabilityConstraints {
 
     pub fn used_interiors(&self) -> &[InteriorNode] {
         &self.used_interiors
-    }
-
-    /// Return whether building these constraints hit the interior-node size limit.
-    pub const fn was_truncated(&self) -> bool {
-        self.was_truncated
     }
 }
 
@@ -198,7 +191,6 @@ pub struct ReachabilityConstraintsBuilder {
         ),
         ScopedReachabilityConstraintId,
     >,
-    was_truncated: bool,
 }
 
 impl ReachabilityConstraintsBuilder {
@@ -207,7 +199,6 @@ impl ReachabilityConstraintsBuilder {
             ReachabilityConstraints {
                 used_interiors: self.interiors.raw.into_boxed_slice(),
                 used_indices: None,
-                was_truncated: self.was_truncated,
             }
         } else {
             let used_indices = RankBitBox::from_bits(self.interior_used.iter().copied());
@@ -218,14 +209,8 @@ impl ReachabilityConstraintsBuilder {
             ReachabilityConstraints {
                 used_interiors,
                 used_indices: Some(Box::new(used_indices)),
-                was_truncated: self.was_truncated,
             }
         }
-    }
-
-    fn size_limit_fallback(&mut self) -> ScopedReachabilityConstraintId {
-        self.was_truncated = true;
-        AMBIGUOUS
     }
 
     /// Marks that a particular TDD node is used. This lets us throw away interior nodes that were
@@ -344,7 +329,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return self.size_limit_fallback();
+            return AMBIGUOUS;
         }
 
         let a_node = self.interiors[a];
@@ -381,7 +366,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return self.size_limit_fallback();
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -451,7 +436,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            return self.size_limit_fallback();
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -499,18 +484,5 @@ impl ReachabilityConstraintsBuilder {
         });
         self.and_cache.insert((a, b), result);
         result
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{AMBIGUOUS, ReachabilityConstraintsBuilder};
-
-    #[test]
-    fn records_size_limit_fallback() {
-        let mut builder = ReachabilityConstraintsBuilder::default();
-
-        assert_eq!(builder.size_limit_fallback(), AMBIGUOUS);
-        assert!(builder.build().was_truncated());
     }
 }
