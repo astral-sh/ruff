@@ -395,7 +395,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
         if matches!(
-            CodeGeneratorKind::from_class(db, self.into(), None),
+            CodeGeneratorKind::from_class(db, self.into()),
             Some(CodeGeneratorKind::DataclassLike(_))
         ) {
             if name == "__dataclass_fields__" {

@@ -136,7 +136,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// `dataclass_transform` (function-based, metaclass-based, and base-class-based).
     pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
         matches!(
-            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self), None),
+            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self)),
             Some(CodeGeneratorKind::DataclassLike(_))
         )
     }
@@ -804,7 +804,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
-            CodeGeneratorKind::from_class(db, self.into(), None)?
+            CodeGeneratorKind::from_class(db, self.into())?
         {
             // Otherwise, if this class is a dataclass-like class, determine its frozen status based on
             // dataclass params and dataclass transformer params.
@@ -1120,7 +1120,7 @@ impl<'db> StaticClassLiteral<'db> {
     ) -> Member<'db> {
         // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
         if matches!(
-            CodeGeneratorKind::from_class(db, self.into(), specialization),
+            CodeGeneratorKind::from_class(db, self.into()),
             Some(CodeGeneratorKind::DataclassLike(_))
         ) {
             if name == "__dataclass_fields__" {
@@ -1143,7 +1143,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
         }
 
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into(), specialization) {
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into()) {
             if let Some(field) = self
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
@@ -1206,7 +1206,7 @@ impl<'db> StaticClassLiteral<'db> {
             .place
             .raw_type()
             .is_some_and(|ty| ty.is_instance_of(db, KnownClass::KwOnly))
-            && CodeGeneratorKind::from_static_class(db, self, None)
+            && CodeGeneratorKind::from_static_class(db, self)
                 .is_some_and(|policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)))
         {
             return Member::unbound();
@@ -1299,7 +1299,7 @@ impl<'db> StaticClassLiteral<'db> {
             return Some(synthesized_setattr);
         }
 
-        let field_policy = CodeGeneratorKind::from_class(db, self.into(), specialization)?;
+        let field_policy = CodeGeneratorKind::from_class(db, self.into())?;
 
         let instance_ty =
             Type::instance(db, self.apply_optional_specialization(db, specialization));
@@ -1655,7 +1655,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Type<'db>> {
-        if CodeGeneratorKind::from_static_class(db, self, specialization).is_some() {
+        if CodeGeneratorKind::from_static_class(db, self).is_some() {
             return None;
         }
 
@@ -1727,7 +1727,7 @@ impl<'db> StaticClassLiteral<'db> {
 
             if base_class.is_frozen_dataclass(db) == Some(true) {
                 let field_policy @ CodeGeneratorKind::DataclassLike(_) =
-                    CodeGeneratorKind::from_static_class(db, base_class, base_specialization)?
+                    CodeGeneratorKind::from_static_class(db, base_class)?
                 else {
                     return None;
                 };
@@ -1824,7 +1824,7 @@ impl<'db> StaticClassLiteral<'db> {
                 let class = superclass.into_class()?;
 
                 if let Some((class_literal, specialization)) = class.static_class_literal(db) {
-                    if field_policy.matches(db, class_literal.into(), specialization) {
+                    if field_policy.matches(db, class_literal.into()) {
                         return Some(FieldSource::Static(class_literal, specialization));
                     }
                 }
@@ -1872,7 +1872,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn validate_members(self, context: &InferContext<'db, '_>) {
         let db = context.db();
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return;
         };
         let class_body_scope = self.body_scope(db);
@@ -2501,7 +2501,7 @@ impl<'db> StaticClassLiteral<'db> {
         // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
         // as instance attributes here causes inherited fields to leak through after a subclass
         // shadows the name with a normal class attribute.
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into(), None)
+        if CodeGeneratorKind::NamedTuple.matches(db, self.into())
             && self
                 .own_fields(db, None, CodeGeneratorKind::NamedTuple)
                 .contains_key(name)
@@ -2547,9 +2547,9 @@ impl<'db> StaticClassLiteral<'db> {
 
                     // `KW_ONLY` sentinels are markers, not real instance attributes.
                     if declared_ty.is_instance_of(db, KnownClass::KwOnly)
-                        && CodeGeneratorKind::from_static_class(db, self, None).is_some_and(
-                            |policy| matches!(policy, CodeGeneratorKind::DataclassLike(_)),
-                        )
+                        && CodeGeneratorKind::from_static_class(db, self).is_some_and(|policy| {
+                            matches!(policy, CodeGeneratorKind::DataclassLike(_))
+                        })
                     {
                         return Member::unbound();
                     }
@@ -2686,7 +2686,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// implicitly assigned in `__init__`, so they behave as instance attributes
     /// even though no explicit binding exists in the class body.
     fn is_own_dataclass_instance_field(self, db: &'db dyn Db, name: &str) -> bool {
-        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self, None) else {
+        let Some(field_policy) = CodeGeneratorKind::from_static_class(db, self) else {
             return false;
         };
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
@@ -2713,7 +2713,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         name: &str,
     ) -> Option<Type<'db>> {
-        let field_policy = CodeGeneratorKind::from_static_class(db, self, None)?;
+        let field_policy = CodeGeneratorKind::from_static_class(db, self)?;
         if !matches!(field_policy, CodeGeneratorKind::DataclassLike(_)) {
             return None;
         }
@@ -2953,7 +2953,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
             .map(|class| class.variance_of(db, typevar));
 
         let default_attribute_variance = {
-            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into(), None);
+            let is_namedtuple = CodeGeneratorKind::NamedTuple.matches(db, self.into());
             // Python 3.13 introduced a synthesized `__replace__` method on dataclasses which uses
             // their field types in contravariant position, thus meaning a frozen dataclass must
             // still be invariant in its field types. Other synthesized methods on dataclasses are
@@ -2962,7 +2962,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
             // methods, so we just look them up normally and don't hardcode this knowledge here.
             let is_frozen_dataclass_prior_to_313 = Program::get(db).python_version(db)
                 <= PythonVersion::PY312
-                && CodeGeneratorKind::from_static_class(db, self, None)
+                && CodeGeneratorKind::from_static_class(db, self)
                     .is_some_and(|kind| self.has_dataclass_param(db, kind, DataclassFlags::FROZEN));
 
             if is_namedtuple || is_frozen_dataclass_prior_to_313 {

@@ -1710,7 +1710,7 @@ impl KnownClass {
                         };
 
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into(), None) {
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                             if let Some(builder) = context
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                             {
@@ -1764,11 +1764,7 @@ impl KnownClass {
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
-                            if CodeGeneratorKind::NamedTuple.matches(
-                                db,
-                                enclosing_class.into(),
-                                None,
-                            ) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                                 if let Some(builder) = context
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                                 {
