@@ -98,6 +98,14 @@ impl<'db> CodeGeneratorKind<'db> {
         class: StaticClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Option<Self> {
+        if class.dataclass_params(db).is_none()
+            && class.known(db).is_none()
+            && !class.has_explicit_bases(db)
+            && !class.has_explicit_metaclass(db)
+        {
+            return None;
+        }
+
         #[salsa::tracked(cycle_initial=|_, _, _, _| None,
             heap_size=ruff_memory_usage::heap_size
         )]
