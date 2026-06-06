@@ -670,7 +670,9 @@ impl HasType for ast::ExprRef<'_> {
         let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        infer_complete_scope_types(model.db, scope).try_expression_type(*self)
+        // Complete-scope inference has a type for every indexed expression. It omits explicit
+        // `Unknown` entries from its retained map, and `expression_type` restores that default.
+        Some(infer_complete_scope_types(model.db, scope).expression_type(*self))
     }
 }
 
@@ -877,6 +879,23 @@ mod tests {
         let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
+
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_expression_type() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file("/src/main.py", "x = missing")
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/main.py").unwrap();
+        let ast = parsed_module(&db, file).load(&db);
+        let assignment = ast.suite()[0].as_assign_stmt().unwrap();
+        let expression = assignment.value.as_name_expr().unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert!(expression.inferred_type(&model).unwrap().is_unknown());
 
         Ok(())
     }

@@ -574,6 +574,40 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 }
 
 #[test]
+fn unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        x = y = missing
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/main.py")?;
+    let module = parsed_module(&db, file).load(&db);
+    let assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+    let value = &*assignment.value;
+    let value_key = value.into();
+    let index = semantic_index(&db, file);
+
+    let expression = index.expression(value);
+    let expression_inference = infer_expression_types(&db, expression, TypeContext::default());
+    assert!(expression_inference.expressions.get(&value_key).is_none());
+    assert!(expression_inference.expression_type(value).is_unknown());
+
+    let definition = index.expect_single_definition(assignment.targets[0].as_name_expr().unwrap());
+    let definition_inference = infer_definition_types(&db, definition);
+    assert!(definition_inference.expressions.get(&value_key).is_none());
+    assert!(definition_inference.expression_type(value).is_unknown());
+
+    let scope_inference = infer_complete_scope_types(&db, global_scope(&db, file));
+    assert!(scope_inference.expressions.get(&value_key).is_none());
+    assert!(scope_inference.expression_type(value).is_unknown());
+
+    Ok(())
+}
+
+#[test]
 fn dependency_implicit_class_member() -> anyhow::Result<()> {
     fn x_rhs_expression(db: &TestDb) -> Expression<'_> {
         let file_main = system_path_to_file(db, "/src/main.py").unwrap();

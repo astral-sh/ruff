@@ -811,10 +811,7 @@ impl<'db> ScopeInference<'db> {
             .unwrap_or_else(Type::unknown)
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
@@ -1248,6 +1245,13 @@ impl<'db> DefinitionInference<'db> {
         self.types.declarations()
     }
 
+    /// Returns `true` if some expression types are stored in deferred inference.
+    pub(crate) fn has_deferred(&self) -> bool {
+        self.extra
+            .as_ref()
+            .is_some_and(|extra| !extra.deferred.is_empty())
+    }
+
     fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
         self.declarations().map(|(_, qualifiers)| qualifiers)
     }
@@ -1362,10 +1366,7 @@ impl<'db> ExpressionInference<'db> {
         self
     }
 
-    pub(crate) fn try_expression_type(
-        &self,
-        expression: impl Into<ExpressionNodeKey>,
-    ) -> Option<Type<'db>> {
+    fn try_expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Option<Type<'db>> {
         self.expressions
             .get(&expression.into())
             .copied()
