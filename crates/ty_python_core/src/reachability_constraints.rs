@@ -352,6 +352,10 @@ impl ReachabilityConstraintsBuilder {
         a: ScopedReachabilityConstraintId,
         b: ScopedReachabilityConstraintId,
     ) -> ScopedReachabilityConstraintId {
+        if a == b {
+            return a;
+        }
+
         match (a, b) {
             (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
             (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
@@ -422,6 +426,10 @@ impl ReachabilityConstraintsBuilder {
         a: ScopedReachabilityConstraintId,
         b: ScopedReachabilityConstraintId,
     ) -> ScopedReachabilityConstraintId {
+        if a == b {
+            return a;
+        }
+
         match (a, b) {
             (ALWAYS_FALSE, _) | (_, ALWAYS_FALSE) => return ALWAYS_FALSE,
             (ALWAYS_TRUE, other) | (other, ALWAYS_TRUE) => return other,

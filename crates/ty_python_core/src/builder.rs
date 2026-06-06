@@ -176,6 +176,7 @@ impl ConditionFlowSnapshot {
             .map_or_else(|| fallback, |snapshots| &snapshots.truthy)
             .clone()
     }
+
     fn falsy(&self) -> FlowSnapshot {
         let Self {
             fallback,
@@ -455,12 +456,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager.enter_nested_scope();
 
         let file_scope_id = self.scopes.push(scope);
+        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
         self.place_tables.push(PlaceTableBuilder::default());
         self.use_def_maps
-            .push(UseDefMapBuilder::new(is_class_scope));
+            .push(UseDefMapBuilder::new(scope_id, is_class_scope));
         let ast_id_scope = self.ast_ids.push(AstIdsBuilder::default());
-
-        let scope_id = ScopeId::new(self.db, self.file, file_scope_id);
 
         self.scope_ids_by_scope.push(scope_id);
         let previous = self.scopes_by_node.insert(node.node_key(), file_scope_id);

@@ -193,13 +193,16 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionType, enum_metadata, infer_expression_type, infer_narrowing_constraints,
+        TypeContext, UnionType, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -218,6 +221,7 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
 };
 
 fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -251,7 +255,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
     match kind {
         PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
-            let ty = infer_expression_type(db, *value, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
             // Only return the type if it's single-valued. For non-single-valued types
             // (like `str`), we can't definitively exclude any specific type from
             // subsequent patterns because the pattern could match any value of that type.
@@ -263,7 +267,7 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr, TypeContext::default())
+                infer_same_file_expression_type(db, *class_expr, TypeContext::default())
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
@@ -532,7 +536,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
-    let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+    let subject_ty =
+        infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
         analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
@@ -631,8 +636,21 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+            | ScopedReachabilityConstraintId::AMBIGUOUS => return base_ty,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Type::Never,
+            _ => {}
+        }
+
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
+        if projected_root == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return Type::Never;
+        }
+        if projected_root == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return base_ty;
+        }
         let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
@@ -705,7 +723,6 @@ struct ProjectedNarrowingNode {
     if_false: ProjectedNarrowingNodeId,
 }
 
-/// Reduced reachability graph containing only predicates relevant to one place.
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
     nodes: Vec<ProjectedNarrowingNode>,
@@ -1017,7 +1034,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_expression_type(db, *value, TypeContext::default());
+            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             if subject_ty.is_single_valued(db) {
                 Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -1068,7 +1085,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+            let class_ty = infer_same_file_expression_type(db, *class_expr, TypeContext::default())
                 .as_class_literal()
                 .map(|class| Type::instance(db, class.top_materialization(db)));
 
@@ -1130,7 +1147,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_expression_type(db, test_expr, TypeContext::default())
+            infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
@@ -1146,7 +1163,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // selection algorithm).
             // Avoiding this on the happy-path is important because these constraints can be
             // very large in number, since we add them on all statement level function calls.
-            let ty = infer_expression_type(db, callable, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
             // Short-circuit for well known types that are known not to return `Never` when called.
             // Without the short-circuit, we've seen that threads keep blocking each other
@@ -1184,7 +1201,8 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                let call_expr_ty =
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {
@@ -1268,11 +1286,7 @@ pub(crate) fn binding_reachability<'db, 'map>(
     use_def: &'map UseDefMap<'db>,
     binding: &BindingWithConstraints<'map, 'db>,
 ) -> Truthiness {
-    use_def.reachability_constraints().evaluate(
-        db,
-        use_def.predicates(),
-        binding.reachability_constraint,
-    )
+    evaluate_reachability(db, use_def, binding.reachability_constraint)
 }
 
 pub(crate) fn evaluate_reachability(
@@ -1283,6 +1297,81 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+pub(crate) struct ReachabilityEvaluationCache<'db> {
+    primary_scope: ScopeId<'db>,
+    primary_entries: RefCell<FxHashMap<ScopedReachabilityConstraintId, Truthiness>>,
+    other_entries: RefCell<FxHashMap<(ScopeId<'db>, ScopedReachabilityConstraintId), Truthiness>>,
+}
+
+impl<'db> ReachabilityEvaluationCache<'db> {
+    pub(crate) fn new(primary_scope: ScopeId<'db>) -> Self {
+        Self {
+            primary_scope,
+            primary_entries: RefCell::new(FxHashMap::default()),
+            other_entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    pub(crate) fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        reachability_constraints: &ReachabilityConstraints,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        reachability: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        match reachability {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            ScopedReachabilityConstraintId::AMBIGUOUS => return Truthiness::Ambiguous,
+            _ => {}
+        }
+
+        if scope == self.primary_scope {
+            if let Some(cached) = self.primary_entries.borrow().get(&reachability) {
+                return *cached;
+            }
+
+            let result = reachability_constraints.evaluate(db, predicates, reachability);
+            self.primary_entries
+                .borrow_mut()
+                .insert(reachability, result);
+            return result;
+        }
+
+        if let Some(cached) = self.other_entries.borrow().get(&(scope, reachability)) {
+            return *cached;
+        }
+
+        let result = reachability_constraints.evaluate(db, predicates, reachability);
+        self.other_entries
+            .borrow_mut()
+            .insert((scope, reachability), result);
+        result
+    }
+}
+
+pub(crate) fn evaluate_reachability_with_cache<'db>(
+    db: &'db dyn Db,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+    scope: ScopeId<'db>,
+    reachability_constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    reachability: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(cache) = cache {
+        cache.evaluate(
+            db,
+            scope,
+            reachability_constraints,
+            predicates,
+            reachability,
+        )
+    } else {
+        reachability_constraints.evaluate(db, predicates, reachability)
+    }
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
@@ -1306,6 +1395,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
         db: &'db dyn Db,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool {
+        let scope = self.scope();
         let predicates = self.predicates();
         let reachability_constraints = self.reachability_constraints();
 
@@ -1316,9 +1406,15 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
                  ..
              }| {
                 predicate(declaration)
-                    && !reachability_constraints
-                        .evaluate(db, predicates, reachability_constraint)
-                        .is_always_false()
+                    && !evaluate_reachability_with_cache(
+                        db,
+                        None,
+                        scope,
+                        reachability_constraints,
+                        predicates,
+                        reachability_constraint,
+                    )
+                    .is_always_false()
             },
         )
     }
@@ -1328,6 +1424,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
         db: &'db dyn Db,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> Option<ScopedDefinitionId> {
+        let scope = self.scope();
         let reachability_predicates = self.predicates();
         let reachability_constraints = self.reachability_constraints();
 
@@ -1338,9 +1435,15 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
                  reachability_constraint,
              }| {
                 (predicate(declaration)
-                    && !reachability_constraints
-                        .evaluate(db, reachability_predicates, reachability_constraint)
-                        .is_always_false())
+                    && !evaluate_reachability_with_cache(
+                        db,
+                        None,
+                        scope,
+                        reachability_constraints,
+                        reachability_predicates,
+                        reachability_constraint,
+                    )
+                    .is_always_false())
                 .then_some(declaration_order)
             },
         )

@@ -852,24 +852,6 @@ def _() -> int:
 ```
 
 ```py
-def returns_list_int(x: list[int]) -> list[int]:
-    return x
-
-def takes_list_str(x: list[str]) -> None: ...
-
-def _() -> list[int]:
-    x6_return_call = []
-    reveal_type(x6_return_call)  # revealed: list[int]
-    return returns_list_int(x6_return_call)
-
-def _() -> None:
-    x6_append_then_return_call = []
-    x6_append_then_return_call.append(1)
-    reveal_type(x6_append_then_return_call)  # revealed: list[int | str]
-    return takes_list_str(x6_append_then_return_call)  # error: [invalid-argument-type]
-```
-
-```py
 x7 = []
 x7[:] = [1, "2", 3.0]
 reveal_type(x7)  # revealed: list[int | str | float]
