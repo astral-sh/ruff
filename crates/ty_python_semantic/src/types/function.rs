@@ -79,7 +79,9 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{nearest_enclosing_class, original_class_type};
+use crate::types::infer::{
+    ScopeInference, infer_complete_scope_types, nearest_enclosing_class, original_class_type,
+};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -1265,6 +1267,27 @@ impl<'db> FunctionType<'db> {
         self.literal(db).has_trivial_body(db)
     }
 
+    /// Returns `true` if the implementation is a transparent exact runtime-class predicate.
+    pub(crate) fn uses_exact_runtime_class_test(self, db: &'db dyn Db) -> bool {
+        #[salsa::tracked]
+        fn implementation_uses_exact_runtime_class_test<'db>(
+            db: &'db dyn Db,
+            implementation: OverloadLiteral<'db>,
+        ) -> bool {
+            let file = implementation.body_scope(db).file(db);
+            let module = parsed_module(db, file).load(db);
+            let function = implementation.node(db, file, &module);
+            let inference = infer_complete_scope_types(db, implementation.body_scope(db));
+
+            function_is_exact_runtime_class_test(db, inference, function)
+        }
+
+        let (_, Some(implementation)) = self.overloads_and_implementation(db) else {
+            return false;
+        };
+        implementation_uses_exact_runtime_class_test(db, implementation)
+    }
+
     /// Returns `true` if any overload or implementation has an explicit return annotation.
     ///
     /// This distinguishes untyped decorators that infer an unknown return from decorators that
@@ -1828,6 +1851,171 @@ pub(crate) fn function_has_stub_body(node: &ast::StmtFunctionDef) -> bool {
         ast::Stmt::Expr(ast::StmtExpr { value, .. }) => value.is_ellipsis_literal_expr(),
         _ => false,
     })
+}
+
+fn is_parameter_reference(expr: &ast::Expr, parameter: &str) -> bool {
+    matches!(
+        expr,
+        ast::Expr::Name(ast::ExprName { id, .. }) if id.as_str() == parameter
+    )
+}
+
+fn exact_class_test_target<'a, 'db>(
+    db: &'db dyn Db,
+    inference: &ScopeInference<'db>,
+    expr: &'a ast::Expr,
+) -> Option<&'a ast::Expr> {
+    match expr {
+        ast::Expr::Call(ast::ExprCall {
+            func,
+            arguments: ast::Arguments { args, keywords, .. },
+            ..
+        }) if keywords.is_empty()
+            && let [argument] = &**args
+            && let Type::ClassLiteral(class) = inference.expression_type(func)
+            && class.is_known(db, KnownClass::Type) =>
+        {
+            Some(argument)
+        }
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+            if attr.as_str() == "__class__" =>
+        {
+            Some(value)
+        }
+        _ => None,
+    }
+}
+
+fn returns_exact_class_comparison<'db>(
+    db: &'db dyn Db,
+    inference: &ScopeInference<'db>,
+    statement: &ast::Stmt,
+    value_parameter: &str,
+    classinfo_parameter: &str,
+    expected_operator: ast::CmpOp,
+) -> bool {
+    matches!(
+        statement,
+        ast::Stmt::Return(ast::StmtReturn { value: Some(value), .. })
+            if matches!(
+                &**value,
+                ast::Expr::Compare(ast::ExprCompare {
+                    left,
+                    ops,
+                    comparators,
+                    ..
+                }) if matches!(&**ops, [operator] if *operator == expected_operator)
+                    && matches!(&**comparators, [comparator]
+                        if is_parameter_reference(comparator, classinfo_parameter))
+                    && exact_class_test_target(db, inference, left)
+                        .is_some_and(|target| is_parameter_reference(target, value_parameter))
+            )
+    )
+}
+
+fn is_classinfo_collection_test<'db>(
+    db: &'db dyn Db,
+    inference: &ScopeInference<'db>,
+    expr: &ast::Expr,
+    classinfo_parameter: &str,
+) -> bool {
+    let ast::Expr::Call(ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    }) = expr
+    else {
+        return false;
+    };
+    let Type::FunctionLiteral(function) = inference.expression_type(func) else {
+        return false;
+    };
+    if !keywords.is_empty() || !function.is_known(db, KnownFunction::IsInstance) {
+        return false;
+    }
+
+    let [value, classinfo] = &**args else {
+        return false;
+    };
+    let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = classinfo else {
+        return false;
+    };
+    let [tuple, list, set] = &**elts else {
+        return false;
+    };
+
+    is_parameter_reference(value, classinfo_parameter)
+        && [tuple, list, set]
+            .into_iter()
+            .zip([KnownClass::Tuple, KnownClass::List, KnownClass::Set])
+            .all(|(element, expected)| {
+                matches!(
+                    inference.expression_type(element),
+                    Type::ClassLiteral(class) if class.is_known(db, expected)
+                )
+            })
+}
+
+fn function_is_exact_runtime_class_test<'db>(
+    db: &'db dyn Db,
+    inference: &ScopeInference<'db>,
+    function: &ast::StmtFunctionDef,
+) -> bool {
+    let mut parameters = function.parameters.iter_non_variadic_params();
+    let Some(value_parameter) = parameters.next() else {
+        return false;
+    };
+    let Some(classinfo_parameter) = parameters.next() else {
+        return false;
+    };
+    if parameters.next().is_some()
+        || function.parameters.vararg.is_some()
+        || function.parameters.kwarg.is_some()
+    {
+        return false;
+    }
+
+    let value_parameter = value_parameter.parameter.name.as_str();
+    let classinfo_parameter = classinfo_parameter.parameter.name.as_str();
+    let body = ast::helpers::body_without_leading_docstring(&function.body);
+
+    match body {
+        [statement] => returns_exact_class_comparison(
+            db,
+            inference,
+            statement,
+            value_parameter,
+            classinfo_parameter,
+            ast::CmpOp::Is,
+        ),
+        [ast::Stmt::If(if_statement), final_return]
+            if if_statement.elif_else_clauses.is_empty()
+                && is_classinfo_collection_test(
+                    db,
+                    inference,
+                    &if_statement.test,
+                    classinfo_parameter,
+                ) =>
+        {
+            matches!(&*if_statement.body, [in_return]
+            if returns_exact_class_comparison(
+                db,
+                inference,
+                in_return,
+                value_parameter,
+                classinfo_parameter,
+                ast::CmpOp::In,
+            )) && returns_exact_class_comparison(
+                db,
+                inference,
+                final_return,
+                value_parameter,
+                classinfo_parameter,
+                ast::CmpOp::Is,
+            )
+        }
+        _ => false,
+    }
 }
 
 /// Classify the body of this function:

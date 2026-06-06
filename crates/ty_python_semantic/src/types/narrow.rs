@@ -1,10 +1,8 @@
 use crate::Db;
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::subscript::PyIndex;
-use crate::types::function::{KnownFunction, OverloadLiteral};
-use crate::types::infer::{
-    ExpressionInference, infer_complete_scope_types, infer_same_file_expression_type,
-};
+use crate::types::function::KnownFunction;
+use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
@@ -38,227 +36,6 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
-
-/// Return the expression whose runtime class is tested by `type(x)` or `x.__class__`.
-fn exact_class_narrowing_target<'a, 'db>(
-    db: &'db dyn Db,
-    expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-    expr: &'a ast::Expr,
-) -> Option<&'a ast::Expr> {
-    match expr.expression_value() {
-        ast::Expr::Call(ast::ExprCall {
-            func,
-            arguments: ast::Arguments { args, keywords, .. },
-            ..
-        }) => {
-            if keywords.is_empty()
-                && let [single_argument] = &**args
-                && let Type::ClassLiteral(called_class) = expression_type(func)
-                && called_class.is_known(db, KnownClass::Type)
-            {
-                Some(single_argument)
-            } else {
-                None
-            }
-        }
-        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if attr.as_str() == "__class__" =>
-        {
-            Some(value)
-        }
-        _ => None,
-    }
-}
-
-fn is_parameter_reference(expr: &ast::Expr, parameter: &str) -> bool {
-    matches!(
-        expr,
-        ast::Expr::Name(ast::ExprName { id, .. }) if id.as_str() == parameter
-    )
-}
-
-fn is_exact_class_comparison<'db>(
-    db: &'db dyn Db,
-    expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-    expr: &ast::Expr,
-    value_parameter: &str,
-    classinfo_parameter: &str,
-    expected_operator: ast::CmpOp,
-) -> bool {
-    matches!(
-        expr,
-        ast::Expr::Compare(ast::ExprCompare {
-            left,
-            ops,
-            comparators,
-            ..
-        }) if matches!(&**ops, [operator] if *operator == expected_operator)
-            && matches!(&**comparators, [comparator]
-                if is_parameter_reference(comparator, classinfo_parameter))
-            && exact_class_narrowing_target(db, expression_type, left)
-                .is_some_and(|target| is_parameter_reference(target, value_parameter))
-    )
-}
-
-fn returns_exact_class_comparison<'db>(
-    db: &'db dyn Db,
-    expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-    statement: &ast::Stmt,
-    value_parameter: &str,
-    classinfo_parameter: &str,
-    expected_operator: ast::CmpOp,
-) -> bool {
-    matches!(
-        statement,
-        ast::Stmt::Return(ast::StmtReturn { value: Some(value), .. })
-            if is_exact_class_comparison(
-                db,
-                expression_type,
-                value,
-                value_parameter,
-                classinfo_parameter,
-                expected_operator,
-            )
-    )
-}
-
-fn is_classinfo_collection_test<'db>(
-    db: &'db dyn Db,
-    expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-    expr: &ast::Expr,
-    classinfo_parameter: &str,
-) -> bool {
-    let ast::Expr::Call(ast::ExprCall {
-        func,
-        arguments: ast::Arguments { args, keywords, .. },
-        ..
-    }) = expr
-    else {
-        return false;
-    };
-    let Type::FunctionLiteral(function) = expression_type(func) else {
-        return false;
-    };
-    if !keywords.is_empty() || !function.is_known(db, KnownFunction::IsInstance) {
-        return false;
-    }
-
-    let [value, classinfo] = &**args else {
-        return false;
-    };
-    if !is_parameter_reference(value, classinfo_parameter) {
-        return false;
-    }
-
-    let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = classinfo else {
-        return false;
-    };
-    let [tuple, list, set] = &**elts else {
-        return false;
-    };
-    [tuple, list, set]
-        .into_iter()
-        .zip([KnownClass::Tuple, KnownClass::List, KnownClass::Set])
-        .all(|(element, expected)| {
-            matches!(
-                expression_type(element),
-                Type::ClassLiteral(class) if class.is_known(db, expected)
-            )
-        })
-}
-
-/// Return whether this implementation is a transparent exact runtime-class predicate.
-///
-/// This is a tracked query because the result is consulted at call sites, potentially across
-/// modules. Callers depend on the boolean classification rather than directly on the callee's AST.
-#[salsa::tracked]
-fn is_exact_runtime_class_typeis_implementation<'db>(
-    db: &'db dyn Db,
-    implementation: OverloadLiteral<'db>,
-) -> bool {
-    let file = implementation.body_scope(db).file(db);
-    let module = parsed_module(db, file).load(db);
-    let function = implementation.node(db, file, &module);
-
-    let mut parameters = function.parameters.iter_non_variadic_params();
-    let Some(value_parameter) = parameters.next() else {
-        return false;
-    };
-    let Some(classinfo_parameter) = parameters.next() else {
-        return false;
-    };
-    if parameters.next().is_some()
-        || function.parameters.vararg.is_some()
-        || function.parameters.kwarg.is_some()
-    {
-        return false;
-    }
-
-    let value_parameter = value_parameter.parameter.name.as_str();
-    let classinfo_parameter = classinfo_parameter.parameter.name.as_str();
-    let body = match &*function.body {
-        [ast::Stmt::Expr(ast::StmtExpr { value, .. }), rest @ ..]
-            if value.as_string_literal_expr().is_some() =>
-        {
-            rest
-        }
-        body => body,
-    };
-
-    let inference = infer_complete_scope_types(db, implementation.body_scope(db));
-    let expression_type = |expression: &ast::Expr| inference.expression_type(expression);
-
-    match body {
-        [statement] => returns_exact_class_comparison(
-            db,
-            &expression_type,
-            statement,
-            value_parameter,
-            classinfo_parameter,
-            ast::CmpOp::Is,
-        ),
-        [ast::Stmt::If(if_statement), final_return] => {
-            if !if_statement.elif_else_clauses.is_empty()
-                || !is_classinfo_collection_test(
-                    db,
-                    &expression_type,
-                    &if_statement.test,
-                    classinfo_parameter,
-                )
-            {
-                return false;
-            }
-
-            matches!(&*if_statement.body, [in_return]
-            if returns_exact_class_comparison(
-                db,
-                &expression_type,
-                in_return,
-                value_parameter,
-                classinfo_parameter,
-                ast::CmpOp::In,
-            )) && returns_exact_class_comparison(
-                db,
-                &expression_type,
-                final_return,
-                value_parameter,
-                classinfo_parameter,
-                ast::CmpOp::Is,
-            )
-        }
-        _ => false,
-    }
-}
-
-fn typeis_call_uses_exact_runtime_class_test<'db>(db: &'db dyn Db, callable: Type<'db>) -> bool {
-    let Type::FunctionLiteral(function) = callable else {
-        return false;
-    };
-    let (_, Some(implementation)) = function.overloads_and_implementation(db) else {
-        return false;
-    };
-    is_exact_runtime_class_typeis_implementation(db, implementation)
-}
 
 fn exact_runtime_class_test_supports_negative_narrowing<'db>(
     db: &'db dyn Db,
@@ -1607,6 +1384,40 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        /// Return the expression being tested by an exact runtime-class check.
+        ///
+        /// `x.__class__` is modeled as equivalent to `type(x)` by [`Type::dunder_class`], so class
+        /// identity checks against either expression can narrow `x`.
+        fn exact_class_narrowing_target<'a, 'db>(
+            db: &'db dyn Db,
+            inference: &ExpressionInference<'db>,
+            expr: &'a ast::Expr,
+        ) -> Option<&'a ast::Expr> {
+            match expr.expression_value() {
+                ast::Expr::Call(ast::ExprCall {
+                    func,
+                    arguments: ast::Arguments { args, keywords, .. },
+                    ..
+                }) => {
+                    if keywords.is_empty()
+                        && let [single_argument] = &**args
+                        && let Type::ClassLiteral(called_class) = inference.expression_type(func)
+                        && called_class.is_known(db, KnownClass::Type)
+                    {
+                        Some(single_argument)
+                    } else {
+                        None
+                    }
+                }
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
+                    if attr.as_str() == "__class__" =>
+                {
+                    Some(value)
+                }
+                _ => None,
+            }
+        }
+
         let ast::ExprCompare {
             range: _,
             node_index: _,
@@ -1633,7 +1444,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
-        let expression_type = |expression: &ast::Expr| inference.expression_type(expression);
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -1927,8 +1737,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x.__class__ is y.__class__`
             // - `if x.__class__ is not y.__class__`
             let exact_class_checks = match (
-                exact_class_narrowing_target(self.db, &expression_type, left),
-                exact_class_narrowing_target(self.db, &expression_type, right),
+                exact_class_narrowing_target(self.db, inference, left),
+                exact_class_narrowing_target(self.db, inference, right),
             ) {
                 (Some(left_target), Some(right_target)) => {
                     [Some((left_target, rhs_ty)), Some((right_target, lhs_ty))]
@@ -2132,10 +1942,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
                 if !is_positive
-                    && typeis_call_uses_exact_runtime_class_test(
-                        self.db,
-                        inference.expression_type(&*expr_call.func),
-                    )
+                    && let Type::FunctionLiteral(function) =
+                        inference.expression_type(&*expr_call.func)
+                    && function.uses_exact_runtime_class_test(self.db)
                     && !exact_runtime_class_test_supports_negative_narrowing(
                         self.db,
                         type_is.return_type(self.db),
