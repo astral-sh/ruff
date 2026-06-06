@@ -1047,7 +1047,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
             .unwrap_or(Truthiness::AlwaysTrue),
-        PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
+        PatternPredicateKind::MatchStar => Truthiness::Ambiguous,
     }
 }
 

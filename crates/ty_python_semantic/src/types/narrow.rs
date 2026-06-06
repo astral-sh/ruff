@@ -916,7 +916,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
                 .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
-            PatternPredicateKind::Unsupported => None,
+            PatternPredicateKind::MatchStar => None,
         }
     }
 
@@ -2056,7 +2056,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .as_deref()
                 .map(|pattern| self.necessary_match_pattern_type(pattern))
                 .unwrap_or_else(Type::object),
-            PatternPredicateKind::Value(_) | PatternPredicateKind::Unsupported => Type::object(),
+            PatternPredicateKind::Value(_) | PatternPredicateKind::MatchStar => Type::object(),
         }
     }
 

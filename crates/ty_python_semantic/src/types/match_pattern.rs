@@ -205,7 +205,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
             .as_deref()
             .map(|p| definite_match_pattern_type(db, p))
             .unwrap_or_else(Type::object),
-        PatternPredicateKind::Unsupported => Type::Never,
+        PatternPredicateKind::MatchStar => Type::Never,
     }
 }
 
