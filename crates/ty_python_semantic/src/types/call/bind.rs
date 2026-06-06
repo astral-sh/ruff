@@ -2663,28 +2663,20 @@ fn call_property_getter<'db>(
     getter: Type<'db>,
     instance: Type<'db>,
 ) -> Option<Type<'db>> {
-    call_property_getter_with(db, getter, instance, |getter, instance| {
+    let call = |getter: Type<'db>| {
         getter
             .try_call(db, &CallArguments::positional([instance]))
             .ok()
             .map(|binding| binding.return_type(db))
-    })
-}
-
-fn call_property_getter_with<'db>(
-    db: &'db dyn Db,
-    getter: Type<'db>,
-    instance: Type<'db>,
-    mut call: impl FnMut(Type<'db>, Type<'db>) -> Option<Type<'db>>,
-) -> Option<Type<'db>> {
+    };
     // Validate the original receiver annotation before applying `Self` to compute the precise
     // return type.
-    let return_ty = call(getter, instance)?;
+    let return_ty = call(getter)?;
     let bound_getter = getter.apply_self_binding(db, instance);
     if bound_getter == getter {
         Some(return_ty)
     } else {
-        call(bound_getter, instance)
+        call(bound_getter)
     }
 }
 

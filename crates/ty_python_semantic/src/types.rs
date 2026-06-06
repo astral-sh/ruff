@@ -7387,9 +7387,7 @@ impl<'db> SelfBinding<'db> {
                 .references_typevar(db, bound_typevar.typevar(db).identity(db)))
         .then(Type::unknown)
     }
-}
 
-impl<'db> SelfBinding<'db> {
     pub(crate) fn new(
         db: &'db dyn Db,
         self_type: Type<'db>,

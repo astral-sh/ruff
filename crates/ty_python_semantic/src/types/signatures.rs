@@ -513,7 +513,7 @@ pub struct Signature<'db> {
     pub(crate) return_ty: Type<'db>,
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy)]
 enum SelfMappingComponents {
     All,
     GenericDefaults,
@@ -937,14 +937,16 @@ impl<'db> Signature<'db> {
             parameters: Parameters::new(db, parameters),
             return_ty: self.return_ty,
         };
-        let mut signature = self_type.map_or(signature.clone(), |self_type| {
+        let mut signature = if let Some(self_type) = self_type {
             signature.apply_self_mapping(
                 db,
                 SelfBinding::new(db, self_type, binding_context)
                     .with_unbound_method_self_fallback(),
                 SelfMappingComponents::All,
             )
-        });
+        } else {
+            signature
+        };
         signature.generic_context = signature
             .generic_context
             .map(|generic_context| generic_context.remove_self(db, binding_context));
@@ -1081,7 +1083,14 @@ impl<'db> Signature<'db> {
         }
 
         let self_mapping = TypeMapping::BindSelf(self_binding);
-        let generic_context = self.map_self_in_generic_defaults(db, &self_mapping);
+        let generic_context = self.generic_context.map(|generic_context| {
+            GenericContext::from_typevar_instances(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| typevar.apply_type_mapping_to_default(db, &self_mapping)),
+            )
+        });
         let (parameters, return_ty) = match components {
             SelfMappingComponents::All => (
                 self.parameters.apply_type_mapping_impl(
@@ -1101,21 +1110,6 @@ impl<'db> Signature<'db> {
             parameters,
             return_ty,
         }
-    }
-
-    fn map_self_in_generic_defaults(
-        &self,
-        db: &'db dyn Db,
-        self_mapping: &TypeMapping<'_, 'db>,
-    ) -> Option<GenericContext<'db>> {
-        self.generic_context.map(|generic_context| {
-            GenericContext::from_typevar_instances(
-                db,
-                generic_context
-                    .variables(db)
-                    .map(|typevar| typevar.apply_type_mapping_to_default(db, self_mapping)),
-            )
-        })
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
