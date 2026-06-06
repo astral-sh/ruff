@@ -193,6 +193,8 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -220,6 +222,7 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -1233,11 +1236,7 @@ pub(crate) fn binding_reachability<'db, 'map>(
     use_def: &'map UseDefMap<'db>,
     binding: &BindingWithConstraints<'map, 'db>,
 ) -> Truthiness {
-    use_def.reachability_constraints().evaluate(
-        db,
-        use_def.predicates(),
-        binding.reachability_constraint,
-    )
+    evaluate_reachability(db, use_def, binding.reachability_constraint)
 }
 
 pub(crate) fn evaluate_reachability(
@@ -1248,6 +1247,81 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+pub(crate) struct ReachabilityEvaluationCache<'db> {
+    primary_scope: ScopeId<'db>,
+    primary_entries: RefCell<FxHashMap<ScopedReachabilityConstraintId, Truthiness>>,
+    other_entries: RefCell<FxHashMap<(ScopeId<'db>, ScopedReachabilityConstraintId), Truthiness>>,
+}
+
+impl<'db> ReachabilityEvaluationCache<'db> {
+    pub(crate) fn new(primary_scope: ScopeId<'db>) -> Self {
+        Self {
+            primary_scope,
+            primary_entries: RefCell::new(FxHashMap::default()),
+            other_entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    pub(crate) fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        scope: ScopeId<'db>,
+        reachability_constraints: &ReachabilityConstraints,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        reachability: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        match reachability {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            ScopedReachabilityConstraintId::AMBIGUOUS => return Truthiness::Ambiguous,
+            _ => {}
+        }
+
+        if scope == self.primary_scope {
+            if let Some(cached) = self.primary_entries.borrow().get(&reachability) {
+                return *cached;
+            }
+
+            let result = reachability_constraints.evaluate(db, predicates, reachability);
+            self.primary_entries
+                .borrow_mut()
+                .insert(reachability, result);
+            return result;
+        }
+
+        if let Some(cached) = self.other_entries.borrow().get(&(scope, reachability)) {
+            return *cached;
+        }
+
+        let result = reachability_constraints.evaluate(db, predicates, reachability);
+        self.other_entries
+            .borrow_mut()
+            .insert((scope, reachability), result);
+        result
+    }
+}
+
+pub(crate) fn evaluate_reachability_with_cache<'db>(
+    db: &'db dyn Db,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+    scope: ScopeId<'db>,
+    reachability_constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    reachability: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(cache) = cache {
+        cache.evaluate(
+            db,
+            scope,
+            reachability_constraints,
+            predicates,
+            reachability,
+        )
+    } else {
+        reachability_constraints.evaluate(db, predicates, reachability)
+    }
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
@@ -1271,6 +1345,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
         db: &'db dyn Db,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> bool {
+        let scope = self.scope();
         let predicates = self.predicates();
         let reachability_constraints = self.reachability_constraints();
 
@@ -1281,9 +1356,15 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
                  ..
              }| {
                 predicate(declaration)
-                    && !reachability_constraints
-                        .evaluate(db, predicates, reachability_constraint)
-                        .is_always_false()
+                    && !evaluate_reachability_with_cache(
+                        db,
+                        None,
+                        scope,
+                        reachability_constraints,
+                        predicates,
+                        reachability_constraint,
+                    )
+                    .is_always_false()
             },
         )
     }
@@ -1293,6 +1374,7 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
         db: &'db dyn Db,
         mut predicate: impl FnMut(DefinitionState<'db>) -> bool,
     ) -> Option<ScopedDefinitionId> {
+        let scope = self.scope();
         let reachability_predicates = self.predicates();
         let reachability_constraints = self.reachability_constraints();
 
@@ -1303,9 +1385,15 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
                  reachability_constraint,
              }| {
                 (predicate(declaration)
-                    && !reachability_constraints
-                        .evaluate(db, reachability_predicates, reachability_constraint)
-                        .is_always_false())
+                    && !evaluate_reachability_with_cache(
+                        db,
+                        None,
+                        scope,
+                        reachability_constraints,
+                        reachability_predicates,
+                        reachability_constraint,
+                    )
+                    .is_always_false())
                 .then_some(declaration_order)
             },
         )
