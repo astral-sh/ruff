@@ -94,6 +94,14 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Projects an instance constraint into the class-object domain.
+    ///
+    /// Unlike [`Self::try_from_instance`], this excludes structural protocol instances: a
+    /// protocol can describe only the current value without constraining its runtime class.
+    fn try_from_instance_constraint(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
+    }
+
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
     pub(crate) const fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
@@ -163,11 +171,22 @@ impl<'db> SubclassOfType<'db> {
                 match mapped {
                     Type::Intersection(intersection) => {
                         let mut builder = IntersectionBuilder::new(db);
-                        for element in intersection.positive_elements_or_object(db) {
-                            builder = builder.add_positive(element.to_meta_type(db));
+                        let mut found_positive = false;
+                        for element in intersection.positive(db) {
+                            if let Some(meta_type) =
+                                Self::try_from_instance_constraint(db, *element)
+                            {
+                                builder = builder.add_positive(meta_type);
+                                found_positive = true;
+                            }
+                        }
+                        if !found_positive {
+                            builder = builder.add_positive(KnownClass::Type.to_instance(db));
                         }
                         for element in intersection.negative(db) {
-                            if let Some(meta_type) = Self::try_from_instance(db, *element) {
+                            if let Some(meta_type) =
+                                Self::try_from_instance_constraint(db, *element)
+                            {
                                 builder = builder.add_negative(meta_type);
                             }
                         }
