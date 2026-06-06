@@ -370,6 +370,14 @@ class Factory:
     def make[T](cls: type[T]) -> T:
         return cls()
 
+    @classmethod
+    def choose[T](cls: type[T], other: T) -> T:
+        return other
+
+    @classmethod
+    def choose_constrained[T: (Factory, Extra)](cls: type[T], other: T) -> T:
+        return other
+
     @overload
     @classmethod
     def overloaded_make[T](cls: type[T], value: int) -> T: ...
@@ -381,9 +389,15 @@ class Factory:
         raise NotImplementedError
 
 class Extra: ...
+class Both(Factory, Extra): ...
+class FactoryChild(Factory): ...
+
+reveal_type(Both.choose(Factory()))  # revealed: Factory
 
 def _(cls: Intersection[type[Factory], type[Extra]]):
     reveal_type(cls.make())  # revealed: Factory & Extra
+    reveal_type(cls.choose(Factory()))  # revealed: Factory
+    reveal_type(cls.choose_constrained(FactoryChild()))  # revealed: Factory
     reveal_type(cls.overloaded_make(1))  # revealed: Factory & Extra
     # revealed: tuple[Factory & Extra, Factory & Extra]
     reveal_type(cls.overloaded_make("one"))
