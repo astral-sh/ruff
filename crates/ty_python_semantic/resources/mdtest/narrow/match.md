@@ -456,6 +456,22 @@ def test_match_capture_preserves_custom_equal_enum_arm() -> int:
         case _:
             return 0
 
+class AlwaysEqualTuple(tuple[int, ...]):
+    def __eq__(self, other: object) -> Literal[True]:
+        return True
+
+class InheritedAlwaysEqualTuple(AlwaysEqualTuple):
+    pass
+
+def test_match_alias_preserves_custom_equal_tuple_subclass(
+    value: InheritedAlwaysEqualTuple | bytes,
+) -> bytes:
+    match value:
+        case 1 as item:
+            return item  # error: [invalid-return-type]
+        case _:
+            return b""
+
 class AlwaysEqualMeta(type):
     def __eq__(cls, other: object) -> Literal[True]:
         return True
