@@ -1937,17 +1937,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
-                PatternPredicateKind::Sequence(SequencePatternPredicateKind {
-                    patterns: pattern
-                        .patterns
-                        .iter()
-                        .map(|pattern| self.predicate_kind(pattern))
-                        .collect(),
-                    has_star: pattern
-                        .patterns
-                        .iter()
-                        .any(|pattern| matches!(pattern, ast::Pattern::MatchStar(_))),
-                })
+                let mut has_star = false;
+                let patterns = pattern
+                    .patterns
+                    .iter()
+                    .map(|pattern| {
+                        if matches!(pattern, ast::Pattern::MatchStar(_)) {
+                            has_star = true;
+                        }
+                        self.predicate_kind(pattern)
+                    })
+                    .collect();
+                PatternPredicateKind::Sequence(SequencePatternPredicateKind { patterns, has_star })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
