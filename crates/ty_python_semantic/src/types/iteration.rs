@@ -331,10 +331,12 @@ impl<'db> Type<'db> {
         // `TypeAlias → value_type` and bottom out at `homogeneous(Recursive)`,
         // dropping the `| str` element-type branch
         // (`pep695_type_aliases.md:586,597,610`).
+        // A non-contractive `μα.α` carries no structure to iterate; unfolding it loops, so leave it
+        // for `non_async_special_case` below (which yields `homogeneous(μα.α)`, like `Divergent`).
         let rec_to_unfold = match self {
-            Type::Recursive(rec) => Some(rec),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(rec),
             Type::TypeAlias(alias) => match alias.value_type(db) {
-                Type::Recursive(rec) => Some(rec),
+                Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(rec),
                 _ => None,
             },
             _ => None,

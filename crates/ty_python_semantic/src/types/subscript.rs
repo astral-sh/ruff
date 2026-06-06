@@ -514,6 +514,10 @@ impl<'db> Type<'db> {
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
+            // A non-contractive `μα.α` carries no structure to subscript into; unfolding it loops,
+            // so treat it as a gradual leaf and return the marker itself (like `Divergent` above).
+            (Type::Recursive(rec), _) if rec.is_non_contractive(db) => Some(Ok(value_ty)),
+
             // Subscripting an opaque recursive type means subscripting one-step
             // unfold of its body. The `Divergent` α-markers in the body are
             // substituted with the recursive type itself so element results
