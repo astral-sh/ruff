@@ -4095,6 +4095,7 @@ impl<'db> Type<'db> {
                         self,
                         bound_method.indexed_call_signatures(db),
                     )
+                    .with_source_overloaded(function.signature(db).overloads.len() > 1)
                     .with_bound_type(self_instance)
                     .into()
                 } else {

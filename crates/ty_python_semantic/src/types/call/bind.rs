@@ -2825,6 +2825,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            source_is_overloaded: false,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec_inline![from],
@@ -2868,6 +2869,9 @@ pub(crate) struct CallableBinding<'db> {
 
     /// The type of the bound `self` or `cls` parameter if this signature is for a bound method.
     pub(crate) bound_type: Option<Type<'db>>,
+
+    /// Whether the source callable was overloaded before its signatures were filtered.
+    source_is_overloaded: bool,
 
     /// The return type of this overloaded callable.
     ///
@@ -2938,18 +2942,20 @@ impl<'db> CallableBinding<'db> {
         signature_type: Type<'db>,
         overloads: impl IntoIterator<Item = (usize, Signature<'db>)>,
     ) -> Self {
-        let overloads = overloads
+        let overloads: SmallVec<_> = overloads
             .into_iter()
             .map(|(source_overload_index, signature)| {
                 Binding::single(signature_type, signature)
                     .with_source_overload_index(source_overload_index)
             })
             .collect();
+        let source_is_overloaded = overloads.len() > 1;
         Self {
             callable_type: signature_type,
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            source_is_overloaded,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads,
@@ -2962,6 +2968,7 @@ impl<'db> CallableBinding<'db> {
             signature_type,
             dunder_call_is_possibly_unbound: false,
             bound_type: None,
+            source_is_overloaded: false,
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
@@ -3161,6 +3168,11 @@ impl<'db> CallableBinding<'db> {
         self
     }
 
+    pub(crate) fn with_source_overloaded(mut self, source_is_overloaded: bool) -> Self {
+        self.source_is_overloaded = source_is_overloaded;
+        self
+    }
+
     /// Returns the source overload indexes that should be shown in diagnostics.
     ///
     /// Bound method overloads preserve their source indexes after receiver filtering. Method
@@ -3268,7 +3280,9 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::Single(index) => {
                         // If only one candidate overload remains, it is the winning match. Evaluate
                         // it as a regular (non-overloaded) call.
-                        self.matching_overload_before_type_checking = Some(index);
+                        if self.overloads.len() > 1 {
+                            self.matching_overload_before_type_checking = Some(index);
+                        }
                         self.overloads[index].check_types(
                             db,
                             constraints,
@@ -3908,7 +3922,9 @@ impl<'db> CallableBinding<'db> {
         if let Some((_, first_overload)) = self.matching_overloads().next() {
             return first_overload.return_type();
         }
-        if let [overload] = self.overloads.as_slice() {
+        if !self.source_is_overloaded
+            && let [overload] = self.overloads.as_slice()
+        {
             return overload.return_type();
         }
         Type::unknown()
@@ -3950,7 +3966,7 @@ impl<'db> CallableBinding<'db> {
 
         match self.overloads.as_slice() {
             [] => {}
-            [overload] => {
+            [overload] if !self.source_is_overloaded => {
                 let callable_description =
                     CallableDescription::new(context.db(), self.signature_type);
                 overload.report_diagnostics(
