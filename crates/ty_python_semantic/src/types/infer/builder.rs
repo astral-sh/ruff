@@ -10240,7 +10240,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             qualifiers: _,
             type_expression_flags,
             mut collection_use_constraints,
@@ -10269,12 +10269,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let diagnostics = context.finish();
         let _ = scope;
-
-        // Missing entries resolve to `Unknown`. Keep explicit entries during cycle recovery,
-        // where a missing entry instead resolves to the cycle fallback.
-        if cycle_recovery.is_none() {
-            expressions.retain(|_, ty| !ty.is_unknown());
-        }
 
         assert!(
             declarations.is_empty(),
@@ -10326,7 +10320,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let Self {
             context,
-            mut expressions,
+            expressions,
             qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
@@ -10355,12 +10349,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let _ = scope;
         let diagnostics = context.finish();
-
-        // Missing entries resolve to `Unknown`. Keep explicit entries during cycle recovery,
-        // where a missing entry instead resolves to the cycle fallback.
-        if cycle_recovery.is_none() {
-            expressions.retain(|_, ty| !ty.is_unknown());
-        }
 
         let extra = (!diagnostics.is_empty()
             || !string_annotations.is_empty()

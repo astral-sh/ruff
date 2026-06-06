@@ -574,7 +574,7 @@ fn dependency_own_instance_member() -> anyhow::Result<()> {
 }
 
 #[test]
-fn unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
+fn scope_unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
         "/src/main.py",
@@ -592,7 +592,7 @@ fn unknown_expression_types_use_compact_storage() -> anyhow::Result<()> {
 
     let expression = index.expression(value);
     let expression_inference = infer_expression_types(&db, expression, TypeContext::default());
-    assert!(expression_inference.expressions.get(&value_key).is_none());
+    assert!(expression_inference.expressions.get(&value_key).is_some());
     assert!(expression_inference.expression_type(value).is_unknown());
 
     let target = &assignment.targets[0];
