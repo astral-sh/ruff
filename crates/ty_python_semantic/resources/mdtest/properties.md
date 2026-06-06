@@ -689,3 +689,33 @@ static_assert(is_disjoint_from(TypeOf[both_a], TypeOf[both_d]))
 assert_equivalent_properties(get_equiv_a, get_equiv_b)
 assert_structural_property_relations(get_int, get_int, set_object, set_object)
 ```
+
+## Protocol-owned properties discard unrelated refinements
+
+`protocols.pyi`:
+
+```pyi
+from typing import Protocol
+from typing_extensions import Self
+
+class BaseProtocol(Protocol):
+    @property
+    def property(self) -> Self: ...
+
+class MarkerProtocol(Protocol):
+    marker: int
+```
+
+`main.py`:
+
+```py
+from protocols import BaseProtocol, MarkerProtocol
+from ty_extensions import Intersection
+
+class Impl:
+    pass
+
+def _(value: Intersection[Impl, BaseProtocol, MarkerProtocol]):
+    reveal_type(value.property)  # revealed: Impl & BaseProtocol
+    value.property.marker  # error: [unresolved-attribute]
+```

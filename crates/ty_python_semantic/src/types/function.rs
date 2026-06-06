@@ -1047,6 +1047,22 @@ impl<'db> FunctionType<'db> {
         )
     }
 
+    pub(crate) fn apply_self(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        let updated_signature = self.signature(db).apply_self(db, self_type);
+        let literal = self.literal(db);
+        let updated_implementation_signature = literal
+            .has_separate_implementation(db)
+            .then(|| self.last_definition_signature(db).apply_self(db, self_type));
+        Self::new(
+            db,
+            literal,
+            UpdatedFunctionSignatures::new(
+                Some(updated_signature),
+                updated_implementation_signature,
+            ),
+        )
+    }
+
     pub(crate) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
