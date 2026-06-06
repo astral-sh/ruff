@@ -8103,6 +8103,8 @@ pub struct TypeIsType<'db> {
     /// The ID of the scope to which the place belongs
     /// and the ID of the place itself within that scope.
     place_info: Option<(ScopeId<'db>, ScopedPlaceId)>,
+    /// Whether the false branch should narrow by the negated return type.
+    allow_negative_narrowing: bool,
 }
 
 fn walk_typeis_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -8136,7 +8138,7 @@ impl<'db> TypeIsType<'db> {
     ///     return isinstance(value, tuple)
     /// ```
     pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, None))
+        Type::TypeIs(Self::new(db, ty, None, true))
     }
 
     pub(crate) fn return_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -8155,12 +8157,36 @@ impl<'db> TypeIsType<'db> {
         scope: ScopeId<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        Type::TypeIs(Self::new(db, self.type_argument(db), Some((scope, place))))
+        Type::TypeIs(Self::new(
+            db,
+            self.type_argument(db),
+            Some((scope, place)),
+            self.allow_negative_narrowing(db),
+        ))
     }
 
     #[must_use]
     pub(crate) fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeIs(Self::new(db, ty, self.place_info(db)))
+        Type::TypeIs(Self::new(
+            db,
+            ty,
+            self.place_info(db),
+            self.allow_negative_narrowing(db),
+        ))
+    }
+
+    #[must_use]
+    pub(crate) fn with_negative_narrowing(
+        self,
+        db: &'db dyn Db,
+        allow_negative_narrowing: bool,
+    ) -> Type<'db> {
+        Type::TypeIs(Self::new(
+            db,
+            self.type_argument(db),
+            self.place_info(db),
+            allow_negative_narrowing,
+        ))
     }
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {

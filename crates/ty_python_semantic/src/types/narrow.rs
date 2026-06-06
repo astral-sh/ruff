@@ -1924,6 +1924,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let place_and_constraint = match return_ty {
             Type::TypeIs(type_is) => {
+                if !is_positive && !type_is.allow_negative_narrowing(self.db) {
+                    return None;
+                }
+
                 let (_, place) = type_is.place_info(self.db)?;
                 Some((
                     place,

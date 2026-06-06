@@ -3,7 +3,7 @@ use std::rc::Rc;
 
 use itertools::Itertools;
 use ruff_db::files::File;
-use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
@@ -67,7 +67,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
-    FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+    FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral, report_revealed_type,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
@@ -116,7 +116,7 @@ use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, Sc
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
     ApplicableConstraints, EnclosingSnapshotResult, EvaluationMode, SemanticIndex, Truthiness,
-    place_table, unpack::UnpackPosition,
+    place_table, semantic_index, unpack::UnpackPosition,
 };
 use ty_python_core::{ExpressionNodeKey, Statement};
 
@@ -141,6 +141,225 @@ mod typed_dict;
 mod typevar;
 
 use super::comparisons::{self, BinaryComparisonVisitor};
+
+fn is_name(expr: &ast::Expr, expected: &str) -> bool {
+    matches!(
+        expr,
+        ast::Expr::Name(ast::ExprName { id, .. }) if id.as_str() == expected
+    )
+}
+
+fn is_type_call(expr: &ast::Expr, value_param: &str) -> bool {
+    matches!(
+        expr,
+        ast::Expr::Call(ast::ExprCall {
+            func,
+            arguments: ast::Arguments { args, keywords, .. },
+            ..
+        }) if keywords.is_empty()
+            && matches!(&**args, [arg] if is_name(arg, value_param))
+            && is_name(func, "type")
+    )
+}
+
+fn is_type_compare(
+    expr: &ast::Expr,
+    value_param: &str,
+    classinfo_param: &str,
+    expected_op: ast::CmpOp,
+) -> bool {
+    matches!(
+        expr,
+        ast::Expr::Compare(ast::ExprCompare {
+            left,
+            ops,
+            comparators,
+            ..
+        }) if matches!(&**ops, [op] if *op == expected_op)
+            && matches!(&**comparators, [comparator] if is_name(comparator, classinfo_param))
+            && is_type_call(left, value_param)
+    )
+}
+
+fn is_returning_type_compare(
+    stmt: &ast::Stmt,
+    value_param: &str,
+    classinfo_param: &str,
+    expected_op: ast::CmpOp,
+) -> bool {
+    matches!(
+        stmt,
+        ast::Stmt::Return(ast::StmtReturn { value: Some(value), .. })
+            if is_type_compare(value, value_param, classinfo_param, expected_op)
+    )
+}
+
+fn is_classinfo_collection_test(expr: &ast::Expr, classinfo_param: &str) -> bool {
+    let ast::Expr::Call(ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    }) = expr
+    else {
+        return false;
+    };
+
+    if !keywords.is_empty() || !is_name(func, "isinstance") {
+        return false;
+    }
+
+    let [value, classinfo] = &**args else {
+        return false;
+    };
+
+    if !is_name(value, classinfo_param) {
+        return false;
+    }
+
+    let ast::Expr::Tuple(ast::ExprTuple { elts, .. }) = classinfo else {
+        return false;
+    };
+
+    matches!(&**elts, [tuple, list, set]
+        if is_name(tuple, "tuple") && is_name(list, "list") && is_name(set, "set"))
+}
+
+fn is_exact_runtime_class_typeis_function(function_node: &ast::StmtFunctionDef) -> bool {
+    let mut parameters = function_node.parameters.iter_non_variadic_params();
+    let Some(value_param) = parameters.next() else {
+        return false;
+    };
+    let Some(classinfo_param) = parameters.next() else {
+        return false;
+    };
+    if parameters.next().is_some()
+        || function_node.parameters.vararg.is_some()
+        || function_node.parameters.kwarg.is_some()
+    {
+        return false;
+    }
+
+    let value_param = value_param.parameter.name.as_str();
+    let classinfo_param = classinfo_param.parameter.name.as_str();
+
+    let body = match &*function_node.body {
+        [ast::Stmt::Expr(ast::StmtExpr { value, .. }), rest @ ..]
+            if value.as_string_literal_expr().is_some() =>
+        {
+            rest
+        }
+        body => body,
+    };
+
+    match body {
+        [stmt] => is_returning_type_compare(stmt, value_param, classinfo_param, ast::CmpOp::Is),
+        [ast::Stmt::If(if_stmt), final_return] => {
+            if !if_stmt.elif_else_clauses.is_empty()
+                || !is_classinfo_collection_test(&if_stmt.test, classinfo_param)
+            {
+                return false;
+            }
+
+            matches!(&*if_stmt.body, [in_return]
+            if is_returning_type_compare(
+                in_return,
+                value_param,
+                classinfo_param,
+                ast::CmpOp::In,
+            )) && is_returning_type_compare(
+                final_return,
+                value_param,
+                classinfo_param,
+                ast::CmpOp::Is,
+            )
+        }
+        _ => false,
+    }
+}
+
+fn public_function_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<FunctionType<'db>> {
+    let symbol = definition.place(db).as_symbol()?;
+    let use_def = semantic_index(db, definition.file(db)).use_def_map(definition.file_scope(db));
+
+    let Place::Defined(DefinedPlace {
+        ty: Type::FunctionLiteral(function),
+        definedness: Definedness::AlwaysDefined,
+        ..
+    }) = place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol)).place
+    else {
+        return None;
+    };
+
+    function
+        .contains_definition(db, definition)
+        .then_some(function)
+}
+
+fn implementation_literal_for_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> Option<OverloadLiteral<'db>> {
+    let function = public_function_for_definition(db, definition)
+        .or_else(|| infer_definition_types(db, definition).function_type(definition))?;
+
+    let (_, implementation) = function.overloads_and_implementation(db);
+    implementation.or_else(|| Some(function.first_overload_or_implementation(db)))
+}
+
+fn is_exact_runtime_class_typeis_definition<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> bool {
+    let Some(implementation) = implementation_literal_for_definition(db, definition) else {
+        return false;
+    };
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    is_exact_runtime_class_typeis_function(implementation.node(db, file, &module))
+}
+
+fn typeis_call_uses_exact_runtime_class_test<'db>(
+    db: &'db dyn Db,
+    bindings: &Bindings<'db>,
+) -> bool {
+    let Some(binding) = bindings.single_element() else {
+        return false;
+    };
+
+    let mut saw_typeis_overload = false;
+    for (_, overload) in binding.matching_overloads() {
+        if !matches!(overload.return_type(), Type::TypeIs(_)) {
+            continue;
+        }
+        saw_typeis_overload = true;
+
+        let Some(definition) = overload.signature.definition() else {
+            return false;
+        };
+        if !is_exact_runtime_class_typeis_definition(db, definition) {
+            return false;
+        }
+    }
+
+    saw_typeis_overload
+}
+
+fn can_skip_negative_narrowing_for_exact_typeis<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::NominalInstance(instance) => !instance.is_object(),
+        Type::Intersection(intersection) => intersection.positive(db).iter().any(|positive| {
+            positive
+                .resolve_type_alias(db)
+                .as_nominal_instance()
+                .is_some_and(|instance| !instance.is_object())
+        }),
+        _ => false,
+    }
+}
 
 /// A helper to track if we already know that declared and inferred types are the same.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -8554,8 +8773,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match return_ty {
-            Type::TypeIs(type_is) => match find_narrowed_place(narrowed_argument_index()) {
-                Some(place) => type_is.bind(db, scope, place),
+            Type::TypeIs(type_is) => match {
+                let argument_index = narrowed_argument_index();
+                find_narrowed_place(argument_index).map(|place| (argument_index, place))
+            } {
+                Some((argument_index, place)) => {
+                    let allow_negative_narrowing =
+                        !typeis_call_uses_exact_runtime_class_test(db, &bindings)
+                            || arguments.args.get(argument_index).is_none_or(|argument| {
+                                !can_skip_negative_narrowing_for_exact_typeis(
+                                    db,
+                                    self.expression_type(argument),
+                                )
+                            });
+
+                    let type_is = if allow_negative_narrowing {
+                        type_is
+                    } else {
+                        let Type::TypeIs(type_is) = type_is.with_negative_narrowing(db, false)
+                        else {
+                            unreachable!("with_negative_narrowing must return Type::TypeIs");
+                        };
+                        type_is
+                    };
+                    type_is.bind(db, scope, place)
+                }
                 None => return_ty,
             },
             Type::TypeGuard(type_guard) => match find_narrowed_place(narrowed_argument_index()) {
