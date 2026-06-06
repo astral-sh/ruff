@@ -160,13 +160,6 @@ impl<'db> SequencePatternPredicateKind<'db> {
         matches!(self.patterns.as_ref(), [PatternPredicateKind::Star(_)])
     }
 
-    pub fn is_exact_length(&self) -> bool {
-        !self
-            .patterns
-            .iter()
-            .any(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))
-    }
-
     /// Return the patterns before and after the starred element.
     pub fn split_around_star(
         &self,

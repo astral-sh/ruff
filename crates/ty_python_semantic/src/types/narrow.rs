@@ -16,8 +16,8 @@ use crate::types::{
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, class_pattern_is_irrefutable,
     definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
-    infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    infer_expression_types, mapping_pattern_type, singleton_pattern_type,
+    starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -1138,10 +1138,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         for (_, subject_ty) in subject_arms.iter().copied() {
             if let Some((_, tuple)) =
                 self.matching_sequence_pattern_arm(kind, subject_ty, target_len, sequence_ty)
+                && unpacker.unpack_tuple(tuple.as_ref()).is_ok()
             {
-                if unpacker.unpack_tuple(tuple.as_ref()).is_ok() {
-                    matched = true;
-                }
+                matched = true;
             }
         }
 
@@ -1250,12 +1249,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn sequence_pattern_target_len(kind: &SequencePatternPredicateKind<'db>) -> TupleLength {
-        if let Some(starred_index) = kind
-            .patterns
-            .iter()
-            .position(|pattern| matches!(pattern, PatternPredicateKind::Star(_)))
-        {
-            TupleLength::Variable(starred_index, kind.patterns.len() - (starred_index + 1))
+        if let Some((prefix, suffix)) = kind.split_around_star() {
+            TupleLength::Variable(prefix.len(), suffix.len())
         } else {
             TupleLength::Fixed(kind.patterns.len())
         }
@@ -2477,17 +2472,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &self,
         kind: &SequencePatternPredicateKind<'db>,
     ) -> Type<'db> {
-        if kind.is_exact_length() {
-            let element_types = kind
-                .patterns
-                .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern));
-            exact_sequence_pattern_type(self.db, element_types)
-        } else {
-            let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() else {
-                return sequence_pattern_type_builder(self.db).build();
-            };
-
+        if let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() {
             let prefix_element_types = prefix_patterns
                 .iter()
                 .map(|pattern| self.necessary_match_pattern_type(pattern));
@@ -2496,6 +2481,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .map(|pattern| self.necessary_match_pattern_type(pattern));
 
             starred_sequence_pattern_type(self.db, prefix_element_types, suffix_element_types)
+        } else {
+            let element_types = kind
+                .patterns
+                .iter()
+                .map(|pattern| self.necessary_match_pattern_type(pattern));
+            exact_sequence_pattern_type(self.db, element_types)
         }
     }
 

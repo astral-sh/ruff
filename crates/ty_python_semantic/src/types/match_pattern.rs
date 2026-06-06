@@ -264,19 +264,19 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
         return sequence_pattern_type_builder(db).build();
     }
 
-    if kind.is_exact_length() {
-        let element_types: Vec<_> = kind
-            .patterns
-            .iter()
-            .map(|pattern| definite_match_pattern_type(db, pattern))
-            .collect();
+    if kind.split_around_star().is_some() {
+        return Type::Never;
+    }
 
-        if element_types.iter().any(Type::is_never) {
-            Type::Never
-        } else {
-            exact_sequence_pattern_type(db, element_types.into_iter())
-        }
-    } else {
+    let element_types: Vec<_> = kind
+        .patterns
+        .iter()
+        .map(|pattern| definite_match_pattern_type(db, pattern))
+        .collect();
+
+    if element_types.iter().any(Type::is_never) {
         Type::Never
+    } else {
+        exact_sequence_pattern_type(db, element_types.into_iter())
     }
 }
