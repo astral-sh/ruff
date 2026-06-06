@@ -507,6 +507,19 @@ class ConstrainedBox(Generic[ConstrainedT]):
 reveal_type(ConstrainedBox.from_token(token=Token[int]()))  # revealed: ConstrainedBox[int]
 reveal_type(ConstrainedBox.from_token(token=Token[str]()))  # revealed: ConstrainedBox[str]
 
+class OverloadedBox[T]:
+    @overload
+    @classmethod
+    def from_value(cls, value: list[T]) -> tuple[T, T]: ...
+    @overload
+    @classmethod
+    def from_value(cls, value: T) -> T: ...
+    @classmethod
+    def from_value(cls, value: T | list[T]) -> T | tuple[T, T]:
+        raise NotImplementedError
+
+reveal_type(OverloadedBox.from_value([1]))  # revealed: tuple[int, int]
+
 class Factory:
     @classmethod
     def make(cls) -> Self:
@@ -669,6 +682,19 @@ reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
 reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
+
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class DecoratedBox[T]:
+    @callable_identity
+    @classmethod
+    def make(cls, value: T) -> "DecoratedBox[T]":
+        raise NotImplementedError
+
+reveal_type(DecoratedBox.make(1))  # revealed: DecoratedBox[int]
 ```
 
 ### Classmethods with `Self` and callable-returning decorators
@@ -1193,6 +1219,19 @@ reveal_type(C.f1(1))  # revealed: str
 reveal_type(C().f1(1))  # revealed: str
 reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
+
+from collections.abc import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class DecoratedStaticBox[T]:
+    @callable_identity
+    @staticmethod
+    def make(value: T) -> DecoratedStaticBox[T]:
+        raise NotImplementedError
+
+reveal_type(DecoratedStaticBox.make(1))  # revealed: DecoratedStaticBox[int]
 ```
 
 When a `@staticmethod` is decorated with `@contextmanager`, accessing it from an instance should not

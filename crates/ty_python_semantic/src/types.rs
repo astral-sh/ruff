@@ -4052,13 +4052,26 @@ impl<'db> Type<'db> {
                     CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                         .with_bound_type(binding_self_type)
                         .into()
-                } else {
-                    // Replacing `Self` exposes the bare class's type variables directly to argument
-                    // inference while retaining the receiver for validation and inference.
+                } else if signature
+                    .overloads
+                    .iter()
+                    .any(Signature::has_explicit_positional_receiver_annotation)
+                {
+                    // Replacing `Self` exposes the bare class's type variables directly to
+                    // argument inference while retaining an explicit receiver for validation
+                    // and inference.
                     let signature = signature.apply_self(db, bound_method.typing_self_type(db));
                     CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                         .with_bound_type(binding_self_type)
                         .into()
+                } else {
+                    // An implicit receiver does not constrain the call. Bind it before overload
+                    // resolution so it does not participate in overload precedence.
+                    CallableBinding::from_overloads(
+                        self,
+                        bound_method.bound_signatures(db).iter().cloned(),
+                    )
+                    .into()
                 }
             }
 
