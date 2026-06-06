@@ -1134,16 +1134,6 @@ impl<'db> Type<'db> {
         builder.build()
     }
 
-    pub(crate) fn needs_self_binding(self, db: &'db dyn Db) -> bool {
-        self.as_function_literal().is_some_and(|function| {
-            function
-                .signature(db)
-                .overloads
-                .iter()
-                .any(|signature| signature.needs_self_mapping(db, true))
-        })
-    }
-
     /// Apply `Self` substitutions without binding or replacing the receiver parameter.
     pub(crate) fn apply_self_binding(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         match self {
@@ -1151,7 +1141,6 @@ impl<'db> Type<'db> {
                 Type::FunctionLiteral(function.apply_self(db, self_type))
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
-                let self_type = callable.signatures(db).self_binding_type(db, self_type);
                 Type::Callable(callable.apply_self(db, self_type))
             }
             _ => self,
@@ -4154,34 +4143,20 @@ impl<'db> Type<'db> {
                 let function = bound_method.function(db);
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
-                let needs_self_binding = Type::FunctionLiteral(function).needs_self_binding(db);
-                let intersection_self = needs_self_binding
-                    && !function.is_classmethod(db)
-                    && matches!(self_instance, Type::Intersection(_));
-                let self_binding_type = signatures.self_binding_type(db, self_instance);
-                let generic_default_self_type = if function.is_classmethod(db) {
-                    signatures.self_binding_type(
-                        db,
-                        self_instance.to_instance(db).unwrap_or_else(Type::unknown),
-                    )
-                } else {
-                    self_binding_type
-                };
+                let typing_self_type = bound_method.typing_self_type(db);
+                let intersection_self =
+                    !function.is_classmethod(db) && matches!(self_instance, Type::Intersection(_));
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
-                        if intersection_self && signature.needs_self_mapping(db, true) {
-                            signature.apply_self(db, signature.self_binding_type(db, self_instance))
+                        if intersection_self {
+                            signature.apply_self_for_bound_call(db, typing_self_type)
                         } else {
-                            signature.apply_self_to_generic_defaults(db, generic_default_self_type)
+                            signature.apply_self_to_generic_defaults(db, typing_self_type)
                         }
                     }),
                 )
-                .with_bound_type(if intersection_self || !needs_self_binding {
-                    self_instance
-                } else {
-                    self_binding_type
-                })
+                .with_bound_type(self_instance)
                 .into()
             }
 

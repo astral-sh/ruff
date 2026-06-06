@@ -44,17 +44,14 @@ pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
-    /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
-    /// This is normally the bound-instance type (the type of `self` or `cls`), but if the bound method is
-    /// a `@classmethod`, then it should be an instance of that bound-instance type.
+    /// Returns the receiver type used to replace `typing.Self` in the bound method signature.
+    /// For a `@classmethod`, this is the instance type corresponding to the bound class object.
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
         let mut self_instance = self.self_instance(db);
         if self.function(db).is_classmethod(db) {
             self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
         }
-        self.function(db)
-            .signature(db)
-            .self_binding_type(db, self_instance)
+        self_instance
     }
 
     pub(crate) fn map_self_type(

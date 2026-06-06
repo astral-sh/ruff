@@ -179,15 +179,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
-        self.overloads
-            .iter()
-            .filter(|signature| signature.needs_self_mapping(db, false))
-            .map(|signature| signature.self_binding_type(db, self_type))
-            .find(|binding_type| *binding_type != self_type)
-            .unwrap_or(self_type)
-    }
-
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
         match self.overloads.as_slice() {
@@ -520,6 +511,12 @@ pub struct Signature<'db> {
 
     /// Return type. If no annotation was provided, this is `Unknown`.
     pub(crate) return_ty: Type<'db>,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum SelfMappingComponents {
+    All,
+    GenericDefaults,
 }
 
 /// Whether one callable signature's parameters are compatible with another's.
@@ -923,15 +920,6 @@ impl<'db> Signature<'db> {
         self.definition
     }
 
-    pub(crate) fn self_binding_type(&self, db: &'db dyn Db, self_type: Type<'db>) -> Type<'db> {
-        let self_typevar = self.generic_context.and_then(|generic_context| {
-            generic_context
-                .variables(db)
-                .find(|typevar| typevar.typevar(db).is_self(db))
-        });
-        self_type.self_binding_type_for(db, self_typevar)
-    }
-
     pub(crate) fn bind_self(&self, db: &'db dyn Db, self_type: Option<Type<'db>>) -> Self {
         let mut parameters = self.parameters.iter().cloned().peekable();
         let removed_receiver = parameters.peek().is_some_and(Parameter::is_positional);
@@ -942,33 +930,25 @@ impl<'db> Signature<'db> {
             parameters.next();
         }
 
-        let mut parameters = Parameters::new(db, parameters);
-        let mut return_ty = self.return_ty;
-        let mut generic_context = self.generic_context;
         let binding_context = self.definition.map(BindingContext::Definition);
-        if let Some(self_type) = self_type
-            && self.needs_self_mapping(db, removed_receiver)
-        {
-            let self_mapping = TypeMapping::BindSelf(
+        let signature = Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            parameters: Parameters::new(db, parameters),
+            return_ty: self.return_ty,
+        };
+        let mut signature = self_type.map_or(signature.clone(), |self_type| {
+            signature.apply_self_mapping(
+                db,
                 SelfBinding::new(db, self_type, binding_context)
                     .with_unbound_method_self_fallback(),
-            );
-            generic_context = self.map_self_in_generic_defaults(db, &self_mapping);
-            parameters = parameters.apply_type_mapping_impl(
-                db,
-                &self_mapping,
-                TypeContext::default(),
-                &ApplyTypeMappingVisitor::default(),
-            );
-            return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
-        }
-        Self {
-            generic_context: generic_context
-                .map(|generic_context| generic_context.remove_self(db, binding_context)),
-            definition: self.definition,
-            parameters,
-            return_ty,
-        }
+                SelfMappingComponents::All,
+            )
+        });
+        signature.generic_context = signature
+            .generic_context
+            .map(|generic_context| generic_context.remove_self(db, binding_context));
+        signature
     }
 
     /// Returns `true` if this signature's first parameter can accept the bound `self` type.
@@ -1044,49 +1024,77 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
-    pub(crate) fn apply_self_to_generic_defaults(
-        &self,
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-    ) -> Self {
-        if !self.generic_defaults_contain_self(db) {
-            return self.clone();
-        }
-
-        let self_mapping = TypeMapping::BindSelf(
+    pub(crate) fn apply_self_for_bound_call(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
+        self.apply_self_mapping(
+            db,
             SelfBinding::new(
                 db,
                 self_type,
                 self.definition.map(BindingContext::Definition),
             )
             .with_unbound_method_self_fallback(),
-        );
-        Self {
-            generic_context: self.map_self_in_generic_defaults(db, &self_mapping),
-            ..self.clone()
-        }
+            SelfMappingComponents::All,
+        )
+    }
+
+    pub(crate) fn apply_self_to_generic_defaults(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Self {
+        self.apply_self_mapping(
+            db,
+            SelfBinding::new(
+                db,
+                self_type,
+                self.definition.map(BindingContext::Definition),
+            )
+            .with_unbound_method_self_fallback(),
+            SelfMappingComponents::GenericDefaults,
+        )
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        if !self.needs_self_mapping(db, false) {
+        self.apply_self_mapping(
+            db,
+            SelfBinding::new(
+                db,
+                self_type,
+                self.definition.map(BindingContext::Definition),
+            ),
+            SelfMappingComponents::All,
+        )
+    }
+
+    fn apply_self_mapping(
+        &self,
+        db: &'db dyn Db,
+        self_binding: SelfBinding<'db>,
+        components: SelfMappingComponents,
+    ) -> Self {
+        let needs_mapping = match components {
+            SelfMappingComponents::All => self.needs_self_mapping(db),
+            SelfMappingComponents::GenericDefaults => self.generic_defaults_contain_self(db),
+        };
+        if !needs_mapping {
             return self.clone();
         }
 
-        let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
-            db,
-            self_type,
-            self.definition.map(BindingContext::Definition),
-        ));
-        let parameters = self.parameters.apply_type_mapping_impl(
-            db,
-            &self_mapping,
-            TypeContext::default(),
-            &ApplyTypeMappingVisitor::default(),
-        );
-        let return_ty =
-            self.return_ty
-                .apply_type_mapping(db, &self_mapping, TypeContext::default());
+        let self_mapping = TypeMapping::BindSelf(self_binding);
         let generic_context = self.map_self_in_generic_defaults(db, &self_mapping);
+        let (parameters, return_ty) = match components {
+            SelfMappingComponents::All => (
+                self.parameters.apply_type_mapping_impl(
+                    db,
+                    &self_mapping,
+                    TypeContext::default(),
+                    &ApplyTypeMappingVisitor::default(),
+                ),
+                self.return_ty
+                    .apply_type_mapping(db, &self_mapping, TypeContext::default()),
+            ),
+            SelfMappingComponents::GenericDefaults => (self.parameters.clone(), self.return_ty),
+        };
         Self {
             generic_context,
             definition: self.definition,
@@ -1256,7 +1264,7 @@ impl<'db> Signature<'db> {
         ))
     }
 
-    pub(crate) fn needs_self_mapping(&self, db: &'db dyn Db, receiver_is_removed: bool) -> bool {
+    fn needs_self_mapping(&self, db: &'db dyn Db) -> bool {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
@@ -1264,9 +1272,7 @@ impl<'db> Signature<'db> {
             || self
                 .parameters
                 .iter()
-                .enumerate()
-                .skip(usize::from(receiver_is_removed))
-                .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
+                .any(|parameter| parameter.annotated_type().contains_self(db))
     }
 
     fn generic_defaults_contain_self(&self, db: &'db dyn Db) -> bool {

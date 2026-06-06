@@ -12,7 +12,7 @@ python-version = "3.13"
 ## Methods
 
 ```py
-from typing import Self
+from typing import Callable, Self
 
 class Shape:
     def set_scale(self: Self, scale: float) -> Self:
@@ -58,6 +58,7 @@ class ClassmethodBase:
 class ClassmethodSubclass(ClassmethodBase): ...
 
 reveal_type(ClassmethodSubclass.make())  # revealed: ClassmethodSubclass
+classmethod_make: Callable[[], ClassmethodSubclass] = ClassmethodSubclass.make
 
 class Outer:
     class Inner:
