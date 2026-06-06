@@ -610,6 +610,14 @@ def test_match_ordered_or_capture(value: tuple[int] | str) -> int | str:
             reveal_type(item)  # revealed: int | str
             return item
 
+def test_match_ordered_or_capture_after_star(
+    value: tuple[Literal[1], int] | tuple[Literal[2], str],
+) -> list[int] | Literal[2]:
+    match value:
+        case [1, *item] | [item, _]:
+            reveal_type(item)  # revealed: list[int] | Literal[2]
+            return item
+
 def test_match_sequence_as_pattern_excludes_previous_cases(
     value: tuple[Literal[1], object] | tuple[Literal[2], object],
 ) -> None:
