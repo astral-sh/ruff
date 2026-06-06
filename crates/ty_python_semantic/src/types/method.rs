@@ -122,9 +122,13 @@ impl<'db> BoundMethodType<'db> {
             && function_signature
                 .overloads
                 .iter()
-                .any(Signature::has_explicit_positional_receiver_annotation);
+                .any(Signature::has_explicit_positional_receiver_annotation)
+            && function_signature
+                .overloads
+                .iter()
+                .any(|signature| signature.can_bind_self_to(db, self_instance));
 
-        let mut signatures: SmallVec<_> = function_signature
+        function_signature
             .overloads
             .iter()
             .enumerate()
@@ -132,19 +136,7 @@ impl<'db> BoundMethodType<'db> {
                 !filter_explicit_receivers || signature.can_bind_self_to(db, self_instance)
             })
             .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type)))
-            .collect();
-
-        if signatures.is_empty() && filter_explicit_receivers {
-            signatures.extend(
-                function_signature
-                    .overloads
-                    .iter()
-                    .enumerate()
-                    .map(|(index, signature)| (index, signature.apply_self(db, typing_self_type))),
-            );
-        }
-
-        signatures
+            .collect()
     }
 
     pub(super) fn recursive_type_normalized_impl(

@@ -2751,22 +2751,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
             (Type::SubclassOf(formal_subclass), Type::Intersection(actual_intersection))
-                if formal_subclass.is_type_var() =>
+                if let Some(formal_typevar) = formal_subclass.into_type_var()
+                    && let Some(actual_instance) =
+                        actual_intersection.to_instance_for_class_receiver(self.db) =>
             {
                 // A class-object intersection passed to `type[T]` contributes one receiver
                 // constraint. Project it to instance space rather than inferring independently
                 // from each positive element, which would produce their union.
-                if let Some(formal_typevar) = formal_subclass.into_type_var()
-                    && let Some(actual_instance) =
-                        actual_intersection.to_instance_for_class_receiver(self.db)
-                {
-                    return self.infer_map_impl(
-                        Type::TypeVar(formal_typevar),
-                        actual_instance,
-                        polarity,
-                        seen,
-                    );
-                }
+                return self.infer_map_impl(
+                    Type::TypeVar(formal_typevar),
+                    actual_instance,
+                    polarity,
+                    seen,
+                );
             }
             (_, Type::Intersection(actual_intersection)) => {
                 // Try to infer type mappings by checking against each intersection element. This
