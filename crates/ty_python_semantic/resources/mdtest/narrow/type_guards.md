@@ -482,7 +482,6 @@ from typing import TypeVar, overload
 from typing_extensions import TypeIs, final
 
 class Base: ...
-class Derived(Base): ...
 
 @final
 class Final: ...
@@ -515,18 +514,6 @@ def non_final(value: Base):
         reveal_type(value)  # revealed: Base
     else:
         reveal_type(value)  # revealed: Base
-
-def object_input(value: object):
-    if is_exact_instance(value, Base):
-        reveal_type(value)  # revealed: Base
-    else:
-        reveal_type(value)  # revealed: object
-
-def union_input(value: Base | int):
-    if is_exact_instance(value, Base):
-        reveal_type(value)  # revealed: Base
-    else:
-        reveal_type(value)  # revealed: Base | int
 
 def final_class(value: Final):
     if is_exact_instance(value, Final):

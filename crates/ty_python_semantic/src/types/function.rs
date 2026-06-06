@@ -79,9 +79,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{
-    ScopeInference, infer_complete_scope_types, nearest_enclosing_class, original_class_type,
-};
+use crate::types::infer::{nearest_enclosing_class, original_class_type};
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -883,7 +881,7 @@ impl<'db> FunctionLiteral<'db> {
             FunctionBodyKind::AlwaysRaisesNotImplementedError => {
                 Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
             }
-            FunctionBodyKind::Regular => None,
+            FunctionBodyKind::ExactRuntimeClassTest | FunctionBodyKind::Regular => None,
         }
     }
 
@@ -1269,23 +1267,10 @@ impl<'db> FunctionType<'db> {
 
     /// Returns `true` if the implementation is a transparent exact runtime-class predicate.
     pub(crate) fn uses_exact_runtime_class_test(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked]
-        fn implementation_uses_exact_runtime_class_test<'db>(
-            db: &'db dyn Db,
-            implementation: OverloadLiteral<'db>,
-        ) -> bool {
-            let file = implementation.body_scope(db).file(db);
-            let module = parsed_module(db, file).load(db);
-            let function = implementation.node(db, file, &module);
-            let inference = infer_complete_scope_types(db, implementation.body_scope(db));
-
-            function_is_exact_runtime_class_test(db, inference, function)
-        }
-
-        let (_, Some(implementation)) = self.overloads_and_implementation(db) else {
-            return false;
-        };
-        implementation_uses_exact_runtime_class_test(db, implementation)
+        matches!(
+            self.literal(db).body_kind(db),
+            FunctionBodyKind::ExactRuntimeClassTest
+        )
     }
 
     /// Returns `true` if any overload or implementation has an explicit return annotation.
@@ -1860,35 +1845,29 @@ fn is_parameter_reference(expr: &ast::Expr, parameter: &str) -> bool {
     )
 }
 
-fn exact_class_test_target<'a, 'db>(
+fn is_exact_class_call<'db>(
     db: &'db dyn Db,
-    inference: &ScopeInference<'db>,
-    expr: &'a ast::Expr,
-) -> Option<&'a ast::Expr> {
-    match expr {
+    infer_type: &impl Fn(&ast::Expr) -> Type<'db>,
+    expr: &ast::Expr,
+    value_parameter: &str,
+) -> bool {
+    matches!(
+        expr,
         ast::Expr::Call(ast::ExprCall {
             func,
             arguments: ast::Arguments { args, keywords, .. },
             ..
         }) if keywords.is_empty()
-            && let [argument] = &**args
-            && let Type::ClassLiteral(class) = inference.expression_type(func)
-            && class.is_known(db, KnownClass::Type) =>
-        {
-            Some(argument)
-        }
-        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. })
-            if attr.as_str() == "__class__" =>
-        {
-            Some(value)
-        }
-        _ => None,
-    }
+            && matches!(&**args, [argument]
+                if is_parameter_reference(argument, value_parameter))
+            && matches!(infer_type(func),
+                Type::ClassLiteral(class) if class.is_known(db, KnownClass::Type))
+    )
 }
 
 fn returns_exact_class_comparison<'db>(
     db: &'db dyn Db,
-    inference: &ScopeInference<'db>,
+    infer_type: &impl Fn(&ast::Expr) -> Type<'db>,
     statement: &ast::Stmt,
     value_parameter: &str,
     classinfo_parameter: &str,
@@ -1907,15 +1886,14 @@ fn returns_exact_class_comparison<'db>(
                 }) if matches!(&**ops, [operator] if *operator == expected_operator)
                     && matches!(&**comparators, [comparator]
                         if is_parameter_reference(comparator, classinfo_parameter))
-                    && exact_class_test_target(db, inference, left)
-                        .is_some_and(|target| is_parameter_reference(target, value_parameter))
+                    && is_exact_class_call(db, infer_type, left, value_parameter)
             )
     )
 }
 
 fn is_classinfo_collection_test<'db>(
     db: &'db dyn Db,
-    inference: &ScopeInference<'db>,
+    infer_type: &impl Fn(&ast::Expr) -> Type<'db>,
     expr: &ast::Expr,
     classinfo_parameter: &str,
 ) -> bool {
@@ -1927,7 +1905,7 @@ fn is_classinfo_collection_test<'db>(
     else {
         return false;
     };
-    let Type::FunctionLiteral(function) = inference.expression_type(func) else {
+    let Type::FunctionLiteral(function) = infer_type(func) else {
         return false;
     };
     if !keywords.is_empty() || !function.is_known(db, KnownFunction::IsInstance) {
@@ -1950,7 +1928,7 @@ fn is_classinfo_collection_test<'db>(
             .zip([KnownClass::Tuple, KnownClass::List, KnownClass::Set])
             .all(|(element, expected)| {
                 matches!(
-                    inference.expression_type(element),
+                    infer_type(element),
                     Type::ClassLiteral(class) if class.is_known(db, expected)
                 )
             })
@@ -1958,7 +1936,7 @@ fn is_classinfo_collection_test<'db>(
 
 fn function_is_exact_runtime_class_test<'db>(
     db: &'db dyn Db,
-    inference: &ScopeInference<'db>,
+    infer_type: &impl Fn(&ast::Expr) -> Type<'db>,
     function: &ast::StmtFunctionDef,
 ) -> bool {
     let mut parameters = function.parameters.iter_non_variadic_params();
@@ -1982,7 +1960,7 @@ fn function_is_exact_runtime_class_test<'db>(
     match body {
         [statement] => returns_exact_class_comparison(
             db,
-            inference,
+            infer_type,
             statement,
             value_parameter,
             classinfo_parameter,
@@ -1992,7 +1970,7 @@ fn function_is_exact_runtime_class_test<'db>(
             if if_statement.elif_else_clauses.is_empty()
                 && is_classinfo_collection_test(
                     db,
-                    inference,
+                    infer_type,
                     &if_statement.test,
                     classinfo_parameter,
                 ) =>
@@ -2000,14 +1978,14 @@ fn function_is_exact_runtime_class_test<'db>(
             matches!(&*if_statement.body, [in_return]
             if returns_exact_class_comparison(
                 db,
-                inference,
+                infer_type,
                 in_return,
                 value_parameter,
                 classinfo_parameter,
                 ast::CmpOp::In,
             )) && returns_exact_class_comparison(
                 db,
-                inference,
+                infer_type,
                 final_return,
                 value_parameter,
                 classinfo_parameter,
@@ -2036,6 +2014,10 @@ pub(super) fn function_body_kind<'db>(
 
     if function_has_stub_body(node) {
         return FunctionBodyKind::Stub;
+    }
+
+    if function_is_exact_runtime_class_test(db, &infer_type, node) {
+        return FunctionBodyKind::ExactRuntimeClassTest;
     }
 
     if let [ast::Stmt::Raise(raise)] = suite
@@ -2068,6 +2050,8 @@ pub(super) enum FunctionBodyKind {
     /// The function body consists of a single `raise NotImplementedError` statement,
     /// possibly preceded by a docstring.
     AlwaysRaisesNotImplementedError,
+    /// The function is a transparent exact runtime-class predicate.
+    ExactRuntimeClassTest,
     /// Any function body that is not a stub and does not consist of a single
     /// `raise NotImplementedError` statement.
     Regular,
