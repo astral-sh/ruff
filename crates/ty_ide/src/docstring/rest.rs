@@ -1,22 +1,68 @@
+use std::borrow::Cow;
 use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use super::markdown;
+use super::sections::{DocstringItem, DocstringSectionKind, DocstringSections};
+
+/// Returns whether a normalized docstring may contain a top-level field list
+/// that markdown rendering would rewrite.
+pub(super) fn may_contain_top_level_field_list(raw: &str) -> bool {
+    let bytes = raw.as_bytes();
+    memchr::memchr_iter(b':', bytes).any(|colon| {
+        (colon == 0 || bytes[colon - 1] == b'\n')
+            && starts_renderable_field_header(&raw[colon + 1..])
+    })
+}
+
+fn starts_renderable_field_header(after_opening_colon: &str) -> bool {
+    let line = after_opening_colon
+        .split_once('\n')
+        .map_or(after_opening_colon, |(line, _)| line);
+
+    let Some(name_end) = line.find(|char: char| char == ':' || char.is_whitespace()) else {
+        return false;
+    };
+
+    let name = &line[..name_end];
+    matches!(
+        name,
+        "param"
+            | "parameter"
+            | "arg"
+            | "argument"
+            | "key"
+            | "keyword"
+            | "kwarg"
+            | "kwparam"
+            | "var"
+            | "ivar"
+            | "cvar"
+            | "return"
+            | "returns"
+            | "raises"
+            | "raise"
+            | "except"
+            | "exception"
+    ) && line[name_end..].contains(':')
+}
 
 /// Represents a parsed restructured text (reST) docstring.
-pub(super) struct Docstring {
+pub(super) struct Docstring<'a> {
+    raw: &'a str,
     field_lists: Vec<FieldList>,
 }
 
-impl Docstring {
+impl<'a> Docstring<'a> {
     /// Constructs a parsed representation from a raw docstring.
-    pub(super) fn parse(raw: &str) -> Self {
+    pub(super) fn parse(raw: &'a str) -> Self {
         let field_lists = FieldList::parse_all(raw);
-        Self { field_lists }
+        Self { raw, field_lists }
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
@@ -46,6 +92,37 @@ impl Docstring {
         }
 
         parameters
+    }
+
+    /// Returns the original docstring when no supported field list is rendered.
+    pub(super) fn render_markdown(&self) -> Cow<'a, str> {
+        let mut output: Option<String> = None;
+        let mut rendered_through = TextSize::default();
+
+        for field_list in &self.field_lists {
+            if field_list.indent != TextSize::default()
+                || field_list.range.start() < rendered_through
+            {
+                continue;
+            }
+
+            let Some(markdown) = field_list.render_markdown() else {
+                continue;
+            };
+
+            let output = output.get_or_insert_with(String::new);
+            output.push_str(
+                &self.raw[rendered_through.to_usize()..field_list.range.start().to_usize()],
+            );
+            output.push_str(&markdown);
+            rendered_through = field_list.range.end();
+        }
+
+        let Some(mut output) = output else {
+            return Cow::Borrowed(self.raw);
+        };
+        output.push_str(&self.raw[rendered_through.to_usize()..]);
+        Cow::Owned(output)
     }
 }
 
@@ -238,6 +315,191 @@ impl FieldList {
 
         FieldHeader::indentation(non_blank_line.text) > indent
             || FieldHeader::at_indent(non_blank_line.text, indent).is_some()
+    }
+
+    fn render_markdown(&self) -> Option<String> {
+        let plan = FieldListRenderPlan::from_fields(&self.fields)?;
+        let markdown = plan.render(&self.fields);
+        (!markdown.is_empty()).then_some(markdown)
+    }
+}
+
+/// Validates a field list and stores cross-field metadata needed while rendering.
+struct FieldListRenderPlan<'a> {
+    parameter_types: FxHashMap<&'a str, &'a str>,
+    attribute_types: FxHashMap<&'a str, &'a str>,
+    return_type: Option<&'a str>,
+}
+
+impl<'a> FieldListRenderPlan<'a> {
+    fn from_fields(fields: &'a [Field]) -> Option<Self> {
+        let mut has_rendered_field = false;
+        let mut has_returns = false;
+        let mut has_return_type = false;
+        let mut parameters: FxHashMap<&'a str, TypedFieldRenderState> = FxHashMap::default();
+        let mut attributes: FxHashMap<&'a str, TypedFieldRenderState> = FxHashMap::default();
+        let mut parameter_types: FxHashMap<&'a str, &'a str> = FxHashMap::default();
+        let mut attribute_types: FxHashMap<&'a str, &'a str> = FxHashMap::default();
+        let mut return_type = None;
+
+        for field in fields {
+            match field {
+                Field::Parameter {
+                    lookup_name, ty, ..
+                } => {
+                    has_rendered_field = true;
+                    parameters
+                        .entry(lookup_name.as_str())
+                        .or_default()
+                        .record_field(ty.is_some());
+                }
+                Field::Attribute { name, ty, .. } => {
+                    has_rendered_field = true;
+                    attributes
+                        .entry(name.as_str())
+                        .or_default()
+                        .record_field(ty.is_some());
+                }
+                Field::Returns { .. } => {
+                    has_rendered_field = true;
+                    has_returns = true;
+                }
+                Field::Raises { .. } => {
+                    has_rendered_field = true;
+                }
+                Field::ParameterType { lookup_name, ty } => {
+                    if parameter_types
+                        .insert(lookup_name.as_str(), ty.as_str())
+                        .is_some()
+                    {
+                        return None;
+                    }
+                }
+                Field::AttributeType { name, ty } => {
+                    if attribute_types.insert(name.as_str(), ty.as_str()).is_some() {
+                        return None;
+                    }
+                }
+                Field::ReturnType { ty } => {
+                    if has_return_type {
+                        return None;
+                    }
+                    has_return_type = true;
+                    return_type = (!ty.is_empty()).then_some(ty.as_str());
+                }
+                Field::Metadata => {}
+                Field::Unknown { .. } => return None,
+            }
+        }
+
+        for lookup_name in parameter_types.keys() {
+            if !parameters
+                .get(*lookup_name)
+                .is_some_and(TypedFieldRenderState::accepts_separate_type)
+            {
+                return None;
+            }
+        }
+
+        for name in attribute_types.keys() {
+            if !attributes
+                .get(*name)
+                .is_some_and(TypedFieldRenderState::accepts_separate_type)
+            {
+                return None;
+            }
+        }
+
+        if !has_rendered_field || (has_return_type && !has_returns) {
+            return None;
+        }
+
+        Some(Self {
+            parameter_types,
+            attribute_types,
+            return_type,
+        })
+    }
+
+    fn render(&self, fields: &'a [Field]) -> String {
+        let mut sections = DocstringSections::default();
+        for field in fields {
+            match field {
+                Field::Parameter {
+                    display_name,
+                    lookup_name,
+                    ty,
+                    description,
+                } => sections.push(
+                    DocstringSectionKind::Parameters,
+                    DocstringItem::new(
+                        Some(display_name.as_str()),
+                        ty.as_deref().or_else(|| {
+                            self.parameter_types
+                                .get(lookup_name.as_str())
+                                .copied()
+                                .filter(|ty| !ty.is_empty())
+                        }),
+                        description.as_str(),
+                    ),
+                ),
+                Field::Attribute {
+                    name,
+                    ty,
+                    description,
+                } => sections.push(
+                    DocstringSectionKind::Attributes,
+                    DocstringItem::new(
+                        Some(name.as_str()),
+                        ty.as_deref().or_else(|| {
+                            self.attribute_types
+                                .get(name.as_str())
+                                .copied()
+                                .filter(|ty| !ty.is_empty())
+                        }),
+                        description.as_str(),
+                    ),
+                ),
+                Field::Returns { name, description } => sections.push(
+                    DocstringSectionKind::Returns,
+                    DocstringItem::new(name.as_deref(), self.return_type, description.as_str()),
+                ),
+                Field::Raises {
+                    exception,
+                    description,
+                } => sections.push(
+                    DocstringSectionKind::Raises,
+                    DocstringItem::new(exception.as_deref(), None, description.as_str()),
+                ),
+                Field::ParameterType { .. }
+                | Field::AttributeType { .. }
+                | Field::ReturnType { .. }
+                | Field::Metadata
+                | Field::Unknown { .. } => {}
+            }
+        }
+
+        sections.render_markdown()
+    }
+}
+
+#[derive(Default)]
+struct TypedFieldRenderState {
+    has_untyped_field: bool,
+    has_inline_typed_field: bool,
+}
+
+impl TypedFieldRenderState {
+    fn record_field(&mut self, has_inline_type: bool) {
+        if has_inline_type {
+            self.has_inline_typed_field = true;
+        } else {
+            self.has_untyped_field = true;
+        }
+    }
+
+    fn accepts_separate_type(&self) -> bool {
+        self.has_untyped_field && !self.has_inline_typed_field
     }
 }
 
@@ -837,7 +1099,7 @@ struct ParameterName<'a> {
 mod tests {
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::Docstring;
+    use super::{Docstring, may_contain_top_level_field_list};
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -858,6 +1120,26 @@ mod tests {
           This is a continuation of param2 description.
         kwargs: Extra keyword arguments.
         ");
+    }
+
+    #[test]
+    fn field_list_precheck_detects_renderable_top_level_fields() {
+        assert!(may_contain_top_level_field_list(
+            "Summary.\n:param value: The value."
+        ));
+        assert!(may_contain_top_level_field_list(
+            ":type value: int\n:param value: The value."
+        ));
+        assert!(!may_contain_top_level_field_list(
+            "Summary: no field list here."
+        ));
+        assert!(!may_contain_top_level_field_list(
+            ":class:`Foo` instances are accepted.\n:meta private:"
+        ));
+        assert!(!may_contain_top_level_field_list(
+            "    :param value: Nested field lists are preserved."
+        ));
+        assert!(!may_contain_top_level_field_list(":rtype: str"));
     }
 
     #[test]
@@ -1183,6 +1465,287 @@ Section::
         let param_docs = parameter_documentation(docstring);
 
         assert_snapshot!(param_docs, @"real: Real parameter.");
+    }
+
+    #[test]
+    fn field_lists_render_supported_sections() {
+        let docstring = "\
+This is a function description.
+:class:`Foo` instances can be passed here.
+
+:param str param1: The first parameter description
+:meta private:
+:param param2: The second parameter description
+:type param2: int
+:kwparam retries: Retry attempts.
+:paramtype retries: int
+:param *args: Extra positional arguments.
+:type args: tuple[str, ...]
+:param **kwargs: Extra keyword arguments.
+:type **kwargs: dict[str, object]
+:var cache: Cached data.
+:vartype cache: dict[str,
+    object]
+:ivar state: Instance state.
+:var str title: Display title.
+:cvar VERSION: Package version.
+:vartype VERSION: str
+:returns baz: The return value description
+:rtype: dict[str,
+    int]
+:raises ValueError: If the value is invalid.
+:meta hide-value:
+:exception RuntimeError: If the system is unavailable.";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        This is a function description.
+        :class:`Foo` instances can be passed here.
+
+        ## Parameters
+        `param1` (`str`): The first parameter description
+        `param2` (`int`): The second parameter description
+        `retries` (`int`): Retry attempts.
+        `*args` (`tuple[str, ...]`): Extra positional arguments.
+        `**kwargs` (`dict[str, object]`): Extra keyword arguments.
+
+        ## Attributes
+        `cache` (`dict[str, object]`): Cached data.
+        `state`: Instance state.
+        `title` (`str`): Display title.
+        `VERSION` (`str`): Package version.
+
+        ## Returns
+        `baz` (`dict[str, int]`): The return value description
+
+        ## Raises
+        `ValueError`: If the value is invalid.
+        `RuntimeError`: If the system is unavailable.
+        ");
+    }
+
+    #[test]
+    fn field_lists_ignore_metadata_fields_when_rendering() {
+        let docstring = "\
+:meta private:
+:param value: The value to validate.
+:meta public:";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Parameters
+        `value`: The value to validate.
+        ");
+
+        let metadata_only = "\
+:meta private:
+:meta public:";
+        assert_eq!(
+            Docstring::parse(metadata_only).render_markdown(),
+            metadata_only
+        );
+    }
+
+    #[test]
+    fn field_lists_preserve_unrenderable_lists() {
+        let docstring = "\
+:param first: First parameter
+:meta private:
+:param second: Second parameter
+:type orphan: str
+:param **: Missing a parameter name.";
+
+        assert_eq!(Docstring::parse(docstring).render_markdown(), docstring);
+
+        assert_snapshot!(parameter_documentation(docstring), @"
+        first: First parameter
+        second: Second parameter
+        ");
+
+        for docstring in [
+            "\
+:param value: The value to validate.
+:rtype: str",
+            "\
+:param value: The value to validate.
+:type value: str
+:type value: int",
+            "\
+:param str value: The value to validate.
+:type value: int",
+            "\
+:var value: The value.
+:vartype orphan: str",
+            "\
+:var value: The value.
+:vartype value: str
+:vartype value: int",
+            "\
+:var str value: The value.
+:vartype value: int",
+            "\
+:returns:",
+            "\
+:raises:",
+            "\
+:meta private:
+:returns:
+:raises:",
+        ] {
+            assert_eq!(Docstring::parse(docstring).render_markdown(), docstring);
+        }
+    }
+
+    #[test]
+    fn field_lists_skip_empty_rendered_sections() {
+        let docstring = "\
+:param value: The value to validate.
+:returns:
+:raises:";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Parameters
+        `value`: The value to validate.
+        ");
+    }
+
+    #[test]
+    fn field_lists_render_return_type_without_name() {
+        let docstring = "\
+:returns: The return value description.
+:rtype: dict[str,
+    int]";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Returns
+        `dict[str, int]`: The return value description.
+        ");
+    }
+
+    #[test]
+    fn field_lists_render_sections_in_canonical_order() {
+        let docstring = "\
+:raises ValueError: If validation fails.
+:param value: The value to validate.
+:returns: The normalized value.
+:raises TypeError: If validation has the wrong type.";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Parameters
+        `value`: The value to validate.
+
+        ## Returns
+        The normalized value.
+
+        ## Raises
+        `ValueError`: If validation fails.
+        `TypeError`: If validation has the wrong type.
+        ");
+    }
+
+    #[test]
+    fn field_lists_render_list_descriptions_as_blocks() {
+        let docstring = "\
+:param value:
+    - First option.
+    - Second option.
+:param steps:
+    1. Validate the input.
+    2. Return the result.
+:param example:
+    ```python
+    validate(value)
+    ```
+    - Keep the next field separate.
+:param done: Whether work is done.";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Parameters
+        `value`:
+        - First option.
+        - Second option.
+
+        `steps`:
+        1. Validate the input.
+        2. Return the result.
+
+        `example`:
+        ```python
+        validate(value)
+        ```
+        - Keep the next field separate.
+
+        `done`: Whether work is done.
+        ");
+    }
+
+    #[test]
+    fn field_lists_render_well_formed_lists_after_unrenderable_lists() {
+        let docstring = "\
+:param first: First parameter.
+
+Some prose between field lists.
+
+:meta private:
+
+More prose between field lists.
+
+:param second: Second parameter.";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        ## Parameters
+        `first`: First parameter.
+
+        Some prose between field lists.
+
+        :meta private:
+
+        More prose between field lists.
+
+        ## Parameters
+        `second`: Second parameter.
+        ");
+    }
+
+    #[test]
+    fn field_lists_inside_code_examples_are_preserved() {
+        let docstring = "\
+Markdown input:
+
+```text
+:param sample: This is sample input
+```
+
+Doctest output:
+
+>>> print(\"field list\")
+:param sample: This is sample output
+
+Literal block::
+
+    :param sample: This is sample input
+
+:param real: Real parameter";
+
+        assert_snapshot!(Docstring::parse(docstring).render_markdown(), @"
+        Markdown input:
+
+        ```text
+        :param sample: This is sample input
+        ```
+
+        Doctest output:
+
+        >>> print(\"field list\")
+        :param sample: This is sample output
+
+        Literal block::
+
+            :param sample: This is sample input
+
+        ## Parameters
+        `real`: Real parameter
+        ");
+
+        assert_snapshot!(parameter_documentation(docstring), @"real: Real parameter");
     }
 
     fn parameter_documentation(docstring: &str) -> String {

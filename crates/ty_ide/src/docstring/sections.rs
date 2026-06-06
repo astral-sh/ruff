@@ -122,12 +122,14 @@ fn render_markdown_section(output: &mut String, heading: &str, fields: &[Docstri
     // Render each field into the output with the appropriate spacing between fields.
     for field in fields {
         if let Some(description) = previous_description {
-            output.push_str(if description_needs_blank_before_next_field(description) {
-                // Add an extra newline to keep the next field out of an open block.
-                "\n\n"
-            } else {
-                "\n"
-            });
+            output.push_str(
+                if DescriptionState::scan(description).needs_blank_before_next_field() {
+                    // Add an extra newline to keep the next field out of an open block.
+                    "\n\n"
+                } else {
+                    "\n"
+                },
+            );
         }
 
         field.render_into(output);
@@ -135,35 +137,58 @@ fn render_markdown_section(output: &mut String, heading: &str, fields: &[Docstri
     }
 }
 
-fn description_needs_blank_before_next_field(description: &str) -> bool {
-    description_leaves_doctest_open(description)
-        || description_starts_with_markdown_list(description)
+#[derive(Debug, Default)]
+struct DescriptionState<'a> {
+    markdown_fence: Option<markdown::MarkdownFence<'a>>,
+    in_doctest: bool,
+    // Markdown allows later paragraph lines to lazily continue a list item, so
+    // any list item in the trailing block keeps the next field at risk.
+    trailing_block_has_markdown_list: bool,
 }
 
-/// Detects whether or not the given text leaves a doctest block open.
-///
-/// Doctest markers that appear within a Markdown fence are ignored.
-fn description_leaves_doctest_open(description: &str) -> bool {
-    let mut markdown_fence: Option<markdown::MarkdownFence<'_>> = None;
-    let mut in_doctest = false;
+impl<'a> DescriptionState<'a> {
+    fn scan(description: &'a str) -> Self {
+        let mut state = Self::default();
 
-    for line in description.lines().map(|line| line.trim_start_matches(' ')) {
-        if let Some(fence) = markdown_fence {
-            if fence.is_closed_by(line) {
-                markdown_fence = None;
-            }
-        } else if in_doctest {
-            if line.is_empty() {
-                in_doctest = false;
-            }
-        } else if line.starts_with(">>>") {
-            in_doctest = true;
-        } else if let Some(fence) = markdown::MarkdownFence::find(line) {
-            markdown_fence = Some(fence);
+        for line in description.lines().map(|line| line.trim_start_matches(' ')) {
+            state.consume_line(line);
         }
+
+        state
     }
 
-    in_doctest
+    fn needs_blank_before_next_field(&self) -> bool {
+        self.in_doctest || self.trailing_block_has_markdown_list
+    }
+
+    fn consume_line(&mut self, line: &'a str) {
+        if let Some(fence) = self.markdown_fence {
+            if fence.is_closed_by(line) {
+                self.markdown_fence = None;
+            }
+            return;
+        }
+
+        if self.in_doctest {
+            if line.is_empty() {
+                self.in_doctest = false;
+                self.trailing_block_has_markdown_list = false;
+            }
+            return;
+        }
+
+        if line.is_empty() {
+            self.trailing_block_has_markdown_list = false;
+        } else if line.starts_with(">>>") {
+            self.in_doctest = true;
+            self.trailing_block_has_markdown_list = false;
+        } else if let Some(fence) = markdown::MarkdownFence::find(line) {
+            self.markdown_fence = Some(fence);
+            self.trailing_block_has_markdown_list = false;
+        } else if starts_with_markdown_list_item(line) {
+            self.trailing_block_has_markdown_list = true;
+        }
+    }
 }
 
 fn description_starts_with_block_content(description: &str) -> bool {
@@ -172,12 +197,6 @@ fn description_starts_with_block_content(description: &str) -> bool {
         markdown::MarkdownFence::find(first_line).is_some()
             || first_line.starts_with(">>>")
             || starts_with_markdown_list_item(first_line)
-    })
-}
-
-fn description_starts_with_markdown_list(description: &str) -> bool {
-    description.lines().next().is_some_and(|first_line| {
-        starts_with_markdown_list_item(first_line.trim_start_matches(' '))
     })
 }
 
