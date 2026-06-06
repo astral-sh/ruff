@@ -944,6 +944,7 @@ impl<'db> Signature<'db> {
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
+        let mut generic_context = self.generic_context;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type
             && self.needs_self_mapping(db, removed_receiver)
@@ -952,6 +953,7 @@ impl<'db> Signature<'db> {
                 SelfBinding::new(db, self_type, binding_context)
                     .with_unbound_method_self_fallback(),
             );
+            generic_context = self.map_self_in_generic_defaults(db, &self_mapping);
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -961,8 +963,7 @@ impl<'db> Signature<'db> {
             return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
-            generic_context: self
-                .generic_context
+            generic_context: generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,
@@ -1043,6 +1044,29 @@ impl<'db> Signature<'db> {
             .is_some_and(|parameter| parameter.is_positional() && !parameter.inferred_annotation)
     }
 
+    pub(crate) fn apply_self_to_generic_defaults(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+    ) -> Self {
+        if !self.generic_defaults_contain_self(db) {
+            return self.clone();
+        }
+
+        let self_mapping = TypeMapping::BindSelf(
+            SelfBinding::new(
+                db,
+                self_type,
+                self.definition.map(BindingContext::Definition),
+            )
+            .with_unbound_method_self_fallback(),
+        );
+        Self {
+            generic_context: self.map_self_in_generic_defaults(db, &self_mapping),
+            ..self.clone()
+        }
+    }
+
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         if !self.needs_self_mapping(db, false) {
             return self.clone();
@@ -1062,20 +1086,28 @@ impl<'db> Signature<'db> {
         let return_ty =
             self.return_ty
                 .apply_type_mapping(db, &self_mapping, TypeContext::default());
-        let generic_context = self.generic_context.map(|generic_context| {
-            GenericContext::from_typevar_instances(
-                db,
-                generic_context
-                    .variables(db)
-                    .map(|typevar| typevar.apply_type_mapping_to_default(db, &self_mapping)),
-            )
-        });
+        let generic_context = self.map_self_in_generic_defaults(db, &self_mapping);
         Self {
             generic_context,
             definition: self.definition,
             parameters,
             return_ty,
         }
+    }
+
+    fn map_self_in_generic_defaults(
+        &self,
+        db: &'db dyn Db,
+        self_mapping: &TypeMapping<'_, 'db>,
+    ) -> Option<GenericContext<'db>> {
+        self.generic_context.map(|generic_context| {
+            GenericContext::from_typevar_instances(
+                db,
+                generic_context
+                    .variables(db)
+                    .map(|typevar| typevar.apply_type_mapping_to_default(db, self_mapping)),
+            )
+        })
     }
 
     /// Returns this signature with the given specialization applied to parameters and return type.
@@ -1228,19 +1260,23 @@ impl<'db> Signature<'db> {
         // TODO: Expand type aliases here so `type Alias = Self` in parameters or returns
         // triggers binding when a method is accessed on a concrete receiver.
         self.return_ty.contains_self(db)
-            || self.generic_context.is_some_and(|generic_context| {
-                generic_context.variables(db).any(|typevar| {
-                    typevar
-                        .default_type(db)
-                        .is_some_and(|default| default.contains_self(db))
-                })
-            })
+            || self.generic_defaults_contain_self(db)
             || self
                 .parameters
                 .iter()
                 .enumerate()
                 .skip(usize::from(receiver_is_removed))
                 .any(|(_, parameter)| parameter.annotated_type().contains_self(db))
+    }
+
+    fn generic_defaults_contain_self(&self, db: &'db dyn Db) -> bool {
+        self.generic_context.is_some_and(|generic_context| {
+            generic_context.variables(db).any(|typevar| {
+                typevar
+                    .default_type(db)
+                    .is_some_and(|default| default.contains_self(db))
+            })
+        })
     }
 
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db> {

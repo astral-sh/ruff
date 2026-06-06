@@ -4171,20 +4171,21 @@ impl<'db> Type<'db> {
                 let intersection_self = needs_self_binding
                     && !function.is_classmethod(db)
                     && matches!(self_instance, Type::Intersection(_));
+                let self_binding_type = signatures.self_binding_type(db, self_instance);
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
                         if intersection_self && signature.needs_self_mapping(db, true) {
                             signature.apply_self(db, signature.self_binding_type(db, self_instance))
                         } else {
-                            signature.clone()
+                            signature.apply_self_to_generic_defaults(db, self_binding_type)
                         }
                     }),
                 )
                 .with_bound_type(if intersection_self || !needs_self_binding {
                     self_instance
                 } else {
-                    signatures.self_binding_type(db, self_instance)
+                    self_binding_type
                 })
                 .into()
             }

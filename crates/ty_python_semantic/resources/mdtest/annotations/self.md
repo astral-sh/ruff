@@ -19,6 +19,9 @@ class Shape:
         reveal_type(self)  # revealed: Self@set_scale
         return self
 
+    def make[T = Self](self) -> T:
+        raise NotImplementedError
+
     def nested_type(self: Self) -> list[Self]:
         return [self]
 
@@ -35,6 +38,7 @@ class Shape:
 
 reveal_type(Shape().nested_type())  # revealed: list[Shape]
 reveal_type(Shape().nested_func())  # revealed: Shape
+reveal_type(Shape().make())  # revealed: Shape
 
 class Circle(Shape):
     def set_scale(self: Self, scale: float) -> Self:
