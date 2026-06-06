@@ -2167,7 +2167,7 @@ impl<'db> StaticClassLiteral<'db> {
         Self::implicit_attribute_inner(
             db,
             class_body_scope,
-            Name::new(name),
+            name.to_string(),
             target_method_decorator,
         )
     }
@@ -2182,11 +2182,9 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn implicit_attribute_inner(
         db: &'db dyn Db,
         class_body_scope: ScopeId<'db>,
-        name: Name,
+        name: String,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
-        let name = name.as_str();
-
         // If we do not see any declarations of an attribute, neither in the class body nor in
         // any method, we build a union of the raw types inferred from all bindings of that
         // attribute, then apply public-type promotion to the final union.
@@ -2244,7 +2242,7 @@ impl<'db> StaticClassLiteral<'db> {
 
         // First check declarations
         for (attribute_declarations, method_scope_id) in
-            attribute_declarations(db, class_body_scope, name)
+            attribute_declarations(db, class_body_scope, &name)
         {
             let method_scope = index.scope(method_scope_id);
             if !is_valid_scope(method_scope) {
@@ -2300,7 +2298,7 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         for (attribute_assignments, attribute_binding_scope_id) in
-            attribute_assignments(db, class_body_scope, name)
+            attribute_assignments(db, class_body_scope, &name)
         {
             let binding_scope = index.scope(attribute_binding_scope_id);
             if !is_valid_scope(binding_scope) {
@@ -2352,6 +2350,10 @@ impl<'db> StaticClassLiteral<'db> {
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
                     continue;
                 };
+
+                if !is_method_reachable.is_always_false() {
+                    is_attribute_bound = true;
+                }
 
                 let inferred_ty = match binding.kind(db) {
                     DefinitionKind::AnnotatedAssignment(_) => {
@@ -2469,9 +2471,6 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
-                    if !is_method_reachable.is_always_false() {
-                        is_attribute_bound = true;
-                    }
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
@@ -2494,24 +2493,20 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    #[salsa::tracked(
-        cycle_fn=own_instance_member_cycle_recover,
-        cycle_initial=|_, id, _, _| Member {
-            inner: Place::bound(Type::divergent(id)).into(),
-        },
-        heap_size=ruff_memory_usage::heap_size,
-    )]
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: Name) -> Member<'db> {
-        let name = name.as_str();
-
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
 
+        let body_scope = self.body_scope(db);
+        let table = place_table(db, body_scope);
+        let symbol_id = table.symbol_id(name);
+
         // NamedTuple fields are modeled via synthesized descriptors on the class. Treating them
         // as instance attributes here causes inherited fields to leak through after a subclass
         // shadows the name with a normal class attribute.
-        if CodeGeneratorKind::NamedTuple.matches(db, self.into(), None)
+        if symbol_id.is_some()
+            && CodeGeneratorKind::NamedTuple.matches(db, self.into(), None)
             && self
                 .own_fields(db, None, CodeGeneratorKind::NamedTuple)
                 .contains_key(name)
@@ -2519,10 +2514,7 @@ impl<'db> StaticClassLiteral<'db> {
             return Member::unbound();
         }
 
-        let body_scope = self.body_scope(db);
-        let table = place_table(db, body_scope);
-
-        if let Some(symbol_id) = table.symbol_id(name) {
+        if let Some(symbol_id) = symbol_id {
             let use_def = use_def_map(db, body_scope);
 
             let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
@@ -3027,7 +3019,7 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
 
         let attribute_variances = attribute_names
             .map(|name| {
-                let place_and_quals = self.own_instance_member(db, Name::new(&name)).inner;
+                let place_and_quals = self.own_instance_member(db, &name).inner;
                 (name, place_and_quals)
             })
             .chain(attribute_places_and_qualifiers)
@@ -3142,22 +3134,8 @@ fn implicit_attribute_cycle_recover<'db>(
     previous_member: &Member<'db>,
     member: Member<'db>,
     _class_body_scope: ScopeId<'db>,
-    _name: Name,
+    _name: String,
     _target_method_decorator: MethodDecorator,
-) -> Member<'db> {
-    let inner = member
-        .inner
-        .cycle_normalized(db, previous_member.inner, cycle);
-    Member { inner }
-}
-
-fn own_instance_member_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_member: &Member<'db>,
-    member: Member<'db>,
-    _class_literal: StaticClassLiteral<'db>,
-    _name: Name,
 ) -> Member<'db> {
     let inner = member
         .inner
