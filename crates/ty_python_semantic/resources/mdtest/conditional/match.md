@@ -212,7 +212,7 @@ def _(subj: abc.Callable[..., str]) -> None:
         case _:
             y = 3
 
-    reveal_type(y)  # revealed: Literal[2]
+    reveal_type(y)  # revealed: Literal[2, 3]
 
 def _(subj: None) -> None:
     y = 1
@@ -221,7 +221,7 @@ def _(subj: None) -> None:
         case abc.Callable():
             y = 2
 
-    reveal_type(y)  # revealed: Literal[1]
+    reveal_type(y)  # revealed: Literal[1, 2]
 
 def _(subj: int | abc.Callable[..., str]) -> None:
     y = 1
