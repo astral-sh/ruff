@@ -3034,6 +3034,20 @@ impl<'db> Type<'db> {
     }
 }
 
+#[salsa::tracked(
+    cycle_initial = |_, _, _, _| true,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn is_possibly_constraint_set_assignable<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+) -> bool {
+    source
+        .when_constraint_set_assignable_to_owned(db, target)
+        .query(|_builder, when| !when.is_never_satisfied(db))
+}
+
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum PathBounds<'db> {
@@ -3184,9 +3198,7 @@ impl<'db> PathBounds<'db> {
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
-                let when = lower.when_constraint_set_assignable_to_owned(db, bound);
-                let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
-                if is_never_satisfied {
+                if !is_possibly_constraint_set_assignable(db, lower, bound) {
                     // This path does not satisfy the typevar's upper bound, and is
                     // therefore not a valid specialization.
                     return Err(());
