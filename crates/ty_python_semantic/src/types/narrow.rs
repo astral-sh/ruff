@@ -2026,11 +2026,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )]))
     }
 
-    /// Return a type that every value matching `pattern` must inhabit.
+    /// Return a type that contains every value that can match `pattern`.
     ///
-    /// Positive narrowing uses this as a sound over-approximation: the result
-    /// may include values that fail nested refutable checks, but matching
-    /// values cannot fall outside it.
+    /// For example, consider:
+    ///
+    /// ```python
+    /// case [int(real=0)]:
+    /// ```
+    ///
+    /// Every match is a one-element sequence containing an `int`, so the
+    /// returned type records those facts. It does not record the nested
+    /// `real=0` check, so it can also contain values such as `[1]` that fail
+    /// the pattern at runtime. This is intentional for positive narrowing:
+    /// the result may retain extra values, but cannot exclude a possible match.
     fn necessary_match_pattern_type(&self, pattern: &PatternPredicateKind<'db>) -> Type<'db> {
         match pattern {
             PatternPredicateKind::Singleton(singleton) => {
