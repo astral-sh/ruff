@@ -423,6 +423,27 @@ MixedTruthinessRefinement = TypeVar("MixedTruthinessRefinement", Extra, AlwaysTr
 def mixed_truthiness_refinement(value: Intersection[Value, MixedTruthinessRefinement]):
     # error: [invalid-argument-type]
     value.copy_from(Value())
+
+class ClassmethodValue:
+    @classmethod
+    def copy_from(cls, other: Self) -> Self:
+        raise NotImplementedError
+
+    @classmethod
+    def choose_default[T = Self](cls) -> T:
+        raise NotImplementedError
+
+class ClassmethodExtra: ...
+
+def classmethod_intersection(
+    cls: Intersection[type[ClassmethodValue], type[ClassmethodExtra]],
+    both: Intersection[ClassmethodValue, ClassmethodExtra],
+    plain: ClassmethodValue,
+):
+    reveal_type(cls.copy_from(both))  # revealed: ClassmethodValue & ClassmethodExtra
+    # error: [invalid-argument-type]
+    cls.copy_from(plain)
+    reveal_type(cls.choose_default())  # revealed: ClassmethodValue & ClassmethodExtra
 ```
 
 ## typing_extensions

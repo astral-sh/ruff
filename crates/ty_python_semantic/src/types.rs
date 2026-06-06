@@ -1134,6 +1134,32 @@ impl<'db> Type<'db> {
         builder.build()
     }
 
+    fn classmethod_self_type(self, db: &'db dyn Db) -> Self {
+        let Type::Intersection(intersection) = self else {
+            return self.to_instance(db).unwrap_or_else(Type::unknown);
+        };
+
+        let mut builder = IntersectionBuilder::new(db);
+        let mut has_positive = false;
+        for positive in intersection.positive(db) {
+            if let Some(instance) = positive.to_instance(db) {
+                builder = builder.add_positive(instance);
+                has_positive = true;
+            }
+        }
+        for negative in intersection.negative(db) {
+            if let Some(instance) = negative.to_instance(db) {
+                builder = builder.add_negative(instance);
+            }
+        }
+
+        if has_positive {
+            builder.build()
+        } else {
+            Type::unknown()
+        }
+    }
+
     /// Apply `Self` substitutions without binding or replacing the receiver parameter.
     pub(crate) fn apply_self_binding(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         match self {
@@ -3897,6 +3923,7 @@ impl<'db> Type<'db> {
                 }
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
+                    let receiver = receiver.unwrap_or(this);
                     let enum_class = match this {
                         Type::ClassLiteral(literal) => Some(literal),
                         Type::SubclassOf(subclass_of) => subclass_of
@@ -3919,18 +3946,21 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                    .to_instance(db)
-                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
+                    let self_instance = receiver.classmethod_self_type(db);
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                    let class_attr_fallback =
-                        Type::try_call_dunder_get_on_attribute(db, class_attr_plain, None, this).0;
+                    let class_attr_fallback = Type::try_call_dunder_get_on_attribute(
+                        db,
+                        class_attr_plain,
+                        None,
+                        receiver,
+                    )
+                    .0;
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        receiver,
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
@@ -4144,8 +4174,7 @@ impl<'db> Type<'db> {
                 let signatures = function.signature(db);
                 let self_instance = bound_method.self_instance(db);
                 let typing_self_type = bound_method.typing_self_type(db);
-                let intersection_self =
-                    !function.is_classmethod(db) && matches!(self_instance, Type::Intersection(_));
+                let intersection_self = matches!(self_instance, Type::Intersection(_));
                 CallableBinding::from_overloads(
                     self,
                     signatures.overloads.iter().map(|signature| {
