@@ -352,6 +352,7 @@ PartiallyMatchedSequenceT = TypeVar(
     tuple[int],
     tuple[int, int],
 )
+SequenceElementT = TypeVar("SequenceElementT")
 
 def test_match_sequence_alias_preserves_bound_typevar(
     value: BoundSequenceT,
@@ -391,6 +392,17 @@ def test_match_sequence_alias_preserves_typevar_union_arm(
             return whole
         case _:
             raise ValueError
+
+def test_match_sequence_alias_preserves_element_narrowing(
+    value: list[SequenceElementT],
+) -> int:
+    match value:
+        case [int()] as whole:
+            # revealed: SequenceElementT@test_match_sequence_alias_preserves_element_narrowing & int
+            reveal_type(whole[0])
+            return whole[0]
+        case _:
+            return 0
 
 class Number(IntEnum):
     ONE = 1
