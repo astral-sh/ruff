@@ -198,10 +198,10 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionType, definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
+        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
+        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -994,9 +994,16 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = infer_same_file_expression_type(db, *class_expr, TypeContext::default())
-                .as_class_literal()
-                .map(|class| Type::instance(db, class.top_materialization(db)));
+            let class_ty =
+                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
+                    Type::ClassLiteral(class) => {
+                        Some(Type::instance(db, class.top_materialization(db)))
+                    }
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        Some(callable_pattern_type(db))
+                    }
+                    _ => None,
+                };
 
             class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                 if subject_ty.is_subtype_of(db, class_ty) {

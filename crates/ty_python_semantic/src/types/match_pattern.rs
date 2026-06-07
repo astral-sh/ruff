@@ -6,8 +6,8 @@ use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
 use crate::types::{
-    CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature, Type,
-    TypeContext, UnionType, infer_same_file_expression_type,
+    CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
+    SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -22,6 +22,10 @@ pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> 
 
 pub(crate) fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
     KnownClass::Mapping.to_instance(db).top_materialization(db)
+}
+
+pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
+    Type::Callable(CallableType::unknown(db)).top_materialization(db)
 }
 
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
@@ -179,10 +183,13 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                infer_same_file_expression_type(db, *class_expr, TypeContext::default())
-                    .to_instance(db)
-                    .unwrap_or(Type::Never)
-                    .top_materialization(db)
+                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
+                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        callable_pattern_type(db)
+                    }
+                    _ => Type::Never,
+                }
             } else {
                 Type::Never
             }
