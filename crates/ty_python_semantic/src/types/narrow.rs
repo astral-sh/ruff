@@ -1359,11 +1359,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             (&grouped_arms)
                 .into_iter()
                 .map(|(original_subject_ty, arms)| {
-                    let mut filtering_types = UnionBuilder::new(self.db);
+                    let filtering_types = original_subject_ty
+                        .flatten_typevars(self.db)
+                        .resolve_type_alias(self.db);
                     let mut matched_types = UnionBuilder::new(self.db);
 
                     for (_, filtering_subject_ty) in arms {
-                        filtering_types.add_in_place(filtering_subject_ty);
                         if let Some((narrowed_subject_ty, _)) = self.matching_sequence_pattern_arm(
                             kind,
                             filtering_subject_ty,
@@ -1374,7 +1375,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         }
                     }
 
-                    let filtering_types = filtering_types.build();
                     let matched_types = matched_types.build();
                     if original_subject_ty.has_typevar(self.db) {
                         if matched_types.is_equivalent_to(self.db, filtering_types) {
