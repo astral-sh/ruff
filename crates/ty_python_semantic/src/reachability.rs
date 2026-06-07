@@ -520,10 +520,11 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     }
 }
 
+type ProjectedNarrowingCacheEntries<'db> =
+    FxHashMap<(ScopeId<'db>, ScopedPlaceId), Rc<RefCell<ProjectedNarrowingState<'db>>>>;
+
 pub(crate) struct ProjectedNarrowingCache<'db> {
-    entries: RefCell<
-        FxHashMap<(ScopeId<'db>, ScopedPlaceId), Rc<RefCell<ProjectedNarrowingState<'db>>>>,
-    >,
+    entries: RefCell<ProjectedNarrowingCacheEntries<'db>>,
 }
 
 impl<'db> ProjectedNarrowingCache<'db> {
