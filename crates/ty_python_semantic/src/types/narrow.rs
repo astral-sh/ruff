@@ -635,10 +635,6 @@ impl<'db> NarrowingConstraint<'db> {
 
         self.replacement_disjuncts.is_empty().then_some(*conjunct)
     }
-
-    pub(crate) fn has_replacement(&self) -> bool {
-        !self.replacement_disjuncts.is_empty()
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
