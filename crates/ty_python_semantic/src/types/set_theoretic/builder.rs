@@ -129,6 +129,92 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+/// Simplify two conjunctions containing opposite polarities of the same element.
+///
+/// - `(R & P) | (R & ~P)` -> `R`
+fn simplify_complementary_cubes<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    // Boolean absorption is not representation-preserving for gradual types. For example,
+    // `(Any & ~None) | None` must not be widened to `Any`.
+    if left.has_dynamic(db) || right.has_dynamic(db) {
+        return None;
+    }
+
+    fn try_orientation<'db>(
+        db: &'db dyn Db,
+        positive_side: Type<'db>,
+        negative_side: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let Type::Intersection(negative_intersection) = negative_side else {
+            return None;
+        };
+        let negative_positive = negative_intersection.positive(db);
+        let negative_negative = negative_intersection.negative(db);
+
+        let try_candidate = |candidate| {
+            if !negative_negative.contains(&candidate) {
+                return None;
+            }
+
+            let mut remainder = IntersectionBuilder::new(db);
+            match positive_side {
+                Type::Intersection(positive_intersection) => {
+                    let positive_positive = positive_intersection.positive(db);
+                    let positive_negative = positive_intersection.negative(db);
+
+                    if positive_positive.len() != negative_positive.len() + 1
+                        || positive_negative.len() + 1 != negative_negative.len()
+                        || positive_positive.iter().any(|element| {
+                            *element != candidate && !negative_positive.contains(element)
+                        })
+                        || positive_negative
+                            .iter()
+                            .any(|element| !negative_negative.contains(element))
+                    {
+                        return None;
+                    }
+
+                    for element in positive_positive {
+                        if *element != candidate {
+                            remainder = remainder.add_positive(*element);
+                        }
+                    }
+                    for element in positive_negative {
+                        remainder = remainder.add_negative(*element);
+                    }
+                }
+                _ => {
+                    if positive_side != candidate
+                        || !negative_positive.is_empty()
+                        || negative_negative.len() != 1
+                    {
+                        return None;
+                    }
+                }
+            }
+            Some(remainder.build())
+        };
+
+        match positive_side {
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .copied()
+                .find_map(try_candidate),
+            _ => try_candidate(positive_side),
+        }
+    }
+
+    if let Some(reduction) = try_orientation(db, left, right) {
+        return Some(reduction);
+    }
+
+    try_orientation(db, right, left)
+}
+
 /// Combine union elements that cover more of the same enum class.
 ///
 /// Enum complements are intersections like `Color & ~Literal[Color.RED]`. When a union contains
@@ -928,6 +1014,12 @@ impl<'db> UnionBuilder<'db> {
                 to_remove.push(i);
                 ty = merged_type;
                 continue;
+            }
+
+            if let Some(replacement) = simplify_complementary_cubes(self.db, ty, element_type) {
+                self.elements.swap_remove(i);
+                self.add_in_place_impl(replacement, seen_aliases);
+                return;
             }
 
             if element_type
@@ -1776,6 +1868,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
 mod tests {
     use super::{
         IntersectionBuilder, MAX_NON_RECURSIVE_UNION_LITERALS, Type, UnionBuilder, UnionType,
+        simplify_complementary_cubes,
     };
 
     use crate::db::tests::{TestDb, setup_db};
@@ -1813,6 +1906,105 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    #[test]
+    fn simplify_complementary_cube_pair() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class Predicate: ...
+            class Shared: ...
+            class Extra: ...
+            ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let instance = |name| {
+            global_symbol(&db, module, name)
+                .place
+                .expect_type()
+                .to_instance(&db)
+                .unwrap()
+        };
+        let predicate = instance("Predicate");
+        let shared = instance("Shared");
+        let extra = instance("Extra");
+
+        let positive = IntersectionBuilder::new(&db)
+            .add_positive(predicate)
+            .add_positive(shared)
+            .build();
+        let negative = IntersectionBuilder::new(&db)
+            .add_positive(shared)
+            .add_negative(predicate)
+            .build();
+
+        let replacement = simplify_complementary_cubes(&db, positive, negative).unwrap();
+        assert_eq!(replacement, shared);
+
+        let more_constrained_negative = IntersectionBuilder::new(&db)
+            .add_positive(shared)
+            .add_positive(extra)
+            .add_negative(predicate)
+            .build();
+        assert!(simplify_complementary_cubes(&db, positive, more_constrained_negative).is_none());
+        assert!(simplify_complementary_cubes(&db, more_constrained_negative, positive).is_none());
+    }
+
+    #[test]
+    fn does_not_simplify_non_comparable_complementary_cubes() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            class Predicate: ...
+            class Left: ...
+            class Right: ...
+            ",
+        )
+        .unwrap();
+        let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+        let instance = |name| {
+            global_symbol(&db, module, name)
+                .place
+                .expect_type()
+                .to_instance(&db)
+                .unwrap()
+        };
+        let predicate = instance("Predicate");
+        let left_remainder = instance("Left");
+        let right_remainder = instance("Right");
+
+        let left = IntersectionBuilder::new(&db)
+            .add_positive(predicate)
+            .add_positive(left_remainder)
+            .build();
+        let right = IntersectionBuilder::new(&db)
+            .add_positive(right_remainder)
+            .add_negative(predicate)
+            .build();
+
+        assert!(simplify_complementary_cubes(&db, left, right).is_none());
+    }
+
+    #[test]
+    fn does_not_simplify_gradual_complementary_cubes() {
+        let db = setup_db();
+        let predicate = KnownClass::Int.to_instance(&db);
+        let gradual = Type::any();
+
+        let positive = IntersectionBuilder::new(&db)
+            .add_positive(gradual)
+            .add_positive(predicate)
+            .build();
+        let negative = IntersectionBuilder::new(&db)
+            .add_positive(gradual)
+            .add_negative(predicate)
+            .build();
+
+        assert!(simplify_complementary_cubes(&db, positive, negative).is_none());
     }
 
     fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
