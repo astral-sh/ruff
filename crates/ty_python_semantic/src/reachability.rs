@@ -198,10 +198,10 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionType, definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, NarrowingTransform,
+        Type, TypeContext, UnionType, definite_match_pattern_type, enum_metadata,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -496,15 +496,10 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
-    accumulated: Option<NarrowingConstraint<'db>>,
+    accumulated: NarrowingTransform<'db>,
     new: Option<NarrowingConstraint<'db>>,
-) -> Option<NarrowingConstraint<'db>> {
-    match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
-        (None, Some(new_c)) => Some(new_c),
-        (Some(acc), None) => Some(acc),
-        (None, None) => None,
-    }
+) -> NarrowingTransform<'db> {
+    NarrowingTransform::from_constraint(new).then(accumulated)
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -566,7 +561,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             joins: projector.graph.joins(projected_root),
             join_cache: FxHashMap::default(),
         };
-        context.narrow(projected_root, None)
+        context.narrow(projected_root, NarrowingTransform::identity())
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -592,19 +587,6 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 Truthiness::AlwaysFalse => id = node.if_false(),
             }
         }
-    }
-}
-
-fn apply_accumulated_narrowing<'db>(
-    db: &'db dyn Db,
-    base_ty: Type<'db>,
-    accumulated: Option<NarrowingConstraint<'db>>,
-) -> Type<'db> {
-    match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
-        None => base_ty,
     }
 }
 
@@ -879,7 +861,7 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             return *cached;
         }
 
-        let result = self.narrow_uncached(id, None);
+        let result = self.narrow_uncached(id, NarrowingTransform::identity());
         self.join_cache.insert(id, result);
         result
     }
@@ -888,13 +870,13 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn narrow(
         &mut self,
         id: ProjectedNarrowingNodeId,
-        accumulated: Option<NarrowingConstraint<'db>>,
+        accumulated: NarrowingTransform<'db>,
     ) -> Type<'db> {
         if self.is_join(id) {
             // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
             // then apply the incoming prefix constraint to its narrowed type.
             let suffix_ty = self.narrow_join(id);
-            return apply_accumulated_narrowing(self.db, suffix_ty, accumulated);
+            return accumulated.apply(self.db, suffix_ty);
         }
 
         self.narrow_uncached(id, accumulated)
@@ -904,14 +886,14 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn narrow_uncached(
         &mut self,
         id: ProjectedNarrowingNodeId,
-        accumulated: Option<NarrowingConstraint<'db>>,
+        accumulated: NarrowingTransform<'db>,
     ) -> Type<'db> {
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
             return Type::Never;
         }
 
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
+            accumulated.apply(self.db, self.base_ty)
         } else {
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =

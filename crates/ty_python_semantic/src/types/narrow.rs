@@ -574,6 +574,43 @@ impl<'db> NarrowingConstraint<'db> {
     }
 }
 
+/// A narrowing operation that can be applied to a previously known type.
+///
+/// A transform with no constraint is the identity transform.
+#[derive(Clone, Debug)]
+pub(crate) struct NarrowingTransform<'db> {
+    constraint: Option<NarrowingConstraint<'db>>,
+}
+
+impl<'db> NarrowingTransform<'db> {
+    pub(crate) fn identity() -> Self {
+        Self { constraint: None }
+    }
+
+    pub(crate) fn from_constraint(constraint: Option<NarrowingConstraint<'db>>) -> Self {
+        Self { constraint }
+    }
+
+    /// Compose this transform with one that occurs later in control flow.
+    pub(crate) fn then(self, later: Self) -> Self {
+        let constraint = match (self.constraint, later.constraint) {
+            (Some(earlier), Some(later)) => Some(earlier.merge_constraint_and(later)),
+            (Some(constraint), None) | (None, Some(constraint)) => Some(constraint),
+            (None, None) => None,
+        };
+        Self { constraint }
+    }
+
+    pub(crate) fn apply(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        match self.constraint {
+            Some(constraint) => NarrowingConstraint::intersection(base_ty)
+                .merge_constraint_and(constraint)
+                .evaluate_constraint_type(db),
+            None => base_ty,
+        }
+    }
+}
+
 impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
     fn from(constraint: Type<'db>) -> Self {
         Self::intersection(constraint)
