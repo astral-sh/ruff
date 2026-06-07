@@ -967,10 +967,12 @@ impl LintConfiguration {
                 docstring_overrides = docstring_override_updates;
             } else {
                 // Otherwise we apply the updates on top of the existing select_set.
+                #[expect(clippy::iter_over_hash_type)]
                 for (rule, enabled) in select_map_updates {
                     select_set.set(rule, enabled);
                 }
 
+                #[expect(clippy::iter_over_hash_type)]
                 for rule in docstring_override_updates {
                     docstring_overrides.insert(rule);
                 }
@@ -990,6 +992,7 @@ impl LintConfiguration {
                     carryover_unfixables = Some(&selection.unfixable);
                 }
             } else {
+                #[expect(clippy::iter_over_hash_type)]
                 for (rule, enabled) in fixable_map_updates {
                     fixable_set.set(rule, enabled);
                 }

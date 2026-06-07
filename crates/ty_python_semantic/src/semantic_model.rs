@@ -181,6 +181,7 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
+        #[expect(clippy::iter_over_hash_type)]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
                 name,

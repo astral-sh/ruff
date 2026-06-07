@@ -22,6 +22,7 @@ pub(super) fn publish_diagnostics_for_document(
     snapshot: &DocumentSnapshot,
     client: &Client,
 ) -> crate::server::Result<()> {
+    #[expect(clippy::iter_over_hash_type)]
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
         client
             .send_notification::<lsp_types::PublishDiagnosticsNotification>(

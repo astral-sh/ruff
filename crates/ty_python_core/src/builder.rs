@@ -646,6 +646,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
+        #[expect(clippy::iter_over_hash_type)]
         for (key, snapshot_id) in &self.enclosing_snapshots {
             if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
                 let name = self.place_tables[key.enclosing_scope]
@@ -737,6 +738,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let mut snapshots_to_mark = Vec::new();
 
+        #[expect(clippy::iter_over_hash_type)]
         for (&key, &snapshot_id) in &self.enclosing_snapshots {
             let ScopedPlaceId::Symbol(enclosing_symbol_id) = key.enclosing_place else {
                 continue;
@@ -903,6 +905,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .is_module(),
                 "the last remaining scope should be the module scope",
             );
+            #[expect(clippy::iter_over_hash_type)]
             for (name, nested_declarations) in &nested_global_or_nonlocal_declarations {
                 for declaration in nested_declarations {
                     if matches!(declaration.kind, GlobalOrNonlocal::Nonlocal) {
@@ -923,6 +926,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // only respect the bindings within the popped scope, rather than in all the nested scopes
         // they've encountered so far.
         if !popped_scope_kind.is_module() {
+            #[expect(clippy::iter_over_hash_type)]
             for (name, declarations) in &nested_global_or_nonlocal_declarations {
                 self.current_scope_info_mut()
                     .nested_global_or_nonlocal_declarations
@@ -1585,6 +1589,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // Collect all the bindings within the loop that reached a loop back edge. Use the minimum
         // definition ID to filter out all the pre-loop bindings. The loop header doesn't shadow
         // them, so there's no need to duplicate them.
+        #[expect(clippy::iter_over_hash_type)]
         for place_id in loop_header_places {
             for live_binding in use_def.loop_back_bindings(*place_id) {
                 if live_binding.binding() >= loop_min_definition_id {
@@ -1593,6 +1598,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
         // Mark the reachability and narrowing constraints as used.
+        #[expect(clippy::iter_over_hash_type)]
         for place_id in loop_header_places {
             for live_binding in loop_header.bindings_for_place(*place_id) {
                 use_def
@@ -1614,6 +1620,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
+        let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
+        nested_bindings.sort_unstable_by_key(|(name, _)| name.clone());
+
         for (name, mut declarations) in nested_bindings {
             // Filter down to only the declarations with `is_bound: true`. If there are none left,
             // skip synthesizing a definition for this symbol. (The reason we track these at all is

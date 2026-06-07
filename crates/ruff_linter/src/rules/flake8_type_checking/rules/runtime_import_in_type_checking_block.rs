@@ -188,6 +188,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         }
     }
 
+    #[expect(clippy::iter_over_hash_type)]
     for ((node_id, action), imports) in actions {
         match action {
             // Generate a diagnostic for every import, but share a fix across all imports within the same

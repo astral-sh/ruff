@@ -63,6 +63,7 @@ pub(crate) fn loop_variable_overrides_iterator(checker: &Checker, target: &Expr,
         iter_finder.names
     };
 
+    #[expect(clippy::iter_over_hash_type)]
     for (name, expr) in target_names {
         if iter_names.contains_key(name) {
             checker.report_diagnostic(

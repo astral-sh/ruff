@@ -420,6 +420,7 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 
         let previous_coverage =
             enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+        #[expect(clippy::iter_over_hash_type)]
         for previous_name in previous_coverage.definitely_matched {
             remaining_names.remove(&previous_name);
         }

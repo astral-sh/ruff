@@ -403,6 +403,7 @@ mod merge {
                 let origin_module_name = origin.module().name(db);
                 let top = origin_module_name.first_component();
                 let mut min_reexport_len = None;
+                #[expect(clippy::iter_over_hash_type)]
                 for &reexport_index in &self.all_reexports {
                     let reexport = &mut self.reexport[reexport_index];
                     // Merge the kind from the original symbol into the
@@ -456,6 +457,7 @@ mod merge {
                 if origin_len > min_reexport_len {
                     self.origin_keep[origin_index] = false;
                 }
+                #[expect(clippy::iter_over_hash_type)]
                 for &reexport_index in &self.all_reexports {
                     let reexport = &self.reexport[reexport_index];
                     if reexport.module().name(db).components().count() > min_reexport_len {

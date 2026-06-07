@@ -1063,6 +1063,7 @@ fn check_class_namespace_against_metaclass_members<'db>(
         }
     }
 
+    #[expect(clippy::iter_over_hash_type)]
     for name in metaclass_instance_members {
         let Some(symbol_id) = table.symbol_id(name.as_str()) else {
             continue;

@@ -1734,6 +1734,8 @@ impl Flake8ImportConventionsOptions {
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
+        let mut aliases = aliases.into_iter().collect::<Vec<_>>();
+        aliases.sort_unstable_by(|(module_a, _), (module_b, _)| module_a.cmp(module_b));
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
@@ -3019,7 +3021,9 @@ impl IsortOptions {
         let import_heading = self.import_heading.unwrap_or_default();
 
         // Verify that all sections listed in `import_heading` are defined in `sections`.
-        for section in import_heading.keys() {
+        let mut import_heading_sections = import_heading.keys().collect::<Vec<_>>();
+        import_heading_sections.sort_unstable();
+        for section in import_heading_sections {
             if let ImportSection::UserDefined(section_name) = section {
                 if !sections.contains_key(section_name) {
                     warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);

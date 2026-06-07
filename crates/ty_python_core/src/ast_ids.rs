@@ -38,6 +38,7 @@ impl AstIds {
         let mut uses_map = FxHashMap::with_capacity_and_hasher(capacity, FxBuildHasher);
 
         for builder in builders {
+            #[expect(clippy::iter_over_hash_type)]
             for (key, use_id) in builder.uses_map {
                 let previous = uses_map.insert(key, use_id);
                 debug_assert!(previous.is_none());

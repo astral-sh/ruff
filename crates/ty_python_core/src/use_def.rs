@@ -1388,6 +1388,7 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint: ScopedNarrowingConstraint,
         places: &PossiblyNarrowedPlaces,
     ) {
+        #[expect(clippy::iter_over_hash_type)]
         for place in places {
             match place {
                 ScopedPlaceId::Symbol(symbol_id) => {
@@ -1485,6 +1486,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.symbol_states[symbol].merge(post_definition_state, &mut self.reachability_constraints);
 
         // And similarly for all associated members:
+        #[expect(clippy::iter_over_hash_type)]
         for (member_id, pre_definition_member_state) in pre_definition.associated_member_states {
             let mut post_definition_state = std::mem::replace(
                 &mut self.member_states[member_id],
@@ -2038,6 +2040,10 @@ impl<'db> UseDefMapBuilder<'db> {
     > {
         let mut interned_ids_by_definition =
             FxHashMap::with_capacity_and_hasher(definitions_by_definition.len(), FxBuildHasher);
+
+        let mut definitions_by_definition =
+            definitions_by_definition.into_iter().collect::<Vec<_>>();
+        definitions_by_definition.sort_unstable_by_key(|(definition, _)| *definition);
 
         for (
             definition,

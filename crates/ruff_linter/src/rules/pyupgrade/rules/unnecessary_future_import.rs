@@ -165,6 +165,7 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
         }
     }
 
+    #[expect(clippy::iter_over_hash_type)]
     for (node_id, unused_aliases) in unused_imports {
         let mut diagnostic = checker.report_diagnostic(
             UnnecessaryFutureImport {

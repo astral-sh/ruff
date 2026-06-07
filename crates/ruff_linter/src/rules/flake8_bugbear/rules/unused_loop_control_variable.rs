@@ -96,6 +96,7 @@ pub(crate) fn unused_loop_control_variable(checker: &Checker, stmt_for: &ast::St
         finder.names
     };
 
+    #[expect(clippy::iter_over_hash_type)]
     for (name, expr) in control_names {
         // Ignore names that are already underscore-prefixed.
         if checker.settings().dummy_variable_rgx.is_match(name) {
