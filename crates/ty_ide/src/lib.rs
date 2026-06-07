@@ -532,7 +532,7 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed = parsed_module(&db, file).load(&db);
                     let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                        Stylist::from_tokens(parsed.full_tokens(&db), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,
@@ -679,7 +679,7 @@ mod tests {
                     let source = source_text(&db, file);
                     let parsed = parsed_module(&db, file).load(&db);
                     let stylist =
-                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                        Stylist::from_tokens(parsed.full_tokens(&db), source.as_str()).into_owned();
                     cursor = Some(Cursor {
                         file,
                         offset,

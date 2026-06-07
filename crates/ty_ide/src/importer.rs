@@ -83,7 +83,7 @@ impl<'a> Importer<'a> {
             db,
             file,
             parsed,
-            tokens: parsed.tokens(),
+            tokens: parsed.full_tokens(db),
             source,
             stylist,
             imports,

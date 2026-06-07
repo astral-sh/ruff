@@ -8,7 +8,7 @@ use tracing::Level;
 pub use range::format_range;
 use ruff_formatter::prelude::*;
 use ruff_formatter::{FormatError, Formatted, PrintError, Printed, SourceCode, format, write};
-use ruff_python_ast::{AnyNodeRef, Mod};
+use ruff_python_ast::{AnyNodeRef, Mod, token::Tokens};
 use ruff_python_parser::{ParseError, ParseOptions, Parsed, parse};
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
@@ -150,11 +150,18 @@ pub fn format_module_ast<'a>(
     source: &'a str,
     options: PyFormatOptions,
 ) -> FormatResult<Formatted<PyFormatContext<'a>>> {
-    format_node(parsed, comment_ranges, source, options)
+    format_node(
+        parsed.syntax(),
+        parsed.tokens(),
+        comment_ranges,
+        source,
+        options,
+    )
 }
 
 fn format_node<'a, N>(
-    parsed: &'a Parsed<N>,
+    syntax: &'a N,
+    tokens: &'a Tokens,
     comment_ranges: &'a CommentRanges,
     source: &'a str,
     options: PyFormatOptions,
@@ -164,11 +171,11 @@ where
     &'a N: Into<AnyNodeRef<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
+    let comments = Comments::from_ast(syntax, source_code, comment_ranges);
 
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
-        [parsed.syntax().format()]
+        PyFormatContext::new(options, source, comments, tokens),
+        [syntax.format()]
     )?;
     formatted
         .context()
@@ -181,15 +188,16 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
     let options = db.format_options(file);
 
     let parsed = parsed_module(db, file).load(db);
+    let tokens = parsed.full_tokens(db);
 
     if let Some(first) = parsed.errors().first() {
         return Err(FormatModuleError::ParseError(first.clone()));
     }
 
-    let comment_ranges = CommentRanges::from(parsed.tokens());
+    let comment_ranges = CommentRanges::from(tokens);
     let source = source_text(db, file);
 
-    let formatted = format_node(&parsed, &comment_ranges, &source, options)?;
+    let formatted = format_node(parsed.syntax(), tokens, &comment_ranges, &source, options)?;
     let printed = formatted.print()?;
 
     if printed.as_code() == &*source {

@@ -320,6 +320,14 @@ impl<T> Parsed<T> {
         &self.tokens
     }
 
+    /// Compacts the token stream while retaining context around matching tokens.
+    pub fn retain_tokens_with_context(
+        &mut self,
+        predicate: impl FnMut(&ruff_python_ast::token::Token) -> bool,
+    ) {
+        self.tokens.retain_with_context(predicate);
+    }
+
     /// Returns a list of syntax errors found during parsing.
     pub fn errors(&self) -> &[ParseError] {
         &self.errors
@@ -333,6 +341,11 @@ impl<T> Parsed<T> {
     /// Consumes the [`Parsed`] output and returns the contained syntax node.
     pub fn into_syntax(self) -> T {
         self.syntax
+    }
+
+    /// Consumes the [`Parsed`] output and returns the token stream.
+    pub fn into_tokens(self) -> Tokens {
+        self.tokens
     }
 
     /// Consumes the [`Parsed`] output and returns a list of syntax errors found during parsing.

@@ -60,13 +60,14 @@ pub fn folding_ranges(
     range_filter: Option<TextRange>,
 ) -> Vec<FoldingRange> {
     let parsed = parsed_module(db, file).load(db);
+    let tokens = parsed.full_tokens(db);
     let source = source_text(db, file);
 
     let mut visitor = FoldingRangeVisitor {
         source: source.as_str(),
         ranges: vec![],
         active_block_fold_start_lines: vec![],
-        tokens: parsed.tokens(),
+        tokens,
         range_filter,
     };
     walk_node(&mut visitor, AnyNodeRef::from(parsed.syntax()));
@@ -76,8 +77,7 @@ pub fn folding_ranges(
     );
 
     // Add remaining ranges not covered by the AST visitor.
-    let own_line_comment_ranges: Vec<_> = parsed
-        .tokens()
+    let own_line_comment_ranges: Vec<_> = tokens
         .iter()
         .filter_map(|token| {
             if token.kind() == TokenKind::Comment

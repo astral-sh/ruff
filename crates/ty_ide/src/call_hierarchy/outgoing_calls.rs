@@ -53,12 +53,13 @@ pub fn outgoing_calls(db: &dyn Db, file: File, offset: TextSize) -> Vec<Outgoing
         };
         let def_file = def.file(db);
         let parsed = parsed_module(db, def_file).load(db);
+        let tokens = parsed.full_tokens(db);
 
         let model = SemanticModel::new(db, def_file);
         let mut finder = OutgoingCallsFinder {
             db,
             model: &model,
-            tokens: parsed.tokens(),
+            tokens,
             by_callee: &mut groups,
             ancestors: Vec::new(),
         };

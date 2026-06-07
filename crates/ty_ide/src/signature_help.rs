@@ -77,7 +77,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
     let parsed = parsed_module(db, file).load(db);
 
     // Get the call expression at the given position.
-    let (call_expr, current_arg_index) = get_call_expr(&parsed, offset)?;
+    let (call_expr, current_arg_index) = get_call_expr(db, &parsed, offset)?;
 
     let model = SemanticModel::new(db, file);
 
@@ -108,15 +108,16 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
 
 /// Returns the innermost call expression that contains the specified offset
 /// and the index of the argument that the offset maps to.
-fn get_call_expr(
-    parsed: &ruff_db::parsed::ParsedModuleRef,
+fn get_call_expr<'a>(
+    db: &dyn Db,
+    parsed: &'a ruff_db::parsed::ParsedModuleRef,
     offset: TextSize,
-) -> Option<(&ast::ExprCall, usize)> {
+) -> Option<(&'a ast::ExprCall, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
 
     // Find the token under the cursor and use its offset to find the node
     let token = parsed
-        .tokens()
+        .full_tokens(db)
         .at_offset(offset)
         .max_by_key(|token| match token.kind() {
             TokenKind::Name

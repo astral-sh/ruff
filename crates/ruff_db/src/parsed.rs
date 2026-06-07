@@ -6,6 +6,7 @@ use get_size2::GetSize;
 use ruff_python_ast::{
     AnyRootNodeRef, HasNodeIndex, ModExpression, ModModule, NodeIndex, NodeIndexError,
     StringLiteral,
+    token::{TokenKind, Tokens},
 };
 use ruff_python_parser::{
     ParseError, ParseErrorType, ParseOptions, Parsed, parse_string_annotation, parse_unchecked,
@@ -15,7 +16,10 @@ use crate::Db;
 use crate::files::File;
 use crate::source::source_text;
 
-/// Returns the parsed AST of `file`, including its token stream.
+/// Returns the parsed AST of `file`, including a compact token stream.
+///
+/// The retained tokens are sufficient for type checking, including suppression comments and
+/// parenthesized diagnostic ranges. Use [`parsed_module_full_tokens`] for arbitrary token access.
 ///
 /// The query uses Ruff's error-resilient parser. That means that the parser always succeeds to produce an
 /// AST even if the file contains syntax errors. The parse errors
@@ -39,7 +43,34 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
     ParsedModule::new(file, parsed)
 }
 
+/// Returns the complete token stream for `file`.
+///
+/// Most semantic analysis only needs the compact token stream stored by [`parsed_module`].
+/// Features that inspect arbitrary tokens, such as editor navigation and formatting, use this
+/// query instead.
+#[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=20)]
+pub fn parsed_module_full_tokens(db: &dyn Db, file: File) -> Tokens {
+    parse_module(db, file).into_tokens()
+}
+
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
+    let mut parsed = parse_module(db, file);
+
+    parsed.retain_tokens_with_context(|token| {
+        matches!(
+            token.kind(),
+            TokenKind::Comment
+                | TokenKind::Newline
+                | TokenKind::NonLogicalNewline
+                | TokenKind::Lpar
+                | TokenKind::Rpar
+        )
+    });
+
+    parsed
+}
+
+fn parse_module(db: &dyn Db, file: File) -> Parsed<ModModule> {
     let source = source_text(db, file);
     let ty = file.source_type(db);
 
@@ -172,6 +203,11 @@ impl ParsedModuleRef {
     /// Returns a reference to the [`ParsedModule`] that this instance was loaded from.
     pub fn module(&self) -> &ParsedModule {
         &self.module
+    }
+
+    /// Returns the complete token stream for this module.
+    pub fn full_tokens<'db>(&self, db: &'db dyn Db) -> &'db Tokens {
+        parsed_module_full_tokens(db, self.module.file())
     }
 
     /// Returns a reference to the AST node at the given index.
@@ -495,6 +531,7 @@ mod tests {
     };
     use crate::tests::TestDb;
     use crate::vendored::{VendoredFileSystemBuilder, VendoredPath};
+    use ruff_python_ast::token::TokenKind;
     use zip::CompressionMethod;
 
     #[test]
@@ -509,6 +546,32 @@ mod tests {
         let parsed = parsed_module(&db, file).load(&db);
 
         assert!(parsed.has_valid_syntax());
+
+        Ok(())
+    }
+
+    #[test]
+    fn compact_tokens_retain_structural_context() -> crate::system::Result<()> {
+        let mut db = TestDb::new();
+        let path = "test.py";
+
+        db.write_file(path, "result = (left + right)  # comment\n")?;
+        let file = system_path_to_file(&db, path).unwrap();
+
+        let parsed = parsed_module(&db, file).load(&db);
+        let compact = parsed.tokens();
+        let full = parsed.full_tokens(&db);
+
+        assert!(compact.len() < full.len());
+        assert!(compact.iter().any(|token| token.kind() == TokenKind::Lpar));
+        assert!(compact.iter().any(|token| token.kind() == TokenKind::Rpar));
+        assert!(
+            compact
+                .iter()
+                .any(|token| token.kind() == TokenKind::Comment)
+        );
+        assert!(!compact.iter().any(|token| token.kind() == TokenKind::Plus));
+        assert!(full.iter().any(|token| token.kind() == TokenKind::Plus));
 
         Ok(())
     }

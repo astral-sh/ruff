@@ -168,6 +168,7 @@ fn call_sites_for_file(
 ) -> Vec<RawCallSite> {
     let parsed = parsed_module(db, file);
     let module = parsed.load(db);
+    let tokens = module.full_tokens(db);
     let model = SemanticModel::new(db, file);
     let mut sites = Vec::new();
 
@@ -175,7 +176,7 @@ fn call_sites_for_file(
         db,
         model: &model,
         module: &module,
-        tokens: module.tokens(),
+        tokens,
         target_definitions,
         target_role,
         needle,

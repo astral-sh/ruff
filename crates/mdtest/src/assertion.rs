@@ -34,8 +34,7 @@
 //! reveal_type(x)
 //! ```
 
-use ruff_db::parsed::ParsedModuleRef;
-use ruff_python_ast::token::Token;
+use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_trivia::{CommentRanges, Cursor};
 use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -49,14 +48,10 @@ pub(crate) struct InlineFileAssertions<'s> {
 }
 
 impl<'s> InlineFileAssertions<'s> {
-    pub(crate) fn from_file(
-        source: &'s str,
-        parsed: &ParsedModuleRef,
-        file_index: &LineIndex,
-    ) -> Self {
+    pub(crate) fn from_file(source: &'s str, tokens: &Tokens, file_index: &LineIndex) -> Self {
         let mut by_line = Vec::new();
         let mut file_assertions = UnparsedAssertionsIter {
-            tokens: parsed.tokens().iter(),
+            tokens: tokens.iter(),
             source,
         }
         .peekable();
@@ -499,7 +494,6 @@ mod tests {
     use super::*;
     use crate::tests::TestDb;
     use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
     use ruff_db::source::line_index;
     use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_trivia::textwrap::dedent;
@@ -509,8 +503,8 @@ mod tests {
         let mut db = TestDb::setup();
         db.write_file("/src/test.py", source).unwrap();
         let file = system_path_to_file(&db, "/src/test.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        InlineFileAssertions::from_file(source, &parsed, &line_index(&db, file))
+        let tokens = ruff_db::parsed::parsed_module_full_tokens(&db, file);
+        InlineFileAssertions::from_file(source, tokens, &line_index(&db, file))
     }
 
     fn into_vec(assertions: InlineFileAssertions<'_>) -> Vec<LineAssertions<'_>> {

@@ -292,9 +292,10 @@ pub fn inlay_hints(
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file).load(db);
+    let tokens = ast.full_tokens(db);
 
     let source = source_text(db, file);
-    let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
+    let stylist = Stylist::from_tokens(tokens, source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
 
     let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);

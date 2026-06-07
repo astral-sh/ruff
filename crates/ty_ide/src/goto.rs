@@ -1341,7 +1341,12 @@ pub(crate) fn find_goto_target<'a>(
     parsed: &'a ParsedModuleRef,
     offset: TextSize,
 ) -> Option<GotoTarget<'a>> {
-    find_goto_target_impl(model, parsed.tokens(), parsed.syntax().into(), offset)
+    find_goto_target_impl(
+        model,
+        parsed.full_tokens(model.db()),
+        parsed.syntax().into(),
+        offset,
+    )
 }
 
 pub(crate) fn find_goto_target_impl<'a>(

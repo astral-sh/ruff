@@ -16,6 +16,40 @@ impl Tokens {
         Tokens { raw: tokens }
     }
 
+    /// Retains matching tokens plus the first and last token in each non-matching run.
+    pub fn retain_with_context(&mut self, mut predicate: impl FnMut(&Token) -> bool) {
+        let tokens = std::mem::take(&mut self.raw);
+        let mut retained = Vec::with_capacity(tokens.len() / 4);
+        let mut first_skipped = None;
+        let mut last_skipped = None;
+
+        let flush_skipped =
+            |retained: &mut Vec<Token>, first: &mut Option<Token>, last: &mut Option<Token>| {
+                if let Some(first) = first.take() {
+                    retained.push(first);
+                    if let Some(last) = last.take()
+                        && last != first
+                    {
+                        retained.push(last);
+                    }
+                }
+            };
+
+        for token in tokens {
+            if predicate(&token) {
+                flush_skipped(&mut retained, &mut first_skipped, &mut last_skipped);
+                retained.push(token);
+            } else {
+                first_skipped.get_or_insert(token);
+                last_skipped = Some(token);
+            }
+        }
+        flush_skipped(&mut retained, &mut first_skipped, &mut last_skipped);
+
+        retained.shrink_to_fit();
+        self.raw = retained;
+    }
+
     /// Returns an iterator over all the tokens that provides context.
     pub fn iter_with_context(&self) -> TokenIterWithContext<'_> {
         TokenIterWithContext::new(&self.raw)
@@ -399,6 +433,38 @@ mod tests {
         let after = tokens.after(TextSize::new(8));
         assert_eq!(after.len(), 7);
         assert_eq!(after.first().unwrap().kind(), TokenKind::Rpar);
+    }
+
+    #[test]
+    fn retain_with_context_keeps_run_boundaries() {
+        let mut tokens = new_tokens(
+            [
+                TokenKind::Name,
+                TokenKind::Colon,
+                TokenKind::Name,
+                TokenKind::Equal,
+                TokenKind::Name,
+                TokenKind::Plus,
+                TokenKind::Name,
+                TokenKind::Newline,
+                TokenKind::Name,
+            ]
+            .into_iter()
+            .zip(0u32..)
+            .map(|(kind, index)| (kind, index..index + 1)),
+        );
+
+        tokens.retain_with_context(|token| token.kind() == TokenKind::Newline);
+
+        assert_eq!(
+            tokens.iter().map(Token::kind).collect::<Vec<_>>(),
+            [
+                TokenKind::Name,
+                TokenKind::Name,
+                TokenKind::Newline,
+                TokenKind::Name,
+            ]
+        );
     }
 
     #[test]

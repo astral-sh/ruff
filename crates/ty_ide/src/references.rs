@@ -177,12 +177,13 @@ fn references_for_keyword_arguments_in_file(
 
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let tokens = module.full_tokens(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
 
     let mut finder = KeywordArgumentReferencesFinder(LocalReferencesFinder {
         model: &model,
-        tokens: module.tokens(),
+        tokens,
         target_definitions,
         references: &mut references,
         mode,
@@ -236,6 +237,7 @@ fn references_for_file(
 ) -> Vec<ReferenceTarget> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let tokens = module.full_tokens(db);
     let model = SemanticModel::new(db, file);
     let mut references = Vec::new();
 
@@ -244,7 +246,7 @@ fn references_for_file(
         target_definitions,
         references: &mut references,
         mode,
-        tokens: module.tokens(),
+        tokens,
         target_text,
         ancestors: Vec::new(),
     };

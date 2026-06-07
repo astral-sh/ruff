@@ -309,9 +309,9 @@ impl Workspace {
 
     /// Returns the token stream for `path` serialized as a string.
     pub fn tokens(&self, file_id: &FileHandle) -> Result<String, Error> {
-        let parsed = ruff_db::parsed::parsed_module(&self.db, file_id.file).load(&self.db);
+        let tokens = ruff_db::parsed::parsed_module_full_tokens(&self.db, file_id.file);
 
-        Ok(format!("{:#?}", parsed.tokens()))
+        Ok(format!("{tokens:#?}"))
     }
 
     #[wasm_bindgen(js_name = "sourceText")]

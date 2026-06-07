@@ -668,13 +668,13 @@ struct ContextNonImport<'m> {
 impl<'m> Context<'m> {
     /// Create a new context for finding completions.
     fn new(
-        db: &'_ dyn Db,
+        db: &'m dyn Db,
         file: File,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
     ) -> Option<Context<'m>> {
-        let cursor = ContextCursor::new(parsed, source, offset);
+        let cursor = ContextCursor::new(db, parsed, source, offset);
         if cursor.is_in_no_completions_place() {
             return None;
         }
@@ -742,6 +742,8 @@ impl<'m> Context<'m> {
 struct ContextCursor<'m> {
     /// The parsed module containing the cursor.
     parsed: &'m ParsedModuleRef,
+    /// The complete token stream for the parsed module.
+    tokens: &'m Tokens,
     /// The source code of the module containing the cursor.
     source: &'m SourceText,
     /// The typed text up to the cursor offset.
@@ -763,16 +765,19 @@ struct ContextCursor<'m> {
 impl<'m> ContextCursor<'m> {
     /// Returns information about the context of the cursor.
     fn new(
+        db: &'m dyn Db,
         parsed: &'m ParsedModuleRef,
         source: &'m SourceText,
         offset: TextSize,
     ) -> ContextCursor<'m> {
-        let tokens_before = tokens_start_before(parsed.tokens(), offset);
+        let tokens = parsed.full_tokens(db);
+        let tokens_before = tokens_start_before(tokens, offset);
         let Some(range) = ContextCursor::find_typed_text_range(tokens_before, offset) else {
             let range = TextRange::empty(offset);
             let covering_node = covering_node(parsed.syntax().into(), range);
             return ContextCursor {
                 parsed,
+                tokens,
                 source,
                 typed: None,
                 offset,
@@ -791,6 +796,7 @@ impl<'m> ContextCursor<'m> {
         let covering_node = covering_node(parsed.syntax().into(), range);
         ContextCursor {
             parsed,
+            tokens,
             source,
             typed: Some(text),
             offset,
@@ -879,8 +885,7 @@ impl<'m> ContextCursor<'m> {
     }
 
     fn next_token_is_open_parenthesis(&self) -> bool {
-        self.parsed
-            .tokens()
+        self.tokens
             .at_offset(self.offset)
             .last()
             .is_some_and(|token| token.kind() == TokenKind::Lpar)
@@ -1919,7 +1924,8 @@ fn add_unimported_completions<'db>(
     }
 
     let source = source_text(db, file);
-    let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
+    let tokens = parsed.full_tokens(db);
+    let stylist = Stylist::from_tokens(tokens, source.as_str());
     let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
