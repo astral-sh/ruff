@@ -146,6 +146,76 @@ fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'d
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct ComplementaryNarrowing<'db> {
+    positive: Type<'db>,
+    negative: Type<'db>,
+}
+
+impl<'db> ComplementaryNarrowing<'db> {
+    fn from_constraints(
+        db: &'db dyn Db,
+        positive: &NarrowingConstraint<'db>,
+        negative: &NarrowingConstraint<'db>,
+    ) -> Option<Self> {
+        fn is_direct_negation<'db>(db: &'db dyn Db, ty: Type<'db>, negated: Type<'db>) -> bool {
+            let Type::Intersection(intersection) = negated else {
+                return false;
+            };
+            intersection.positive(db).is_empty()
+                && intersection.negative(db).len() == 1
+                && intersection.negative(db).contains(&ty)
+        }
+
+        let positive = positive.single_intersection_type()?;
+        let negative = negative.single_intersection_type()?;
+        (is_direct_negation(db, positive, negative) || is_direct_negation(db, negative, positive))
+            .then_some(Self { positive, negative })
+    }
+
+    pub(crate) fn positive(self) -> Type<'db> {
+        self.positive
+    }
+
+    pub(crate) fn negative(self) -> Type<'db> {
+        self.negative
+    }
+
+    fn swapped(self) -> Self {
+        Self {
+            positive: self.negative,
+            negative: self.positive,
+        }
+    }
+
+    pub(crate) fn or(self, db: &'db dyn Db, other: Self) -> Self {
+        Self {
+            positive: UnionType::from_two_elements(db, self.positive, other.positive),
+            negative: IntersectionBuilder::new(db)
+                .add_positive(self.negative)
+                .add_positive(other.negative)
+                .build(),
+        }
+    }
+
+    pub(crate) fn and(self, db: &'db dyn Db, other: Self) -> Self {
+        Self {
+            positive: IntersectionBuilder::new(db)
+                .add_positive(self.positive)
+                .add_positive(other.positive)
+                .build(),
+            negative: UnionType::from_two_elements(db, self.negative, other.negative),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PredicateNarrowingConstraints<'db> {
+    pub(crate) positive: Option<NarrowingConstraint<'db>>,
+    pub(crate) negative: Option<NarrowingConstraint<'db>>,
+    pub(crate) complementary: Option<ComplementaryNarrowing<'db>>,
+}
+
 /// Return the type constraints that `test` would place on `symbol` if true and false.
 ///
 /// For example, if we have this code:
@@ -166,11 +236,8 @@ pub(crate) fn infer_narrowing_constraints<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
-) -> (
-    Option<NarrowingConstraint<'db>>,
-    Option<NarrowingConstraint<'db>>,
-) {
-    let constraints = match predicate.node {
+) -> PredicateNarrowingConstraints<'db> {
+    let (positive, negative) = match predicate.node {
         PredicateNode::Expression(expression) => {
             let constraints = all_narrowing_constraints_for_expression(db, expression);
             (
@@ -189,11 +256,26 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             (None, None)
         }
     };
+    let complementary =
+        positive
+            .as_ref()
+            .zip(negative.as_ref())
+            .and_then(|(positive, negative)| {
+                ComplementaryNarrowing::from_constraints(db, positive, negative)
+            });
 
     if predicate.is_positive {
-        constraints
+        PredicateNarrowingConstraints {
+            positive,
+            negative,
+            complementary,
+        }
     } else {
-        (constraints.1, constraints.0)
+        PredicateNarrowingConstraints {
+            positive: negative,
+            negative: positive,
+            complementary: complementary.map(ComplementaryNarrowing::swapped),
+        }
     }
 }
 
@@ -558,21 +640,6 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
-    /// Merge two constraints with OR semantics.
-    fn merge_constraint_or(mut self, other: Self) -> Self {
-        for disjunct in other.intersection_disjuncts {
-            if !self.intersection_disjuncts.contains(&disjunct) {
-                self.intersection_disjuncts.push(disjunct);
-            }
-        }
-        for disjunct in other.replacement_disjuncts {
-            if !self.replacement_disjuncts.contains(&disjunct) {
-                self.replacement_disjuncts.push(disjunct);
-            }
-        }
-        self
-    }
-
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -587,90 +654,287 @@ impl<'db> NarrowingConstraint<'db> {
         }
         union.build()
     }
+
+    fn single_intersection_type(&self) -> Option<Type<'db>> {
+        let [disjunct] = &*self.intersection_disjuncts else {
+            return None;
+        };
+        let [conjunct] = &*disjunct.conjuncts else {
+            return None;
+        };
+
+        self.replacement_disjuncts.is_empty().then_some(*conjunct)
+    }
 }
 
-/// A narrowing operation that can be applied to a previously known type.
-///
-/// A transform with no constraint is the identity transform.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct NarrowingTransformId(usize);
+
+impl NarrowingTransformId {
+    const IDENTITY: Self = Self(0);
+    const UNREACHABLE: Self = Self(1);
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+enum NarrowingTransformNode<'db> {
+    Identity,
+    Unreachable,
+    Constraint(NarrowingConstraint<'db>),
+    Then {
+        earlier: NarrowingTransformId,
+        later: NarrowingTransformId,
+    },
+    Join {
+        left: NarrowingTransformId,
+        right: NarrowingTransformId,
+    },
+    Branch {
+        condition: ComplementaryNarrowing<'db>,
+        if_true: NarrowingTransformId,
+        if_false: NarrowingTransformId,
+    },
+}
+
+/// A factorized narrowing operation that can be applied to a previously known type.
+#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingTransform<'db> {
-    reachable: bool,
-    constraint: Option<NarrowingConstraint<'db>>,
+    nodes: Box<[NarrowingTransformNode<'db>]>,
+    root: NarrowingTransformId,
 }
 
 impl<'db> NarrowingTransform<'db> {
     pub(crate) fn identity() -> Self {
-        Self {
-            reachable: true,
-            constraint: None,
-        }
+        NarrowingTransformBuilder::default().build(NarrowingTransformId::IDENTITY)
     }
 
-    pub(crate) fn unreachable() -> Self {
-        Self {
-            reachable: false,
-            constraint: None,
-        }
+    pub(crate) fn apply(&self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        self.apply_node(
+            db,
+            self.root,
+            base_ty,
+            base_ty,
+            &mut vec![None; self.nodes.len()],
+        )
     }
 
-    pub(crate) fn from_constraint(constraint: Option<NarrowingConstraint<'db>>) -> Self {
+    fn apply_node(
+        &self,
+        db: &'db dyn Db,
+        id: NarrowingTransformId,
+        base_ty: Type<'db>,
+        original_base_ty: Type<'db>,
+        cache: &mut [Option<Type<'db>>],
+    ) -> Type<'db> {
+        if base_ty == original_base_ty
+            && let Some(cached) = cache[id.0]
+        {
+            return cached;
+        }
+
+        let result = match &self.nodes[id.0] {
+            NarrowingTransformNode::Identity => base_ty,
+            NarrowingTransformNode::Unreachable => Type::Never,
+            NarrowingTransformNode::Constraint(constraint) => {
+                NarrowingConstraint::intersection(base_ty)
+                    .merge_constraint_and(constraint.clone())
+                    .evaluate_constraint_type(db)
+            }
+            NarrowingTransformNode::Then { earlier, later } => {
+                let earlier = self.apply_node(db, *earlier, base_ty, original_base_ty, cache);
+                self.apply_node(db, *later, earlier, original_base_ty, cache)
+            }
+            NarrowingTransformNode::Join { left, right } => UnionType::from_two_elements(
+                db,
+                self.apply_node(db, *left, base_ty, original_base_ty, cache),
+                self.apply_node(db, *right, base_ty, original_base_ty, cache),
+            ),
+            NarrowingTransformNode::Branch {
+                condition,
+                if_true,
+                if_false,
+            } => {
+                let if_true = IntersectionBuilder::new(db)
+                    .add_positive(self.apply_node(db, *if_true, base_ty, original_base_ty, cache))
+                    .add_positive(condition.positive())
+                    .build();
+                let if_false = IntersectionBuilder::new(db)
+                    .add_positive(self.apply_node(db, *if_false, base_ty, original_base_ty, cache))
+                    .add_positive(condition.negative())
+                    .build();
+                UnionType::from_two_elements(db, if_true, if_false)
+            }
+        };
+        if base_ty == original_base_ty {
+            cache[id.0] = Some(result);
+        }
+        result
+    }
+}
+
+pub(crate) struct NarrowingTransformBuilder<'db> {
+    nodes: Vec<NarrowingTransformNode<'db>>,
+    cache: FxHashMap<NarrowingTransformNode<'db>, NarrowingTransformId>,
+    branch_specs: FxHashMap<NarrowingTransformId, NarrowingBranchSpec<'db>>,
+}
+
+#[derive(Clone, Copy)]
+struct NarrowingBranchSpec<'db> {
+    condition: ComplementaryNarrowing<'db>,
+    if_true: NarrowingTransformId,
+    if_false: NarrowingTransformId,
+    branches: usize,
+}
+
+impl Default for NarrowingTransformBuilder<'_> {
+    fn default() -> Self {
+        let nodes = vec![
+            NarrowingTransformNode::Identity,
+            NarrowingTransformNode::Unreachable,
+        ];
+        let cache = nodes
+            .iter()
+            .cloned()
+            .enumerate()
+            .map(|(index, node)| (node, NarrowingTransformId(index)))
+            .collect();
         Self {
-            reachable: true,
-            constraint,
+            nodes,
+            cache,
+            branch_specs: FxHashMap::default(),
+        }
+    }
+}
+
+impl<'db> NarrowingTransformBuilder<'db> {
+    // Compact only long chains: applying the identity below normalizes equivalent
+    // intersections, which would otherwise change the displayed type of short flows.
+    const MIN_REPEATED_BRANCHES: usize = 4;
+
+    pub(crate) fn identity() -> NarrowingTransformId {
+        NarrowingTransformId::IDENTITY
+    }
+
+    pub(crate) fn unreachable() -> NarrowingTransformId {
+        NarrowingTransformId::UNREACHABLE
+    }
+
+    pub(crate) fn constraint(
+        &mut self,
+        constraint: Option<NarrowingConstraint<'db>>,
+    ) -> NarrowingTransformId {
+        match constraint {
+            Some(constraint) => self.add_node(NarrowingTransformNode::Constraint(constraint)),
+            None => Self::identity(),
         }
     }
 
     /// Compose this transform with one that occurs later in control flow.
-    pub(crate) fn then(self, later: Self) -> Self {
-        if !self.reachable || !later.reachable {
-            return Self::unreachable();
-        }
-
-        let constraint = match (self.constraint, later.constraint) {
-            (Some(earlier), Some(later)) => Some(earlier.merge_constraint_and(later)),
-            (Some(constraint), None) | (None, Some(constraint)) => Some(constraint),
-            (None, None) => None,
-        };
-        Self {
-            reachable: true,
-            constraint,
+    pub(crate) fn then(
+        &mut self,
+        earlier: NarrowingTransformId,
+        later: NarrowingTransformId,
+    ) -> NarrowingTransformId {
+        match (&self.nodes[earlier.0], &self.nodes[later.0]) {
+            (NarrowingTransformNode::Unreachable, _) | (_, NarrowingTransformNode::Unreachable) => {
+                Self::unreachable()
+            }
+            (NarrowingTransformNode::Identity, _) => later,
+            (_, NarrowingTransformNode::Identity) => earlier,
+            _ => self.add_node(NarrowingTransformNode::Then { earlier, later }),
         }
     }
 
     /// Join transforms from alternative control-flow paths.
-    pub(crate) fn join(self, other: Self) -> Self {
-        match (self.reachable, other.reachable) {
-            (false, false) => Self::unreachable(),
-            (true, false) => self,
-            (false, true) => other,
-            (true, true) => {
-                let constraint = match (self.constraint, other.constraint) {
-                    (Some(left), Some(right)) => Some(left.merge_constraint_or(right)),
-                    (Some(constraint), None) | (None, Some(constraint)) => Some(
-                        NarrowingConstraint::intersection(Type::object())
-                            .merge_constraint_or(constraint),
-                    ),
-                    (None, None) => None,
-                };
-                Self {
-                    reachable: true,
-                    constraint,
-                }
-            }
+    pub(crate) fn join(
+        &mut self,
+        left: NarrowingTransformId,
+        right: NarrowingTransformId,
+    ) -> NarrowingTransformId {
+        if left == right {
+            return left;
+        }
+        match (&self.nodes[left.0], &self.nodes[right.0]) {
+            (NarrowingTransformNode::Unreachable, _) => right,
+            (_, NarrowingTransformNode::Unreachable) => left,
+            _ => self.add_node(NarrowingTransformNode::Join { left, right }),
         }
     }
 
-    pub(crate) fn apply(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
-        if !self.reachable {
-            return Type::Never;
+    pub(crate) fn branch(
+        &mut self,
+        db: &'db dyn Db,
+        condition: ComplementaryNarrowing<'db>,
+        if_true: NarrowingTransformId,
+        if_false: NarrowingTransformId,
+    ) -> NarrowingTransformId {
+        if if_true == if_false {
+            return if_true;
         }
 
-        match self.constraint {
-            Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                .merge_constraint_and(constraint)
-                .evaluate_constraint_type(db),
-            None => base_ty,
+        let spec = if let Some(nested) = self.branch_specs.get(&if_false)
+            && if_true == nested.if_true
+        {
+            NarrowingBranchSpec {
+                condition: nested.condition.or(db, condition),
+                if_true,
+                if_false: nested.if_false,
+                branches: nested.branches + 1,
+            }
+        } else if let Some(nested) = self.branch_specs.get(&if_true)
+            && if_false == nested.if_false
+        {
+            NarrowingBranchSpec {
+                condition: nested.condition.and(db, condition),
+                if_true: nested.if_true,
+                if_false,
+                branches: nested.branches + 1,
+            }
+        } else {
+            NarrowingBranchSpec {
+                condition,
+                if_true,
+                if_false,
+                branches: 1,
+            }
+        };
+
+        let result = if spec.branches >= Self::MIN_REPEATED_BRANCHES {
+            self.add_node(NarrowingTransformNode::Branch {
+                condition: spec.condition,
+                if_true: spec.if_true,
+                if_false: spec.if_false,
+            })
+        } else {
+            let positive = self.constraint(Some(NarrowingConstraint::intersection(
+                condition.positive(),
+            )));
+            let negative = self.constraint(Some(NarrowingConstraint::intersection(
+                condition.negative(),
+            )));
+            let if_true = self.then(if_true, positive);
+            let if_false = self.then(if_false, negative);
+            self.join(if_true, if_false)
+        };
+        self.branch_specs.insert(result, spec);
+        result
+    }
+
+    pub(crate) fn build(mut self, root: NarrowingTransformId) -> NarrowingTransform<'db> {
+        self.nodes.shrink_to_fit();
+        NarrowingTransform {
+            nodes: self.nodes.into_boxed_slice(),
+            root,
         }
+    }
+
+    fn add_node(&mut self, node: NarrowingTransformNode<'db>) -> NarrowingTransformId {
+        if let Some(id) = self.cache.get(&node) {
+            return *id;
+        }
+        let id = NarrowingTransformId(self.nodes.len());
+        self.nodes.push(node.clone());
+        self.cache.insert(node, id);
+        id
     }
 }
 

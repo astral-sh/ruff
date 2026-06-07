@@ -198,8 +198,9 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, NarrowingTransform,
-        Type, TypeContext, UnionType, definite_match_pattern_type, enum_metadata,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingTransform,
+        NarrowingTransformBuilder, NarrowingTransformId, PredicateNarrowingConstraints, Type,
+        TypeContext, UnionType, definite_match_pattern_type, enum_metadata,
         infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
@@ -522,7 +523,24 @@ fn large_projected_narrowing_transform<'db>(
     let predicates = use_def.predicates();
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let root = projector.project(id);
-    ProjectedNarrowingContext::new(&projector.graph).transform(root)
+    ProjectedNarrowingContext::new(db, &projector.graph).build(root)
+}
+
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_large_projected_constraint<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+) -> Type<'db> {
+    large_projected_narrowing_transform(db, scope, id, place).apply(db, base_ty)
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -581,9 +599,9 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         let transform = if projector.graph.nodes.len() >= MIN_CACHED_PROJECTED_NODES {
             let node = self.get_interior_node(id);
             let scope = predicate_scope(db, predicates[node.atom()]);
-            large_projected_narrowing_transform(db, scope, id, place)
+            return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
         } else {
-            ProjectedNarrowingContext::new(&projector.graph).transform(projected_root)
+            ProjectedNarrowingContext::new(db, &projector.graph).build(projected_root)
         };
         transform.apply(db, base_ty)
     }
@@ -640,13 +658,7 @@ struct ProjectedNarrowingGraph<'db> {
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
-    predicate_constraints_cache: FxHashMap<
-        ScopedPredicateId,
-        (
-            Option<NarrowingConstraint<'db>>,
-            Option<NarrowingConstraint<'db>>,
-        ),
-    >,
+    predicate_constraints_cache: FxHashMap<ScopedPredicateId, PredicateNarrowingConstraints<'db>>,
 }
 
 impl ProjectedNarrowingGraph<'_> {
@@ -768,10 +780,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn predicate_constraints(
         &mut self,
         predicate_id: ScopedPredicateId,
-    ) -> (
-        Option<NarrowingConstraint<'db>>,
-        Option<NarrowingConstraint<'db>>,
-    ) {
+    ) -> PredicateNarrowingConstraints<'db> {
         if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
             return cached.clone();
         }
@@ -810,9 +819,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 } else {
                     let if_true = self.project(node.if_true());
                     let if_false = self.project(node.if_false());
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
+                    let constraints = self.predicate_constraints(node.atom());
 
-                    if pos_constraint.is_none() && neg_constraint.is_none() {
+                    if constraints.positive.is_none() && constraints.negative.is_none() {
                         self.graph.or(if_true, if_false)
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
@@ -832,41 +841,55 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
 /// Builds narrowing transforms over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
+    db: &'db dyn Db,
     graph: &'a ProjectedNarrowingGraph<'db>,
-    transform_cache: Vec<Option<NarrowingTransform<'db>>>,
+    builder: NarrowingTransformBuilder<'db>,
+    transform_cache: Vec<Option<NarrowingTransformId>>,
 }
 
 impl<'a, 'db> ProjectedNarrowingContext<'a, 'db> {
-    fn new(graph: &'a ProjectedNarrowingGraph<'db>) -> Self {
+    fn new(db: &'db dyn Db, graph: &'a ProjectedNarrowingGraph<'db>) -> Self {
         ProjectedNarrowingContext {
+            db,
             graph,
+            builder: NarrowingTransformBuilder::default(),
             transform_cache: vec![None; graph.nodes.len()],
         }
     }
 
+    fn build(mut self, root: ProjectedNarrowingNodeId) -> NarrowingTransform<'db> {
+        let root = self.transform(root);
+        self.builder.build(root)
+    }
+
     /// Build the transform for a projected node, reusing shared subgraphs.
-    fn transform(&mut self, id: ProjectedNarrowingNodeId) -> NarrowingTransform<'db> {
+    fn transform(&mut self, id: ProjectedNarrowingNodeId) -> NarrowingTransformId {
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            return NarrowingTransform::identity();
+            return self.builder.identity();
         }
         if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return NarrowingTransform::unreachable();
+            return self.builder.unreachable();
         }
 
-        if let Some(cached) = &self.transform_cache[id.0] {
-            return cached.clone();
+        if let Some(cached) = self.transform_cache[id.0] {
+            return cached;
         }
 
         let node = self.graph.node(id);
-        let (positive, negative) = self.graph.predicate_constraints_cache[&node.atom].clone();
-        let if_true = self
-            .transform(node.if_true)
-            .then(NarrowingTransform::from_constraint(positive));
-        let if_false = self
-            .transform(node.if_false)
-            .then(NarrowingTransform::from_constraint(negative));
-        let result = if_true.join(if_false);
-        self.transform_cache[id.0] = Some(result.clone());
+        let constraints = self.graph.predicate_constraints_cache[&node.atom].clone();
+        let if_true = self.transform(node.if_true);
+        let if_false = self.transform(node.if_false);
+        let result = if let Some(complementary) = constraints.complementary {
+            self.builder
+                .branch(self.db, complementary, if_true, if_false)
+        } else {
+            let positive = self.builder.from_constraint(constraints.positive);
+            let negative = self.builder.from_constraint(constraints.negative);
+            let if_true = self.builder.then(if_true, positive);
+            let if_false = self.builder.then(if_false, negative);
+            self.builder.join(if_true, if_false)
+        };
+        self.transform_cache[id.0] = Some(result);
         result
     }
 }
