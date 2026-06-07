@@ -180,20 +180,23 @@ impl<'db> ComplementaryNarrowing<'db> {
     pub(crate) fn negative(self) -> Type<'db> {
         self.negative
     }
-
-    fn swapped(self) -> Self {
-        Self {
-            positive: self.negative,
-            negative: self.positive,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
 pub(crate) struct PredicateNarrowingConstraints<'db> {
     pub(crate) positive: Option<NarrowingConstraint<'db>>,
     pub(crate) negative: Option<NarrowingConstraint<'db>>,
-    pub(crate) complementary: Option<ComplementaryNarrowing<'db>>,
+}
+
+impl<'db> PredicateNarrowingConstraints<'db> {
+    pub(crate) fn complementary(&self, db: &'db dyn Db) -> Option<ComplementaryNarrowing<'db>> {
+        self.positive
+            .as_ref()
+            .zip(self.negative.as_ref())
+            .and_then(|(positive, negative)| {
+                ComplementaryNarrowing::from_constraints(db, positive, negative)
+            })
+    }
 }
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
@@ -236,25 +239,12 @@ pub(crate) fn infer_narrowing_constraints<'db>(
             (None, None)
         }
     };
-    let complementary =
-        positive
-            .as_ref()
-            .zip(negative.as_ref())
-            .and_then(|(positive, negative)| {
-                ComplementaryNarrowing::from_constraints(db, positive, negative)
-            });
-
     if predicate.is_positive {
-        PredicateNarrowingConstraints {
-            positive,
-            negative,
-            complementary,
-        }
+        PredicateNarrowingConstraints { positive, negative }
     } else {
         PredicateNarrowingConstraints {
             positive: negative,
             negative: positive,
-            complementary: complementary.map(ComplementaryNarrowing::swapped),
         }
     }
 }
@@ -645,6 +635,10 @@ impl<'db> NarrowingConstraint<'db> {
 
         self.replacement_disjuncts.is_empty().then_some(*conjunct)
     }
+
+    pub(crate) fn has_replacement(&self) -> bool {
+        !self.replacement_disjuncts.is_empty()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
@@ -944,10 +938,9 @@ impl Default for NarrowingTransformBuilder<'_> {
 }
 
 impl<'db> NarrowingTransformBuilder<'db> {
-    // Compact only long chains: medium chains do not amortize building and applying the
-    // condition DAG. Applying the identity below also normalizes equivalent intersections,
-    // which would otherwise change the displayed type of short flows.
-    const MIN_REPEATED_BRANCHES: usize = 8;
+    // Compact only long chains: applying the identity below normalizes equivalent
+    // intersections, which would otherwise change the displayed type of short flows.
+    const MIN_REPEATED_BRANCHES: usize = 4;
 
     pub(crate) fn identity() -> NarrowingTransformId {
         NarrowingTransformId::IDENTITY
