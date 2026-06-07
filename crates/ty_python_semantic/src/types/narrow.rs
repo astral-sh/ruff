@@ -919,11 +919,74 @@ impl<'db> NarrowingTransformBuilder<'db> {
         result
     }
 
-    pub(crate) fn build(mut self, root: NarrowingTransformId) -> NarrowingTransform<'db> {
-        self.nodes.shrink_to_fit();
+    pub(crate) fn build(self, root: NarrowingTransformId) -> NarrowingTransform<'db> {
+        let mut reachable = vec![false; self.nodes.len()];
+        let mut pending = vec![root];
+        while let Some(id) = pending.pop() {
+            if std::mem::replace(&mut reachable[id.0], true) {
+                continue;
+            }
+            match self.nodes[id.0] {
+                NarrowingTransformNode::Identity
+                | NarrowingTransformNode::Unreachable
+                | NarrowingTransformNode::Constraint(_) => {}
+                NarrowingTransformNode::Then { earlier, later } => {
+                    pending.extend([earlier, later]);
+                }
+                NarrowingTransformNode::Join { left, right } => {
+                    pending.extend([left, right]);
+                }
+                NarrowingTransformNode::Branch {
+                    if_true, if_false, ..
+                } => {
+                    pending.extend([if_true, if_false]);
+                }
+            }
+        }
+
+        let mut remap = vec![NarrowingTransformId::UNREACHABLE; self.nodes.len()];
+        let mut nodes =
+            Vec::with_capacity(reachable.iter().filter(|reachable| **reachable).count());
+        for (index, node) in self.nodes.into_iter().enumerate() {
+            if !reachable[index] {
+                continue;
+            }
+
+            let new_id = NarrowingTransformId(nodes.len());
+            remap[index] = new_id;
+            let remap_child = |id: NarrowingTransformId| {
+                debug_assert!(id.0 < index && reachable[id.0]);
+                remap[id.0]
+            };
+            nodes.push(match node {
+                NarrowingTransformNode::Identity => NarrowingTransformNode::Identity,
+                NarrowingTransformNode::Unreachable => NarrowingTransformNode::Unreachable,
+                NarrowingTransformNode::Constraint(constraint) => {
+                    NarrowingTransformNode::Constraint(constraint)
+                }
+                NarrowingTransformNode::Then { earlier, later } => NarrowingTransformNode::Then {
+                    earlier: remap_child(earlier),
+                    later: remap_child(later),
+                },
+                NarrowingTransformNode::Join { left, right } => NarrowingTransformNode::Join {
+                    left: remap_child(left),
+                    right: remap_child(right),
+                },
+                NarrowingTransformNode::Branch {
+                    condition,
+                    if_true,
+                    if_false,
+                } => NarrowingTransformNode::Branch {
+                    condition,
+                    if_true: remap_child(if_true),
+                    if_false: remap_child(if_false),
+                },
+            });
+        }
+
         NarrowingTransform {
-            nodes: self.nodes.into_boxed_slice(),
-            root,
+            nodes: nodes.into_boxed_slice(),
+            root: remap[root.0],
         }
     }
 
