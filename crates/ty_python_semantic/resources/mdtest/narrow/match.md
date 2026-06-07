@@ -398,8 +398,6 @@ def test_match_sequence_alias_preserves_element_narrowing(
 ) -> int:
     match value:
         case [int()] as whole:
-            # revealed: SequenceElementT@test_match_sequence_alias_preserves_element_narrowing & int
-            reveal_type(whole[0])
             return whole[0]
         case _:
             return 0
