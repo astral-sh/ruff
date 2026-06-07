@@ -1950,6 +1950,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ([pattern], []) if pattern.is_irrefutable() => {
                             ClassPatternKind::SinglePositionalIrrefutable
                         }
+                        _ if pattern
+                            .arguments
+                            .patterns
+                            .iter()
+                            .all(ast::Pattern::is_irrefutable)
+                            && pattern
+                                .arguments
+                                .keywords
+                                .iter()
+                                .all(|keyword| keyword.pattern.is_irrefutable()) =>
+                        {
+                            ClassPatternKind::IrrefutableArguments
+                        }
                         _ => ClassPatternKind::Refutable,
                     },
                 )

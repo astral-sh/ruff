@@ -314,7 +314,22 @@ def _(target: Point):
         case Point(x, y):  # irrefutable sub-patterns
             pass
         case _:
-            assert_never(target)  # error: [type-assertion-failure]
+            assert_never(target)
+
+@dataclass
+class Success:
+    value: int
+
+@dataclass
+class Failure:
+    error: str
+
+def closed_class_union_is_exhaustive(result: Success | Failure) -> int | str:
+    match result:
+        case Success(value):
+            return value
+        case Failure(error):
+            return error
 
 def _(target: Point | Other):
     match target:

@@ -199,10 +199,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
-        Type, TypeContext, UnionType, callable_pattern_type, class_pattern_is_irrefutable,
-        definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        Type, TypeContext, UnionType, callable_pattern_type, class_pattern_is_exhaustive,
+        definite_match_pattern_type, enum_metadata, exhaustive_match_pattern_type,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -270,7 +270,7 @@ fn type_narrowed_by_pattern<'db>(
 ) -> Type<'db> {
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .add_negative(exhaustive_match_pattern_type(db, predicate.kind(db)))
         .build()
 }
 
@@ -999,11 +999,11 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let (class_ty, is_irrefutable) =
+            let (class_ty, is_exhaustive) =
                 match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
                     Type::ClassLiteral(class) => (
                         Type::instance(db, class.top_materialization(db)),
-                        class_pattern_is_irrefutable(db, class, *kind),
+                        class_pattern_is_exhaustive(db, class, *kind),
                     ),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         (callable_pattern_type(db), kind.is_irrefutable())
@@ -1012,7 +1012,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 };
 
             if subject_ty.is_subtype_of(db, class_ty) {
-                if is_irrefutable {
+                if is_exhaustive {
                     Truthiness::AlwaysTrue
                 } else {
                     // A class pattern like `case Point(x=0, y=0)` is not irrefutable,

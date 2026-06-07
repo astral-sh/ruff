@@ -14,7 +14,7 @@ use crate::types::{
     CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType,
     KnownClass, KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature,
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, class_pattern_is_irrefutable,
+    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, class_pattern_is_exhaustive,
     definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
     infer_expression_types, mapping_pattern_type, singleton_pattern_type,
     starred_sequence_pattern_type,
@@ -2404,7 +2404,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
         let is_irrefutable = match class_type {
-            Type::ClassLiteral(class) => class_pattern_is_irrefutable(self.db, class, kind),
+            Type::ClassLiteral(class) => class_pattern_is_exhaustive(self.db, class, kind),
             _ => kind.is_irrefutable(),
         };
         if !is_positive && !is_irrefutable {

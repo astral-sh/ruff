@@ -342,7 +342,6 @@ def match_non_exhaustive(x: A | B | C):
             # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
 
-# error: [invalid-return-type]
 def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
     match obj:
         case GenericClass(x=42):

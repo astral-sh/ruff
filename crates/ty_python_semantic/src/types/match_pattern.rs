@@ -49,34 +49,59 @@ pub(crate) fn class_pattern_is_irrefutable(
     match kind {
         ClassPatternKind::Irrefutable => true,
         ClassPatternKind::SinglePositionalIrrefutable => {
-            Type::ClassLiteral(class)
-                .member(db, "__match_args__")
-                .place
-                .is_undefined()
-                && class
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .any(|base| {
-                        matches!(
-                            base.class_literal(db).known(db),
-                            Some(
-                                KnownClass::Bool
-                                    | KnownClass::Bytearray
-                                    | KnownClass::Bytes
-                                    | KnownClass::Dict
-                                    | KnownClass::Float
-                                    | KnownClass::FrozenSet
-                                    | KnownClass::Int
-                                    | KnownClass::List
-                                    | KnownClass::Set
-                                    | KnownClass::Str
-                                    | KnownClass::Tuple
-                            )
-                        )
-                    })
+            class_match_args_are_undefined(db, class) && class_uses_match_self(db, class)
+        }
+        ClassPatternKind::IrrefutableArguments | ClassPatternKind::Refutable => false,
+    }
+}
+
+pub(crate) fn class_pattern_is_exhaustive(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+    kind: ClassPatternKind,
+) -> bool {
+    match kind {
+        ClassPatternKind::Irrefutable | ClassPatternKind::IrrefutableArguments => true,
+        ClassPatternKind::SinglePositionalIrrefutable => {
+            if class_match_args_are_undefined(db, class) {
+                class_uses_match_self(db, class)
+            } else {
+                !class_uses_match_self(db, class)
+            }
         }
         ClassPatternKind::Refutable => false,
     }
+}
+
+fn class_match_args_are_undefined(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    Type::ClassLiteral(class)
+        .member(db, "__match_args__")
+        .place
+        .is_undefined()
+}
+
+fn class_uses_match_self(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|base| {
+            matches!(
+                base.class_literal(db).known(db),
+                Some(
+                    KnownClass::Bool
+                        | KnownClass::Bytearray
+                        | KnownClass::Bytes
+                        | KnownClass::Dict
+                        | KnownClass::Float
+                        | KnownClass::FrozenSet
+                        | KnownClass::Int
+                        | KnownClass::List
+                        | KnownClass::Set
+                        | KnownClass::Str
+                        | KnownClass::Tuple
+                )
+            )
+        })
 }
 
 fn sequence_pattern_getitem_method<'db>(
@@ -253,6 +278,44 @@ pub(crate) fn definite_match_pattern_type<'db>(
             .map(|p| definite_match_pattern_type(db, p))
             .unwrap_or_else(Type::object),
         PatternPredicateKind::Star(_) => Type::object(),
+    }
+}
+
+/// Return the values that exhaustiveness checking treats as consumed by `kind`.
+///
+/// Direct class patterns with irrefutable subpatterns are exhaustive for a known class, even
+/// though attribute lookup can fail at runtime. Ordered alternatives and nested sequence patterns
+/// use [`definite_match_pattern_type`] instead so they do not discard a later matching alternative.
+pub(crate) fn exhaustive_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Type<'db> {
+    match kind {
+        PatternPredicateKind::Class(class_expr, kind) => {
+            let Some(class) =
+                infer_same_file_expression_type(db, *class_expr, TypeContext::default())
+                    .as_class_literal()
+            else {
+                return Type::Never;
+            };
+
+            if class_pattern_is_exhaustive(db, class, *kind) {
+                Type::instance(db, class.top_materialization(db))
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Or(predicates) => UnionType::from_elements(
+            db,
+            predicates
+                .iter()
+                .map(|predicate| exhaustive_match_pattern_type(db, predicate)),
+        ),
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|pattern| exhaustive_match_pattern_type(db, pattern))
+            .unwrap_or_else(Type::object),
+        _ => definite_match_pattern_type(db, kind),
     }
 }
 

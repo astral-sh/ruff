@@ -138,6 +138,8 @@ pub enum ClassPatternKind {
     Irrefutable,
     /// Exactly one irrefutable positional subpattern and no keyword subpatterns.
     SinglePositionalIrrefutable,
+    /// Every positional and keyword subpattern is irrefutable.
+    IrrefutableArguments,
     Refutable,
 }
 
