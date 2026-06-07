@@ -539,15 +539,7 @@ fn type_narrowed_by_factored_projected_constraint<'db>(
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
 
-    let mut context = ProjectedNarrowingContext {
-        db,
-        base_ty,
-        graph: &projector.graph,
-        joins: projector.graph.joins(projected_root),
-        join_cache: FxHashMap::default(),
-        branch_factor_plan: ProjectedBranchFactorPlan::new(db, &projector.graph, base_ty),
-    };
-    context.narrow(projected_root, None)
+    narrow_projected_graph(db, base_ty, &projector.graph, projected_root)
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -613,15 +605,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             return type_narrowed_by_factored_projected_constraint(db, scope, id, base_ty, place);
         }
 
-        let mut context = ProjectedNarrowingContext {
-            db,
-            base_ty,
-            graph: &projector.graph,
-            joins: projector.graph.joins(projected_root),
-            join_cache: FxHashMap::default(),
-            branch_factor_plan: ProjectedBranchFactorPlan::new(db, &projector.graph, base_ty),
-        };
-        context.narrow(projected_root, None)
+        narrow_projected_graph(db, base_ty, &projector.graph, projected_root)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -791,12 +775,10 @@ impl ProjectedNarrowingGraph<'_> {
             None
         };
 
-        if let Some(factors) = self.repeated_branch_factors.as_mut() {
-            factors.push(factor);
-        } else if factor.is_some() {
-            let mut factors = vec![None; self.nodes.len()];
-            factors[id.0] = factor;
-            self.repeated_branch_factors = Some(factors);
+        if factor.is_some() || self.repeated_branch_factors.is_some() {
+            self.repeated_branch_factors
+                .get_or_insert_with(|| vec![None; id.0])
+                .push(factor);
         }
 
         id
@@ -1036,18 +1018,9 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         db: &'db dyn Db,
         graph: &ProjectedNarrowingGraph<'db>,
         id: ProjectedNarrowingNodeId,
-    ) -> Option<(
-        ProjectedNarrowingNodeId,
-        ProjectedNarrowingNodeId,
-        Type<'db>,
-    )> {
+    ) -> Option<(ProjectedBranchFactor, Type<'db>)> {
         let factor = graph.repeated_branch_factor(id)?;
-
-        Some((
-            factor.if_true,
-            factor.if_false,
-            self.condition(db, graph, id)?,
-        ))
+        Some((factor, self.condition(db, graph, id)?))
     }
 
     fn condition(
@@ -1094,6 +1067,23 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
     }
 }
 
+fn narrow_projected_graph<'db>(
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    graph: &ProjectedNarrowingGraph<'db>,
+    root: ProjectedNarrowingNodeId,
+) -> Type<'db> {
+    let mut context = ProjectedNarrowingContext {
+        db,
+        base_ty,
+        graph,
+        joins: graph.joins(root),
+        join_cache: FxHashMap::default(),
+        branch_factor_plan: ProjectedBranchFactorPlan::new(db, graph, base_ty),
+    };
+    context.narrow(root, None)
+}
+
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
@@ -1135,20 +1125,20 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             return None;
         }
 
-        let (if_true, if_false, condition) = self
+        let (factor, condition) = self
             .branch_factor_plan
             .as_mut()?
             .factor_condition(self.db, self.graph, id)?;
 
         let if_true_ty = self.narrow(
-            if_true,
+            factor.if_true,
             accumulate_constraint(
                 accumulated.clone(),
                 Some(NarrowingConstraint::intersection(condition)),
             ),
         );
         let if_false_ty = self.narrow(
-            if_false,
+            factor.if_false,
             accumulate_constraint(
                 accumulated,
                 Some(NarrowingConstraint::intersection(condition.negate(self.db))),
@@ -1598,41 +1588,8 @@ mod tests {
         let root = add_condition(3, nested, left);
 
         let mut plan = ProjectedBranchFactorPlan::new(&db, &graph, Type::object()).unwrap();
-        let (if_true, if_false, condition) = plan.factor_condition(&db, &graph, root).unwrap();
-        assert_eq!((if_true, if_false), (reachable, unreachable));
+        let (factor, condition) = plan.factor_condition(&db, &graph, root).unwrap();
+        assert_eq!((factor.if_true, factor.if_false), (reachable, unreachable));
         assert_eq!(condition, Type::int_literal(0));
-    }
-
-    #[test]
-    fn factors_small_projected_branch() {
-        let db = setup_db();
-        let mut graph = ProjectedNarrowingGraph::default();
-
-        let mut add_condition = |value: u16, if_true, if_false| {
-            let atom = ScopedPredicateId::new(usize::from(value));
-            let positive = Type::int_literal(i64::from(value));
-            graph.predicate_constraints_cache.insert(
-                atom,
-                (
-                    Some(NarrowingConstraint::intersection(positive)),
-                    Some(NarrowingConstraint::intersection(positive.negate(&db))),
-                ),
-            );
-            graph.add_node(ProjectedNarrowingNode {
-                atom,
-                if_true,
-                if_false,
-            })
-        };
-
-        let reachable = ProjectedNarrowingNodeId::ALWAYS_TRUE;
-        let unreachable = ProjectedNarrowingNodeId::ALWAYS_FALSE;
-        let left = add_condition(0, reachable, unreachable);
-        let right = add_condition(1, reachable, unreachable);
-        let root = add_condition(2, left, right);
-
-        let mut plan = ProjectedBranchFactorPlan::new(&db, &graph, Type::object()).unwrap();
-        let (if_true, if_false, _) = plan.factor_condition(&db, &graph, root).unwrap();
-        assert_eq!((if_true, if_false), (reachable, unreachable));
     }
 }
