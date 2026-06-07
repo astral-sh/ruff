@@ -957,19 +957,29 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
-                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                    // existing `element`. This also means that `~ty | ty` is a subtype of
-                    // `element | ty`, because both elements in the first union are subtypes of
-                    // the corresponding elements in the second union. But `~ty | ty` is just
-                    // `object`. Since `object` is a subtype of `element | ty`, we can only
-                    // conclude that `element | ty` must be `object` (object has no other
-                    // supertypes). This means we can simplify the whole union to just
-                    // `object`, since all other potential elements would also be subtypes of
-                    // `object`.
-                    self.collapse_to_object();
-                    return;
+                // The collapse below relies on `ty | ~ty == object` (the law of excluded middle),
+                // which only holds for fully-static `ty`. The recursion markers are gradual and do
+                // not negate to a true set-complement: `~Divergent(id) == Divergent(id)` (a gradual
+                // leaf, like `~Any == Any`), and `~Recursive(_) == Divergent(binder_id)` (see
+                // `Type::negate`). Applying De Morgan would then unsoundly collapse a union to
+                // `object` — e.g. `Divergent(id) | Recursive(μid.id)` (the same marker), where
+                // `~Recursive(μid.id) == Divergent(id)` is trivially a subtype of the existing
+                // `Divergent(id)` element.
+                if !matches!(ty, Type::Divergent(_) | Type::Recursive(_)) {
+                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                    if negated.is_subtype_of(self.db, element_type) {
+                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                        // existing `element`. This also means that `~ty | ty` is a subtype of
+                        // `element | ty`, because both elements in the first union are subtypes of
+                        // the corresponding elements in the second union. But `~ty | ty` is just
+                        // `object`. Since `object` is a subtype of `element | ty`, we can only
+                        // conclude that `element | ty` must be `object` (object has no other
+                        // supertypes). This means we can simplify the whole union to just
+                        // `object`, since all other potential elements would also be subtypes of
+                        // `object`.
+                        self.collapse_to_object();
+                        return;
+                    }
                 }
             }
         }

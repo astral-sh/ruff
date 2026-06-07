@@ -3500,8 +3500,9 @@ impl<'db> Type<'db> {
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
-            // TODO: Type::recursive(db, id, None, Type::divergent(id))
-            cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+            // Seed the member cycle with the μα.α recursion marker (`Recursive`), matching
+            // `place_by_id`'s seed, so every cycle-recovery query starts in the same shape.
+            cycle_initial=|db, id, _, _, _, _| Place::bound(Type::recursive(db, id, None, Type::divergent(id))).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 // Present a recursively-defined member (e.g. a cross-instance attribute
                 // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
