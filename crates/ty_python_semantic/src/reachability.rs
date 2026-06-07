@@ -509,9 +509,6 @@ fn accumulate_constraint<'db>(
     }
 }
 
-const MIN_CACHED_PROJECTED_NODES: usize = 30;
-const MIN_REPEATED_NARROWING_BRANCHES: usize = 4;
-
 fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'db> {
     match predicate.node {
         PredicateNode::Expression(expression) => expression.scope(db),
@@ -521,7 +518,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     }
 }
 
-/// Cache the final narrowed type for large projected graphs that are reused by many place loads.
+/// Cache the final narrowed type for projected roots with repeated continuations.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
@@ -529,7 +526,7 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_large_projected_constraint<'db>(
+fn type_narrowed_by_factored_projected_constraint<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     id: ScopedReachabilityConstraintId,
@@ -606,10 +603,14 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
 
-        if projector.graph.nodes.len() >= MIN_CACHED_PROJECTED_NODES {
+        if projector
+            .graph
+            .repeated_branch_factor(projected_root)
+            .is_some()
+        {
             let node = self.get_interior_node(id);
             let scope = predicate_scope(db, predicates[node.atom()]);
-            return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
+            return type_narrowed_by_factored_projected_constraint(db, scope, id, base_ty, place);
         }
 
         let mut context = ProjectedNarrowingContext {
@@ -685,6 +686,12 @@ struct ProjectedNarrowingNode {
     if_false: ProjectedNarrowingNodeId,
 }
 
+#[derive(Clone, Copy)]
+struct ProjectedBranchFactor {
+    if_true: ProjectedNarrowingNodeId,
+    if_false: ProjectedNarrowingNodeId,
+}
+
 /// Reduced reachability graph containing only predicates relevant to one place.
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
@@ -699,12 +706,44 @@ struct ProjectedNarrowingGraph<'db> {
             Option<NarrowingConstraint<'db>>,
         ),
     >,
+    /// Structurally repeated regions that can resolve to only two continuation subgraphs.
+    ///
+    /// This remains unallocated for graphs without repeated continuations. Exact-complement
+    /// validation and condition construction are deferred until narrowing evaluates a candidate.
+    repeated_branch_factors: Option<Vec<Option<ProjectedBranchFactor>>>,
 }
 
 impl ProjectedNarrowingGraph<'_> {
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
         self.nodes[id.0]
+    }
+
+    fn branch_factor(&self, id: ProjectedNarrowingNodeId) -> Option<ProjectedBranchFactor> {
+        if id.is_terminal() {
+            return None;
+        }
+
+        self.repeated_branch_factors
+            .as_ref()
+            .and_then(|factors| factors[id.0])
+            .or_else(|| {
+                let node = self.node(id);
+                Some(ProjectedBranchFactor {
+                    if_true: node.if_true,
+                    if_false: node.if_false,
+                })
+            })
+    }
+
+    fn repeated_branch_factor(
+        &self,
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<ProjectedBranchFactor> {
+        if id.is_terminal() {
+            return None;
+        }
+        self.repeated_branch_factors.as_ref()?[id.0]
     }
 
     /// Interns a projected node, collapsing nodes with identical branches.
@@ -720,6 +759,46 @@ impl ProjectedNarrowingGraph<'_> {
         let id = ProjectedNarrowingNodeId(self.nodes.len());
         self.nodes.push(node);
         self.node_cache.insert(node, id);
+
+        let if_true_factor = self.branch_factor(node.if_true);
+        let if_false_factor = self.branch_factor(node.if_false);
+        let factor = if let (Some(if_true), Some(if_false)) = (if_true_factor, if_false_factor)
+            && if_true.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
+            && if_true.if_true == if_false.if_true
+            && if_true.if_false == if_false.if_false
+        {
+            Some(ProjectedBranchFactor {
+                if_true: if_true.if_true,
+                if_false: if_true.if_false,
+            })
+        } else if let Some(nested) = if_false_factor
+            && node.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
+            && node.if_true == nested.if_true
+        {
+            Some(ProjectedBranchFactor {
+                if_true: node.if_true,
+                if_false: nested.if_false,
+            })
+        } else if let Some(nested) = if_true_factor
+            && node.if_false != ProjectedNarrowingNodeId::ALWAYS_FALSE
+            && node.if_false == nested.if_false
+        {
+            Some(ProjectedBranchFactor {
+                if_true: nested.if_true,
+                if_false: node.if_false,
+            })
+        } else {
+            None
+        };
+
+        if let Some(factors) = self.repeated_branch_factors.as_mut() {
+            factors.push(factor);
+        } else if factor.is_some() {
+            let mut factors = vec![None; self.nodes.len()];
+            factors[id.0] = factor;
+            self.repeated_branch_factors = Some(factors);
+        }
+
         id
     }
 
@@ -911,22 +990,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-#[derive(Clone, Copy)]
-struct ProjectedBranchFactor<'db> {
-    predicate: Type<'db>,
-    if_true: ProjectedNarrowingNodeId,
-    if_false: ProjectedNarrowingNodeId,
-    branches: usize,
-    condition: Option<Type<'db>>,
-}
-
-/// Precomputes regions of the projected narrowing DAG with two possible continuations.
-///
-/// Unlike the linear-chain matcher, this can compose alternating shared-true and shared-false
-/// regions. For example, it can factor `(P | Q) & R` when the projected children share the same
-/// two continuation subgraphs.
+/// Lazily builds exact conditions for structurally repeated projected branches.
 struct ProjectedBranchFactorPlan<'db> {
-    factors: Vec<Option<ProjectedBranchFactor<'db>>>,
+    conditions: Vec<Option<Type<'db>>>,
 }
 
 impl<'db> ProjectedBranchFactorPlan<'db> {
@@ -935,65 +1001,13 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         graph: &ProjectedNarrowingGraph<'db>,
         base_ty: Type<'db>,
     ) -> Option<Self> {
-        if graph.nodes.len() < MIN_REPEATED_NARROWING_BRANCHES || base_ty.has_dynamic(db) {
+        if graph.repeated_branch_factors.is_none() || base_ty.has_dynamic(db) {
             return None;
         }
 
-        let mut factors = Vec::with_capacity(graph.nodes.len());
-        let mut has_factor = false;
-
-        for node in &graph.nodes {
-            let Some(predicate) = Self::atomic_condition(db, graph, node) else {
-                factors.push(None);
-                continue;
-            };
-
-            let if_true_factor = Self::factor(&factors, node.if_true);
-            let if_false_factor = Self::factor(&factors, node.if_false);
-            let (if_true, if_false, branches) = if let (Some(if_true), Some(if_false)) =
-                (if_true_factor, if_false_factor)
-                && if_true.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
-                && if_true.if_true == if_false.if_true
-                && if_true.if_false == if_false.if_false
-            {
-                (
-                    if_true.if_true,
-                    if_true.if_false,
-                    if_true.branches + if_false.branches + 1,
-                )
-            } else if let Some(nested) = if_false_factor
-                && node.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
-                && node.if_true == nested.if_true
-            {
-                (node.if_true, nested.if_false, nested.branches + 1)
-            } else if let Some(nested) = if_true_factor
-                && node.if_false != ProjectedNarrowingNodeId::ALWAYS_FALSE
-                && node.if_false == nested.if_false
-            {
-                (nested.if_true, node.if_false, nested.branches + 1)
-            } else {
-                (node.if_true, node.if_false, 1)
-            };
-
-            let factor = ProjectedBranchFactor {
-                predicate,
-                if_true,
-                if_false,
-                branches,
-                condition: None,
-            };
-            has_factor |= branches >= MIN_REPEATED_NARROWING_BRANCHES;
-            factors.push(Some(factor));
-        }
-
-        has_factor.then_some(Self { factors })
-    }
-
-    fn factor(
-        factors: &[Option<ProjectedBranchFactor<'db>>],
-        id: ProjectedNarrowingNodeId,
-    ) -> Option<ProjectedBranchFactor<'db>> {
-        factors.get(id.0).copied().flatten()
+        Some(Self {
+            conditions: vec![None; graph.nodes.len()],
+        })
     }
 
     fn atomic_condition(
@@ -1027,15 +1041,12 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         ProjectedNarrowingNodeId,
         Type<'db>,
     )> {
-        let factor = Self::factor(&self.factors, id)?;
-        if factor.branches < MIN_REPEATED_NARROWING_BRANCHES {
-            return None;
-        }
+        let factor = graph.repeated_branch_factor(id)?;
 
         Some((
             factor.if_true,
             factor.if_false,
-            self.condition(db, graph, id),
+            self.condition(db, graph, id)?,
         ))
     }
 
@@ -1044,46 +1055,42 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         db: &'db dyn Db,
         graph: &ProjectedNarrowingGraph<'db>,
         id: ProjectedNarrowingNodeId,
-    ) -> Type<'db> {
-        let factor =
-            Self::factor(&self.factors, id).expect("only factorable nodes have conditions");
-        if let Some(cached) = factor.condition {
-            return cached;
+    ) -> Option<Type<'db>> {
+        if let Some(cached) = self.conditions[id.0] {
+            return Some(cached);
         }
 
+        let factor = graph.branch_factor(id)?;
         let node = graph.node(id);
-        let predicate = factor.predicate;
+        let predicate = Self::atomic_condition(db, graph, &node)?;
         let result = if node.if_true == factor.if_true {
             // `P ? true : C` is equivalent to `P | C`.
             if node.if_false == factor.if_false {
                 predicate
             } else {
-                let if_false = self.condition(db, graph, node.if_false);
+                let if_false = self.condition(db, graph, node.if_false)?;
                 UnionType::from_two_elements(db, predicate, if_false)
             }
         } else if node.if_false == factor.if_false {
             // `P ? C : false` is equivalent to `P & C`.
             IntersectionBuilder::new(db)
                 .add_positive(predicate)
-                .add_positive(self.condition(db, graph, node.if_true))
+                .add_positive(self.condition(db, graph, node.if_true)?)
                 .build()
         } else {
             // The remaining case is `(P & Ct) | (~P & Cf)`.
             let if_true = IntersectionBuilder::new(db)
                 .add_positive(predicate)
-                .add_positive(self.condition(db, graph, node.if_true))
+                .add_positive(self.condition(db, graph, node.if_true)?)
                 .build();
             let if_false = IntersectionBuilder::new(db)
                 .add_positive(predicate.negate(db))
-                .add_positive(self.condition(db, graph, node.if_false))
+                .add_positive(self.condition(db, graph, node.if_false)?)
                 .build();
             UnionType::from_two_elements(db, if_true, if_false)
         };
-        self.factors[id.0]
-            .as_mut()
-            .expect("only factorable nodes have conditions")
-            .condition = Some(result);
-        result
+        self.conditions[id.0] = Some(result);
+        Some(result)
     }
 }
 
@@ -1594,5 +1601,38 @@ mod tests {
         let (if_true, if_false, condition) = plan.factor_condition(&db, &graph, root).unwrap();
         assert_eq!((if_true, if_false), (reachable, unreachable));
         assert_eq!(condition, Type::int_literal(0));
+    }
+
+    #[test]
+    fn factors_small_projected_branch() {
+        let db = setup_db();
+        let mut graph = ProjectedNarrowingGraph::default();
+
+        let mut add_condition = |value: u16, if_true, if_false| {
+            let atom = ScopedPredicateId::new(usize::from(value));
+            let positive = Type::int_literal(i64::from(value));
+            graph.predicate_constraints_cache.insert(
+                atom,
+                (
+                    Some(NarrowingConstraint::intersection(positive)),
+                    Some(NarrowingConstraint::intersection(positive.negate(&db))),
+                ),
+            );
+            graph.add_node(ProjectedNarrowingNode {
+                atom,
+                if_true,
+                if_false,
+            })
+        };
+
+        let reachable = ProjectedNarrowingNodeId::ALWAYS_TRUE;
+        let unreachable = ProjectedNarrowingNodeId::ALWAYS_FALSE;
+        let left = add_condition(0, reachable, unreachable);
+        let right = add_condition(1, reachable, unreachable);
+        let root = add_condition(2, left, right);
+
+        let mut plan = ProjectedBranchFactorPlan::new(&db, &graph, Type::object()).unwrap();
+        let (if_true, if_false, _) = plan.factor_condition(&db, &graph, root).unwrap();
+        assert_eq!((if_true, if_false), (reachable, unreachable));
     }
 }
