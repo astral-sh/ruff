@@ -1030,16 +1030,27 @@ impl<'db> Type<'db> {
     ///
     /// [`has_structural_divergent`]: Type::has_structural_divergent
     pub(crate) fn wrap_structural_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle
-            .head_ids()
-            .fold(self, |ty, id| {
-                if ty.has_structural_divergent(db, id) {
-                    Type::recursive(db, id, None, ty)
-                } else {
-                    ty
-                }
-            })
+        self.wrap_structural_recursive_fold_only(db, cycle)
             .resolve_structureless_cycle_to_never(cycle)
+    }
+
+    /// Like [`wrap_structural_recursive`] but **without** the structureless→`Never` finalization.
+    /// Folds any structural `Divergent` into an implicit `Type::Recursive` μ-binder so the cycle
+    /// result carries the binder (operations unfold it) instead of exposing a bare `Divergent`, but
+    /// leaves a structureless top-level `Divergent` as-is. Used by generic cycles (union/intersection/
+    /// inference) where the value-cycle Never-resolution would misfire on a mid-iteration provisional.
+    pub(crate) fn wrap_structural_recursive_fold_only(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        cycle.head_ids().fold(self, |ty, id| {
+            if ty.has_structural_divergent(db, id) {
+                Type::recursive(db, id, None, ty)
+            } else {
+                ty
+            }
+        })
     }
 
     /// Resolve a converged *structureless* cycle — a value that is exactly the bare `Divergent`

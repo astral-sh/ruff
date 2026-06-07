@@ -446,9 +446,11 @@ pub(crate) fn infer_expression_type<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id, _| Type::divergent(id),
+    cycle_initial=|db, id, _| Type::recursive(db, id, None, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result
+            .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
+            .wrap_structural_recursive_fold_only(db, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]

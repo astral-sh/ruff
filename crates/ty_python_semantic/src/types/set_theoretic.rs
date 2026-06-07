@@ -67,9 +67,11 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result
+                .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
+                .wrap_structural_recursive_fold_only(db, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -694,9 +696,11 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result
+                .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
+                .wrap_structural_recursive_fold_only(db, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
