@@ -1,5 +1,6 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
+use crate::definition::Definition;
 use crate::scope::ScopeId;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
@@ -12,7 +13,7 @@ use salsa;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum ExpressionKind {
     Normal,
-    TypeExpression,
+    AnnotationExpression,
 }
 
 /// An independently type-inferable expression.
@@ -55,8 +56,11 @@ pub struct Expression<'db> {
     #[tracked]
     pub assigned_to: Option<AstNodeRef<ast::StmtAssign>>,
 
-    /// Should this expression be inferred as a normal expression or a type expression?
+    /// Should this expression be inferred as a normal expression or an annotation expression?
     pub kind: ExpressionKind,
+
+    /// The definition whose declaration this annotation belongs to.
+    pub annotation_owner: Option<Definition<'db>>,
 }
 
 // The Salsa heap is tracked separately.

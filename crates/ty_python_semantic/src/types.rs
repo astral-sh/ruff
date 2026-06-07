@@ -15,6 +15,7 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -103,7 +104,7 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index};
@@ -214,6 +215,40 @@ pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
+    if let DefinitionKind::AnnotatedAssignment(assignment) = definition.kind(db) {
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let target = assignment.target(&module);
+
+        if definition.scope(db).file_scope_id(db).is_global()
+            && assignment.value(&module).is_some()
+            && let Some(name) = target.as_name_expr()
+        {
+            let annotation = assignment.annotation(&module);
+            let index = semantic_index(db, file);
+            let annotation_expression = index.expression(annotation);
+            let inference =
+                infer_expression_types(db, annotation_expression, TypeContext::default());
+            let mut declared = TypeAndQualifiers::declared(inference.expression_type(annotation))
+                .with_qualifier(inference.qualifiers(annotation));
+
+            // PEP 613 aliases derive their declaration from the right-hand side.
+            if !declared.inner_type().is_typealias_special_form() {
+                if name.id == "TYPE_CHECKING" {
+                    declared.inner = Type::bool_literal(true);
+                }
+
+                if let Some(special_form) =
+                    SpecialFormType::try_from_file_and_name(db, file, &name.id)
+                {
+                    declared.inner = Type::SpecialForm(special_form);
+                }
+
+                return InferredDeclaration::Declared(declared);
+            }
+        }
+    }
+
     let inference = infer_definition_types(db, definition);
     inference.inferred_declaration(definition)
 }

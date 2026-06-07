@@ -1317,6 +1317,10 @@ struct ExpressionInferenceExtra<'db> {
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
+
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    /// Only populated for expressions that have non-empty qualifiers.
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
 impl<'db> ExpressionInference<'db> {
@@ -1385,6 +1389,13 @@ impl<'db> ExpressionInference<'db> {
             .as_ref()?
             .collection_use_constraints
             .get(&collection_def)
+    }
+
+    pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.qualifiers.get(&expression.into()).copied())
+            .unwrap_or_default()
     }
 
     fn fallback_type(&self) -> Option<Type<'db>> {

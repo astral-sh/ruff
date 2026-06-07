@@ -321,6 +321,68 @@ fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
 }
 
 #[test]
+fn imported_annotated_assignment_doesnt_infer_value() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_files([
+        ("/src/a.py", "from foo import x"),
+        ("/src/foo.py", r#"x: int = "not an int""#),
+    ])?;
+
+    let a = system_path_to_file(&db, "/src/a.py").unwrap();
+    let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+
+    db.clear_salsa_events();
+
+    let x_ty = global_symbol(&db, a, "x").place.expect_type();
+    assert_eq!(x_ty.display(&db).to_string(), "int");
+
+    let events = db.take_salsa_events();
+    assert_function_query_was_not_run(
+        &db,
+        infer_definition_types,
+        first_public_binding(&db, foo, "x"),
+        &events,
+    );
+    assert_file_diagnostics(
+        &db,
+        "/src/foo.py",
+        &[r#"Object of type `Literal["not an int"]` is not assignable to `int`"#],
+    );
+
+    Ok(())
+}
+
+#[test]
+fn imported_pep_613_alias_infers_value() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_files([
+        ("/src/a.py", "from foo import Alias\nx: Alias = 1"),
+        (
+            "/src/foo.py",
+            "from typing import TypeAlias\nAlias: TypeAlias = int",
+        ),
+    ])?;
+
+    let foo = system_path_to_file(&db, "/src/foo.py").unwrap();
+
+    db.clear_salsa_events();
+
+    assert_file_diagnostics(&db, "/src/a.py", &[]);
+
+    let events = db.take_salsa_events();
+    assert_function_query_was_run(
+        &db,
+        infer_definition_types,
+        first_public_binding(&db, foo, "Alias"),
+        &events,
+    );
+
+    Ok(())
+}
+
+#[test]
 fn dependency_internal_symbol_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 

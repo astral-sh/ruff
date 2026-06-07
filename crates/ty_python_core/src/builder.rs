@@ -1128,6 +1128,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 AstNodeRef::new(self.module, alias.expression),
                 None,
                 ExpressionKind::Normal,
+                None,
             );
             self.alias_predicates.insert(
                 ExpressionNodeKey::from(leaf),
@@ -1251,11 +1252,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 self.add_dict_key_assignment_definitions(&node.targets, &node.value, assignment);
             }
             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
-                self.add_standalone_type_expression(&ann_assign.annotation);
                 let assignment = self.add_definition(
                     place_id,
                     AnnotatedAssignmentDefinitionNodeRef { node: ann_assign },
                 );
+                self.add_standalone_annotation_expression(&ann_assign.annotation, assignment);
 
                 if let Some(value) = ann_assign.value.as_deref() {
                     self.add_dict_key_assignment_definitions(
@@ -2027,7 +2028,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
     /// standalone (type narrowing tests, RHS of an assignment.)
     fn add_standalone_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None)
+        self.add_standalone_expression_impl(expression_node, ExpressionKind::Normal, None, None)
     }
 
     /// Record an expression that is immediately assigned to a target, and that needs to be a Salsa
@@ -2042,13 +2043,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             expression_node,
             ExpressionKind::Normal,
             Some(assigned_to),
+            None,
         )
     }
 
-    /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as a
-    /// *type* expression, which makes sure that it will later be inferred as such.
-    fn add_standalone_type_expression(&mut self, expression_node: &ast::Expr) -> Expression<'db> {
-        self.add_standalone_expression_impl(expression_node, ExpressionKind::TypeExpression, None)
+    /// Same as [`SemanticIndexBuilder::add_standalone_expression`], but marks the expression as an
+    /// annotation expression so that inference preserves type qualifiers.
+    fn add_standalone_annotation_expression(
+        &mut self,
+        expression_node: &ast::Expr,
+        owner: Definition<'db>,
+    ) -> Expression<'db> {
+        self.add_standalone_expression_impl(
+            expression_node,
+            ExpressionKind::AnnotationExpression,
+            None,
+            Some(owner),
+        )
     }
 
     fn add_standalone_expression_impl(
@@ -2056,6 +2067,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         expression_node: &ast::Expr,
         expression_kind: ExpressionKind,
         assigned_to: Option<&ast::StmtAssign>,
+        annotation_owner: Option<Definition<'db>>,
     ) -> Expression<'db> {
         let expression = Expression::new(
             self.db,
@@ -2063,6 +2075,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             AstNodeRef::new(self.module, expression_node),
             assigned_to.map(|assigned_to| AstNodeRef::new(self.module, assigned_to)),
             expression_kind,
+            annotation_owner,
         );
         self.expressions_by_node
             .insert(expression_node.into(), expression);

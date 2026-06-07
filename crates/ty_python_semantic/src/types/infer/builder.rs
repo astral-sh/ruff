@@ -397,8 +397,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Definition(definition) | InferenceRegion::Deferred(definition) => {
                 Some(definition)
             }
+            InferenceRegion::Expression(expression, _) => expression.annotation_owner(self.db()),
             InferenceRegion::Statement(_)
-            | InferenceRegion::Expression(_, _)
             | InferenceRegion::FunctionDecorators(_)
             | InferenceRegion::Scope(_, _) => None,
         })
@@ -507,6 +507,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .extend(extra.string_annotations.iter().copied());
             self.expected_types
                 .extend(extra.expected_types.iter().copied());
+            self.qualifiers.extend(extra.qualifiers.iter().copied());
             self.type_expression_flags
                 .extend(extra.type_expression_flags.iter().copied());
 
@@ -1129,10 +1130,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ExpressionKind::Normal => {
                 self.infer_expression_impl(expression.node_ref(self.db()).node(self.module()), tcx);
             }
-            ExpressionKind::TypeExpression => {
-                self.infer_type_expression(expression.node_ref(self.db()).node(self.module()));
+            ExpressionKind::AnnotationExpression => {
+                self.infer_annotation_expression_allow_pep_613(
+                    expression.node_ref(self.db()).node(self.module()),
+                    DeferredExpressionState::from(self.defer_annotations()),
+                );
             }
         }
+    }
+
+    fn infer_standalone_annotation_expression(
+        &mut self,
+        annotation: &ast::Expr,
+        definition: Definition<'db>,
+    ) -> TypeAndQualifiers<'db> {
+        let expression = self.index.expression(annotation);
+        debug_assert_eq!(expression.annotation_owner(self.db()), Some(definition));
+
+        let inference = infer_expression_types(self.db(), expression, TypeContext::default());
+        let declared = TypeAndQualifiers::declared(inference.expression_type(annotation))
+            .with_qualifier(inference.qualifiers(annotation));
+        self.extend_expression(inference);
+        declared
     }
 
     /// Add a binding for the given definition.
@@ -4401,10 +4420,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let annotation = assignment.annotation(self.module());
-        let mut declared = self.infer_annotation_expression_allow_pep_613(
-            annotation,
-            DeferredExpressionState::from(self.defer_annotations()),
-        );
+        let mut declared = if definition
+            .scope(self.db())
+            .file_scope_id(self.db())
+            .is_global()
+            && value.is_some()
+            && target.is_name_expr()
+        {
+            self.infer_standalone_annotation_expression(annotation, definition)
+        } else {
+            self.infer_annotation_expression_allow_pep_613(
+                annotation,
+                DeferredExpressionState::from(self.defer_annotations()),
+            )
+        };
 
         // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
         // not as variable annotations. Check both resolved type and AST form.
@@ -10235,7 +10264,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Self {
             context,
             expressions,
-            qualifiers: _,
+            qualifiers,
             type_expression_flags,
             mut collection_use_constraints,
             string_annotations,
@@ -10278,6 +10307,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 || !type_expression_flags.is_empty()
                 || !collection_use_constraints.is_empty()
                 || !expected_types.is_empty()
+                || !qualifiers.is_empty()
                 || cycle_recovery.is_some()
                 || !bindings.is_empty()
                 || !diagnostics.is_empty()).then(|| {
@@ -10297,7 +10327,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     bindings: bindings.into_boxed_slice(),
                     diagnostics,
                     cycle_recovery,
-                    collection_use_constraints
+                    collection_use_constraints,
+                    qualifiers: FrozenMap::from(qualifiers),
                 })
             });
 
