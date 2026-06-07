@@ -219,6 +219,8 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -494,12 +496,33 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 }
 
-/// AND a new optional narrowing constraint with an accumulated one.
-fn accumulate_constraint<'db>(
-    accumulated: NarrowingTransform<'db>,
-    new: Option<NarrowingConstraint<'db>>,
+const MIN_CACHED_PROJECTED_NODES: usize = 30;
+
+fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'db> {
+    match predicate.node {
+        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::IsNonTerminalCall(call) => call.callable.scope(db),
+        PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial = |_, _, _, _, _| NarrowingTransform::identity(),
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn large_projected_narrowing_transform<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    place: ScopedPlaceId,
 ) -> NarrowingTransform<'db> {
-    NarrowingTransform::from_constraint(new).then(accumulated)
+    let use_def = use_def_map(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let predicates = use_def.predicates();
+    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let root = projector.project(id);
+    ProjectedNarrowingContext::new(&projector.graph).transform(root)
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
@@ -554,14 +577,15 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
-        let mut context = ProjectedNarrowingContext {
-            db,
-            base_ty,
-            graph: &projector.graph,
-            joins: projector.graph.joins(projected_root),
-            join_cache: FxHashMap::default(),
+
+        let transform = if projector.graph.nodes.len() >= MIN_CACHED_PROJECTED_NODES {
+            let node = self.get_interior_node(id);
+            let scope = predicate_scope(db, predicates[node.atom()]);
+            large_projected_narrowing_transform(db, scope, id, place)
+        } else {
+            ProjectedNarrowingContext::new(&projector.graph).transform(projected_root)
         };
-        context.narrow(projected_root, NarrowingTransform::identity())
+        transform.apply(db, base_ty)
     }
 
     /// Analyze the statically known reachability for a given constraint.
@@ -599,10 +623,6 @@ impl ProjectedNarrowingNodeId {
     const ALWAYS_TRUE: Self = Self(usize::MAX);
     /// Terminal node for paths that are statically unreachable.
     const ALWAYS_FALSE: Self = Self(usize::MAX - 1);
-
-    fn is_terminal(self) -> bool {
-        self == Self::ALWAYS_TRUE || self == Self::ALWAYS_FALSE
-    }
 }
 
 /// Interior node in a projected narrowing graph.
@@ -649,35 +669,6 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
-    }
-
-    /// Returns the projected nodes that join multiple incoming paths.
-    ///
-    /// Projection interns equivalent subgraphs into a DAG. Caching each join lets narrowing
-    /// evaluate a shared suffix once and apply each incoming prefix constraint afterward.
-    fn joins(&self, root: ProjectedNarrowingNodeId) -> Vec<bool> {
-        let mut referenced = vec![false; self.nodes.len()];
-        let mut joins = vec![false; self.nodes.len()];
-        let mut visited = vec![false; self.nodes.len()];
-        let mut pending = vec![root];
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || std::mem::replace(&mut visited[id.0], true) {
-                continue;
-            }
-
-            let node = self.node(id);
-            for next in [node.if_true, node.if_false] {
-                if !next.is_terminal() {
-                    if std::mem::replace(&mut referenced[next.0], true) {
-                        joins[next.0] = true;
-                    }
-                    pending.push(next);
-                }
-            }
-        }
-
-        joins
     }
 
     /// Constructs the canonical disjunction of two projected subgraphs.
@@ -839,82 +830,44 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Evaluates narrowed types over a projected narrowing graph.
+/// Builds narrowing transforms over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
-    db: &'db dyn Db,
-    base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
-    /// Marks join boundaries in the projected DAG.
-    joins: Vec<bool>,
-    /// Caches each join's narrowed suffix type from its boundary.
-    join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    transform_cache: Vec<Option<NarrowingTransform<'db>>>,
 }
 
-impl<'db> ProjectedNarrowingContext<'_, 'db> {
-    fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
-        !id.is_terminal() && self.joins[id.0]
+impl<'a, 'db> ProjectedNarrowingContext<'a, 'db> {
+    fn new(graph: &'a ProjectedNarrowingGraph<'db>) -> Self {
+        ProjectedNarrowingContext {
+            graph,
+            transform_cache: vec![None; graph.nodes.len()],
+        }
     }
 
-    /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
-    fn narrow_join(&mut self, id: ProjectedNarrowingNodeId) -> Type<'db> {
-        if let Some(cached) = self.join_cache.get(&id) {
-            return *cached;
-        }
-
-        let result = self.narrow_uncached(id, NarrowingTransform::identity());
-        self.join_cache.insert(id, result);
-        result
-    }
-
-    /// Recursively evaluates a projected path while accumulating narrowing constraints.
-    fn narrow(
-        &mut self,
-        id: ProjectedNarrowingNodeId,
-        accumulated: NarrowingTransform<'db>,
-    ) -> Type<'db> {
-        if self.is_join(id) {
-            // Preserve replacement narrowing order at a join: evaluate the shared suffix once,
-            // then apply the incoming prefix constraint to its narrowed type.
-            let suffix_ty = self.narrow_join(id);
-            return accumulated.apply(self.db, suffix_ty);
-        }
-
-        self.narrow_uncached(id, accumulated)
-    }
-
-    /// Recursively evaluates an unshared projected path while accumulating narrowing constraints.
-    fn narrow_uncached(
-        &mut self,
-        id: ProjectedNarrowingNodeId,
-        accumulated: NarrowingTransform<'db>,
-    ) -> Type<'db> {
-        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return Type::Never;
-        }
-
+    /// Build the transform for a projected node, reusing shared subgraphs.
+    fn transform(&mut self, id: ProjectedNarrowingNodeId) -> NarrowingTransform<'db> {
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            accumulated.apply(self.db, self.base_ty)
-        } else {
-            let node = self.graph.node(id);
-            let (pos_constraint, neg_constraint) =
-                self.graph.predicate_constraints_cache[&node.atom].clone();
-
-            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                self.narrow(node.if_false, false_accumulated)
-            } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                self.narrow(node.if_true, true_accumulated)
-            } else {
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-                let true_ty = self.narrow(node.if_true, true_accumulated);
-
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                let false_ty = self.narrow(node.if_false, false_accumulated);
-
-                UnionType::from_two_elements(self.db, true_ty, false_ty)
-            }
+            return NarrowingTransform::identity();
         }
+        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            return NarrowingTransform::unreachable();
+        }
+
+        if let Some(cached) = &self.transform_cache[id.0] {
+            return cached.clone();
+        }
+
+        let node = self.graph.node(id);
+        let (positive, negative) = self.graph.predicate_constraints_cache[&node.atom].clone();
+        let if_true = self
+            .transform(node.if_true)
+            .then(NarrowingTransform::from_constraint(positive));
+        let if_false = self
+            .transform(node.if_false)
+            .then(NarrowingTransform::from_constraint(negative));
+        let result = if_true.join(if_false);
+        self.transform_cache[id.0] = Some(result.clone());
+        result
     }
 }
 

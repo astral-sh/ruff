@@ -558,6 +558,21 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints with OR semantics.
+    fn merge_constraint_or(mut self, other: Self) -> Self {
+        for disjunct in other.intersection_disjuncts {
+            if !self.intersection_disjuncts.contains(&disjunct) {
+                self.intersection_disjuncts.push(disjunct);
+            }
+        }
+        for disjunct in other.replacement_disjuncts {
+            if !self.replacement_disjuncts.contains(&disjunct) {
+                self.replacement_disjuncts.push(disjunct);
+            }
+        }
+        self
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -577,31 +592,79 @@ impl<'db> NarrowingConstraint<'db> {
 /// A narrowing operation that can be applied to a previously known type.
 ///
 /// A transform with no constraint is the identity transform.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingTransform<'db> {
+    reachable: bool,
     constraint: Option<NarrowingConstraint<'db>>,
 }
 
 impl<'db> NarrowingTransform<'db> {
     pub(crate) fn identity() -> Self {
-        Self { constraint: None }
+        Self {
+            reachable: true,
+            constraint: None,
+        }
+    }
+
+    pub(crate) fn unreachable() -> Self {
+        Self {
+            reachable: false,
+            constraint: None,
+        }
     }
 
     pub(crate) fn from_constraint(constraint: Option<NarrowingConstraint<'db>>) -> Self {
-        Self { constraint }
+        Self {
+            reachable: true,
+            constraint,
+        }
     }
 
     /// Compose this transform with one that occurs later in control flow.
     pub(crate) fn then(self, later: Self) -> Self {
+        if !self.reachable || !later.reachable {
+            return Self::unreachable();
+        }
+
         let constraint = match (self.constraint, later.constraint) {
             (Some(earlier), Some(later)) => Some(earlier.merge_constraint_and(later)),
             (Some(constraint), None) | (None, Some(constraint)) => Some(constraint),
             (None, None) => None,
         };
-        Self { constraint }
+        Self {
+            reachable: true,
+            constraint,
+        }
+    }
+
+    /// Join transforms from alternative control-flow paths.
+    pub(crate) fn join(self, other: Self) -> Self {
+        match (self.reachable, other.reachable) {
+            (false, false) => Self::unreachable(),
+            (true, false) => self,
+            (false, true) => other,
+            (true, true) => {
+                let constraint = match (self.constraint, other.constraint) {
+                    (Some(left), Some(right)) => Some(left.merge_constraint_or(right)),
+                    (Some(constraint), None) | (None, Some(constraint)) => Some(
+                        NarrowingConstraint::intersection(Type::object())
+                            .merge_constraint_or(constraint),
+                    ),
+                    (None, None) => None,
+                };
+                Self {
+                    reachable: true,
+                    constraint,
+                }
+            }
+        }
     }
 
     pub(crate) fn apply(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        if !self.reachable {
+            return Type::Never;
+        }
+
         match self.constraint {
             Some(constraint) => NarrowingConstraint::intersection(base_ty)
                 .merge_constraint_and(constraint)
