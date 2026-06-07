@@ -613,7 +613,7 @@ def _(x: A | B | C):
         case _:
             raise ValueError()
 
-    reveal_type(x)  # revealed: B | (A & ~B)
+    reveal_type(x)  # revealed: B | A
 ```
 
 Reassignment in non-terminal branches is also preserved when the default branch is terminal:
