@@ -619,7 +619,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             db,
             base_ty,
             graph: &state.graph,
-            joins: ProjectedJoins::Dense(state.graph.joins(projected_root)),
+            joins: state.graph.joins(projected_root),
             join_cache: FxHashMap::default(),
         };
         context.narrow(projected_root, None)
@@ -652,7 +652,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
                 NarrowingProjector::new(db, self, predicates, place, &mut state_mut);
             projector.project(id)
         };
-        let joins = state_mut.graph.sparse_joins(projected_root);
+        let joins = state_mut.graph.joins(projected_root);
         drop(state_mut);
 
         let state_ref = state.borrow();
@@ -660,7 +660,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             db,
             base_ty,
             graph: &state_ref.graph,
-            joins: ProjectedJoins::Sparse(joins),
+            joins,
             join_cache: FxHashMap::default(),
         };
         context.narrow(projected_root, None)
@@ -792,31 +792,6 @@ impl ProjectedNarrowingGraph<'_> {
                 if !next.is_terminal() {
                     if std::mem::replace(&mut referenced[next.0], true) {
                         joins[next.0] = true;
-                    }
-                    pending.push(next);
-                }
-            }
-        }
-
-        joins
-    }
-
-    fn sparse_joins(&self, root: ProjectedNarrowingNodeId) -> FxHashSet<ProjectedNarrowingNodeId> {
-        let mut referenced = FxHashSet::default();
-        let mut joins = FxHashSet::default();
-        let mut visited = FxHashSet::default();
-        let mut pending = vec![root];
-
-        while let Some(id) = pending.pop() {
-            if id.is_terminal() || !visited.insert(id) {
-                continue;
-            }
-
-            let node = self.node(id);
-            for next in [node.if_true, node.if_false] {
-                if !next.is_terminal() {
-                    if !referenced.insert(next) {
-                        joins.insert(next);
                     }
                     pending.push(next);
                 }
@@ -990,34 +965,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Evaluates narrowed types over a projected narrowing graph.
-enum ProjectedJoins {
-    Dense(Vec<bool>),
-    Sparse(FxHashSet<ProjectedNarrowingNodeId>),
-}
-
-impl ProjectedJoins {
-    fn contains(&self, id: ProjectedNarrowingNodeId) -> bool {
-        match self {
-            ProjectedJoins::Dense(joins) => joins[id.0],
-            ProjectedJoins::Sparse(joins) => joins.contains(&id),
-        }
-    }
-}
-
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
-    joins: ProjectedJoins,
+    joins: Vec<bool>,
     /// Caches each join's narrowed suffix type from its boundary.
     join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
-        !id.is_terminal() && self.joins.contains(id)
+        !id.is_terminal() && self.joins[id.0]
     }
 
     /// Evaluates one projected join from its boundary and caches its narrowed suffix type.

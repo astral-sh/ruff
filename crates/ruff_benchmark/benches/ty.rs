@@ -1320,6 +1320,41 @@ fn benchmark_projected_narrowing_progressive_attribute_bindings(criterion: &mut 
     );
 }
 
+/// Benchmarks reads interleaved with conditional assignments to a local variable.
+///
+/// This exercises the same overlapping-root pattern as the attribute benchmark, but the projected
+/// graphs are small enough that join-tracking overhead dominates.
+fn benchmark_projected_narrowing_progressive_local_bindings(criterion: &mut Criterion) {
+    const NUM_ASSIGNMENTS: usize = 80;
+
+    setup_rayon();
+
+    let mut code =
+        "def check(flags: list[bool]) -> None:\n    value: int | None = None\n".to_string();
+    for index in 0..NUM_ASSIGNMENTS {
+        writeln!(
+            &mut code,
+            "    if flags[{index}]:\n        value = {index}\n    repr(value)"
+        )
+        .ok();
+    }
+
+    criterion.bench_function(
+        "ty_micro[projected_narrowing_progressive_local_bindings]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
     const NUM_BRANCHES: usize = 11;
 
@@ -1599,6 +1634,7 @@ criterion_group!(
     benchmark_pandas_tdd,
     benchmark_projected_narrowing_repeated_attribute_bindings,
     benchmark_projected_narrowing_progressive_attribute_bindings,
+    benchmark_projected_narrowing_progressive_local_bindings,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
 );
