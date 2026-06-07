@@ -904,12 +904,18 @@ pub(crate) struct NarrowingTransformBuilder<'db> {
     cache: FxHashMap<NarrowingTransformNode<'db>, NarrowingTransformId>,
     conditions: Vec<NarrowingConditionNode<'db>>,
     condition_cache: FxHashMap<NarrowingConditionNode<'db>, NarrowingConditionId>,
-    branch_specs: FxHashMap<NarrowingTransformId, NarrowingBranchSpec>,
+    branch_specs: FxHashMap<NarrowingTransformId, NarrowingBranchSpec<'db>>,
 }
 
 #[derive(Clone, Copy)]
-struct NarrowingBranchSpec {
-    condition: NarrowingConditionId,
+enum NarrowingBranchCondition<'db> {
+    Atom(ComplementaryNarrowing<'db>),
+    Node(NarrowingConditionId),
+}
+
+#[derive(Clone, Copy)]
+struct NarrowingBranchSpec<'db> {
+    condition: NarrowingBranchCondition<'db>,
     if_true: NarrowingTransformId,
     if_false: NarrowingTransformId,
     branches: usize,
@@ -1003,16 +1009,16 @@ impl<'db> NarrowingTransformBuilder<'db> {
         }
 
         let atomic_condition = condition;
-        let condition = self.add_condition(NarrowingConditionNode::Atom(condition));
         let spec = if let Some(nested) = self.branch_specs.get(&if_false).copied()
             && if_true != Self::unreachable()
             && if_true == nested.if_true
         {
             NarrowingBranchSpec {
-                condition: self.add_condition(NarrowingConditionNode::Or {
-                    left: nested.condition,
-                    right: condition,
-                }),
+                condition: NarrowingBranchCondition::Node(self.combine_condition(
+                    nested.condition,
+                    condition,
+                    true,
+                )),
                 if_true,
                 if_false: nested.if_false,
                 branches: nested.branches + 1,
@@ -1022,17 +1028,18 @@ impl<'db> NarrowingTransformBuilder<'db> {
             && if_false == nested.if_false
         {
             NarrowingBranchSpec {
-                condition: self.add_condition(NarrowingConditionNode::And {
-                    left: nested.condition,
-                    right: condition,
-                }),
+                condition: NarrowingBranchCondition::Node(self.combine_condition(
+                    nested.condition,
+                    condition,
+                    false,
+                )),
                 if_true: nested.if_true,
                 if_false,
                 branches: nested.branches + 1,
             }
         } else {
             NarrowingBranchSpec {
-                condition,
+                condition: NarrowingBranchCondition::Atom(condition),
                 if_true,
                 if_false,
                 branches: 1,
@@ -1040,8 +1047,9 @@ impl<'db> NarrowingTransformBuilder<'db> {
         };
 
         let result = if spec.branches >= Self::MIN_REPEATED_BRANCHES {
+            let condition = self.condition_id(spec.condition);
             self.add_node(NarrowingTransformNode::Branch {
-                condition: spec.condition,
+                condition,
                 if_true: spec.if_true,
                 if_false: spec.if_false,
             })
@@ -1199,6 +1207,31 @@ impl<'db> NarrowingTransformBuilder<'db> {
         self.conditions.push(node);
         self.condition_cache.insert(node, id);
         id
+    }
+
+    fn condition_id(&mut self, condition: NarrowingBranchCondition<'db>) -> NarrowingConditionId {
+        match condition {
+            NarrowingBranchCondition::Atom(condition) => {
+                self.add_condition(NarrowingConditionNode::Atom(condition))
+            }
+            NarrowingBranchCondition::Node(id) => id,
+        }
+    }
+
+    fn combine_condition(
+        &mut self,
+        left: NarrowingBranchCondition<'db>,
+        right: ComplementaryNarrowing<'db>,
+        is_or: bool,
+    ) -> NarrowingConditionId {
+        let left = self.condition_id(left);
+        let right = self.add_condition(NarrowingConditionNode::Atom(right));
+        let node = if is_or {
+            NarrowingConditionNode::Or { left, right }
+        } else {
+            NarrowingConditionNode::And { left, right }
+        };
+        self.add_condition(node)
     }
 }
 
