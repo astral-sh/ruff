@@ -33,9 +33,10 @@ use crate::place::{
     RequiresExplicitReExport, TypeOrigin, builtins_module_scope, builtins_symbol,
     class_body_implicit_symbol, explicit_global_symbol, loop_header_reachability,
     module_type_implicit_global_declaration, module_type_implicit_global_symbol, place_by_id,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    place_from_bindings, place_from_bindings_with_projected_narrowing_cache,
+    place_from_declarations, typing_extensions_symbol,
 };
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{ProjectedNarrowingCache, ReachabilityConstraintsExtension};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
 use crate::types::call::bind::MatchingOverloadIndex;
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -236,6 +237,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
+    /// Projected narrowing graphs reused across local place loads and speculative inference.
+    projected_narrowing_cache: Rc<ProjectedNarrowingCache<'db>>,
+
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FxHashMap<ExpressionNodeKey, TypeQualifiers>,
@@ -366,6 +370,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
             expression_cache: None,
+            projected_narrowing_cache: Rc::new(ProjectedNarrowingCache::new()),
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
             collection_use_constraints: FxHashMap::default(),
@@ -8783,9 +8788,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if !is_discarded_dict_key_assignment(db, definition) =>
                             {
                                 let binding_ty = binding_type(db, definition);
-                                union = union.add(
-                                    binding.narrowing_constraint.narrow(db, binding_ty, place),
-                                );
+                                union = union.add(binding.narrowing_constraint.narrow_with_cache(
+                                    db,
+                                    binding_ty,
+                                    place,
+                                    &self.projected_narrowing_cache,
+                                ));
                             }
                             DefinitionState::Defined(_)
                             | DefinitionState::Undefined
@@ -8970,7 +8978,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let place = place_from_bindings_with_projected_narrowing_cache(
+                db,
+                use_def.bindings_at_use(use_id),
+                &self.projected_narrowing_cache,
+            )
+            .place;
 
             (place, Some(use_id))
         }
@@ -10253,6 +10266,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            projected_narrowing_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
@@ -10334,6 +10348,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            projected_narrowing_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10428,6 +10443,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            projected_narrowing_cache: _,
             declarations: _,
             deferred: _,
             scope: _,
@@ -10482,6 +10498,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            projected_narrowing_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10574,6 +10591,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Builder only state
             expression_cache: _,
+            projected_narrowing_cache: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10627,6 +10645,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred_state,
             typevar_binding_context,
             ref expression_cache,
+            ref projected_narrowing_cache,
             ref return_types_and_ranges,
             ref dataclass_field_specifiers,
 
@@ -10660,6 +10679,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         builder.context.inference_flags = self.inference_flags();
         builder.expression_cache.clone_from(expression_cache);
         builder
+            .projected_narrowing_cache
+            .clone_from(projected_narrowing_cache);
+        builder
             .return_types_and_ranges
             .clone_from(return_types_and_ranges);
         builder
@@ -10691,6 +10713,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            projected_narrowing_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,

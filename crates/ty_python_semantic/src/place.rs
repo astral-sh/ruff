@@ -7,7 +7,9 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachability};
+use crate::reachability::{
+    ProjectedNarrowingCache, ReachabilityConstraintsExtension, evaluate_reachability,
+};
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
@@ -581,6 +583,19 @@ pub(super) fn place_from_bindings<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
 ) -> PlaceWithDefinition<'db> {
     place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+}
+
+pub(super) fn place_from_bindings_with_projected_narrowing_cache<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    projected_narrowing_cache: &ProjectedNarrowingCache<'db>,
+) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl_with_projected_narrowing_cache(
+        db,
+        bindings_with_constraints,
+        RequiresExplicitReExport::No,
+        Some(projected_narrowing_cache),
+    )
 }
 
 /// Build a declared type from a [`DeclarationsIterator`].
@@ -1330,6 +1345,20 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> PlaceWithDefinition<'db> {
+    place_from_bindings_impl_with_projected_narrowing_cache(
+        db,
+        bindings_with_constraints,
+        requires_explicit_reexport,
+        None,
+    )
+}
+
+fn place_from_bindings_impl_with_projected_narrowing_cache<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    requires_explicit_reexport: RequiresExplicitReExport,
+    projected_narrowing_cache: Option<&ProjectedNarrowingCache<'db>>,
+) -> PlaceWithDefinition<'db> {
     let predicates = bindings_with_constraints.predicates();
     let reachability_constraints = bindings_with_constraints.reachability_constraints();
     let boundness_analysis = bindings_with_constraints.boundness_analysis();
@@ -1472,10 +1501,12 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some((
-                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
-                static_reachability,
-            ))
+            let narrowed_ty = if let Some(cache) = projected_narrowing_cache {
+                narrowing_constraint.narrow_with_cache(db, binding_ty, binding.place(db), cache)
+            } else {
+                narrowing_constraint.narrow(db, binding_ty, binding.place(db))
+            };
+            Some((narrowed_ty, static_reachability))
         },
     );
 

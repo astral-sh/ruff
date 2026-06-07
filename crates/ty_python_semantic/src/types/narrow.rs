@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::{ProjectedNarrowingCache, ReachabilityConstraintsExtension};
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -2746,6 +2746,14 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
 
 pub(crate) trait NarrowingEvaluatorExtension<'db> {
     fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db>;
+
+    fn narrow_with_cache(
+        &self,
+        db: &'db dyn Db,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        cache: &ProjectedNarrowingCache<'db>,
+    ) -> Type<'db>;
 }
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
@@ -2757,5 +2765,23 @@ impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
             base_type,
             place,
         )
+    }
+
+    fn narrow_with_cache(
+        &self,
+        db: &'db dyn Db,
+        base_type: Type<'db>,
+        place: ScopedPlaceId,
+        cache: &ProjectedNarrowingCache<'db>,
+    ) -> Type<'db> {
+        self.reachability_constraints()
+            .narrow_by_constraint_with_cache(
+                db,
+                self.predicates(),
+                self.constraint(),
+                base_type,
+                place,
+                cache,
+            )
     }
 }

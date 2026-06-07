@@ -193,6 +193,9 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -219,6 +222,7 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -507,6 +511,44 @@ fn accumulate_constraint<'db>(
     }
 }
 
+fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'db> {
+    match predicate.node {
+        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::IsNonTerminalCall(call) => call.callable.scope(db),
+        PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+    }
+}
+
+pub(crate) struct ProjectedNarrowingCache<'db> {
+    entries: RefCell<
+        FxHashMap<(ScopeId<'db>, ScopedPlaceId), Rc<RefCell<ProjectedNarrowingState<'db>>>>,
+    >,
+}
+
+impl<'db> ProjectedNarrowingCache<'db> {
+    pub(crate) fn new() -> Self {
+        Self {
+            entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    fn state(
+        &self,
+        scope: ScopeId<'db>,
+        place: ScopedPlaceId,
+    ) -> Rc<RefCell<ProjectedNarrowingState<'db>>> {
+        let key = (scope, place);
+        if let Some(state) = self.entries.borrow().get(&key) {
+            return Rc::clone(state);
+        }
+
+        let state = Rc::new(RefCell::new(ProjectedNarrowingState::default()));
+        self.entries.borrow_mut().insert(key, Rc::clone(&state));
+        state
+    }
+}
+
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
     /// Narrow a type by walking a TDD narrowing constraint.
     fn narrow_by_constraint(
@@ -516,6 +558,16 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
         id: ScopedReachabilityConstraintId,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
+    ) -> Type<'db>;
+
+    fn narrow_by_constraint_with_cache(
+        &self,
+        db: &'db dyn Db,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+        base_ty: Type<'db>,
+        place: ScopedPlaceId,
+        cache: &ProjectedNarrowingCache<'db>,
     ) -> Type<'db>;
 
     /// Analyze the statically known reachability for a given constraint.
@@ -557,13 +609,57 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        let mut projector = NarrowingProjector::new(db, self, predicates, place);
-        let projected_root = projector.project(id);
+        let mut state = ProjectedNarrowingState::default();
+        let projected_root = {
+            let mut projector = NarrowingProjector::new(db, self, predicates, place, &mut state);
+            projector.project(id)
+        };
         let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
-            graph: &projector.graph,
-            joins: projector.graph.joins(projected_root),
+            graph: &state.graph,
+            joins: ProjectedJoins::Dense(state.graph.joins(projected_root)),
+            join_cache: FxHashMap::default(),
+        };
+        context.narrow(projected_root, None)
+    }
+
+    fn narrow_by_constraint_with_cache(
+        &self,
+        db: &'db dyn Db,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+        base_ty: Type<'db>,
+        place: ScopedPlaceId,
+        cache: &ProjectedNarrowingCache<'db>,
+    ) -> Type<'db> {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+            | ScopedReachabilityConstraintId::AMBIGUOUS => return base_ty,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Type::Never,
+            _ => {}
+        }
+
+        let node = self.get_interior_node(id);
+        let scope = predicate_scope(db, predicates[node.atom()]);
+        let state = cache.state(scope, place);
+        let Ok(mut state_mut) = state.try_borrow_mut() else {
+            return self.narrow_by_constraint(db, predicates, id, base_ty, place);
+        };
+        let projected_root = {
+            let mut projector =
+                NarrowingProjector::new(db, self, predicates, place, &mut state_mut);
+            projector.project(id)
+        };
+        let joins = state_mut.graph.sparse_joins(projected_root);
+        drop(state_mut);
+
+        let state_ref = state.borrow();
+        let mut context = ProjectedNarrowingContext {
+            db,
+            base_ty,
+            graph: &state_ref.graph,
+            joins: ProjectedJoins::Sparse(joins),
             join_cache: FxHashMap::default(),
         };
         context.narrow(projected_root, None)
@@ -647,6 +743,12 @@ struct ProjectedNarrowingGraph<'db> {
     >,
 }
 
+#[derive(Default)]
+struct ProjectedNarrowingState<'db> {
+    project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
+    graph: ProjectedNarrowingGraph<'db>,
+}
+
 impl ProjectedNarrowingGraph<'_> {
     /// Returns an interior projected node by ID.
     fn node(&self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNode {
@@ -689,6 +791,31 @@ impl ProjectedNarrowingGraph<'_> {
                 if !next.is_terminal() {
                     if std::mem::replace(&mut referenced[next.0], true) {
                         joins[next.0] = true;
+                    }
+                    pending.push(next);
+                }
+            }
+        }
+
+        joins
+    }
+
+    fn sparse_joins(&self, root: ProjectedNarrowingNodeId) -> FxHashSet<ProjectedNarrowingNodeId> {
+        let mut referenced = FxHashSet::default();
+        let mut joins = FxHashSet::default();
+        let mut visited = FxHashSet::default();
+        let mut pending = vec![root];
+
+        while let Some(id) = pending.pop() {
+            if id.is_terminal() || !visited.insert(id) {
+                continue;
+            }
+
+            let node = self.node(id);
+            for next in [node.if_true, node.if_false] {
+                if !next.is_terminal() {
+                    if !referenced.insert(next) {
+                        joins.insert(next);
                     }
                     pending.push(next);
                 }
@@ -769,8 +896,7 @@ struct NarrowingProjector<'a, 'db> {
     constraints: &'a ReachabilityConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
-    project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
-    graph: ProjectedNarrowingGraph<'db>,
+    state: &'a mut ProjectedNarrowingState<'db>,
 }
 
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
@@ -780,14 +906,14 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         constraints: &'a ReachabilityConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
+        state: &'a mut ProjectedNarrowingState<'db>,
     ) -> Self {
         Self {
             db,
             constraints,
             predicates,
             place,
-            project_cache: FxHashMap::default(),
-            graph: ProjectedNarrowingGraph::default(),
+            state,
         }
     }
 
@@ -799,13 +925,19 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
         Option<NarrowingConstraint<'db>>,
         Option<NarrowingConstraint<'db>>,
     ) {
-        if let Some(cached) = self.graph.predicate_constraints_cache.get(&predicate_id) {
+        if let Some(cached) = self
+            .state
+            .graph
+            .predicate_constraints_cache
+            .get(&predicate_id)
+        {
             return cached.clone();
         }
 
         let constraints =
             infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
-        self.graph
+        self.state
+            .graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
         constraints
@@ -815,7 +947,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     fn project(&mut self, id: ScopedReachabilityConstraintId) -> ProjectedNarrowingNodeId {
         type Id = ScopedReachabilityConstraintId;
 
-        if let Some(cached) = self.project_cache.get(&id) {
+        if let Some(cached) = self.state.project_cache.get(&id) {
             return *cached;
         }
 
@@ -840,9 +972,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                     let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
 
                     if pos_constraint.is_none() && neg_constraint.is_none() {
-                        self.graph.or(if_true, if_false)
+                        self.state.graph.or(if_true, if_false)
                     } else {
-                        self.graph.add_node(ProjectedNarrowingNode {
+                        self.state.graph.add_node(ProjectedNarrowingNode {
                             atom: node.atom(),
                             if_true,
                             if_false,
@@ -852,25 +984,39 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             }
         };
 
-        self.project_cache.insert(id, projected);
+        self.state.project_cache.insert(id, projected);
         projected
     }
 }
 
 /// Evaluates narrowed types over a projected narrowing graph.
+enum ProjectedJoins {
+    Dense(Vec<bool>),
+    Sparse(FxHashSet<ProjectedNarrowingNodeId>),
+}
+
+impl ProjectedJoins {
+    fn contains(&self, id: ProjectedNarrowingNodeId) -> bool {
+        match self {
+            ProjectedJoins::Dense(joins) => joins[id.0],
+            ProjectedJoins::Sparse(joins) => joins.contains(&id),
+        }
+    }
+}
+
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
     base_ty: Type<'db>,
     graph: &'a ProjectedNarrowingGraph<'db>,
     /// Marks join boundaries in the projected DAG.
-    joins: Vec<bool>,
+    joins: ProjectedJoins,
     /// Caches each join's narrowed suffix type from its boundary.
     join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
     fn is_join(&self, id: ProjectedNarrowingNodeId) -> bool {
-        !id.is_terminal() && self.joins[id.0]
+        !id.is_terminal() && self.joins.contains(id)
     }
 
     /// Evaluates one projected join from its boundary and caches its narrowed suffix type.
