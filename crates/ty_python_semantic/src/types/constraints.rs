@@ -4820,6 +4820,8 @@ impl SequentMap {
             || !constraint_data.bounds.has_upper()
             || lower.is_never()
             || upper.is_object()
+            || any_over_type(db, lower, false, |ty| ty.is_divergent())
+            || any_over_type(db, upper, false, |ty| ty.is_divergent())
         {
             return;
         }

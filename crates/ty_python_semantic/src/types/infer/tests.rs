@@ -151,6 +151,45 @@ def process(flag: bool, items: list[str]) -> None:
 }
 
 #[test]
+fn declared_str_loop_predicates_avoid_recursive_expression_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+        def process(lines: list[str]) -> str:
+            line: str = ""
+            while line.endswith("\\"):
+                line = lines.pop()
+            while not line or line == "yield":
+                line = lines.pop()
+            while "isort:skip" in line or "isort: skip" in line:
+                line = lines.pop()
+            return line
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    db.clear_salsa_events();
+    assert_file_diagnostics(&db, "/src/a.py", &[]);
+    let events = db.take_salsa_events();
+
+    let module = parsed_module(&db, file).load(&db);
+    let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+    for while_stmt in &function.body[1..4] {
+        let while_stmt = while_stmt.as_while_stmt().unwrap();
+        let predicate = semantic_index(&db, file).expression(&while_stmt.test);
+        assert_function_query_was_not_run(
+            &db,
+            infer_expression_type_impl,
+            InferExpression::Bare(predicate),
+            &events,
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(

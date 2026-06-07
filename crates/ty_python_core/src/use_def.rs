@@ -817,13 +817,20 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
-            .declarations
-            .expect("binding definition should have retained declarations");
-        self.declarations_iterator(
+        self.try_declarations_at_binding(binding)
+            .expect("binding definition should have retained declarations")
+    }
+
+    /// Return the declarations retained for a binding, if this definition records them.
+    pub fn try_declarations_at_binding(
+        &self,
+        binding: Definition<'db>,
+    ) -> Option<DeclarationsIterator<'_, 'db>> {
+        let declarations_id = self.definitions_by_definition.get(&binding)?.declarations?;
+        Some(self.declarations_iterator(
             &self.interned_declarations[declarations_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
-        )
+        ))
     }
 
     pub fn end_of_scope_declarations<'map>(

@@ -818,6 +818,19 @@ def collect(items: list[int]) -> None:
         values.append(A())
 ```
 
+### Declared string predicates still validate method calls
+
+Loop reachability can use the declared return type of `str.endswith`, but normal expression
+inference must still validate the call.
+
+```py
+def process(lines: list[str]) -> str:
+    line: str = ""
+    while line.endswith(1):  # error: [invalid-argument-type]
+        line = lines.pop()
+    return line
+```
+
 ### Loop headers remain precise in large scopes
 
 Loop-header reachability and type inference should remain exact regardless of the size of the

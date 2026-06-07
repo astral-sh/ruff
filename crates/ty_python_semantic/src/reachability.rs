@@ -200,12 +200,14 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
-        UnionType, definite_match_pattern_type, definition_expression_type, enum_metadata,
-        infer_expression_type, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
+        TypeContext, UnionType, definite_match_pattern_type, definition_expression_type,
+        enum_metadata, infer_expression_type, infer_narrowing_constraints,
+        infer_same_file_expression_type, inferred_declaration, mapping_pattern_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
+use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::IndexSlice;
 use ruff_python_ast as ast;
@@ -218,7 +220,7 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     LoopToken, ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     ast_ids::HasScopedUseId,
-    definition::DefinitionState,
+    definition::{Definition, DefinitionKind, DefinitionState},
     get_loop_header,
     place::{PlaceExpr, PlaceTable, ScopedPlaceId},
     place_table,
@@ -1109,6 +1111,9 @@ fn analyze_loop_header_predicate<'db>(
     type_truthinesses: &mut FxHashMap<Type<'db>, Truthiness>,
 ) -> Truthiness {
     if let PredicateNode::Expression(expression) = predicate_node.node {
+        if declared_str_predicate_is_ambiguous(db, expression) {
+            return Truthiness::Ambiguous;
+        }
         let ty = infer_expression_type(db, expression, TypeContext::default());
         let truthiness = *type_truthinesses.entry(ty).or_insert_with(|| ty.bool(db));
         return truthiness.negate_if(!predicate_node.is_positive);
@@ -1135,6 +1140,157 @@ fn analyze_loop_header_predicate<'db>(
     }
 
     analyze_single(db, predicate_node)
+}
+
+fn declared_str_predicate_is_ambiguous<'db>(
+    db: &'db dyn Db,
+    expression: ty_python_core::expression::Expression<'db>,
+) -> bool {
+    let scope = expression.scope(db);
+    let file = expression.file(db);
+    let module = parsed_module(db, file).load(db);
+    let use_def = use_def_map(db, scope);
+
+    declared_str_predicate_node_is_ambiguous(
+        db,
+        use_def,
+        scope,
+        file,
+        expression.node_ref(db).node(&module),
+    )
+}
+
+fn declared_str_predicate_node_is_ambiguous<'db>(
+    db: &'db dyn Db,
+    use_def: &UseDefMap<'db>,
+    scope: ScopeId<'db>,
+    file: File,
+    expression: &ast::Expr,
+) -> bool {
+    match expression {
+        ast::Expr::Call(call) => {
+            let ast::Expr::Attribute(attribute) = call.func.as_ref() else {
+                return false;
+            };
+            attribute.attr.as_str() == "endswith"
+                && name_declares_str(db, use_def, scope, file, attribute.value.as_ref())
+        }
+        ast::Expr::UnaryOp(unary) => {
+            unary.op == ast::UnaryOp::Not
+                && name_declares_str(db, use_def, scope, file, unary.operand.as_ref())
+        }
+        ast::Expr::Compare(compare) => {
+            let [op] = &*compare.ops else {
+                return false;
+            };
+            let [right] = &*compare.comparators else {
+                return false;
+            };
+
+            match op {
+                ast::CmpOp::Eq | ast::CmpOp::NotEq => {
+                    (matches!(compare.left.as_ref(), ast::Expr::StringLiteral(_))
+                        && name_declares_str(db, use_def, scope, file, right))
+                        || (matches!(right, ast::Expr::StringLiteral(_))
+                            && name_declares_str(db, use_def, scope, file, compare.left.as_ref()))
+                }
+                ast::CmpOp::In | ast::CmpOp::NotIn => {
+                    matches!(
+                        compare.left.as_ref(),
+                        ast::Expr::StringLiteral(ast::ExprStringLiteral { value, .. })
+                            if !value.is_empty()
+                    ) && name_declares_str(db, use_def, scope, file, right)
+                }
+                _ => false,
+            }
+        }
+        ast::Expr::BoolOp(bool_op) => bool_op
+            .values
+            .iter()
+            .all(|value| declared_str_predicate_node_is_ambiguous(db, use_def, scope, file, value)),
+        _ => false,
+    }
+}
+
+fn name_declares_str<'db>(
+    db: &'db dyn Db,
+    use_def: &UseDefMap<'db>,
+    scope: ScopeId<'db>,
+    file: File,
+    expression: &ast::Expr,
+) -> bool {
+    let ast::Expr::Name(name) = expression else {
+        return false;
+    };
+
+    let mut has_binding = false;
+    let mut has_loop_header = false;
+    for binding in use_def.bindings_at_use(name.scoped_use_id(db, file)) {
+        let DefinitionState::Defined(binding) = binding.binding else {
+            return false;
+        };
+        has_loop_header |= matches!(binding.kind(db), DefinitionKind::LoopHeader(_));
+        if !binding_declares_str(db, use_def, scope, binding, &mut FxHashSet::default()) {
+            return false;
+        }
+        has_binding = true;
+    }
+    has_binding && has_loop_header
+}
+
+fn binding_declares_str<'db>(
+    db: &'db dyn Db,
+    use_def: &UseDefMap<'db>,
+    scope: ScopeId<'db>,
+    binding: Definition<'db>,
+    active: &mut FxHashSet<Definition<'db>>,
+) -> bool {
+    if binding.scope(db) != scope || !active.insert(binding) {
+        return false;
+    }
+
+    let result =
+        match binding.kind(db) {
+            DefinitionKind::LoopHeader(loop_header) => {
+                let mut has_binding = false;
+                let all_declared_str = get_loop_header(db, loop_header.loop_token())
+                    .bindings_for_place(loop_header.place())
+                    .all(|live_binding| {
+                        has_binding = true;
+                        use_def
+                            .definition(live_binding.binding())
+                            .definition()
+                            .is_some_and(|source| {
+                                binding_declares_str(db, use_def, scope, source, active)
+                            })
+                    });
+                has_binding && all_declared_str
+            }
+            DefinitionKind::AnnotatedAssignment(_) => declaration_is_str(db, binding),
+            kind if kind.is_user_visible() => use_def
+                .try_declarations_at_binding(binding)
+                .is_some_and(|mut declarations| {
+                    let mut has_declaration = false;
+                    let all_declared_str = declarations.all(|declaration| {
+                        has_declaration = true;
+                        declaration
+                            .declaration
+                            .definition()
+                            .is_some_and(|declaration| declaration_is_str(db, declaration))
+                    });
+                    has_declaration && all_declared_str
+                }),
+            _ => false,
+        };
+
+    active.remove(&binding);
+    result
+}
+
+fn declaration_is_str<'db>(db: &'db dyn Db, declaration: Definition<'db>) -> bool {
+    inferred_declaration(db, declaration)
+        .declared()
+        .is_some_and(|declared| declared.inner_type().is_instance_of(db, KnownClass::Str))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1998,6 +2154,10 @@ fn loop_header_predicate_truthinesses<'db>(
         .all(|(place, _)| complete_places.contains(&place));
     reachability_truthinesses.sort_unstable_by_key(|(id, _)| id.as_u32());
     reachability_truthinesses.dedup_by_key(|(id, _)| *id);
+    if complete {
+        analyses = FxHashMap::default();
+        complete_places = FxHashSet::default();
+    }
     LoopHeaderPredicateTruthinesses {
         analyses,
         reachability_truthinesses: reachability_truthinesses.into(),
