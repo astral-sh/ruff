@@ -1022,7 +1022,11 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                if ty.negation_is_subtype_of_cached(self.db, element_type, &mut ty_negated) {
+                // Do not apply excluded-middle collapse to recursion markers: their negation is
+                // gradual, not a true set complement.
+                if !matches!(ty, Type::Divergent(_) | Type::Recursive(_))
+                    && ty.negation_is_subtype_of_cached(self.db, element_type, &mut ty_negated)
+                {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of
