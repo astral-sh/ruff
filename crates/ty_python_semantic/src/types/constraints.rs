@@ -696,6 +696,7 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -917,6 +918,25 @@ impl<'db> ConstraintSetBuilder<'db> {
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
         self.storage.borrow().constraints[constraint]
+    }
+
+    fn cached_constraint_implies(
+        &self,
+        db: &'db dyn Db,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) -> bool {
+        let key = (ante, post);
+        if let Some(result) = self.storage.borrow().constraint_implication_cache.get(&key) {
+            return *result;
+        }
+
+        let result = ante.implies(db, self, post);
+        self.storage
+            .borrow_mut()
+            .constraint_implication_cache
+            .insert(key, result);
+        result
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
@@ -5583,7 +5603,7 @@ impl SequentMap {
         // identify constraints that are identical besides e.g. ordering of union/intersection
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
-        if left_constraint.implies(db, builder, right_constraint) {
+        if builder.cached_constraint_implies(db, left_constraint, right_constraint) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db, builder),
@@ -5592,7 +5612,7 @@ impl SequentMap {
             );
             self.add_single_implication(db, builder, left_constraint, right_constraint);
         }
-        if right_constraint.implies(db, builder, left_constraint) {
+        if builder.cached_constraint_implies(db, right_constraint, left_constraint) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db, builder),
@@ -6363,6 +6383,49 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    #[test]
+    fn constraint_implications_are_cached() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let t_bool = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Bool.to_instance(&db),
+        );
+
+        assert!(builder.cached_constraint_implies(&db, t_bool, t_int));
+        assert!(builder.cached_constraint_implies(&db, t_bool, t_int));
+
+        {
+            let storage = builder.storage.borrow();
+            assert_eq!(
+                storage.constraint_implication_cache.get(&(t_bool, t_int)),
+                Some(&true)
+            );
+            assert_eq!(storage.constraint_implication_cache.len(), 1);
+        }
+
+        assert!(!builder.cached_constraint_implies(&db, t_int, t_bool));
+        assert!(!builder.cached_constraint_implies(&db, t_int, t_bool));
+
+        let storage = builder.storage.borrow();
+        assert_eq!(
+            storage.constraint_implication_cache.get(&(t_int, t_bool)),
+            Some(&false)
+        );
+        assert_eq!(storage.constraint_implication_cache.len(), 2);
     }
 
     #[track_caller]
