@@ -96,7 +96,7 @@ static_assert(is_equivalent_to(Intersection[str, int, Not[bytes], Not[None]], In
 static_assert(is_equivalent_to(Intersection[str | int, Not[type[Any]]], Intersection[int | str, Not[type[Unknown]]]))
 
 static_assert(not is_equivalent_to(str | int, int | str | bytes))
-static_assert(not is_equivalent_to(str | int | bytes, int | str | dict))
+static_assert(not is_equivalent_to(str | int | bytes, int | str | dict))  # error: [missing-type-argument]
 
 static_assert(is_equivalent_to(Unknown, Unknown | Any))
 static_assert(is_equivalent_to(Unknown, Intersection[Unknown, Any]))

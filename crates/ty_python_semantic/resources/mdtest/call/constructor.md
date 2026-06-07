@@ -63,6 +63,28 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo(1, 2))  # revealed: Foo
 ```
 
+## `__new__` with an invalid decorator and unresolved return annotation
+
+Regression test for <https://github.com/astral-sh/ty/issues/3470>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import TypeVar
+from typing_extensions import deprecated
+
+class C:
+    @deprecated  # error: [invalid-argument-type] "LiteralString"
+    def __new__() -> T:  # error: [empty-body] "TypeVar"
+        pass
+
+C()
+T = TypeVar
+```
+
 ## `__new__` present on a superclass
 
 If the `__new__` method is defined on a superclass, we can still infer the signature of the
@@ -143,6 +165,92 @@ class Foo:
 reveal_type(Foo(1))  # revealed: Foo
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `SomeCallable.__call__`"
 reveal_type(Foo())  # revealed: Foo
+```
+
+## A class object in place of `__new__`
+
+Regression test for <https://github.com/astral-sh/ty/issues/3491>.
+
+```py
+class C:
+    class __new__(a):  # error: [unresolved-reference]
+        pass
+
+C()
+```
+
+We do not fully model the constructor chain when the callable used as `__new__` is itself a class
+object. These cases document the runtime behavior and the approximation we make today.
+
+If the assigned class returns an outer-class instance that is not also an instance of the assigned
+class, the assigned class's `__init__` is skipped. Here, `D()` calls `Factory.__new__(Factory, D)`,
+which returns a `D`. Python skips `Factory.__init__`, then continues the outer call with
+`D.__init__`. This is what we currently model.
+
+```py
+class Factory:
+    def __new__(cls, outer_cls: type["D"]) -> "D":
+        return object.__new__(D)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class D:
+    __new__ = Factory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# error: [missing-argument] "No argument provided for required parameter `value` of `D.__init__`"
+D()
+```
+
+If the returned outer-class instance is also an instance of the assigned class, the assigned class
+call does continue into `__init__`. Here, `E()` calls `SubclassFactory.__new__(SubclassFactory, E)`,
+which returns an `E`. Since `E` is a `SubclassFactory` subclass and overrides `__init__`, the inner
+`SubclassFactory(E)` call dispatches to `E.__init__(..., E)`. The outer `E()` call then dispatches
+to `E.__init__` again with the outer call arguments. We currently only model that outer call.
+
+```py
+class SubclassFactory:
+    def __new__(cls, outer_cls: type["E"]) -> "E":
+        return object.__new__(E)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class E(SubclassFactory):
+    __new__ = SubclassFactory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# TODO should also be - error: [invalid-argument-type] "Argument to `E.__init__` is incorrect: Expected `int`, found `<class 'E'>`"
+# error: [missing-argument] "No argument provided for required parameter `value` of `E.__init__`"
+E()
+```
+
+If the assigned class returns an instance of itself instead of an outer-class instance, its own
+`__init__` is called and the outer class's `__init__` is skipped. Here, `SelfFactory.__new__`
+returns a `SelfFactory`, so `SelfFactory.__init__` runs inside `ReturnsFactory()` but
+`ReturnsFactory.__init__` does not. We currently do not model that nested `__init__` call.
+
+```py
+class SelfFactory:
+    def __new__(cls, outer_cls: type["ReturnsFactory"]) -> "SelfFactory":
+        return object.__new__(SelfFactory)
+
+    def __init__(self, outer_cls: int) -> None:
+        pass
+
+class ReturnsFactory:
+    __new__ = SelfFactory
+
+    def __init__(self, value: int) -> None:
+        pass
+
+# TODO should be - error: [invalid-argument-type] "Argument to `SelfFactory.__init__` is incorrect: Expected `int`, found `<class 'ReturnsFactory'>`"
+ReturnsFactory()
 ```
 
 ## `__new__` is implicitly a static method, but explicitly marking it as one is harmless
@@ -541,7 +649,7 @@ class Tracer:
 from typing import Generic, TypeVar
 
 S = TypeVar("S")
-T = TypeVar("T", bound="Box")
+T = TypeVar("T", bound="Box")  # error: [missing-type-argument]
 
 class Box(Generic[S]):
     def __new__(cls: type[T], x: S) -> T:
@@ -937,7 +1045,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar, overload
 
 S = TypeVar("S")
-T = TypeVar("T", bound="E")
+T = TypeVar("T", bound="E")  # error: [missing-type-argument]
 
 class E(Generic[S]):
     @overload

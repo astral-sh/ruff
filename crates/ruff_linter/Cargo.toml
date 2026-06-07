@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.15.12"
+version = "0.15.16"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -83,6 +83,7 @@ default = []
 schemars = ["dep:schemars", "ruff_python_ast/schemars"]
 # Enables rules for internal integration tests
 test-rules = []
+testing = []
 
 [lints]
 workspace = true

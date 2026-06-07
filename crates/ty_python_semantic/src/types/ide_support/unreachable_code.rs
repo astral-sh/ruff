@@ -45,7 +45,7 @@ pub enum UnreachableKind {
 /// `ALWAYS_FALSE` constraints are classified as unconditional; all others are
 /// unreachable only under the current analysis.
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn unreachable_ranges(db: &dyn Db, file: File) -> Vec<UnreachableRange> {
+pub fn unreachable_ranges(db: &dyn Db, file: File) -> Box<[UnreachableRange]> {
     let index = semantic_index(db, file);
     let mut unreachable = Vec::new();
 
@@ -70,7 +70,7 @@ pub fn unreachable_ranges(db: &dyn Db, file: File) -> Vec<UnreachableRange> {
     merge_overlapping_ranges(unreachable)
 }
 
-fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Vec<UnreachableRange> {
+fn merge_overlapping_ranges(mut ranges: Vec<UnreachableRange>) -> Box<[UnreachableRange]> {
     ranges.sort_unstable_by_key(|range| (range.range.start(), range.range.end(), range.kind));
 
     ranges

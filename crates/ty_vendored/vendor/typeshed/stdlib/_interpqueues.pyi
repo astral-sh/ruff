@@ -2,8 +2,8 @@
 The 'interpreters' module provides a more convenient interface.
 """
 
-from typing import Any, Literal, SupportsIndex
-from typing_extensions import TypeAlias
+import sys
+from typing import Any, Literal, SupportsIndex, TypeAlias
 
 _UnboundOp: TypeAlias = Literal[1, 2, 3]
 
@@ -19,15 +19,19 @@ def bind(qid: SupportsIndex) -> None:
     The queue is not destroyed until there are no references left.
     """
 
-def create(maxsize: SupportsIndex, fmt: SupportsIndex, unboundop: _UnboundOp) -> int:
-    """create(maxsize, unboundop, fallback) -> qid
+if sys.version_info >= (3, 15):
+    def create(maxsize: SupportsIndex, unboundop: SupportsIndex = -1, fallback: SupportsIndex = -1) -> int: ...
 
-    Create a new cross-interpreter queue and return its unique generated ID.
-    It is a new reference as though bind() had been called on the queue.
+else:
+    def create(maxsize: SupportsIndex, fmt: SupportsIndex, unboundop: _UnboundOp) -> int:
+        """create(maxsize, unboundop, fallback) -> qid
 
-    The caller is responsible for calling destroy() for the new queue
-    before the runtime is finalized.
-    """
+        Create a new cross-interpreter queue and return its unique generated ID.
+        It is a new reference as though bind() had been called on the queue.
+
+        The caller is responsible for calling destroy() for the new queue
+        before the runtime is finalized.
+        """
 
 def destroy(qid: SupportsIndex) -> None:
     """destroy(qid)
@@ -76,11 +80,15 @@ def list_all() -> list[tuple[int, int, _UnboundOp]]:
     Each corresponding default unbound op and fallback is also included.
     """
 
-def put(qid: SupportsIndex, obj: Any, fmt: SupportsIndex, unboundop: _UnboundOp) -> None:
-    """put(qid, obj)
+if sys.version_info >= (3, 15):
+    def put(qid: SupportsIndex, obj: Any, unboundop: SupportsIndex = -1, fallback: SupportsIndex = -1) -> None: ...
 
-    Add the object's data to the queue.
-    """
+else:
+    def put(qid: SupportsIndex, obj: Any, fmt: SupportsIndex, unboundop: _UnboundOp) -> None:
+        """put(qid, obj)
+
+        Add the object's data to the queue.
+        """
 
 def release(qid: SupportsIndex) -> None:
     """release(qid)

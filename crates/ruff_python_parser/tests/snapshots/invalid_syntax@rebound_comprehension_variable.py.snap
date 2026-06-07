@@ -180,28 +180,30 @@ Module(
                         ExprDictComp {
                             node_index: NodeIndex(None),
                             range: 58..91,
-                            key: Named(
-                                ExprNamed {
-                                    node_index: NodeIndex(None),
-                                    range: 60..66,
-                                    target: Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 60..61,
-                                            id: Name("a"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                    value: NumberLiteral(
-                                        ExprNumberLiteral {
-                                            node_index: NodeIndex(None),
-                                            range: 65..66,
-                                            value: Int(
-                                                0,
-                                            ),
-                                        },
-                                    ),
-                                },
+                            key: Some(
+                                Named(
+                                    ExprNamed {
+                                        node_index: NodeIndex(None),
+                                        range: 60..66,
+                                        target: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 60..61,
+                                                id: Name("a"),
+                                                ctx: Store,
+                                            },
+                                        ),
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 65..66,
+                                                value: Int(
+                                                    0,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
                             ),
                             value: Name(
                                 ExprName {
@@ -269,13 +271,15 @@ Module(
                         ExprDictComp {
                             node_index: NodeIndex(None),
                             range: 92..125,
-                            key: Name(
-                                ExprName {
-                                    node_index: NodeIndex(None),
-                                    range: 93..96,
-                                    id: Name("key"),
-                                    ctx: Load,
-                                },
+                            key: Some(
+                                Name(
+                                    ExprName {
+                                        node_index: NodeIndex(None),
+                                        range: 93..96,
+                                        id: Name("key"),
+                                        ctx: Load,
+                                    },
+                                ),
                             ),
                             value: Named(
                                 ExprNamed {

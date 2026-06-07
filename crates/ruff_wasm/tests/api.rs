@@ -4,7 +4,10 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
 use ruff_source_file::OneIndexed;
-use ruff_wasm::{ExpandedMessage, Location, PositionEncoding, Workspace};
+use ruff_wasm::{
+    ExpandedMessage, ExpandedSubDiagnostic, Location, PositionEncoding, SubDiagnosticSeverity,
+    Workspace,
+};
 
 macro_rules! check {
     ($source:expr, $config:expr, $expected:expr) => {{
@@ -32,6 +35,7 @@ fn empty_config() {
         [ExpandedMessage {
             code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
+            sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
@@ -55,6 +59,7 @@ fn syntax_error() {
         [ExpandedMessage {
             code: "invalid-syntax".to_string(),
             message: "Expected an expression".to_string(),
+            sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(3)
@@ -79,6 +84,7 @@ fn unsupported_syntax_error() {
             code: "invalid-syntax".to_string(),
             message: "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
                 .to_string(),
+            sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
                 column: OneIndexed::from_zero_indexed(0)
@@ -88,6 +94,28 @@ fn unsupported_syntax_error() {
                 column: OneIndexed::from_zero_indexed(5)
             },
             fix: None,
+        }]
+    );
+}
+
+#[wasm_bindgen_test]
+fn sub_diagnostics() {
+    ruff_wasm::before_main();
+
+    let config = js_sys::JSON::parse(r#"{}"#).unwrap();
+    let output = Workspace::new(config, PositionEncoding::Utf8)
+        .unwrap()
+        .check("import os\n")
+        .unwrap();
+    let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
+
+    assert_eq!(result[0].message, "`os` imported but unused".to_string());
+    assert_eq!(
+        result[0].sub_diagnostics,
+        [ExpandedSubDiagnostic {
+            severity: SubDiagnosticSeverity::Help,
+            message: "Remove unused import: `os`".to_string(),
+            location: None,
         }]
     );
 }

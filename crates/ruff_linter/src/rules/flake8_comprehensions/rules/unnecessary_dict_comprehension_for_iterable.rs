@@ -92,8 +92,12 @@ pub(crate) fn unnecessary_dict_comprehension_for_iterable(
         return;
     }
 
+    let Some(key) = dict_comp.key.as_deref() else {
+        return;
+    };
+
     // Don't suggest `dict.keys` if the target is not the same as the key.
-    if ComparableExpr::from(&generator.target) != ComparableExpr::from(dict_comp.key.as_ref()) {
+    if ComparableExpr::from(&generator.target) != ComparableExpr::from(key) {
         return;
     }
 

@@ -66,7 +66,31 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    reveal_type(paths)  # revealed: Sequence[str]
+    # Exact sequence alternatives remain as negative protocol constraints.
+    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'>) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+    reveal_type(paths)
+
+def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
+    match value:
+        case int(), str():
+            return 1
+
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(real=0)]:
+            return 1
+
+def guarded_exact_sequence_pattern_is_not_exhaustive(value: tuple[int, str], flag: bool) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(), str()] if flag:
+            return 1
+
+def guarded_then_unguarded_exact_sequence_patterns_are_exhaustive(value: tuple[int, str], flag: bool) -> int:
+    match value:
+        case [int(), str()] if flag:
+            return 1
+        case [int(), str()]:
+            return 2
 ```
 
 ## Basic match
@@ -326,6 +350,38 @@ def _(answer: Answer):
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+## Matching on enum value patterns in invalid code
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/3481>.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from enum import Enum
+from typing import TypeVar
+
+def f(x: T): ...
+def g(x: T): ...
+
+f()  # error: [missing-argument] "No argument provided for required parameter `x`"
+g()  # error: [missing-argument]
+
+class C(Enum):
+    a = 1
+    b = 2
+
+match m:  # error: [unresolved-reference] "Name `m` used when not defined"
+    case C.a:
+        _()  # error: [unresolved-reference] "Name `_` used when not defined"
+    case _:
+        _()  # error: [unresolved-reference]
+
+T = TypeVar
 ```
 
 ## Or match

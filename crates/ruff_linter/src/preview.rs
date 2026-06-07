@@ -9,6 +9,11 @@ use crate::settings::{LinterSettings, types::PreviewMode};
 
 // Rule-specific behavior
 
+// https://github.com/astral-sh/ruff/issues/25375
+pub(crate) const fn is_pytest_asyncio_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/issues/23802
 pub(crate) const fn is_annotated_assignment_redefinition_enabled(
     settings: &LinterSettings,
@@ -300,6 +305,11 @@ pub(crate) const fn is_plural_ngettext_check_enabled(settings: &LinterSettings) 
     settings.preview.is_enabled()
 }
 
+// https://github.com/astral-sh/ruff/pull/22560
+pub(crate) const fn is_f811_shadowing_in_type_checking_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/19023
 pub(crate) const fn is_resolve_string_annotation_pyi041_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
@@ -350,5 +360,10 @@ pub(crate) const fn is_collapsible_if_fix_safe_enabled(settings: &LinterSettings
 
 // https://github.com/astral-sh/ruff/pull/23404
 pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23259
+pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

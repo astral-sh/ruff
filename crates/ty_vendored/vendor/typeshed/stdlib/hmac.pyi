@@ -7,8 +7,7 @@ from _hashlib import _HashObject, compare_digest as compare_digest
 from _typeshed import ReadableBuffer, SizedBuffer
 from collections.abc import Callable
 from types import ModuleType
-from typing import overload
-from typing_extensions import TypeAlias
+from typing import TypeAlias, overload
 
 _DigestMod: TypeAlias = str | Callable[[], _HashObject] | ModuleType
 
@@ -37,7 +36,6 @@ def new(key: bytes | bytearray, msg: ReadableBuffer | None, digestmod: _DigestMo
     method, and can ask for the hash value at any time by calling its digest()
     or hexdigest() methods.
     """
-
 @overload
 def new(key: bytes | bytearray, *, digestmod: _DigestMod) -> HMAC: ...
 

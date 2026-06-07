@@ -5,8 +5,8 @@ import sys
 from _warnings import warn as warn, warn_explicit as warn_explicit
 from collections.abc import Sequence
 from types import ModuleType, TracebackType
-from typing import Any, Generic, Literal, TextIO, overload
-from typing_extensions import LiteralString, TypeAlias, TypeVar
+from typing import Any, Generic, Literal, TextIO, TypeAlias, overload
+from typing_extensions import LiteralString, TypeVar
 
 __all__ = [
     "warn",
@@ -29,7 +29,9 @@ if sys.version_info >= (3, 14):
     _ActionKind: TypeAlias = Literal["default", "error", "ignore", "always", "module", "once"]
 else:
     _ActionKind: TypeAlias = Literal["default", "error", "ignore", "always", "all", "module", "once"]
-filters: Sequence[tuple[str, re.Pattern[str] | None, type[Warning], re.Pattern[str] | None, int]]  # undocumented, do not mutate
+filters: Sequence[
+    tuple[str, re.Pattern[str] | None, type[Warning] | tuple[type[Warning], ...], re.Pattern[str] | None, int]
+]  # undocumented, do not mutate
 
 def showwarning(
     message: Warning | str,
@@ -58,7 +60,9 @@ def filterwarnings(
     'append' -- if true, append to the list of filters
     """
 
-def simplefilter(action: _ActionKind, category: type[Warning] = ..., lineno: int = 0, append: bool = False) -> None:
+def simplefilter(
+    action: _ActionKind, category: type[Warning] | tuple[type[Warning], ...] = ..., lineno: int = 0, append: bool = False
+) -> None:
     """Insert a simple entry into the list of warnings filters (at the front).
 
     A simple filter matches all modules and messages.
@@ -83,16 +87,32 @@ class WarningMessage:
     file: TextIO | None
     line: str | None
     source: Any | None
-    def __init__(
-        self,
-        message: Warning | str,
-        category: type[Warning],
-        filename: str,
-        lineno: int,
-        file: TextIO | None = None,
-        line: str | None = None,
-        source: Any | None = None,
-    ) -> None: ...
+    if sys.version_info >= (3, 15):
+        module: str | None
+    if sys.version_info >= (3, 15):
+        def __init__(
+            self,
+            message: Warning | str,
+            category: type[Warning],
+            filename: str,
+            lineno: int,
+            file: TextIO | None = None,
+            line: str | None = None,
+            source: Any | None = None,
+            module: str | None = None,
+        ) -> None: ...
+
+    else:
+        def __init__(
+            self,
+            message: Warning | str,
+            category: type[Warning],
+            filename: str,
+            lineno: int,
+            file: TextIO | None = None,
+            line: str | None = None,
+            source: Any | None = None,
+        ) -> None: ...
 
 class catch_warnings(Generic[_W_co]):
     """A context manager that copies and restores the warnings filter upon
@@ -121,7 +141,7 @@ class catch_warnings(Generic[_W_co]):
             record: Literal[False] = False,
             module: ModuleType | None = None,
             action: _ActionKind | None = None,
-            category: type[Warning] = ...,
+            category: type[Warning] | tuple[type[Warning], ...] = ...,
             lineno: int = 0,
             append: bool = False,
         ) -> None:
@@ -129,7 +149,6 @@ class catch_warnings(Generic[_W_co]):
             should be used other than sys.modules['warnings'].
 
             """
-
         @overload
         def __init__(
             self: catch_warnings[list[WarningMessage]],
@@ -137,7 +156,7 @@ class catch_warnings(Generic[_W_co]):
             record: Literal[True],
             module: ModuleType | None = None,
             action: _ActionKind | None = None,
-            category: type[Warning] = ...,
+            category: type[Warning] | tuple[type[Warning], ...] = ...,
             lineno: int = 0,
             append: bool = False,
         ) -> None: ...
@@ -148,7 +167,7 @@ class catch_warnings(Generic[_W_co]):
             record: bool,
             module: ModuleType | None = None,
             action: _ActionKind | None = None,
-            category: type[Warning] = ...,
+            category: type[Warning] | tuple[type[Warning], ...] = ...,
             lineno: int = 0,
             append: bool = False,
         ) -> None: ...
@@ -162,7 +181,6 @@ class catch_warnings(Generic[_W_co]):
             keyword-only.
 
             """
-
         @overload
         def __init__(
             self: catch_warnings[list[WarningMessage]], *, record: Literal[True], module: ModuleType | None = None

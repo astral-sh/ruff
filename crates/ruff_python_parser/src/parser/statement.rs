@@ -4,8 +4,8 @@ use std::fmt::{Display, Write};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
-    self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
-    PythonVersion, Stmt, WithItem,
+    self as ast, AtomicNodeIndex, DecoratorList, ExceptHandler, Expr, ExprContext, IpyEscapeKind,
+    Operator, PythonVersion, Stmt, Suite, WithItem,
 };
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -117,8 +117,12 @@ impl<'src> Parser<'src> {
             TokenKind::If => Stmt::If(self.parse_if_statement()),
             TokenKind::For => Stmt::For(self.parse_for_statement(start)),
             TokenKind::While => Stmt::While(self.parse_while_statement()),
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(vec![], start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start)),
+            TokenKind::Def => {
+                Stmt::FunctionDef(self.parse_function_definition(DecoratorList::new(), start))
+            }
+            TokenKind::Class => {
+                Stmt::ClassDef(self.parse_class_definition(DecoratorList::new(), start))
+            }
             TokenKind::Try => Stmt::Try(self.parse_try_statement()),
             TokenKind::With => Stmt::With(self.parse_with_statement(start)),
             TokenKind::At => self.parse_decorators(),
@@ -190,8 +194,8 @@ impl<'src> Parser<'src> {
     /// Matches the `simple_stmts` rule in the [Python grammar].
     ///
     /// [Python grammar]: https://docs.python.org/3/reference/grammar.html
-    fn parse_simple_statements(&mut self) -> Vec<Stmt> {
-        let mut stmts = vec![];
+    fn parse_simple_statements(&mut self) -> Suite {
+        let mut stmts = Suite::with_capacity(1);
         let mut progress = ParserProgress::default();
 
         loop {
@@ -254,6 +258,7 @@ impl<'src> Parser<'src> {
 
         // test_ok simple_stmts_with_semicolons
         // return; import a; from x import y; z; type T = int
+        stmts.shrink_to_fit();
         stmts
     }
 
@@ -609,16 +614,19 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
-                p.parse_alias(ImportStyle::Import)
-            });
+        let mut names = self.parse_comma_separated_list_into_vec_with_capacity(
+            RecoveryContextKind::ImportNames,
+            |p| p.parse_alias(ImportStyle::Import),
+            1,
+        );
 
         if names.is_empty() {
             // test_err import_stmt_empty
             // import
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImport {
             names,
@@ -684,7 +692,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = vec![];
+        let mut names = Vec::new();
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -734,6 +742,8 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -1037,7 +1047,7 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name());
+        let mut name = Expr::Name(self.parse_name(ExpressionContext::default()));
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();
@@ -1436,8 +1446,13 @@ impl<'src> Parser<'src> {
         });
 
         if self.at(TokenKind::Else) {
+            if elif_else_clauses.is_empty() {
+                elif_else_clauses.reserve_exact(1);
+            }
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
+
+        elif_else_clauses.shrink_to_fit();
 
         ast::StmtIf {
             test: Box::new(test.expr),
@@ -1534,7 +1549,7 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1546,6 +1561,8 @@ impl<'src> Parser<'src> {
             }
             handler
         });
+        handlers.shrink_to_fit();
+
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
         for handler_err_range in mixed_except_ranges {
@@ -1577,14 +1594,14 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         let (finalbody, has_finally) = if self.eat(TokenKind::Finally) {
             self.expect(TokenKind::Colon);
             (self.parse_body(Clause::Finally), true)
         } else {
-            (vec![], false)
+            (Suite::new(), false)
         };
 
         if !has_except && !has_finally {
@@ -1890,7 +1907,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtFor {
@@ -1940,7 +1957,7 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Colon);
             self.parse_body(Clause::Else)
         } else {
-            vec![]
+            Suite::new()
         };
 
         ast::StmtWhile {
@@ -1966,7 +1983,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#function-definitions>
     fn parse_function_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtFunctionDef {
         self.bump(TokenKind::Def);
@@ -2094,7 +2111,7 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-classdef>
     fn parse_class_definition(
         &mut self,
-        decorator_list: Vec<ast::Decorator>,
+        decorator_list: DecoratorList,
         start: TextSize,
     ) -> ast::StmtClassDef {
         self.bump(TokenKind::Class);
@@ -2165,7 +2182,9 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
-        let items = self.parse_with_items();
+        let mut items = self.parse_with_items();
+        items.shrink_to_fit();
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
@@ -2263,15 +2282,17 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec(
+                self.parse_comma_separated_list_into_vec_with_capacity(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec(
+            self.parse_comma_separated_list_into_vec_with_capacity(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                1,
             )
         }
     }
@@ -2309,7 +2330,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut parsed_with_items = vec![];
+        let mut parsed_with_items = Vec::with_capacity(1);
         let mut has_optional_vars = false;
 
         // test_err with_items_parenthesized_missing_comma
@@ -2394,12 +2415,12 @@ impl<'src> Parser<'src> {
         }
 
         let with_items = if with_item_kind.is_parenthesized() {
-            Some(
-                parsed_with_items
-                    .into_iter()
-                    .map(|parsed_with_item| parsed_with_item.item)
-                    .collect(),
-            )
+            let with_items: Vec<_> = parsed_with_items
+                .into_iter()
+                .map(|parsed_with_item| parsed_with_item.item)
+                .collect();
+
+            Some(with_items)
         } else {
             self.rewind(checkpoint);
 
@@ -2800,7 +2821,7 @@ impl<'src> Parser<'src> {
             // async def foo(): ...
             TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
                 is_async: true,
-                ..self.parse_function_definition(vec![], async_start)
+                ..self.parse_function_definition(DecoratorList::new(), async_start)
             }),
 
             // test_ok async_with_statement
@@ -2831,8 +2852,24 @@ impl<'src> Parser<'src> {
                 );
 
                 // Although this statement is not a valid `async` statement,
-                // we still parse it.
-                self.parse_statement()
+                // we still parse it. Guard the recursive recovery path so
+                // `async async async ...` cannot overflow the parser stack.
+                if let Some(stmt) = self.with_recursion(Self::parse_statement) {
+                    stmt
+                } else {
+                    let range = self.node_range(async_start);
+                    self.add_error(ParseErrorType::RecursionLimitExceeded, range);
+                    Stmt::Expr(ast::StmtExpr {
+                        range,
+                        value: Box::new(Expr::Name(ast::ExprName {
+                            range,
+                            id: Name::new_static("async"),
+                            ctx: ExprContext::Invalid,
+                            node_index: AtomicNodeIndex::NONE,
+                        })),
+                        node_index: AtomicNodeIndex::NONE,
+                    })
+                }
             }
         }
     }
@@ -2843,7 +2880,7 @@ impl<'src> Parser<'src> {
     fn parse_decorators(&mut self) -> Stmt {
         let start = self.node_start();
 
-        let mut decorators = vec![];
+        let mut decorators = DecoratorList::new();
         let mut progress = ParserProgress::default();
 
         // test_err decorator_missing_expression
@@ -2964,6 +3001,8 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
+        decorators.shrink_to_fit();
+
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
             TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
@@ -3009,7 +3048,7 @@ impl<'src> Parser<'src> {
                         ..ast::Parameters::default()
                     }),
                     returns: None,
-                    body: vec![],
+                    body: Suite::new(),
                 }
                 .into()
             }
@@ -3020,7 +3059,7 @@ impl<'src> Parser<'src> {
     ///
     /// This could either be a single statement that's on the same line as the
     /// clause header or an indented block.
-    fn parse_body(&mut self, parent_clause: Clause) -> Vec<Stmt> {
+    fn parse_body(&mut self, parent_clause: Clause) -> Suite {
         // Note: The test cases in this method chooses a clause at random to test
         // the error logic.
 
@@ -3058,7 +3097,7 @@ impl<'src> Parser<'src> {
             );
         }
 
-        Vec::new()
+        Suite::new()
     }
 
     /// Parses a block of statements.
@@ -3066,11 +3105,20 @@ impl<'src> Parser<'src> {
     /// # Panics
     ///
     /// If the parser isn't positioned at an `Indent` token.
-    fn parse_block(&mut self) -> Vec<Stmt> {
+    fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements =
-            self.parse_list_into_vec(RecoveryContextKind::BlockStatements, Self::parse_statement);
+        let statements = if let Some(statements) = self.with_recursion(|parser| {
+            parser.parse_list_into_thin_vec(
+                RecoveryContextKind::BlockStatements,
+                Parser::parse_statement,
+            )
+        }) {
+            statements
+        } else {
+            self.report_recursion_limit_exceeded(self.current_token_range());
+            Suite::new()
+        };
 
         self.expect(TokenKind::Dedent);
 
@@ -3498,6 +3546,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        parameters.args.shrink_to_fit();
+        parameters.kwonlyargs.shrink_to_fit();
+        parameters.posonlyargs.shrink_to_fit();
+
         parameters.range = self.node_range(start);
 
         parameters
@@ -3908,12 +3960,11 @@ impl<'src> Parser<'src> {
         }
     }
 
-    /// Specialized [`Parser::parse_list_into_vec`] for parsing a sequence of clauses.
+    /// Parses a sequence of clauses.
     ///
-    /// The difference is that the parser only continues parsing for as long as it sees the token
-    /// indicating the start of the specific clause. This is different from
-    /// [`Parser::parse_list_into_vec`] that performs error recovery when the next token is not a
-    /// list terminator or the start of a list element.
+    /// The parser only continues for as long as it sees the token indicating the start of the
+    /// specific clause. Unlike [`Parser::parse_list`], this method does not perform error recovery
+    /// when the next token is not a list terminator or the start of a list element.
     ///
     /// The special method is necessary because Python uses indentation over explicit delimiters to
     /// indicate the end of a clause.
@@ -3955,6 +4006,9 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
+            if clauses.is_empty() {
+                clauses.reserve_exact(1);
+            }
             clauses.push(parse_clause(self));
         }
 

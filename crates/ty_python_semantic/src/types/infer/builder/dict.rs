@@ -40,7 +40,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // back.
             let supports_typed_dict_context = {
                 let mut speculative_builder = self.speculate();
-                infer_unpacked_keyword_types(arguments, &mut |expr, tcx| {
+                infer_unpacked_keyword_types(arguments, |expr, tcx| {
                     speculative_builder.infer_expression(expr, tcx)
                 })
                 .into_iter()
@@ -109,6 +109,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_collection_literal(
             KnownClass::Dict,
+            None,
             &items,
             &mut infer_elt_ty,
             call_expression_tcx,

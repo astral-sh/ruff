@@ -626,8 +626,7 @@ be able to unify the two assignments to `A`.
 ```py
 from functions import invoke, Covariant, head_covariant, lift_covariant
 
-# TODO: revealed: `int`
-# revealed: Unknown
+# revealed: int
 reveal_type(invoke(head_covariant, Covariant[int]()))
 # revealed: Covariant[Literal[1]]
 reveal_type(invoke(lift_covariant, 1))
@@ -744,18 +743,18 @@ def decorated[T](t: T) -> None:
 ## Attribute access on `Callable`-bounded TypeVars
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def my_decorator[T: Callable](f: T) -> None:
+def my_decorator[T: Callable[..., Any]](f: T) -> None:
     # error: [unresolved-attribute]
     f.whatever
     # error: [unresolved-attribute]
     f.whatever = 1
 
-class Box[T: Callable]:
+class Box[T: Callable[..., Any]]:
     cls: type[T]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable[..., Any]]) -> None:
     # error: [unresolved-attribute]
     box.cls.whatever
 ```
@@ -1006,16 +1005,15 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
 
-# TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
-# we confuse with "R has no lower bound".
 # revealed: (...) -> Never
 reveal_type(into_regular_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: (...) -> Never
-# revealed: (...) -> Unknown
+# revealed: (...) -> Never
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: Never
-# revealed: Unknown
-reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+# Keep this in a function so the top-level mdtest block remains reachable after revealing `Never`.
+def _():
+    # revealed: Never
+    reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
 class Proxy: ...
 

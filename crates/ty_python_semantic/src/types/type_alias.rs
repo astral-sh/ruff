@@ -3,8 +3,12 @@ use std::fmt::Write;
 use crate::{
     Db,
     types::{
-        GenericContext, Type, UnionType, definition_expression_type,
-        display::qualified_name_components_from_scope, generics::Specialization, visitor,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
+        TypeMapping, TypeVarVariance, UnionType, definition_expression_type,
+        display::qualified_name_components_from_scope,
+        generics::{ApplySpecialization, Specialization},
+        variance::VarianceInferable,
+        visitor,
     },
 };
 use ty_python_core::{
@@ -170,7 +174,7 @@ impl<'db> PEP695TypeAliasType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(super) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.rhs_scope(db);
         let module = parsed_module(db, scope.file(db)).load(db);
         let type_alias_stmt_node = scope.node(db).expect_type_alias();
@@ -184,7 +188,22 @@ impl<'db> PEP695TypeAliasType<'db> {
             let specialization = self
                 .specialization(db)
                 .unwrap_or_else(|| generic_context.default_specialization(db, None));
-            ty.apply_specialization(db, specialization)
+            let type_mapping = match specialization.materialization_kind(db) {
+                None => {
+                    TypeMapping::ApplySpecialization(ApplySpecialization::TypeAlias(specialization))
+                }
+                Some(materialization_kind) => TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::TypeAlias(specialization),
+                    materialization_kind,
+                },
+            };
+
+            ty.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            )
         } else {
             ty
         }
@@ -392,6 +411,17 @@ impl<'db> TypeAliasType<'db> {
     /// Returns a struct that can display the fully qualified name of this type alias.
     pub(crate) fn qualified_name(self, db: &'db dyn Db) -> QualifiedTypeAliasName<'db> {
         QualifiedTypeAliasName::from_type_alias(db, self)
+    }
+}
+
+#[salsa::tracked]
+impl<'db> VarianceInferable<'db> for TypeAliasType<'db> {
+    #[salsa::tracked(
+        cycle_initial=|_, _, _, _| TypeVarVariance::Bivariant,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        self.value_type(db).variance_of(db, typevar)
     }
 }
 

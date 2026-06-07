@@ -1,6 +1,6 @@
 use itertools::Either;
 use ruff_db::files::File;
-use ruff_index::IndexVec;
+use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
@@ -11,14 +11,16 @@ use crate::reachability::{ReachabilityConstraintsExtension, evaluate_reachabilit
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::{
     DynamicType, KnownClass, MemberLookupPolicy, Type, TypeAndQualifiers, TypeQualifiers,
-    UnionBuilder, UnionType, binding_type, declaration_type,
+    UnionBuilder, UnionType, binding_type, inferred_declaration, is_discarded_dict_key_assignment,
 };
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
-use ty_python_core::place::{PlaceExprRef, ScopedPlaceId};
+use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::predicate::{Predicate, ScopedPredicateId};
-use ty_python_core::reachability_constraints::ReachabilityConstraints;
+use ty_python_core::reachability_constraints::{
+    ReachabilityConstraints, ScopedReachabilityConstraintId,
+};
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
@@ -367,23 +369,6 @@ pub(crate) fn symbol<'db>(
         db,
         scope,
         name,
-        RequiresExplicitReExport::No,
-        considered_definitions,
-    )
-}
-
-/// Infer the public type of a place (its type as seen from outside its scope) in the given
-/// `scope`.
-pub(crate) fn place<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    member: PlaceExprRef,
-    considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    place_impl(
-        db,
-        scope,
-        member,
         RequiresExplicitReExport::No,
         considered_definitions,
     )
@@ -1127,7 +1112,7 @@ enum DeclarationsBoundnessEvaluator<'map, 'db> {
     BasedOnUnboundVisibility {
         unbound_visibility: Option<DeclarationWithConstraint<'db>>,
         reachability_constraints: &'map ReachabilityConstraints,
-        predicates: &'map IndexVec<ScopedPredicateId, Predicate<'db>>,
+        predicates: &'map IndexSlice<ScopedPredicateId, Predicate<'db>>,
         requires_explicit_reexport: RequiresExplicitReExport,
     },
 }
@@ -1156,6 +1141,7 @@ impl<'db> DeclarationsBoundnessEvaluator<'_, 'db> {
                     Some(DeclarationWithConstraint {
                         declaration,
                         reachability_constraint,
+                        ..
                     }) if declaration.is_undefined_or(|def| {
                         is_non_exported(db, def, requires_explicit_reexport)
                     }) =>
@@ -1192,14 +1178,21 @@ fn symbol_impl<'db>(
         file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
     };
 
-    if name == "platform" && is_known_module(KnownModule::Sys) {
-        match Program::get(db).python_platform(db) {
-            crate::PythonPlatform::Identifier(platform) => {
-                return Place::bound(Type::string_literal(db, platform.as_str())).into();
+    // Check the symbol name first to avoid a module-resolution query for every symbol lookup.
+    if matches!(name, "version_info" | "platform") && is_known_module(KnownModule::Sys) {
+        match name {
+            "version_info" => {
+                return Place::bound(Type::sys_version_info()).into();
             }
-            crate::PythonPlatform::All => {
-                // Fall through to the looked up type
-            }
+            "platform" => match Program::get(db).python_platform(db) {
+                crate::PythonPlatform::Identifier(platform) => {
+                    return Place::bound(Type::string_literal(db, platform.as_str())).into();
+                }
+                crate::PythonPlatform::All => {
+                    // Fall through to the looked up type
+                }
+            },
+            _ => {}
         }
     }
 
@@ -1223,29 +1216,6 @@ fn symbol_impl<'db>(
                 db,
                 scope,
                 symbol.into(),
-                requires_explicit_reexport,
-                considered_definitions,
-            )
-        })
-        .unwrap_or_default()
-}
-
-fn place_impl<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    place: PlaceExprRef,
-    requires_explicit_reexport: RequiresExplicitReExport,
-    considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("place_impl", ?place).entered();
-
-    place_table(db, scope)
-        .place_id(place)
-        .map(|place| {
-            place_by_id(
-                db,
-                scope,
-                place,
                 requires_explicit_reexport,
                 considered_definitions,
             )
@@ -1281,6 +1251,10 @@ fn loop_header_reachability_impl<'db>(
     definition: Definition<'db>,
     is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
+    // This cutoff was chosen by benchmarking real isort to keep loop analysis
+    // overhead minimal while preserving diagnostics.
+    const MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES: usize = 2048;
+
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
     };
@@ -1292,12 +1266,21 @@ fn loop_header_reachability_impl<'db>(
 
     let mut deleted_reachability = Truthiness::AlwaysFalse;
     let mut reachable_bindings = FxIndexSet::default();
+    let live_bindings: Vec<_> = loop_header.bindings_for_place(place).collect();
+    let use_exact_reachability = use_def.reachability_constraints().used_interiors().len()
+        <= MAX_EXACT_LOOP_HEADER_REACHABILITY_NODES;
 
-    for live_binding in loop_header.bindings_for_place(place) {
+    for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else {
+        } else if use_exact_reachability {
             evaluate_reachability(db, use_def, live_binding.reachability_constraint())
+        } else if live_binding.reachability_constraint()
+            == ScopedReachabilityConstraintId::ALWAYS_FALSE
+        {
+            Truthiness::AlwaysFalse
+        } else {
+            Truthiness::Ambiguous
         };
         // Skip unreachable bindings.
         if reachability.is_always_false() {
@@ -1349,7 +1332,7 @@ impl<'db> LoopHeaderReachability<'db> {
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
         // See [`Type::cycle_normalized`] for more details.
-        let reachable_bindings = if cycle.iteration() <= 1 {
+        let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
             self.reachable_bindings
         } else {
             let previous_bindings = previous.reachable_bindings.iter().copied();
@@ -1409,7 +1392,8 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
-    let mut only_loop_header_bindings = true;
+    // special handling for synthetic loop header definitions and nested bindings definitions
+    let mut only_non_shadowing_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1418,6 +1402,14 @@ fn place_from_bindings_impl<'db>(
              reachability_constraint,
          }| {
             let binding = match binding {
+                DefinitionState::Defined(binding)
+                    if is_discarded_dict_key_assignment(db, binding) =>
+                {
+                    // This synthesized `d[key] = value` binding was derived from an assignment such
+                    // as `d = {key: value}`. If the RHS is not known to be stored unchanged, discard
+                    // the binding so that lookup of `d[key]` can fall back to `d`.
+                    return None;
+                }
                 DefinitionState::Defined(binding) => binding,
                 DefinitionState::Undefined => {
                     return None;
@@ -1486,7 +1478,7 @@ fn place_from_bindings_impl<'db>(
                 // `Never` will be eliminated automatically.
 
                 if unbound_visibility().is_none_or(Truthiness::is_always_false) {
-                    return Some(Type::Never);
+                    return Some((Type::Never, static_reachability));
                 }
                 return None;
             }
@@ -1504,24 +1496,30 @@ fn place_from_bindings_impl<'db>(
                 if loop_header.reachable_bindings.is_empty() {
                     return None;
                 }
+            } else if matches!(binding.kind(db), DefinitionKind::NestedBindings(_)) {
+                // Nested bindings definitions similar to loop header definitions, synthetic
+                // bindings with special shadowing behavior. They can also coexist with `UNBOUND`.
             } else {
-                only_loop_header_bindings = false;
+                only_non_shadowing_bindings = false;
             }
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
+            Some((
+                narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
+                static_reachability,
+            ))
         },
     );
 
-    let place = if let Some(first) = types.next() {
-        let ty = if let Some(second) = types.next() {
+    let place = if let Some((first, first_reachability)) = types.next() {
+        let ty = if let Some((second, second_reachability)) = types.next() {
             let mut builder = PublicTypeBuilder::new(db);
-            builder.add(first);
-            builder.add(second);
+            builder.add(first, first_reachability);
+            builder.add(second, second_reachability);
 
-            for ty in types {
-                builder.add(ty);
+            for (ty, reachability) in types {
+                builder.add(ty, reachability);
             }
 
             builder.build()
@@ -1532,9 +1530,9 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
-                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
-                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
-                    // definitely-visible alongside a loop header binding. See "Use with loop
+                Some(Truthiness::AlwaysTrue) if only_non_shadowing_bindings => {
+                    // Loop header and nested binding definitions don't shadow prior bindings, so
+                    // UNBOUND can still be definitely-visible alongside them. See "Use with loop
                     // header and also `UNBOUND` definitely visible" in `while_loop.md`.
                     Definedness::PossiblyUndefined
                 }
@@ -1575,7 +1573,7 @@ pub(super) struct PlaceWithDefinition<'db> {
 /// Accumulates types from multiple bindings or declarations, and eventually builds a
 /// union type from them.
 ///
-/// `@overload`ed function literal types are discarded if they are immediately followed
+/// `@overload`ed function literal types are discarded if they are definitely followed
 /// by their implementation. This is to ensure that we do not merge all of them into the
 /// union type. The last one will include the other overloads already.
 struct PublicTypeBuilder<'db> {
@@ -1603,18 +1601,42 @@ impl<'db> PublicTypeBuilder<'db> {
         }
     }
 
-    fn add(&mut self, element: Type<'db>) -> bool {
+    fn add(&mut self, element: Type<'db>, reachability: Truthiness) -> bool {
         match element {
             Type::FunctionLiteral(function) => {
-                if function
-                    .literal(self.db)
-                    .last_definition
-                    .is_overload(self.db)
-                {
+                let last_definition = function.literal(self.db).last_definition;
+                if last_definition.is_overload(self.db) {
+                    // Distinct overloaded function values can be assigned to the same public
+                    // symbol in separate branches. Preserve the queued value unless the next
+                    // overload belongs to the same place.
+                    if !self.queue.is_some_and(|queued| {
+                        let Type::FunctionLiteral(queued_function) = queued else {
+                            return false;
+                        };
+                        function.has_same_place_as(self.db, queued_function)
+                    }) {
+                        self.drain_queue();
+                    }
+
                     self.queue = Some(element);
                     false
                 } else {
-                    self.queue = None;
+                    // An unconditional implementation shadows preceding overload definitions. A
+                    // conditional definition, however, can be only one public possibility among
+                    // several, so keep any unrelated queued overloaded function in the union.
+                    if reachability.is_always_true()
+                        || self.queue.is_some_and(|queued| {
+                            let Type::FunctionLiteral(queued_function) = queued else {
+                                return false;
+                            };
+                            let queued_definition = queued_function.last_definition(self.db);
+                            function.contains_definition(self.db, queued_definition)
+                        })
+                    {
+                        self.queue = None;
+                    } else {
+                        self.drain_queue();
+                    }
                     self.add_to_union(element);
                     true
                 }
@@ -1652,10 +1674,10 @@ impl<'db> DeclaredTypeBuilder<'db> {
         }
     }
 
-    fn add(&mut self, element: TypeAndQualifiers<'db>) {
+    fn add(&mut self, element: TypeAndQualifiers<'db>, reachability: Truthiness) {
         let element_ty = element.inner_type();
 
-        if self.inner.add(element_ty) {
+        if self.inner.add(element_ty, reachability) {
             if let Some(first_ty) = self.first_type {
                 if !first_ty.is_equivalent_to(self.inner.db, element_ty) {
                     self.conflicting_types.insert(element_ty);
@@ -1728,6 +1750,7 @@ fn place_from_declarations_impl<'db>(
         let DeclarationWithConstraint {
             declaration,
             reachability_constraint,
+            ..
         } = declaration_with_constraint;
 
         let DefinitionState::Defined(declaration) = declaration else {
@@ -1744,21 +1767,22 @@ fn place_from_declarations_impl<'db>(
         if static_reachability.is_always_false() {
             None
         } else {
+            let declared_type = inferred_declaration(db, declaration).declared()?;
             first_declaration.get_or_insert(declaration);
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 
-            Some(declaration_type(db, declaration))
+            Some((declared_type, static_reachability))
         }
     });
 
-    if let Some(first) = types.next() {
-        let (declared, conflicting) = if let Some(second) = types.next() {
+    if let Some((first, first_reachability)) = types.next() {
+        let (declared, conflicting) = if let Some((second, second_reachability)) = types.next() {
             let mut builder = DeclaredTypeBuilder::new(db);
-            builder.add(first);
-            builder.add(second);
-            for element in types {
-                builder.add(element);
+            builder.add(first, first_reachability);
+            builder.add(second, second_reachability);
+            for (element, reachability) in types {
+                builder.add(element, reachability);
             }
             builder.build()
         } else {
@@ -1969,7 +1993,7 @@ pub(crate) mod implicit_globals {
         cycle_initial=|_, _| smallvec::SmallVec::default(),
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
+    fn module_type_symbols(db: &dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
         let Some(module_type) = KnownClass::ModuleType
             .to_class_literal(db)
             .as_class_literal()

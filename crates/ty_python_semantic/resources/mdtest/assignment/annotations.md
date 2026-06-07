@@ -363,45 +363,6 @@ def foo(v: str | int | None, w: str | str | None, x: str | str):
     reveal_type(x)  # revealed: str
 ```
 
-## PEP-604 in non-type-expression context
-
-### In Python 3.10 and later
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
-```py
-IntOrStr = int | str
-```
-
-### Earlier versions
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-# snapshot: unsupported-operator
-IntOrStr = int | str
-```
-
-```snapshot
-error[unsupported-operator]: Unsupported `|` operation
- --> src/mdtest_snippet.py:2:12
-  |
-2 | IntOrStr = int | str
-  |            ---^^^---
-  |            |     |
-  |            |     Has type `<class 'str'>`
-  |            Has type `<class 'int'>`
-  |
-info: PEP 604 `|` unions are only available on Python 3.10+ unless they are quoted
-info: Python 3.9 was assumed when resolving types because it was specified on the command line
-```
-
 ## Attribute expressions in type annotations are understood
 
 ```py
@@ -474,7 +435,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Literal, Sequence
+from typing import Literal, Mapping, Sequence
 
 def f[T](x: T) -> list[T]:
     return [x]
@@ -521,9 +482,28 @@ reveal_type(x12)  # revealed: list[str | None]
 x13: dict[str, list[int | None]] | dict[str, list[str | None]] = {"a": ["b"]}
 reveal_type(x13)  # revealed: dict[str, list[str | None]]
 
-x14 = [{"a": [1], "b": 1}, {"a": [1]}]
-x14.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
-reveal_type(x14)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+x14: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = {"a": ["b"]}
+reveal_type(x14)  # revealed: dict[str, list[str | None]]
+
+x15 = [{"a": [1], "b": 1}, {"a": [1]}]
+x15.append(reveal_type({"b": 1}))  # revealed: dict[str, list[int] | int]
+reveal_type(x15)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+
+type EitherList = list[int | str] | list[int | None]
+
+x16: EitherList = [None, None]
+reveal_type(x16)  # revealed: list[int | None]
+
+x17: EitherList = ["1", "2", "3"]
+reveal_type(x17)  # revealed: list[int | str]
+
+type SelfOp[T] = Mapping[Literal["$eq", "$ne"], T]
+type ListOp[T] = Mapping[Literal["$in", "$nin"], Sequence[T]]
+type Ops[T] = SelfOp[T] | ListOp[T]
+type NestedOp[T] = T | Ops[T]
+
+x18: NestedOp[str] = {"$in": ["a", "b"]}
+reveal_type(x18)  # revealed: dict[Literal["$in", "$nin"], list[str]]
 ```
 
 ## Annotations influence generic call argument inference
@@ -536,13 +516,22 @@ python-version = "3.13"
 A function's arguments are also inferred using the type context:
 
 ```py
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 class TD(TypedDict):
     x: int
 
 def first[T](x: list[T]) -> T:
     return x[0]
+
+type ObjectCallback = Callable[[object], None]
+type IntCallback = Callable[[int], None]
+
+def make_callback[T](callback: Callable[[T], None]) -> Callable[[T], None]:
+    return callback
+
+def consume(value: int) -> None:
+    pass
 
 x1: TD = first([{"x": 0}, {"x": 1}])
 reveal_type(x1)  # revealed: TD
@@ -559,6 +548,10 @@ x3: TD = first([{"y": 0}, {"x": 1}])
 # error: [invalid-key] "Unknown key "y" for TypedDict `TD`"
 # error: [invalid-assignment] "Object of type `TD | None | dict[str, int]` is not assignable to `TD | None`"
 x4: TD | None = first([{"y": 0}, {"x": 1}])
+
+# `ObjectCallback` is redundant in this union, so expanding the aliases collapses the narrowing
+# target to `IntCallback`.
+x5: ObjectCallback | IntCallback = make_callback(lambda value: consume(value.bit_length()))
 ```
 
 But not in a way that leads to assignability errors:
@@ -630,18 +623,38 @@ def _():
 
     # revealed: list[int | X]
     # revealed: list[str | X]
-    x2 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
+    x2 = two_lists(reveal_type([X()]), reveal_type([X()]))
     reveal_type(x2)  # revealed: X
 
-    # revealed: dict[int | X, Any]
-    # revealed: dict[str | X, Any]
-    x3 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x3 = two_lists_default(reveal_type(lst(X())), reveal_type(lst(X())))
     reveal_type(x3)  # revealed: X
+
+    # revealed: list[int | X]
+    # revealed: list[str | X]
+    x4 = two_lists_default(reveal_type([X()]), reveal_type([X()]))
+    reveal_type(x4)  # revealed: X
 
     # revealed: dict[int | X, Any]
     # revealed: dict[str | X, Any]
-    x4 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
-    reveal_type(x4)  # revealed: X
+    x5 = two_dicts(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x5)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x6 = two_dicts(reveal_type({X(): X()}), reveal_type({X(): X()}))
+    reveal_type(x6)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x7 = two_dicts_default(reveal_type(dct(X(), X())), reveal_type(dct(X(), X())))
+    reveal_type(x7)  # revealed: X
+
+    # revealed: dict[int | X, Any]
+    # revealed: dict[str | X, Any]
+    x8 = two_dicts_default(reveal_type({X(): X()}), reveal_type({X(): X()}))
+    reveal_type(x8)  # revealed: X
 ```
 
 ## Prefer the declared type of generic classes and callables
@@ -800,8 +813,10 @@ Similarly, if the inferred type is a subtype of the declared type, we prefer dec
 assignments that are in non-covariant position.
 
 ```py
+import builtins
 from collections import defaultdict
-from typing import Any, Iterable, Literal, MutableSequence, Sequence
+from collections.abc import Mapping
+from typing import Any, Callable, Iterable, Literal, MutableSequence, overload, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
 reveal_type(x1)  # revealed: list[int]
@@ -872,9 +887,59 @@ reveal_type(x18)  # revealed: list[list[Any]]
 
 x19: dict[int, dict[str, int]] = defaultdict(dict)
 reveal_type(x19)  # revealed: defaultdict[int, dict[str, int]]
+
+x20: Mapping[str, list[str]] = reveal_type(defaultdict(list))  # revealed: defaultdict[str, list[str]]
+x20["key"].append(1)  # error: [invalid-argument-type]
+
+factory: Callable[[], list[str]] = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(factory())  # revealed: list[str]
+
+optional_factory: Callable[[], list[str]] | None = reveal_type(list)  # revealed: <class 'list[str]'>
+
+qualified_factory: Callable[[], list[str]] = reveal_type(builtins.list)  # revealed: <class 'list[str]'>
+reveal_type(qualified_factory())  # revealed: list[str]
+
+type ListFactory = Callable[[], list[str]]
+
+alias_factory: ListFactory = reveal_type(list)  # revealed: <class 'list[str]'>
+reveal_type(alias_factory())  # revealed: list[str]
+
+gradual_factory: Callable[..., Any] = reveal_type(list)  # revealed: <class 'list'>
+dynamic_factory: Callable[[Any], Any] = reveal_type(list)  # revealed: <class 'list'>
+
+class Wrapped[T]:
+    value: T
+
+    def __new__(cls, value: T) -> "Wrapped[tuple[T]]":
+        raise NotImplementedError
+
+wrapped_factory: Callable[[str], Wrapped[tuple[str]]] = reveal_type(Wrapped)  # revealed: <class 'Wrapped[str]'>
+reveal_type(wrapped_factory("x"))  # revealed: Wrapped[tuple[str]]
+
+class M[T]:
+    value: T
+
+    def __new__[S](cls, value: S) -> "M[tuple[S]]":
+        raise NotImplementedError
+
+m_factory: Callable[[str], M[tuple[str]]] = reveal_type(M)  # revealed: <class 'M'>
+reveal_type(m_factory("x"))  # revealed: M[tuple[str]]
+
+class MultiPath[T]:
+    value: T
+
+    @overload
+    def __init__(self, value: T) -> None: ...
+    @overload
+    def __init__(self, value: list[T]) -> None: ...
+    def __init__(self, value: object) -> None: ...
+
+# fmt: off
+multi_path_factory: Callable[[list[int]], MultiPath[int] | MultiPath[list[int]]] = reveal_type(MultiPath)  # revealed: <class 'MultiPath'>
+# fmt: on
 ```
 
-## Narrow generic unions
+## Narrow union declared type for generic calls
 
 ```toml
 [environment]
@@ -926,6 +991,37 @@ def _(target: TargetWithTD):
     reveal_type(target)  # revealed: (TD, /) -> None
 ```
 
+```py
+from typing import Mapping, Sequence
+
+x1: list[int | str] | list[int | None] = list((1, 2, 3))
+reveal_type(x1)  # revealed: list[int | str]
+
+x2: Sequence[int | str] | Sequence[int | None] = list((1, 2, 3))
+reveal_type(x2)  # revealed: list[int]
+
+x3: list[int] | list[int | None] | list[str | None] = list(("1", "2"))
+reveal_type(x3)  # revealed: list[str | None]
+
+x4: dict[str, list[int | None]] | dict[str, list[str | None]] = dict([("a", ["b"])])
+reveal_type(x4)  # revealed: dict[str, list[str | None]]
+
+x5: Mapping[str, list[int | None]] | Mapping[str, list[str | None]] = dict([("a", ["b"])])
+reveal_type(x5)  # revealed: dict[str, list[str | None]]
+
+x6 = [dict([("a", list((1,))), ("b", 1)]), dict([("a", list((1,)))])]
+x6.append(reveal_type(dict([("b", 1)])))  # revealed: dict[str, list[int] | int]
+reveal_type(x6)  # revealed: list[dict[str, list[int] | int] | dict[str, list[int]]]
+
+type EitherList = list[int | str] | list[int | None]
+
+x7: EitherList = list((None, None))
+reveal_type(x7)  # revealed: list[int | None]
+
+x8: EitherList = list(("1", "2", "3"))
+reveal_type(x8)  # revealed: list[int | str]
+```
+
 ## Prefer the inferred type of non-generic classes
 
 ```toml
@@ -962,9 +1058,9 @@ def _(i: int):
     reveal_type(b)  # revealed: list[int | None]
     reveal_type(c)  # revealed: list[int | None]
 
-    a: list | None = []
-    b: list | None = identity([])
-    c: list | int | None = identity([])
+    a: list | None = []  # error: [missing-type-argument]
+    b: list | None = identity([])  # error: [missing-type-argument]
+    c: list | int | None = identity([])  # error: [missing-type-argument]
     reveal_type(a)  # revealed: list[Unknown]
     reveal_type(b)  # revealed: list[Unknown]
     reveal_type(c)  # revealed: list[Unknown]

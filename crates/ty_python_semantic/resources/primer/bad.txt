@@ -1,2 +1,0 @@
-spark  # too many iterations (in `exported_names` query), `should not be able to access instance member `spark` of type variable IndexOpsLike@astype in inferable position`
-steam.py  # too many iterations

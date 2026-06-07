@@ -224,7 +224,7 @@ class Foo[T]:
         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
         reveal_type(super())
 
-    def method3(self: Foo):
+    def method3(self: Foo):  # error: [missing-type-argument]
         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
         reveal_type(super())
 
@@ -494,6 +494,7 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from typing import Literal
 from ty_extensions import reveal_mro
 
 class A: ...
@@ -514,9 +515,7 @@ def f(x: C | D):
     # error: [unresolved-attribute] "Attribute `b` is not defined on `<super: <class 'A'>, D>` in union `<super: <class 'A'>, C> | <super: <class 'A'>, D>`"
     s.b
 
-def f(flag: bool):
-    x = "" if flag else "hello"
-    reveal_type(x)  # revealed: Literal["", "hello"]
+def f(x: Literal["", "hello"]):
     reveal_type(super(str, x))  # revealed: <super: <class 'str'>, str>
 
 def f(x: int | str):

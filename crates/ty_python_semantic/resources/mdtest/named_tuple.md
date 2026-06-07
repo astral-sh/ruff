@@ -1424,10 +1424,12 @@ satisfy:
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(...) -> NamedTupleLike
+    # revealed: bound method tuple[object, ...] & NamedTupleLike._replace(...) -> tuple[object, ...] & NamedTupleLike
+    reveal_type(x._replace)
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], [_T](value: tuple[_T, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
-    reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
+    # revealed: bound method tuple[object, ...] & NamedTupleLike.__iter__() -> Iterator[object]
+    reveal_type(x.__iter__)
 
 def _(y: type[typing.NamedTuple]):
     reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
@@ -1467,7 +1469,7 @@ The type described by `NamedTuple` in type expressions is understood as being as
 `tuple[object, ...]` and `tuple[Any, ...]`:
 
 ```py
-static_assert(is_assignable_to(NamedTuple, tuple))
+static_assert(is_assignable_to(NamedTuple, tuple))  # error: [missing-type-argument]
 static_assert(is_assignable_to(NamedTuple, tuple[object, ...]))
 static_assert(is_assignable_to(NamedTuple, tuple[Any, ...]))
 

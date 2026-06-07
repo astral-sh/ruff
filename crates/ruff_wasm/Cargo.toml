@@ -1,6 +1,6 @@
 [package]
 name = "ruff_wasm"
-version = "0.15.12"
+version = "0.15.16"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -17,6 +17,7 @@ doctest = false
 test = false
 
 [dependencies]
+ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }
 ruff_python_ast = { workspace = true }

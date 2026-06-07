@@ -1,10 +1,12 @@
 use ruff_db::files::{File, FilePath};
 use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
+use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
@@ -15,11 +17,12 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
-use ty_python_core::scope::FileScopeId;
+use ty_python_core::scope::{FileScopeId, Scope};
 use ty_python_core::semantic_index;
 use ty_python_core::symbol::Symbol;
 
@@ -76,13 +79,18 @@ impl<'db> SemanticModel<'db> {
         &self,
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
-        let index = semantic_index(self.db, self.file);
         let mut members = FxHashMap::default();
+        let index = semantic_index(self.db, self.file);
         let Some(file_scope) = self.scope(node) else {
             return members;
         };
 
-        for (file_scope, _) in index.ancestor_scopes(file_scope) {
+        for (file_scope, _) in index
+            .visible_ancestor_scopes(file_scope)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
@@ -117,7 +125,8 @@ impl<'db> SemanticModel<'db> {
         let is_typing_extensions_available = self.file.is_stub(self.db)
             || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
-            .into_iter()
+            .iter()
+            .copied()
             .filter(|module| {
                 is_typing_extensions_available || module.name(self.db) != &typing_extensions
             })
@@ -190,9 +199,7 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for submodule in module.all_submodules(self.db) {
             let ty = Type::module_literal(self.db, self.file, *submodule);
-            let Some(base) = submodule.name(self.db).components().next_back() else {
-                continue;
-            };
+            let base = submodule.name(self.db).last_component();
             completions.push(Completion {
                 name: Name::new(base),
                 ty: Some(ty),
@@ -225,7 +232,6 @@ impl<'db> SemanticModel<'db> {
     /// scope of this model's `File` are returned.
     pub fn scoped_completions(&self, node: ast::AnyNodeRef<'_>) -> Vec<Completion<'db>> {
         let index = semantic_index(self.db, self.file);
-
         let Some(file_scope) = self.scope(node) else {
             return vec![];
         };
@@ -324,6 +330,56 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
+    /// Returns the scopes enclosing `node`, starting with the scope containing
+    /// the node itself.
+    ///
+    /// Like [`Self::scope`], this handles nodes inside string annotations.
+    pub fn ancestor_scopes(
+        &self,
+        node: ast::AnyNodeRef<'_>,
+    ) -> impl Iterator<Item = (FileScopeId, &Scope)> + '_ {
+        let index = semantic_index(self.db, self.file);
+        self.scope(node)
+            .into_iter()
+            .flat_map(move |scope| index.ancestor_scopes(scope))
+    }
+
+    /// Returns the first local definition created by `covering_node`, if any.
+    ///
+    /// A local definition is a user-visible definition associated with `covering_node` itself, or
+    /// one of its ancestors, whose focus range covers the queried node. This returns only the first
+    /// match because one syntax node can represent multiple semantic definitions, for example
+    /// `from module import *`. This helper is intended for classifying the local occurrence, such as
+    /// deciding whether it is a binding or declaration, not for enumerating every symbol introduced
+    /// by the syntax.
+    pub fn first_local_definition(
+        &self,
+        covering_node: &CoveringNode<'_>,
+    ) -> Option<Definition<'db>> {
+        let index = semantic_index(self.db, self.file);
+        let parsed = parsed_module(self.db, self.file).load(self.db);
+        let target_range = covering_node.node().range();
+
+        for node in covering_node.ancestors() {
+            let Some(definitions) = index.try_definitions(node) else {
+                continue;
+            };
+
+            if let Some(definition) = definitions.iter().copied().find(|definition| {
+                let kind = definition.kind(self.db);
+                kind.is_user_visible()
+                    && definition
+                        .focus_range(self.db, &parsed)
+                        .range()
+                        .contains_range(target_range)
+            }) {
+                return Some(definition);
+            }
+        }
+
+        None
+    }
+
     /// Get a "safe" [`ast::AnyNodeRef`] to use for referring to the given (sub-)AST node.
     ///
     /// If we're analyzing a string annotation, it will return the string literal's node.
@@ -420,7 +476,10 @@ impl<'db> SemanticModel<'db> {
                 {
                     return TypeQualifiers::empty();
                 }
-                declaration_type(self.db, definition).qualifiers()
+                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                    return TypeQualifiers::empty();
+                };
+                declared.qualifiers()
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {
@@ -726,6 +785,9 @@ impl_binding_has_ty_def!(ast::StmtClassDef);
 impl_binding_has_ty_def!(ast::Parameter);
 impl_binding_has_ty_def!(ast::ParameterWithDefault);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
+impl_binding_has_ty_def!(ast::TypeParamParamSpec);
+impl_binding_has_ty_def!(ast::TypeParamTypeVarTuple);
+impl_binding_has_ty_def!(ast::StmtTypeAlias);
 
 impl HasType for ast::Alias {
     fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
@@ -740,6 +802,7 @@ impl HasType for ast::Alias {
 impl HasOptionalDefinition for ast::ExceptHandlerExceptHandler {
     fn optional_definition<'db>(&self, model: &SemanticModel<'db>) -> Option<Definition<'db>> {
         self.name.as_ref()?;
+
         let index = semantic_index(model.db, model.file);
         Some(index.expect_single_definition(self))
     }
@@ -754,11 +817,10 @@ impl HasType for ast::ExceptHandlerExceptHandler {
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::parsed::parsed_module;
-
     use crate::db::tests::TestDbBuilder;
     use crate::{HasType, SemanticModel};
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::parsed::parsed_module;
 
     #[test]
     fn function_type() -> anyhow::Result<()> {

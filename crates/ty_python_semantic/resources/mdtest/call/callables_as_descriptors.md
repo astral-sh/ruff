@@ -14,7 +14,7 @@ the first argument:
 
 ```py
 from ty_extensions import RegularCallableTypeOf
-from typing import Callable
+from typing import Any, Callable
 
 class C1:
     def method(self: C1, x: int) -> str:
@@ -111,7 +111,7 @@ intention that it shouldn't influence the method's descriptor behavior. For exam
 `method_decorated` below as a bound method, even though its type is `Callable[[C1, int], str]`:
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
 def memoize[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     raise NotImplementedError
@@ -132,7 +132,7 @@ C1().method_decorated(1)
 This also works with an argumentless `Callable` annotation:
 
 ```py
-def memoize2(f: Callable) -> Callable:
+def memoize2(f: Callable[..., Any]) -> Callable[..., Any]:
     raise NotImplementedError
 
 class C2:
@@ -141,6 +141,21 @@ class C2:
         return str(x)
 
 C2().method_decorated(1)
+```
+
+And if the callable-typed decorator leaves some generic parameters unconstrained, we should keep
+those parameters unspecialized rather than collapsing them to `Never`:
+
+```py
+def passthrough[T, R](f: Callable[[T], R]) -> Callable[[T], R]:
+    raise NotImplementedError
+
+@passthrough
+def f(x):
+    return x
+
+reveal_type(f)  # revealed: (Unknown, /) -> Unknown
+reveal_type(f(1))  # revealed: Unknown
 ```
 
 And with unions of `Callable` types:

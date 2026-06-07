@@ -207,6 +207,19 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.get(index).map(|item| &item.types)
     }
 
+    pub(crate) fn insert_type(
+        &mut self,
+        index: usize,
+        tcx: impl Into<TypeContext<'db>>,
+        ty: Type<'db>,
+    ) {
+        self.items
+            .get_mut(index)
+            .expect("argument index should be valid")
+            .types
+            .insert(tcx, ty);
+    }
+
     pub(crate) fn iter_types(&self) -> impl Iterator<Item = &CallArgumentTypes<'db>> + '_ {
         self.items.iter().map(|item| &item.types)
     }
@@ -249,36 +262,59 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         }
     }
 
-    /// Returns the `functools.partial(...)` bound-argument slice when argument expansion is
-    /// concrete enough for partial-application analysis.
-    pub(crate) fn functools_partial_bound_arguments(&self, db: &'db dyn Db) -> Option<Self> {
-        let bound_call_arguments = self.start_from(1);
+    /// Create a new [`CallArguments`] containing only the arguments at the specified indices.
+    ///
+    /// The resulting argument list preserves the order of `indices`. Unlike [`Self::start_from`],
+    /// this can project a non-contiguous subset of the original call arguments. This is used to
+    /// turn the forwarded outer arguments into the argument list for a synthetic sub-call:
+    ///
+    /// ```py
+    /// def wrapper[**P, R](func: Callable[P, R], **kwargs: P.kwargs) -> R: ...
+    /// wrapper(TagSet=[...], func=f)  # select `TagSet=[...]`, but not the later `func=f`
+    /// ```
+    pub(crate) fn select(&self, indices: &[usize]) -> Self {
+        Self {
+            items: indices
+                .iter()
+                .map(|index| self.items[*index].clone())
+                .collect(),
+        }
+    }
 
-        // We only handle variadics and keyword-maps that can be normalized to concrete argument
-        // positions for overload matching.
-        if bound_call_arguments.iter().any(|(argument, argument_ty)| {
+    /// Returns the `functools.partial(...)` bound-argument slice and whether it is concrete enough
+    /// to synthesize a precise partial signature.
+    pub(crate) fn functools_partial_bound_arguments(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(Self, bool)> {
+        let bound_call_arguments = self.start_from(1);
+        let mut can_synthesize_signature = true;
+
+        for (argument, argument_ty) in bound_call_arguments.iter() {
             let argument_ty = argument_ty.get_default().unwrap_or_else(Type::unknown);
             match argument {
-                Argument::Variadic => !matches!(
-                    argument_ty
-                        .as_nominal_instance()
-                        .and_then(|nominal| nominal.tuple_spec(db)),
-                    Some(spec) if spec.as_fixed_length().is_some()
-                ),
-                // Optional TypedDict keys may be absent at runtime, so we can only refine
-                // `partial(...)` when every expanded key is guaranteed to be present.
-                Argument::Keywords => {
-                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty).is_none_or(
-                        |unpacked_keys| unpacked_keys.values().any(|key| !key.is_required),
-                    )
+                Argument::Variadic => {
+                    if !matches!(
+                        argument_ty
+                            .as_nominal_instance()
+                            .and_then(|nominal| nominal.tuple_spec(db)),
+                        Some(spec) if spec.as_fixed_length().is_some()
+                    ) {
+                        return None;
+                    }
                 }
-                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => false,
+                Argument::Keywords => {
+                    // Known `TypedDict` items can still be checked against their target
+                    // parameters, even though possible hidden items prevent us from synthesizing
+                    // a precise partial signature.
+                    extract_unpacked_typed_dict_keys_from_value_type(db, argument_ty)?;
+                    can_synthesize_signature = false;
+                }
+                Argument::Positional | Argument::Synthetic | Argument::Keyword(_) => {}
             }
-        }) {
-            return None;
         }
 
-        Some(bound_call_arguments)
+        Some((bound_call_arguments, can_synthesize_signature))
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -496,6 +532,8 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
+        Type::EnumComplement(_) => true,
+        Type::Intersection(intersection) => intersection.finite_alternatives(db).is_some(),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
             class.is_known(db, KnownClass::Bool)
@@ -519,6 +557,8 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
     match ty {
+        Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db)),
+        Type::Intersection(intersection) => intersection.finite_alternatives(db),
         Type::NominalInstance(instance) => {
             let class = instance.class(db);
 
@@ -567,7 +607,19 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(union.elements(db).to_vec()),
+        Type::Union(union) => Some(
+            union
+                .elements(db)
+                .iter()
+                .flat_map(|element| match element {
+                    Type::EnumComplement(complement) => complement.remaining_literal_types(db),
+                    Type::Intersection(intersection) => intersection
+                        .finite_alternatives(db)
+                        .unwrap_or_else(|| vec![*element]),
+                    _ => vec![*element],
+                })
+                .collect(),
+        ),
         // For type aliases, expand the underlying value type.
         Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form

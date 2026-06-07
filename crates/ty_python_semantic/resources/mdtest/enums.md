@@ -441,6 +441,48 @@ reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 ```
 
+### `__new__` without `_value_` annotation
+
+When `__new__` is defined but no explicit `_value_` annotation exists, member RHS values are passed
+to `__new__`, but the method can assign `_value_` independently. In this case, `.value` falls back
+to `Any`:
+
+```py
+from enum import Enum
+
+class Connector(Enum):
+    def __new__(cls, value: str, connector_id: int) -> "Connector":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+    GITHUB = ("github", 1)
+
+reveal_type(Connector.GITHUB.value)  # revealed: Any
+reveal_type(Connector.GITHUB._value_)  # revealed: Any
+```
+
+An explicit `_value_` annotation still takes precedence:
+
+```py
+from enum import Enum
+
+class AnnotatedConnector(Enum):
+    _value_: str
+
+    def __new__(cls, value: str, connector_id: int = 0) -> "AnnotatedConnector":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+    GITHUB = "github"
+
+reveal_type(AnnotatedConnector.GITHUB.value)  # revealed: str
+reveal_type(AnnotatedConnector.GITHUB._value_)  # revealed: str
+```
+
 ### Inherited `_value_` annotation
 
 A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated
@@ -514,6 +556,108 @@ class Child(Parent):
     B = "bad"  # error: [invalid-assignment]
 
 reveal_type(Child.A.value)  # revealed: Any
+```
+
+### Inherited `__new__`
+
+A custom `__new__` on a parent enum is inherited by subclasses. Without an explicit `_value_`
+annotation, subclass member values remain dynamic:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: str, connector_id: int) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    GITHUB = ("github", 1)
+
+reveal_type(Child.GITHUB.value)  # revealed: Any
+reveal_type(Child.GITHUB._value_)  # revealed: Any
+```
+
+An explicit `_value_` annotation on the subclass still takes precedence:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: str, connector_id: int = 0) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    _value_: str
+
+    GITHUB = "github"
+
+reveal_type(Child.GITHUB.value)  # revealed: str
+reveal_type(Child.GITHUB._value_)  # revealed: str
+```
+
+Member values are still validated against the inherited `__new__` signature, even when `_value_` is
+explicitly annotated:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __new__(cls, value: int, connector_id: int = 0) -> "Base":
+        obj = object.__new__(cls)
+        obj._value_ = value
+        obj.connector_id = connector_id
+        return obj
+
+class Child(Base):
+    _value_: str
+
+    GITHUB = "github"  # error: [invalid-assignment]
+```
+
+### Custom enum metaclass member transformation
+
+A custom `EnumMeta` metaclass can rewrite member values before the stdlib enum constructor validates
+and forwards them to `__new__` / `__init__`. We therefore avoid validating the raw right-hand side
+of member declarations in this case:
+
+```py
+from enum import EnumMeta, IntEnum
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    pass
+
+class MyModelChoices(IntegerChoices):
+    GOOD = 1, "I like this"
+
+reveal_type(MyModelChoices.GOOD.value)  # revealed: Any
+```
+
+An explicit `_value_` annotation on the transformed enum class still takes precedence, even when the
+annotation is inherited from a user-defined enum base:
+
+```py
+from enum import EnumMeta, IntEnum
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    _value_: int
+
+class AnnotatedChoices(IntegerChoices):
+    GOOD = 1, "I like this"
+
+reveal_type(AnnotatedChoices.GOOD.value)  # revealed: int
+reveal_type(AnnotatedChoices.GOOD._value_)  # revealed: int
 ```
 
 ### Non-member attributes with disallowed type
@@ -883,6 +1027,7 @@ effect of using `auto()` will be for an arbitrary non-integer mixin, so for anyt
 
 ```python
 from enum import Enum, auto
+from typing import Any
 
 class A(str, Enum):
     X = auto()
@@ -896,7 +1041,7 @@ class B(bytes, Enum):
 
 reveal_type(B.X.value)  # revealed: Any
 
-class C(tuple, Enum):
+class C(tuple[Any, ...], Enum):
     X = auto()
     Y = auto()
 
@@ -947,6 +1092,230 @@ class WithInit(Enum):
     AUTO = auto()
 
 reveal_type(WithInit.MERCURY.value)  # revealed: Any
+```
+
+When `_generate_next_value_` is overridden, its return type is used for `auto()` value types, unless
+overridden by an explicit `_value_` annotation or a custom construction hook:
+
+```py
+from enum import StrEnum, IntEnum, auto
+from typing import Literal
+
+class CustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values): ...
+
+    A = auto()
+    B = auto()
+
+reveal_type(CustomNextValue.A.value)  # revealed: Unknown
+
+class CustomNextValueNonAuto(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[3]:
+        return 3
+
+    A = 1
+    B = 2
+
+reveal_type(CustomNextValueNonAuto.A.value)  # revealed: Literal[1]
+
+class CustomNextValueStr(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    A = auto()
+    B = auto()
+
+# Should not be `Literal['A']`
+# revealed: str
+reveal_type(CustomNextValueStr.A.value)
+
+class CustomNextValuePrecedence(Enum):
+    _value_: str
+
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["a"]:
+        return "a"
+
+    A = auto()
+    B = auto()
+
+# `_value_` annotation takes precedence over `_generate_next_value_`'s return type
+# revealed: str
+reveal_type(CustomNextValuePrecedence.A.value)
+
+def foo(a: CustomNextValuePrecedence):
+    # revealed: str
+    reveal_type(a.value)
+
+class CustomNextValueInt(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+    A = auto()
+    B = auto()
+
+# `IntEnum` inherits `_value_: int`, which takes precedence over `_generate_next_value_`
+# revealed: int
+reveal_type(CustomNextValueInt.A.value)
+```
+
+When an enum defines both `_generate_next_value_` and a construction hook (`__new__`, `__init__`, or
+a custom enum metaclass `__new__`), the hook can rewrite `_value_` to a different type than the
+value returned by `_generate_next_value_`. The hook-based `Any` fallback should therefore take
+precedence:
+
+```py
+from enum import Enum, EnumMeta, IntEnum, auto
+from ty_extensions import enum_members
+from typing import Literal
+
+class WithNewAndGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    def __new__(cls, value: str) -> "WithNewAndGenerateNextValue":
+        obj = object.__new__(cls)
+        obj._value_ = len(value)
+        return obj
+
+    A = auto()
+    B = auto()
+
+# `__new__` rewrites `_value_` to an `int`, so we can't trust `_generate_next_value_`'s return type
+reveal_type(WithNewAndGenerateNextValue.A.value)  # revealed: Any
+
+def _instance_new(a: WithNewAndGenerateNextValue):
+    reveal_type(a.value)  # revealed: Any
+
+class WithNewAndLiteralGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["x"]:
+        return "x"
+
+    def __new__(cls, value: str) -> "WithNewAndLiteralGenerateNextValue":
+        obj = object.__new__(cls)
+        obj._value_ = object()
+        return obj
+
+    A = auto()
+    B = auto()
+
+# `__new__` can rewrite duplicate generated values to distinct values, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(WithNewAndLiteralGenerateNextValue))
+reveal_type(WithNewAndLiteralGenerateNextValue.A)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.A]
+reveal_type(WithNewAndLiteralGenerateNextValue.B)  # revealed: Literal[WithNewAndLiteralGenerateNextValue.B]
+reveal_type(WithNewAndLiteralGenerateNextValue.A.value)  # revealed: Any
+reveal_type(WithNewAndLiteralGenerateNextValue.B.value)  # revealed: Any
+
+class WithInitAndGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    def __init__(self, value: str) -> None: ...
+
+    A = auto()
+    B = auto()
+
+reveal_type(WithInitAndGenerateNextValue.A.value)  # revealed: Any
+
+def _instance_init(a: WithInitAndGenerateNextValue):
+    reveal_type(a.value)  # revealed: Any
+
+class WithInitAndLiteralGenerateNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["x"]:
+        return "x"
+
+    def __init__(self, value: str) -> None: ...
+
+    A = auto()
+    B = auto()
+
+# `__init__` runs after duplicate generated values are resolved to aliases.
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(WithInitAndLiteralGenerateNextValue))
+
+class ChoicesType(EnumMeta):
+    def __new__(metacls, classname, bases, classdict, **kwds): ...
+
+class IntegerChoices(IntEnum, metaclass=ChoicesType):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+class MyModelChoices(IntegerChoices):
+    A = auto()
+    B = auto()
+
+# The metaclass `__new__` can rewrite member values before they reach `_value_`
+reveal_type(MyModelChoices.A.value)  # revealed: Any
+
+def _instance_metaclass(a: MyModelChoices):
+    reveal_type(a.value)  # revealed: Any
+
+class IntEnumDuplicateAutoAliases(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal[42]:
+        return 42
+
+    A = auto()
+    B = auto()
+
+# The stdlib `IntEnum.__new__` preserves duplicate generated values as aliases.
+# revealed: tuple[Literal["A"]]
+reveal_type(enum_members(IntEnumDuplicateAutoAliases))
+```
+
+For non-`auto()` members in a mixed enum, `_generate_next_value_` does not apply at all, and the
+inferred value type should be used (subject to the same hook-based `Any` fallback):
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+from typing import Literal
+
+class MixedAutoAndLiteral(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+    A = auto()
+    B = 99
+
+reveal_type(MixedAutoAndLiteral.A.value)  # revealed: str
+reveal_type(MixedAutoAndLiteral.B.value)  # revealed: Literal[99]
+
+def _mixed_instance(x: MixedAutoAndLiteral):
+    # Union of all member value types, not just `_generate_next_value_`'s return type
+    reveal_type(x.value)  # revealed: str | Literal[99]
+
+class InheritedCustomNextValue(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> str:
+        return ""
+
+class InheritedCustomNextValueChild(InheritedCustomNextValue):
+    A = auto()
+    B = 1
+    C = 1
+
+# `A` uses the inherited `_generate_next_value_`, so `B` is not an alias of `A`.
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(InheritedCustomNextValueChild))
+reveal_type(InheritedCustomNextValueChild.A.value)  # revealed: str
+reveal_type(InheritedCustomNextValueChild.B)  # revealed: Literal[InheritedCustomNextValueChild.B]
+reveal_type(InheritedCustomNextValueChild.B.value)  # revealed: Literal[1]
+reveal_type(InheritedCustomNextValueChild.C)  # revealed: Literal[InheritedCustomNextValueChild.B]
+
+def _inherited_mixed_instance(x: InheritedCustomNextValueChild):
+    reveal_type(x.value)  # revealed: str | Literal[1]
 ```
 
 ### `member` and `nonmember`
@@ -1142,6 +1511,10 @@ class Answer(Enum):
     YES = 1
     NO = 2
 
+    def through_self(self) -> None:
+        reveal_type(self.YES)  # revealed: Literal[Answer.YES]
+        reveal_type(self.NO)  # revealed: Literal[Answer.NO]
+
 reveal_type(Answer.YES.NO)  # revealed: Literal[Answer.NO]
 
 def _(answer: Answer) -> None:
@@ -1307,6 +1680,13 @@ class NoMembers(Enum): ...
 def _(answer: Answer, no_members: NoMembers):
     reveal_type(type(answer))  # revealed: <class 'Answer'>
     reveal_type(type(no_members))  # revealed: type[NoMembers]
+
+def narrowed_meta_type(answer: Answer):
+    if answer is Answer.YES:
+        return
+
+    reveal_type(type(answer))  # revealed: <class 'Answer'>
+    reveal_type(answer.__class__)  # revealed: <class 'Answer'>
 ```
 
 ### Cyclic references
@@ -2235,7 +2615,9 @@ def _(answer: Answer):
 
 ```py
 from enum import Enum
-from typing_extensions import assert_never
+from typing import Any, Protocol, TypeVar
+from typing_extensions import Literal, assert_never, assert_type, overload
+from ty_extensions import Intersection
 
 class Color(Enum):
     RED = 1
@@ -2260,6 +2642,124 @@ def color_name_without_assertion(color: Color) -> str:
         return "Green"
     elif color is Color.BLUE:
         return "Blue"
+
+def color_value_without_red(color: Color) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+def color_value_without_red_and_with_any(color: Intersection[Color, Any]) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color)  # revealed: Color & Any & ~Literal[Color.RED]
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+T = TypeVar("T")
+
+def color_value_without_red_and_with_typevar(
+    color: Intersection[Color, T],
+) -> Literal[2, 3]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2, 3]
+    return color.value
+
+class HasValue(Protocol):
+    @property
+    def value(self) -> Literal[2]: ...
+
+TWithRestrictedValue = TypeVar("TWithRestrictedValue", bound=HasValue)
+
+def color_value_without_red_and_with_restricted_typevar(
+    color: Intersection[Color, TWithRestrictedValue],
+) -> Literal[2]:
+    if color is Color.RED:
+        raise ValueError()
+    reveal_type(color.value)  # revealed: Literal[2]
+    return color.value
+
+def color_truthy_without_red(color: Color) -> int:
+    if color is Color.RED:
+        raise ValueError()
+    if color:
+        return 1
+
+def color_after_merge(color: Color) -> None:
+    if color is Color.RED:
+        merged = color
+    else:
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_different_complement_merge(color: Color, flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_grouped_literal_and_complement_merge(color: Color, flag: bool, other_flag: bool) -> None:
+    if flag:
+        if other_flag:
+            merged = Color.BLUE
+        else:
+            merged = Color.RED
+    else:
+        if color is Color.RED:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color
+    assert_type(merged, Color)
+
+def color_after_dynamic_complement_merge(color: Intersection[Color, Any], flag: bool) -> None:
+    if flag:
+        if color is Color.RED:
+            return
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Color & Any
+    assert_type(merged, Intersection[Color, Any])
+
+def color_after_shared_complement_merge(color: Color, flag: bool) -> None:
+    if color is Color.RED:
+        return
+    if flag:
+        merged = color
+    else:
+        if color is Color.GREEN:
+            return
+        merged = color
+    reveal_type(merged)  # revealed: Literal[Color.GREEN, Color.BLUE]
+    assert_type(merged, Literal[Color.GREEN, Color.BLUE])
+
+def color_compare_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color == Color.RED)  # revealed: Literal[False]
+    reveal_type(color != Color.RED)  # revealed: Literal[True]
+
+@overload
+def color_overload(color: Literal[Color.GREEN]) -> Literal["green"]: ...
+@overload
+def color_overload(color: Literal[Color.BLUE]) -> Literal["blue"]: ...
+def color_overload(color: Color) -> str:
+    return color.name.lower()
+
+def color_overload_without_red(color: Color) -> None:
+    if color is Color.RED:
+        return
+    reveal_type(color_overload(color))  # revealed: Literal["green", "blue"]
 
 def color_name_misses_one_variant(color: Color) -> str:
     if color is Color.RED:
@@ -2287,8 +2787,8 @@ python-version = "3.10"
 ```
 
 ```py
-from enum import Enum
-from typing_extensions import assert_never
+from enum import Enum, IntEnum
+from typing_extensions import Literal, assert_never
 
 class Color(Enum):
     RED = 1
@@ -2333,6 +2833,37 @@ def singleton_check(value: Singleton) -> str:
             return "Singleton value"
         case _:
             assert_never(value)
+
+class ThreadSubset(IntEnum):
+    WARP = 1
+    WARPGROUP = 2
+    BLOCK = 3
+
+def thread_subset_name(value: Literal[ThreadSubset.WARPGROUP, ThreadSubset.WARP]) -> str:
+    match value:
+        case ThreadSubset.WARPGROUP:
+            return "Warpgroup"
+        case ThreadSubset.WARP:
+            return "Warp"
+        case _:
+            assert_never(value)
+
+class CustomEq(Enum):
+    A = 1
+    B = 2
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def custom_eq_match(value: Literal[CustomEq.A, CustomEq.B]) -> str:
+    match value:
+        case CustomEq.A:
+            return "A"
+        case CustomEq.B:
+            return "B"
+        case _:
+            reveal_type(value)  # revealed: CustomEq
+            return "default"
 ```
 
 ## `if` statements (function syntax)

@@ -1,4 +1,4 @@
-use crate::config::Analysis;
+use crate::config::{Analysis, Rules};
 use camino::{Utf8Component, Utf8PathBuf};
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
@@ -28,14 +28,11 @@ pub(crate) struct Db {
     files: Files,
     system: MdtestSystem,
     vendored: VendoredFileSystem,
-    rule_selection: Arc<RuleSelection>,
     settings: Option<Settings>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
-        let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
-
         let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
@@ -45,7 +42,6 @@ impl Db {
             }))),
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
-            rule_selection: Arc::new(rule_selection),
             settings: None,
         };
 
@@ -114,6 +110,17 @@ impl Db {
         }
     }
 
+    pub(crate) fn update_mdtest_rule_selection(&mut self, rules: Option<&Rules>) {
+        let rule_selection = mdtest_rule_selection(rules);
+
+        let settings = self.settings();
+        if settings.rule_selection(self) != &rule_selection {
+            settings
+                .set_rule_selection(self)
+                .to(MdtestRuleSelection(rule_selection));
+        }
+    }
+
     pub(crate) fn use_os_system_with_temp_dir(&mut self, cwd: SystemPathBuf, temp_dir: TempDir) {
         self.system.with_os(cwd, temp_dir);
         Files::sync_all(self);
@@ -173,7 +180,7 @@ impl SemanticDb for Db {
     }
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
-        &self.rule_selection
+        self.settings().rule_selection(self)
     }
 
     fn lint_registry(&self) -> &LintRegistry {
@@ -209,7 +216,74 @@ struct Settings {
     #[returns(ref)]
     analysis: AnalysisSettings,
     #[default]
+    #[returns(deref)]
+    rule_selection: MdtestRuleSelection,
+    #[default]
     verbose: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct MdtestRuleSelection(RuleSelection);
+
+impl Default for MdtestRuleSelection {
+    fn default() -> Self {
+        Self(mdtest_rule_selection(None))
+    }
+}
+
+impl std::ops::Deref for MdtestRuleSelection {
+    type Target = RuleSelection;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
+    let registry = default_lint_registry();
+    let mut selection = RuleSelection::all(registry, Severity::Info);
+
+    // In general (as shown by the initialization of `selection` above), we enable even rules that
+    // are ignored by default in mdtests so that their behaviour is covered alongside the default
+    // rules.
+    //
+    // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+    // chosen to keep it opt-in to minimize churn in unrelated tests.
+    let missing_override_decorator = registry
+        .get("missing-override-decorator")
+        .expect("missing-override-decorator is a known lint rule");
+    selection.disable(missing_override_decorator);
+
+    if let Some(rules) = rules {
+        let set_lint_level =
+            |selection: &mut RuleSelection, lint, level| match Severity::try_from(level) {
+                Ok(severity) => {
+                    selection.enable(lint, severity, ty_python_semantic::lint::LintSource::File);
+                }
+                Err(()) => selection.disable(lint),
+            };
+
+        // If "all" key is present, use it's value as the default for all rules.
+        if let Some(level) = rules.get("all") {
+            for lint in registry.lints() {
+                set_lint_level(&mut selection, *lint, *level);
+            }
+        }
+
+        // Apply overrides for specific (non-"all") rules.
+        for (rule_name, level) in rules {
+            if rule_name == "all" {
+                continue;
+            }
+
+            let lint = registry
+                .get(rule_name)
+                .unwrap_or_else(|error| panic!("Unknown lint rule `{rule_name}`: {error}"));
+            set_lint_level(&mut selection, lint, *level);
+        }
+    }
+
+    selection
 }
 
 #[derive(Debug, Clone)]

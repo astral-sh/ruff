@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use js_sys::Error;
+use ruff_db::diagnostic;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -31,6 +32,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
+    subDiagnostics: SubDiagnostic[];
     start_location: {
         row: number;
         column: number;
@@ -54,15 +56,79 @@ export interface Diagnostic {
         }[];
     } | null;
 }
+
+export interface SubDiagnostic {
+    severity: SubDiagnosticSeverity;
+    message: string;
+    location: SubDiagnosticLocation | null;
+}
+
+export enum SubDiagnosticSeverity {
+    Help = "help",
+    Info = "info",
+    Warning = "warning",
+    Error = "error",
+    Fatal = "fatal",
+}
+
+export interface SubDiagnosticLocation {
+    path: string;
+    start_location: {
+        row: number;
+        column: number;
+    };
+    end_location: {
+        row: number;
+        column: number;
+    };
+}
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
+    #[serde(rename = "subDiagnostics")]
+    pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedSubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    pub message: String,
+    pub location: Option<ExpandedSubDiagnosticLocation>,
+}
+
+#[derive(Serialize, Deserialize, Copy, Clone, Eq, PartialEq, Debug)]
+#[serde(rename_all = "lowercase")]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedSubDiagnosticLocation {
+    pub path: String,
+    pub start_location: Location,
+    pub end_location: Location,
 }
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
@@ -274,9 +340,38 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
+                let sub_diagnostics = msg
+                    .sub_diagnostics()
+                    .iter()
+                    .map(|sub_diagnostic| {
+                        let location = sub_diagnostic.primary_span_ref().and_then(|span| {
+                            let source_file = span.as_ruff_file()?;
+                            let source_code = source_file.to_source_code();
+                            let range = span.range()?;
+
+                            Some(ExpandedSubDiagnosticLocation {
+                                path: source_file.name().to_string(),
+                                start_location: source_code
+                                    .source_location(range.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(range.end(), self.position_encoding)
+                                    .into(),
+                            })
+                        });
+
+                        ExpandedSubDiagnostic {
+                            severity: sub_diagnostic.severity().into(),
+                            message: sub_diagnostic.concise_message().to_string(),
+                            location,
+                        }
+                    })
+                    .collect();
+
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.concise_message().to_string(),
+                    sub_diagnostics,
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
                         .into(),

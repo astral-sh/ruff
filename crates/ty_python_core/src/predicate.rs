@@ -8,7 +8,7 @@
 //!   static reachability of a binding, and the reachability of a statement or expression.
 
 use ruff_db::files::File;
-use ruff_index::{Idx, IndexVec};
+use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
 use crate::db::Db;
@@ -51,7 +51,7 @@ impl Idx for ScopedPredicateId {
 }
 
 // A collection of predicates for a given scope.
-pub type Predicates<'db> = IndexVec<ScopedPredicateId, Predicate<'db>>;
+pub type Predicates<'db> = FrozenIndexVec<ScopedPredicateId, Predicate<'db>>;
 
 #[derive(Debug, Default)]
 pub(crate) struct PredicatesBuilder<'db> {
@@ -68,7 +68,7 @@ impl<'db> PredicatesBuilder<'db> {
 
     pub(crate) fn build(mut self) -> Predicates<'db> {
         self.predicates.shrink_to_fit();
-        self.predicates
+        self.predicates.into()
     }
 }
 
@@ -145,6 +145,45 @@ impl ClassPatternKind {
     }
 }
 
+/// Structural details for sequence patterns that affect narrowing and reachability.
+///
+/// `patterns` stores one predicate per syntactic element, with a starred element
+/// represented by [`PatternPredicateKind::MatchStar`]. `has_star` records
+/// whether the pattern accepts additional sequence elements.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct SequencePatternPredicateKind<'db> {
+    pub patterns: Box<[PatternPredicateKind<'db>]>,
+    pub has_star: bool,
+}
+
+impl<'db> SequencePatternPredicateKind<'db> {
+    /// Return `true` for `case [*rest]`, the only sequence pattern with no
+    /// length or element constraints.
+    pub fn is_irrefutable(&self) -> bool {
+        self.patterns.len() == 1 && self.has_star
+    }
+
+    pub const fn is_exact_length(&self) -> bool {
+        !self.has_star
+    }
+
+    /// Return the patterns before and after the starred element.
+    pub fn split_around_star(
+        &self,
+    ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
+        if !self.has_star {
+            return None;
+        }
+
+        let star_index = self
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, PatternPredicateKind::MatchStar))?;
+        let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
+        Some((prefix, &star_and_suffix[1..]))
+    }
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
@@ -153,9 +192,9 @@ pub enum PatternPredicateKind<'db> {
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
-    Sequence(ClassPatternKind),
+    Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
-    Unsupported,
+    MatchStar,
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]

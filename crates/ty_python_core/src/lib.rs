@@ -1,10 +1,14 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use ruff_python_ast as ast;
 use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_index::{IndexSlice, IndexVec};
+use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use ruff_text_size::TextRange;
@@ -14,6 +18,7 @@ use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 use ty_module_resolver::ModuleName;
 
+use crate::frozen::{FrozenMap, FrozenSet};
 use crate::place::ScopedPlaceId;
 pub use crate::statement::{Statement, StatementNodeKey};
 use ast_ids::AstIds;
@@ -29,7 +34,8 @@ use scope::{NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, Scope
 use symbol::ScopedSymbolId;
 pub use use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator, UseDefMap,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, NarrowingEvaluator,
+    ScopedDefinitionId, UseDefMap,
 };
 use use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId};
 
@@ -39,6 +45,7 @@ mod builder;
 mod db;
 pub mod definition;
 pub mod expression;
+pub mod frozen;
 pub(crate) mod member;
 pub mod narrowing_constraints;
 pub mod node_key;
@@ -254,20 +261,54 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
     NoLongerInEagerContext,
 }
 
+#[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
+struct DefinitionsByNode<'db> {
+    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
+    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+}
+
+impl<'db> DefinitionsByNode<'db> {
+    fn from_map(definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>) -> Self {
+        let mut single = FxHashMap::default();
+        let mut non_single = FxHashMap::default();
+        single.reserve(definitions_by_node.len());
+
+        for (key, definitions) in definitions_by_node {
+            if definitions.len() == 1 {
+                single.insert(key, definitions[0]);
+            } else {
+                non_single.insert(key, definitions.into_boxed_slice());
+            }
+        }
+
+        single.shrink_to_fit();
+        non_single.shrink_to_fit();
+
+        Self { single, non_single }
+    }
+
+    fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
+        self.single
+            .get(&key)
+            .map(std::slice::from_ref)
+            .or_else(|| self.non_single.get(&key).map(AsRef::as_ref))
+    }
+}
+
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
     /// List of all place tables in this file, indexed by scope.
-    place_tables: IndexVec<FileScopeId, Arc<PlaceTable>>,
+    place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
     /// List of all scopes in this file.
-    scopes: IndexVec<FileScopeId, Scope>,
+    scopes: FrozenIndexVec<FileScopeId, Scope>,
 
     /// Map expressions to their corresponding scope.
     scopes_by_expression: ExpressionsScopeMap,
 
     /// Map from a node creating a definition to its definition.
-    definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
+    definitions_by_node: DefinitionsByNode<'db>,
 
     /// Map from a standalone expression to its [`Expression`] ingredient.
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
@@ -279,39 +320,45 @@ pub struct SemanticIndex<'db> {
     scopes_by_node: FxHashMap<NodeWithScopeKey, FileScopeId>,
 
     /// Map from a lambda expression to its containing statement.
-    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
+    enclosing_lambda_statements: FrozenMap<ExpressionNodeKey, Statement<'db>>,
+
+    // Map from a constraining use of a collection literal to its definition.
+    collections_by_use: FrozenMap<ExpressionNodeKey, Definition<'db>>,
+
+    // Map from a collection literal definition to statements containing a constraining use.
+    uses_by_collection: FrozenMap<Definition<'db>, Box<[(Statement<'db>, ExpressionNodeKey)]>>,
 
     /// Map from the file-local [`FileScopeId`] to the salsa-ingredient [`ScopeId`].
-    scope_ids_by_scope: IndexVec<FileScopeId, ScopeId<'db>>,
+    scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: IndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
     /// Note: We should not depend on this map when analysing other files or
     /// changing a file invalidates all dependents.
-    ast_ids: IndexVec<FileScopeId, AstIds>,
+    ast_ids: AstIds,
 
     /// The set of modules that are imported anywhere within this file.
-    imported_modules: Arc<FxHashSet<ModuleName>>,
+    imported_modules: Arc<FrozenSet<ModuleName>>,
 
     /// Flags about the global scope (code usage impacting inference)
     has_future_annotations: bool,
 
     /// Map of all of the enclosing snapshots that appear in this file.
-    enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    enclosing_snapshots: FrozenMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
 
     /// List of all semantic syntax errors in this file.
     semantic_syntax_errors: Vec<SemanticSyntaxError>,
 
     /// Set of all generator functions in this file.
-    generator_functions: FxHashSet<FileScopeId>,
+    generator_functions: FrozenSet<FileScopeId>,
 
     /// Narrowing alias metadata for predicate leaf names.
     /// When a predicate references an alias variable (e.g., `is_none` from `is_none = x is None`),
     /// the alias Name node is mapped to its aliased expression for constraint-generation time.
-    narrowing_alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+    narrowing_alias_predicates: FrozenMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -352,13 +399,13 @@ impl<'db> SemanticIndex<'db> {
     /// This set only considers `import` statements, not `from...import` statements.
     /// See `ModuleLiteralType::available_submodule_attributes` for discussion
     /// of why this analysis is intentionally limited.
-    pub fn imported_modules(&self) -> &FxHashSet<ModuleName> {
-        &self.imported_modules
+    pub fn imported_modules(&self) -> impl Iterator<Item = &ModuleName> {
+        self.imported_modules.iter()
     }
 
     #[track_caller]
-    pub(crate) fn ast_ids(&self, scope_id: FileScopeId) -> &AstIds {
-        &self.ast_ids[scope_id]
+    pub(crate) fn ast_ids(&self) -> &AstIds {
+        &self.ast_ids
     }
 
     /// Returns the ID of the `expression`'s enclosing scope.
@@ -402,6 +449,46 @@ impl<'db> SemanticIndex<'db> {
 
     pub fn symbol_is_nonlocal_in_scope(&self, symbol: ScopedSymbolId, scope: FileScopeId) -> bool {
         self.place_table(scope).symbol(symbol).is_nonlocal()
+    }
+
+    /// Returns `true` if the given symbol in the given scope resolves to the global scope, either
+    /// because:
+    ///
+    /// 1. The given scope *is* the global scope.
+    /// 2. The symbol is explicitly declared `global` in the given scope.
+    /// 3. The symbol is a free variable in the given scope, and no enclosing function scope
+    ///    defines it.
+    ///
+    /// The third case requires walking ancestor scopes until we encounter either a binding or a
+    /// `nonlocal` declaration (those aren't allowed to resolve to the global scope, so we don't
+    /// need to chase them).
+    pub fn symbol_resolves_to_global_scope(
+        &self,
+        symbol: ScopedSymbolId,
+        scope: FileScopeId,
+    ) -> bool {
+        let symbol = self.place_table(scope).symbol(symbol);
+        let name = symbol.name();
+        // Note that `visible_ancestor_scopes` includes the starting scope itself.
+        for (visible_scope_id, _) in self.visible_ancestor_scopes(scope) {
+            if visible_scope_id.is_global() {
+                // We return `true` here even if the global variable isn't actually defined. That
+                // case will be probably a diagnostic elsewhere.
+                return true;
+            }
+            let place_table = self.place_table(visible_scope_id);
+            let Some(visible_symbol_id) = place_table.symbol_id(name) else {
+                continue;
+            };
+            let visible_symbol = place_table.symbol(visible_symbol_id);
+            if visible_symbol.is_global() {
+                return true;
+            }
+            if visible_symbol.is_local() || visible_symbol.is_nonlocal() {
+                return false;
+            }
+        }
+        unreachable!("should return true at the global scope above");
     }
 
     /// Returns the id of the parent scope.
@@ -453,6 +540,26 @@ impl<'db> SemanticIndex<'db> {
         self.enclosing_lambda_statements.get(&lambda).copied()
     }
 
+    /// If this is a potentially constraining use of an unconstrained collection literal, returns
+    /// its definition.
+    pub fn unconstrained_collection_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        self.collections_by_use.get(&collection_use.into()).copied()
+    }
+
+    /// Returns all potentially constraining uses of the given unnannotated collection literal.
+    pub fn constraining_collection_uses(
+        &self,
+        collection_def: Definition<'db>,
+    ) -> impl Iterator<Item = (Statement<'db>, ExpressionNodeKey)> {
+        self.uses_by_collection
+            .get(&collection_def)
+            .into_iter()
+            .flat_map(|uses| uses.iter().copied())
+    }
+
     pub fn is_in_type_checking_block(&self, scope_id: FileScopeId, range: TextRange) -> bool {
         self.ancestor_scopes(scope_id).any(|(scope_id, _)| {
             self.use_def_map(scope_id)
@@ -496,10 +603,21 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_key`.
     ///
     /// There will only ever be >1 `Definition` associated with a `definition_key`
-    /// if the definition is created by a wildcard (`*`) import.
+    /// if the definitions are created by a wildcard (`*`) import.
     #[track_caller]
-    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &Definitions<'db> {
-        &self.definitions_by_node[&definition_key.into()]
+    pub fn definitions(&self, definition_key: impl Into<DefinitionNodeKey>) -> &[Definition<'db>] {
+        self.definitions_by_node
+            .get(definition_key.into())
+            .expect("definition should be present in the semantic index")
+    }
+
+    /// Returns the [`definition::Definition`] salsa ingredient(s) for `definition_node`, if any.
+    pub fn try_definitions(
+        &self,
+        definition_node: ast::AnyNodeRef<'_>,
+    ) -> Option<&[Definition<'db>]> {
+        let definition_key = DefinitionNodeKey::from_node_ref(definition_node);
+        self.definitions_by_node.get(definition_key)
     }
 
     /// Returns the [`definition::Definition`] salsa ingredient for `definition_key`.
@@ -510,9 +628,9 @@ impl<'db> SemanticIndex<'db> {
     /// the `debug_assertions` feature is enabled, this method will panic.
     ///
     /// It is generally safe to use this method for any AST node that does not
-    /// correspond to a `*` (wildcard) import, since `*` imports are the only
-    /// situations that can result in multiple definitions being associated with a
-    /// single AST node.
+    /// correspond to a `*` (wildcard) import, since those are the only situations
+    /// that can result in multiple definitions being associated with a single AST
+    /// node.
     #[track_caller]
     pub fn expect_single_definition(
         &self,
@@ -526,6 +644,16 @@ impl<'db> SemanticIndex<'db> {
             definitions.len()
         );
         definitions[0]
+    }
+
+    pub fn try_definition(
+        &self,
+        definition_key: impl Into<DefinitionNodeKey>,
+    ) -> Option<Definition<'db>> {
+        self.definitions_by_node
+            .single
+            .get(&definition_key.into())
+            .copied()
     }
 
     /// Returns the [`Expression`] ingredient for an expression node.
@@ -1401,8 +1529,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
             .elt
             .as_name_expr()
             .unwrap();
-        let element_use_id =
-            element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
+        let element_use_id = element.scoped_use_id(&db, file);
 
         let binding = use_def.first_binding_at_use(element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
@@ -1672,7 +1799,7 @@ class C[T]:
         let ast::Expr::Name(x_use_expr_name) = x_use_expr.as_ref() else {
             panic!("expected a Name");
         };
-        let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
+        let x_use_id = x_use_expr_name.scoped_use_id(&db, file);
         let use_def = use_def_map(&db, scope);
         let binding = use_def.first_binding_at_use(x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {

@@ -23,14 +23,21 @@ fn execute_command(
 fn debug_command() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
+    let ty_toml = SystemPath::new("ty.toml");
     let foo_content = "\
 def foo() -> str:
 return 42
+";
+    let ty_toml_content = "\
+[environment]
+python-version = \"3.10\"
+python-platform = \"linux\"
 ";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
+        .with_file(ty_toml, ty_toml_content)?
         .enable_pull_diagnostics(false)
         .build()
         .wait_until_workspaces_are_initialized();
@@ -42,15 +49,15 @@ return 42
         .as_str()
         .expect("debug command to return a string response");
 
-    insta::with_settings!({
-        filters => vec![
-            (r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]"),
-            (r"Workspace .+\)", "Workspace XXX"),
-            (r"Project at .+", "Project at XXX"),
-            (r"rules: \{(.|\n)+?\}\,", "rules: <RULES>,"),
-    ]}, {
-        insta::assert_snapshot!(response);
-    });
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]");
+    settings.add_filter(r"Workspace .+\)", "Workspace XXX");
+    settings.add_filter(r"Project at .+", "Project at XXX");
+    settings.add_filter(r"(?m)^(\s+).*/site-packages,$", "$1<site-packages>,");
+    settings.add_filter(r"rules: \{(.|\n)+?\}\,", "rules: <RULES>,");
+    let _settings = settings.bind_to_scope();
+
+    insta::assert_snapshot!(response);
 
     Ok(())
 }

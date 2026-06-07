@@ -35,7 +35,7 @@ class I3: ...
 class I5: ...
 class HeterogeneousSubclass0(tuple[()]): ...
 
-# revealed: Overload[(self, index: SupportsIndex, /) -> Never, (self, index: slice[Any, Any, Any], /) -> tuple[()]]
+# revealed: Overload[(self, index: SupportsIndex, /) -> Never, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[()]]
 reveal_type(HeterogeneousSubclass0.__getitem__)
 
 def f0(h0: HeterogeneousSubclass0, i: int):
@@ -50,7 +50,7 @@ def f0(h0: HeterogeneousSubclass0, i: int):
 
 class HeterogeneousSubclass1(tuple[I0]): ...
 
-# revealed: Overload[(self, index: SupportsIndex, /) -> I0, (self, index: slice[Any, Any, Any], /) -> tuple[I0, ...]]
+# revealed: Overload[(self, index: SupportsIndex, /) -> I0, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[I0, ...]]
 reveal_type(HeterogeneousSubclass1.__getitem__)
 
 def f0(h1: HeterogeneousSubclass1, i: int):
@@ -64,7 +64,7 @@ def f0(h1: HeterogeneousSubclass1, i: int):
 # to illustrate that the `__getitem__` overloads for these two indices are combined
 class HeterogeneousSubclass4(tuple[I0, I1, I0, I3]): ...
 
-# revealed: Overload[(self, index: Literal[-4, -2, 0, 2], /) -> I0, (self, index: Literal[-3, 1], /) -> I1, (self, index: Literal[-1, 3], /) -> I3, (self, index: SupportsIndex, /) -> I0 | I1 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I3, ...]]
+# revealed: Overload[(self, index: Literal[-4, -2, 0, 2], /) -> I0, (self, index: Literal[-3, 1], /) -> I1, (self, index: Literal[-1, 3], /) -> I3, (self, index: SupportsIndex, /) -> I0 | I1 | I3, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[I0 | I1 | I3, ...]]
 reveal_type(HeterogeneousSubclass4.__getitem__)
 
 def f(h4: HeterogeneousSubclass4, i: int):
@@ -80,7 +80,7 @@ def f(h4: HeterogeneousSubclass4, i: int):
 
 class MixedSubclass(tuple[I0, *tuple[I1, ...], I2, I3, I2, I5]): ...
 
-# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-3], /) -> I3, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-5], /) -> I1 | I0, (self, index: Literal[-1], /) -> I5, (self, index: Literal[1], /) -> I1 | I2, (self, index: Literal[-4, -2], /) -> I2, (self, index: Literal[2, 3], /) -> I1 | I2 | I3, (self, index: Literal[-3], /) -> I3, (self, index: Literal[4], /) -> I1 | I2 | I3 | I5, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3 | I5, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[I0 | I1 | I2 | I3 | I5, ...]]
 reveal_type(MixedSubclass.__getitem__)
 
 def g(m: MixedSubclass, i: int):
@@ -104,7 +104,7 @@ def g(m: MixedSubclass, i: int):
 
 class MixedSubclass2(tuple[I0, I1, *tuple[I2, ...], I3]): ...
 
-# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: Literal[-1], /) -> I3, (self, index: Literal[2], /) -> I2 | I3, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[Any, Any, Any], /) -> tuple[I0 | I1 | I2 | I3, ...]]
+# revealed: Overload[(self, index: Literal[0], /) -> I0, (self, index: Literal[-2], /) -> I2 | I1, (self, index: Literal[1], /) -> I1, (self, index: Literal[-3], /) -> I2 | I1 | I0, (self, index: Literal[-1], /) -> I3, (self, index: Literal[2], /) -> I2 | I3, (self, index: SupportsIndex, /) -> I0 | I1 | I2 | I3, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[I0 | I1 | I2 | I3, ...]]
 reveal_type(MixedSubclass2.__getitem__)
 
 def g(m: MixedSubclass2, i: int):
@@ -139,7 +139,7 @@ reveal_mro(os.stat_result)
 # gives the right result for those elements in the tuple, and we aim to synthesize
 # the minimum number of overloads for any given tuple
 #
-# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[Any, Any, Any], /) -> tuple[int | float, ...]]
+# revealed: Overload[(self, index: Literal[-10, -9, -8, -7, -6, -5, -4, 0, 1, 2, 3, 4, 5, 6], /) -> int, (self, index: SupportsIndex, /) -> int | float, (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | float, ...]]
 reveal_type(os.stat_result.__getitem__)
 ```
 
@@ -148,7 +148,7 @@ But perhaps the most commonly used tuple subclass instance is the singleton `sys
 ```py
 import sys
 
-# revealed: Overload[(self, index: Literal[-5, 0], /) -> Literal[3], (self, index: Literal[-4, 1], /) -> Literal[11], (self, index: Literal[-3, -1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[Any, Any, Any], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
+# revealed: Overload[(self, index: Literal[-5, -4, -3, -1, 0, 1, 2, 4], /) -> int, (self, index: Literal[-2, 3], /) -> Literal["alpha", "beta", "candidate", "final"], (self, index: SupportsIndex, /) -> int | Literal["alpha", "beta", "candidate", "final"], (self, index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | Literal["alpha", "beta", "candidate", "final"], ...]]
 reveal_type(type(sys.version_info).__getitem__)
 ```
 
@@ -220,6 +220,9 @@ def _(m: int, n: int):
 
     tuple_slice = t[m:n]
     reveal_type(tuple_slice)  # revealed: tuple[Literal[1, "a", b"b"] | None, ...]
+
+def invalid_slice_bound(t: tuple[int, ...], start: float) -> tuple[int, ...]:
+    return t[start:]  # error: [invalid-argument-type]
 
 class I0: ...
 class I1: ...
@@ -317,7 +320,7 @@ For tuple instances, we can track more detailed information about the length and
 the tuple. This information carries over to the generic alias that the tuple is an instance of.
 
 ```py
-def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:
+def _(a: tuple, b: tuple[int], c: tuple[int, str], d: tuple[int, ...]) -> None:  # error: [missing-type-argument]
     reveal_type(a)  # revealed: tuple[Unknown, ...]
     reveal_type(b)  # revealed: tuple[int]
     reveal_type(c)  # revealed: tuple[int, str]
@@ -332,7 +335,13 @@ reveal_type(tuple[int, ...])  # revealed: <class 'tuple[int, ...]'>
 ```py
 from typing import Any
 
-def _(a: type[tuple], b: type[tuple[int]], c: type[tuple[int, ...]], d: type[tuple[Any, ...]]) -> None:
+def _(
+    # error: [missing-type-argument]
+    a: type[tuple],
+    b: type[tuple[int]],
+    c: type[tuple[int, ...]],
+    d: type[tuple[Any, ...]],
+) -> None:
     reveal_type(a)  # revealed: type[tuple[Unknown, ...]]
     reveal_type(b)  # revealed: type[tuple[int]]
     reveal_type(c)  # revealed: type[tuple[int, ...]]
@@ -354,7 +363,7 @@ class A(tuple[int, str]): ...
 # revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
-class C(tuple): ...
+class C(tuple): ...  # error: [missing-type-argument]
 
 # revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)

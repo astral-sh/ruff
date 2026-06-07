@@ -23,6 +23,7 @@ use crate::{
                 validate_paramspec_components,
             },
             function_known_decorators, infer_statement_types, nearest_enclosing_function,
+            original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -414,13 +415,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators,
             deprecated,
             dataclass_transformer_params,
+            function.returns.is_some(),
         );
         let function_literal = FunctionLiteral {
             last_definition: overload_literal,
         };
 
-        let mut inferred_ty =
-            Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -990,10 +991,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let class_definition = self.index.expect_single_definition(class);
-        let class_literal = infer_definition_types(db, class_definition)
-            .declaration_type(class_definition)
-            .inner_type()
-            .as_class_literal()?;
+        let class_literal = original_class_type(db, class_definition)?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod || function_name == "__new__" {
@@ -1085,7 +1083,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in the lambda body scope.
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter_with_default: &'ast ast::ParameterWithDefault,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1115,7 +1113,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter: &'ast ast::Parameter,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1151,7 +1149,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// lambda expression, based on a `Callable` type annotation, if present.
     fn annotated_lambda_parameter_type(
         &mut self,
-        index: usize,
+        index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
@@ -1164,7 +1162,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index].annotated_type();
+        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown() || parameter_type.has_unspecialized_type_var(self.db()) {
             None
         } else {

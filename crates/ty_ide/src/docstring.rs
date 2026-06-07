@@ -6,11 +6,14 @@
 //! There are no formal specifications for any of these formats, so the parsing
 //! logic needs to be tolerant of variations.
 
+mod markdown;
+mod rest;
+
+use indexmap::IndexMap;
 use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::sync::LazyLock;
 
 use crate::MarkupKind;
@@ -32,11 +35,6 @@ static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
 
 static NUMPY_UNDERLINE_REGEX: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"^\s*-+\s*$").expect("NumPy underline regex should be valid"));
-
-static REST_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*:param\s+(?:(\w+)\s+)?(\w+)\s*:\s*(.+)")
-        .expect("reST parameter regex should be valid")
-});
 
 /// A docstring which hasn't yet been interpreted or rendered
 ///
@@ -71,8 +69,8 @@ impl Docstring {
 
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
-    pub fn parameter_documentation(&self) -> HashMap<String, String> {
-        let mut param_docs = HashMap::new();
+    pub fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut param_docs = IndexMap::new();
 
         // Google-style docstrings
         param_docs.extend(extract_google_style_params(&self.0));
@@ -202,10 +200,11 @@ fn render_markdown(docstring: &str) -> String {
     let mut in_literal = false;
     let mut in_any_code = false;
     let mut temp_owned_line;
-    for untrimmed_line in docstring.lines() {
+    for line in docstring.lines() {
         // We can assume leading whitespace has been normalized
-        let mut line = untrimmed_line.trim_start_matches(' ');
-        let line_indent = untrimmed_line.len() - line.len();
+        let trimmed_source_line = line.trim_start_matches(' ');
+        let mut rendered_line = trimmed_source_line;
+        let line_indent = line.len() - trimmed_source_line.len();
 
         // First thing's first, add a newline to start the new line
         if !first_line {
@@ -224,7 +223,7 @@ fn render_markdown(docstring: &str) -> String {
         // If we're in a literal block and we find a non-empty dedented line, end the block
         // TODO: we should remove all the trailing blank lines
         // (Just pop all trailing `\n` from `output`?)
-        if in_literal && line_indent < block_indent && !line.is_empty() {
+        if in_literal && line_indent < block_indent && !rendered_line.is_empty() {
             in_literal = false;
             in_any_code = false;
             block_indent = 0;
@@ -235,7 +234,7 @@ fn render_markdown(docstring: &str) -> String {
         // We previously entered a literal block and we just found our first non-blank line
         // So now we're actually in the literal block
         if let Some(literal) = starting_literal
-            && !line.is_empty()
+            && !rendered_line.is_empty()
         {
             starting_literal = None;
             in_literal = true;
@@ -248,7 +247,7 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
-        if !in_any_code && line.starts_with(">>>") {
+        if !in_any_code && rendered_line.starts_with(">>>") {
             block_indent = line_indent;
             in_doctest = true;
             in_any_code = true;
@@ -258,60 +257,47 @@ fn render_markdown(docstring: &str) -> String {
         }
 
         // If we're not in a codeblock and we see a markdown codefence, start one
-        let has_tick_fence = line.starts_with("```");
-        let has_tilde_fence = line.starts_with("~~~");
-        if !in_any_code && (has_tick_fence || has_tilde_fence) {
-            let without_leading_fence = if has_tick_fence {
-                line.trim_start_matches('`')
-            } else {
-                line.trim_start_matches('~')
-            };
-            let fence_len = line.len() - without_leading_fence.len();
-            let fence = &line[..fence_len];
-            // If we don't see this amount of ticks again on the line, assume we're opening a markdown block
-            // (We *don't* want to consider ```hello``` as a codefence, that's inline code!)
-            if !without_leading_fence.contains(fence) {
-                // Unlike other blocks we don't need to emit fences because it's already markdown
-                block_indent = line_indent;
-                in_any_code = true;
-                in_markdown_with_fence = Some(fence.to_owned());
-                // Render the line verbatim without its indent and move on.
-                //
-                // If there's any indent this is really just Bad Syntax but it "makes sense"
-                // to someone writing docs like this:
-                //
-                // Returns:
-                //     Some details...
-                //     ```
-                //     some_example()
-                //     ```
-                //     etc etc...
-                //
-                // We "make this work" by stripping the indent on the fences but preserving the
-                // full indent of the lines between the fences
-                output.push_str(line);
-                continue;
-            }
+        if !in_any_code && let Some(fence) = markdown::MarkdownFence::find(trimmed_source_line) {
+            // Unlike other blocks we don't need to emit fences because it's already markdown
+            block_indent = line_indent;
+            in_any_code = true;
+            in_markdown_with_fence = Some(fence);
+            // Render the line verbatim without its indent and move on.
+            //
+            // If there's any indent this is really just Bad Syntax but it "makes sense"
+            // to someone writing docs like this:
+            //
+            // Returns:
+            //     Some details...
+            //     ```
+            //     some_example()
+            //     ```
+            //     etc etc...
+            //
+            // We "make this work" by stripping the indent on the fences but preserving the
+            // full indent of the lines between the fences
+            output.push_str(rendered_line);
+            continue;
         // If we're in a markdown code fence and this line seems to terminate it, end the block
-        } else if let Some(fence) = &in_markdown_with_fence
-            && line.starts_with(fence)
+        } else if let Some(fence) = in_markdown_with_fence
+            && fence.is_closed_by(rendered_line)
         {
             in_any_code = false;
             block_indent = 0;
             in_markdown_with_fence = None;
             // Render the line without its indent and move on.
-            output.push_str(line);
+            output.push_str(rendered_line);
             continue;
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
-        let parsed_lit = line
+        let parsed_lit = rendered_line
             // first check for a line ending with `::`
             .strip_suffix("::")
             .map(|prefix| (prefix, None))
             // if that fails, look for a line ending with `:: lang`
             .or_else(|| {
-                let (prefix, lang) = line.rsplit_once(' ')?;
+                let (prefix, lang) = rendered_line.rsplit_once(' ')?;
                 let prefix = prefix.trim_end().strip_suffix("::")?;
                 Some((prefix, Some(lang)))
             });
@@ -337,9 +323,9 @@ fn render_markdown(docstring: &str) -> String {
             };
 
             if include_colon {
-                line = line.strip_suffix(":").unwrap();
+                rendered_line = rendered_line.strip_suffix(":").unwrap();
             } else {
-                line = without_directive.trim_end();
+                rendered_line = without_directive.trim_end();
             }
 
             starting_literal = match directive {
@@ -382,7 +368,7 @@ fn render_markdown(docstring: &str) -> String {
                     // This is probably gibberish/invalid syntax? But it's a no-op in normal cases.
                     temp_owned_line = format!("**{without_directive}{pretty_directive}{suffix}:**");
 
-                    line = temp_owned_line.as_str();
+                    rendered_line = temp_owned_line.as_str();
                     None
                 }
                 // Things that just mean "it's code"
@@ -417,16 +403,22 @@ fn render_markdown(docstring: &str) -> String {
             // except we need to find and parse it anyway to do this escaping properly! :(
             // For now we assume `inline code` does not span a line (I'm not even sure if can).
             //
-            // Things that need to be escaped: underscores
+            // Things that need to be escaped: underscores and HTML-sensitive characters.
             //
             // e.g. we want __init__ => \_\_init\_\_ but `__init__` => `__init__`
-            let escape = |input: &str| input.replace('_', "\\_");
+            let escape = |input: &str| {
+                input
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;")
+                    .replace('>', "&gt;")
+                    .replace('_', "\\_")
+            };
 
             let mut in_inline_code = false;
             let mut first_chunk = true;
             let mut opening_tick_count = 0;
             let mut current_tick_count = 0;
-            for chunk in line.split('`') {
+            for chunk in rendered_line.split('`') {
                 // First chunk is definitionally not in inline-code and so always plaintext
                 if first_chunk {
                     first_chunk = false;
@@ -476,7 +468,7 @@ fn render_markdown(docstring: &str) -> String {
             }
             // NOTE: explicitly not "flushing" the ticks here.
             // We respect however the user closed their inline code.
-        } else if line.is_empty() {
+        } else if rendered_line.is_empty() {
             if in_doctest {
                 // This is the end of a doctest
                 block_indent = 0;
@@ -486,14 +478,14 @@ fn render_markdown(docstring: &str) -> String {
             }
         } else {
             // Print the line verbatim, it's in code
-            output.push_str(line);
+            output.push_str(rendered_line);
         }
     }
     // Flush codeblock
     if in_any_code {
         output.push('\n');
-        if let Some(fence) = &in_markdown_with_fence {
-            output.push_str(fence);
+        if let Some(fence) = in_markdown_with_fence {
+            output.push_str(fence.marker());
         } else {
             output.push_str(FENCE);
         }
@@ -503,8 +495,8 @@ fn render_markdown(docstring: &str) -> String {
 }
 
 /// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_google_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut in_args_section = false;
     let mut current_param: Option<String> = None;
@@ -596,8 +588,8 @@ fn get_indentation_level(line: &str) -> usize {
 }
 
 /// Extract parameter documentation from NumPy-style docstrings.
-fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_numpy_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
     let mut lines = docstring
         .universal_newlines()
@@ -763,71 +755,11 @@ fn extract_numpy_style_params(docstring: &str) -> HashMap<String, String> {
 }
 
 /// Extract parameter documentation from reST/Sphinx-style docstrings.
-fn extract_rest_style_params(docstring: &str) -> HashMap<String, String> {
-    let mut param_docs = HashMap::new();
+fn extract_rest_style_params(docstring: &str) -> IndexMap<String, String> {
+    let mut param_docs = IndexMap::new();
 
-    let mut current_param: Option<String> = None;
-    let mut current_doc = String::new();
-
-    for line_obj in docstring.universal_newlines() {
-        let line = line_obj.as_str();
-        if let Some(captures) = REST_PARAM_REGEX.captures(line) {
-            // Save previous parameter if exists
-            if let Some(param_name) = current_param.take() {
-                param_docs.insert(param_name, current_doc.trim().to_string());
-                current_doc.clear();
-            }
-
-            // Extract parameter name and description
-            if let (Some(param_match), Some(desc_match)) = (captures.get(2), captures.get(3)) {
-                current_param = Some(param_match.as_str().to_string());
-                current_doc = desc_match.as_str().to_string();
-            }
-        } else if current_param.is_some() {
-            let trimmed = line.trim();
-
-            // Check if this is a new section - stop processing if we hit section headers
-            if trimmed == "Parameters" || trimmed == "Args" || trimmed == "Arguments" {
-                // Save current param and stop processing
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                break;
-            }
-
-            // Check if this is another directive line starting with ':'
-            if trimmed.starts_with(':') {
-                // This is a new directive, save current param
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                // Let the next iteration handle this directive
-                continue;
-            }
-
-            // Check if this is a continuation line (indented)
-            if line.starts_with("    ") && !trimmed.is_empty() {
-                // This is a continuation line
-                if !current_doc.is_empty() {
-                    current_doc.push('\n');
-                }
-                current_doc.push_str(trimmed);
-            } else if !trimmed.is_empty() && !line.starts_with(' ') && !line.starts_with('\t') {
-                // This is a non-indented line - likely end of the current parameter
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                break;
-            }
-        }
-    }
-
-    // Don't forget the last parameter
-    if let Some(param_name) = current_param {
-        param_docs.insert(param_name, current_doc.trim().to_string());
+    for parameter in rest::Docstring::parse(docstring).parameter_documentation() {
+        param_docs.insert(parameter.name.into_string(), parameter.description);
     }
 
     param_docs
@@ -898,6 +830,38 @@ mod tests {
         Here ```_is_`````__a__``\_random\_````_mess__````<HB>
         ```_is_`````__a__``\_random\_````_mess__````
         ");
+    }
+
+    #[test]
+    fn html_escape() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        Parse a URL into 6 components:
+        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+
+        Markdown code fences keep literal HTML:
+
+        ```text
+        <tag attr="value">content</tag>
+        ```
+
+        So does `inline <code>`.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        Parse a URL into 6 components:<HB>
+        &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;;&lt;params&gt;?&lt;query&gt;#&lt;fragment&gt;<HB>
+        <HB>
+        Markdown code fences keep literal HTML:<HB>
+        <HB>
+        ```text
+        <tag attr="value">content</tag>
+        ```<HB>
+        <HB>
+        So does `inline <code>`.
+        "#);
     }
 
     // A literal block where the `::` is flush with the paragraph

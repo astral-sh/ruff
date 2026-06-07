@@ -2832,7 +2832,7 @@
       "type": "object",
       "properties": {
         "convention": {
-          "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)\ndefaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in\nthe specified convention. As such, the intended workflow is to enable a\nconvention and then selectively enable or disable any additional rules\non top of it.\n\nFor example, to use Google-style conventions but avoid requiring\ndocumentation for every function parameter:\n\n```toml\n[tool.ruff.lint]\n# Enable all `pydocstyle` rules, limiting to those that adhere to the\n# Google convention via `convention = \"google\"`, below.\nselect = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires\n# documentation for every function parameter.\nignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```\n\nTo enable an additional rule that's excluded from the convention,\nselect the desired rule via its fully qualified rule code (e.g.,\n`D400` instead of `D4` or `D40`):\n\n```toml\n[tool.ruff.lint]\n# Enable D400 on top of the Google convention.\nextend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```",
+          "description": "Whether to use Google-style, NumPy-style conventions, or the [PEP 257](https://peps.python.org/pep-0257/)\ndefaults when analyzing docstring sections.\n\nEnabling a convention will disable all rules that are not included in\nthe specified convention. As such, the intended workflow is to enable a\nconvention and then selectively enable or disable any additional rules\non top of it.\n\nFor example, to use Google-style conventions but avoid requiring\ndocumentation for every function parameter:\n\n```toml\n[tool.ruff.lint]\n# Enable all `pydocstyle` rules, limiting to those that adhere to the\n# Google convention via `convention = \"google\"`, below.\nselect = [\"D\"]\n\n# On top of the Google convention, disable `D417`, which requires\n# documentation for every function parameter.\nignore = [\"D417\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```\n\nThe PEP 257 convention includes all `D` errors apart from:\n[`D203`](rules/incorrect-blank-line-before-class.md),\n[`D212`](rules/multi-line-summary-first-line.md),\n[`D213`](rules/multi-line-summary-second-line.md),\n[`D214`](rules/overindented-section.md),\n[`D215`](rules/overindented-section-underline.md),\n[`D404`](rules/docstring-starts-with-this.md),\n[`D405`](rules/non-capitalized-section-name.md),\n[`D406`](rules/missing-new-line-after-section-name.md),\n[`D407`](rules/missing-dashed-underline-after-section.md),\n[`D408`](rules/missing-section-underline-after-name.md),\n[`D409`](rules/mismatched-section-underline-length.md),\n[`D410`](rules/no-blank-line-after-section.md),\n[`D411`](rules/no-blank-line-before-section.md),\n[`D413`](rules/missing-blank-line-after-last-section.md),\n[`D415`](rules/missing-terminal-punctuation.md),\n[`D416`](rules/missing-section-name-colon.md),\n[`D417`](rules/undocumented-param.md), and\n[`D420`](rules/incorrect-section-order.md).\n\nThe NumPy convention includes all `D` errors apart from:\n[`D107`](rules/undocumented-public-init.md),\n[`D203`](rules/incorrect-blank-line-before-class.md),\n[`D212`](rules/multi-line-summary-first-line.md),\n[`D213`](rules/multi-line-summary-second-line.md),\n[`D402`](rules/signature-in-docstring.md),\n[`D413`](rules/missing-blank-line-after-last-section.md),\n[`D415`](rules/missing-terminal-punctuation.md),\n[`D416`](rules/missing-section-name-colon.md), and\n[`D417`](rules/undocumented-param.md).\n\nThe Google convention includes all `D` errors apart from:\n[`D203`](rules/incorrect-blank-line-before-class.md),\n[`D204`](rules/incorrect-blank-line-after-class.md),\n[`D213`](rules/multi-line-summary-second-line.md),\n[`D215`](rules/overindented-section-underline.md),\n[`D400`](rules/missing-trailing-period.md),\n[`D401`](rules/non-imperative-mood.md),\n[`D404`](rules/docstring-starts-with-this.md),\n[`D406`](rules/missing-new-line-after-section-name.md),\n[`D407`](rules/missing-dashed-underline-after-section.md),\n[`D408`](rules/missing-section-underline-after-name.md),\n[`D409`](rules/mismatched-section-underline-length.md), and\n[`D413`](rules/missing-blank-line-after-last-section.md).\n\nFor more information see the [FAQ](faq.md#does-ruff-support-numpy-or-google-style-docstrings) entry.\n\nTo enable an additional rule that's excluded from the convention,\nselect the desired rule via its fully qualified rule code (e.g.,\n`D400` instead of `D4` or `D40`):\n\n```toml\n[tool.ruff.lint]\n# Enable D400 on top of the Google convention.\nextend-select = [\"D400\"]\n\n[tool.ruff.lint.pydocstyle]\nconvention = \"google\"\n```",
           "anyOf": [
             {
               "$ref": "#/definitions/Convention"
@@ -3004,6 +3004,15 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "max-statements-in-try": {
+          "description": "Maximum number of statements allowed for a try clause body (see `W0717`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0
         }
       },
       "additionalProperties": false
@@ -3126,6 +3135,7 @@
         "AIR2",
         "AIR20",
         "AIR201",
+        "AIR202",
         "AIR3",
         "AIR30",
         "AIR301",
@@ -3172,6 +3182,7 @@
         "ASYNC110",
         "ASYNC115",
         "ASYNC116",
+        "ASYNC119",
         "ASYNC2",
         "ASYNC21",
         "ASYNC210",
@@ -3976,6 +3987,7 @@
         "PLW07",
         "PLW071",
         "PLW0711",
+        "PLW0717",
         "PLW1",
         "PLW15",
         "PLW150",
@@ -4243,6 +4255,9 @@
         "RUF071",
         "RUF072",
         "RUF073",
+        "RUF074",
+        "RUF075",
+        "RUF076",
         "RUF1",
         "RUF10",
         "RUF100",

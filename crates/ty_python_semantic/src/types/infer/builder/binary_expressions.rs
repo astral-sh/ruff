@@ -8,15 +8,13 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
     DIVISION_BY_ZERO, report_unsupported_augmented_assignment, report_unsupported_binary_operation,
 };
+use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::typevar::TypeVarConstraints;
 use crate::types::{
     DynamicType, InternedConstraintSet, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, Type, TypeContext, TypeVarBoundOrConstraints, TypedDictType, UnionBuilder,
     UnionTypeInstance,
 };
-use ruff_python_ast::PythonVersion;
-
-use crate::Program;
 
 enum BinaryExpressionOperandTypes<'db> {
     Inferred(Type<'db>, Type<'db>),
@@ -52,14 +50,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                report_unsupported_binary_operation(
-                    &self.context,
-                    self.index,
-                    binary,
-                    left_ty,
-                    right_ty,
-                    *op,
-                );
+                report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
                 Type::unknown()
             })
     }
@@ -334,12 +325,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
 
-        let pep_604_unions_allowed = || {
-            Program::get(db).python_version(db) >= PythonVersion::PY310
-                || self.file().is_stub(db)
-                || self.is_in_type_checking_block(self.scope(), node)
-        };
-
         match (left_ty, right_ty, op) {
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(
@@ -400,6 +385,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
             (rec @ Type::Recursive(_), _, _) | (_, rec @ Type::Recursive(_), _) => Some(rec),
+
+            (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
+            | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),
 
             (any @ Type::Dynamic(DynamicType::Any), _, _)
             | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
@@ -567,7 +555,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
-                match (left.kind(), right.kind(), op) {
+                let recursively_defined = if left.recursively_defined().is_yes()
+                    || right.recursively_defined().is_yes()
+                {
+                    RecursivelyDefined::Yes
+                } else {
+                    RecursivelyDefined::No
+                };
+                let result = match (left.kind(), right.kind(), op) {
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
@@ -844,7 +839,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
 
                     _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
-                }
+                };
+
+                result.map(|result| match result {
+                    Type::LiteralValue(literal) => {
+                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
+                    }
+                    _ => result,
+                })
             }
 
             (
@@ -910,7 +912,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     | KnownInstanceType::NewType(_),
                 ),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => {
+            ) => {
                 if left_ty.is_equivalent_to(db, right_ty) {
                     Some(left_ty)
                 } else {
@@ -940,7 +942,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(..)
                 | Type::SpecialForm(..),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() && instance.has_known_class(db, KnownClass::NoneType) => {
+            ) if instance.has_known_class(db, KnownClass::NoneType) => {
                 Some(UnionTypeInstance::from_value_expression_types(
                     db,
                     [left_ty, right_ty],
@@ -966,7 +968,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 _,
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
                 ast::Operator::BitOr,
-            ) if pep_604_unions_allowed() => Type::try_call_bin_op_with_policy(
+            ) => Type::try_call_bin_op_with_policy(
                 db,
                 left_ty,
                 ast::Operator::BitOr,
@@ -996,6 +998,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
+                | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::LiteralValue(_)
@@ -1003,6 +1006,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
                 | Type::Callable(..)
@@ -1021,6 +1025,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
                 | Type::Intersection(_)
+                | Type::EnumComplement(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::LiteralValue(_)
@@ -1028,6 +1033,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
+                | Type::TypeForm(_)
                 | Type::TypedDict(_),
                 op,
             ) => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),

@@ -1,5 +1,5 @@
 ---
-source: crates/ty_test/src/lib.rs
+source: crates/mdtest/src/lib.rs
 expression: snapshot
 ---
 
@@ -13,28 +13,27 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/with/async.md
 ## mdtest_snippet.py
 
 ```
- 1 | async def _(flag: bool):
- 2 |     class Manager1:
- 3 |         def __aenter__(self) -> str:
- 4 |             return "foo"
- 5 | 
- 6 |         def __aexit__(self, exc_type, exc_value, traceback): ...
- 7 | 
- 8 |     class NotAContextManager: ...
- 9 |     context_expr = Manager1() if flag else NotAContextManager()
-10 | 
-11 |     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing"
-12 |     async with context_expr as f:
-13 |         reveal_type(f)  # revealed: str
+ 1 | class Manager1:
+ 2 |     def __aenter__(self) -> str:
+ 3 |         return "foo"
+ 4 | 
+ 5 |     def __aexit__(self, exc_type, exc_value, traceback): ...
+ 6 | 
+ 7 | class NotAContextManager: ...
+ 8 | 
+ 9 | async def _(context_expr: Manager1 | NotAContextManager):
+10 |     # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing"
+11 |     async with context_expr as f:
+12 |         reveal_type(f)  # revealed: str
 ```
 
 # Diagnostics
 
 ```
 error[invalid-context-manager]: Object of type `Manager1 | NotAContextManager` cannot be used with `async with` because the methods `__aenter__` and `__aexit__` are possibly missing
-  --> src/mdtest_snippet.py:12:16
+  --> src/mdtest_snippet.py:11:16
    |
-12 |     async with context_expr as f:
+11 |     async with context_expr as f:
    |                ^^^^^^^^^^^^
    |
 info: `NotAContextManager` does not implement `__aenter__` or `__aexit__`

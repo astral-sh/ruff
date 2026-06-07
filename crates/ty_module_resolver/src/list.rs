@@ -10,7 +10,7 @@ use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, se
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
-    let mut modules = list_modules(db);
+    let mut modules = list_modules(db).to_vec();
     let mut stack = modules.clone();
     while let Some(module) = stack.pop() {
         for &submodule in module.all_submodules(db) {
@@ -23,8 +23,8 @@ pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
 }
 
 /// List all available top-level modules.
-#[salsa::tracked]
-pub fn list_modules(db: &dyn Db) -> Vec<Module<'_>> {
+#[salsa::tracked(returns(deref))]
+pub fn list_modules(db: &dyn Db) -> Box<[Module<'_>]> {
     let mut modules: BTreeMap<&ModuleName, ListedModule<'_>> = BTreeMap::new();
     for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
         for new in list_modules_in(db, SearchPathIngredient::new(db, search_path.clone())) {
@@ -463,7 +463,7 @@ mod tests {
     }
 
     fn sorted_list(db: &dyn Db) -> Vec<Module<'_>> {
-        let mut modules = list_modules(db);
+        let mut modules = list_modules(db).to_vec();
         modules.sort_by(|m1, m2| m1.name(db).cmp(m2.name(db)));
         modules
     }

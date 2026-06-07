@@ -617,6 +617,14 @@ def h(x: TI) -> list[TI]:
     return [x]
 
 reveal_type(h(1))  # revealed: list[int]
+
+# An unrelated Literal union element should not prevent promotion when the
+# promoted type still satisfies another element of the upper bound.
+def i[T: Literal[1] | str](x: T) -> list[T]:
+    return [x]
+
+reveal_type(i("a"))  # revealed: list[str]
+reveal_type(i(1))  # revealed: list[Literal[1]]
 ```
 
 ## Literal annotations from declaration are respected

@@ -756,6 +756,105 @@ foo1(f1, 1, "a", "b")
 foo1(f1, x=1, z="a")
 ```
 
+Inline literals passed through `ParamSpec` components should be inferred using the specialized
+parameter types of the callable argument. This mirrors wrappers like `asyncio.to_thread` around
+clients that expose large `Unpack[TypedDict]` keyword signatures, but also applies to other
+context-sensitive literals.
+
+```py
+from typing import Callable, TypedDict, Unpack, overload
+
+class Tag(TypedDict):
+    Key: str
+    Value: str
+
+class PutObjectRequest(TypedDict):
+    TagSet: list[Tag]
+
+def put_tags(tags: list[Tag], /) -> None: ...
+def put_object(**kwargs: Unpack[PutObjectRequest]) -> None: ...
+def put_int_list(values: list[int], /) -> None: ...
+def put_int_tuple(values: tuple[int, ...], /) -> None: ...
+def put_int_tuples(values: list[tuple[int, ...]], /) -> None: ...
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def to_thread_like_keyword[**P, R](func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+to_thread_like(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+to_thread_like(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+to_thread_like(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+to_thread_like_keyword(func=put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=put_object)  # revealed: list[Tag]
+
+class ThreadRunner:
+    def run[**P, R](self, func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+        return func(*args, **kwargs)
+
+class ClassThreadRunner:
+    @classmethod
+    def run[**P, R](cls, func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+        return func(*args, **kwargs)
+
+runner = ThreadRunner()
+runner.run(put_tags, reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+runner.run(put_object, TagSet=reveal_type([{"Key": "k", "Value": "v"}]))  # revealed: list[Tag]
+runner.run(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+runner.run(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+runner.run(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+ClassThreadRunner.run(put_int_list, reveal_type([1, 2]))  # revealed: list[int]
+ClassThreadRunner.run(put_int_tuple, reveal_type((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
+ClassThreadRunner.run(put_int_tuples, reveal_type([(1, 2)]))  # revealed: list[tuple[int, ...]]
+
+def requires_x(*, x: int) -> str:
+    return ""
+
+def with_flag[**P, R](func: Callable[P, R], flag: int, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+with_flag(x=1, func=requires_x, flag=1)
+with_flag(x=1, func=requires_x, flag="bad")  # error: [invalid-argument-type]
+
+@overload
+def overloaded_put_object(*, TagSet: list[Tag]) -> None: ...
+@overload
+def overloaded_put_object(*, func: object, TagSet: list[int]) -> None: ...
+def overloaded_put_object(*, TagSet: object, func: object = None) -> None: ...
+
+to_thread_like_keyword(TagSet=reveal_type([{"Key": "k", "Value": "v"}]), func=overloaded_put_object)  # revealed: list[Tag]
+```
+
+ParamSpec forwarding should not use raw unspecialized parameter types from a wrapped generic
+callable as argument context. The forwarded list literals should be inferred the same way as in the
+equivalent direct generic call, not with a raw `list[T]` context from the wrapped callable.
+
+```py
+from typing import Callable
+
+def generic_pair[T](x: list[T], y: list[T], /) -> None: ...
+def generic_pair_with_container[T](x: T, y: list[T], /) -> None: ...
+def generic_identity_list[T](x: list[T], /) -> list[T]:
+    raise NotImplementedError
+
+def to_thread_like[**P, R](func: Callable[P, R], /, *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+# TODO: This should not error once the call-expression type context specializes the generic
+# wrapped callable before we infer forwarded `ParamSpec` arguments.
+# error: [invalid-assignment]
+union_list_result: list[int | str] = to_thread_like(generic_identity_list, reveal_type([1]))  # revealed: list[int]
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+to_thread_like(generic_pair, [1], reveal_type([""]))  # revealed: list[str]
+
+# error: [invalid-argument-type]
+to_thread_like(generic_pair_with_container, 1, reveal_type([""]))  # revealed: list[str]
+```
+
 ### Specializing `ParamSpec` with another `ParamSpec`
 
 ```py
@@ -819,11 +918,87 @@ def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
     return func
 
 @callable_identity
-def f(env: dict) -> None:
+def f(env: dict[str, int]) -> None:
     pass
 
-# revealed: (env: dict[Unknown, Unknown]) -> None
+# revealed: (env: dict[str, int]) -> None
 reveal_type(f)
+```
+
+### Transparent decorator passthrough
+
+A decorator typed as `Callable[P, R] -> Callable[P, R]` preserves overload signatures.
+
+```py
+from typing import Callable, overload
+
+def transparent[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(*, y: str) -> str: ...
+@transparent
+def test(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(test)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(test(1))  # revealed: int
+reveal_type(test(y="x"))  # revealed: str
+
+# error: [no-matching-overload]
+reveal_type(test(1, y="x"))  # revealed: Unknown
+
+@transparent
+def increment(value: int) -> int:
+    return value + 1
+
+reveal_type(increment)  # revealed: (value: int) -> int
+reveal_type(increment(1))  # revealed: int
+```
+
+A type alias for `Callable[P, R]` can also be used to type a transparent decorator.
+
+```py
+type Fn[**P, R] = Callable[P, R]
+
+def transparent[**P, R](func: Fn[P, R]) -> Fn[P, R]:
+    return func
+
+@overload
+def alias_decorated(x: int) -> int: ...
+@overload
+def alias_decorated(*, y: str) -> str: ...
+@transparent
+def alias_decorated(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(alias_decorated)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(alias_decorated(1))  # revealed: int
+reveal_type(alias_decorated(y="x"))  # revealed: str
+```
+
+A transparent decorator returned by a decorator factory also preserves overload signatures.
+
+```py
+def transparent_factory[**P, R]() -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        return func
+
+    return decorator
+
+@overload
+def decorated_factory(x: int) -> int: ...
+@overload
+def decorated_factory(*, y: str) -> str: ...
+@transparent_factory()
+def decorated_factory(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+reveal_type(decorated_factory)  # revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(decorated_factory(1))  # revealed: int
+reveal_type(decorated_factory(y="x"))  # revealed: str
 ```
 
 ### Overloads
@@ -996,10 +1171,8 @@ reveal_type(t1("a"))  # revealed: Unknown
 reveal_type(t1(y=1))  # revealed: Unknown
 
 t2 = Task(never_returns)
-# TODO: This should be `Task[(x: int), Never]`
-reveal_type(t2)  # revealed: Task[(x: int), Unknown]
-# TODO: This should be `Never`
-reveal_type(t2(1))  # revealed: Unknown
+reveal_type(t2)  # revealed: Task[(x: int), Never]
+reveal_type(t2(1))  # revealed: Never
 ```
 
 ## ParamSpec attribute assignability

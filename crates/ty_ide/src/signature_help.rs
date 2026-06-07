@@ -236,7 +236,7 @@ fn create_parameters<'db>(
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
     } else {
-        std::collections::HashMap::new()
+        indexmap::IndexMap::new()
     };
 
     parameters
@@ -351,6 +351,27 @@ mod tests {
             let active_signature = &result.signatures[active_sig_index];
             assert_eq!(active_signature.active_parameter, Some(0));
         }
+    }
+
+    #[test]
+    fn signature_help_bound_method_overload_self_type() {
+        let test = cursor_test(
+            r#"
+        def f(string: str):
+            string.removesuffix("suffix"<CURSOR>)
+        "#,
+        );
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (suffix: str, /) -> str
+        ---------------------------------------------
+
+        -------------- active parameter -------------
+        suffix: str
+        ---------------------------------------------
+        ");
     }
 
     #[test]

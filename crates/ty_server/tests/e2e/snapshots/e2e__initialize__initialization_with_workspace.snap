@@ -67,6 +67,7 @@ expression: initialization_result
         "changeNotifications": true
       }
     },
+    "callHierarchyProvider": true,
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [

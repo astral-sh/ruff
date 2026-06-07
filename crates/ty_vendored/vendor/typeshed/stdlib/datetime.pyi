@@ -7,8 +7,8 @@ time zone and DST data sources.
 import sys
 from abc import abstractmethod
 from time import struct_time
-from typing import ClassVar, Final, NoReturn, SupportsIndex, final, overload, type_check_only
-from typing_extensions import CapsuleType, Self, TypeAlias, deprecated, disjoint_base
+from typing import ClassVar, Final, NoReturn, SupportsIndex, TypeAlias, final, overload, type_check_only
+from typing_extensions import CapsuleType, Self, deprecated, disjoint_base
 
 if sys.version_info >= (3, 11):
     __all__ = ("date", "datetime", "time", "timedelta", "timezone", "tzinfo", "MINYEAR", "MAXYEAR", "UTC")
@@ -97,10 +97,13 @@ class date:
     @classmethod
     def fromordinal(cls, n: int, /) -> Self:
         """int -> date corresponding to a proleptic Gregorian ordinal."""
-
-    @classmethod
-    def fromisoformat(cls, date_string: str, /) -> Self:
-        """str -> Construct a date from a string in ISO 8601 format."""
+    if sys.version_info >= (3, 15):
+        @classmethod
+        def fromisoformat(cls, string: str, /) -> Self: ...
+    else:
+        @classmethod
+        def fromisoformat(cls, date_string: str, /) -> Self:
+            """str -> Construct a date from a string in ISO 8601 format."""
 
     @classmethod
     def fromisocalendar(cls, year: int, week: int, day: int) -> Self:
@@ -118,9 +121,13 @@ class date:
     def ctime(self) -> str:
         """Return ctime() style string."""
     if sys.version_info >= (3, 14):
-        @classmethod
-        def strptime(cls, date_string: str, format: str, /) -> Self:
-            """string, format -> new date parsed from a string (like time.strptime())."""
+        if sys.version_info >= (3, 15):
+            @classmethod
+            def strptime(cls, string: str, format: str, /) -> Self: ...
+        else:
+            @classmethod
+            def strptime(cls, date_string: str, format: str, /) -> Self:
+                """string, format -> new date parsed from a string (like time.strptime())."""
     # On <3.12, the name of the parameter in the pure-Python implementation
     # didn't match the name in the C implementation,
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+
@@ -163,11 +170,11 @@ class date:
     @overload
     def __sub__(self, value: datetime, /) -> NoReturn:
         """Return self-value."""
-
     @overload
     def __sub__(self, value: Self, /) -> timedelta: ...
     @overload
     def __sub__(self, value: timedelta, /) -> Self: ...
+
     def __hash__(self) -> int: ...
     def weekday(self) -> int:
         """Return the day of the week represented by the date.
@@ -228,14 +235,22 @@ class time:
         of the time to include. Valid options are 'auto', 'hours', 'minutes',
         'seconds', 'milliseconds' and 'microseconds'.
         """
-
-    @classmethod
-    def fromisoformat(cls, time_string: str, /) -> Self:
-        """string -> time from a string in ISO 8601 format"""
-    if sys.version_info >= (3, 14):
+    if sys.version_info >= (3, 15):
         @classmethod
-        def strptime(cls, date_string: str, format: str, /) -> Self:
-            """string, format -> new time parsed from a string (like time.strptime())."""
+        def fromisoformat(cls, string: str, /) -> Self: ...
+    else:
+        @classmethod
+        def fromisoformat(cls, time_string: str, /) -> Self:
+            """string -> time from a string in ISO 8601 format"""
+
+    if sys.version_info >= (3, 14):
+        if sys.version_info >= (3, 15):
+            @classmethod
+            def strptime(cls, string: str, format: str, /) -> Self: ...
+        else:
+            @classmethod
+            def strptime(cls, date_string: str, format: str, /) -> Self:
+                """string, format -> new time parsed from a string (like time.strptime())."""
     # On <3.12, the name of the parameter in the pure-Python implementation
     # didn't match the name in the C implementation,
     # meaning it is only *safe* to pass it as a keyword argument on 3.12+
@@ -354,15 +369,15 @@ class timedelta:
     @overload
     def __floordiv__(self, value: timedelta, /) -> int:
         """Return self//value."""
-
     @overload
     def __floordiv__(self, value: int, /) -> timedelta: ...
+
     @overload
     def __truediv__(self, value: timedelta, /) -> float:
         """Return self/value."""
-
     @overload
     def __truediv__(self, value: float, /) -> timedelta: ...
+
     def __mod__(self, value: timedelta, /) -> timedelta:
         """Return self%value."""
 
@@ -449,6 +464,9 @@ class datetime(date):
     @classmethod
     def combine(cls, date: _Date, time: _Time, tzinfo: _TzInfo | None = ...) -> Self:
         """date, time -> datetime with same date and time fields"""
+    if sys.version_info >= (3, 15):
+        @classmethod
+        def fromisoformat(cls, string: str, /) -> Self: ...
 
     def timestamp(self) -> float:
         """Return POSIX timestamp as float."""
@@ -506,10 +524,13 @@ class datetime(date):
         of the time to include. Valid options are 'auto', 'hours', 'minutes',
         'seconds', 'milliseconds' and 'microseconds'.
         """
-
-    @classmethod
-    def strptime(cls, date_string: str, format: str, /) -> Self:
-        """string, format -> new datetime parsed from a string (like time.strptime())."""
+    if sys.version_info >= (3, 15):
+        @classmethod
+        def strptime(cls, string: str, format: str, /) -> Self: ...
+    else:
+        @classmethod
+        def strptime(cls, date_string: str, format: str, /) -> Self:
+            """string, format -> new datetime parsed from a string (like time.strptime())."""
 
     def utcoffset(self) -> timedelta | None:
         """Return self.tzinfo.utcoffset(self)."""
@@ -526,10 +547,10 @@ class datetime(date):
     def __gt__(self, value: datetime, /) -> bool: ...  # type: ignore[override]
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
+
     @overload  # type: ignore[override]
     def __sub__(self, value: Self, /) -> timedelta:
         """Return self-value."""
-
     @overload
     def __sub__(self, value: timedelta, /) -> Self: ...
 

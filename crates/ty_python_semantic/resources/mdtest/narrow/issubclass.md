@@ -171,7 +171,7 @@ python-version = "3.10"
 ```
 
 ```py
-def _(x: type[int | list | bytes]):
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
     # snapshot: invalid-argument-type
     if issubclass(x, int | list[int]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -195,7 +195,7 @@ info: Element `<class 'list[int]'>` in the union is not a class object
 The same validation also applies when an invalid `UnionType` is nested inside a tuple:
 
 ```py
-def _(x: type[int | list | bytes]):
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
     # snapshot: invalid-argument-type
     if issubclass(x, (int, list[int] | bytes)):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -219,7 +219,7 @@ info: Element `<class 'list[int]'>` in the union is not a class object
 Including nested tuples:
 
 ```py
-def _(x: type[int | list | bytes]):
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
     # snapshot: invalid-argument-type
     if issubclass(x, (int, (str, list[int] | bytes))):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -245,7 +245,7 @@ And non-literal tuples:
 ```py
 classes = (int, list[int] | bytes)
 
-def _(x: type[int | list | bytes]):
+def _(x: type[int | list | bytes]):  # error: [missing-type-argument]
     # snapshot: invalid-argument-type
     if issubclass(x, classes):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
@@ -262,26 +262,6 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
    |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
-```
-
-## PEP-604 unions on Python \<3.10
-
-PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
-any type narrowing.
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-# error: [unsupported-operator]
-def _(x: type[int | str | bytes]):
-    # error: [unsupported-operator]
-    if issubclass(x, int | str):
-        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
-    else:
-        reveal_type(x)  # revealed: (type[int] & Unknown) | (type[str] & Unknown) | (type[bytes] & Unknown)
 ```
 
 ## `classinfo` is a `types.UnionType`
@@ -321,7 +301,7 @@ from typing import final
 class GenericFinal[T]:
     x: T  # invariant
 
-def f(x: type[GenericFinal]):
+def f(x: type[GenericFinal]):  # error: [missing-type-argument]
     reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
 
     if issubclass(x, GenericFinal):
@@ -337,7 +317,7 @@ This also works if the typevar has an upper bound:
 class BoundedGenericFinal[T: int]:
     x: T  # invariant
 
-def g(x: type[BoundedGenericFinal]):
+def g(x: type[BoundedGenericFinal]):  # error: [missing-type-argument]
     reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
 
     if issubclass(x, BoundedGenericFinal):

@@ -5,8 +5,7 @@ This avoids all the overhead of SAX and pulldom to gain performance.
 """
 
 from _typeshed import ReadableBuffer, SupportsRead
-from typing import Any, Final, NoReturn
-from typing_extensions import TypeAlias
+from typing import Any, Final, NoReturn, TypeAlias
 from xml.dom.minidom import Document, DocumentFragment, DOMImplementation, Element, Node, TypeInfo
 from xml.dom.xmlbuilder import DOMBuilderFilter, Options
 from xml.parsers.expat import XMLParserType
