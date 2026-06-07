@@ -368,10 +368,11 @@ impl FStringConversion {
                     // string, we can't convert the format string to an f-string. For example,
                     // converting `"{x} {x}".format(x=foo())` would result in `f"{foo()} {foo()}"`,
                     // which would call `foo()` twice.
-                    if !seen.insert(specifier) {
-                        if any_over_expr(arg, &Expr::is_call_expr) {
-                            return Ok(Self::SideEffects);
-                        }
+                    //
+                    // This is also true for builtins, so we don't treat them as special when
+                    // checking for effects here.
+                    if !seen.insert(specifier) && contains_effect(arg, |_| false) {
+                        return Ok(Self::SideEffects);
                     }
 
                     converted.push_str(&formatted_expr(
@@ -504,23 +505,28 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let mut prev_end = call.start();
     for (range, conversion) in patches {
         let fstring = match conversion {
-            FStringConversion::Convert(fstring) => Some(fstring),
-            FStringConversion::EmptyLiteral => None,
+            FStringConversion::Convert(fstring) => fstring,
+            FStringConversion::EmptyLiteral => {
+                // Keep a leading empty literal to avoid orphaning a space, parenthesis, or comment
+                // before the first kept segment; drop later ones by advancing `prev_end`.
+                if !contents.is_empty() {
+                    prev_end = range.end();
+                }
+                continue;
+            }
             FStringConversion::NonEmptyLiteral => {
                 // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                Some(curly_unescape(checker.locator().slice(range)).to_string())
+                curly_unescape(checker.locator().slice(range)).to_string()
             }
             // We handled this in the previous loop.
             FStringConversion::SideEffects => unreachable!(),
         };
-        if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
-            contents.push_str(&fstring);
-        }
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
         prev_end = range.end();
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));

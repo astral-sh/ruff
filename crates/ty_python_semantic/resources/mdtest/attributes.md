@@ -1033,6 +1033,31 @@ class C1(metaclass=Meta1): ...
 reveal_type(C1.attr)  # revealed: Literal["metaclass value"]
 ```
 
+A dynamically-created metaclass can define methods with the same names as methods in the class it
+creates. These methods can have different roles; in particular, the metaclass's `__new__` creates
+the class object and its `__call__` creates instances, while the class's methods create and operate
+on instances of that class:
+
+```py
+class DynamicallyConstructed(
+    metaclass=type(
+        "DynamicMeta",
+        (type,),
+        {
+            "__new__": lambda mcls, name, bases, namespace: type.__new__(mcls, name, bases, namespace),
+            "__call__": lambda cls: type.__call__(cls),
+        },
+    )
+):
+    def __new__(cls):
+        return super().__new__(cls)
+
+    def __call__(self, value: int) -> int:
+        return value
+
+DynamicallyConstructed()(1)
+```
+
 Assignments in instance methods of a metaclass are also attributes on its class-object instances. In
 particular, a metaclass `__init__` assignment happens after the initial class namespace has been
 converted into a class object, so it shadows an attribute from that namespace:
@@ -1721,8 +1746,8 @@ def f(x: list[int], y: list[int] | None, z: None):
     z.index
 ```
 
-This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
-base type:
+This is also true of type aliases of unions, special-case `NewType`s that have a union as a base
+type, and type variables with union upper bounds:
 
 ```toml
 [environment]
@@ -1740,6 +1765,10 @@ def g(x: MaybeList, y: FloatNT):
     x.index
     # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
     y.hex
+
+def h[T: list[int] | None](x: T):
+    # error: [unresolved-attribute] "Attribute `append` is not defined on `None` in union `list[int] | None`"
+    x.append
 ```
 
 ## Inherited class attributes
@@ -1832,6 +1861,50 @@ def _(a_and_b: Intersection[A, B]):
 def _(a_and_b: Intersection[type[A], type[B]]):
     reveal_type(a_and_b.x)  # revealed: P & Q
     a_and_b.x = R()
+```
+
+For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the attribute. Once
+found, however, descriptors and `Self` must be bound using the full `A & B` receiver.
+
+### Method binding uses the full intersection type
+
+```py
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+class A:
+    def method(self) -> Self:
+        return self
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.method())  # revealed: A & B
+```
+
+### Descriptor binding uses the full intersection type
+
+```py
+from typing import Any, TypeVar, overload
+from typing_extensions import Self
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Descriptor:
+    @overload
+    def __get__(self, instance: None, owner: type, /) -> Self: ...
+    @overload
+    def __get__(self, instance: T, owner: type | None = None, /) -> T: ...
+    def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
+
+class A:
+    desc = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[A, B]):
+    reveal_type(a_and_b.desc)  # revealed: A & B
 ```
 
 ### Negation types
@@ -3082,6 +3155,27 @@ class NestedLists2:
 reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
+During fixpoint iteration, overloads may fail to resolve correctly and be treated as `Unknown`. Even
+in this case, `Divergent` is propagated, guaranteeing the convergence of type inference. Here is the
+regression test for this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+
+```py
+from typing import Any
+
+class NestedListsConcat:
+    def __init__(self):
+        self.x = [0]
+        self.y = [0]
+
+    def f(self, y: list[Any]):
+        # The overload that fails to resolve is `list.__add__` in both of these cases.
+        self.x = [self.x] + []
+        self.y = [self.y].__add__(y)
+
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+```
+
 ### Builtin types attributes
 
 This test can probably be removed eventually, but we currently include it because we do not yet
@@ -3399,14 +3493,14 @@ python-version = "3.14"
 ```
 
 ```py
-from typing import Callable
+from typing import Any, Callable
 
-def f(x: Callable):
+def f(x: Callable[..., Any]):
     x.__name__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__name__`
  --> src/mdtest_snippet.py:4:5
   |
 4 |     x.__name__  # snapshot: unresolved-attribute
@@ -3417,12 +3511,12 @@ help: See this FAQ for more information: <https://docs.astral.sh/ty/reference/ty
 ```
 
 ```py
-def g(x: Callable):
+def g(x: Callable[..., Any]):
     x.__annotate__  # snapshot: unresolved-attribute
 ```
 
 ```snapshot
-error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+error[unresolved-attribute]: Object of type `(...) -> Any` has no attribute `__annotate__`
  --> src/mdtest_snippet.py:6:5
   |
 6 |     x.__annotate__  # snapshot: unresolved-attribute

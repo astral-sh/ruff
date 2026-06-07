@@ -72,7 +72,7 @@ is destroyed.
 """
 
 import sys
-from _typeshed import ReadableBuffer, Unused
+from _typeshed import ReadableBuffer, StrOrBytesPath, Unused
 from typing import IO, Any, BinaryIO, Final, Literal, NamedTuple, NoReturn, TypeAlias, overload
 from typing_extensions import Self, deprecated
 
@@ -80,7 +80,10 @@ __all__ = ["open", "Error", "Wave_read", "Wave_write"]
 if sys.version_info >= (3, 15):
     __all__ += ["WAVE_FORMAT_PCM", "WAVE_FORMAT_IEEE_FLOAT", "WAVE_FORMAT_EXTENSIBLE"]
 
-_File: TypeAlias = str | IO[bytes]
+if sys.version_info >= (3, 15):
+    _File: TypeAlias = StrOrBytesPath | IO[bytes]
+else:
+    _File: TypeAlias = str | IO[bytes]
 
 class Error(Exception): ...
 

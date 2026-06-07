@@ -36,7 +36,7 @@ env:
   RUST_BACKTRACE: 1
   # Line-tables-only debug info: faster builds, backtraces still work.
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
-  CONFORMANCE_SUITE_COMMIT: 5a701a037b5243df1f39622b642893d865f06205
+  CONFORMANCE_SUITE_COMMIT: 735dba9cea697bf163be39d4c1a62ed4351e3877
   PYTHON_VERSION: 3.12
 
 jobs:

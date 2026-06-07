@@ -151,9 +151,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             match &**arg {
                 arg_name @ ("total" | "closed") => {
                     let kw_type = self.infer_expression(&kw.value, TypeContext::default());
-                    if kw_type
-                        .as_literal_value()
-                        .is_none_or(|literal| !literal.is_bool())
+                    if !kw.value.is_boolean_literal_expr()
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
                     {

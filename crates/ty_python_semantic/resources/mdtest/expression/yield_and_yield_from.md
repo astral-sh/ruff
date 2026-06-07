@@ -54,7 +54,7 @@ class Once(Generic[T]):
 for x in Once("a"):
     reveal_type(x)  # revealed: str
 
-def generator() -> Generator:
+def generator() -> Generator[str]:
     result = yield from Once("a")
 
     # At runtime, the value of `result` will be the `.value` attribute of the `StopIteration`
@@ -143,7 +143,7 @@ def unannotated():
     x = yield 1
     reveal_type(x)  # revealed: Unknown
 
-def default_generator() -> Generator:
+def default_generator() -> Generator[None]:
     x = yield
     reveal_type(x)  # revealed: None
 
@@ -193,7 +193,7 @@ def iterator_yield_from() -> Generator[int, None, int]:
 ```py
 from typing import Generator
 
-def generator() -> Generator:
+def generator() -> Generator[None]:
     yield from 42  # error: [not-iterable] "Object of type `Literal[42]` is not iterable"
 ```
 

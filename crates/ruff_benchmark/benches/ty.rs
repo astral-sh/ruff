@@ -1248,6 +1248,62 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
+    const NUM_BRANCHES: usize = 11;
+
+    setup_rayon();
+
+    // Regression benchmark for https://github.com/astral-sh/ty/issues/3663.
+    let mut code = "from typing import Literal, TypedDict\n\n".to_string();
+    for i in 0..NUM_BRANCHES {
+        writeln!(
+            &mut code,
+            "class Node{i}(TypedDict):\n    type: Literal['node-{i}']\n    children: list['Node']\n"
+        )
+        .ok();
+    }
+    code.push_str("class Leaf(TypedDict):\n    type: Literal['leaf']\n    text: str\n\n");
+    code.push_str("type Node = ");
+    for i in 0..NUM_BRANCHES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "Node{i}").ok();
+    }
+    code.push_str(
+        r#" | Leaf
+
+value: list[Node] = [
+    {"type": "node-0", "children": [
+        {"type": "node-1", "children": [
+            {"type": "node-2", "children": [{"type": "leaf", "text": "x"}]},
+            {"type": "node-3", "children": [{"type": "leaf", "text": "y"}]},
+        ]},
+        {"type": "node-4", "children": [
+            {"type": "node-5", "children": [{"type": "leaf", "text": "z"}]},
+            {"type": "node-6", "children": [{"type": "leaf", "text": "w"}]},
+        ]},
+    ]},
+]
+"#,
+    );
+
+    criterion.bench_function(
+        "ty_micro[recursive_typed_dict_union_contextual_inference]",
+        |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        },
+    );
+}
+
 fn benchmark_pydantic_core_schema_dict(criterion: &mut Criterion) {
     const NUM_CORE_SCHEMA_VARIANTS: usize = 24;
 
@@ -1469,6 +1525,7 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
+    benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);

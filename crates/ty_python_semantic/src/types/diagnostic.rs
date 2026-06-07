@@ -116,6 +116,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -2025,6 +2026,90 @@ declare_lint! {
         summary: "detects missing required arguments in a call",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for generic types used without type parameters in type expressions.
+    ///
+    /// ## Why is this bad?
+    /// Using a generic type without specifying its type parameters results in the
+    /// type parameters being implicitly filled with `Unknown`, reducing the
+    /// precision of type checking. Explicit type parameters make the intended types
+    /// clear and enable the type checker to catch more errors.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// import re
+    ///
+    /// def handle(m: re.Match) -> str:  # error: [missing-type-argument]
+    ///     return m.string
+    ///
+    /// # Use explicit type parameters instead:
+    /// def handle(m: re.Match[str]) -> str:
+    ///     return m.string
+    /// ```
+    pub(crate) static MISSING_TYPE_ARGUMENT = {
+        summary: "detects generic types used without explicit type parameters in type expressions",
+        status: LintStatus::stable("0.0.45"),
+        default_level: Level::Ignore,
+    }
+}
+
+pub(super) fn report_missing_type_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    ty: Type<'db>,
+    annotation: &ast::Expr,
+) {
+    match ty {
+        Type::ClassLiteral(class) => {
+            let db = context.db();
+
+            let Some(generic_context) = class.generic_context(db) else {
+                return;
+            };
+
+            // Don't warn if all type parameters have defaults (PEP 696).
+            if generic_context
+                .variables(db)
+                .all(|tv| tv.default_type(db).is_some())
+            {
+                return;
+            }
+
+            let required_count = generic_context
+                .variables(db)
+                .filter(|tv| tv.default_type(db).is_none())
+                .count();
+
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                let class_name = class.name(db);
+                if required_count == 1 {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type argument for generic class `{class_name}` \
+                         (expected 1 type argument)"
+                    ));
+                } else {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type arguments for generic class `{class_name}` \
+                         (expected {required_count} type arguments)"
+                    ));
+                }
+            }
+        }
+        Type::SpecialForm(
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+        ) => {
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                builder.into_diagnostic(format_args!(
+                    "Missing type arguments for generic type `Callable` \
+                     (expected 2 type arguments)"
+                ));
+            }
+        }
+        _ => {}
     }
 }
 
@@ -4733,7 +4818,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
+        "Special form `Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -5135,18 +5220,18 @@ pub(crate) fn report_duplicate_bases(
             class.name(db)
         ),
     );
-    if let Some(first_base) = bases_list[*first_index].source_node() {
-        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
-            format_args!("Class `{duplicate_name}` first included in bases list here"),
-        ));
-    }
+    let first_base = bases_list[*first_index].source_node();
+    sub_diagnostic.annotate(
+        Annotation::secondary(context.span(first_base)).message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
+    );
     for index in later_indices {
-        if let Some(repeated_base) = bases_list[*index].source_node() {
-            sub_diagnostic.annotate(
-                Annotation::primary(context.span(repeated_base))
-                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
-            );
-        }
+        let repeated_base = bases_list[*index].source_node();
+        sub_diagnostic.annotate(
+            Annotation::primary(context.span(repeated_base))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
     }
 
     diagnostic.sub(sub_diagnostic);

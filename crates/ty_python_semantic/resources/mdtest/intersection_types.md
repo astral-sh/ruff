@@ -1082,7 +1082,7 @@ def _(
     # `NotCallable` would fail with call-non-callable
     # We only show the call-top-callable error (it's more specific)
     # error: [call-top-callable]
-    x()
+    reveal_type(x())  # revealed: object
 ```
 
 ### Keyword arguments
@@ -1343,7 +1343,7 @@ class Y(Base):
     pass
 
 def test(x: Intersection[X, Y]) -> None:
-    reveal_type(x.f)  # revealed: (bound method X.f() -> int) & (bound method Y.f() -> int)
+    reveal_type(x.f)  # revealed: bound method X & Y.f() -> int
     reveal_type(x.f())  # revealed: int
 
 # Example subclass that inhabits that intersection:

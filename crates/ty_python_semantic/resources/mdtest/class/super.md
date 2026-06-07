@@ -224,7 +224,7 @@ class Foo[T]:
         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
         reveal_type(super())
 
-    def method3(self: Foo):
+    def method3(self: Foo):  # error: [missing-type-argument]
         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
         reveal_type(super())
 

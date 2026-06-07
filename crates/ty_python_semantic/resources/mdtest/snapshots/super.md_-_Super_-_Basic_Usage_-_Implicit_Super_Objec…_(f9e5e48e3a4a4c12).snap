@@ -73,7 +73,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  58 |         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
  59 |         reveal_type(super())
  60 | 
- 61 |     def method3(self: Foo):
+ 61 |     def method3(self: Foo):  # error: [missing-type-argument]
  62 |         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
  63 |         reveal_type(super())
  64 | 
@@ -159,6 +159,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
 ```
 
 # Diagnostics
+
+```
+info[missing-type-argument]: Missing type argument for generic class `Foo` (expected 1 type argument)
+  --> src/mdtest_snippet.py:61:23
+   |
+61 |     def method3(self: Foo):  # error: [missing-type-argument]
+   |                       ^^^
+   |
+
+```
 
 ```
 error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method7)` call

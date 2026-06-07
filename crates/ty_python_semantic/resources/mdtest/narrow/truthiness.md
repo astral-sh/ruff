@@ -517,6 +517,10 @@ def test() -> None:
 
 ## Truthiness narrowing of `NewType`s
 
+`NewType`s over `float` and `complex` use their concrete union base when looking up numeric
+attributes such as `real`. Truthiness adds `~AlwaysFalsy` to the outer `NewType`, but that
+refinement must not be forwarded as the receiver for this special union-base lookup.
+
 ```py
 from typing import NewType
 
@@ -532,6 +536,7 @@ def f(floaty: FloatNewType, complexy: ComplexNewType):
 
     if complexy:
         reveal_type(complexy)  # revealed: ComplexNewType & ~AlwaysFalsy
+        reveal_type(complexy.real)  # revealed: int | float
         expects_complex(complexy)  # fine
         expects_float(complexy)  # error: [invalid-argument-type]
 ```

@@ -7,7 +7,7 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    report_invalid_concatenate_last_arg, report_missing_type_arguments,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -112,6 +112,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
+        report_missing_type_arguments(&self.context, ty, annotation);
         let result_ty = ty
             .default_specialize(self.db())
             .in_type_expression(
@@ -1239,7 +1240,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
                     }
-                    Type::SpecialForm(special_form @ SpecialFormType::Callable) => {
+                    Type::SpecialForm(
+                        special_form @ (SpecialFormType::TypingCallable
+                        | SpecialFormType::CollectionsAbcCallable),
+                    ) => {
                         self.infer_parameterized_special_form_type_expression(
                             subscript,
                             special_form,
@@ -1913,7 +1917,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => self.infer_type_expression(arguments_slice),
             },
-            SpecialFormType::Callable => self.infer_callable_type(subscript),
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
+                self.infer_callable_type(subscript)
+            }
 
             // `ty_extensions` special forms
             SpecialFormType::Not => {
@@ -2224,7 +2230,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.type_expression_context()
                     ));
                     diag.info("`typing.Concatenate` is only valid:");
-                    diag.info(" - as the first argument to `typing.Callable`");
+                    diag.info(" - as the first argument to `Callable`");
                     diag.info(" - as a type argument for a `ParamSpec` parameter");
                 }
 

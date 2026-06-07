@@ -1310,8 +1310,8 @@ static_assert(
 
 static_assert(not is_equivalent_to(GenericProto[str], GenericProto[int]))
 static_assert(not is_equivalent_to(GenericProto[str], LegacyGenericProto[int]))
-static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))
-static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))
+static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))  # error: [missing-type-argument]
+static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))  # error: [missing-type-argument]
 ```
 
 ## Intersections of protocols
@@ -2183,7 +2183,8 @@ S = TypeVar("S")
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [missing-type-argument]
 static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
 
 class NominalGeneric[T]:
@@ -2198,23 +2199,23 @@ def _[T](x: T) -> T:
 class NominalConcrete:
     def method(self, input: int) -> None: ...
 
-static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))
-static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
+static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 # `NewStyleClassScoped` is implicitly `NewStyleClassScoped[Unknown]`,
 # and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
 # where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
-static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))
-static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
 
 # Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
-static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
@@ -3027,14 +3028,14 @@ reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 `typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.
 
 ```py
-from typing import SupportsIndex, Sized, Literal
+from typing import Any, SupportsIndex, Sized, Literal
 
 def one(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
     a: SupportsIndex = some_int
     b: SupportsIndex = some_literal_int
     c: SupportsIndex = some_indexable
 
-def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
+def two(some_list: list[Any], some_tuple: tuple[int, str], some_sized: Sized):
     a: Sized = some_list
     b: Sized = some_tuple
     c: Sized = some_sized
@@ -3351,13 +3352,13 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from typing import cast, Protocol
+from typing import Any, cast, Protocol
 
 class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
-def f(value: Iterator):
-    cast(Iterator, value)  # error: [redundant-cast]
+def f(value: Iterator[Any]):
+    cast(Iterator[Any], value)  # error: [redundant-cast]
 ```
 
 ### Recursive generic protocols
@@ -3450,13 +3451,13 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 
 class Foo[T]: ...
 
 class A(Protocol):
     @property
-    def _(self: "A") -> Foo: ...
+    def _(self: "A") -> Foo[Any]: ...
 
 class B(Protocol):
     @property
@@ -3626,7 +3627,7 @@ def g(x: B2[int]):
     pass
 ```
 
-## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
+## The `Generator` protocol's `_ReturnT_co` needs special casing
 
 The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
 that generator, and it's also in the pathway for the return values from `async` functions. (In the
@@ -3644,7 +3645,7 @@ returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to
 but it caught the related exception and returned something anyway), but coincidentally it tells ty
 what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
 Something with a method that returns `float` isn't assignable to something where the same method
-returns `str`. Problem solved.
+returns `str`.
 
 However, prior to 3.13, the `_ReturnT_co` type only appeared in the `__iter__` method.
 Unfortunately, the `__iter__` method on a `Generator` just returns `self`; its return type is the
@@ -3656,8 +3657,11 @@ be. But how we break the cycle isn't really the problem; the problem is that the
 protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` interacts with
 assignability.
 
-As a special case workaround for this, we compare `Generator` implementations *nominally* when the
-target Python version is 3.12 or earlier in `has_relation_to`.
+As a special case workaround for this, we compare `Generator` implementations *nominally* in
+`has_relation_to`. Prior to Python 3.13, this is necessary because `_ReturnT_co` is not structurally
+visible. As of Python 3.13, it is necessary because structurally inferring through
+`close() -> _ReturnT_co | None` can spuriously infer `None`. The latter workaround can be removed
+once [ty#3596](https://github.com/astral-sh/ty/issues/3596) is fixed.
 
 ```toml
 [environment]
@@ -3697,10 +3701,10 @@ static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProto
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
-## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
+## The `Generator` protocol's `_ReturnT_co` appears in `close` as of Python 3.13
 
 The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
-appears in `Generator`'s `close` method, and no special case is needed.
+appears in `Generator`'s `close` method.
 
 ```toml
 [environment]
@@ -3736,6 +3740,39 @@ static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantPr
 static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
 static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+```
+
+## Inferring async return contexts on Python 3.13 or newer
+
+Regression test for [ty#3583](https://github.com/astral-sh/ty/issues/3583). When inferring the
+generic async call in a return statement, the `Awaitable[int]` context should not infer `None`
+through `Generator.close()`.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T", bound=tuple[Any, ...])
+
+class Select(Generic[T]):
+    pass
+
+def first[T](v: T) -> Select[tuple[T]]:
+    raise NotImplementedError
+
+async def second[T](query: Select[tuple[T]]) -> T:
+    raise NotImplementedError
+
+async def variant_one() -> int:
+    result = await second(first(123))
+    return result
+
+async def variant_two() -> int:
+    return await second(first(123))
 ```
 
 ## TODO

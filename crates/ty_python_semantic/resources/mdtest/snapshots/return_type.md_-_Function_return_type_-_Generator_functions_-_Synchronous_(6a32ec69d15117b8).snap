@@ -16,19 +16,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
  1 | import types
  2 | import typing
  3 | 
- 4 | def f() -> types.GeneratorType:
+ 4 | def f() -> types.GeneratorType[int, None, None]:
  5 |     yield 42
  6 | 
- 7 | def g() -> typing.Generator:
+ 7 | def g() -> typing.Generator[int]:
  8 |     yield 42
  9 | 
-10 | def h() -> typing.Iterator:
+10 | def h() -> typing.Iterator[int]:
 11 |     yield 42
 12 | 
-13 | def i() -> typing.Iterable:
+13 | def i() -> typing.Iterable[int]:
 14 |     yield 42
 15 | 
-16 | def i2() -> typing.Generator:
+16 | def i2() -> typing.Generator[int]:
 17 |     yield from i()
 18 | 
 19 | def j() -> str:  # error: [invalid-return-type]

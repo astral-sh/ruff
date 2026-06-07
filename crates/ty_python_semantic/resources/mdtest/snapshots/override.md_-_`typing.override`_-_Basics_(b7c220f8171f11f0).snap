@@ -13,162 +13,162 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 ## mdtest_snippet.pyi
 
 ```
-  1 | from typing_extensions import override, Callable, TypeVar
+  1 | from typing_extensions import Any, Callable, TypeVar, override
   2 | 
-  3 | def lossy_decorator(fn: Callable) -> Callable: ...
-  4 | 
-  5 | class A:
-  6 |     @override
-  7 |     def __repr__(self): ...  # fine: overrides `object.__repr__`
-  8 | 
-  9 | class Parent:
- 10 |     def foo(self): ...
- 11 |     @property
- 12 |     def my_property1(self) -> int: ...
- 13 |     @property
- 14 |     def my_property2(self) -> int: ...
- 15 | 
- 16 |     baz = None
- 17 | 
- 18 |     @classmethod
- 19 |     def class_method1(cls) -> int: ...
- 20 |     @staticmethod
- 21 |     def static_method1() -> int: ...
- 22 |     @classmethod
- 23 |     def class_method2(cls) -> int: ...
- 24 |     @staticmethod
- 25 |     def static_method2() -> int: ...
- 26 |     @lossy_decorator
- 27 |     def decorated_1(self): ...
- 28 |     @lossy_decorator
- 29 |     def decorated_2(self): ...
- 30 |     @lossy_decorator
- 31 |     def decorated_3(self): ...
- 32 | 
- 33 | class Child(Parent):
- 34 |     @override
- 35 |     def foo(self): ...  # fine: overrides `Parent.foo`
- 36 |     @property
- 37 |     @override
- 38 |     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
- 39 |     @override
- 40 |     @property
- 41 |     def my_property2(self) -> int: ...  # fine: overrides `Parent.my_property2`
- 42 |     @override
- 43 |     def baz(self): ...  # fine: overrides `Parent.baz`
- 44 |     @classmethod
- 45 |     @override
- 46 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
- 47 |     @staticmethod
- 48 |     @override
- 49 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
- 50 |     @override
- 51 |     @classmethod
- 52 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
- 53 |     @override
- 54 |     @staticmethod
- 55 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
- 56 |     @override
- 57 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
- 58 |     @override
- 59 |     @lossy_decorator
- 60 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
- 61 |     @lossy_decorator
- 62 |     @override
- 63 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
- 64 | 
- 65 | class OtherChild(Parent): ...
- 66 | 
- 67 | class Grandchild(OtherChild):
- 68 |     @override
- 69 |     def foo(self): ...  # fine: overrides `Parent.foo`
- 70 |     @override
- 71 |     @property
- 72 |     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
- 73 |     @override
- 74 |     def baz(self): ...  # fine: overrides `Parent.baz`
- 75 |     @classmethod
- 76 |     @override
- 77 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
- 78 |     @staticmethod
- 79 |     @override
- 80 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
- 81 |     @override
- 82 |     @classmethod
- 83 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
- 84 |     @override
- 85 |     @staticmethod
- 86 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
- 87 |     @override
- 88 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
- 89 |     @override
- 90 |     @lossy_decorator
- 91 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
- 92 |     @lossy_decorator
- 93 |     @override
- 94 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
- 95 | 
- 96 | class Invalid:
- 97 |     @override
- 98 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
- 99 |     @override
-100 |     @classmethod
-101 |     def foo(self): ...  # error: [invalid-explicit-override]
-102 |     @classmethod
-103 |     @override
-104 |     def bar(self): ...  # error: [invalid-explicit-override]
-105 |     @staticmethod
-106 |     @override
-107 |     def baz(): ...  # error: [invalid-explicit-override]
-108 |     @override
-109 |     @staticmethod
-110 |     def eggs(): ...  # error: [invalid-explicit-override]
-111 |     @property
-112 |     @override
-113 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
-114 |     @override
-115 |     @property
-116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
-117 |     @property
-118 |     @override
-119 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
-120 |     @bad_settable_property.setter
-121 |     def bad_settable_property(self, x: int) -> None: ...
-122 |     @lossy_decorator
-123 |     @override
-124 |     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
-125 |     @override
-126 |     @lossy_decorator
-127 |     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
-128 | 
-129 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
-130 | # but not `@override` violations
-131 | class LiskovViolatingButNotOverrideViolating(Parent):
-132 |     @override
-133 |     @property
-134 |     def foo(self) -> int: ...
-135 |     @override
-136 |     def my_property1(self) -> int: ...
-137 | 
-138 |     # TODO: This maybe shouldn't be a Liskov violation? Whether called on the type or
-139 |     # on an instance, it will behave the same from the caller's perspective. The only difference
-140 |     # is whether the method body gets access to `cls`, which is not a concern of Liskov.
-141 |     @staticmethod
-142 |     @override
-143 |     def class_method1() -> int: ...  # error: [invalid-method-override]
-144 |     @classmethod
-145 |     @override
-146 |     def static_method1(cls) -> int: ...
-147 | 
-148 | # Diagnostic edge case: `override` is very far away from the method definition in the source code:
-149 | 
-150 | T = TypeVar("T")
-151 | 
-152 | def identity(x: T) -> T: ...
-153 | 
-154 | class Foo:
-155 |     @override
-156 |     @identity
+  3 | # Decorator intentionally erases the wrapped signature.
+  4 | def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
+  5 | 
+  6 | class A:
+  7 |     @override
+  8 |     def __repr__(self): ...  # fine: overrides `object.__repr__`
+  9 | 
+ 10 | class Parent:
+ 11 |     def foo(self): ...
+ 12 |     @property
+ 13 |     def my_property1(self) -> int: ...
+ 14 |     @property
+ 15 |     def my_property2(self) -> int: ...
+ 16 | 
+ 17 |     baz = None
+ 18 | 
+ 19 |     @classmethod
+ 20 |     def class_method1(cls) -> int: ...
+ 21 |     @staticmethod
+ 22 |     def static_method1() -> int: ...
+ 23 |     @classmethod
+ 24 |     def class_method2(cls) -> int: ...
+ 25 |     @staticmethod
+ 26 |     def static_method2() -> int: ...
+ 27 |     @lossy_decorator
+ 28 |     def decorated_1(self): ...
+ 29 |     @lossy_decorator
+ 30 |     def decorated_2(self): ...
+ 31 |     @lossy_decorator
+ 32 |     def decorated_3(self): ...
+ 33 | 
+ 34 | class Child(Parent):
+ 35 |     @override
+ 36 |     def foo(self): ...  # fine: overrides `Parent.foo`
+ 37 |     @property
+ 38 |     @override
+ 39 |     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
+ 40 |     @override
+ 41 |     @property
+ 42 |     def my_property2(self) -> int: ...  # fine: overrides `Parent.my_property2`
+ 43 |     @override
+ 44 |     def baz(self): ...  # fine: overrides `Parent.baz`
+ 45 |     @classmethod
+ 46 |     @override
+ 47 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+ 48 |     @staticmethod
+ 49 |     @override
+ 50 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+ 51 |     @override
+ 52 |     @classmethod
+ 53 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+ 54 |     @override
+ 55 |     @staticmethod
+ 56 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+ 57 |     @override
+ 58 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+ 59 |     @override
+ 60 |     @lossy_decorator
+ 61 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+ 62 |     @lossy_decorator
+ 63 |     @override
+ 64 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
+ 65 | 
+ 66 | class OtherChild(Parent): ...
+ 67 | 
+ 68 | class Grandchild(OtherChild):
+ 69 |     @override
+ 70 |     def foo(self): ...  # fine: overrides `Parent.foo`
+ 71 |     @override
+ 72 |     @property
+ 73 |     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
+ 74 |     @override
+ 75 |     def baz(self): ...  # fine: overrides `Parent.baz`
+ 76 |     @classmethod
+ 77 |     @override
+ 78 |     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
+ 79 |     @staticmethod
+ 80 |     @override
+ 81 |     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
+ 82 |     @override
+ 83 |     @classmethod
+ 84 |     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
+ 85 |     @override
+ 86 |     @staticmethod
+ 87 |     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
+ 88 |     @override
+ 89 |     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
+ 90 |     @override
+ 91 |     @lossy_decorator
+ 92 |     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
+ 93 |     @lossy_decorator
+ 94 |     @override
+ 95 |     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
+ 96 | 
+ 97 | class Invalid:
+ 98 |     @override
+ 99 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
+100 |     @override
+101 |     @classmethod
+102 |     def foo(self): ...  # error: [invalid-explicit-override]
+103 |     @classmethod
+104 |     @override
+105 |     def bar(self): ...  # error: [invalid-explicit-override]
+106 |     @staticmethod
+107 |     @override
+108 |     def baz(): ...  # error: [invalid-explicit-override]
+109 |     @override
+110 |     @staticmethod
+111 |     def eggs(): ...  # error: [invalid-explicit-override]
+112 |     @property
+113 |     @override
+114 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
+115 |     @override
+116 |     @property
+117 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
+118 |     @property
+119 |     @override
+120 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
+121 |     @bad_settable_property.setter
+122 |     def bad_settable_property(self, x: int) -> None: ...
+123 |     @lossy_decorator
+124 |     @override
+125 |     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
+126 |     @override
+127 |     @lossy_decorator
+128 |     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
+129 | 
+130 | # TODO: all overrides in this class should cause us to emit *Liskov* violations,
+131 | # but not `@override` violations
+132 | class LiskovViolatingButNotOverrideViolating(Parent):
+133 |     @override
+134 |     @property
+135 |     def foo(self) -> int: ...
+136 |     @override
+137 |     def my_property1(self) -> int: ...
+138 | 
+139 |     # TODO: This maybe shouldn't be a Liskov violation? Whether called on the type or
+140 |     # on an instance, it will behave the same from the caller's perspective. The only difference
+141 |     # is whether the method body gets access to `cls`, which is not a concern of Liskov.
+142 |     @staticmethod
+143 |     @override
+144 |     def class_method1() -> int: ...  # error: [invalid-method-override]
+145 |     @classmethod
+146 |     @override
+147 |     def static_method1(cls) -> int: ...
+148 | 
+149 | # Diagnostic edge case: `override` is very far away from the method definition in the source code:
+150 | 
+151 | T = TypeVar("T")
+152 | 
+153 | def identity(x: T) -> T: ...
+154 | 
+155 | class Foo:
+156 |     @override
 157 |     @identity
 158 |     @identity
 159 |     @identity
@@ -186,18 +186,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/override.md
 171 |     @identity
 172 |     @identity
 173 |     @identity
-174 |     def bar(self): ...  # error: [invalid-explicit-override]
+174 |     @identity
+175 |     def bar(self): ...  # error: [invalid-explicit-override]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-explicit-override]: Method `___reprrr__` is decorated with `@override` but does not override anything
-  --> src/mdtest_snippet.pyi:97:5
+  --> src/mdtest_snippet.pyi:98:5
    |
-97 |     @override
+98 |     @override
    |     ---------
-98 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
+99 |     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
    |         ^^^^^^^^^^^
    |
 info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
@@ -206,12 +207,12 @@ info: No `___reprrr__` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `foo` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:99:5
+   --> src/mdtest_snippet.pyi:100:5
     |
- 99 |     @override
+100 |     @override
     |     ---------
-100 |     @classmethod
-101 |     def foo(self): ...  # error: [invalid-explicit-override]
+101 |     @classmethod
+102 |     def foo(self): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
 info: No `foo` definitions were found on any superclasses of `Invalid`
@@ -220,11 +221,11 @@ info: No `foo` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:103:5
+   --> src/mdtest_snippet.pyi:104:5
     |
-103 |     @override
+104 |     @override
     |     ---------
-104 |     def bar(self): ...  # error: [invalid-explicit-override]
+105 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
 info: No `bar` definitions were found on any superclasses of `Invalid`
@@ -233,11 +234,11 @@ info: No `bar` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `baz` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:106:5
+   --> src/mdtest_snippet.pyi:107:5
     |
-106 |     @override
+107 |     @override
     |     ---------
-107 |     def baz(): ...  # error: [invalid-explicit-override]
+108 |     def baz(): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
 info: No `baz` definitions were found on any superclasses of `Invalid`
@@ -246,12 +247,12 @@ info: No `baz` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `eggs` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:108:5
+   --> src/mdtest_snippet.pyi:109:5
     |
-108 |     @override
+109 |     @override
     |     ---------
-109 |     @staticmethod
-110 |     def eggs(): ...  # error: [invalid-explicit-override]
+110 |     @staticmethod
+111 |     def eggs(): ...  # error: [invalid-explicit-override]
     |         ^^^^
     |
 info: No `eggs` definitions were found on any superclasses of `Invalid`
@@ -260,11 +261,11 @@ info: No `eggs` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_property1` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:112:5
+   --> src/mdtest_snippet.pyi:113:5
     |
-112 |     @override
+113 |     @override
     |     ---------
-113 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
+114 |     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
     |
 info: No `bad_property1` definitions were found on any superclasses of `Invalid`
@@ -273,12 +274,12 @@ info: No `bad_property1` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_property2` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:114:5
+   --> src/mdtest_snippet.pyi:115:5
     |
-114 |     @override
+115 |     @override
     |     ---------
-115 |     @property
-116 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
+116 |     @property
+117 |     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^
     |
 info: No `bad_property2` definitions were found on any superclasses of `Invalid`
@@ -287,11 +288,11 @@ info: No `bad_property2` definitions were found on any superclasses of `Invalid`
 
 ```
 error[invalid-explicit-override]: Method `bad_settable_property` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:118:5
+   --> src/mdtest_snippet.pyi:119:5
     |
-118 |     @override
+119 |     @override
     |     ---------
-119 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
+120 |     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
     |         ^^^^^^^^^^^^^^^^^^^^^
     |
 info: No `bad_settable_property` definitions were found on any superclasses of `Invalid`
@@ -300,14 +301,14 @@ info: No `bad_settable_property` definitions were found on any superclasses of `
 
 ```
 error[invalid-method-override]: Invalid override of method `class_method1`
-   --> src/mdtest_snippet.pyi:143:9
+   --> src/mdtest_snippet.pyi:144:9
     |
-143 |     def class_method1() -> int: ...  # error: [invalid-method-override]
+144 |     def class_method1() -> int: ...  # error: [invalid-method-override]
     |         ^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method1`
     |
-   ::: src/mdtest_snippet.pyi:19:9
+   ::: src/mdtest_snippet.pyi:20:9
     |
- 19 |     def class_method1(cls) -> int: ...
+ 20 |     def class_method1(cls) -> int: ...
     |         ------------------------- `Parent.class_method1` defined here
     |
 info: `LiskovViolatingButNotOverrideViolating.class_method1` is a staticmethod but `Parent.class_method1` is a classmethod
@@ -317,14 +318,14 @@ info: This violates the Liskov Substitution Principle
 
 ```
 error[invalid-explicit-override]: Method `bar` is decorated with `@override` but does not override anything
-   --> src/mdtest_snippet.pyi:174:9
+   --> src/mdtest_snippet.pyi:175:9
     |
-174 |     def bar(self): ...  # error: [invalid-explicit-override]
+175 |     def bar(self): ...  # error: [invalid-explicit-override]
     |         ^^^
     |
-   ::: src/mdtest_snippet.pyi:155:5
+   ::: src/mdtest_snippet.pyi:156:5
     |
-155 |     @override
+156 |     @override
     |     ---------
     |
 info: No `bar` definitions were found on any superclasses of `Foo`

@@ -1668,6 +1668,8 @@ class Wm:
     ) -> tuple[int, int, int, int] | None: ...
 
     aspect = wm_aspect
+
+    # wm_attributes: Get all attributes
     if sys.version_info >= (3, 13):
         @overload
         def wm_attributes(self, *, return_python_dict: Literal[False] = False) -> tuple[Any, ...]:
@@ -1706,6 +1708,7 @@ class Wm:
             On Unix, there are currently no special attribute values.
             """
 
+    # wm_attributes: Get one attribute (old variant using string that starts with "-")
     @overload
     def wm_attributes(self, option: Literal["-alpha"], /) -> float:
         """Return or sets platform specific attributes.
@@ -1790,6 +1793,7 @@ class Wm:
         @overload
         def wm_attributes(self, option: Literal["-type"], /) -> str: ...
     if sys.version_info >= (3, 13):
+        # wm_attributes: Get one attribute (new variant without "-")
         @overload
         def wm_attributes(self, option: Literal["alpha"], /) -> float:
             """Return or sets platform specific attributes.
@@ -1857,6 +1861,7 @@ class Wm:
             @overload
             def wm_attributes(self, option: Literal["type"], /) -> str: ...
 
+    # wm_attributes: Set an attribute (old variant using string that starts with "-")
     @overload
     def wm_attributes(self, option: str, /): ...
     @overload
@@ -1929,9 +1934,11 @@ class Wm:
         @overload
         def wm_attributes(self, option: Literal["-type"], value: str, /) -> Literal[""]: ...
 
+    # wm_attributes: Set multiple attributes (old variant using strings that start with "-")
     @overload
     def wm_attributes(self, option: str, value, /, *__other_option_value_pairs: Any) -> Literal[""]: ...
 
+    # wm_attributes: Set an attribute (new variant with kwarg instead of string)
     if sys.version_info >= (3, 13):
         if sys.platform == "darwin":
             @overload
@@ -3064,12 +3071,12 @@ class Canvas(Widget, XView, YView):
         function identified with FUNCID.
         """
 
-    def canvasx(self, screenx, gridspacing=None):
+    def canvasx(self, screenx: float | str, gridspacing: float | str | None = None) -> float:
         """Return the canvas x coordinate of pixel position SCREENX rounded
         to nearest multiple of GRIDSPACING units.
         """
 
-    def canvasy(self, screeny, gridspacing=None):
+    def canvasy(self, screeny: float | str, gridspacing: float | str | None = None) -> float:
         """Return the canvas y coordinate of pixel position SCREENY rounded
         to nearest multiple of GRIDSPACING units.
         """

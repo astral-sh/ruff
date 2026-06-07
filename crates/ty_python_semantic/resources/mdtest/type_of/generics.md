@@ -459,7 +459,7 @@ from typing import final
 class P[T]:
     x: T
 
-def expects_type_p(x: type[P]):
+def expects_type_p(x: type[P]):  # error: [missing-type-argument]
     pass
 
 def expects_type_p_of_int(x: type[P[int]]):
@@ -519,7 +519,7 @@ This also works with `ParamSpec`:
 @final
 class C[**P]: ...
 
-def expects_type_c(f: type[C]): ...
+def expects_type_c(f: type[C]): ...  # error: [missing-type-argument]
 def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
 
 # OK, the unspecialized `C` is assignable to `type[C[...]]`

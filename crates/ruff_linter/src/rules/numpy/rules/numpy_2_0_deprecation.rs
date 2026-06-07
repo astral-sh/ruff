@@ -323,10 +323,10 @@ pub(crate) fn numpy_2_0_deprecation(checker: &Checker, expr: &Expr) {
         },
         ["numpy", "in1d"] => Replacement {
             existing: "in1d",
-            details: Details::AutoImport {
-                path: "numpy",
-                name: "isin",
-                compatibility: Compatibility::BackwardsCompatible,
+            details: Details::Manual {
+                guideline: Some(
+                    "Use `np.isin` instead. Unlike `np.in1d`, `np.isin` preserves the shape of its input, so `np.in1d(ar1, ar2)` is equivalent to `np.isin(ar1, ar2).ravel()`.",
+                ),
             },
         },
         ["numpy", "INF"] => Replacement {

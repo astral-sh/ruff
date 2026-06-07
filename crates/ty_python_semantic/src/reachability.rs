@@ -198,13 +198,13 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
-        infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, Type, TypeContext,
+        UnionType, definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
-use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -221,97 +221,56 @@ use ty_python_core::{
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
-    let ty = match singleton {
-        ast::Singleton::None => Type::none(db),
-        ast::Singleton::True => Type::bool_literal(true),
-        ast::Singleton::False => Type::bool_literal(false),
-    };
-    debug_assert!(ty.is_singleton(db));
-    ty
-}
-
-fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
-    KnownClass::Mapping.to_instance(db).top_materialization(db)
-}
-
-pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
-    IntersectionBuilder::new(db)
-        .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
-        // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
-        // patterns explicitly do not match them or their subclasses.
-        .add_negative(KnownClass::Str.to_instance(db))
-        .add_negative(KnownClass::Bytes.to_instance(db))
-        .add_negative(KnownClass::Bytearray.to_instance(db))
-        .build()
-}
-
-/// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
-/// match that pattern.
-fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
-    match kind {
-        PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
-        PatternPredicateKind::Value(value) => {
-            let ty = infer_expression_type(db, *value, TypeContext::default());
-            // Only return the type if it's single-valued. For non-single-valued types
-            // (like `str`), we can't definitively exclude any specific type from
-            // subsequent patterns because the pattern could match any value of that type.
-            if ty.is_single_valued(db) {
-                ty
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr, TypeContext::default())
-                    .to_instance(db)
-                    .unwrap_or(Type::Never)
-                    .top_materialization(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
-                mapping_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Sequence(kind) => {
-            if kind.is_irrefutable() {
-                sequence_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Or(predicates) => {
-            UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
-        }
-        PatternPredicateKind::As(pattern, _) => pattern
-            .as_deref()
-            .map(|p| pattern_kind_to_type(db, p))
-            .unwrap_or_else(Type::object),
-        PatternPredicateKind::Unsupported => Type::Never,
-    }
-}
-
-/// Go through the list of previous match cases, and accumulate a union of all types that were already
-/// matched by these patterns.
-fn type_excluded_by_previous_patterns<'db>(
+/// Narrow `subject_ty` by all preceding unguarded match patterns.
+///
+/// Caching each prefix lets the next case reuse the already-normalized subject instead of
+/// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
+/// same intersections.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
-    mut predicate: PatternPredicate<'db>,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let mut builder = UnionBuilder::new(db);
-    while let Some(previous) = predicate.previous_predicate(db) {
-        predicate = *previous;
+    let Some(previous) = predicate.previous_predicate(db) else {
+        return subject_ty;
+    };
+    let previous = *previous;
+    let narrowed_by_previous_patterns =
+        type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
-        if predicate.guard(db).is_none() {
-            builder = builder.add(pattern_kind_to_type(db, predicate.kind(db)));
-        }
+    if previous.guard(db).is_some() {
+        narrowed_by_previous_patterns
+    } else {
+        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
     }
-    builder.build()
+}
+
+/// Narrow `subject_ty` by a match pattern.
+///
+/// This result is also the preceding-pattern prefix for the next unguarded case.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_pattern<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .build()
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -376,7 +335,7 @@ fn enum_member_pattern_name<'db>(
     enum_class: ClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let value_ty = pattern_kind_to_type(db, kind);
+    let value_ty = definite_match_pattern_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class(db) != enum_class {
         return None;
@@ -498,7 +457,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
-    let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+    let subject_ty =
+        infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
         analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
@@ -506,11 +466,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject = IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(type_excluded_by_previous_patterns(db, predicate));
-
-    let narrowed_subject_ty = narrowed_subject.clone().build();
+    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -521,9 +477,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = narrowed_subject
-        .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
-        .build();
+    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -849,14 +803,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let predicate = self.predicates[predicate_id];
-        let pos_constraint = infer_narrowing_constraint(self.db, predicate, self.place);
-        let neg_predicate = Predicate {
-            node: predicate.node,
-            is_positive: !predicate.is_positive,
-        };
-        let neg_constraint = infer_narrowing_constraint(self.db, neg_predicate, self.place);
-        let constraints = (pos_constraint, neg_constraint);
+        let constraints =
+            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
@@ -995,7 +943,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_expression_type(db, *value, TypeContext::default());
+            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             if subject_ty.is_single_valued(db) {
                 Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -1004,7 +952,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Singleton(singleton) => {
-            let singleton_ty = singleton_to_type(db, *singleton);
+            let singleton_ty = singleton_pattern_type(db, *singleton);
 
             if subject_ty.is_equivalent_to(db, singleton_ty) {
                 Truthiness::AlwaysTrue
@@ -1026,7 +974,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         .add_negative(UnionType::from_elements(db, excluded_types.iter()))
                         .build();
 
-                    excluded_types.push(pattern_kind_to_type(db, p));
+                    excluded_types.push(definite_match_pattern_type(db, p));
 
                     analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
                 })
@@ -1046,7 +994,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
+            let class_ty = infer_same_file_expression_type(db, *class_expr, TypeContext::default())
                 .as_class_literal()
                 .map(|class| Type::instance(db, class.top_materialization(db)));
 
@@ -1082,7 +1030,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            let sequence_ty = sequence_pattern_type(db);
+            let sequence_ty = sequence_pattern_type_builder(db).build();
             if subject_ty.is_subtype_of(db, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
@@ -1099,7 +1047,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
             .unwrap_or(Truthiness::AlwaysTrue),
-        PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
+        PatternPredicateKind::MatchStar => Truthiness::Ambiguous,
     }
 }
 
@@ -1108,7 +1056,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_expression_type(db, test_expr, TypeContext::default())
+            infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
@@ -1124,7 +1072,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // selection algorithm).
             // Avoiding this on the happy-path is important because these constraints can be
             // very large in number, since we add them on all statement level function calls.
-            let ty = infer_expression_type(db, callable, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
             // Short-circuit for well known types that are known not to return `Never` when called.
             // Without the short-circuit, we've seen that threads keep blocking each other
@@ -1162,7 +1110,8 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                let call_expr_ty =
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {

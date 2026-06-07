@@ -676,9 +676,9 @@ def decorated(t: T) -> None:
 ## Attribute access on `Callable`-bounded TypeVars
 
 ```py
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
-F = TypeVar("F", bound=Callable)
+F = TypeVar("F", bound=Callable[..., Any])
 
 def my_decorator(f: F) -> None:
     # error: [unresolved-attribute]
@@ -689,7 +689,7 @@ def my_decorator(f: F) -> None:
 class Box(Generic[F]):
     cls: type[F]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable[..., Any]]) -> None:
     # error: [unresolved-attribute]
     box.cls.whatever
 ```

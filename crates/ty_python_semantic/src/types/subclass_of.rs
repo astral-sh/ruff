@@ -342,7 +342,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
             (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    !left.could_coexist_in_mro_with(db, right, self.constraints),
+                    !left.could_coexist_in_mro_with_disjointness_checker(db, right, self),
                 )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {

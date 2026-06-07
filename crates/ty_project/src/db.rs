@@ -105,11 +105,20 @@ impl ProjectDatabase {
         // TODO: Use the `program_settings` to compute the key for the database's persistent
         //   cache and load the cache if it exists.
         //   we may want to have a dedicated method for this?
+        // Important: For persistent caching it's essential that we can compute the
+        // cache key before loading the DB. Because of that, access to the `db` (other than system and vendored) is
+        // strictly forbidden before resolving the `program_settings`.
 
         // Initialize the `Program` singleton
         let (program_settings, program_settings_diagnostics) = strategy.to_anyhow(
             project_metadata.to_program_settings(db.system(), db.vendored(), strategy),
         )?;
+
+        // This must be called before `from_settings`, or the `SearchPath` root
+        // will take precedence over the `Project` root, resulting in
+        // all project files having HIGH durability.
+        project_metadata.try_add_project_root(&db);
+
         Program::from_settings(&db, program_settings);
 
         let (settings, settings_diagnostics) = strategy.map_err(
@@ -591,7 +600,8 @@ mod format {
 }
 
 #[cfg(any(test, feature = "testing"))]
-pub(crate) mod tests {
+#[cfg_attr(not(feature = "testing"), expect(unreachable_pub))]
+pub(crate) mod testing {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
@@ -664,6 +674,8 @@ pub(crate) mod tests {
                 .to_search_paths(self.system(), self.vendored(), &FallibleStrategy)
                 .expect("Valid search path settings");
 
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
             Program::from_settings(
                 self,
                 ProgramSettings {
@@ -675,8 +687,6 @@ pub(crate) mod tests {
                     search_paths,
                 },
             );
-
-            self.files().try_add_root(self, root, FileRootKind::Project);
 
             Ok(())
         }
@@ -775,4 +785,76 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl salsa::Database for TestDb {}
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::Db as _;
+    use ruff_db::files::FileRootKind;
+    use ruff_db::system::{SystemPathBuf, TestSystem};
+    use ty_module_resolver::list_modules;
+
+    use crate::{ProjectDatabase, ProjectMetadata};
+
+    #[test]
+    fn search_root_registration() -> anyhow::Result<()> {
+        let system = TestSystem::default();
+        let project = SystemPathBuf::from("/project");
+        let project_src = project.join("src");
+        let external = SystemPathBuf::from("/external");
+        let venv = project.join(".venv");
+
+        system.memory_file_system().write_files_all([
+            (
+                project.join("ty.toml"),
+                r#"
+                [environment]
+                root = ["src", "../external"]
+                extra-paths = [".venv"]
+                "#,
+            ),
+            (project_src.join("foo.py"), ""),
+            (external.join("bar.py"), ""),
+            (venv.join("baz.py"), ""),
+        ])?;
+
+        let metadata = ProjectMetadata::discover(&project, &system)?;
+        let db = ProjectDatabase::fallible(metadata, system)?;
+
+        let modules = list_modules(&db);
+        assert!(
+            modules
+                .iter()
+                .any(|module| module.name(&db).as_str() == "bar")
+        );
+
+        let project_src_root = db
+            .files()
+            .root(&db, &project_src)
+            .expect("project source file root");
+        assert_eq!(project_src_root.path(&db), &*project);
+        assert_eq!(
+            project_src_root.kind_at_time_of_creation(&db),
+            FileRootKind::Project
+        );
+
+        let external_root = db
+            .files()
+            .root(&db, &external)
+            .expect("external first-party file root");
+        assert_eq!(external_root.path(&db), &*external);
+        assert_eq!(
+            external_root.kind_at_time_of_creation(&db),
+            FileRootKind::SearchPath
+        );
+
+        let venv_root = db.files().root(&db, &venv).expect("virtualenv file root");
+        assert_eq!(venv_root.path(&db), &*venv);
+        assert_eq!(
+            venv_root.kind_at_time_of_creation(&db),
+            FileRootKind::SearchPath
+        );
+
+        Ok(())
+    }
 }

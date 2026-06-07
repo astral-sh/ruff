@@ -982,7 +982,7 @@ impl<'m> ContextCursor<'m> {
             // invalid we extract the token under the self and check if it makes
             // up that "empty space" inside the Parameters Node. If it does, we know
             // that we are still binding variables, just that the current state is
-            // syntatically invalid. Hence we suppress autocomplete suggestons
+            // syntactically invalid. Hence we suppress autocomplete suggestons
             // also in those cases.
             ast::AnyNodeRef::Parameters(params) => {
                 if !params.range.contains_range(self.range) {
@@ -1823,7 +1823,7 @@ fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'
 
     // Note that we specifically omit the `type` keyword here, since
     // it will be included via `builtins`. This does make its sorting
-    // priority slighty different than other keywords, but it's not
+    // priority slightly different than other keywords, but it's not
     // clear (to me, AG) if that's an issue or not. Since the builtin
     // completion has an actual type associated with it, we use that
     // instead of a keyword completion.
@@ -1936,7 +1936,14 @@ fn add_unimported_completions<'db>(
                 let name = module_name.as_str();
                 (name, ImportRequest::module(name))
             });
+
+        // Don't suggest symbols that are already imported.
+        if members.satisfies(db, file, &request) {
+            continue;
+        }
+
         let import_action = importer.import(request, &members);
+
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
         completions.add_skip_query(
@@ -4763,7 +4770,7 @@ quux.<CURSOR>
         __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
         __ge__ :: bound method Quux.__ge__(value: tuple[int | str, ...], /) -> bool
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
-        __getitem__ :: Overload[(index: Literal[-2, 0], /) -> int, (index: Literal[-1, 1], /) -> str, (index: SupportsIndex, /) -> int | str, (index: slice[Any, Any, Any], /) -> tuple[int | str, ...]]
+        __getitem__ :: Overload[(index: Literal[-2, 0], /) -> int, (index: Literal[-1, 1], /) -> str, (index: SupportsIndex, /) -> int | str, (index: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> tuple[int | str, ...]]
         __getstate__ :: bound method Quux.__getstate__() -> object
         __gt__ :: bound method Quux.__gt__(value: tuple[int | str, ...], /) -> bool
         __hash__ :: bound method Quux.__hash__() -> int
@@ -9783,6 +9790,217 @@ TypedDi<CURSOR>
         );
     }
 
+    #[test]
+    fn auto_import_omits_directly_imported_symbol() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from package import Thing\nThi<CURSOR>\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_wildcard_imported_symbol() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from package import *\nThi<CURSOR>\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_directly_imported_symbol_in_nested_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+def f():
+    from package import Thing
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_imported_symbol_from_parent_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+from package import Thing
+
+def f():
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_conditionally_imported_symbol_available_in_all_branches() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+if condition:
+    from package import Thing
+else:
+    from package import Thing
+
+Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_omits_conditionally_imported_symbol_available_in_some_branches() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+if condition:
+    from package import Thing
+
+Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: <no import required> :: <no import edit>",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_suggestion_for_import_after_cursor() {
+        let builder = CursorTest::builder()
+            .source("main.py", "Thi<CURSOR>\nfrom package import Thing\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        Thing :: package :: from package import Thing
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_qualified_suggestion_for_same_named_import() {
+        let builder = CursorTest::builder()
+            .source("main.py", "from other import Thing\nThi<CURSOR>\n")
+            .source("other/__init__.py", "class Thing: ...\n")
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        package.Thing :: package :: import package
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_preserves_qualified_suggestion_for_shadowed_import() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+from package import Thing
+
+def f():
+    Thing = 1
+    Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing");
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"
+        Thing :: <no import required> :: <no import edit>
+        package.Thing :: package :: import package
+        ",
+        );
+    }
+
+    #[test]
+    fn auto_import_does_not_use_enclosing_class_scope() {
+        let builder = CursorTest::builder()
+            .source(
+                "main.py",
+                "\
+class C:
+    from package import Thing
+
+    def f(self):
+        Thi<CURSOR>
+",
+            )
+            .source("package/__init__.py", "class Thing: ...\n")
+            .completion_test_builder()
+            .module_names()
+            .imports()
+            .filter(|c| c.name == "Thing" && c.import.is_some());
+        assert_snapshot!(
+            builder.build().snapshot(),
+            @"Thing :: package :: from package import Thing",
+        );
+    }
+
     /// Tests that `xs = ["..."]; xs[0].<CURSOR>` gets completions
     /// appropriate for `str`.
     #[test]
@@ -9927,7 +10145,7 @@ bar(y_true=y<CURSOR>
 
     // Ideally, we should favour completions that are definitely raisable
     // here. However, doing so would require `exception_ty` to fall back to
-    // token matching when AST-matching fails, making the function signficantly
+    // token matching when AST-matching fails, making the function significantly
     // more complex. At the time of writing, this trade-off was not
     // considered worthwhile.
     //
@@ -10259,7 +10477,7 @@ raise <CURSOR>
                 // N.B. We very much want to use the default settings
                 // here, so that our test environment matches the
                 // production environment. If a default changes, the
-                // tests should be fixed to accomodate that change
+                // tests should be fixed to accommodate that change
                 // as well. ---AG
                 settings: CompletionSettings::default(),
                 capabilities: CompletionCapabilities::default(),

@@ -717,7 +717,7 @@ info: The base of a `NewType` is not allowed to be a `TypedDict`.
 from typing import Any, NewType, TypeVar, Generic
 
 # All of these are allowed.
-A = NewType("A", list)
+A = NewType("A", list)  # error: [missing-type-argument]
 B = NewType("B", list[int])
 B = NewType("B", list[Any])
 

@@ -50,20 +50,34 @@ question when considering a typevar, by translating the desired relationship int
 
 ```py
 from typing import Any
-from ty_extensions import ConstraintSet, is_assignable_to, is_subtype_of, static_assert
+from ty_extensions import ConstraintSet, is_assignable_to, is_constraint_set_assignable_to, is_subtype_of, static_assert
 
 def assignability[T]():
+    # TODO: is_assignable_to should eventually work the way is_constraint_set_assignable_to does
+    # below.
     constraints = is_assignable_to(T, bool)
-    # TODO: expected = ConstraintSet.range(Never, T, bool)
     expected = ConstraintSet.never()
     static_assert(constraints == expected)
 
+    constraints = is_constraint_set_assignable_to(T, bool)
+    expected = ConstraintSet.range(Never, T, bool)
+    static_assert(constraints == expected)
+
+    # TODO: is_assignable_to should eventually work the way is_constraint_set_assignable_to does
+    # below.
     constraints = is_assignable_to(T, int)
-    # TODO: expected = ConstraintSet.range(Never, T, int)
     expected = ConstraintSet.never()
+    static_assert(constraints == expected)
+
+    constraints = is_constraint_set_assignable_to(T, int)
+    expected = ConstraintSet.range(Never, T, int)
     static_assert(constraints == expected)
 
     constraints = is_assignable_to(T, object)
+    expected = ConstraintSet.always()
+    static_assert(constraints == expected)
+
+    constraints = is_constraint_set_assignable_to(T, object)
     expected = ConstraintSet.always()
     static_assert(constraints == expected)
 
