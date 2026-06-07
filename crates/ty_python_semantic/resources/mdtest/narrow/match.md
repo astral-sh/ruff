@@ -175,7 +175,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 ## Sequence patterns
 
 ```py
-from collections.abc import Sequence
+from collections.abc import MutableMapping, MutableSequence, Sequence
 from enum import Enum, IntEnum
 from typing import Any, Literal, TypeAlias, TypeVar
 from typing_extensions import assert_never
@@ -353,6 +353,7 @@ PartiallyMatchedSequenceT = TypeVar(
     tuple[int, int],
 )
 SequenceElementT = TypeVar("SequenceElementT")
+RecursiveContainer: TypeAlias = int | MutableMapping[str, "RecursiveContainer"] | MutableSequence["RecursiveContainer"]
 
 def test_match_sequence_alias_preserves_bound_typevar(
     value: BoundSequenceT,
@@ -401,6 +402,17 @@ def test_match_sequence_alias_preserves_element_narrowing(
             return whole[0]
         case _:
             return 0
+
+def test_match_class_alias_preserves_recursive_containers(
+    value: RecursiveContainer,
+) -> None:
+    match value:
+        case MutableMapping() as mapping:
+            for item in mapping.values():
+                test_match_class_alias_preserves_recursive_containers(item)
+        case MutableSequence() as sequence:
+            for item in sequence:
+                test_match_class_alias_preserves_recursive_containers(item)
 
 class Number(IntEnum):
     ONE = 1

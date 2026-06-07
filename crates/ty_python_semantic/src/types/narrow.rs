@@ -1145,7 +1145,86 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Sequence(kind) => {
                 self.match_sequence_pattern_subject_type(kind, subject_ty)
             }
+            PatternPredicateKind::Class(class_expr, _) => {
+                let class_ty = self.necessary_match_pattern_type(pattern);
+                let class =
+                    infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
+                        .as_class_literal();
+                self.match_class_pattern_subject_type(class, class_ty, subject_ty, false)
+            }
             _ => self.intersect_types(subject_ty, self.necessary_match_pattern_type(pattern)),
+        }
+    }
+
+    /// Narrow a class-pattern alias without replacing specialized union arms with the class's top
+    /// materialization.
+    fn match_class_pattern_subject_type(
+        &self,
+        class: Option<ClassLiteral<'db>>,
+        class_ty: Type<'db>,
+        subject_ty: Type<'db>,
+        filter_nominal_arms: bool,
+    ) -> Type<'db> {
+        match subject_ty {
+            Type::TypeAlias(alias) => self.match_class_pattern_subject_type(
+                class,
+                class_ty,
+                alias.value_type(self.db),
+                true,
+            ),
+            Type::Union(union) => UnionType::from_elements(
+                self.db,
+                union.elements(self.db).iter().copied().map(|element| {
+                    self.match_class_pattern_subject_type(class, class_ty, element, true)
+                }),
+            ),
+            Type::Intersection(intersection) => {
+                let filter_nominal_arms = filter_nominal_arms
+                    || intersection
+                        .positive(self.db)
+                        .iter()
+                        .any(|positive| matches!(positive, Type::TypeAlias(_) | Type::Union(_)));
+                let mut builder = IntersectionBuilder::new(self.db);
+                for positive in intersection.positive(self.db) {
+                    builder = builder.add_positive(self.match_class_pattern_subject_type(
+                        class,
+                        class_ty,
+                        *positive,
+                        filter_nominal_arms,
+                    ));
+                }
+                for negative in intersection.negative(self.db) {
+                    builder = builder.add_negative(*negative);
+                }
+                builder.build()
+            }
+            Type::NominalInstance(instance) if filter_nominal_arms => {
+                let Some(class) = class else {
+                    return self.intersect_types(subject_ty, class_ty);
+                };
+                let subject_class = instance.class(self.db);
+                if subject_class.is_subtype_of_class_literal(self.db, class) {
+                    subject_ty
+                } else if ClassType::NonGeneric(class)
+                    .is_subtype_of_class_literal(self.db, subject_class.class_literal(self.db))
+                {
+                    self.intersect_types(subject_ty, class_ty)
+                } else {
+                    Type::Never
+                }
+            }
+            Type::TypedDict(_) if filter_nominal_arms => {
+                if class.is_some_and(|class| {
+                    KnownClass::Dict.is_subclass_of(self.db, ClassType::NonGeneric(class))
+                }) {
+                    subject_ty
+                } else {
+                    Type::Never
+                }
+            }
+            _ if subject_ty.is_subtype_of(self.db, class_ty) => subject_ty,
+            _ if subject_ty.is_disjoint_from(self.db, class_ty) => Type::Never,
+            _ => self.intersect_types(subject_ty, class_ty),
         }
     }
 
