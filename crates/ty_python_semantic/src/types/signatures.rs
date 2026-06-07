@@ -12,6 +12,7 @@
 
 use std::collections::BTreeMap;
 use std::slice::Iter;
+use std::sync::Arc;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -868,7 +869,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = self.parameters.value.first_mut()
+        if let Some(first_parameter) = Arc::make_mut(&mut self.parameters.data).value.first_mut()
             && first_parameter.is_positional()
             && first_parameter.annotated_type.is_unknown()
             && first_parameter.inferred_annotation
@@ -2498,9 +2499,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.value[..source.parameters.len().saturating_sub(2)];
+                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
                     let target_prefix_params =
-                        &target.parameters.value[..target.parameters.len().saturating_sub(2)];
+                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
 
                     for (target_index, (source_param, target_param)) in source_prefix_params
                         .iter()
@@ -2525,7 +2526,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Standard,
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.value[..source.parameters.len().saturating_sub(2)];
+                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
 
                     for (target_index, param) in source_prefix_params
                         .iter()
@@ -2581,7 +2582,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let target_prefix_params =
-                        &target.parameters.value[..target.parameters.len().saturating_sub(2)];
+                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
 
                     let mut parameters = ParametersZip {
                         current_source: None,
@@ -3104,13 +3105,26 @@ pub(crate) enum ParametersKind<'db> {
 // between the `value` and `kind` field, it would be better to structure it such that these
 // invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Vec<Parameter<'db>>,
+struct ParametersData<'db> {
+    value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Parameters<'db> {
+    data: Arc<ParametersData<'db>>,
+}
+
 impl<'db> Parameters<'db> {
+    fn from_vec(value: Vec<Parameter<'db>>, kind: ParametersKind<'db>) -> Self {
+        Self {
+            data: Arc::new(ParametersData {
+                value: value.into_boxed_slice(),
+                kind,
+            }),
+        }
+    }
+
     /// Create a new parameter list from an iterator of parameters.
     ///
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
@@ -3236,44 +3250,39 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        value.shrink_to_fit();
-
-        Parameters { value, kind }
+        Self::from_vec(value, kind)
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self {
-            value: Vec::new(),
-            kind: ParametersKind::Standard,
-        }
+        Self::from_vec(Vec::new(), ParametersKind::Standard)
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
-        self.value.as_slice()
+        &self.data.value
     }
 
-    pub(crate) const fn kind(&self) -> ParametersKind<'db> {
-        self.kind
+    pub(crate) fn kind(&self) -> ParametersKind<'db> {
+        self.data.kind
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
-    pub(crate) const fn is_gradual(&self) -> bool {
+    pub(crate) fn is_gradual(&self) -> bool {
         matches!(
-            self.kind,
+            self.data.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
-    pub(crate) const fn is_top(&self) -> bool {
-        matches!(self.kind, ParametersKind::Top)
+    pub(crate) fn is_top(&self) -> bool {
+        matches!(self.data.kind, ParametersKind::Top)
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
-    pub(crate) const fn is_standard(&self) -> bool {
-        matches!(self.kind, ParametersKind::Standard)
+    pub(crate) fn is_standard(&self) -> bool {
+        matches!(self.data.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -3281,8 +3290,8 @@ impl<'db> Parameters<'db> {
     /// For either `P` or `Concatenate[<prefix-params>, P]`, use [`as_paramspec_with_prefix`].
     ///
     /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
-    pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
-        match self.kind {
+    pub(crate) fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
+        match self.data.kind {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -3297,26 +3306,27 @@ impl<'db> Parameters<'db> {
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        match self.kind {
+        match self.data.kind {
             ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
-            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => {
-                Some((&self.value[..self.value.len().saturating_sub(2)], typevar))
-            }
+            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => Some((
+                &self.data.value[..self.data.value.len().saturating_sub(2)],
+                typevar,
+            )),
             _ => None,
         }
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
-        Self {
-            value: vec![
+        Self::from_vec(
+            vec![
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(todo_type!("todo signature *args")),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     /// Return parameters that represents a gradual form using `...` as the only parameter.
@@ -3325,20 +3335,20 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self {
-            value: vec![
+        Self::from_vec(
+            vec![
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
-        Self {
-            value: vec![
+        Self::from_vec(
+            vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
                     typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                 )),
@@ -3346,8 +3356,8 @@ impl<'db> Parameters<'db> {
                     Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
                 ),
             ],
-            kind: ParametersKind::ParamSpec(typevar),
-        }
+            ParametersKind::ParamSpec(typevar),
+        )
     }
 
     /// Create a parameter list representing a `Concatenate` form with the given prefix parameters
@@ -3373,10 +3383,7 @@ impl<'db> Parameters<'db> {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(kwargs_type),
         ]);
-        Self {
-            value: prefix_params,
-            kind: ParametersKind::Concatenate(concatenate_tail),
-        }
+        Self::from_vec(prefix_params, ParametersKind::Concatenate(concatenate_tail))
     }
 
     /// Return parameters that represents an unknown list of parameters.
@@ -3386,28 +3393,28 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self {
-            value: vec![
+        Self::from_vec(
+            vec![
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
     pub(crate) fn bottom() -> Self {
-        Self {
-            value: vec![
+        Self::from_vec(
+            vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            kind: ParametersKind::Standard,
-        }
+            ParametersKind::Standard,
+        )
     }
 
     /// Return the "top" parameters (infinite union of all possible parameters), which cannot
@@ -3416,17 +3423,17 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self {
+        Self::from_vec(
             // We always emit `called-top-callable` for any call to the top callable (based on the
             // `kind` below), so we otherwise give it the most permissive signature`(*object,
             // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            value: vec![
+            vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            kind: ParametersKind::Top,
-        }
+            ParametersKind::Top,
+        )
     }
 
     fn from_parameters(
@@ -3554,7 +3561,7 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
-                self.kind,
+                self.data.kind,
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
@@ -3573,22 +3580,22 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
-        Self {
-            value: self
+        Self::from_vec(
+            self.data
                 .value
                 .iter()
                 .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
                 .collect(),
-            kind: self.kind,
-        }
+            self.data.kind,
+        )
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.value.len()
+        self.data.value.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
-        self.value.iter()
+        self.data.value.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -3602,7 +3609,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.value.get(index)
+        self.data.value.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -3700,9 +3707,9 @@ impl<'db> Parameters<'db> {
         };
 
         let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.value[..variadic_index]);
+        expanded.extend_from_slice(&self.data.value[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.value[variadic_index + 2..]);
+        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
         Parameters::new(db, expanded)
     }
 }
@@ -3712,7 +3719,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.value.iter()
+        self.data.value.iter()
     }
 }
 
@@ -3720,7 +3727,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.value[index]
+        &self.data.value[index]
     }
 }
 
@@ -4326,7 +4333,6 @@ mod tests {
         assert_eq!(
             signature
                 .parameters
-                .value
                 .iter()
                 .map(ParameterWithoutDefinition::from)
                 .collect::<Vec<_>>(),
@@ -4369,7 +4375,7 @@ mod tests {
 
     #[track_caller]
     fn assert_params_have_definitions(signature: &Signature<'_>) {
-        for parameter in &signature.parameters.value {
+        for parameter in &signature.parameters {
             assert!(
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
@@ -4471,7 +4477,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -4509,7 +4515,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -4552,7 +4558,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -4596,7 +4602,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected two positional-or-keyword parameters");
         };
