@@ -1565,13 +1565,6 @@ impl<'db> Type<'db> {
         ))
     }
 
-    pub(crate) const fn as_module_literal(self) -> Option<ModuleLiteralType<'db>> {
-        match self {
-            Type::ModuleLiteral(module) => Some(module),
-            _ => None,
-        }
-    }
-
     pub(crate) const fn is_union(self) -> bool {
         matches!(self, Type::Union(_))
     }
