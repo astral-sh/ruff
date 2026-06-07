@@ -1096,6 +1096,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Self::merge_optional_constraints_and(constraints, alias_constraints)
     }
 
+    /// Add replacement constraints for names bound by a successful pattern.
+    ///
+    /// Capture constraints are only produced for positive pattern predicates: a failed pattern
+    /// does not bind its captures. Nested captures are evaluated against the portion of the subject
+    /// that can satisfy their enclosing pattern.
     fn evaluate_match_pattern_aliases(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
@@ -1164,6 +1169,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    /// Return the type a subject can have after successfully matching `pattern`.
+    ///
+    /// This is used for `as` bindings and nested captures. Unlike ordinary subject narrowing, it
+    /// must retain arms that can match through custom equality and preserve the original identity
+    /// of generic subjects where possible.
     fn match_pattern_subject_type(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
@@ -1297,6 +1307,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer each sequence capture from subject arms that can satisfy the complete pattern.
+    ///
+    /// Filtering the whole arm before combining element types preserves correlations such as the
+    /// first element of `tuple[Literal[1], int] | tuple[Literal[2], str]`.
     fn match_sequence_pattern_element_types(
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1324,6 +1338,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    /// Narrow a whole-sequence alias while retaining the identity of generic subjects.
+    ///
+    /// For example, in `case [int()] as whole`, a `list[T]` subject remains tied to the original
+    /// `T`, intersected with the structural and element constraints established by the pattern.
     fn match_sequence_pattern_subject_type(
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
