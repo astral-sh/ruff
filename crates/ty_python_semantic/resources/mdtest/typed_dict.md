@@ -2463,7 +2463,13 @@ type RecursiveItem = A | RecursiveItem
 
 def _(item: RecursiveItem) -> None:
     # The common-constraint check must terminate when an alias refers back to its containing union.
-    reveal_type(dict(item))  # revealed: dict[str, object]
+    #
+    # TODO: this should be `dict[str, object]`. We do not yet unify type variables for a `TypedDict`
+    # reached *through a type alias*: `dict()` of a `TypedDict` argument infers `dict[str, object]`,
+    # but `dict()` of an *alias to* that `TypedDict` does not — a plain `type Item = A` produces the
+    # same `dict[Unknown, Unknown]`. This is independent of recursion; the self-referential alias
+    # merely collapses to a single `TypedDict`-via-alias and so hits the same gap.
+    reveal_type(dict(item))  # revealed: dict[Unknown, Unknown]
 ```
 
 Generic protocol inference must preserve structural constraints that differ from

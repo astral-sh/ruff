@@ -3727,8 +3727,9 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::Ambiguous { divergent_fallback } => divergent_fallback
-                    .unwrap_or_else(|| Type::Dynamic(DynamicType::AmbiguousOverload)),
+                OverloadCallReturnType::Ambiguous { divergent_fallback } => {
+                    divergent_fallback.unwrap_or(Type::Dynamic(DynamicType::AmbiguousOverload))
+                }
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
             };
         }

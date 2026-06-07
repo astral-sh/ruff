@@ -5797,7 +5797,18 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+
+            // A named recursive *type alias* (`source_alias = Some`) is a valid recursive type. An
+            // *implicit* recursive type (`source_alias = None`) comes from a self-referential cyclic
+            // *value* — e.g. `X = NamedTuple("X", [("x", "X")]), None`, where `X` is bound to a tuple
+            // value — and using such a runtime value as a type is invalid. Check its body so a
+            // value-shaped body (a tuple/instance) yields `invalid-type-form`.
+            Type::Recursive(rec) if rec.source_alias(db).is_some() => Ok(*self),
+            Type::Recursive(rec) => rec
+                .body(db)
+                .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
+                .map(|_| *self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
