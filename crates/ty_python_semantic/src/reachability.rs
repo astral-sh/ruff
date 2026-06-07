@@ -523,7 +523,7 @@ fn large_projected_narrowing_transform<'db>(
     let predicates = use_def.predicates();
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let root = projector.project(id);
-    projected_narrowing_transform(db, &projector.graph, root)
+    projected_narrowing_transform(&projector.graph, root)
 }
 
 #[salsa::tracked(
@@ -601,7 +601,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             let scope = predicate_scope(db, predicates[node.atom()]);
             return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
         } else {
-            projected_narrowing_transform(db, &projector.graph, projected_root)
+            projected_narrowing_transform(&projector.graph, projected_root)
         };
         transform.apply(db, base_ty)
     }
@@ -899,7 +899,6 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
 /// Builds a narrowing transform over a projected narrowing graph.
 fn projected_narrowing_transform<'db>(
-    db: &'db dyn Db,
     graph: &ProjectedNarrowingGraph<'db>,
     root: ProjectedNarrowingNodeId,
 ) -> NarrowingTransform<'db> {
@@ -909,7 +908,7 @@ fn projected_narrowing_transform<'db>(
     let root = graph.fold(root, identity, unreachable, |node, if_true, if_false| {
         let constraints = graph.predicate_constraints_cache[&node.atom].clone();
         if let Some(complementary) = constraints.complementary {
-            builder.branch(db, complementary, if_true, if_false)
+            builder.branch(complementary, if_true, if_false)
         } else {
             let positive = builder.constraint(constraints.positive);
             let negative = builder.constraint(constraints.negative);

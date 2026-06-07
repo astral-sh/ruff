@@ -187,26 +187,6 @@ impl<'db> ComplementaryNarrowing<'db> {
             negative: self.positive,
         }
     }
-
-    pub(crate) fn or(self, db: &'db dyn Db, other: Self) -> Self {
-        Self {
-            positive: UnionType::from_two_elements(db, self.positive, other.positive),
-            negative: IntersectionBuilder::new(db)
-                .add_positive(self.negative)
-                .add_positive(other.negative)
-                .build(),
-        }
-    }
-
-    pub(crate) fn and(self, db: &'db dyn Db, other: Self) -> Self {
-        Self {
-            positive: IntersectionBuilder::new(db)
-                .add_positive(self.positive)
-                .add_positive(other.positive)
-                .build(),
-            negative: UnionType::from_two_elements(db, self.negative, other.negative),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -675,6 +655,22 @@ impl NarrowingTransformId {
     const UNREACHABLE: Self = Self(1);
 }
 
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+struct NarrowingConditionId(usize);
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+enum NarrowingConditionNode<'db> {
+    Atom(ComplementaryNarrowing<'db>),
+    Or {
+        left: NarrowingConditionId,
+        right: NarrowingConditionId,
+    },
+    And {
+        left: NarrowingConditionId,
+        right: NarrowingConditionId,
+    },
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 enum NarrowingTransformNode<'db> {
     Identity,
@@ -689,7 +685,7 @@ enum NarrowingTransformNode<'db> {
         right: NarrowingTransformId,
     },
     Branch {
-        condition: ComplementaryNarrowing<'db>,
+        condition: NarrowingConditionId,
         if_true: NarrowingTransformId,
         if_false: NarrowingTransformId,
     },
@@ -699,6 +695,7 @@ enum NarrowingTransformNode<'db> {
 #[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingTransform<'db> {
     nodes: Box<[NarrowingTransformNode<'db>]>,
+    conditions: Box<[NarrowingConditionNode<'db>]>,
     root: NarrowingTransformId,
 }
 
@@ -708,12 +705,14 @@ impl<'db> NarrowingTransform<'db> {
     }
 
     pub(crate) fn apply(&self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        let mut condition_cache = vec![None; self.conditions.len()];
         self.apply_node(
             db,
             self.root,
             base_ty,
             base_ty,
             &mut vec![None; self.nodes.len()],
+            &mut condition_cache,
         )
     }
 
@@ -724,6 +723,7 @@ impl<'db> NarrowingTransform<'db> {
         base_ty: Type<'db>,
         original_base_ty: Type<'db>,
         cache: &mut [Option<Type<'db>>],
+        condition_cache: &mut [Option<ComplementaryNarrowing<'db>>],
     ) -> Type<'db> {
         if base_ty == original_base_ty
             && let Some(cached) = cache[id.0]
@@ -735,30 +735,49 @@ impl<'db> NarrowingTransform<'db> {
             NarrowingTransformNode::Identity => base_ty,
             NarrowingTransformNode::Unreachable => Type::Never,
             NarrowingTransformNode::Constraint(constraint) => {
-                NarrowingConstraint::intersection(base_ty)
-                    .merge_constraint_and(constraint.clone())
-                    .evaluate_constraint_type(db)
+                apply_narrowing_constraint(db, base_ty, constraint.clone())
             }
-            NarrowingTransformNode::Then { earlier, later } => {
-                let earlier = self.apply_node(db, *earlier, base_ty, original_base_ty, cache);
-                self.apply_node(db, *later, earlier, original_base_ty, cache)
+            NarrowingTransformNode::Then { .. } => {
+                self.apply_sequence(db, id, base_ty, original_base_ty, cache, condition_cache)
             }
             NarrowingTransformNode::Join { left, right } => UnionType::from_two_elements(
                 db,
-                self.apply_node(db, *left, base_ty, original_base_ty, cache),
-                self.apply_node(db, *right, base_ty, original_base_ty, cache),
+                self.apply_node(db, *left, base_ty, original_base_ty, cache, condition_cache),
+                self.apply_node(
+                    db,
+                    *right,
+                    base_ty,
+                    original_base_ty,
+                    cache,
+                    condition_cache,
+                ),
             ),
             NarrowingTransformNode::Branch {
                 condition,
                 if_true,
                 if_false,
             } => {
+                let condition = self.apply_condition(db, *condition, condition_cache);
                 let if_true = IntersectionBuilder::new(db)
-                    .add_positive(self.apply_node(db, *if_true, base_ty, original_base_ty, cache))
+                    .add_positive(self.apply_node(
+                        db,
+                        *if_true,
+                        base_ty,
+                        original_base_ty,
+                        cache,
+                        condition_cache,
+                    ))
                     .add_positive(condition.positive())
                     .build();
                 let if_false = IntersectionBuilder::new(db)
-                    .add_positive(self.apply_node(db, *if_false, base_ty, original_base_ty, cache))
+                    .add_positive(self.apply_node(
+                        db,
+                        *if_false,
+                        base_ty,
+                        original_base_ty,
+                        cache,
+                        condition_cache,
+                    ))
                     .add_positive(condition.negative())
                     .build();
                 UnionType::from_two_elements(db, if_true, if_false)
@@ -769,17 +788,128 @@ impl<'db> NarrowingTransform<'db> {
         }
         result
     }
+
+    fn apply_sequence(
+        &self,
+        db: &'db dyn Db,
+        id: NarrowingTransformId,
+        base_ty: Type<'db>,
+        original_base_ty: Type<'db>,
+        cache: &mut [Option<Type<'db>>],
+        condition_cache: &mut [Option<ComplementaryNarrowing<'db>>],
+    ) -> Type<'db> {
+        let mut sequence = Vec::new();
+        let mut pending = vec![id];
+        while let Some(id) = pending.pop() {
+            if let NarrowingTransformNode::Then { earlier, later } = self.nodes[id.0] {
+                pending.extend([later, earlier]);
+            } else {
+                sequence.push(id);
+            }
+        }
+
+        let mut result = base_ty;
+        let mut accumulated: Option<NarrowingConstraint<'db>> = None;
+        for id in sequence {
+            if let NarrowingTransformNode::Constraint(constraint) = &self.nodes[id.0] {
+                accumulated = Some(match accumulated {
+                    Some(accumulated) => accumulated.merge_constraint_and(constraint.clone()),
+                    None => constraint.clone(),
+                });
+            } else {
+                if let Some(constraint) = accumulated.take() {
+                    result = apply_narrowing_constraint(db, result, constraint);
+                }
+                result = self.apply_node(db, id, result, original_base_ty, cache, condition_cache);
+            }
+        }
+        if let Some(constraint) = accumulated {
+            result = apply_narrowing_constraint(db, result, constraint);
+        }
+        result
+    }
+
+    fn apply_condition(
+        &self,
+        db: &'db dyn Db,
+        id: NarrowingConditionId,
+        cache: &mut [Option<ComplementaryNarrowing<'db>>],
+    ) -> ComplementaryNarrowing<'db> {
+        if let Some(cached) = cache[id.0] {
+            return cached;
+        }
+
+        let result = match self.conditions[id.0] {
+            NarrowingConditionNode::Atom(condition) => condition,
+            NarrowingConditionNode::Or { .. } => {
+                let mut positive = UnionBuilder::new(db);
+                let mut negative = IntersectionBuilder::new(db);
+                let mut pending = vec![id];
+                while let Some(id) = pending.pop() {
+                    match self.conditions[id.0] {
+                        NarrowingConditionNode::Or { left, right } if cache[id.0].is_none() => {
+                            pending.extend([left, right]);
+                        }
+                        _ => {
+                            let condition = self.apply_condition(db, id, cache);
+                            positive = positive.add(condition.positive());
+                            negative = negative.add_positive(condition.negative());
+                        }
+                    }
+                }
+                ComplementaryNarrowing {
+                    positive: positive.build(),
+                    negative: negative.build(),
+                }
+            }
+            NarrowingConditionNode::And { .. } => {
+                let mut positive = IntersectionBuilder::new(db);
+                let mut negative = UnionBuilder::new(db);
+                let mut pending = vec![id];
+                while let Some(id) = pending.pop() {
+                    match self.conditions[id.0] {
+                        NarrowingConditionNode::And { left, right } if cache[id.0].is_none() => {
+                            pending.extend([left, right]);
+                        }
+                        _ => {
+                            let condition = self.apply_condition(db, id, cache);
+                            positive = positive.add_positive(condition.positive());
+                            negative = negative.add(condition.negative());
+                        }
+                    }
+                }
+                ComplementaryNarrowing {
+                    positive: positive.build(),
+                    negative: negative.build(),
+                }
+            }
+        };
+        cache[id.0] = Some(result);
+        result
+    }
+}
+
+fn apply_narrowing_constraint<'db>(
+    db: &'db dyn Db,
+    base_ty: Type<'db>,
+    constraint: NarrowingConstraint<'db>,
+) -> Type<'db> {
+    NarrowingConstraint::intersection(base_ty)
+        .merge_constraint_and(constraint)
+        .evaluate_constraint_type(db)
 }
 
 pub(crate) struct NarrowingTransformBuilder<'db> {
     nodes: Vec<NarrowingTransformNode<'db>>,
     cache: FxHashMap<NarrowingTransformNode<'db>, NarrowingTransformId>,
-    branch_specs: FxHashMap<NarrowingTransformId, NarrowingBranchSpec<'db>>,
+    conditions: Vec<NarrowingConditionNode<'db>>,
+    condition_cache: FxHashMap<NarrowingConditionNode<'db>, NarrowingConditionId>,
+    branch_specs: FxHashMap<NarrowingTransformId, NarrowingBranchSpec>,
 }
 
 #[derive(Clone, Copy)]
-struct NarrowingBranchSpec<'db> {
-    condition: ComplementaryNarrowing<'db>,
+struct NarrowingBranchSpec {
+    condition: NarrowingConditionId,
     if_true: NarrowingTransformId,
     if_false: NarrowingTransformId,
     branches: usize,
@@ -800,6 +930,8 @@ impl Default for NarrowingTransformBuilder<'_> {
         Self {
             nodes,
             cache,
+            conditions: Vec::new(),
+            condition_cache: FxHashMap::default(),
             branch_specs: FxHashMap::default(),
         }
     }
@@ -862,7 +994,6 @@ impl<'db> NarrowingTransformBuilder<'db> {
 
     pub(crate) fn branch(
         &mut self,
-        db: &'db dyn Db,
         condition: ComplementaryNarrowing<'db>,
         if_true: NarrowingTransformId,
         if_false: NarrowingTransformId,
@@ -871,20 +1002,30 @@ impl<'db> NarrowingTransformBuilder<'db> {
             return if_true;
         }
 
-        let spec = if let Some(nested) = self.branch_specs.get(&if_false)
+        let atomic_condition = condition;
+        let condition = self.add_condition(NarrowingConditionNode::Atom(condition));
+        let spec = if let Some(nested) = self.branch_specs.get(&if_false).copied()
+            && if_true != Self::unreachable()
             && if_true == nested.if_true
         {
             NarrowingBranchSpec {
-                condition: nested.condition.or(db, condition),
+                condition: self.add_condition(NarrowingConditionNode::Or {
+                    left: nested.condition,
+                    right: condition,
+                }),
                 if_true,
                 if_false: nested.if_false,
                 branches: nested.branches + 1,
             }
-        } else if let Some(nested) = self.branch_specs.get(&if_true)
+        } else if let Some(nested) = self.branch_specs.get(&if_true).copied()
+            && if_false != Self::unreachable()
             && if_false == nested.if_false
         {
             NarrowingBranchSpec {
-                condition: nested.condition.and(db, condition),
+                condition: self.add_condition(NarrowingConditionNode::And {
+                    left: nested.condition,
+                    right: condition,
+                }),
                 if_true: nested.if_true,
                 if_false,
                 branches: nested.branches + 1,
@@ -906,10 +1047,10 @@ impl<'db> NarrowingTransformBuilder<'db> {
             })
         } else {
             let positive = self.constraint(Some(NarrowingConstraint::intersection(
-                condition.positive(),
+                atomic_condition.positive(),
             )));
             let negative = self.constraint(Some(NarrowingConstraint::intersection(
-                condition.negative(),
+                atomic_condition.negative(),
             )));
             let if_true = self.then(if_true, positive);
             let if_false = self.then(if_false, negative);
@@ -921,7 +1062,9 @@ impl<'db> NarrowingTransformBuilder<'db> {
 
     pub(crate) fn build(self, root: NarrowingTransformId) -> NarrowingTransform<'db> {
         let mut reachable = vec![false; self.nodes.len()];
+        let mut reachable_conditions = vec![false; self.conditions.len()];
         let mut pending = vec![root];
+        let mut pending_conditions = Vec::new();
         while let Some(id) = pending.pop() {
             if std::mem::replace(&mut reachable[id.0], true) {
                 continue;
@@ -937,11 +1080,58 @@ impl<'db> NarrowingTransformBuilder<'db> {
                     pending.extend([left, right]);
                 }
                 NarrowingTransformNode::Branch {
-                    if_true, if_false, ..
+                    condition,
+                    if_true,
+                    if_false,
                 } => {
                     pending.extend([if_true, if_false]);
+                    pending_conditions.push(condition);
                 }
             }
+        }
+
+        while let Some(id) = pending_conditions.pop() {
+            if std::mem::replace(&mut reachable_conditions[id.0], true) {
+                continue;
+            }
+            match self.conditions[id.0] {
+                NarrowingConditionNode::Atom(_) => {}
+                NarrowingConditionNode::Or { left, right }
+                | NarrowingConditionNode::And { left, right } => {
+                    pending_conditions.extend([left, right]);
+                }
+            }
+        }
+
+        let mut condition_remap = vec![NarrowingConditionId(usize::MAX); self.conditions.len()];
+        let mut conditions = Vec::with_capacity(
+            reachable_conditions
+                .iter()
+                .filter(|reachable| **reachable)
+                .count(),
+        );
+        for (index, condition) in self.conditions.into_iter().enumerate() {
+            if !reachable_conditions[index] {
+                continue;
+            }
+
+            let new_id = NarrowingConditionId(conditions.len());
+            condition_remap[index] = new_id;
+            let remap_child = |id: NarrowingConditionId| {
+                debug_assert!(id.0 < index && reachable_conditions[id.0]);
+                condition_remap[id.0]
+            };
+            conditions.push(match condition {
+                NarrowingConditionNode::Atom(condition) => NarrowingConditionNode::Atom(condition),
+                NarrowingConditionNode::Or { left, right } => NarrowingConditionNode::Or {
+                    left: remap_child(left),
+                    right: remap_child(right),
+                },
+                NarrowingConditionNode::And { left, right } => NarrowingConditionNode::And {
+                    left: remap_child(left),
+                    right: remap_child(right),
+                },
+            });
         }
 
         let mut remap = vec![NarrowingTransformId::UNREACHABLE; self.nodes.len()];
@@ -977,7 +1167,7 @@ impl<'db> NarrowingTransformBuilder<'db> {
                     if_true,
                     if_false,
                 } => NarrowingTransformNode::Branch {
-                    condition,
+                    condition: condition_remap[condition.0],
                     if_true: remap_child(if_true),
                     if_false: remap_child(if_false),
                 },
@@ -986,6 +1176,7 @@ impl<'db> NarrowingTransformBuilder<'db> {
 
         NarrowingTransform {
             nodes: nodes.into_boxed_slice(),
+            conditions: conditions.into_boxed_slice(),
             root: remap[root.0],
         }
     }
@@ -997,6 +1188,16 @@ impl<'db> NarrowingTransformBuilder<'db> {
         let id = NarrowingTransformId(self.nodes.len());
         self.nodes.push(node.clone());
         self.cache.insert(node, id);
+        id
+    }
+
+    fn add_condition(&mut self, node: NarrowingConditionNode<'db>) -> NarrowingConditionId {
+        if let Some(id) = self.condition_cache.get(&node) {
+            return *id;
+        }
+        let id = NarrowingConditionId(self.conditions.len());
+        self.conditions.push(node);
+        self.condition_cache.insert(node, id);
         id
     }
 }
