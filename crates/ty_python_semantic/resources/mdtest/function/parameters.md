@@ -2,8 +2,9 @@
 
 Within a function scope, the declared type of each parameter is its annotated type (or Unknown if
 not annotated). The initial inferred type is the annotated type of the parameter, if any. If there
-is no annotation, it is the union of `Unknown` with the type of the default value expression (if
-any).
+is no annotation but there is a default value, the declared type is inferred by promoting the
+default value's type (literals are widened to their base types, e.g. `Literal["foo"]` → `str`;
+singletons like `None` are widened to `T | Unknown`).
 
 The variadic parameter is a variadic tuple of its annotated type; the variadic-keywords parameter is
 a dictionary from strings to its annotated type.
@@ -16,14 +17,48 @@ from typing import Literal
 def f(a, b: int, c=1, d: int = 2, /, e=3, f: Literal[4] = 4, *args: object, g=5, h: Literal[6] = 6, **kwargs: str):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: int
-    reveal_type(c)  # revealed: Unknown | Literal[1]
+    reveal_type(c)  # revealed: int
     reveal_type(d)  # revealed: int
-    reveal_type(e)  # revealed: Unknown | Literal[3]
+    reveal_type(e)  # revealed: int
     reveal_type(f)  # revealed: Literal[4]
-    reveal_type(g)  # revealed: Unknown | Literal[5]
+    reveal_type(g)  # revealed: int
     reveal_type(h)  # revealed: Literal[6]
     reveal_type(args)  # revealed: tuple[object, ...]
     reveal_type(kwargs)  # revealed: dict[str, str]
+```
+
+## Unannotated parameters with defaults
+
+Unannotated parameters with defaults get a declared type inferred by promoting the default value's
+type. Literals are widened to their base types; singletons like `None` are widened to `T | Unknown`
+to avoid being overly restrictive.
+
+```py
+def f(a="foo", b=1, c=True, d=None, e=b"bytes"):
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: int
+    reveal_type(c)  # revealed: bool
+    reveal_type(d)  # revealed: None | Unknown
+    reveal_type(e)  # revealed: bytes
+```
+
+At call sites, the inferred type is checked:
+
+```py
+def f(x="foo"): ...
+
+f("bar")  # ok
+f(1)  # error: [invalid-argument-type]
+```
+
+Since `None | Unknown` includes `Unknown`, a `None`-defaulted parameter accepts any argument type:
+
+```py
+def f(x=None): ...
+
+f(None)  # ok
+f("anything")  # ok
+f(42)  # ok
 ```
 
 ## Unannotated variadic parameters
