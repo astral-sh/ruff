@@ -79,7 +79,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{ApplySpecialization, GenericContext, typing_self};
-use crate::types::infer::{nearest_enclosing_class, original_class_type};
+use crate::types::infer::original_class_type;
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
@@ -469,13 +469,20 @@ impl<'db> OverloadLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     pub(crate) fn signature(self, db: &'db dyn Db) -> Signature<'db> {
-        let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
-
         let scope = self.body_scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
         let function_node = scope.node(db).expect_function().node(&module);
+        let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
         let file_scope_id = scope.file_scope_id(db);
+        let mut signature = self.raw_signature_from_node(
+            db,
+            ReturnCallableTypeVarScope::Public,
+            function_node,
+            definition,
+            index,
+            file_scope_id,
+        );
         let is_generator = file_scope_id.is_generator_function(index);
 
         if function_node.is_async && !is_generator {
@@ -501,6 +508,32 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
     ) -> Signature<'db> {
+        let scope = self.body_scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let function_stmt_node = scope.node(db).expect_function().node(&module);
+        let definition = self.definition(db);
+        let index = semantic_index(db, scope.file(db));
+        let file_scope_id = scope.file_scope_id(db);
+
+        self.raw_signature_from_node(
+            db,
+            return_callable_typevar_scope,
+            function_stmt_node,
+            definition,
+            index,
+            file_scope_id,
+        )
+    }
+
+    fn raw_signature_from_node(
+        self,
+        db: &'db dyn Db,
+        return_callable_typevar_scope: ReturnCallableTypeVarScope,
+        function_stmt_node: &ast::StmtFunctionDef,
+        definition: Definition<'db>,
+        index: &SemanticIndex<'db>,
+        file_scope_id: FileScopeId,
+    ) -> Signature<'db> {
         /// `self` or `cls` can be implicitly positional-only if:
         /// - It is a method AND
         /// - No parameters in the method use PEP-570 syntax AND
@@ -512,8 +545,7 @@ impl<'db> OverloadLiteral<'db> {
             db: &'db dyn Db,
             literal: OverloadLiteral<'db>,
             node: &ast::StmtFunctionDef,
-            scope: FileScopeId,
-            index: &SemanticIndex,
+            class_definition: Option<Definition<'db>>,
         ) -> bool {
             let parameters = &node.parameters;
 
@@ -533,7 +565,7 @@ impl<'db> OverloadLiteral<'db> {
                 return false;
             }
 
-            let Some(class_definition) = index.class_definition_of_method(scope) else {
+            let Some(class_definition) = class_definition else {
                 return false;
             };
 
@@ -556,22 +588,16 @@ impl<'db> OverloadLiteral<'db> {
                 .is_some_and(|class| class.is_protocol(db))
         }
 
-        let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let function_stmt_node = scope.node(db).expect_function().node(&module);
-        let definition = self.definition(db);
-        let index = semantic_index(db, scope.file(db));
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
-        let file_scope_id = scope.file_scope_id(db);
+        let class_definition = index.class_definition_of_method(file_scope_id);
 
         let has_implicitly_positional_first_parameter = has_implicitly_positional_only_first_param(
             db,
             self,
             function_stmt_node,
-            file_scope_id,
-            index,
+            class_definition,
         );
 
         let mut raw_signature = Signature::from_function(
@@ -595,11 +621,7 @@ impl<'db> OverloadLiteral<'db> {
             let method_has_explicit_self = generic_context
                 .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
 
-            let class_scope_id = definition.scope(db);
-            let class_scope = index.scope(class_scope_id.file_scope_id(db));
-            let class_node = class_scope.node().as_class()?;
-            let class_def = index.expect_single_definition(class_node);
-            let class_literal = original_class_type(db, class_def)?;
+            let class_literal = original_class_type(db, class_definition?)?;
             let class_is_generic = class_literal.generic_context(db).is_some();
             let class_is_fallback = class_literal
                 .known(db)
@@ -624,10 +646,8 @@ impl<'db> OverloadLiteral<'db> {
             if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
-                let index = semantic_index(db, scope_id.file(db));
-                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class_literal)
                     .expect(
                         "We should always find the surrounding class \
                      for an implicit self: Self annotation",
