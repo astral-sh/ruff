@@ -193,6 +193,8 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -204,7 +206,7 @@ use crate::{
         singleton_pattern_type,
     },
 };
-use ruff_index::IndexSlice;
+use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -219,6 +221,7 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -1195,11 +1198,7 @@ pub(crate) fn binding_reachability<'db, 'map>(
     use_def: &'map UseDefMap<'db>,
     binding: &BindingWithConstraints<'map, 'db>,
 ) -> Truthiness {
-    use_def.reachability_constraints().evaluate(
-        db,
-        use_def.predicates(),
-        binding.reachability_constraint,
-    )
+    evaluate_reachability(db, use_def, binding.reachability_constraint)
 }
 
 pub(crate) fn evaluate_reachability(
@@ -1210,6 +1209,91 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+pub(crate) struct ReachabilityEvaluationCache<'db> {
+    primary_scope: ScopeId<'db>,
+    primary_constraints: usize,
+    primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
+}
+
+impl<'db> ReachabilityEvaluationCache<'db> {
+    pub(crate) fn new(
+        primary_scope: ScopeId<'db>,
+        primary_constraints: &ReachabilityConstraints,
+    ) -> Self {
+        Self {
+            primary_scope,
+            primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
+            primary_entries: RefCell::new(Vec::new()),
+            other_entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    pub(crate) fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ReachabilityConstraints,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            ScopedReachabilityConstraintId::AMBIGUOUS => return Truthiness::Ambiguous,
+            _ => {}
+        }
+
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
+        let constraints_key = std::ptr::from_ref(constraints).addr();
+        let scope = match predicate.node {
+            PredicateNode::Expression(expression) => expression.scope(db),
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(db)
+            }
+            PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+        };
+
+        if scope != self.primary_scope || constraints_key != self.primary_constraints {
+            let key = (constraints_key, id);
+            if let Some(result) = self.other_entries.borrow().get(&key).copied() {
+                return result;
+            }
+
+            let result = constraints.evaluate(db, predicates, id);
+            self.other_entries.borrow_mut().insert(key, result);
+            return result;
+        }
+
+        let index = id.index();
+        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
+            return result;
+        }
+
+        let result = constraints.evaluate(db, predicates, id);
+        let mut entries = self.primary_entries.borrow_mut();
+        if entries.len() <= index {
+            entries.resize(index + 1, None);
+        }
+        entries[index] = Some(result);
+        result
+    }
+}
+
+pub(crate) fn evaluate_reachability_with_cache<'db>(
+    db: &'db dyn Db,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    id: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(cache) = cache {
+        cache.evaluate(db, constraints, predicates, id)
+    } else {
+        constraints.evaluate(db, predicates, id)
+    }
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {
