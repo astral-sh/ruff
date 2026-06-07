@@ -33,9 +33,7 @@ use super::enums::{enum_member_literals, enum_metadata};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
-use std::collections::hash_map::Entry;
 
 fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
@@ -180,9 +178,9 @@ pub(crate) fn infer_narrowing_constraints<'db>(
         }
         PredicateNode::Pattern(pattern) => {
             let positive = all_narrowing_constraints_for_pattern(db, pattern)
-                .and_then(|constraints| constraints.get(&place).cloned());
+                .and_then(|constraints| constraints.get(place).cloned());
             let negative = all_negative_narrowing_constraints_for_pattern(db, pattern)
-                .and_then(|constraints| constraints.get(&place).cloned());
+                .and_then(|constraints| constraints.get(place).cloned());
             (positive, negative)
         }
         PredicateNode::IsNonTerminalCall(_) | PredicateNode::StarImportPlaceholder(_) => {
@@ -580,7 +578,65 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+/// Most narrowing results contain only a few places, so linear storage avoids a hash table.
+#[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct NarrowingConstraints<'db>(Vec<(ScopedPlaceId, NarrowingConstraint<'db>)>);
+
+impl<'db> NarrowingConstraints<'db> {
+    fn get(&self, place: ScopedPlaceId) -> Option<&NarrowingConstraint<'db>> {
+        self.0
+            .iter()
+            .find_map(|(candidate, constraint)| (*candidate == place).then_some(constraint))
+    }
+
+    fn get_mut(&mut self, place: ScopedPlaceId) -> Option<&mut NarrowingConstraint<'db>> {
+        self.0
+            .iter_mut()
+            .find_map(|(candidate, constraint)| (*candidate == place).then_some(constraint))
+    }
+
+    fn insert(&mut self, place: ScopedPlaceId, constraint: NarrowingConstraint<'db>) {
+        if let Some(existing) = self.get_mut(place) {
+            *existing = constraint;
+        } else {
+            self.0.push((place, constraint));
+        }
+    }
+
+    fn contains_key(&self, place: ScopedPlaceId) -> bool {
+        self.get(place).is_some()
+    }
+
+    fn retain(&mut self, mut f: impl FnMut(&ScopedPlaceId, &mut NarrowingConstraint<'db>) -> bool) {
+        self.0
+            .retain_mut(|(place, constraint)| f(place, constraint));
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.0.shrink_to_fit();
+    }
+}
+
+impl<'db> FromIterator<(ScopedPlaceId, NarrowingConstraint<'db>)> for NarrowingConstraints<'db> {
+    fn from_iter<T: IntoIterator<Item = (ScopedPlaceId, NarrowingConstraint<'db>)>>(
+        iter: T,
+    ) -> Self {
+        let mut constraints = Self::default();
+        for (place, constraint) in iter {
+            constraints.insert(place, constraint);
+        }
+        constraints
+    }
+}
+
+impl<'db> IntoIterator for NarrowingConstraints<'db> {
+    type Item = (ScopedPlaceId, NarrowingConstraint<'db>);
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
 
 #[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct ExpressionNarrowingConstraints<'db> {
@@ -591,9 +647,9 @@ struct ExpressionNarrowingConstraints<'db> {
 impl<'db> ExpressionNarrowingConstraints<'db> {
     fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
         if is_positive {
-            self.positive.as_ref()?.get(&place)
+            self.positive.as_ref()?.get(place)
         } else {
-            self.negative.as_ref()?.get(&place)
+            self.negative.as_ref()?.get(place)
         }
     }
 }
@@ -603,12 +659,11 @@ fn insert_narrowing_constraint<'db>(
     place: ScopedPlaceId,
     constraint: NarrowingConstraint<'db>,
 ) {
-    constraints
-        .entry(place)
-        .and_modify(|existing| {
-            *existing = existing.merge_constraint_and(constraint.clone());
-        })
-        .or_insert(constraint);
+    if let Some(existing) = constraints.get_mut(place) {
+        *existing = existing.merge_constraint_and(constraint);
+    } else {
+        constraints.insert(place, constraint);
+    }
 }
 
 /// Merge constraints with AND semantics (intersection/conjunction).
@@ -625,15 +680,10 @@ fn merge_constraints_and<'db>(
     from: NarrowingConstraints<'db>,
 ) {
     for (key, from_constraint) in from {
-        match into.entry(key) {
-            Entry::Occupied(mut entry) => {
-                let into_constraint = entry.get();
-
-                entry.insert(into_constraint.merge_constraint_and(from_constraint));
-            }
-            Entry::Vacant(entry) => {
-                entry.insert(from_constraint);
-            }
+        if let Some(into_constraint) = into.get_mut(key) {
+            *into_constraint = into_constraint.merge_constraint_and(from_constraint);
+        } else {
+            into.insert(key, from_constraint);
         }
     }
 }
@@ -650,25 +700,19 @@ fn merge_constraints_or<'db>(
     from: NarrowingConstraints<'db>,
 ) {
     // For places that appear in `into` but not in `from`, widen to object
-    into.retain(|key, _| from.contains_key(key));
+    into.retain(|key, _| from.contains_key(*key));
 
     for (key, from_constraint) in from {
-        match into.entry(key) {
-            Entry::Occupied(mut entry) => {
-                let into_constraint = entry.get_mut();
-                // Union the intersection constraints by concatenating disjunct lists.
-                into_constraint
-                    .intersection_disjuncts
-                    .extend(from_constraint.intersection_disjuncts);
+        if let Some(into_constraint) = into.get_mut(key) {
+            // Union the intersection constraints by concatenating disjunct lists.
+            into_constraint
+                .intersection_disjuncts
+                .extend(from_constraint.intersection_disjuncts);
 
-                // Concatenate replacement disjuncts
-                into_constraint
-                    .replacement_disjuncts
-                    .extend(from_constraint.replacement_disjuncts);
-            }
-            Entry::Vacant(_) => {
-                // Place only appears in `from`, not in `into`. No constraint needed.
-            }
+            // Concatenate replacement disjuncts
+            into_constraint
+                .replacement_disjuncts
+                .extend(from_constraint.replacement_disjuncts);
         }
     }
 }
@@ -1534,12 +1578,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let constraint = NarrowingConstraint::intersection(
                     exactly_sized.negate_if(self.db, !constrain_with_equality),
                 );
-                constraints
-                    .entry(self.expect_place(&target))
-                    .and_modify(|existing| {
-                        *existing = existing.merge_constraint_and(constraint.clone());
-                    })
-                    .or_insert(constraint);
+                insert_narrowing_constraint(
+                    &mut constraints,
+                    self.expect_place(&target),
+                    constraint,
+                );
             };
 
             // E.g., `len(items) == 2`
@@ -1771,12 +1814,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
-                constraints
-                    .entry(place)
-                    .and_modify(|existing| {
-                        *existing = existing.merge_constraint_and(constraint.clone());
-                    })
-                    .or_insert(constraint);
+                insert_narrowing_constraint(&mut constraints, place, constraint);
             }
 
             // Right-hand side narrowing for:
@@ -1793,12 +1831,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
-                constraints
-                    .entry(place)
-                    .and_modify(|existing| {
-                        *existing = existing.merge_constraint_and(constraint.clone());
-                    })
-                    .or_insert(constraint);
+                insert_narrowing_constraint(&mut constraints, place, constraint);
 
                 // Use the narrowed type for subsequent comparisons in a chain.
                 last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
