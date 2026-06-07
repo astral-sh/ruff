@@ -23,9 +23,6 @@ class Project(NamedTuple):
 
     python_version: Literal["3.13", "3.14", "3.12", "3.11", "3.10", "3.9", "3.8"]
 
-    omitted_requirement_lines: list[tuple[str, str]] = []
-    """Requirement lines to remove from files in the cloned checkout."""
-
     skip: str | None = None
     """The project is skipped from benchmarking if not `None`."""
 
@@ -40,7 +37,6 @@ class Project(NamedTuple):
     def clone(self, checkout_dir: Path) -> None:
         # Skip cloning if the project has already been cloned (the script doesn't yet support updating)
         if (checkout_dir / ".git").exists():
-            self.prepare(checkout_dir)
             return
 
         logging.debug(f"Cloning {self.repository} to {checkout_dir}")
@@ -99,18 +95,6 @@ class Project(NamedTuple):
             raise RuntimeError(f"Failed to clone {self.name}:\n\n{e.stderr}") from e
 
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
-        self.prepare(checkout_dir)
-
-    def prepare(self, checkout_dir: Path) -> None:
-        for relative_path, omitted_line in self.omitted_requirement_lines:
-            requirements_path = checkout_dir / relative_path
-            if not requirements_path.exists():
-                continue
-
-            lines = requirements_path.read_text().splitlines()
-            requirements_path.write_text(
-                "\n".join(line for line in lines if line.strip() != omitted_line) + "\n"
-            )
 
 
 class IncrementalEdit(NamedTuple):
@@ -197,16 +181,15 @@ ALL: Final = [
         python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
+        # requirements_test_all.txt was replaced by these two files upstream.
+        # See https://github.com/home-assistant/core/blob/a0162d2ff0ed061501405a617961be149b15bd1f/requirements_all.txt#L1-L4
         install_arguments=[
             "-r",
             "requirements_all.txt",
             "-r",
             "requirements_test.txt",
-        ],
-        # Home Assistant's pytradfri async extra pulls in dtlssocket, which
-        # requires local autoconf support to build from source.
-        omitted_requirement_lines=[
-            ("requirements_all.txt", "pytradfri[async]==9.0.1"),
+            "--excludes",
+            str(Path(__file__).with_name("homeassistant-excludes.txt")),
         ],
         edit=IncrementalEdit(
             edited_file="homeassistant/core.py",
@@ -278,6 +261,7 @@ ALL: Final = [
         repository="https://github.com/pandas-dev/pandas-stubs",
         revision="1352ba3daa86f1c47a3cce5ad212a770cc693cb4",
         include=["pandas-stubs"],
+        # See https://github.com/pandas-dev/pandas-stubs/blob/1352ba3daa86f1c47a3cce5ad212a770cc693cb4/pyproject.toml#L8-L72
         python_version="3.11",
         install_arguments=[
             "-r",
@@ -291,6 +275,7 @@ ALL: Final = [
         name="prefect",
         repository="https://github.com/PrefectHQ/prefect.git",
         revision="db66b14dbaea18e726fc4ea0100fd194383c6c59",
+        # See https://github.com/PrefectHQ/prefect/blob/db66b14dbaea18e726fc4ea0100fd194383c6c59/.pre-commit-config.yaml#L25-L39
         include=[
             "src/prefect/server/models",
             "src/prefect/concurrency",
@@ -326,7 +311,7 @@ ALL: Final = [
         repository="https://github.com/pytorch/pytorch.git",
         revision="29d6170e7c79f2c71943692985a1546fb2bed28c",
         include=["torch", "caffe2"],
-        # see https://github.com/pytorch/pytorch/blob/c56655268b4ae575ee4c89c312fd93ca2f5b3ba9/pyrefly.toml#L23
+        # Based on https://github.com/pytorch/pytorch/blob/29d6170e7c79f2c71943692985a1546fb2bed28c/pyrefly.toml#L23-L47
         exclude=[
             "torch/_inductor/codegen/triton.py",
             "tools/linter/adapters/test_device_bias_linter.py",
@@ -364,18 +349,29 @@ ALL: Final = [
             "*/__pycache__/**",
             "*/.*",
         ],
+        # Based on the upstream lint environment, keeping only packages needed
+        # to resolve imports from torch/ and caffe2/. Checker versions are managed
+        # separately by the benchmark.
+        # https://github.com/pytorch/pytorch/blob/29d6170e7c79f2c71943692985a1546fb2bed28c/tools/linter/adapters/pyrefly_linter.py#L1-L28
         install_arguments=[
-            "-r",
-            "requirements.txt",
-            "types-requests",
-            "types-pyyaml",
-            "types-tabulate",
-            "types-protobuf",
-            "types-setuptools",
-            "types-jinja2",
-            "types-colorama",
-            "types-openpyxl",
-            "types-python-dateutil",
+            'numpy==1.26.4 ; python_version >= "3.10" and python_version <= "3.11"',
+            'numpy==2.1.0 ; python_version >= "3.12" and python_version <= "3.13"',
+            'numpy==2.3.4 ; python_version >= "3.14"',
+            "expecttest==0.3.0",
+            "sympy==1.13.3",
+            "types-requests==2.27.25",
+            "types-pyyaml==6.0.2",
+            "types-tabulate==0.8.8",
+            "types-protobuf==5.29.1.20250403",
+            "types-setuptools==79.0.0.20250422",
+            "types-jinja2==2.11.9",
+            "types-colorama==0.4.6",
+            "filelock==3.18.0",
+            "junitparser==2.1.1",
+            "rich==14.1.0",
+            "optree==0.17.0",
+            "types-openpyxl==3.1.5.20250919",
+            "types-python-dateutil==2.9.0.20251008",
         ],
         python_version="3.11",
         edit=IncrementalEdit(
