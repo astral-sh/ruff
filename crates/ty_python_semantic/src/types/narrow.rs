@@ -944,9 +944,10 @@ impl Default for NarrowingTransformBuilder<'_> {
 }
 
 impl<'db> NarrowingTransformBuilder<'db> {
-    // Compact only long chains: applying the identity below normalizes equivalent
-    // intersections, which would otherwise change the displayed type of short flows.
-    const MIN_REPEATED_BRANCHES: usize = 4;
+    // Compact only long chains: medium chains do not amortize building and applying the
+    // condition DAG. Applying the identity below also normalizes equivalent intersections,
+    // which would otherwise change the displayed type of short flows.
+    const MIN_REPEATED_BRANCHES: usize = 8;
 
     pub(crate) fn identity() -> NarrowingTransformId {
         NarrowingTransformId::IDENTITY
