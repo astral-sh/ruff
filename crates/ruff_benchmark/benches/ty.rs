@@ -1218,7 +1218,7 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
 /// Regression benchmark for repeated loads under a long `TypeIs` `elif` chain.
 ///
 /// Each branch adds one negative narrowing constraint to `source`. Without compacting the repeated
-/// branches and caching large projected results, every load rebuilds the accumulated intersection.
+/// branches and caching the factored result, every load rebuilds the accumulated intersection.
 fn benchmark_typeis_elif_narrowing(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 40;
     const LOADS_PER_BRANCH: usize = 10;
