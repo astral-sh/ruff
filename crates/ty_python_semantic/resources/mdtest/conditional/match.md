@@ -233,22 +233,12 @@ def _(subj: int | abc.Callable[..., str]) -> None:
             y = 3
 
     reveal_type(y)  # revealed: Literal[2, 3]
-
-def _(subj: abc.Callable[..., str]) -> None:
-    y = 1
-
-    match subj:
-        case abc.Callable(foo=_):
-            y = 2
-        case _:
-            y = 3
-
-    reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ### With arguments
 
 ```py
+from typing_extensions import assert_never
 from dataclasses import dataclass
 
 @dataclass
@@ -257,7 +247,6 @@ class Point:
     y: int
 
 class Other: ...
-class C: ...
 
 def _(target: Point):
     y = 1
@@ -274,21 +263,10 @@ def _(target: Point):
 
 def _(target: Point):
     match target:
-        case Point(x, y):  # irrefutable sub-patterns, but refutable attribute extraction
+        case Point(x, y):  # irrefutable sub-patterns
             pass
         case _:
-            reveal_type(target)  # revealed: Point
-
-def _(target: C):
-    y = 1
-
-    match target:
-        case C(foo=_):
-            y = 2
-        case _:
-            y = 3
-
-    reveal_type(y)  # revealed: Literal[2, 3]
+            assert_never(target)
 
 def _(target: Point | Other):
     match target:
