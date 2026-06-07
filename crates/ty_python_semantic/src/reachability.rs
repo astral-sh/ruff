@@ -206,7 +206,7 @@ use crate::{
         mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
-use ruff_index::IndexSlice;
+use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -1251,15 +1251,20 @@ pub(crate) fn evaluate_reachability(
 
 pub(crate) struct ReachabilityEvaluationCache<'db> {
     primary_scope: ScopeId<'db>,
-    primary_entries: RefCell<FxHashMap<ScopedReachabilityConstraintId, Truthiness>>,
-    other_entries: RefCell<FxHashMap<(ScopeId<'db>, ScopedReachabilityConstraintId), Truthiness>>,
+    primary_constraints: usize,
+    primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
 }
 
 impl<'db> ReachabilityEvaluationCache<'db> {
-    pub(crate) fn new(primary_scope: ScopeId<'db>) -> Self {
+    pub(crate) fn new(
+        primary_scope: ScopeId<'db>,
+        primary_constraints: &ReachabilityConstraints,
+    ) -> Self {
         Self {
             primary_scope,
-            primary_entries: RefCell::new(FxHashMap::default()),
+            primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
+            primary_entries: RefCell::new(Vec::new()),
             other_entries: RefCell::new(FxHashMap::default()),
         }
     }
@@ -1267,20 +1272,19 @@ impl<'db> ReachabilityEvaluationCache<'db> {
     pub(crate) fn evaluate(
         &self,
         db: &'db dyn Db,
-        reachability_constraints: &ReachabilityConstraints,
+        constraints: &ReachabilityConstraints,
         predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        reachability: ScopedReachabilityConstraintId,
+        id: ScopedReachabilityConstraintId,
     ) -> Truthiness {
-        match reachability {
+        match id {
             ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
             ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
             ScopedReachabilityConstraintId::AMBIGUOUS => return Truthiness::Ambiguous,
             _ => {}
         }
 
-        let predicate = predicates[reachability_constraints
-            .get_interior_node(reachability)
-            .atom()];
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
+        let constraints_key = std::ptr::from_ref(constraints).addr();
         let scope = match predicate.node {
             PredicateNode::Expression(expression) => expression.scope(db),
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
@@ -1290,26 +1294,28 @@ impl<'db> ReachabilityEvaluationCache<'db> {
             PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
         };
 
-        if scope == self.primary_scope {
-            if let Some(cached) = self.primary_entries.borrow().get(&reachability) {
-                return *cached;
+        if scope != self.primary_scope || constraints_key != self.primary_constraints {
+            let key = (constraints_key, id);
+            if let Some(result) = self.other_entries.borrow().get(&key).copied() {
+                return result;
             }
 
-            let result = reachability_constraints.evaluate(db, predicates, reachability);
-            self.primary_entries
-                .borrow_mut()
-                .insert(reachability, result);
+            let result = constraints.evaluate(db, predicates, id);
+            self.other_entries.borrow_mut().insert(key, result);
             return result;
         }
 
-        if let Some(cached) = self.other_entries.borrow().get(&(scope, reachability)) {
-            return *cached;
+        let index = id.index();
+        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
+            return result;
         }
 
-        let result = reachability_constraints.evaluate(db, predicates, reachability);
-        self.other_entries
-            .borrow_mut()
-            .insert((scope, reachability), result);
+        let result = constraints.evaluate(db, predicates, id);
+        let mut entries = self.primary_entries.borrow_mut();
+        if entries.len() <= index {
+            entries.resize(index + 1, None);
+        }
+        entries[index] = Some(result);
         result
     }
 }
@@ -1317,14 +1323,14 @@ impl<'db> ReachabilityEvaluationCache<'db> {
 pub(crate) fn evaluate_reachability_with_cache<'db>(
     db: &'db dyn Db,
     cache: Option<&ReachabilityEvaluationCache<'db>>,
-    reachability_constraints: &ReachabilityConstraints,
+    constraints: &ReachabilityConstraints,
     predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-    reachability: ScopedReachabilityConstraintId,
+    id: ScopedReachabilityConstraintId,
 ) -> Truthiness {
     if let Some(cache) = cache {
-        cache.evaluate(db, reachability_constraints, predicates, reachability)
+        cache.evaluate(db, constraints, predicates, id)
     } else {
-        reachability_constraints.evaluate(db, predicates, reachability)
+        constraints.evaluate(db, predicates, id)
     }
 }
 
