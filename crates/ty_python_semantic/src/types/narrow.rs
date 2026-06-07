@@ -1290,11 +1290,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             (&grouped_arms)
                 .into_iter()
                 .map(|(original_subject_ty, arms)| {
-                    let mut filtering_types = UnionBuilder::new(self.db);
+                    let filtering_types = original_subject_ty
+                        .flatten_typevars(self.db)
+                        .resolve_type_alias(self.db);
                     let mut matched_types = UnionBuilder::new(self.db);
 
                     for (_, filtering_subject_ty) in arms {
-                        filtering_types.add_in_place(filtering_subject_ty);
                         if let Some((narrowed_subject_ty, _)) = self.matching_sequence_pattern_arm(
                             kind,
                             filtering_subject_ty,
@@ -1305,7 +1306,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         }
                     }
 
-                    let filtering_types = filtering_types.build();
                     let matched_types = matched_types.build();
                     if original_subject_ty.has_typevar(self.db) {
                         if matched_types.is_equivalent_to(self.db, filtering_types) {
@@ -2500,12 +2500,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
-        let is_irrefutable = match class_type {
+        let is_exhaustive = match class_type {
             Type::ClassLiteral(class) => class_pattern_is_exhaustive(self.db, class, kind),
             _ => kind.is_irrefutable(),
         };
-        if !is_positive && !is_irrefutable {
-            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive
+        if !is_positive && !is_exhaustive {
+            // A class pattern like `case Point(x=0, y=0)` is not exhaustive. In the positive
             // case, we can still narrow the subject to `Point`. In the negative case, we cannot
             // exclude `Point` as a possibility.
             return None;
