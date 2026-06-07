@@ -80,8 +80,8 @@ use crate::types::known_instance::{
 pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDescriptorKind};
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{
-    NarrowingTransform, NarrowingTransformBuilder, NarrowingTransformId,
-    PredicateNarrowingConstraints, infer_narrowing_constraints,
+    NarrowingTransform, NarrowingTransformBuilder, PredicateNarrowingConstraints,
+    infer_narrowing_constraints,
 };
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};

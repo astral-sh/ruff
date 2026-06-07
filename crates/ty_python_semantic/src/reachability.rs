@@ -199,10 +199,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingTransform,
-        NarrowingTransformBuilder, NarrowingTransformId, PredicateNarrowingConstraints, Type,
-        TypeContext, UnionType, definite_match_pattern_type, enum_metadata,
-        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        NarrowingTransformBuilder, PredicateNarrowingConstraints, Type, TypeContext, UnionType,
+        definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -523,7 +523,7 @@ fn large_projected_narrowing_transform<'db>(
     let predicates = use_def.predicates();
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let root = projector.project(id);
-    ProjectedNarrowingContext::new(db, &projector.graph).build(root)
+    projected_narrowing_transform(db, &projector.graph, root)
 }
 
 #[salsa::tracked(
@@ -601,7 +601,7 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             let scope = predicate_scope(db, predicates[node.atom()]);
             return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
         } else {
-            ProjectedNarrowingContext::new(db, &projector.graph).build(projected_root)
+            projected_narrowing_transform(db, &projector.graph, projected_root)
         };
         transform.apply(db, base_ty)
     }
@@ -681,6 +681,64 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Fold the graph bottom-up, evaluating each shared subgraph once.
+    fn fold<T: Copy>(
+        &self,
+        root: ProjectedNarrowingNodeId,
+        if_true_terminal: T,
+        if_false_terminal: T,
+        mut fold_node: impl FnMut(ProjectedNarrowingNode, T, T) -> T,
+    ) -> T {
+        fn fold_inner<T: Copy>(
+            graph: &ProjectedNarrowingGraph<'_>,
+            id: ProjectedNarrowingNodeId,
+            if_true_terminal: T,
+            if_false_terminal: T,
+            cache: &mut [Option<T>],
+            fold_node: &mut impl FnMut(ProjectedNarrowingNode, T, T) -> T,
+        ) -> T {
+            if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+                return if_true_terminal;
+            }
+            if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                return if_false_terminal;
+            }
+            if let Some(cached) = cache[id.0] {
+                return cached;
+            }
+
+            let node = graph.node(id);
+            let if_true = fold_inner(
+                graph,
+                node.if_true,
+                if_true_terminal,
+                if_false_terminal,
+                cache,
+                fold_node,
+            );
+            let if_false = fold_inner(
+                graph,
+                node.if_false,
+                if_true_terminal,
+                if_false_terminal,
+                cache,
+                fold_node,
+            );
+            let result = fold_node(node, if_true, if_false);
+            cache[id.0] = Some(result);
+            result
+        }
+
+        fold_inner(
+            self,
+            root,
+            if_true_terminal,
+            if_false_terminal,
+            &mut vec![None; self.nodes.len()],
+            &mut fold_node,
+        )
     }
 
     /// Constructs the canonical disjunction of two projected subgraphs.
@@ -839,59 +897,28 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Builds narrowing transforms over a projected narrowing graph.
-struct ProjectedNarrowingContext<'a, 'db> {
+/// Builds a narrowing transform over a projected narrowing graph.
+fn projected_narrowing_transform<'db>(
     db: &'db dyn Db,
-    graph: &'a ProjectedNarrowingGraph<'db>,
-    builder: NarrowingTransformBuilder<'db>,
-    transform_cache: Vec<Option<NarrowingTransformId>>,
-}
-
-impl<'a, 'db> ProjectedNarrowingContext<'a, 'db> {
-    fn new(db: &'db dyn Db, graph: &'a ProjectedNarrowingGraph<'db>) -> Self {
-        ProjectedNarrowingContext {
-            db,
-            graph,
-            builder: NarrowingTransformBuilder::default(),
-            transform_cache: vec![None; graph.nodes.len()],
-        }
-    }
-
-    fn build(mut self, root: ProjectedNarrowingNodeId) -> NarrowingTransform<'db> {
-        let root = self.transform(root);
-        self.builder.build(root)
-    }
-
-    /// Build the transform for a projected node, reusing shared subgraphs.
-    fn transform(&mut self, id: ProjectedNarrowingNodeId) -> NarrowingTransformId {
-        if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
-            return self.builder.identity();
-        }
-        if id == ProjectedNarrowingNodeId::ALWAYS_FALSE {
-            return self.builder.unreachable();
-        }
-
-        if let Some(cached) = self.transform_cache[id.0] {
-            return cached;
-        }
-
-        let node = self.graph.node(id);
-        let constraints = self.graph.predicate_constraints_cache[&node.atom].clone();
-        let if_true = self.transform(node.if_true);
-        let if_false = self.transform(node.if_false);
-        let result = if let Some(complementary) = constraints.complementary {
-            self.builder
-                .branch(self.db, complementary, if_true, if_false)
+    graph: &ProjectedNarrowingGraph<'db>,
+    root: ProjectedNarrowingNodeId,
+) -> NarrowingTransform<'db> {
+    let mut builder = NarrowingTransformBuilder::default();
+    let identity = NarrowingTransformBuilder::identity();
+    let unreachable = NarrowingTransformBuilder::unreachable();
+    let root = graph.fold(root, identity, unreachable, |node, if_true, if_false| {
+        let constraints = graph.predicate_constraints_cache[&node.atom].clone();
+        if let Some(complementary) = constraints.complementary {
+            builder.branch(db, complementary, if_true, if_false)
         } else {
-            let positive = self.builder.from_constraint(constraints.positive);
-            let negative = self.builder.from_constraint(constraints.negative);
-            let if_true = self.builder.then(if_true, positive);
-            let if_false = self.builder.then(if_false, negative);
-            self.builder.join(if_true, if_false)
-        };
-        self.transform_cache[id.0] = Some(result);
-        result
-    }
+            let positive = builder.constraint(constraints.positive);
+            let negative = builder.constraint(constraints.negative);
+            let if_true = builder.then(if_true, positive);
+            let if_false = builder.then(if_false, negative);
+            builder.join(if_true, if_false)
+        }
+    });
+    builder.build(root)
 }
 
 fn analyze_single_pattern_predicate_kind<'db>(
