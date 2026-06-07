@@ -1349,7 +1349,7 @@ fn explicit_function_return<'db>(
     let Some(definition) = function else {
         return ExplicitFunctionReturn::Unknown;
     };
-    let ty_python_core::definition::DefinitionKind::Function(function) = definition.kind(db) else {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
         return ExplicitFunctionReturn::Unknown;
     };
     let Some(returns) = function.node(&module).returns.as_deref() else {
@@ -1368,15 +1368,15 @@ fn explicit_function_return<'db>(
 fn underlying_function_definition<'db>(
     db: &'db dyn Db,
     use_def: &UseDefMap<'db>,
-    definition: ty_python_core::definition::Definition<'db>,
-    active: &mut FxHashSet<ty_python_core::definition::Definition<'db>>,
-) -> Option<ty_python_core::definition::Definition<'db>> {
+    definition: Definition<'db>,
+    active: &mut FxHashSet<Definition<'db>>,
+) -> Option<Definition<'db>> {
     if !active.insert(definition) {
         return None;
     }
     let result = match definition.kind(db) {
-        ty_python_core::definition::DefinitionKind::Function(_) => Some(definition),
-        ty_python_core::definition::DefinitionKind::LoopHeader(loop_header) => {
+        DefinitionKind::Function(_) => Some(definition),
+        DefinitionKind::LoopHeader(loop_header) => {
             let header = get_loop_header(db, loop_header.loop_token());
             let mut function = None;
             for binding in header.bindings_for_place(loop_header.place()) {
@@ -1511,29 +1511,20 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct LoopCarriedTerminalPredicates(FxHashSet<ScopedPredicateId>);
-
-impl LoopCarriedTerminalPredicates {
-    fn contains(&self, predicate: ScopedPredicateId) -> bool {
-        self.0.contains(&predicate)
-    }
-}
-
 fn loop_carried_terminal_predicates_cycle_recover<'db>(
     _db: &'db dyn Db,
     _cycle: &salsa::Cycle,
-    _previous: &LoopCarriedTerminalPredicates,
-    result: LoopCarriedTerminalPredicates,
+    _previous: &FxHashSet<ScopedPredicateId>,
+    result: FxHashSet<ScopedPredicateId>,
     _scope: ScopeId<'db>,
     _loop_token: LoopToken<'db>,
-) -> LoopCarriedTerminalPredicates {
+) -> FxHashSet<ScopedPredicateId> {
     result
 }
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial = |_, _, _, _| LoopCarriedTerminalPredicates::default(),
+    cycle_initial = |_, _, _, _| FxHashSet::default(),
     cycle_fn = loop_carried_terminal_predicates_cycle_recover,
     heap_size = get_size2::GetSize::get_heap_size
 )]
@@ -1541,25 +1532,23 @@ fn loop_carried_terminal_predicates<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     loop_token: LoopToken<'db>,
-) -> LoopCarriedTerminalPredicates {
+) -> FxHashSet<ScopedPredicateId> {
     let use_def = use_def_map(db, scope);
     let predicates = use_def.predicates();
-    LoopCarriedTerminalPredicates(
-        use_def
-            .reachability_constraints()
-            .used_interiors()
-            .iter()
-            .filter_map(|node| {
-                let predicate = node.atom();
-                let PredicateNode::IsNonTerminalCall(call) = predicates[predicate].node else {
-                    return None;
-                };
-                loop_carried_function_return_type(db, use_def, loop_token, scope, call.callable)?
-                    .is_equivalent_to(db, Type::Never)
-                    .then_some(predicate)
-            })
-            .collect(),
-    )
+    use_def
+        .reachability_constraints()
+        .used_interiors()
+        .iter()
+        .filter_map(|node| {
+            let predicate = node.atom();
+            let PredicateNode::IsNonTerminalCall(call) = predicates[predicate].node else {
+                return None;
+            };
+            loop_carried_function_return_type(db, use_def, loop_token, scope, call.callable)?
+                .is_equivalent_to(db, Type::Never)
+                .then_some(predicate)
+        })
+        .collect()
 }
 
 fn loop_carried_function_return_type<'db>(
@@ -1582,10 +1571,8 @@ fn loop_carried_function_return_type<'db>(
         let DefinitionState::Defined(definition) = use_def.definition(binding.binding()) else {
             return None;
         };
-        if !matches!(
-            definition.kind(db),
-            ty_python_core::definition::DefinitionKind::Function(_)
-        ) || function.is_some_and(|previous| previous != definition)
+        if !matches!(definition.kind(db), DefinitionKind::Function(_))
+            || function.is_some_and(|previous| previous != definition)
         {
             return None;
         }
@@ -1593,7 +1580,7 @@ fn loop_carried_function_return_type<'db>(
     }
     let definition = function?;
 
-    let ty_python_core::definition::DefinitionKind::Function(function) = definition.kind(db) else {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
         return None;
     };
     let returns = function.node(&module).returns.as_deref()?;
@@ -1616,10 +1603,6 @@ struct LoopHeaderPredicateAnalysis {
 }
 
 impl LoopHeaderPredicateTruthinesses {
-    fn get(&self, predicate: ScopedPredicateId) -> Option<LoopHeaderPredicateAnalysis> {
-        self.analyses.get(&predicate).copied()
-    }
-
     fn reachability(&self, id: ScopedReachabilityConstraintId) -> Option<Truthiness> {
         self.reachability_truthinesses
             .binary_search_by_key(&id.as_u32(), |(id, _)| id.as_u32())
@@ -1711,15 +1694,6 @@ fn is_unconstrained_collection_literal(expression: &ast::Expr) -> bool {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct RecursiveCollectionPlaces(FxHashSet<ScopedPlaceId>);
-
-impl RecursiveCollectionPlaces {
-    fn contains(&self, place: ScopedPlaceId) -> bool {
-        self.0.contains(&place)
-    }
-}
-
 #[salsa::tracked(
     returns(ref),
     heap_size = get_size2::GetSize::get_heap_size
@@ -1728,11 +1702,11 @@ fn recursive_collection_places<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     loop_token: LoopToken<'db>,
-) -> RecursiveCollectionPlaces {
+) -> FxHashSet<ScopedPlaceId> {
     let use_def = use_def_map(db, scope);
     let loop_header = get_loop_header(db, loop_token);
     let module = parsed_module(db, scope.file(db)).load(db);
-    let places = loop_header
+    loop_header
         .definitions()
         .filter_map(|(place, definition)| {
             use_def
@@ -1744,12 +1718,7 @@ fn recursive_collection_places<'db>(
             let has_augmented_assignment = loop_header
                 .bindings_for_place(place)
                 .filter_map(|binding| use_def.definition(binding.binding()).definition())
-                .any(|binding| {
-                    matches!(
-                        binding.kind(db),
-                        ty_python_core::definition::DefinitionKind::AugmentedAssignment(_)
-                    )
-                });
+                .any(|binding| matches!(binding.kind(db), DefinitionKind::AugmentedAssignment(_)));
             has_augmented_assignment.then_some((definition, place))
         })
         .filter_map(|(definition, place)| {
@@ -1757,17 +1726,14 @@ fn recursive_collection_places<'db>(
                 .bindings_at_definition(definition)
                 .filter_map(|binding| binding.binding.definition())
                 .any(|binding| {
-                    let ty_python_core::definition::DefinitionKind::Assignment(assignment) =
-                        binding.kind(db)
-                    else {
+                    let DefinitionKind::Assignment(assignment) = binding.kind(db) else {
                         return false;
                     };
                     is_unconstrained_collection_literal(assignment.value(&module))
                 })
                 .then_some(place)
         })
-        .collect();
-    RecursiveCollectionPlaces(places)
+        .collect()
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1778,20 +1744,12 @@ struct ScopeLoopHeaderPlaces<'db> {
 }
 
 impl<'db> ScopeLoopHeaderPlaces<'db> {
-    fn as_set(&self) -> &FxHashSet<ScopedPlaceId> {
-        &self.all
-    }
-
     fn requires_per_definition_analysis(
         &self,
         loop_token: LoopToken<'db>,
         place: ScopedPlaceId,
     ) -> bool {
         self.per_definition.contains(&(loop_token, place))
-    }
-
-    fn has_per_definition_analysis(&self) -> bool {
-        !self.per_definition.is_empty()
     }
 }
 
@@ -1810,9 +1768,7 @@ fn scope_loop_header_places<'db>(
         .all_definitions_with_usage()
         .filter_map(|(_, state, _)| state.definition())
     {
-        let ty_python_core::definition::DefinitionKind::LoopHeader(loop_header) =
-            definition.kind(db)
-        else {
+        let DefinitionKind::LoopHeader(loop_header) = definition.kind(db) else {
             continue;
         };
         let place = loop_header.place();
@@ -1824,6 +1780,7 @@ fn scope_loop_header_places<'db>(
         return places;
     }
 
+    // Avoid loading the module and inspecting ranges unless a place appears in multiple headers.
     // Sequential headers cannot participate in the same Salsa cycle. Only nested headers for the
     // same place need to fall back to the existing per-definition fixed point.
     let module = parsed_module(db, scope.file(db)).load(db);
@@ -1833,9 +1790,7 @@ fn scope_loop_header_places<'db>(
         .all_definitions_with_usage()
         .filter_map(|(_, state, _)| state.definition())
     {
-        let ty_python_core::definition::DefinitionKind::LoopHeader(loop_header) =
-            definition.kind(db)
-        else {
+        let DefinitionKind::LoopHeader(loop_header) = definition.kind(db) else {
             continue;
         };
         let place = loop_header.place();
@@ -1896,7 +1851,7 @@ fn scope_loop_predicate_metadata<'db>(
     let use_def = use_def_map(db, scope);
     let place_table = place_table(db, scope);
     let loop_places = scope_loop_header_places(db, scope);
-    let track_direct_references = loop_places.has_per_definition_analysis();
+    let track_direct_references = !loop_places.per_definition.is_empty();
     let mut metadata = ScopeLoopPredicateMetadata::default();
 
     for node in use_def.reachability_constraints().used_interiors() {
@@ -1910,7 +1865,7 @@ fn scope_loop_predicate_metadata<'db>(
                 let (loop_dependent, references_loop) = expression_loop_dependencies(
                     db,
                     place_table,
-                    loop_places.as_set(),
+                    &loop_places.all,
                     expression,
                     track_direct_references,
                 );
@@ -1925,7 +1880,7 @@ fn scope_loop_predicate_metadata<'db>(
                 let (loop_dependent, references_loop) = expression_loop_dependencies(
                     db,
                     place_table,
-                    loop_places.as_set(),
+                    &loop_places.all,
                     call.call_expr,
                     true,
                 );
@@ -1954,15 +1909,6 @@ fn scope_loop_predicate_metadata<'db>(
     metadata
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-struct LoopDeletedPlaces(FxHashSet<ScopedPlaceId>);
-
-impl LoopDeletedPlaces {
-    fn contains(&self, place: ScopedPlaceId) -> bool {
-        self.0.contains(&place)
-    }
-}
-
 #[salsa::tracked(
     returns(ref),
     heap_size = get_size2::GetSize::get_heap_size
@@ -1971,25 +1917,23 @@ fn loop_deleted_places<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
     loop_token: LoopToken<'db>,
-) -> LoopDeletedPlaces {
+) -> FxHashSet<ScopedPlaceId> {
     let use_def = use_def_map(db, scope);
     let loop_header = get_loop_header(db, loop_token);
-    LoopDeletedPlaces(
-        loop_header
-            .definitions()
-            .filter_map(|(place, _)| {
-                loop_header
-                    .bindings_for_place(place)
-                    .any(|binding| {
-                        matches!(
-                            use_def.definition(binding.binding()),
-                            DefinitionState::Deleted
-                        )
-                    })
-                    .then_some(place)
-            })
-            .collect(),
-    )
+    loop_header
+        .definitions()
+        .filter_map(|(place, _)| {
+            loop_header
+                .bindings_for_place(place)
+                .any(|binding| {
+                    matches!(
+                        use_def.definition(binding.binding()),
+                        DefinitionState::Deleted
+                    )
+                })
+                .then_some(place)
+        })
+        .collect()
 }
 
 /// Analyze a predicate that can change with an outer loop without joining the current loop's cycle.
@@ -2010,14 +1954,13 @@ fn analyze_loop_independent_predicate<'db>(
 /// their loop-back bindings have been evaluated.
 pub(crate) fn loop_header_requires_recursive_collection_analysis<'db>(
     db: &'db dyn Db,
-    definition: ty_python_core::definition::Definition<'db>,
+    definition: Definition<'db>,
 ) -> bool {
-    let ty_python_core::definition::DefinitionKind::LoopHeader(loop_header) = definition.kind(db)
-    else {
+    let DefinitionKind::LoopHeader(loop_header) = definition.kind(db) else {
         return false;
     };
     let scope = definition.scope(db);
-    recursive_collection_places(db, scope, loop_header.loop_token()).contains(loop_header.place())
+    recursive_collection_places(db, scope, loop_header.loop_token()).contains(&loop_header.place())
 }
 
 /// Analyze the predicates used by one loop header.
@@ -2109,7 +2052,7 @@ fn loop_header_predicate_truthinesses<'db>(
                                 let can_become_bound = predicate_metadata
                                     .bare_name_places
                                     .get(&predicate)
-                                    .is_some_and(|&place| deleted_places.contains(place));
+                                    .is_some_and(|place| deleted_places.contains(place));
                                 if truthiness.is_ambiguous() {
                                     if !can_become_bound {
                                         (true, false)
@@ -2280,12 +2223,12 @@ pub(crate) fn evaluate_loop_header_reachability<'db>(
             use_def.reachability_constraints(),
             reachability,
             |predicate| {
-                truthinesses.get(predicate).map_or_else(
+                truthinesses.analyses.get(&predicate).copied().map_or_else(
                     || {
                         let predicate_node = &use_def.predicates()[predicate];
                         match predicate_node.node {
                             PredicateNode::IsNonTerminalCall(_)
-                                if terminal_predicates.contains(predicate) =>
+                                if terminal_predicates.contains(&predicate) =>
                             {
                                 Truthiness::AlwaysFalse.negate_if(!predicate_node.is_positive)
                             }
