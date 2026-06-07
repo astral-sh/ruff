@@ -208,6 +208,8 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
+            // `Divergent` is the recursive α-leaf and `Recursive` its μ-binder (not standalone
+            // types); their truthiness is `Ambiguous`, like `Dynamic`.
             Type::Dynamic(_)
             | Type::Divergent(_)
             | Type::Recursive(_)

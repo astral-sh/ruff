@@ -512,6 +512,9 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
+            // `Divergent` is the recursive α-leaf (reached after a `Type::Recursive` unfold, or a
+            // cycle mid-iteration provisional), not a standalone type — subscripting it yields
+            // itself, like `Dynamic`. Generic cycle *results* are wrapped in `Type::Recursive`.
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             // A non-contractive `μα.α` carries no structure to subscript into; unfolding it loops,

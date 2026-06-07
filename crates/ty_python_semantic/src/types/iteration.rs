@@ -216,6 +216,8 @@ impl<'db> Type<'db> {
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                // `Divergent` is the recursive α-leaf (after a `Type::Recursive` unfold), not a
+                // standalone type — iterating it is homogeneous, like `Dynamic`.
                 Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
                 // `Type::Recursive` is already unfolded one step at the entry of
                 // `try_iterate_with_mode`; if it reaches here (e.g. via the

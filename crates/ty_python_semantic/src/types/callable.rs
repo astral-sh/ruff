@@ -57,6 +57,8 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            // `Divergent` is the recursive α-leaf (after a `Type::Recursive` unfold), not a
+            // standalone type — upcast to a dynamic callable, like `Dynamic`.
             Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
