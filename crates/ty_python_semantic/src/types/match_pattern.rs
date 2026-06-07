@@ -41,6 +41,11 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
+/// Return whether `kind` is guaranteed to match every instance of `class` at runtime.
+///
+/// This is stricter than [`class_pattern_is_exhaustive`]: nested and ordered patterns use this
+/// result to exclude values from later alternatives, so attribute lookup must not be able to make
+/// the pattern fail.
 pub(crate) fn class_pattern_is_irrefutable(
     db: &dyn Db,
     class: ClassLiteral<'_>,
@@ -55,6 +60,11 @@ pub(crate) fn class_pattern_is_irrefutable(
     }
 }
 
+/// Return whether static exhaustiveness checking treats `kind` as consuming `class`.
+///
+/// For a direct class pattern such as `case Point(x, y)`, we treat irrefutable subpatterns as
+/// exhaustive even though a custom attribute lookup could still fail at runtime. Nested and
+/// ordered patterns use [`class_pattern_is_irrefutable`] instead.
 pub(crate) fn class_pattern_is_exhaustive(
     db: &dyn Db,
     class: ClassLiteral<'_>,
