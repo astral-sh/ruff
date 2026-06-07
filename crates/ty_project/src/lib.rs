@@ -388,6 +388,16 @@ impl Project {
             });
         };
 
+        // A file can be reparsed by another worker after its own check task has already cleared it.
+        // Clear all non-open project files once more after the parallel check completes.
+        let open_files = self.open_files(db);
+        let checked_files = ProjectFiles::new(db, self);
+        for file in &checked_files {
+            if !open_files.contains(&file) {
+                parsed_module(db, file).clear();
+            }
+        }
+
         tracing::debug!(
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
