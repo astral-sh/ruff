@@ -1248,6 +1248,78 @@ fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     });
 }
 
+fn projected_narrowing_conditional_attribute_bindings_code(
+    load_after_each_assignment: bool,
+) -> String {
+    const NUM_ASSIGNMENTS: usize = 60;
+    const NUM_FINAL_LOADS: usize = 200;
+
+    let mut code = "class Container:\n    value: int | None = None\n\n".to_string();
+    code.push_str("def check(container: Container, flags: list[bool]) -> None:\n");
+    for index in 0..NUM_ASSIGNMENTS {
+        writeln!(
+            &mut code,
+            "    if flags[{index}]:\n        container.value = {index}"
+        )
+        .ok();
+        if load_after_each_assignment {
+            code.push_str("    repr(container.value)\n");
+        }
+    }
+    if !load_after_each_assignment {
+        for _ in 0..NUM_FINAL_LOADS {
+            code.push_str("    repr(container.value)\n");
+        }
+    }
+
+    code
+}
+
+fn benchmark_projected_narrowing_attribute_bindings(
+    criterion: &mut Criterion,
+    name: &str,
+    load_after_each_assignment: bool,
+) {
+    setup_rayon();
+
+    let code = projected_narrowing_conditional_attribute_bindings_code(load_after_each_assignment);
+    criterion.bench_function(name, |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmarks repeated reads from an attribute with many conditionally visible bindings.
+///
+/// The generated code first conditionally assigns `container.value` many times, then reads it
+/// repeatedly after the control-flow state has stabilized.
+fn benchmark_projected_narrowing_repeated_attribute_bindings(criterion: &mut Criterion) {
+    benchmark_projected_narrowing_attribute_bindings(
+        criterion,
+        "ty_micro[projected_narrowing_repeated_attribute_bindings]",
+        false,
+    );
+}
+
+/// Benchmarks reads interleaved with conditional assignments to the same attribute.
+///
+/// Each read sees one more possible binding than the previous read, so the projected narrowing
+/// roots overlap but are not identical.
+fn benchmark_projected_narrowing_progressive_attribute_bindings(criterion: &mut Criterion) {
+    benchmark_projected_narrowing_attribute_bindings(
+        criterion,
+        "ty_micro[projected_narrowing_progressive_attribute_bindings]",
+        true,
+    );
+}
+
 fn benchmark_recursive_typed_dict_union_contextual_inference(criterion: &mut Criterion) {
     const NUM_BRANCHES: usize = 11;
 
@@ -1525,6 +1597,8 @@ criterion_group!(
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
+    benchmark_projected_narrowing_repeated_attribute_bindings,
+    benchmark_projected_narrowing_progressive_attribute_bindings,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,
 );
