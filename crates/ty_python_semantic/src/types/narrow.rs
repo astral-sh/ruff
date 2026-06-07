@@ -2058,6 +2058,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     Type::ClassLiteral(class) => {
                         Type::instance(self.db, class.top_materialization(self.db))
                     }
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        Type::Callable(CallableType::unknown(self.db)).top_materialization(self.db)
+                    }
                     _ => Type::object(),
                 }
             }

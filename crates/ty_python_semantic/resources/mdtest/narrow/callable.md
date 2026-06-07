@@ -206,6 +206,11 @@ def _(subj: None | abc.Callable[..., str]) -> None:
             reveal_type(subj)  # revealed: (...) -> str
         case _:
             reveal_type(subj)  # revealed: None
+
+def _(subj: tuple[abc.Callable[..., int]] | tuple[None]) -> None:
+    match subj:
+        case [abc.Callable()]:
+            reveal_type(subj[0])  # revealed: (...) -> int
 ```
 
 `collections.abc.Callable` has no `__match_args__`, so it does not accept positional subpatterns:
