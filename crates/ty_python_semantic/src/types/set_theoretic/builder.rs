@@ -129,6 +129,79 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 }
 
+fn simplify_complementary_cube_orientation<'db>(
+    db: &'db dyn Db,
+    positive_side: Type<'db>,
+    negative_side: Type<'db>,
+) -> Option<Type<'db>> {
+    let Type::Intersection(negative_intersection) = negative_side else {
+        return None;
+    };
+    let negative_positive = negative_intersection.positive(db);
+    let negative_negative = negative_intersection.negative(db);
+
+    let try_candidate = |candidate| {
+        if !negative_negative.contains(&candidate) {
+            return None;
+        }
+
+        let mut remainder = IntersectionBuilder::new(db);
+        match positive_side {
+            Type::Intersection(positive_intersection) => {
+                let positive_positive = positive_intersection.positive(db);
+                let positive_negative = positive_intersection.negative(db);
+
+                if positive_positive.len() != negative_positive.len() + 1
+                    || positive_negative.len() + 1 != negative_negative.len()
+                    || positive_positive.iter().any(|element| {
+                        *element != candidate && !negative_positive.contains(element)
+                    })
+                    || positive_negative
+                        .iter()
+                        .any(|element| !negative_negative.contains(element))
+                {
+                    return None;
+                }
+
+                for element in positive_positive {
+                    if *element != candidate {
+                        remainder = remainder.add_positive(*element);
+                    }
+                }
+                for element in positive_negative {
+                    remainder = remainder.add_negative(*element);
+                }
+            }
+            _ => {
+                if positive_side != candidate
+                    || !negative_positive.is_empty()
+                    || negative_negative.len() != 1
+                {
+                    return None;
+                }
+            }
+        }
+
+        // Boolean absorption is not representation-preserving for gradual types. For example,
+        // `(Any & ~None) | None` must not be widened to `Any`. Delay this recursive traversal
+        // until after the cheap shape checks because this function runs in the hot union loop.
+        if positive_side.has_dynamic(db) || negative_side.has_dynamic(db) {
+            return None;
+        }
+
+        Some(remainder.build())
+    };
+
+    match positive_side {
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .find_map(try_candidate),
+        _ => try_candidate(positive_side),
+    }
+}
+
 /// Simplify two conjunctions containing opposite polarities of the same element.
 ///
 /// - `(R & P) | (R & ~P)` -> `R`
@@ -137,82 +210,11 @@ fn simplify_complementary_cubes<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Option<Type<'db>> {
-    // Boolean absorption is not representation-preserving for gradual types. For example,
-    // `(Any & ~None) | None` must not be widened to `Any`.
-    if left.has_dynamic(db) || right.has_dynamic(db) {
-        return None;
-    }
-
-    fn try_orientation<'db>(
-        db: &'db dyn Db,
-        positive_side: Type<'db>,
-        negative_side: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let Type::Intersection(negative_intersection) = negative_side else {
-            return None;
-        };
-        let negative_positive = negative_intersection.positive(db);
-        let negative_negative = negative_intersection.negative(db);
-
-        let try_candidate = |candidate| {
-            if !negative_negative.contains(&candidate) {
-                return None;
-            }
-
-            let mut remainder = IntersectionBuilder::new(db);
-            match positive_side {
-                Type::Intersection(positive_intersection) => {
-                    let positive_positive = positive_intersection.positive(db);
-                    let positive_negative = positive_intersection.negative(db);
-
-                    if positive_positive.len() != negative_positive.len() + 1
-                        || positive_negative.len() + 1 != negative_negative.len()
-                        || positive_positive.iter().any(|element| {
-                            *element != candidate && !negative_positive.contains(element)
-                        })
-                        || positive_negative
-                            .iter()
-                            .any(|element| !negative_negative.contains(element))
-                    {
-                        return None;
-                    }
-
-                    for element in positive_positive {
-                        if *element != candidate {
-                            remainder = remainder.add_positive(*element);
-                        }
-                    }
-                    for element in positive_negative {
-                        remainder = remainder.add_negative(*element);
-                    }
-                }
-                _ => {
-                    if positive_side != candidate
-                        || !negative_positive.is_empty()
-                        || negative_negative.len() != 1
-                    {
-                        return None;
-                    }
-                }
-            }
-            Some(remainder.build())
-        };
-
-        match positive_side {
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .copied()
-                .find_map(try_candidate),
-            _ => try_candidate(positive_side),
-        }
-    }
-
-    if let Some(reduction) = try_orientation(db, left, right) {
+    if let Some(reduction) = simplify_complementary_cube_orientation(db, left, right) {
         return Some(reduction);
     }
 
-    try_orientation(db, right, left)
+    simplify_complementary_cube_orientation(db, right, left)
 }
 
 /// Combine union elements that cover more of the same enum class.
