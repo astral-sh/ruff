@@ -304,8 +304,9 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    // TODO: recursive initial (cyclic-definition error)
-    cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
+    // Seed the scope cycle with the μα.α recursion marker (`Recursive`), matching the other
+    // cycle-recovery seeds, so every cycle-recovery query starts in the same shape.
+    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::recursive(db, id, None, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },

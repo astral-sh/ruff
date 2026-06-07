@@ -1001,6 +1001,14 @@ impl<'db> Type<'db> {
         matches!(self, Type::Recursive(rec) if rec.body(db).is_divergent())
     }
 
+    /// True if this type is the structureless cycle marker — a bare `Divergent` α-variable or its
+    /// degenerate μ-binder `μα.α` (a `Recursive` whose body is exactly that `Divergent`). Both denote
+    /// the same ill-founded self-reference (`type Itself = Itself`), so cycle-detection sites that key
+    /// off the marker must treat them alike regardless of which form a cycle's seed produced.
+    pub(crate) fn is_structureless_cycle_marker(self, db: &'db dyn Db) -> bool {
+        self.is_divergent() || self.is_bottom_recursive(db)
+    }
+
     pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
         match self {
             Type::Divergent(divergent) => Some(divergent),

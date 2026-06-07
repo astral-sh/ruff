@@ -1533,7 +1533,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
         let expanded = value_ty.expand_eagerly(self.db());
-        if expanded.is_divergent() {
+        if expanded.is_structureless_cycle_marker(self.db()) {
             if let Some(builder) = self
                 .context
                 .report_lint(&CYCLIC_TYPE_ALIAS_DEFINITION, type_alias)
