@@ -304,6 +304,7 @@ pub(crate) fn infer_scope_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
+    // TODO: recursive initial (cyclic-definition error)
     cycle_initial=|_, id, _| ScopeInference::cycle_initial(Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -631,7 +632,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| UnpackResult::cycle_initial(Type::divergent(id)),
+    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::recursive(db, id, None, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },

@@ -886,7 +886,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::recursive(db, id, None, Type::divergent(id))).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         // A structureless place cycle (e.g. a cyclic import `A = A`, or a loop-carried local with
         // no base case) has no inhabitant; resolve it to `Never` rather than exposing the bare

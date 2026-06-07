@@ -997,6 +997,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::Recursive(_))
     }
 
+    pub(crate) fn is_bottom_recursive(self, db: &'db dyn Db) -> bool {
+        matches!(self, Type::Recursive(rec) if rec.body(db).is_divergent())
+    }
+
     pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
@@ -2768,7 +2772,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::recursive(db, id, None, Type::divergent(id))).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             // Present a recursively-defined member (e.g. a cross-instance attribute
             // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
@@ -3496,6 +3500,7 @@ impl<'db> Type<'db> {
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
+            // TODO: Type::recursive(db, id, None, Type::divergent(id))
             cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 // Present a recursively-defined member (e.g. a cross-instance attribute
@@ -5997,7 +6002,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -6718,7 +6723,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|_, id, _, ()| Type::divergent(id),
+        cycle_initial=|db, id, _, ()| Type::recursive(db, id, None, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)
         },

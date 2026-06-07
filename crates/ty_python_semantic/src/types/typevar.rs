@@ -518,7 +518,11 @@ impl<'db> TypeVarInstance<'db> {
 
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
-    #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|db, id, _| Some(Type::recursive(db, id, None, Type::divergent(id))),
+        cycle_fn=lazy_default_cycle_recover,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
             let parameters = match ty {
