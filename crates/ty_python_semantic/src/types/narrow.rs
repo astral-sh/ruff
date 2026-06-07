@@ -572,6 +572,40 @@ impl<'db> NarrowingConstraint<'db> {
         }
         union.build()
     }
+
+    pub(crate) fn is_intersection_only(&self) -> bool {
+        self.replacement_disjuncts.is_empty()
+    }
+
+    pub(crate) fn single_intersection_type(&self) -> Option<Type<'db>> {
+        let [disjunct] = &*self.intersection_disjuncts else {
+            return None;
+        };
+        let [conjunct] = &*disjunct.conjuncts else {
+            return None;
+        };
+
+        self.replacement_disjuncts.is_empty().then_some(*conjunct)
+    }
+
+    /// Return whether these are single intersection constraints represented as `T` and `~T`.
+    pub(crate) fn is_direct_complement_of(&self, db: &'db dyn Db, other: &Self) -> bool {
+        fn is_direct_negation<'db>(db: &'db dyn Db, ty: Type<'db>, negated: Type<'db>) -> bool {
+            let Type::Intersection(intersection) = negated else {
+                return false;
+            };
+            intersection.positive(db).is_empty()
+                && intersection.negative(db).len() == 1
+                && intersection.negative(db).contains(&ty)
+        }
+
+        self.single_intersection_type()
+            .zip(other.single_intersection_type())
+            .is_some_and(|(self_ty, other_ty)| {
+                is_direct_negation(db, self_ty, other_ty)
+                    || is_direct_negation(db, other_ty, self_ty)
+            })
+    }
 }
 
 impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {

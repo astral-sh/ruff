@@ -554,3 +554,35 @@ def f():
     else:
         reveal_type(y)  # revealed: int | str
 ```
+
+## Repeated `TypeIs` `elif` narrowing
+
+Each later branch retains the negative constraints from all earlier predicates.
+
+```py
+from typing_extensions import TypeIs
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Source: ...
+class A(Source): ...
+class B(Source): ...
+class C(Source): ...
+class D(Source): ...
+
+def istype(value: object, cls: type[T]) -> TypeIs[T]:
+    return type(value) is cls
+
+def check(source: Source) -> None:
+    if istype(source, A):
+        reveal_type(source)  # revealed: A
+    elif istype(source, B):
+        reveal_type(source)  # revealed: B & ~A
+    elif istype(source, C):
+        reveal_type(source)  # revealed: C & ~A & ~B
+    elif istype(source, D):
+        reveal_type(source)  # revealed: D & ~A & ~B & ~C
+    else:
+        reveal_type(source)  # revealed: Source & ~A & ~B & ~C & ~D
+```
