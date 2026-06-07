@@ -219,6 +219,8 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
+    use_def_map,
 };
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
@@ -507,6 +509,50 @@ fn accumulate_constraint<'db>(
     }
 }
 
+const MIN_CACHED_PROJECTED_NODES: usize = 30;
+const MIN_REPEATED_NARROWING_BRANCHES: usize = 4;
+
+fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'db> {
+    match predicate.node {
+        PredicateNode::Expression(expression) => expression.scope(db),
+        PredicateNode::IsNonTerminalCall(call) => call.callable.scope(db),
+        PredicateNode::Pattern(pattern) => pattern.scope(db),
+        PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+    }
+}
+
+/// Cache the final narrowed type for large projected graphs that are reused by many place loads.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_large_projected_constraint<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    id: ScopedReachabilityConstraintId,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+) -> Type<'db> {
+    let use_def = use_def_map(db, scope);
+    let constraints = use_def.reachability_constraints();
+    let predicates = use_def.predicates();
+    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let projected_root = projector.project(id);
+
+    let mut context = ProjectedNarrowingContext {
+        db,
+        base_ty,
+        graph: &projector.graph,
+        joins: projector.graph.joins(projected_root),
+        join_cache: FxHashMap::default(),
+        branch_factor_plan: ProjectedBranchFactorPlan::new(db, &projector.graph, base_ty),
+    };
+    context.narrow(projected_root, None)
+}
+
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
     /// Narrow a type by walking a TDD narrowing constraint.
     fn narrow_by_constraint(
@@ -559,12 +605,20 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
     ) -> Type<'db> {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
+
+        if projector.graph.nodes.len() >= MIN_CACHED_PROJECTED_NODES {
+            let node = self.get_interior_node(id);
+            let scope = predicate_scope(db, predicates[node.atom()]);
+            return type_narrowed_by_large_projected_constraint(db, scope, id, base_ty, place);
+        }
+
         let mut context = ProjectedNarrowingContext {
             db,
             base_ty,
             graph: &projector.graph,
             joins: projector.graph.joins(projected_root),
             join_cache: FxHashMap::default(),
+            branch_factor_plan: ProjectedBranchFactorPlan::new(db, &projector.graph, base_ty),
         };
         context.narrow(projected_root, None)
     }
@@ -857,6 +911,182 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
+#[derive(Clone, Copy)]
+struct ProjectedBranchFactor<'db> {
+    predicate: Type<'db>,
+    if_true: ProjectedNarrowingNodeId,
+    if_false: ProjectedNarrowingNodeId,
+    branches: usize,
+    condition: Option<Type<'db>>,
+}
+
+/// Precomputes regions of the projected narrowing DAG with two possible continuations.
+///
+/// Unlike the linear-chain matcher, this can compose alternating shared-true and shared-false
+/// regions. For example, it can factor `(P | Q) & R` when the projected children share the same
+/// two continuation subgraphs.
+struct ProjectedBranchFactorPlan<'db> {
+    factors: Vec<Option<ProjectedBranchFactor<'db>>>,
+}
+
+impl<'db> ProjectedBranchFactorPlan<'db> {
+    fn new(
+        db: &'db dyn Db,
+        graph: &ProjectedNarrowingGraph<'db>,
+        base_ty: Type<'db>,
+    ) -> Option<Self> {
+        if graph.nodes.len() < MIN_REPEATED_NARROWING_BRANCHES || base_ty.has_dynamic(db) {
+            return None;
+        }
+
+        let mut factors = Vec::with_capacity(graph.nodes.len());
+        let mut has_factor = false;
+
+        for node in &graph.nodes {
+            let Some(predicate) = Self::atomic_condition(db, graph, node) else {
+                factors.push(None);
+                continue;
+            };
+
+            let if_true_factor = Self::factor(&factors, node.if_true);
+            let if_false_factor = Self::factor(&factors, node.if_false);
+            let (if_true, if_false, branches) = if let (Some(if_true), Some(if_false)) =
+                (if_true_factor, if_false_factor)
+                && if_true.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && if_true.if_true == if_false.if_true
+                && if_true.if_false == if_false.if_false
+            {
+                (
+                    if_true.if_true,
+                    if_true.if_false,
+                    if_true.branches + if_false.branches + 1,
+                )
+            } else if let Some(nested) = if_false_factor
+                && node.if_true != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_true == nested.if_true
+            {
+                (node.if_true, nested.if_false, nested.branches + 1)
+            } else if let Some(nested) = if_true_factor
+                && node.if_false != ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_false == nested.if_false
+            {
+                (nested.if_true, node.if_false, nested.branches + 1)
+            } else {
+                (node.if_true, node.if_false, 1)
+            };
+
+            let factor = ProjectedBranchFactor {
+                predicate,
+                if_true,
+                if_false,
+                branches,
+                condition: None,
+            };
+            has_factor |= branches >= MIN_REPEATED_NARROWING_BRANCHES;
+            factors.push(Some(factor));
+        }
+
+        has_factor.then_some(Self { factors })
+    }
+
+    fn factor(
+        factors: &[Option<ProjectedBranchFactor<'db>>],
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<ProjectedBranchFactor<'db>> {
+        factors.get(id.0).copied().flatten()
+    }
+
+    fn atomic_condition(
+        db: &'db dyn Db,
+        graph: &ProjectedNarrowingGraph<'db>,
+        node: &ProjectedNarrowingNode,
+    ) -> Option<Type<'db>> {
+        let (positive, negative) = &graph.predicate_constraints_cache[&node.atom];
+        let (positive, negative) = (positive.as_ref()?, negative.as_ref()?);
+        if !positive.is_direct_complement_of(db, negative) {
+            return None;
+        }
+
+        let positive = positive.single_intersection_type()?;
+        let negative = negative.single_intersection_type()?;
+        // Gradual types do not have an exact set-theoretic complement.
+        if positive.has_dynamic(db) || negative.has_dynamic(db) {
+            return None;
+        }
+
+        Some(positive)
+    }
+
+    fn factor_condition(
+        &mut self,
+        db: &'db dyn Db,
+        graph: &ProjectedNarrowingGraph<'db>,
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<(
+        ProjectedNarrowingNodeId,
+        ProjectedNarrowingNodeId,
+        Type<'db>,
+    )> {
+        let factor = Self::factor(&self.factors, id)?;
+        if factor.branches < MIN_REPEATED_NARROWING_BRANCHES {
+            return None;
+        }
+
+        Some((
+            factor.if_true,
+            factor.if_false,
+            self.condition(db, graph, id),
+        ))
+    }
+
+    fn condition(
+        &mut self,
+        db: &'db dyn Db,
+        graph: &ProjectedNarrowingGraph<'db>,
+        id: ProjectedNarrowingNodeId,
+    ) -> Type<'db> {
+        let factor =
+            Self::factor(&self.factors, id).expect("only factorable nodes have conditions");
+        if let Some(cached) = factor.condition {
+            return cached;
+        }
+
+        let node = graph.node(id);
+        let predicate = factor.predicate;
+        let result = if node.if_true == factor.if_true {
+            // `P ? true : C` is equivalent to `P | C`.
+            if node.if_false == factor.if_false {
+                predicate
+            } else {
+                let if_false = self.condition(db, graph, node.if_false);
+                UnionType::from_two_elements(db, predicate, if_false)
+            }
+        } else if node.if_false == factor.if_false {
+            // `P ? C : false` is equivalent to `P & C`.
+            IntersectionBuilder::new(db)
+                .add_positive(predicate)
+                .add_positive(self.condition(db, graph, node.if_true))
+                .build()
+        } else {
+            // The remaining case is `(P & Ct) | (~P & Cf)`.
+            let if_true = IntersectionBuilder::new(db)
+                .add_positive(predicate)
+                .add_positive(self.condition(db, graph, node.if_true))
+                .build();
+            let if_false = IntersectionBuilder::new(db)
+                .add_positive(predicate.negate(db))
+                .add_positive(self.condition(db, graph, node.if_false))
+                .build();
+            UnionType::from_two_elements(db, if_true, if_false)
+        };
+        self.factors[id.0]
+            .as_mut()
+            .expect("only factorable nodes have conditions")
+            .condition = Some(result);
+        result
+    }
+}
+
 /// Evaluates narrowed types over a projected narrowing graph.
 struct ProjectedNarrowingContext<'a, 'db> {
     db: &'db dyn Db,
@@ -866,6 +1096,7 @@ struct ProjectedNarrowingContext<'a, 'db> {
     joins: Vec<bool>,
     /// Caches each join's narrowed suffix type from its boundary.
     join_cache: FxHashMap<ProjectedNarrowingNodeId, Type<'db>>,
+    branch_factor_plan: Option<ProjectedBranchFactorPlan<'db>>,
 }
 
 impl<'db> ProjectedNarrowingContext<'_, 'db> {
@@ -882,6 +1113,46 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         let result = self.narrow_uncached(id, None);
         self.join_cache.insert(id, result);
         result
+    }
+
+    fn narrow_factored_branch(
+        &mut self,
+        id: ProjectedNarrowingNodeId,
+        accumulated: Option<NarrowingConstraint<'db>>,
+    ) -> Option<Type<'db>> {
+        // Replacement narrowing does not distribute over this rewrite.
+        if accumulated
+            .as_ref()
+            .is_some_and(|constraint| !constraint.is_intersection_only())
+        {
+            return None;
+        }
+
+        let (if_true, if_false, condition) = self
+            .branch_factor_plan
+            .as_mut()?
+            .factor_condition(self.db, self.graph, id)?;
+
+        let if_true_ty = self.narrow(
+            if_true,
+            accumulate_constraint(
+                accumulated.clone(),
+                Some(NarrowingConstraint::intersection(condition)),
+            ),
+        );
+        let if_false_ty = self.narrow(
+            if_false,
+            accumulate_constraint(
+                accumulated,
+                Some(NarrowingConstraint::intersection(condition.negate(self.db))),
+            ),
+        );
+
+        Some(UnionType::from_two_elements(
+            self.db,
+            if_true_ty,
+            if_false_ty,
+        ))
     }
 
     /// Recursively evaluates a projected path while accumulating narrowing constraints.
@@ -913,6 +1184,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         if id == ProjectedNarrowingNodeId::ALWAYS_TRUE {
             apply_accumulated_narrowing(self.db, self.base_ty, accumulated)
         } else {
+            if let Some(narrowed) = self.narrow_factored_branch(id, accumulated.clone()) {
+                return narrowed;
+            }
+
             let node = self.graph.node(id);
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
@@ -1271,5 +1546,53 @@ impl<'db> DeclarationsIteratorExtension<'db> for DeclarationsIterator<'_, 'db> {
                 .then_some(declaration_order)
             },
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        NarrowingConstraint, ProjectedBranchFactorPlan, ProjectedNarrowingGraph,
+        ProjectedNarrowingNode, ProjectedNarrowingNodeId, Type,
+    };
+
+    use crate::db::tests::setup_db;
+    use ruff_index::Idx;
+    use ty_python_core::predicate::ScopedPredicateId;
+
+    #[test]
+    fn factors_projected_branches_with_equivalent_continuations() {
+        let db = setup_db();
+        let mut graph = ProjectedNarrowingGraph::default();
+
+        let mut add_condition = |value: u16, if_true, if_false| {
+            let atom = ScopedPredicateId::new(usize::from(value));
+            let positive = Type::int_literal(i64::from(value));
+            let negative = positive.negate(&db);
+            graph.predicate_constraints_cache.insert(
+                atom,
+                (
+                    Some(NarrowingConstraint::intersection(positive)),
+                    Some(NarrowingConstraint::intersection(negative)),
+                ),
+            );
+            graph.add_node(ProjectedNarrowingNode {
+                atom,
+                if_true,
+                if_false,
+            })
+        };
+
+        let reachable = ProjectedNarrowingNodeId::ALWAYS_TRUE;
+        let unreachable = ProjectedNarrowingNodeId::ALWAYS_FALSE;
+        let left = add_condition(0, reachable, unreachable);
+        let right = add_condition(1, reachable, unreachable);
+        let nested = add_condition(2, left, right);
+        let root = add_condition(3, nested, left);
+
+        let mut plan = ProjectedBranchFactorPlan::new(&db, &graph, Type::object()).unwrap();
+        let (if_true, if_false, condition) = plan.factor_condition(&db, &graph, root).unwrap();
+        assert_eq!((if_true, if_false), (reachable, unreachable));
+        assert_eq!(condition, Type::int_literal(0));
     }
 }
