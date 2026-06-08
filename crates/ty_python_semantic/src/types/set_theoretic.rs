@@ -67,6 +67,14 @@ impl<'db> UnionType<'db> {
     }
 
     /// Create a union type `A | B` from two elements `A` and `B`.
+    pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        match (a, b) {
+            _ if a == b => a,
+            (Type::Never, other) | (other, Type::Never) => other,
+            _ => Self::from_two_elements_impl(db, a, b),
+        }
+    }
+
     #[salsa::tracked(
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
@@ -74,7 +82,7 @@ impl<'db> UnionType<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+    fn from_two_elements_impl(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
         UnionBuilder::new(db).add(a).add(b).build()
     }
 
