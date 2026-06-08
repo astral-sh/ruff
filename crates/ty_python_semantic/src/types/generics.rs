@@ -53,6 +53,21 @@ pub(crate) fn enclosing_generic_contexts<'db>(
         .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
 }
 
+/// Returns the binding contexts introduced by the given scope or any enclosing scope.
+pub(crate) fn enclosing_binding_contexts<'a, 'db>(
+    index: &'a SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = BindingContext<'db>> + 'a {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::Function(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::TypeAlias(node) => Some(index.expect_single_definition(node).into()),
+            _ => None,
+        })
+}
+
 /// Binds an unbound typevar.
 ///
 /// When a typevar is first created, we will have a [`TypeVarInstance`] which does not have an

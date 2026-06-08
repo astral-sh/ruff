@@ -686,6 +686,7 @@ impl TypeVarNonce {
 struct TypeVarNonceGeneratorInner<'db> {
     next: TypeVarNonce,
     seen: FxHashSet<GenericContext<'db>>,
+    enclosing: FxHashSet<BindingContext<'db>>,
 }
 
 /// A clone-safe generator of fresh bound-typevar occurrence nonces.
@@ -704,23 +705,37 @@ impl Default for TypeVarNonceGenerator<'_> {
             inner: Rc::new(RefCell::new(TypeVarNonceGeneratorInner {
                 next: TypeVarNonce::FIRST,
                 seen: FxHashSet::default(),
+                enclosing: FxHashSet::default(),
             })),
         }
     }
 }
 
 impl<'db> TypeVarNonceGenerator<'db> {
-    pub(crate) fn record_enclosing_scopes(
+    pub(crate) fn record_enclosing_binding_contexts(
         &self,
-        generic_contexts: impl IntoIterator<Item = GenericContext<'db>>,
+        binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
     ) {
         let mut inner = self.inner.borrow_mut();
-        inner.seen.extend(generic_contexts);
+        inner.enclosing.extend(binding_contexts);
     }
 
-    pub(crate) fn should_freshen(&self, generic_context: GenericContext<'db>) -> bool {
+    pub(crate) fn should_freshen(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> bool {
         let mut inner = self.inner.borrow_mut();
-        !inner.seen.insert(generic_context)
+        let mut binding_contexts = generic_context
+            .variables(db)
+            .map(|typevar| typevar.binding_context(db));
+        // A context inherited from an enclosing definition can be merged with another context.
+        // Only the unmerged context represents a recursive occurrence that needs freshening.
+        let matches_enclosing = binding_contexts.next().is_some_and(|binding_context| {
+            inner.enclosing.contains(&binding_context)
+                && binding_contexts.all(|other| other == binding_context)
+        });
+        matches_enclosing || !inner.seen.insert(generic_context)
     }
 
     pub(crate) fn next(&self) -> TypeVarNonce {

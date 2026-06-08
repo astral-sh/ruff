@@ -55,8 +55,8 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
@@ -499,13 +499,12 @@ pub(crate) struct Bindings<'db> {
     /// Whether each argument will be used as a value and/or a type form in this call.
     argument_forms: ArgumentForms,
 
-    /// Generic contexts that enclose this call site, if known.
+    /// Binding contexts that enclose this call site, if known.
     ///
     /// This is an optimization hint for deciding when direct-call generic freshening is needed.
-    /// `None` means the caller did not provide the information, so we conservatively freshen every
-    /// eligible generic callable. `Some([])` means the caller knows there are no enclosing generic
-    /// contexts, so freshening can be skipped.
-    enclosing_generic_contexts: Option<Box<[GenericContext<'db>]>>,
+    /// `None` means the caller did not provide lexical collision information. `Some([])` means the
+    /// caller knows there are no enclosing binding contexts.
+    enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
 }
 
 impl<'db> Bindings<'db> {
@@ -638,7 +637,7 @@ impl<'db> Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
-            enclosing_generic_contexts: None,
+            enclosing_binding_contexts: None,
         }
     }
 
@@ -672,7 +671,7 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             argument_forms: ArgumentForms::new(0),
-            enclosing_generic_contexts: None,
+            enclosing_binding_contexts: None,
         }
     }
 
@@ -720,11 +719,11 @@ impl<'db> Bindings<'db> {
         self
     }
 
-    pub(crate) fn with_enclosing_generic_contexts(
+    pub(crate) fn with_enclosing_binding_contexts(
         mut self,
-        enclosing_generic_contexts: impl IntoIterator<Item = GenericContext<'db>>,
+        enclosing_binding_contexts: impl IntoIterator<Item = BindingContext<'db>>,
     ) -> Self {
-        self.enclosing_generic_contexts = Some(enclosing_generic_contexts.into_iter().collect());
+        self.enclosing_binding_contexts = Some(enclosing_binding_contexts.into_iter().collect());
         self
     }
 
@@ -985,7 +984,7 @@ impl<'db> Bindings<'db> {
             argument_forms: self.argument_forms,
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
-            enclosing_generic_contexts: self.enclosing_generic_contexts,
+            enclosing_binding_contexts: self.enclosing_binding_contexts,
             elements: self
                 .elements
                 .into_iter()
@@ -1005,14 +1004,15 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         nonce_generator: &TypeVarNonceGenerator<'db>,
     ) {
-        let enclosing_generic_contexts = self.enclosing_generic_contexts.take();
-        if let Some(enclosing_generic_contexts) = enclosing_generic_contexts.as_deref() {
-            nonce_generator.record_enclosing_scopes(enclosing_generic_contexts.iter().copied());
+        let enclosing_binding_contexts = self.enclosing_binding_contexts.take();
+        if let Some(enclosing_binding_contexts) = enclosing_binding_contexts.as_deref() {
+            nonce_generator
+                .record_enclosing_binding_contexts(enclosing_binding_contexts.iter().copied());
         }
         for item in self.iter_callable_items_mut() {
             item.freshen_generic_contexts_in_place(db, nonce_generator);
         }
-        self.enclosing_generic_contexts = enclosing_generic_contexts;
+        self.enclosing_binding_contexts = enclosing_binding_contexts;
     }
 
     /// Match the arguments of a call site against the parameters of a collection of possibly
@@ -2814,7 +2814,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_generic_contexts: None,
+            enclosing_binding_contexts: None,
         }
     }
 }
@@ -2840,7 +2840,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             argument_forms: ArgumentForms::new(0),
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            enclosing_generic_contexts: None,
+            enclosing_binding_contexts: None,
         }
     }
 }
@@ -3020,7 +3020,7 @@ impl<'db> CallableBinding<'db> {
             let Some(generic_context) = overload.signature.generic_context else {
                 continue;
             };
-            if nonce_generator.should_freshen(generic_context) {
+            if nonce_generator.should_freshen(db, generic_context) {
                 overload.freshen_bound_typevars(db, nonce.value());
             }
         }
