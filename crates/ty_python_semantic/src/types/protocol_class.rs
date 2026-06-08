@@ -802,9 +802,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return self.never();
         }
 
-        target
-            .members(db)
-            .when_all(db, self.constraints, |target_member| {
+        target.members(db).when_all_pruning_unmentioned_deferred(
+            db,
+            self.constraints,
+            |target_member| {
                 let source_member = source.member_by_name(db, target_member.name);
 
                 if self.is_context_collection_enabled() && source_member.is_none() {
@@ -891,7 +892,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     });
                 }
                 result
-            })
+            },
+        )
     }
 }
 

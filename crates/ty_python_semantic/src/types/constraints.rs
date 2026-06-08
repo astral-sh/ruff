@@ -47,9 +47,11 @@
 //! The raw [`Node`] and [`NodeId`] layer only represents the TDD formula itself. The public
 //! [`ConstraintSet`] wrapper adds deferred existential quantification metadata for callable-local
 //! type variables. While constructing larger positive formulas, those variables remain visible in
-//! the raw TDD and the deferred metadata is merged globally. Before terminal semantic observations
-//! or solution extraction, the wrapper interprets the set as `∃ deferred_vars . raw_formula`.
-//! Operations that introduce negation-like semantics force this interpretation first, because
+//! the raw TDD and the deferred metadata is merged globally. A small number of construction sites
+//! with known-independent operands can eagerly quantify operand-local variables for performance.
+//! Before terminal semantic observations or solution extraction, the wrapper interprets the set as
+//! `∃ deferred_vars . raw_formula`. Operations that introduce negation-like semantics force this
+//! interpretation first, because
 //! preserving quantifier structure through negation would require a more expressive representation.
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
@@ -117,7 +119,7 @@ use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -191,6 +193,15 @@ pub(crate) trait IteratorConstraintsExtension<T> {
         builder: &'c ConstraintSetBuilder<'db>,
         f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c>;
+
+    /// Returns the constraints under which every element of the iterator holds, eagerly applying
+    /// deferred quantification for variables that are local to a single operand.
+    fn when_all_pruning_unmentioned_deferred<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
 }
 
 impl<I, T> IteratorConstraintsExtension<T> for I
@@ -256,6 +267,54 @@ where
             deferred_quantification,
         )
     }
+
+    fn when_all_pruning_unmentioned_deferred<'db, 'c>(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let mut constraints = Vec::new();
+        for element in self {
+            let constraint = f(element);
+            constraint.verify_builder(builder);
+            if constraint.node.is_never_satisfied(db, builder) {
+                return ConstraintSet::never(builder);
+            }
+            constraints.push(constraint);
+        }
+
+        let (constraints, deferred_quantification) =
+            prepare_distributed_constraints(db, builder, constraints);
+        let node = NodeId::distributed_and(db, builder, constraints.into_iter().map(|c| c.node));
+        ConstraintSet::from_node_with_deferred_quantification(
+            builder,
+            node,
+            deferred_quantification,
+        )
+    }
+}
+
+fn prepare_distributed_constraints<'db, 'c>(
+    db: &'db dyn Db,
+    builder: &'c ConstraintSetBuilder<'db>,
+    constraints: Vec<ConstraintSet<'db, 'c>>,
+) -> (Vec<ConstraintSet<'db, 'c>>, InferableTypeVars<'db>) {
+    let mut pruned = Vec::with_capacity(constraints.len());
+    let mut deferred_quantification = InferableTypeVars::None;
+
+    for (index, constraint) in constraints.iter().copied().enumerate() {
+        let constraint = constraint.quantify_unkept_deferred(db, builder, |identity| {
+            constraints.iter().enumerate().any(|(other_index, other)| {
+                other_index != index && other.node.mentions_typevar(db, builder, identity)
+            })
+        });
+        deferred_quantification =
+            deferred_quantification.merge(db, constraint.deferred_quantification);
+        pruned.push(constraint);
+    }
+
+    (pruned, deferred_quantification)
 }
 
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
@@ -676,6 +735,37 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             self.node,
             self.deferred_quantification
                 .merge(db, deferred_quantification),
+        )
+    }
+
+    fn quantify_unkept_deferred(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut should_keep_deferred: impl FnMut(BoundTypeVarIdentity<'db>) -> bool,
+    ) -> Self {
+        if matches!(self.deferred_quantification, InferableTypeVars::None) {
+            return self;
+        }
+
+        let mut kept = FxOrderSet::default();
+        let mut quantified = FxOrderSet::default();
+        for identity in self.deferred_quantification.iter(db) {
+            if should_keep_deferred(identity) {
+                kept.insert(identity);
+            } else {
+                quantified.insert(identity);
+            }
+        }
+
+        if quantified.is_empty() {
+            return self;
+        }
+
+        Self::from_node_with_deferred_quantification(
+            builder,
+            self.node.exists(db, builder, quantified.iter().copied()),
+            InferableTypeVars::from_typevars(db, kept),
         )
     }
 
@@ -2821,6 +2911,36 @@ impl NodeId {
         }
     }
 
+    fn mentions_typevar<'db>(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        let mentions_typevar = |ty: Type<'db>| match ty {
+            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            _ => false,
+        };
+        let mut mentioned = false;
+        self.for_each_unique_constraint(builder, &mut |constraint, _| {
+            if mentioned {
+                return;
+            }
+
+            let constraint = builder.constraint_data(constraint);
+            mentioned = constraint.typevar.identity(db) == bound_typevar
+                || constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+                || constraint
+                    .bounds
+                    .upper
+                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar));
+        });
+        mentioned
+    }
+
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3633,11 +3753,17 @@ impl InteriorNode {
         }
         drop(storage);
 
-        let mut path = self.path_assignments(builder);
         let mentions_typevar = |ty: Type<'db>| match ty {
             Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
             _ => false,
         };
+        if !self.node().mentions_typevar(db, builder, bound_typevar) {
+            let mut storage = builder.storage.borrow_mut();
+            storage.exists_one_cache.insert(key, self.node());
+            return self.node();
+        }
+
+        let mut path = self.path_assignments(builder);
         let result = self.abstract_one_inner(
             db,
             builder,
@@ -6851,6 +6977,22 @@ mod tests {
             let actual: FxOrderSet<_> = set.deferred_quantification.iter(&db).collect();
             assert_eq!(actual, expected);
         }
+
+        let pruned_when_all = [t_int, u_str]
+            .into_iter()
+            .when_all_pruning_unmentioned_deferred(&db, &builder, |constraint| constraint);
+        let actual: FxOrderSet<_> = pruned_when_all.deferred_quantification.iter(&db).collect();
+        assert_eq!(actual, FxOrderSet::default());
+
+        let u_equals_t =
+            ConstraintSet::constrain_typevar(&db, &builder, u, Type::TypeVar(t), Type::TypeVar(t));
+        let pruned_when_all = [t_int, u_equals_t]
+            .into_iter()
+            .when_all_pruning_unmentioned_deferred(&db, &builder, |constraint| constraint);
+
+        let expected = FxOrderSet::from_iter([t.identity(&db)]);
+        let actual: FxOrderSet<_> = pruned_when_all.deferred_quantification.iter(&db).collect();
+        assert_eq!(actual, expected);
     }
 
     #[test]
