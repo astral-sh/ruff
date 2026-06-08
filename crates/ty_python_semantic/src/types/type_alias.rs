@@ -1,5 +1,7 @@
 use std::fmt::Write;
 
+use rustc_hash::FxHashMap;
+
 use crate::{
     Db,
     types::{
@@ -57,50 +59,99 @@ fn strip_top_level_divergent<'db>(
     }
 }
 
-fn expand_top_level_union_aliases<'db>(
-    db: &'db dyn Db,
+#[derive(Clone, Copy)]
+struct TopLevelAliasExpansion<'db> {
     ty: Type<'db>,
-    seen: &mut Vec<TypeAliasType<'db>>,
-) -> Type<'db> {
-    let Type::Union(union) = ty else {
-        return ty;
-    };
+    hit_cycle: bool,
+}
 
-    let mut expanded_elements = vec![];
-    for element in union.elements(db).iter().copied() {
-        match element {
-            Type::TypeAlias(alias) => {
-                let Some(expanded) = expand_top_level_alias(db, alias, seen) else {
-                    continue;
-                };
-                if let Type::Union(expanded_union) = expanded {
-                    expanded_elements.extend(expanded_union.elements(db).iter().copied());
-                } else {
-                    expanded_elements.push(expanded);
-                }
-            }
-            _ => expanded_elements.push(element),
+struct TopLevelAliasExpander<'db> {
+    seen: Vec<TypeAliasType<'db>>,
+    cache: FxHashMap<TypeAliasType<'db>, TopLevelAliasExpansion<'db>>,
+}
+
+impl<'db> TopLevelAliasExpander<'db> {
+    fn new(root: TypeAliasType<'db>) -> Self {
+        Self {
+            seen: vec![root],
+            cache: FxHashMap::default(),
         }
     }
 
-    UnionType::from_elements_leave_aliases(db, expanded_elements)
-}
+    fn expand_union_aliases(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> TopLevelAliasExpansion<'db> {
+        let Type::Union(union) = ty else {
+            return TopLevelAliasExpansion {
+                ty,
+                hit_cycle: false,
+            };
+        };
 
-fn expand_top_level_alias<'db>(
-    db: &'db dyn Db,
-    alias: TypeAliasType<'db>,
-    seen: &mut Vec<TypeAliasType<'db>>,
-) -> Option<Type<'db>> {
-    if seen.contains(&alias) {
-        return None;
+        let mut hit_cycle = false;
+        let mut expanded_elements = vec![];
+        for element in union.elements(db).iter().copied() {
+            match element {
+                Type::TypeAlias(alias) => {
+                    let Some(expanded) = self.expand_alias(db, alias) else {
+                        hit_cycle = true;
+                        continue;
+                    };
+                    hit_cycle |= expanded.hit_cycle;
+                    if let Type::Union(expanded_union) = expanded.ty {
+                        expanded_elements.extend(expanded_union.elements(db).iter().copied());
+                    } else {
+                        expanded_elements.push(expanded.ty);
+                    }
+                }
+                _ => expanded_elements.push(element),
+            }
+        }
+
+        TopLevelAliasExpansion {
+            ty: UnionType::from_elements_leave_aliases(db, expanded_elements),
+            hit_cycle,
+        }
     }
 
-    seen.push(alias);
-    let raw = alias.raw_value_type(db);
-    let value = alias.apply_function_specialization(db, raw);
-    let expanded = expand_top_level_union_aliases(db, value, seen);
-    seen.pop();
-    Some(expanded)
+    fn expand_alias(
+        &mut self,
+        db: &'db dyn Db,
+        alias: TypeAliasType<'db>,
+    ) -> Option<TopLevelAliasExpansion<'db>> {
+        if self.seen.contains(&alias) {
+            return None;
+        }
+
+        if let Some(expanded) = self.cache.get(&alias).copied() {
+            return Some(expanded);
+        }
+
+        self.seen.push(alias);
+        let raw = alias.raw_value_type(db);
+        let value = alias.apply_function_specialization(db, raw);
+        let expanded = self.expand_union_aliases(db, value);
+        self.seen.pop();
+
+        // Results that skipped a seen alias depend on the current expansion stack.
+        if !expanded.hit_cycle {
+            self.cache.insert(alias, expanded);
+        }
+
+        Some(expanded)
+    }
+}
+
+fn expand_top_level_union_aliases<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    root_alias: TypeAliasType<'db>,
+) -> Type<'db> {
+    TopLevelAliasExpander::new(root_alias)
+        .expand_union_aliases(db, ty)
+        .ty
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -175,14 +226,14 @@ impl<'db> PEP695TypeAliasType<'db> {
                 expand_top_level_union_aliases(
                     db,
                     simplified,
-                    &mut vec![crate::types::TypeAliasType::PEP695(self)],
+                    crate::types::TypeAliasType::PEP695(self),
                 )
             }
         } else {
             expand_top_level_union_aliases(
                 db,
                 self.apply_function_specialization(db, raw),
-                &mut vec![crate::types::TypeAliasType::PEP695(self)],
+                crate::types::TypeAliasType::PEP695(self),
             )
         }
     }
@@ -364,7 +415,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         expand_top_level_union_aliases(
             db,
             definition_expression_type(db, definition, value_arg),
-            &mut vec![TypeAliasType::ManualPEP695(self)],
+            TypeAliasType::ManualPEP695(self),
         )
     }
 }
