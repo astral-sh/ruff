@@ -120,8 +120,7 @@ fn extend_collection_use_constraints<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        // TODO: recursive initial
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::recursive(db, id, None, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
         inference.cycle_normalized(db, previous, cycle, definition)
