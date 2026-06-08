@@ -173,7 +173,10 @@ impl PlaceTable {
     /// Iterate over the "root" expressions of the place (e.g. `x.y.z`, `x.y`, `x` for `x.y.z[0]`).
     ///
     /// Note, this iterator may skip some parents if they are not defined in the current scope.
-    pub fn parents<'a>(&'a self, place_expr: impl Into<PlaceExprRef<'a>>) -> ParentPlaceIter<'a> {
+    pub fn parents<'a>(
+        &'a self,
+        place_expr: impl Into<PlaceExprRef<'a>>,
+    ) -> impl Iterator<Item = ScopedPlaceId> + 'a {
         match place_expr.into() {
             PlaceExprRef::Symbol(_) => ParentPlaceIter::for_symbol(),
             PlaceExprRef::Member(member) => {
@@ -484,28 +487,56 @@ impl From<FilePlaceId> for ScopedPlaceId {
     }
 }
 
-pub struct ParentPlaceIter<'a> {
-    state: Option<ParentPlaceIterState<'a>>,
+pub(crate) struct ParentPlaceIter<'a, S = SymbolTable, M = MemberTable> {
+    state: Option<ParentPlaceIterState<'a, S, M>>,
 }
 
-enum ParentPlaceIterState<'a> {
+trait SymbolLookup {
+    fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId>;
+}
+
+impl SymbolLookup for SymbolTable {
+    fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        SymbolTable::symbol_id(self, name)
+    }
+}
+
+impl SymbolLookup for SymbolTableBuilder {
+    fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        SymbolTableBuilder::symbol_id(self, name)
+    }
+}
+
+trait MemberLookup {
+    fn member_id<'a>(&self, member: impl Into<MemberExprRef<'a>>) -> Option<ScopedMemberId>;
+}
+
+impl MemberLookup for MemberTable {
+    fn member_id<'a>(&self, member: impl Into<MemberExprRef<'a>>) -> Option<ScopedMemberId> {
+        MemberTable::member_id(self, member)
+    }
+}
+
+impl MemberLookup for MemberTableBuilder {
+    fn member_id<'a>(&self, member: impl Into<MemberExprRef<'a>>) -> Option<ScopedMemberId> {
+        MemberTable::member_id(self, member)
+    }
+}
+
+enum ParentPlaceIterState<'a, S, M> {
     Symbol {
         symbol_name: &'a str,
-        symbols: &'a SymbolTable,
+        symbols: &'a S,
     },
     Member {
-        symbols: &'a SymbolTable,
-        members: &'a MemberTable,
+        symbols: &'a S,
+        members: &'a M,
         next_member: MemberExprRef<'a>,
     },
 }
 
-impl<'a> ParentPlaceIterState<'a> {
-    fn parent_state(
-        expression: &MemberExprRef<'a>,
-        symbols: &'a SymbolTable,
-        members: &'a MemberTable,
-    ) -> Self {
+impl<'a, S, M> ParentPlaceIterState<'a, S, M> {
+    fn parent_state(expression: &MemberExprRef<'a>, symbols: &'a S, members: &'a M) -> Self {
         match expression.parent() {
             Some(parent) => Self::Member {
                 next_member: parent,
@@ -520,15 +551,15 @@ impl<'a> ParentPlaceIterState<'a> {
     }
 }
 
-impl<'a> ParentPlaceIter<'a> {
+impl<'a, S, M> ParentPlaceIter<'a, S, M> {
     pub(super) fn for_symbol() -> Self {
         ParentPlaceIter { state: None }
     }
 
     pub(super) fn for_member(
         expression: &'a MemberExpr,
-        symbol_table: &'a SymbolTable,
-        member_table: &'a MemberTable,
+        symbol_table: &'a S,
+        member_table: &'a M,
     ) -> Self {
         let expr_ref = expression.as_ref();
         ParentPlaceIter {
@@ -541,7 +572,11 @@ impl<'a> ParentPlaceIter<'a> {
     }
 }
 
-impl Iterator for ParentPlaceIter<'_> {
+impl<S, M> Iterator for ParentPlaceIter<'_, S, M>
+where
+    S: SymbolLookup,
+    M: MemberLookup,
+{
     type Item = ScopedPlaceId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -574,7 +609,12 @@ impl Iterator for ParentPlaceIter<'_> {
     }
 }
 
-impl FusedIterator for ParentPlaceIter<'_> {}
+impl<S, M> FusedIterator for ParentPlaceIter<'_, S, M>
+where
+    S: SymbolLookup,
+    M: MemberLookup,
+{
+}
 
 /// Builder for computing the conservative set of places that could possibly be narrowed.
 ///

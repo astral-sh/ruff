@@ -1,10 +1,9 @@
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
-use ruff_index::{IndexVec, newtype_index};
+use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
-use std::ops::{Deref, DerefMut};
 
 /// Uniquely identifies a symbol in a given scope.
 #[newtype_index]
@@ -157,17 +156,17 @@ impl Symbol {
 /// The symbols of a given scope.
 ///
 /// Allows lookup by name and a symbol's ID.
-#[derive(Default, get_size2::GetSize)]
+#[derive(get_size2::GetSize)]
 pub(super) struct SymbolTable {
-    symbols: IndexVec<ScopedSymbolId, Symbol>,
+    symbols: FrozenIndexVec<ScopedSymbolId, Symbol>,
 
     /// Map from symbol name to its ID.
-    ///
-    /// Uses a hash table to avoid storing the name twice.
-    map: hashbrown::HashTable<ScopedSymbolId>,
+    symbols_by_name: Box<[ScopedSymbolId]>,
 }
 
 impl SymbolTable {
+    const LINEAR_LOOKUP_THRESHOLD: usize = 16;
+
     /// Look up a symbol by its ID.
     ///
     /// ## Panics
@@ -177,20 +176,19 @@ impl SymbolTable {
         &self.symbols[id]
     }
 
-    /// Look up a symbol by its ID, mutably.
-    ///
-    /// ## Panics
-    /// If the ID is not valid for this symbol table.
-    #[track_caller]
-    pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
-        &mut self.symbols[id]
-    }
-
     /// Look up the ID of a symbol by its name.
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.map
-            .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
-            .copied()
+        if self.symbols_by_name.len() <= Self::LINEAR_LOOKUP_THRESHOLD {
+            self.symbols_by_name
+                .iter()
+                .find(|id| self.symbols[**id].name == name)
+                .copied()
+        } else {
+            self.symbols_by_name
+                .binary_search_by(|id| self.symbols[*id].name().as_str().cmp(name))
+                .ok()
+                .map(|index| self.symbols_by_name[index])
+        }
     }
 
     /// Iterate over the symbols in this symbol table.
@@ -222,17 +220,22 @@ impl std::fmt::Debug for SymbolTable {
 
 #[derive(Debug, Default)]
 pub(super) struct SymbolTableBuilder {
-    table: SymbolTable,
+    symbols: IndexVec<ScopedSymbolId, Symbol>,
+
+    /// Map from symbol name to its ID.
+    ///
+    /// Uses a hash table to avoid storing the name twice.
+    map: hashbrown::HashTable<ScopedSymbolId>,
 }
 
 impl SymbolTableBuilder {
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(symbol.name());
-        let entry = self.table.map.entry(
+        let entry = self.map.entry(
             hash,
-            |id| &self.table.symbols[*id].name == symbol.name(),
-            |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
+            |id| &self.symbols[*id].name == symbol.name(),
+            |id| SymbolTable::hash_name(&self.symbols[*id].name),
         );
 
         match entry {
@@ -247,33 +250,48 @@ impl SymbolTableBuilder {
             }
             Entry::Vacant(entry) => {
                 symbol.name.shrink_to_fit();
-                let id = self.table.symbols.push(symbol);
+                let id = self.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)
             }
         }
     }
 
+    #[track_caller]
+    pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+        &self.symbols[id]
+    }
+
+    #[track_caller]
+    pub(crate) fn symbol_mut(&mut self, id: ScopedSymbolId) -> &mut Symbol {
+        &mut self.symbols[id]
+    }
+
+    pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        self.map
+            .find(SymbolTable::hash_name(name), |id| {
+                self.symbols[*id].name == name
+            })
+            .copied()
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
+        self.symbols.iter()
+    }
+
     pub(super) fn build(self) -> SymbolTable {
-        let mut table = self.table;
-        table.symbols.shrink_to_fit();
-        table
-            .map
-            .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
-        table
-    }
-}
+        let Self { mut symbols, .. } = self;
 
-impl Deref for SymbolTableBuilder {
-    type Target = SymbolTable;
+        let mut symbols_by_name = symbols.indices().collect::<Vec<_>>();
+        if symbols_by_name.len() > SymbolTable::LINEAR_LOOKUP_THRESHOLD {
+            symbols_by_name
+                .sort_unstable_by(|left, right| symbols[*left].name().cmp(symbols[*right].name()));
+        }
 
-    fn deref(&self) -> &Self::Target {
-        &self.table
-    }
-}
-
-impl DerefMut for SymbolTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
+        symbols.shrink_to_fit();
+        SymbolTable {
+            symbols: symbols.into(),
+            symbols_by_name: symbols_by_name.into_boxed_slice(),
+        }
     }
 }
