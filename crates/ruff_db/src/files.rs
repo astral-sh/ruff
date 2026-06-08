@@ -84,6 +84,11 @@ impl Files {
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
+        // DashMap's entry API requires an owned key. Avoid cloning it for cached paths.
+        if let Some(file) = self.inner.system_by_path.get(absolute.as_path()) {
+            return *file;
+        }
+
         *self
             .inner
             .system_by_path
@@ -129,6 +134,10 @@ impl Files {
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
+        if let Some(file) = self.inner.vendored_by_path.get(path) {
+            return Ok(*file);
+        }
+
         let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
@@ -181,7 +190,7 @@ impl Files {
     pub fn try_virtual_file(&self, path: &SystemVirtualPath) -> Option<VirtualFile> {
         self.inner
             .system_virtual_by_path
-            .get(&path.to_path_buf())
+            .get(path)
             .map(|entry| *entry.value())
     }
 
