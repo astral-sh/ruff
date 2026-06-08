@@ -382,7 +382,7 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::divergent(id);
+    let cycle_recovery = Type::recursive(db, id, None, Type::divergent(id));
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
