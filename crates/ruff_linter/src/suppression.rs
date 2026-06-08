@@ -274,21 +274,9 @@ impl Suppressions {
                         false,
                         UnusedNOQA {
                             codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
+                                disabled: &group.disabled_codes,
+                                duplicated: &group.duplicated_codes,
+                                unmatched: &group.unused_codes,
                             }),
                             kind: UnusedNOQAKind::Suppression,
                         },

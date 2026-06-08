@@ -224,18 +224,9 @@ pub(crate) fn check_noqa(
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
-                                    disabled: disabled_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    duplicated: duplicated_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    unmatched: unmatched_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
+                                    disabled: &disabled_codes,
+                                    duplicated: &duplicated_codes,
+                                    unmatched: &unmatched_codes,
                                 }),
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },

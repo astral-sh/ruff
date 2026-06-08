@@ -5,10 +5,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use crate::AlwaysFixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Default)]
-pub(crate) struct UnusedCodes {
-    pub disabled: Vec<String>,
-    pub duplicated: Vec<String>,
-    pub unmatched: Vec<String>,
+pub(crate) struct UnusedCodes<'a> {
+    pub disabled: &'a [&'a str],
+    pub duplicated: &'a [&'a str],
+    pub unmatched: &'a [&'a str],
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -82,12 +82,12 @@ impl UnusedNOQAKind {
 /// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
-pub(crate) struct UnusedNOQA {
-    pub codes: Option<UnusedCodes>,
+pub(crate) struct UnusedNOQA<'a> {
+    pub codes: Option<UnusedCodes<'a>>,
     pub kind: UnusedNOQAKind,
 }
 
-impl AlwaysFixableViolation for UnusedNOQA {
+impl AlwaysFixableViolation for UnusedNOQA<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         match &self.codes {
