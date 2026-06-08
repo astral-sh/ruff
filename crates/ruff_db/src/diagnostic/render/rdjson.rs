@@ -79,9 +79,7 @@ fn diagnostic_to_rdjson<'a>(
         message: diagnostic.concise_message(),
         location,
         code: RdjsonCode {
-            value: diagnostic
-                .secondary_code()
-                .map_or_else(|| diagnostic.name(), |code| code.as_str()),
+            value: diagnostic.secondary_code_or_id(false),
             url: diagnostic.documentation_url(),
         },
         suggestions: rdjson_suggestions(

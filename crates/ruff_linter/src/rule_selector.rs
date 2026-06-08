@@ -29,15 +29,18 @@ pub enum RuleSelector {
         redirected_from: Option<&'static str>,
     },
     /// Select an individual rule with a given prefix.
-    Rule {
+    RuleCode {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
+    },
+    Rule {
+        rule: Rule,
     },
 }
 
 impl RuleSelector {
     pub(crate) const fn rule(prefix: RuleCodePrefix) -> Self {
-        Self::Rule {
+        Self::RuleCode {
             prefix,
             redirected_from: None,
         }
@@ -79,26 +82,29 @@ impl FromStr for RuleSelector {
                     None => (s, None),
                 };
 
-                let (linter, code) =
-                    Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
+                if let Some((linter, code)) = Linter::parse_code(s) {
+                    if code.is_empty() {
+                        return Ok(Self::Linter(linter));
+                    }
 
-                if code.is_empty() {
-                    return Ok(Self::Linter(linter));
-                }
+                    let prefix = RuleCodePrefix::parse(&linter, code)
+                        .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
-                let prefix = RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(s.to_string()))?;
-
-                if is_single_rule_selector(&prefix) {
-                    Ok(Self::Rule {
-                        prefix,
-                        redirected_from,
-                    })
+                    if is_single_rule_selector(&prefix) {
+                        Ok(Self::RuleCode {
+                            prefix,
+                            redirected_from,
+                        })
+                    } else {
+                        Ok(Self::Prefix {
+                            prefix,
+                            redirected_from,
+                        })
+                    }
+                } else if let Ok(rule) = Rule::from_name(s) {
+                    Ok(Self::Rule { rule })
                 } else {
-                    Ok(Self::Prefix {
-                        prefix,
-                        redirected_from,
-                    })
+                    Err(ParseError::Unknown(s.to_string()))
                 }
             }
         }
@@ -136,7 +142,8 @@ impl RuleSelector {
             RuleSelector::All => ("", "ALL"),
             RuleSelector::C => ("", "C"),
             RuleSelector::T => ("", "T"),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+            RuleSelector::Rule { rule } => ("", rule.name().as_str()),
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::RuleCode { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
             RuleSelector::Linter(l) => (l.common_prefix(), ""),
@@ -204,9 +211,10 @@ impl RuleSelector {
                     .chain(Linter::Flake8Print.rules()),
             ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+            RuleSelector::Prefix { prefix, .. } | RuleSelector::RuleCode { prefix, .. } => {
                 RuleSelectorIter::Vec(prefix.clone().rules())
             }
+            RuleSelector::Rule { rule } => RuleSelectorIter::One(std::iter::once(*rule)),
         }
     }
 
@@ -233,7 +241,7 @@ impl RuleSelector {
 
     /// Returns true if this selector is exact i.e. selects a single rule by code
     pub fn is_exact(&self) -> bool {
-        matches!(self, Self::Rule { .. })
+        matches!(self, Self::RuleCode { .. })
     }
 }
 
@@ -241,6 +249,7 @@ pub enum RuleSelectorIter {
     All(RuleIter),
     Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
+    One(std::iter::Once<Rule>),
 }
 
 impl Iterator for RuleSelectorIter {
@@ -251,6 +260,7 @@ impl Iterator for RuleSelectorIter {
             RuleSelectorIter::All(iter) => iter.next(),
             RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
+            RuleSelectorIter::One(iter) => iter.next(),
         }
     }
 }
@@ -306,7 +316,7 @@ mod schema {
             )
             .filter(|p| {
                 // Exclude any prefixes where all of the rules are removed
-                if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                if let Ok(Self::RuleCode { prefix, .. } | Self::Prefix { prefix, .. }) =
                     RuleSelector::parse_no_redirect(p)
                 {
                     !prefix.rules().all(|rule| rule.is_removed())
@@ -345,7 +355,7 @@ impl RuleSelector {
             RuleSelector::T => Specificity::LinterGroup,
             RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
-            RuleSelector::Rule { .. } => Specificity::Rule,
+            RuleSelector::RuleCode { .. } | RuleSelector::Rule { .. } => Specificity::Rule,
             RuleSelector::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
                 match prefix.len() {
@@ -380,7 +390,7 @@ impl RuleSelector {
                     .map_err(|_| ParseError::Unknown(s.to_string()))?;
 
                 if is_single_rule_selector(&prefix) {
-                    Ok(Self::Rule {
+                    Ok(Self::RuleCode {
                         prefix,
                         redirected_from: None,
                     })

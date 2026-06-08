@@ -181,10 +181,10 @@ impl Serialize for RuleCode<'_> {
 }
 
 impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
-    fn from(code: &'a Diagnostic) -> Self {
-        match code.secondary_code() {
-            Some(diagnostic) => Self::SecondaryCode(diagnostic),
-            None => Self::LintId(code.id().as_str()),
+    fn from(diag: &'a Diagnostic) -> Self {
+        match diag.secondary_code() {
+            Some(code) => Self::SecondaryCode(code),
+            None => Self::LintId(diag.name()),
         }
     }
 }

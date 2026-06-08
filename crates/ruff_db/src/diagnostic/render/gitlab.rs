@@ -7,17 +7,18 @@ use std::{
 use ruff_source_file::LineColumn;
 use serde::{Serialize, Serializer, ser::SerializeSeq};
 
-use crate::diagnostic::{Diagnostic, Severity};
+use crate::diagnostic::{Diagnostic, DisplayDiagnosticConfig, Severity};
 
 use super::FileResolver;
 
 pub(super) struct GitlabRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
 }
 
 impl<'a> GitlabRenderer<'a> {
-    pub(super) fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, config: &'a DisplayDiagnosticConfig) -> Self {
+        Self { resolver, config }
     }
 }
 
@@ -33,6 +34,7 @@ impl GitlabRenderer<'_> {
             serde_json::to_string_pretty(&SerializedMessages {
                 diagnostics,
                 resolver: self.resolver,
+                config: self.config,
                 #[expect(
                     clippy::disallowed_methods,
                     reason = "We don't have access to a `System` here, \
@@ -49,6 +51,7 @@ impl GitlabRenderer<'_> {
 struct SerializedMessages<'a> {
     diagnostics: &'a [Diagnostic],
     resolver: &'a dyn FileResolver,
+    config: &'a DisplayDiagnosticConfig,
     project_dir: Option<&'a str>,
 }
 
@@ -99,7 +102,7 @@ impl Serialize for SerializedMessages<'_> {
             fingerprints.insert(message_fingerprint);
 
             let description = diagnostic.concise_message();
-            let check_name = diagnostic.secondary_code_or_id();
+            let check_name = diagnostic.secondary_code_or_id(self.config.preview);
             let severity = match diagnostic.severity() {
                 Severity::Info => "info",
                 Severity::Warning => "minor",

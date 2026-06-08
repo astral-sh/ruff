@@ -102,7 +102,7 @@ pub(super) fn diagnostic_to_json<'a>(
     // and the severity is displayed.
     if config.preview {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            code: diagnostic.secondary_code_or_id(config.preview),
             severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
@@ -115,7 +115,7 @@ pub(super) fn diagnostic_to_json<'a>(
         }
     } else {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            code: diagnostic.secondary_code_or_id(config.preview),
             severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),

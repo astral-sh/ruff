@@ -369,7 +369,9 @@ impl Workspace {
                     .collect();
 
                 ExpandedMessage {
-                    code: msg.secondary_code_or_id().to_string(),
+                    code: msg
+                        .secondary_code_or_id(self.settings.linter.preview.is_enabled())
+                        .to_string(),
                     message: msg.concise_message().to_string(),
                     sub_diagnostics,
                     start_location: source_code
