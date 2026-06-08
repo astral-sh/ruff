@@ -992,24 +992,16 @@ fn protocol_recursive_type_impl<'db>(
         return Type::ProtocolInstance(protocol);
     }
 
-    let binder_id = protocol.recursive_binder_id(db);
-    let mapping = TypeMapping::ReplaceRecursiveOrigin {
-        origin,
-        binder_id: crate::types::recursive::BinderId::new(binder_id),
+    let Some(builder) = origin.builder(db) else {
+        return Type::ProtocolInstance(protocol);
     };
-    let visitor = ApplyTypeMappingVisitor::default();
-    let mapped_interface =
-        interface.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
+    let mapped_interface = builder.fold_protocol_interface(db, interface);
     // Preserve class-based protocols when no self-reference was replaced.
     if mapped_interface == interface {
         return Type::ProtocolInstance(protocol);
     }
     let body = Type::ProtocolInstance(protocol.with_interface(mapped_interface));
-    if body.contains_divergent_with_id(db, binder_id) {
-        Type::protocol_recursive(db, binder_id, protocol, body)
-    } else {
-        Type::ProtocolInstance(protocol)
-    }
+    builder.finish(db, body, Type::ProtocolInstance(protocol))
 }
 
 #[salsa::tracked(

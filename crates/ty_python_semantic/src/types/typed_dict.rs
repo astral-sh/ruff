@@ -667,7 +667,6 @@ fn typed_dict_recursive_type_impl<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
 ) -> Type<'db> {
-    let binder_id = typed_dict.recursive_binder_id();
     let origin = RecursiveOrigin::TypedDict(typed_dict);
 
     if !typed_dict
@@ -678,22 +677,21 @@ fn typed_dict_recursive_type_impl<'db>(
         return Type::TypedDict(typed_dict);
     }
 
+    let Some(builder) = origin.builder(db) else {
+        return Type::TypedDict(typed_dict);
+    };
     let items = typed_dict
         .items(db)
         .iter()
         .map(|(name, field)| {
             let mut field = field.clone();
-            field.declared_ty = origin.fold_self_references(db, field.declared_ty, binder_id);
+            field.declared_ty = builder.fold_type(db, field.declared_ty);
             (name.clone(), field)
         })
         .collect();
 
     let body = Type::TypedDict(TypedDictType::from_schema_items(db, items));
-    if body.contains_divergent_with_id(db, binder_id) {
-        Type::typed_dict_recursive(db, binder_id, typed_dict, body)
-    } else {
-        Type::TypedDict(typed_dict)
-    }
+    builder.finish(db, body, Type::TypedDict(typed_dict))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {

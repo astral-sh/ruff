@@ -1079,51 +1079,6 @@ impl<'db> Type<'db> {
         Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
     }
 
-    pub(crate) fn type_alias_recursive(
-        db: &'db dyn Db,
-        binder_id: salsa::Id,
-        alias: TypeAliasType<'db>,
-        body: Type<'db>,
-    ) -> Self {
-        Self::recursive(db, binder_id, RecursiveOrigin::TypeAlias(alias), body)
-    }
-
-    pub(crate) fn typed_dict_recursive(
-        db: &'db dyn Db,
-        binder_id: salsa::Id,
-        typed_dict: TypedDictType<'db>,
-        body: Type<'db>,
-    ) -> Self {
-        Self::recursive(db, binder_id, RecursiveOrigin::TypedDict(typed_dict), body)
-    }
-
-    pub(crate) fn newtype_recursive(
-        db: &'db dyn Db,
-        binder_id: salsa::Id,
-        newtype: NewType<'db>,
-        body: Type<'db>,
-    ) -> Self {
-        Self::recursive(db, binder_id, RecursiveOrigin::NewType(newtype), body)
-    }
-
-    pub(crate) fn function_recursive(
-        db: &'db dyn Db,
-        binder_id: salsa::Id,
-        function: FunctionType<'db>,
-        body: Type<'db>,
-    ) -> Self {
-        Self::recursive(db, binder_id, RecursiveOrigin::Function(function), body)
-    }
-
-    pub(crate) fn protocol_recursive(
-        db: &'db dyn Db,
-        binder_id: salsa::Id,
-        protocol: ProtocolInstanceType<'db>,
-        body: Type<'db>,
-    ) -> Self {
-        Self::recursive(db, binder_id, RecursiveOrigin::Protocol(protocol), body)
-    }
-
     /// True if this type is a `Type::Recursive(_)` μ-binder. Used by future phases.
     #[allow(dead_code)]
     pub(crate) const fn is_recursive(&self) -> bool {

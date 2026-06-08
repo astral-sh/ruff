@@ -213,15 +213,14 @@ fn newtype_recursive_type<'db>(db: &'db dyn Db, newtype: NewType<'db>) -> Type<'
 
     let base_ty = Type::instance(db, base_class);
     let origin = RecursiveOrigin::NewType(newtype);
-    let Some(binder_id) = origin.binder_id(db) else {
-        return Type::NewTypeInstance(newtype);
-    };
-    if !visitor::any_over_type(db, base_ty, false, |ty| origin.matches_type(db, ty)) {
+    if !origin.contains_in_type(db, base_ty) {
         return Type::NewTypeInstance(newtype);
     }
+    let Some(builder) = origin.builder(db) else {
+        return Type::NewTypeInstance(newtype);
+    };
 
-    let Type::NominalInstance(mapped_base) = origin.fold_self_references(db, base_ty, binder_id)
-    else {
+    let Type::NominalInstance(mapped_base) = builder.fold_type(db, base_ty) else {
         return Type::NewTypeInstance(newtype);
     };
 
@@ -232,11 +231,7 @@ fn newtype_recursive_type<'db>(db: &'db dyn Db, newtype: NewType<'db>) -> Type<'
         Some(NewTypeBase::ClassType(mapped_base.class(db))),
     );
     let body = Type::NewTypeInstance(body_newtype);
-    if body.contains_divergent_with_id(db, binder_id) {
-        Type::newtype_recursive(db, binder_id, newtype, body)
-    } else {
-        Type::NewTypeInstance(newtype)
-    }
+    builder.finish(db, body, Type::NewTypeInstance(newtype))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
