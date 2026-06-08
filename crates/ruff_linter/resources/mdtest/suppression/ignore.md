@@ -111,9 +111,7 @@ select = [ "E" ]
 ```
 
 ```py
-# TODO:
 # ruff:ignore[E262]
-# error: [no-space-after-inline-comment]
 x = 1  #bad
 ```
 

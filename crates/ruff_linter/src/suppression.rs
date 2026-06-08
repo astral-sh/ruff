@@ -887,7 +887,10 @@ impl<'a> SuppressionsBuilder<'a> {
                 TokenKind::Newline => {
                     break;
                 }
-                TokenKind::Comment => {}
+                TokenKind::Comment => {
+                    // Extend the suppression range to include comments before the final newline.
+                    end = next_token.end();
+                }
                 TokenKind::NonLogicalNewline if is_inner_comment => {
                     if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
@@ -2642,6 +2645,37 @@ def foo():
                 reason: "",
             },
         )
+        "##,
+        );
+    }
+
+    #[test]
+    fn trailing_comment_own_line_ignore() {
+        let source = "# ruff: ignore[some-thing]
+x = 1 # trailing";
+        let comment = Suppressions::debug(source);
+        assert_debug_snapshot!(
+            comment,
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: ignore[some-thing]\nx = 1 # trailing",
+                    code: "some-thing",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: ignore[some-thing]",
+                        action: Ignore,
+                        codes: [
+                            "some-thing",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
         "##,
         );
     }
