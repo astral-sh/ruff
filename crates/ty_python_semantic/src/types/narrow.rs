@@ -605,9 +605,7 @@ impl<'db> NarrowingConstraint<'db> {
             let Type::Intersection(intersection) = negated else {
                 return false;
             };
-            intersection.positive(db).is_empty()
-                && intersection.negative(db).len() == 1
-                && intersection.negative(db).contains(&ty)
+            intersection.is_simple_negation(db) && intersection.negative(db).contains(&ty)
         }
 
         fn are_direct_complements<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
@@ -636,6 +634,25 @@ impl<'db> NarrowingConstraint<'db> {
             true
         }
 
+        fn de_morgan_disjunction<'db>(
+            db: &'db dyn Db,
+            disjunction: &[Conjunctions<'db>],
+            conjunction: &Conjunctions<'db>,
+        ) -> Option<SmallVec<[Type<'db>; 2]>> {
+            if disjunction.len() < 2 || conjunction.conjuncts.len() < 2 {
+                return None;
+            }
+
+            let disjunction = disjunction
+                .iter()
+                .map(|disjunct| match &*disjunct.conjuncts {
+                    [conjunct] => Some(*conjunct),
+                    _ => None,
+                })
+                .collect::<Option<SmallVec<_>>>()?;
+            are_pairwise_negated(db, &disjunction, &conjunction.conjuncts).then_some(disjunction)
+        }
+
         if let Some(condition) = self
             .single_intersection_type()
             .zip(other.single_intersection_type())
@@ -654,27 +671,13 @@ impl<'db> NarrowingConstraint<'db> {
             &*self.intersection_disjuncts,
             &*other.intersection_disjuncts,
         ) {
-            (positive, [negative]) if positive.len() > 1 => {
-                let positive = positive
-                    .iter()
-                    .map(|disjunct| match &*disjunct.conjuncts {
-                        [conjunct] => Some(*conjunct),
-                        _ => None,
-                    })
-                    .collect::<Option<Vec<_>>>()?;
-                are_pairwise_negated(db, &positive, &negative.conjuncts)
-                    .then(|| UnionType::from_elements(db, positive))
+            (disjunction, [conjunction]) => {
+                let disjunction = de_morgan_disjunction(db, disjunction, conjunction)?;
+                Some(UnionType::from_elements(db, disjunction))
             }
-            ([positive], negative) if positive.conjuncts.len() > 1 && negative.len() > 1 => {
-                let negative = negative
-                    .iter()
-                    .map(|disjunct| match &*disjunct.conjuncts {
-                        [conjunct] => Some(*conjunct),
-                        _ => None,
-                    })
-                    .collect::<Option<Vec<_>>>()?;
-                are_pairwise_negated(db, &positive.conjuncts, &negative)
-                    .then(|| positive.clone().evaluate_constraint_type(db))
+            ([conjunction], disjunction) => {
+                de_morgan_disjunction(db, disjunction, conjunction)?;
+                Some(conjunction.clone().evaluate_constraint_type(db))
             }
             _ => None,
         }
@@ -683,71 +686,47 @@ impl<'db> NarrowingConstraint<'db> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Conjunctions, NarrowingConstraint, Type, UnionType};
+    use super::{Conjunctions, IntersectionType, NarrowingConstraint, Type, UnionType};
     use crate::db::tests::setup_db;
-    use smallvec::{smallvec, smallvec_inline};
+    use smallvec::SmallVec;
+
+    fn constraint<'db>(disjuncts: &[&[Type<'db>]]) -> NarrowingConstraint<'db> {
+        NarrowingConstraint {
+            intersection_disjuncts: disjuncts
+                .iter()
+                .map(|conjuncts| Conjunctions {
+                    conjuncts: conjuncts.iter().copied().collect(),
+                })
+                .collect(),
+            replacement_disjuncts: SmallVec::default(),
+        }
+    }
 
     #[test]
     fn exact_de_morgan_complement_condition() {
         let db = setup_db();
         let a = Type::int_literal(1);
         let b = Type::int_literal(2);
+        let not_a = a.negate(&db);
+        let not_b = b.negate(&db);
 
-        let direct = NarrowingConstraint::intersection(a);
-        let negated_direct = NarrowingConstraint::intersection(a.negate(&db));
+        let union = constraint(&[&[a], &[b]]);
         assert_eq!(
-            direct.exact_complement_condition(&db, &negated_direct),
-            Some(a)
-        );
-
-        let union = NarrowingConstraint {
-            intersection_disjuncts: smallvec![
-                Conjunctions::singleton(a),
-                Conjunctions::singleton(b),
-            ],
-            replacement_disjuncts: smallvec![],
-        };
-        let negated_union = NarrowingConstraint {
-            intersection_disjuncts: smallvec![Conjunctions {
-                conjuncts: smallvec![a.negate(&db), b.negate(&db)],
-            }],
-            replacement_disjuncts: smallvec![],
-        };
-        assert_eq!(
-            union.exact_complement_condition(&db, &negated_union),
+            union.exact_complement_condition(&db, &constraint(&[&[not_a, not_b]])),
             Some(UnionType::from_two_elements(&db, a, b))
         );
 
-        let intersection = NarrowingConstraint {
-            intersection_disjuncts: smallvec![Conjunctions {
-                conjuncts: smallvec![a, b],
-            }],
-            replacement_disjuncts: smallvec![],
-        };
-        let negated_intersection = NarrowingConstraint {
-            intersection_disjuncts: smallvec![
-                Conjunctions::singleton(a.negate(&db)),
-                Conjunctions::singleton(b.negate(&db)),
-            ],
-            replacement_disjuncts: smallvec![],
-        };
+        let intersection = constraint(&[&[a, b]]);
         assert_eq!(
-            intersection.exact_complement_condition(&db, &negated_intersection),
-            Some(
-                Conjunctions {
-                    conjuncts: smallvec_inline![a, b],
-                }
-                .evaluate_constraint_type(&db)
-            )
+            intersection.exact_complement_condition(&db, &constraint(&[&[not_a], &[not_b]])),
+            Some(IntersectionType::from_elements(&db, [a, b]))
         );
 
-        let mismatched = NarrowingConstraint {
-            intersection_disjuncts: smallvec![Conjunctions {
-                conjuncts: smallvec![a.negate(&db), Type::int_literal(3).negate(&db)],
-            }],
-            replacement_disjuncts: smallvec![],
-        };
-        assert_eq!(union.exact_complement_condition(&db, &mismatched), None);
+        let not_c = Type::int_literal(3).negate(&db);
+        assert_eq!(
+            union.exact_complement_condition(&db, &constraint(&[&[not_a, not_c]])),
+            None
+        );
     }
 }
 
