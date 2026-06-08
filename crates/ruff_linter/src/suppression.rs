@@ -275,14 +275,12 @@ impl Suppressions {
                 continue;
             }
 
-            // Note that `contains_inclusive` is used here for diagnostics with an empty range, such
-            // as missing-newline-at-end-of-file (W292) that would otherwise be unsuppressible.
             if suppression.range.contains_range(range)
                 || suppression.is_ignore()
-                    && (suppression.range.contains_inclusive(range.start())
+                    && (suppression.range.contains(range.start())
                         || diagnostic
                             .parent()
-                            .is_some_and(|parent| suppression.range.contains_inclusive(parent)))
+                            .is_some_and(|parent| suppression.range.contains(parent)))
             {
                 suppression.used.set(true);
                 return true;
