@@ -57,6 +57,52 @@ fn strip_top_level_divergent<'db>(
     }
 }
 
+fn expand_top_level_union_aliases<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen: &mut Vec<TypeAliasType<'db>>,
+) -> Type<'db> {
+    let Type::Union(union) = ty else {
+        return ty;
+    };
+
+    let mut expanded_elements = vec![];
+    for element in union.elements(db).iter().copied() {
+        match element {
+            Type::TypeAlias(alias) => {
+                let Some(expanded) = expand_top_level_alias(db, alias, seen) else {
+                    continue;
+                };
+                if let Type::Union(expanded_union) = expanded {
+                    expanded_elements.extend(expanded_union.elements(db).iter().copied());
+                } else {
+                    expanded_elements.push(expanded);
+                }
+            }
+            _ => expanded_elements.push(element),
+        }
+    }
+
+    UnionType::from_elements_leave_aliases(db, expanded_elements)
+}
+
+fn expand_top_level_alias<'db>(
+    db: &'db dyn Db,
+    alias: TypeAliasType<'db>,
+    seen: &mut Vec<TypeAliasType<'db>>,
+) -> Option<Type<'db>> {
+    if seen.contains(&alias) {
+        return None;
+    }
+
+    seen.push(alias);
+    let raw = alias.raw_value_type(db);
+    let value = alias.apply_function_specialization(db, raw);
+    let expanded = expand_top_level_union_aliases(db, value, seen);
+    seen.pop();
+    Some(expanded)
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
@@ -119,17 +165,25 @@ impl<'db> PEP695TypeAliasType<'db> {
             let body = self.apply_function_specialization(db, folded_raw);
             let simplified = strip_top_level_divergent(db, body, binder_id);
             if simplified.contains_divergent_with_id(db, binder_id) {
-                Type::recursive(
+                Type::type_alias_recursive(
                     db,
                     binder_id,
-                    Some(crate::types::TypeAliasType::PEP695(self)),
+                    crate::types::TypeAliasType::PEP695(self),
                     simplified,
                 )
             } else {
-                simplified
+                expand_top_level_union_aliases(
+                    db,
+                    simplified,
+                    &mut vec![crate::types::TypeAliasType::PEP695(self)],
+                )
             }
         } else {
-            self.apply_function_specialization(db, raw)
+            expand_top_level_union_aliases(
+                db,
+                self.apply_function_specialization(db, raw),
+                &mut vec![crate::types::TypeAliasType::PEP695(self)],
+            )
         }
     }
 
@@ -168,7 +222,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.
     /// Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -286,7 +340,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     /// Computed lazily from the definition to avoid including the value in the interned
     /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -307,7 +361,11 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
             return Type::unknown();
         };
-        definition_expression_type(db, definition, value_arg)
+        expand_top_level_union_aliases(
+            db,
+            definition_expression_type(db, definition, value_arg),
+            &mut vec![TypeAliasType::ManualPEP695(self)],
+        )
     }
 }
 

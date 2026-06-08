@@ -603,7 +603,7 @@ fn to_class_type_cycle_initial<'db>(
         if generic_context.variables(db).len() == 1 {
             generic_context.specialize_tuple(
                 db,
-                Type::recursive(db, id, None, Type::divergent(id)),
+                Type::implicit_recursive(db, id, Type::divergent(id)),
                 self_,
             )
         } else {

@@ -561,7 +561,7 @@ impl<'db> TypeVarInstance<'db> {
     /// Returns the "unchecked" default type of a type variable instance.
     /// `lazy_default` checks if the default type is not self-referential.
     #[salsa::tracked(
-        cycle_initial=|db, id, _| Some(Type::recursive(db, id, None, Type::divergent(id))),
+        cycle_initial=|db, id, _| Some(Type::implicit_recursive(db, id, Type::divergent(id))),
         cycle_fn=lazy_default_cycle_recover,
         heap_size=ruff_memory_usage::heap_size
     )]

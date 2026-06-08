@@ -519,15 +519,16 @@ impl ClassInfoConstraintFunction {
                 }
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
-            // `Type::Recursive` and `Type::TypeAlias` are both opaque names;
-            // `unfold_one` resolves either to a non-opaque type in one step.
             // Recursive bodies contain `Divergent` leaves that bottom out via
             // the `Type::Divergent` arm above.
-            Type::Recursive(_) | Type::TypeAlias(_) => self.generate_constraint(
+            Type::Recursive(_) => self.generate_constraint(
                 db,
                 crate::types::coinductive::unfold_one(db, classinfo),
                 is_positive,
             ),
+            Type::TypeAlias(alias) => {
+                self.generate_constraint(db, alias.value_type(db), is_positive)
+            }
             Type::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);

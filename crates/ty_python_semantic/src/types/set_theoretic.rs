@@ -68,7 +68,7 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result
                 .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
@@ -770,7 +770,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result
                 .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)

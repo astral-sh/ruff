@@ -1192,14 +1192,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // default) is too permissive — e.g. it would make `str <: Divergent` succeed
             // under assignability, breaking invariance checks on `list[Recursive]`.
             (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
-                // Only resolve the marker to its wrapping μ-binder for *named* recursive types
-                // (PEP 695 aliases). The strict structural unfold is what keeps `list[A]`
-                // invariance precise for those. Implicit recursive types from inference cycles
-                // (`source_alias = None`) stay gradual — like a bare `Divergent` — so that a
+                // Only resolve the marker to its wrapping μ-binder for recursive types with an
+                // explicit origin. The strict structural unfold is what keeps `list[A]`
+                // invariance precise for named recursive aliases. Implicit recursive types from
+                // inference cycles stay gradual — like a bare `Divergent` — so that a
                 // self-referential implicit attribute's own assignments are not flagged (e.g.
                 // `self.x = [self.x[0].flip()]`, where `flip` widens the element type).
                 if let Some(wrapping) = self.find_wrapping_recursive(db, divergent)
-                    && wrapping.source_alias(db).is_some()
+                    && wrapping.has_explicit_origin(db)
                 {
                     let is_left = matches!(source, Type::Divergent(d) if d.id() == divergent.id());
                     let recursive_ty = Type::Recursive(wrapping);
@@ -1220,11 +1220,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             {
                 self.always()
             }
-            // `Type::Recursive` and `Type::TypeAlias` are both opaque names
-            // that `coinductive::delegate_recursive` handles uniformly:
+            // `Type::Recursive` is the only recursive-name type that
+            // `coinductive::delegate_recursive` handles:
             // it records the pair on the visitor for cycle detection, unfolds
-            // one step (`Recursive` → body with `Divergent` leaves, `TypeAlias`
-            // → resolved value type), and dispatches structurally via
+            // one step (`Recursive` → body with `Divergent` leaves), and dispatches structurally via
             // `<Self as CoInductiveRelation>::check_structural`.
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
                 crate::types::coinductive::delegate_recursive(
@@ -1237,16 +1236,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
-                crate::types::coinductive::delegate_recursive(
-                    db,
-                    self,
-                    source,
-                    target,
-                    self.typevar_evaluation,
-                    self.relation_visitor,
-                )
-            }
+            (Type::TypeAlias(alias), _) => self.check_type_pair(db, alias.value_type(db), target),
+
+            (_, Type::TypeAlias(alias)) => self.check_type_pair(db, source, alias.value_type(db)),
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
@@ -2709,9 +2701,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
             // Same delegation pattern as `TypeRelationChecker::check_type_pair`
-            // for opaque-name types (`Type::Recursive`, `Type::TypeAlias`),
-            // routed through the disjointness visitor (whose co-inductive
-            // fallback is `false`, "not disjoint when we loop").
+            // for `Type::Recursive`, routed through the disjointness visitor
+            // (whose co-inductive fallback is `false`, "not disjoint when we loop").
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
                 crate::types::coinductive::delegate_recursive(
                     db,
@@ -2723,16 +2714,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::TypeAlias(_), _) | (_, Type::TypeAlias(_)) => {
-                crate::types::coinductive::delegate_recursive(
-                    db,
-                    self,
-                    left,
-                    right,
-                    TypeVarEvaluation::Eager,
-                    self.disjointness_visitor,
-                )
-            }
+            (Type::TypeAlias(alias), _) => self.check_type_pair(db, alias.value_type(db), right),
+
+            (_, Type::TypeAlias(alias)) => self.check_type_pair(db, left, alias.value_type(db)),
 
             (Type::EnumComplement(complement), other) => {
                 self.check_type_pair(db, complement.remaining_literal_union(db), other)

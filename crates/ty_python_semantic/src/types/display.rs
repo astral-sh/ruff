@@ -957,12 +957,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
             // Display `Type::Recursive` by substituting recursive-position `Divergent`
-            // markers with the source alias name, then printing the body. So
+            // markers with the source type when it has an explicit origin, then printing the body.
+            // So
             // `μα. int | tuple[α, ...] | None` shows as
-            // `int | tuple[OptNestedInt, ...] | None`. If no source alias is known
+            // `int | tuple[OptNestedInt, ...] | None`. If no explicit origin is known
             // (implicit recursion from inference cycles), fall back to the body as-is.
             Type::Recursive(r) => r
-                .body_with_alias_marker(self.db)
+                .body_with_origin_marker(self.db)
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
             Type::Never => f.with_type(self.ty).write_str("Never"),
