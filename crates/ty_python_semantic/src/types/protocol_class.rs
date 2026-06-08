@@ -18,9 +18,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType,
-        RecursiveOrigin, Signature, StaticClassLiteral, Type, TypeMapping, TypeQualifiers,
-        TypeVarVariance, VarianceInferable,
+        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
+        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -671,43 +670,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         self.definition
     }
 
-    fn ty(&self) -> Type<'db> {
+    pub(super) fn ty(&self) -> Type<'db> {
         match &self.kind {
             ProtocolMemberKind::Method(callable) => Type::Callable(*callable),
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
-        }
-    }
-
-    pub(super) fn contains_recursive_origin(
-        &self,
-        db: &'db dyn Db,
-        origin: RecursiveOrigin<'db>,
-    ) -> bool {
-        let type_contains_origin = |ty| {
-            crate::types::visitor::any_over_type(db, ty, false, |inner_ty| {
-                origin.matches_type(db, inner_ty)
-            })
-        };
-        let callable_contains_origin = |callable: CallableType<'db>| {
-            type_contains_origin(Type::Callable(callable.bind_self(db, None)))
-        };
-        let accessor_contains_origin = |accessor| match accessor {
-            Type::FunctionLiteral(function) => {
-                callable_contains_origin(function.into_callable_type(db))
-            }
-            Type::Callable(callable) => callable_contains_origin(callable),
-            ty => type_contains_origin(ty),
-        };
-
-        match &self.kind {
-            ProtocolMemberKind::Method(callable) => callable_contains_origin(*callable),
-            ProtocolMemberKind::Property(property) => {
-                property.getter(db).is_some_and(accessor_contains_origin)
-                    || property.setter(db).is_some_and(accessor_contains_origin)
-                    || property.deleter(db).is_some_and(accessor_contains_origin)
-            }
-            ProtocolMemberKind::Other(ty) => type_contains_origin(*ty),
         }
     }
 }

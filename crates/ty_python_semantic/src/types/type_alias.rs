@@ -5,8 +5,8 @@ use rustc_hash::FxHashMap;
 use crate::{
     Db,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionType, definition_expression_type,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, GenericContext, RecursiveOrigin, Type,
+        TypeContext, TypeMapping, TypeVarVariance, UnionType, definition_expression_type,
         display::qualified_name_components_from_scope,
         generics::{ApplySpecialization, Specialization},
         variance::VarianceInferable,
@@ -195,7 +195,8 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// otherwise return the simplified body directly.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let raw = self.raw_value_type(db);
-        if self.is_self_referential(db) {
+        let origin = RecursiveOrigin::TypeAlias(crate::types::TypeAliasType::PEP695(self));
+        if origin.contains_in_type(db, raw) {
             use salsa::plumbing::AsId;
             let binder_id = self.as_id();
             // Fold self-references to `Divergent(binder_id)` on the *raw* body **before** applying
@@ -236,38 +237,6 @@ impl<'db> PEP695TypeAliasType<'db> {
                 crate::types::TypeAliasType::PEP695(self),
             )
         }
-    }
-
-    /// Whether this alias is *directly* self-referential — its raw body
-    /// literally mentions itself as `Type::TypeAlias(a)` with the same
-    /// definition. Used to decide when `value_type` should wrap the result in
-    /// `Type::Recursive`, and to drive α-binding short-circuits in
-    /// `Type::is_redundant_with` and `Type::apply_type_mapping_impl`.
-    ///
-    /// Limitation: this does not follow mutually-recursive chains
-    /// (e.g. `type R = R2 | int; type R2 = R`). Transitive detection would
-    /// require either an AST-based walker or a fixpoint over the
-    /// type-alias graph.
-    ///
-    /// `cycle_initial = true` is required because callers (e.g. the `TypeAlias`
-    /// arm of `Type::apply_type_mapping_impl`) invoke this method
-    /// transitively from inside its own `any_over_type` traversal. Re-entering
-    /// for the same alias means the body refers to itself by definition, so
-    /// `true` is the sound co-inductive fallback.
-    #[allow(dead_code)]
-    #[salsa::tracked(
-        cycle_initial = |_, _, _| true,
-        heap_size = ruff_memory_usage::heap_size,
-    )]
-    pub(crate) fn is_self_referential(self, db: &'db dyn Db) -> bool {
-        let raw = self.raw_value_type(db);
-        let self_def = self.definition(db);
-        crate::types::visitor::any_over_type(db, raw, false, |ty| match ty {
-            Type::TypeAlias(crate::types::TypeAliasType::PEP695(other)) => {
-                other.definition(db) == self_def
-            }
-            _ => false,
-        })
     }
 
     /// The RHS type of a PEP-695 style type alias with *no* specialization applied.

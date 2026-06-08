@@ -1554,27 +1554,6 @@ impl<'db> FunctionType<'db> {
     heap_size=ruff_memory_usage::heap_size
 )]
 fn function_recursive_type<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
-    fn type_contains_origin<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        origin: RecursiveOrigin<'db>,
-    ) -> bool {
-        any_over_type(db, ty, false, |inner_ty| origin.matches_type(db, inner_ty))
-    }
-
-    fn signature_contains_origin<'db>(
-        db: &'db dyn Db,
-        signature: &Signature<'db>,
-        origin: RecursiveOrigin<'db>,
-    ) -> bool {
-        signature.parameters().iter().any(|parameter| {
-            type_contains_origin(db, parameter.annotated_type(), origin)
-                || parameter
-                    .default_type()
-                    .is_some_and(|ty| type_contains_origin(db, ty, origin))
-        }) || type_contains_origin(db, signature.return_ty, origin)
-    }
-
     let origin = RecursiveOrigin::Function(function);
     let signature = function.signature(db);
     let implementation_signature = function
@@ -1582,13 +1561,10 @@ fn function_recursive_type<'db>(db: &'db dyn Db, function: FunctionType<'db>) ->
         .has_separate_implementation(db)
         .then(|| function.last_definition_signature(db).clone());
 
-    if !signature
-        .overloads
-        .iter()
-        .any(|signature| signature_contains_origin(db, signature, origin))
+    if !origin.contains_in_callable_signature(db, &signature)
         && !implementation_signature
             .as_ref()
-            .is_some_and(|signature| signature_contains_origin(db, signature, origin))
+            .is_some_and(|signature| origin.contains_in_signature(db, signature))
     {
         return Type::FunctionLiteral(function);
     }

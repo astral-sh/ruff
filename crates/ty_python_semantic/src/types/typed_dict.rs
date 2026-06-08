@@ -639,17 +639,6 @@ impl<'db> TypedDictType<'db> {
             }
         }
     }
-
-    fn contains_self_reference(self, db: &'db dyn Db, binder_id: salsa::Id) -> bool {
-        self.items(db).values().any(|field| {
-            visitor::any_over_type(db, field.declared_ty, false, |ty| {
-                matches!(
-                    ty,
-                    Type::TypedDict(other) if other.recursive_binder_id() == binder_id
-                )
-            })
-        })
-    }
 }
 
 #[salsa::tracked(
@@ -679,12 +668,16 @@ fn typed_dict_recursive_type_impl<'db>(
     typed_dict: TypedDictType<'db>,
 ) -> Type<'db> {
     let binder_id = typed_dict.recursive_binder_id();
+    let origin = RecursiveOrigin::TypedDict(typed_dict);
 
-    if !typed_dict.contains_self_reference(db, binder_id) {
+    if !typed_dict
+        .items(db)
+        .values()
+        .any(|field| origin.contains_in_type(db, field.declared_ty))
+    {
         return Type::TypedDict(typed_dict);
     }
 
-    let origin = RecursiveOrigin::TypedDict(typed_dict);
     let items = typed_dict
         .items(db)
         .iter()

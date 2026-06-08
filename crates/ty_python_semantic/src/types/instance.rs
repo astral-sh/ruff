@@ -987,7 +987,7 @@ fn protocol_recursive_type_impl<'db>(
     let origin = RecursiveOrigin::Protocol(protocol);
     if !interface
         .members(db)
-        .any(|member| member.contains_recursive_origin(db, origin))
+        .any(|member| origin.contains_in_protocol_member(db, &member))
     {
         return Type::ProtocolInstance(protocol);
     }
