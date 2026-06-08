@@ -1561,7 +1561,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ProtocolMemberAccessMode::Class,
                 )
             });
-        if result.is_never_satisfied(db) {
+        if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
             self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                 member_name: member.name.into(),
             });
@@ -1686,7 +1686,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         )
                     })
                 });
-                if result.is_never_satisfied(db) {
+                if self.is_context_collection_enabled() && result.is_never_satisfied(db) {
                     self.provide_context(|| ErrorContext::ProtocolMemberIncompatible {
                         member_name: target_member.name.into(),
                     });
