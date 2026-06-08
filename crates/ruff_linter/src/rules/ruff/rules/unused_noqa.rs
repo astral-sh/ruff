@@ -6,9 +6,9 @@ use crate::AlwaysFixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub(crate) struct UnusedCodes<'a> {
-    pub disabled: &'a [&'a str],
-    pub duplicated: &'a [&'a str],
-    pub unmatched: &'a [&'a str],
+    pub(crate) disabled: &'a [&'a str],
+    pub(crate) duplicated: &'a [&'a str],
+    pub(crate) unmatched: &'a [&'a str],
 }
 
 #[derive(Debug, PartialEq, Eq)]
