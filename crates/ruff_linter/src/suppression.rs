@@ -275,6 +275,9 @@ impl Suppressions {
             // as missing-newline-at-end-of-file (W292) that would otherwise be unsuppressible.
             if *code == suppression_code
                 && (suppression.range.contains_range(range)
+                    || diagnostic
+                        .parent()
+                        .is_some_and(|parent| suppression.range.contains_inclusive(parent))
                     || suppression.is_ignore()
                         && suppression.range.contains_inclusive(range.start()))
             {

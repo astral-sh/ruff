@@ -162,8 +162,6 @@ from foo import (  # noqa: F401
 )
 
 from foo import (  # ruff:ignore[F401]
-        # TODO:
-        # error: [unused-import]
         baz
 )
 ```
