@@ -92,6 +92,7 @@ datatest-stable = { version = "0.3.3" }
 divan = { package = "codspeed-divan-compat", version = "4.4.1" }
 drop_bomb = { version = "0.1.5" }
 dunce = { version = "1.0.5" }
+erasable = { version = "1.3.0" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
@@ -174,6 +175,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 ] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "3.0.0", features = ["inline"] }
+slice-dst = { version = "1.6.0", features = ["erasable"] }
 smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
 snapbox = { version = "1.0.0", features = [
     "diff",

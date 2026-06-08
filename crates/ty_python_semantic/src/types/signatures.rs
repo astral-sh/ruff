@@ -11,11 +11,15 @@
 //! arguments must match _at least one_ overload.
 
 use std::collections::BTreeMap;
+use std::mem::size_of_val;
 use std::slice::Iter;
 use std::sync::Arc;
 
+use erasable::Thin;
+use get_size2::{GetSize, GetSizeTracker};
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
+use slice_dst::SliceWithHeader;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
@@ -928,15 +932,13 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = self.parameters.data.value.first()
+        if let Some(first_parameter) = self.parameters.as_slice().first()
             && first_parameter.is_positional()
             && first_parameter.annotated_type.is_unknown()
             && first_parameter.inferred_annotation
             && let Some(self_type) = self_type()
-            && let Some(first_parameter) =
-                Arc::make_mut(&mut self.parameters.data).value.first_mut()
         {
-            first_parameter.annotated_type = self_type;
+            self.parameters.set_first_annotated_type(self_type);
 
             // If we've added an implicit `self` annotation, we might need to update the
             // signature's generic context, too. (The generic context should include any synthetic
@@ -3182,25 +3184,74 @@ pub(crate) enum ParametersKind<'db> {
 // TODO: Given how the current structure is laid out which needs to follow certain invariants
 // between the `value` and `kind` field, it would be better to structure it such that these
 // invariants are followed at the type level instead.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct ParametersData<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Box<[Parameter<'db>]>,
-    kind: ParametersKind<'db>,
+/// Co-locates the kind and parameters in the same reference-counted allocation.
+type ParametersData<'db> = SliceWithHeader<ParametersKind<'db>, Parameter<'db>>;
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct Parameters<'db> {
+    data: Thin<Arc<ParametersData<'db>>>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
-    data: Arc<ParametersData<'db>>,
+#[expect(unsafe_code)]
+unsafe impl salsa::Update for Parameters<'_> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        // `Parameters` has no self-referential state, so replacing the entire value is valid.
+        let old = unsafe { &mut *old_pointer };
+        if *old == new_value {
+            false
+        } else {
+            *old = new_value;
+            true
+        }
+    }
+}
+
+impl GetSize for Parameters<'_> {
+    fn get_heap_size_with_tracker<Tracker: GetSizeTracker>(
+        &self,
+        mut tracker: Tracker,
+    ) -> (usize, Tracker) {
+        if !tracker.track(std::ptr::from_ref(&self.data.header)) {
+            return (0, tracker);
+        }
+
+        let mut size = size_of_val(&*self.data);
+        let (header_size, mut tracker) = self.data.header.get_heap_size_with_tracker(tracker);
+        size += header_size;
+        for parameter in &self.data.slice {
+            let (parameter_size, next_tracker) = parameter.get_heap_size_with_tracker(tracker);
+            size += parameter_size;
+            tracker = next_tracker;
+        }
+        (size, tracker)
+    }
 }
 
 impl<'db> Parameters<'db> {
     fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
-        Self {
-            data: Arc::new(ParametersData {
-                value: value.into(),
-                kind,
-            }),
+        let value = value.into().into_vec();
+        let data: Arc<ParametersData<'db>> = SliceWithHeader::new(kind, value);
+        Self { data: data.into() }
+    }
+
+    fn set_first_annotated_type(&mut self, ty: Type<'db>) {
+        let updated = Thin::with_mut(&mut self.data, |data| {
+            let Some(data) = Arc::get_mut(data) else {
+                return false;
+            };
+            let Some(first) = data.slice.first_mut() else {
+                return false;
+            };
+            first.annotated_type = ty;
+            true
+        });
+
+        if !updated {
+            let mut value = self.as_slice().to_vec();
+            if let Some(first) = value.first_mut() {
+                first.annotated_type = ty;
+                *self = Self::from_parts(value, self.kind());
+            }
         }
     }
 
@@ -3338,30 +3389,30 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
-        &self.data.value
+        &self.data.slice
     }
 
     pub(crate) fn kind(&self) -> ParametersKind<'db> {
-        self.data.kind
+        self.data.header
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
     pub(crate) fn is_gradual(&self) -> bool {
         matches!(
-            self.data.kind,
+            self.data.header,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
     pub(crate) fn is_top(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Top)
+        matches!(self.data.header, ParametersKind::Top)
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
     pub(crate) fn is_standard(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Standard)
+        matches!(self.data.header, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -3370,7 +3421,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
     pub(crate) fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
-        match self.data.kind {
+        match self.data.header {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -3385,10 +3436,10 @@ impl<'db> Parameters<'db> {
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        match self.data.kind {
+        match self.data.header {
             ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
             ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => Some((
-                &self.data.value[..self.data.value.len().saturating_sub(2)],
+                &self.data.slice[..self.data.slice.len().saturating_sub(2)],
                 typevar,
             )),
             _ => None,
@@ -3640,7 +3691,7 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
-                self.data.kind,
+                self.data.header,
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
@@ -3661,20 +3712,20 @@ impl<'db> Parameters<'db> {
 
         let value: Box<[_]> = self
             .data
-            .value
+            .slice
             .iter()
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts(value, self.data.kind)
+        Self::from_parts(value, self.data.header)
     }
 
     pub(crate) fn len(&self) -> usize {
-        self.data.value.len()
+        self.data.slice.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
-        self.data.value.iter()
+        self.data.slice.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -3688,7 +3739,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.data.value.get(index)
+        self.data.slice.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -3786,9 +3837,9 @@ impl<'db> Parameters<'db> {
         };
 
         let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.data.value[..variadic_index]);
+        expanded.extend_from_slice(&self.data.slice[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
+        expanded.extend_from_slice(&self.data.slice[variadic_index + 2..]);
         Parameters::new(db, expanded)
     }
 }
@@ -3798,7 +3849,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.value.iter()
+        self.data.slice.iter()
     }
 }
 
@@ -3806,7 +3857,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.data.value[index]
+        &self.data.slice[index]
     }
 }
 
@@ -4397,6 +4448,26 @@ mod tests {
     use crate::place::global_symbol;
     use crate::types::{FunctionType, KnownClass, LiteralValueType};
     use ruff_db::system::DbWithWritableSystem as _;
+
+    #[test]
+    fn parameters_are_pointer_sized() {
+        assert_eq!(
+            std::mem::size_of::<Parameters<'_>>(),
+            std::mem::size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn parameters_mutation_is_copy_on_write() {
+        let original =
+            Parameters::from_parts([Parameter::positional_only(None)], ParametersKind::Standard);
+        let mut updated = original.clone();
+
+        updated.set_first_annotated_type(Type::object());
+
+        assert_eq!(original[0].annotated_type(), Type::unknown());
+        assert_eq!(updated[0].annotated_type(), Type::object());
+    }
 
     #[track_caller]
     fn get_function_f<'db>(db: &'db TestDb, file: &'static str) -> FunctionType<'db> {
