@@ -6356,7 +6356,8 @@ impl<'db> Type<'db> {
                         // typevars and structural equivalence with a differently-shaped
                         // recursive alias fails (`aliases.md:405,409`).
                         if let TypeAliasType::PEP695(pep695_alias) = alias
-                            && pep695_alias.is_self_referential(db)
+                            && RecursiveOrigin::TypeAlias(alias)
+                                .contains_in_type(db, alias.raw_value_type(db))
                         {
                             let alias_context = pep695_alias.generic_context(db);
                             let spec_context = match specialization {
