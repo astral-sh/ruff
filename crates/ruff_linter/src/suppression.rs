@@ -71,7 +71,8 @@ pub(crate) struct PendingSuppressionComment<'a> {
 }
 
 impl PendingSuppressionComment<'_> {
-    /// Whether the comment "matches" another comment, based on indentation and suppressed codes
+    /// Whether the comment "matches" another comment, based on indentation and suppressed codes.
+    ///
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
     /// "disable" comment and other is the matching "enable" comment.
     fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
