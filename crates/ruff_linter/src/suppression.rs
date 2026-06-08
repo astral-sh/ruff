@@ -431,16 +431,16 @@ impl Suppressions {
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
-        let edit = if comment.codes.len() == 1 {
+        let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
-                range = comment.codes[0];
+                range = *code;
             }
             delete_comment(comment.range, locator)
-        } else if remove_codes.len() == 1 {
+        } else if let [remove_code] = remove_codes {
             let code_index = comment
                 .codes
                 .iter()
-                .position(|range| locator.slice(range) == remove_codes[0])
+                .position(|range| locator.slice(range) == *remove_code)
                 .unwrap();
             if highlight_only_code {
                 range = comment.codes[code_index];
@@ -458,14 +458,9 @@ impl Suppressions {
             };
             Edit::range_deletion(code_range)
         } else {
-            let first = comment
-                .codes
-                .first()
-                .expect("suppression comment without codes");
-            let last = comment
-                .codes
-                .last()
-                .expect("suppression comment without codes");
+            let [first, .., last] = comment.codes.as_slice() else {
+                unreachable!("suppression comment without codes");
+            };
             let code_range = TextRange::new(first.start(), last.end());
             let remaining = comment
                 .codes_as_str(locator.contents())
