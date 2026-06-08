@@ -518,10 +518,11 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     }
 }
 
-/// Reprojects and narrows a factorizable constraint in a tracked query.
+/// Caches the narrowed type for a projected root with repeated continuations.
 ///
-/// Reconstructing the projected graph from scoped IDs lets Salsa cache the final narrowed type for
-/// repeated loads without retaining each intermediate path prefix.
+/// The caller has already detected the repeated-continuation shape. This query rebuilds the
+/// projected graph from scoped IDs and caches only the final type so repeated loads can reuse it;
+/// the graph and its intermediate path prefixes remain temporary.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
