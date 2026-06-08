@@ -18,9 +18,8 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
-};
+use crate::types::recursive::RecursiveRelationVisitor;
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
@@ -798,8 +797,9 @@ impl<'db> ProtocolInstanceType<'db> {
             _: (),
         ) -> bool {
             let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::disjoint_default(&constraints);
+            let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(&constraints);
+            let disjointness_visitor =
+                RecursiveRelationVisitor::assume_not_disjoint_on_cycle(&constraints);
             let signature_relation_visitor = SignatureRelationVisitor::default();
             let materialization_visitor = ApplyTypeMappingVisitor::default();
             let checker = TypeRelationChecker::subtyping(

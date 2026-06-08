@@ -15,9 +15,8 @@ use crate::types::constraints::{
     PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
-use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
-};
+use crate::types::recursive::RecursiveRelationVisitor;
+use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::signatures::{
     CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
 };
@@ -1367,8 +1366,9 @@ impl<'db> Specialization<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = HasRelationToVisitor::default(constraints);
-        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
+        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(constraints);
+        let disjointness_visitor =
+            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker::new(

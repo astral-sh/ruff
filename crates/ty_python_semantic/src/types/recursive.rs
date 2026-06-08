@@ -10,7 +10,7 @@
 //! break cycles.
 
 use crate::Db;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
@@ -19,6 +19,75 @@ use crate::types::{
     DivergentType, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
     TypedDictType,
 };
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct RecursiveRelationKey<'db> {
+    left: Type<'db>,
+    right: Type<'db>,
+    relation: TypeRelation,
+}
+
+pub(crate) struct RecursiveRelationVisitor<'db, 'c> {
+    visitor: CycleDetector<TypeRelation, RecursiveRelationKey<'db>, ConstraintSet<'db, 'c>>,
+}
+
+impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
+    /// Construct a visitor for directional relation checks. The fallback is
+    /// `true`: if we loop, assume the relation currently being proven holds.
+    pub(crate) fn assume_related_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
+        }
+    }
+
+    /// Construct a visitor for disjointness checks. The fallback is `false`:
+    /// if we loop, assume the types are not disjoint.
+    pub(crate) fn assume_not_disjoint_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, false)),
+        }
+    }
+
+    pub(crate) fn visit_pair(
+        &self,
+        left: Type<'db>,
+        right: Type<'db>,
+        relation: TypeRelation,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.visitor.visit(
+            RecursiveRelationKey {
+                left,
+                right,
+                relation,
+            },
+            work,
+        )
+    }
+
+    /// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning
+    /// the active relation pairs.
+    pub(crate) fn wrapping_recursive_for_divergent(
+        &self,
+        db: &'db dyn Db,
+        divergent: DivergentType,
+    ) -> Option<RecursiveType<'db>> {
+        let binder_id = divergent.id();
+        let found = std::cell::Cell::new(None);
+        self.visitor.any_active(|key| {
+            for side in [key.left, key.right] {
+                if let Type::Recursive(rec) = side
+                    && rec.binder_id(db) == binder_id
+                {
+                    found.set(Some(rec));
+                    return true;
+                }
+            }
+            false
+        });
+        found.into_inner()
+    }
+}
 
 /// A relation that supports recursive reasoning over [`Type::Recursive`].
 pub(crate) trait RecursiveRelation<'db, 'c> {
@@ -44,50 +113,18 @@ pub(crate) fn check_recursive_relation<'db, 'c, R>(
     checker: &R,
     source: Type<'db>,
     target: Type<'db>,
-    visitor: &CycleDetector<
-        TypeRelation,
-        (Type<'db>, Type<'db>, TypeRelation),
-        ConstraintSet<'db, 'c>,
-    >,
+    visitor: &RecursiveRelationVisitor<'db, 'c>,
 ) -> ConstraintSet<'db, 'c>
 where
     R: RecursiveRelation<'db, 'c>,
 {
-    let key = (source, target, checker.relation_key());
-    visitor.visit(key, || {
+    visitor.visit_pair(source, target, checker.relation_key(), || {
         checker.check_structural(
             db,
             source.unfold_recursive_once(db),
             target.unfold_recursive_once(db),
         )
     })
-}
-
-/// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning a
-/// relation visitor's active seen set.
-pub(crate) fn find_wrapping_recursive<'db>(
-    db: &'db dyn Db,
-    divergent: DivergentType,
-    visitor: &CycleDetector<
-        TypeRelation,
-        (Type<'db>, Type<'db>, TypeRelation),
-        ConstraintSet<'db, '_>,
-    >,
-) -> Option<RecursiveType<'db>> {
-    let binder_id = divergent.id();
-    let found = std::cell::Cell::new(None);
-    visitor.any_active(|(left, right, _)| {
-        for side in [*left, *right] {
-            if let Type::Recursive(rec) = side
-                && rec.binder_id(db) == binder_id
-            {
-                found.set(Some(rec));
-                return true;
-            }
-        }
-        false
-    });
-    found.into_inner()
 }
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
