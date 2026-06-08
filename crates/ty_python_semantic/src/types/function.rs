@@ -286,6 +286,19 @@ impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
+    fn with_deprecated(self, db: &'db dyn Db, deprecated: DeprecatedInstance<'db>) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(deprecated),
+            self.dataclass_transformer_params(db),
+            self.has_explicit_return_annotation(db),
+        )
+    }
+
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
@@ -1116,6 +1129,19 @@ impl<'db> FunctionType<'db> {
             .with_dataclass_transformer_params(db, params);
         let literal = FunctionLiteral { last_definition };
         Self::new(db, literal, None)
+    }
+
+    pub(crate) fn with_deprecated(
+        self,
+        db: &'db dyn Db,
+        deprecated: DeprecatedInstance<'db>,
+    ) -> Self {
+        // A decorator only applies to the specific overload that it is attached to, not to all
+        // previous overloads.
+        let literal = self.literal(db);
+        let last_definition = literal.last_definition.with_deprecated(db, deprecated);
+        let literal = FunctionLiteral { last_definition };
+        Self::new(db, literal, self.updated_signatures(db).cloned())
     }
 
     /// Returns the [`File`] in which this function is defined.
