@@ -594,8 +594,9 @@ impl<'db> NarrowingConstraint<'db> {
 
     /// Returns whether these constraints are represented directly as `T` and `~T`.
     ///
-    /// This deliberately does not search for semantic equivalence: branch factoring relies on the
-    /// representation-level complement to preserve the original narrowing.
+    /// This checks the stored type shape rather than asking whether arbitrary type expressions are
+    /// semantically complementary. The caller reconstructs the branch condition from the positive
+    /// constraint, so the negative constraint must be its literal `~T` representation.
     pub(crate) fn is_direct_complement_of(&self, db: &'db dyn Db, other: &Self) -> bool {
         fn is_direct_negation<'db>(db: &'db dyn Db, ty: Type<'db>, negated: Type<'db>) -> bool {
             let Type::Intersection(intersection) = negated else {
