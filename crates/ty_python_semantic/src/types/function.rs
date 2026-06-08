@@ -1982,10 +1982,6 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
-    /// `contextlib.asynccontextmanager`
-    #[strum(serialize = "asynccontextmanager")]
-    AsyncContextManager,
-
     /// `dataclasses.dataclass`
     Dataclass,
     /// `dataclasses.field`
@@ -2105,9 +2101,6 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
-            }
-            Self::AsyncContextManager => {
-                matches!(module, KnownModule::Contextlib)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -2637,8 +2630,6 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
-
-                KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
