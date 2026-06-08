@@ -1000,7 +1000,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 ///
 /// Instead of separately narrowing under `A` and `~A & B`, the plan combines them into `A | B`
 /// and evaluates the shared continuation once. Factoring is only available when every predicate
-/// contributes direct complementary intersection constraints `T` and `~T`.
+/// contributes exact structurally complementary intersection constraints.
 struct ProjectedBranchFactorPlan<'db> {
     conditions: Vec<Option<Type<'db>>>,
 }
@@ -1020,9 +1020,10 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         })
     }
 
-    /// Returns the positive type for a predicate represented exactly by `T` and `~T`.
+    /// Returns the positive type for a predicate with exact structural complements.
     ///
-    /// Replacement, disjunctive, semantically equivalent, and gradual complements are rejected.
+    /// This accepts direct `T` / `~T` pairs and De Morgan DNF pairs. Replacement, merely
+    /// semantically equivalent, and gradual complements are rejected.
     fn atomic_condition(
         db: &'db dyn Db,
         graph: &ProjectedNarrowingGraph<'db>,
@@ -1030,18 +1031,13 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
     ) -> Option<Type<'db>> {
         let (positive, negative) = &graph.predicate_constraints_cache[&node.atom];
         let (positive, negative) = (positive.as_ref()?, negative.as_ref()?);
-        if !positive.is_direct_complement_of(db, negative) {
-            return None;
-        }
-
-        let positive = positive.single_intersection_type()?;
-        let negative = negative.single_intersection_type()?;
+        let condition = positive.exact_complement_condition(db, negative)?;
         // Gradual types do not have an exact set-theoretic complement.
-        if positive.has_dynamic(db) || negative.has_dynamic(db) {
+        if condition.has_dynamic(db) {
             return None;
         }
 
-        Some(positive)
+        Some(condition)
     }
 
     fn factor_condition(
