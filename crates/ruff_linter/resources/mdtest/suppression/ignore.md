@@ -115,6 +115,36 @@ select = [ "E" ]
 x = 1  #bad
 ```
 
+An ignore comment inside a multi-line statement only covers the next physical line, including its
+trailing comment:
+
+```py
+values = [
+    # ruff:ignore[E262]
+    1,  #bad
+    # error: [no-space-after-inline-comment]
+    2,  #bad
+]
+```
+
+An own-line ignore does not extend to a comment on the following line:
+
+```py
+# ruff:ignore[E265]
+x = 1
+# error: [no-space-after-block-comment]
+#bad
+```
+
+An own-line ignore above a multi-line statement covers a trailing comment on its final line:
+
+```py
+# ruff:ignore[E262]
+x = (
+    1
+)  #bad
+```
+
 ## Respect parent suppression range
 
 ```toml
