@@ -253,7 +253,11 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
 
     let mut rule_noqa_code_match_arms = quote!();
 
-    for (rule, codes) in rule_to_codes {
+    // Keep the proc-macro output stable so unchanged code can be reused incrementally.
+    for (rule, codes) in rule_to_codes
+        .into_iter()
+        .sorted_by_key(|(rule, _)| rule.to_token_stream().to_string())
+    {
         let rule_name = rule.segments.last().unwrap();
         assert_eq!(
             codes.len(),
