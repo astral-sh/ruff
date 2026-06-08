@@ -172,6 +172,19 @@ where
     }
 }
 
+/// Return the key used by type-transform visitors for cycle detection.
+///
+/// Recursive origins that can appear as ordinary `Type` variants are keyed by
+/// their `Type::Recursive` wrapper, so the generic cycle detector does not need
+/// origin-specific identity logic.
+pub(crate) fn type_transform_visit_key<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::FunctionLiteral(function) => function.recursive_type(db),
+        Type::NewTypeInstance(newtype) => newtype.recursive_type(db),
+        _ => ty,
+    }
+}
+
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
 /// field of a `#[salsa::interned]` struct that uses `heap_size`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]

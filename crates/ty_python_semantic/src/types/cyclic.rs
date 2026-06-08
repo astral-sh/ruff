@@ -27,7 +27,6 @@ use std::marker::PhantomData;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::Db;
 use crate::FxIndexSet;
 use crate::types::Type;
 
@@ -107,22 +106,15 @@ impl<Tag, T, R> CycleDetector<Tag, T, R> {
 }
 
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
-    /// Some recursive types cannot be evaluated for equality using simple hash values.
-    /// `is_cycle` provides a manual equality check.
-    /// `on_cycle` returns the type to be used as a fallback during the cycle.
-    fn visit_or_else(
-        &self,
-        item: T,
-        is_cycle: impl FnOnce(&FxIndexSet<T>, &T) -> bool,
-        on_cycle: impl FnOnce(T) -> R,
-        func: impl FnOnce() -> R,
-    ) -> R {
+    /// Visit `item`, using key equality to decide whether active recursion has
+    /// been reached and `on_cycle` to produce the fallback value.
+    fn visit_or_else(&self, item: T, on_cycle: impl FnOnce(T) -> R, func: impl FnOnce() -> R) -> R {
         if let Some(val) = self.cache.borrow().get(&item) {
             return val.clone();
         }
 
         // We hit a cycle
-        if is_cycle(&self.seen.borrow(), &item) || !self.seen.borrow_mut().insert(item.clone()) {
+        if !self.seen.borrow_mut().insert(item.clone()) {
             return on_cycle(item);
         }
 
@@ -137,49 +129,14 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     /// For `TypeTransformer`, use `visit_type` instead.
     pub fn visit(&self, item: T, func: impl FnOnce() -> R) -> R {
         debug_assert!(self.fallback.is_some());
-        self.visit_or_else(
-            item,
-            FxIndexSet::contains,
-            |_| self.fallback.clone().unwrap(),
-            func,
-        )
+        self.visit_or_else(item, |_| self.fallback.clone().unwrap(), func)
     }
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
-    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
-        if left == right {
-            return true;
-        }
-
-        match (left, right) {
-            // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
-            // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
-            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
-                left.literal(db) == right.literal(db)
-            }
-            // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                left.definition(db) == right.definition(db)
-            }
-            _ => false,
-        }
-    }
-
-    pub fn visit_type(
-        &self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        func: impl FnOnce() -> Type<'db>,
-    ) -> Type<'db> {
+    pub fn visit_type(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
         self.visit_or_else(
             ty,
-            |seen, ty| {
-                seen.contains(ty)
-                    || seen
-                        .iter()
-                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
-            },
             // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
             |item| item,
             func,
