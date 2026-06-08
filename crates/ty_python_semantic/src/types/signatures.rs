@@ -869,11 +869,13 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = Arc::make_mut(&mut self.parameters.data).value.first_mut()
+        if let Some(first_parameter) = self.parameters.data.value.first()
             && first_parameter.is_positional()
             && first_parameter.annotated_type.is_unknown()
             && first_parameter.inferred_annotation
             && let Some(self_type) = self_type()
+            && let Some(first_parameter) =
+                Arc::make_mut(&mut self.parameters.data).value.first_mut()
         {
             first_parameter.annotated_type = self_type;
 
@@ -3106,6 +3108,7 @@ pub(crate) enum ParametersKind<'db> {
 // invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct ParametersData<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
     value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
 }
