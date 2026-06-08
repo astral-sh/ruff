@@ -991,7 +991,25 @@ fn rule_f401() {
 
 #[test]
 fn rule_unused_import() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "unused-import"]));
+    insta::with_settings!({filters => vec![
+        (r#"(?s)## What it does.*"#, "<truncated>"),
+    ]}, {
+        assert_cmd_snapshot!(
+            ruff_cmd().args(["rule", "unused-import"]),
+            @"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        # unused-import (F401)
+
+        Derived from the **Pyflakes** linter.
+
+        Fix is sometimes available.
+
+        <truncated>
+        ",
+        );
+    });
 }
 
 #[test]
