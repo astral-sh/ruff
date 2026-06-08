@@ -518,8 +518,30 @@ impl<'db> Type<'db> {
                 .is_always_satisfied(db)
         }
 
-        if self == other {
+        if self == other || matches!(self, Type::Never) {
             return true;
+        }
+
+        match (self, other) {
+            (_, Type::NominalInstance(target)) if target.is_object() => return true,
+            (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
+                return true;
+            }
+            (Type::Dynamic(_), Type::Dynamic(_)) => return true,
+            (Type::Dynamic(_), Type::Union(union))
+                if union.elements(db).iter().any(Type::is_dynamic) =>
+            {
+                return true;
+            }
+            (Type::Dynamic(_), _) => return false,
+            (_, Type::Dynamic(_)) => {
+                return matches!(self, Type::Intersection(intersection) if intersection
+                    .positive(db)
+                    .iter()
+                    .any(Type::is_non_divergent_dynamic));
+            }
+            (_, Type::Union(union)) if union.elements(db).contains(&self) => return true,
+            _ => {}
         }
 
         is_redundant_with_impl(db, self, other)
