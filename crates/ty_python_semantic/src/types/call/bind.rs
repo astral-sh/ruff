@@ -25,10 +25,10 @@ use self::constructor::{ConstructorBinding, ConstructorContext};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
+use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::PyIndex;
 use crate::types::call::arguments::{CallArgumentTypes, Expansion, is_expandable_type};
-use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::callable::CallableTypeKind;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, PathBounds, Solutions,
 };
@@ -66,8 +66,7 @@ use crate::types::{
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
-use ty_module_resolver::KnownModule;
-use ty_python_core::{EvaluationMode, semantic_index};
+use ty_python_core::semantic_index;
 
 pub(crate) use self::constructor::ConstructorCallableKind;
 
@@ -2061,18 +2060,6 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::Cast) => {
                             if let [Some(casted_ty), Some(_)] = overload.parameter_types() {
                                 overload.set_return_type(*casted_ty);
-                            }
-                        }
-
-                        // TODO: Remove this special handling once we have full support for
-                        // generic protocols in the solver.
-                        Some(KnownFunction::AsyncContextManager) => {
-                            if let [Some(callable)] = overload.parameter_types() {
-                                if let Some(return_ty) =
-                                    asynccontextmanager_return_type(db, *callable)
-                                {
-                                    overload.set_return_type(return_ty);
-                                }
                             }
                         }
 
@@ -7689,50 +7676,6 @@ impl fmt::Display for FunctionKind {
 // An example of a routine with many many overloads:
 // https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
 const MAXIMUM_OVERLOADS: usize = 50;
-
-/// Infer the return type for a call to `asynccontextmanager`.
-///
-/// The `@asynccontextmanager` decorator transforms a function that returns (a subtype of) `AsyncIterator[T]`
-/// into a function that returns `_AsyncGeneratorContextManager[T]`.
-///
-/// TODO: This function only handles the most basic case. It should be removed once we have
-/// full support for generic protocols in the solver.
-fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> Option<Type<'db>> {
-    let bindings = func_ty.bindings(db);
-    let binding = bindings
-        .single_element()?
-        .overloads
-        .iter()
-        .exactly_one()
-        .ok()?;
-    let signature = &binding.signature;
-
-    let yield_ty = signature
-        .return_ty
-        .try_iterate_with_mode(db, EvaluationMode::Async)
-        .ok()?
-        .homogeneous_element_type(db);
-
-    let context_manager =
-        known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
-            .place
-            .ignore_possibly_undefined()?
-            .as_class_literal()?;
-
-    let context_manager = context_manager.apply_specialization(db, |generic_context| {
-        generic_context.specialize_partial(db, [Some(yield_ty), None])
-    });
-
-    let new_return_ty = Type::from(context_manager).to_instance(db)?;
-    let new_signature = Signature::new(signature.parameters().clone(), new_return_ty);
-
-    Some(Type::Callable(CallableType::new(
-        db,
-        CallableSignature::single(new_signature),
-        CallableTypeKind::FunctionLike,
-        CallableFunctionProvenance::None,
-    )))
-}
 
 /// Maximum repetition count for struct format specifiers.
 /// Larger counts fall back to `tuple[Unknown, ...]`.
