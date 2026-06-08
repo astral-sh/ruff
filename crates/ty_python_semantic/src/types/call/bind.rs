@@ -9,6 +9,7 @@
 //! `ty_python_semantic::types::call::bind`.
 
 mod constructor;
+mod enum_property;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -2795,6 +2796,8 @@ impl<'db> Bindings<'db> {
                 }
             }
         }
+
+        self.evaluate_enum_property_calls(db, call_arguments);
     }
 }
 
