@@ -1001,6 +1001,15 @@ impl<'db> Type<'db> {
         Self::recursive(db, binder_id, RecursiveOrigin::TypeAlias(alias), body)
     }
 
+    pub(crate) fn typed_dict_recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        typed_dict: TypedDictType<'db>,
+        body: Type<'db>,
+    ) -> Self {
+        Self::recursive(db, binder_id, RecursiveOrigin::TypedDict(typed_dict), body)
+    }
+
     /// True if this type is a `Type::Recursive(_)` μ-binder. Used by future phases.
     #[allow(dead_code)]
     pub(crate) const fn is_recursive(&self) -> bool {
@@ -6184,9 +6193,18 @@ impl<'db> Type<'db> {
                 Type::GenericAlias(generic.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::TypedDict(typed_dict) => {
-                Type::TypedDict(typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Type::TypedDict(typed_dict) => match type_mapping {
+                TypeMapping::ReplaceSelfTypedDict {
+                    typed_dict_id,
+                    binder_id,
+                } if typed_dict.recursive_binder_id() == typed_dict_id.into_id() =>
+                {
+                    Type::divergent(binder_id.into_id())
+                }
+                _ => Type::TypedDict(
+                    typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ),
+            },
 
             Type::SubclassOf(subclass_of) => subclass_of.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
 
@@ -6391,6 +6409,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::ReplaceSelfAlias { .. } |
+                TypeMapping::ReplaceSelfTypedDict { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
@@ -6408,6 +6427,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceParameterDefaults |
                 TypeMapping::EagerExpansion |
                 TypeMapping::ReplaceSelfAlias { .. } |
+                TypeMapping::ReplaceSelfTypedDict { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
@@ -7421,6 +7441,13 @@ pub enum TypeMapping<'a, 'db> {
         binder_id: recursive::BinderId,
     },
 
+    /// Replace `Type::TypedDict(t)` references with `Type::divergent(binder_id)`
+    /// when `t` has the same recursive binder id.
+    ReplaceSelfTypedDict {
+        typed_dict_id: recursive::BinderId,
+        binder_id: recursive::BinderId,
+    },
+
     /// Replace `Type::Divergent(d)` markers where `d.id() == binder_id` with the
     /// `replacement` type. Used by display to substitute the α-binder marker with
     /// the explicit origin's source type for nicer rendering.
@@ -7469,6 +7496,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::ReplaceSelfAlias { .. }
+            | TypeMapping::ReplaceSelfTypedDict { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
@@ -7516,6 +7544,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::ReplaceSelfAlias { .. }
+            | TypeMapping::ReplaceSelfTypedDict { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }

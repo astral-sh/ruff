@@ -1856,16 +1856,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(_), _) => self.never(),
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_typeddict_pair(db, source_td, target_td)
-                })
+                self.check_typeddict_pair(db, source_td, target_td)
             }
 
             // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
-            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
+            (Type::TypedDict(typed_dict), _) => {
                 let spec = &[KnownClass::Str.to_instance(db), Type::object()];
                 let str_object_map = KnownClass::Mapping.to_specialized_instance(db, spec);
                 let result = self.check_type_pair(db, str_object_map, target);
@@ -1879,7 +1877,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     }
                 }
                 result
-            }),
+            }
 
             // A non-`TypedDict` cannot subtype a `TypedDict`
             (_, Type::TypedDict(_)) => self.never(),
@@ -3193,9 +3191,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 
             (Type::TypedDict(left_td), Type::TypedDict(right_td)) => {
-                self.with_recursion_guard(left, right, || {
-                    self.check_typeddict_pair(db, left_td, right_td)
-                })
+                self.check_typeddict_pair(db, left_td, right_td)
             }
 
             // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
