@@ -120,7 +120,6 @@ mod call;
 mod callable;
 mod class;
 mod class_base;
-mod coinductive;
 mod constraints;
 mod context;
 mod context_manager;
@@ -1128,6 +1127,14 @@ impl<'db> Type<'db> {
     #[allow(dead_code)]
     pub(crate) const fn is_recursive(&self) -> bool {
         matches!(self, Type::Recursive(_))
+    }
+
+    /// One-step unfold of a recursive type.
+    pub(crate) fn unfold_recursive_once(self, db: &'db dyn Db) -> Self {
+        match self {
+            Type::Recursive(rec) => *rec.body(db),
+            _ => self,
+        }
     }
 
     pub(crate) fn is_bottom_recursive(self, db: &'db dyn Db) -> bool {
