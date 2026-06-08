@@ -15,7 +15,7 @@ impl<'db> Bindings<'db> {
     ) {
         let property_instance =
             |getter: Option<Type<'db>>, setter: Option<Type<'db>>, deleter: Option<Type<'db>>| {
-                Type::PropertyInstance(PropertyInstanceType::new(
+                Type::PropertyInstance(PropertyInstanceType::new_enum_property(
                     db,
                     getter.filter(|ty| !ty.is_none(db)),
                     setter.filter(|ty| !ty.is_none(db)),

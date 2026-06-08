@@ -734,6 +734,18 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 assert_type(Answer.YES.some_property, str)
 assert_type(Answer.YES.direct_property, int)
+
+def get(value: Enum) -> str:
+    return value.name
+
+descriptor = enum_property(get)
+retained: enum_property = descriptor
+retained_as_property: property = descriptor
+not_enum_property: enum_property = property(get)  # error: [invalid-assignment]
+retained_getter: enum_property = descriptor.getter(get)
+assert_type(descriptor.name, str)
+assert_type(descriptor.clsname, str)
+assert_type(descriptor.member, Enum | None)
 ```
 
 Enum attributes defined using `enum.property` take precedence over generated attributes.
