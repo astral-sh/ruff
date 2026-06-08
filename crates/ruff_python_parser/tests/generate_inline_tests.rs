@@ -109,6 +109,7 @@ fn install_tests(tests: &HashMap<String, Test>, target_dir: &str) -> Result<Test
     let existing = existing_tests(&tests_dir)?;
 
     let mut updated_files = vec![];
+    // Sort so `TestFiles` reports generated files that need updating deterministically.
     let mut sorted_tests = tests.iter().collect::<Vec<_>>();
     sorted_tests.sort_unstable_by_key(|(name, _)| *name);
 

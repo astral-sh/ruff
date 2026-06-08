@@ -1734,8 +1734,10 @@ impl Flake8ImportConventionsOptions {
         }
 
         let mut normalized_aliases: FxHashMap<String, String> = FxHashMap::default();
-        let mut aliases = aliases.into_iter().collect::<Vec<_>>();
-        aliases.sort_unstable_by(|(module_a, _), (module_b, _)| module_a.cmp(module_b));
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "every invalid alias is rejected, regardless of which one is reported first"
+        )]
         for (module, alias) in aliases {
             let normalized_alias = alias.nfkc().collect::<String>();
             if normalized_alias == "__debug__" {
