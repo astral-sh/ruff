@@ -1041,6 +1041,11 @@ impl<'db> SymbolVisitor<'db> {
             self.all_invalid = true;
             return;
         };
+        let star_range = import_from
+            .names
+            .iter()
+            .find(|alias| &alias.name == "*")
+            .map(Ranged::range);
         self.symbols
             .extend(symbols.symbols.iter().filter_map(|symbol| {
                 // If there's no `__all__`, then names with an underscore
@@ -1050,6 +1055,10 @@ impl<'db> SymbolVisitor<'db> {
                     return None;
                 }
                 let mut symbol = symbol.clone();
+                if let Some(star_range) = star_range {
+                    symbol.name_range = star_range;
+                    symbol.full_range = star_range;
+                }
                 let Some(imported_from) = ImportedFrom::import_from(
                     self.db,
                     self.file,

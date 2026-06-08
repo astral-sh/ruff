@@ -703,10 +703,10 @@ def zqzqzq():
 
         assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
-         --> pandas/__init__.py:2:5
+         --> pandas/__init__.py:2:27
           |
         2 | from pandas.io.api import *
-          |     ^^^^^^
+          |                           ^
           |
         info: Function zqzqzq
         ");
