@@ -519,7 +519,7 @@ impl MemberLookup for MemberTable {
 
 impl MemberLookup for MemberTableBuilder {
     fn member_id<'a>(&self, member: impl Into<MemberExprRef<'a>>) -> Option<ScopedMemberId> {
-        MemberTable::member_id(self, member)
+        MemberTableBuilder::member_id(self, member)
     }
 }
 

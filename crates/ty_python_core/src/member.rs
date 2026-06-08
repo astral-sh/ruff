@@ -1,4 +1,4 @@
-use ruff_index::{IndexVec, newtype_index};
+use ruff_index::{FrozenIndexVec, IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
 
@@ -7,9 +7,9 @@ use hashbrown::hash_table::Entry;
 use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 
+use std::cmp::Ordering;
 use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
-use std::ops::{Deref, DerefMut};
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -400,6 +400,12 @@ impl<'a> MemberExprRef<'a> {
     }
 }
 
+fn compare_member_expression_refs(left: &MemberExprRef<'_>, right: &MemberExprRef<'_>) -> Ordering {
+    left.path
+        .cmp(right.path)
+        .then_with(|| left.segments.iter().cmp(right.segments.iter()))
+}
+
 impl<'a> From<&'a MemberExpr> for MemberExprRef<'a> {
     fn from(value: &'a MemberExpr) -> Self {
         value.as_ref()
@@ -420,17 +426,17 @@ impl Hash for MemberExprRef<'_> {
 pub struct ScopedMemberId;
 
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].
-#[derive(Default, get_size2::GetSize)]
+#[derive(get_size2::GetSize)]
 pub(super) struct MemberTable {
-    members: IndexVec<ScopedMemberId, Member>,
+    members: FrozenIndexVec<ScopedMemberId, Member>,
 
     /// Map from member path to its ID.
-    ///
-    /// Uses a hash table to avoid storing the path twice.
-    map: hashbrown::HashTable<ScopedMemberId>,
+    members_by_expression: Box<[ScopedMemberId]>,
 }
 
 impl MemberTable {
+    const LINEAR_LOOKUP_THRESHOLD: usize = 16;
+
     /// Returns the member with the given ID.
     ///
     /// ## Panics
@@ -438,15 +444,6 @@ impl MemberTable {
     #[track_caller]
     pub(crate) fn member(&self, id: ScopedMemberId) -> &Member {
         &self.members[id]
-    }
-
-    /// Returns a mutable reference to the member with the given ID.
-    ///
-    /// ## Panics
-    /// If the ID is not valid for this table.
-    #[track_caller]
-    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
-        &mut self.members[id]
     }
 
     /// Returns an iterator over all members in the table.
@@ -464,10 +461,19 @@ impl MemberTable {
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(&member);
-        self.map
-            .find(hash, |id| self.members[*id].expression == member)
-            .copied()
+        if self.members_by_expression.len() <= Self::LINEAR_LOOKUP_THRESHOLD {
+            self.members_by_expression
+                .iter()
+                .find(|id| self.members[**id].expression == member)
+                .copied()
+        } else {
+            self.members_by_expression
+                .binary_search_by(|id| {
+                    compare_member_expression_refs(&self.members[*id].expression.as_ref(), &member)
+                })
+                .ok()
+                .map(|index| self.members_by_expression[index])
+        }
     }
 
     pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
@@ -498,7 +504,12 @@ impl std::fmt::Debug for MemberTable {
 
 #[derive(Debug, Default)]
 pub(super) struct MemberTableBuilder {
-    table: MemberTable,
+    members: IndexVec<ScopedMemberId, Member>,
+
+    /// Map from member path to its ID.
+    ///
+    /// Uses a hash table to avoid storing the path twice.
+    map: hashbrown::HashTable<ScopedMemberId>,
 }
 
 impl MemberTableBuilder {
@@ -508,11 +519,11 @@ impl MemberTableBuilder {
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
         let member_ref = member.expression.as_ref();
         let hash = MemberTable::hash_member_expression_ref(&member_ref);
-        let entry = self.table.map.entry(
+        let entry = self.map.entry(
             hash,
-            |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
+            |id| self.members[*id].expression.as_ref() == member.expression.as_ref(),
             |id| {
-                let ref_expr = self.table.members[*id].expression.as_ref();
+                let ref_expr = self.members[*id].expression.as_ref();
                 MemberTable::hash_member_expression_ref(&ref_expr)
             },
         );
@@ -530,35 +541,55 @@ impl MemberTableBuilder {
             Entry::Vacant(entry) => {
                 member.expression.shrink_to_fit();
 
-                let id = self.table.members.push(member);
+                let id = self.members.push(member);
                 entry.insert(id);
                 (id, true)
             }
         }
     }
 
+    pub(crate) fn member(&self, id: ScopedMemberId) -> &Member {
+        &self.members[id]
+    }
+
+    pub(super) fn member_mut(&mut self, id: ScopedMemberId) -> &mut Member {
+        &mut self.members[id]
+    }
+
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Member> {
+        self.members.iter()
+    }
+
+    pub(crate) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        self.map
+            .find(MemberTable::hash_member_expression_ref(&member), |id| {
+                self.members[*id].expression == member
+            })
+            .copied()
+    }
+
     pub(super) fn build(self) -> MemberTable {
-        let mut table = self.table;
-        table.members.shrink_to_fit();
-        table.map.shrink_to_fit(|id| {
-            let ref_expr = table.members[*id].expression.as_ref();
-            MemberTable::hash_member_expression_ref(&ref_expr)
-        });
-        table
-    }
-}
+        let Self { mut members, .. } = self;
 
-impl Deref for MemberTableBuilder {
-    type Target = MemberTable;
+        let mut members_by_expression = members.indices().collect::<Vec<_>>();
+        if members_by_expression.len() > MemberTable::LINEAR_LOOKUP_THRESHOLD {
+            members_by_expression.sort_unstable_by(|left, right| {
+                compare_member_expression_refs(
+                    &members[*left].expression.as_ref(),
+                    &members[*right].expression.as_ref(),
+                )
+            });
+        }
 
-    fn deref(&self) -> &Self::Target {
-        &self.table
-    }
-}
-
-impl DerefMut for MemberTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
+        members.shrink_to_fit();
+        MemberTable {
+            members: members.into(),
+            members_by_expression: members_by_expression.into_boxed_slice(),
+        }
     }
 }
 
@@ -611,7 +642,7 @@ impl Segments {
 /// Layout: [kind: 2 bits][offset: 30 bits]
 /// - Bits 0-1: `SegmentKind` (0=Attribute, 1=IntSubscript, 2=StringSubscript)
 /// - Bits 2-31: Absolute offset from start of path (up to 1,073,741,823 bytes)
-#[derive(Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
 struct SegmentInfo(u32);
 
 const KIND_MASK: u32 = 0b11;
