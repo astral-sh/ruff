@@ -50,6 +50,10 @@ impl<'db> ClassType<'db> {
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
+    pub(super) fn class_type(self) -> ClassType<'db> {
+        self.0
+    }
+
     /// Returns the protocol members of this class.
     ///
     /// A protocol's members define the interface declared by the protocol.

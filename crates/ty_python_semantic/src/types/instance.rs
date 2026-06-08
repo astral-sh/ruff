@@ -532,8 +532,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         if let Some(source_protocol) = ty.as_protocol_instance()
             && let Protocol::FromClass(source_class) = source_protocol.inner
             && let Protocol::FromClass(proto_class) = protocol.inner
-            && source_class.is_known(db, KnownClass::Generator)
-            && proto_class.is_known(db, KnownClass::Generator)
+            && source_class
+                .class_type()
+                .is_known(db, KnownClass::Generator)
+            && proto_class.class_type().is_known(db, KnownClass::Generator)
         {
             return result;
         }
@@ -751,7 +753,11 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(class) => {
-                if let Some((_, Some(specialization))) = class.static_class_literal(db) {
+                if let Some(interface) = class.interface_override() {
+                    walk_protocol_interface(db, interface, visitor);
+                } else if let Some((_, Some(specialization))) =
+                    class.class_type().static_class_literal(db)
+                {
                     walk_specialization(db, specialization, visitor);
                 }
             }
@@ -773,7 +779,7 @@ impl<'db> ProtocolInstanceType<'db> {
     // instances is through the `Type::instance` constructor function.
     fn from_class(class: ProtocolClass<'db>) -> Self {
         Self {
-            inner: Protocol::FromClass(class),
+            inner: Protocol::FromClass(ClassBasedProtocol::new(class)),
             _phantom: PhantomData,
         }
     }
@@ -795,7 +801,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn to_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => Some(NominalInstanceType(
-                NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(*class)),
+                NominalInstanceInner::NonTuple(NominalInstanceClass::Plain(class.class_type())),
             )),
             Protocol::Synthesized(_) => None,
         }
@@ -803,14 +809,16 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(crate) fn recursive_binder_id(self, _db: &'db dyn Db) -> salsa::Id {
         match self.inner {
-            Protocol::FromClass(class) => class.as_id(),
+            Protocol::FromClass(class) => class.origin().as_id(),
             Protocol::Synthesized(synthesized) => synthesized.interface().as_id(),
         }
     }
 
     pub(crate) fn is_same_recursive_origin_as(self, _db: &'db dyn Db, other: Self) -> bool {
         match (self.inner, other.inner) {
-            (Protocol::FromClass(left), Protocol::FromClass(right)) => left == right,
+            (Protocol::FromClass(left), Protocol::FromClass(right)) => {
+                left.origin() == right.origin()
+            }
             (Protocol::Synthesized(left), Protocol::Synthesized(right)) => {
                 left.interface() == right.interface()
             }
@@ -820,10 +828,15 @@ impl<'db> ProtocolInstanceType<'db> {
 
     pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
-            Protocol::FromClass(class) if class.is_known(db, KnownClass::Generator) => {
+            Protocol::FromClass(class) if class.has_interface_override() => {
                 Type::ProtocolInstance(self)
             }
-            Protocol::FromClass(class) => protocol_class_recursive_type(db, *class),
+            Protocol::FromClass(class)
+                if class.class_type().is_known(db, KnownClass::Generator) =>
+            {
+                Type::ProtocolInstance(self)
+            }
+            Protocol::FromClass(class) => protocol_class_recursive_type(db, class.class_type()),
             Protocol::Synthesized(synthesized) => {
                 synthesized_protocol_recursive_type(db, synthesized.interface())
             }
@@ -833,7 +846,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
-            Protocol::FromClass(class) => SubclassOfType::from(db, class),
+            Protocol::FromClass(class) => SubclassOfType::from(db, class.origin()),
 
             // TODO: we can and should do better here.
             //
@@ -905,6 +918,16 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    fn with_interface(self, interface: ProtocolInterface<'db>) -> Self {
+        match self.inner {
+            Protocol::FromClass(class) => Self {
+                inner: Protocol::FromClass(class.with_interface(interface)),
+                _phantom: PhantomData,
+            },
+            Protocol::Synthesized(_) => Self::synthesized(SynthesizedProtocolType::new(interface)),
+        }
+    }
+
     pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -913,9 +936,15 @@ impl<'db> ProtocolInstanceType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self.inner {
-            Protocol::FromClass(class) => {
-                Self::from_class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            Protocol::FromClass(class) => Self {
+                inner: Protocol::FromClass(class.apply_type_mapping_impl(
+                    db,
+                    type_mapping,
+                    tcx,
+                    visitor,
+                )),
+                _phantom: PhantomData,
+            },
             Protocol::Synthesized(synthesized) => Self::synthesized(
                 synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
@@ -975,9 +1004,7 @@ fn protocol_recursive_type_impl<'db>(
     if mapped_interface == interface {
         return Type::ProtocolInstance(protocol);
     }
-    let body = Type::ProtocolInstance(ProtocolInstanceType::synthesized(
-        SynthesizedProtocolType::new(mapped_interface),
-    ));
+    let body = Type::ProtocolInstance(protocol.with_interface(mapped_interface));
     if body.contains_divergent_with_id(db, binder_id) {
         Type::protocol_recursive(db, binder_id, protocol, body)
     } else {
@@ -1024,8 +1051,119 @@ fn synthesized_protocol_recursive_type<'db>(
 /// definition in source code, and those that are synthesized from a set of members.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) enum Protocol<'db> {
-    FromClass(ProtocolClass<'db>),
+    FromClass(ClassBasedProtocol<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
+}
+
+/// A class-based protocol keeps its source class for identity/display and can
+/// carry a folded interface for recursive μ-type bodies.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
+pub(super) struct ClassBasedProtocol<'db> {
+    origin: ProtocolClass<'db>,
+    interface: Option<ProtocolInterface<'db>>,
+}
+
+impl<'db> ClassBasedProtocol<'db> {
+    fn new(origin: ProtocolClass<'db>) -> Self {
+        Self {
+            origin,
+            interface: None,
+        }
+    }
+
+    fn origin(self) -> ProtocolClass<'db> {
+        self.origin
+    }
+
+    pub(super) fn class_type(self) -> ClassType<'db> {
+        self.origin.class_type()
+    }
+
+    fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
+        self.interface.unwrap_or_else(|| self.origin.interface(db))
+    }
+
+    fn interface_override(self) -> Option<ProtocolInterface<'db>> {
+        self.interface
+    }
+
+    fn has_interface_override(self) -> bool {
+        self.interface.is_some()
+    }
+
+    fn with_interface(self, interface: ProtocolInterface<'db>) -> Self {
+        Self {
+            origin: self.origin,
+            interface: Some(interface),
+        }
+    }
+
+    fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        if let Some(interface) = self.interface {
+            interface.instance_member(db, name)
+        } else {
+            self.origin.instance_member(db, name)
+        }
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            origin: self
+                .origin
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            interface: self
+                .interface
+                .map(|interface| interface.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+        }
+    }
+
+    fn find_legacy_typevars_impl(
+        self,
+        db: &'db dyn Db,
+        binding_context: Option<Definition<'db>>,
+        typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
+        visitor: &FindLegacyTypeVarsVisitor<'db>,
+    ) {
+        if let Some(interface) = self.interface {
+            interface.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        } else {
+            self.origin
+                .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        let interface = if let Some(interface) = self.interface {
+            Some(interface.recursive_type_normalized_impl(db, div, nested)?)
+        } else {
+            None
+        };
+        Some(Self {
+            origin: self
+                .origin
+                .recursive_type_normalized_impl(db, div, nested)?,
+            interface,
+        })
+    }
+
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+        if let Some(interface) = self.interface {
+            interface.variance_of(db, typevar)
+        } else {
+            self.origin.variance_of(db, typevar)
+        }
+    }
 }
 
 impl<'db> Protocol<'db> {
@@ -1061,7 +1199,7 @@ impl<'db> Protocol<'db> {
 impl<'db> VarianceInferable<'db> for Protocol<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
-            Protocol::FromClass(class_type) => class_type.variance_of(db, typevar),
+            Protocol::FromClass(class) => class.variance_of(db, typevar),
             Protocol::Synthesized(synthesized_protocol_type) => {
                 synthesized_protocol_type.variance_of(db, typevar)
             }

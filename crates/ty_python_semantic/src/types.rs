@@ -1643,7 +1643,7 @@ impl<'db> Type<'db> {
             }
             Type::NominalInstance(instance_type) => instance_type.is_definition_generic(db),
             Type::ProtocolInstance(protocol) => {
-                matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
+                matches!(protocol.inner, Protocol::FromClass(class) if class.class_type().is_generic())
             }
             Type::TypedDict(typed_dict) => typed_dict
                 .defining_class()
@@ -5831,7 +5831,7 @@ impl<'db> Type<'db> {
             }
             Type::ProtocolInstance(instance) => {
                 if let Protocol::FromClass(class) = instance.inner {
-                    class.iter_mro(db).find_map(from_class_base)
+                    class.class_type().iter_mro(db).find_map(from_class_base)
                 } else {
                     None
                 }
@@ -7283,7 +7283,7 @@ impl<'db> Type<'db> {
             )),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => class.type_definition(db),
+                Protocol::FromClass(class) => class.class_type().type_definition(db),
                 Protocol::Synthesized(_) => None,
             },
 

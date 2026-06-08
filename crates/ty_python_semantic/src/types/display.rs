@@ -40,6 +40,8 @@ use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
 use ty_python_core::semantic_index;
 
+use super::instance::ClassBasedProtocol;
+
 /// A named item that can be either a class or a type alias.
 ///
 /// This wrapper allows tracking both classes and type aliases together for
@@ -584,7 +586,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::FromClass(class),
                 ..
-            }) => return self.visit_type(db, Type::from(class)),
+            }) => return self.visit_type(db, Type::from(class.class_type())),
             // no need to recurse into TypeVar bounds/constraints
             Type::TypeVar(_) => return,
             _ => {}
@@ -796,6 +798,45 @@ impl Display for ClassDisplay<'_> {
     }
 }
 
+impl<'db> ClassBasedProtocol<'db> {
+    fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> ClassBasedProtocolDisplay<'db> {
+        ClassBasedProtocolDisplay {
+            db,
+            protocol: self,
+            settings,
+        }
+    }
+}
+
+struct ClassBasedProtocolDisplay<'db> {
+    db: &'db dyn Db,
+    protocol: ClassBasedProtocol<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for ClassBasedProtocolDisplay<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        match self.protocol.class_type() {
+            ClassType::NonGeneric(class) => class
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
+            ClassType::Generic(alias) => alias
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f),
+        }
+    }
+}
+
+impl Display for ClassBasedProtocolDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
 impl<'db> TypeAliasType<'db> {
     fn display_with(
         self,
@@ -986,14 +1027,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => match *class {
-                    ClassType::NonGeneric(class) => class
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
-                    ClassType::Generic(alias) => alias
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f),
-                },
+                Protocol::FromClass(class) => class
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f),
                 Protocol::Synthesized(synthetic) => {
                     f.set_invalid_type_annotation();
                     f.write_char('<')?;
