@@ -241,51 +241,54 @@ impl Suppressions {
             context: &LintContext,
             locator: &Locator,
         ) -> bool {
-            if let Some((group_key, group)) = grouped_diagnostic
-                && key.is_none_or(|key| key != *group_key)
-            {
-                if group.any_invalid() {
-                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    ) {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
-                    }
-                }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: &group.disabled_codes,
-                                duplicated: &group.duplicated_codes,
-                                unmatched: &group.unused_codes,
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
+            let Some((group_key, group)) = grouped_diagnostic else {
+                return false;
+            };
+
+            if key.is_some_and(|key| key == *group_key) {
+                return false;
+            }
+
+            if group.any_invalid() {
+                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &group.invalid_codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group.invalid_codes.iter().join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                ) {
+                    diagnostic.help(
+                        "Add non-Ruff rule codes to the `lint.external` configuration option",
                     );
                 }
-                true
-            } else {
-                false
             }
+
+            if group.any_unused() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: &group.disabled_codes,
+                            duplicated: &group.duplicated_codes,
+                            unmatched: &group.unused_codes,
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
+            }
+
+            true
         }
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
