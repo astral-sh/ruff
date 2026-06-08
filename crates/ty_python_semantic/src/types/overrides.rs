@@ -422,9 +422,11 @@ fn check_class_declaration<'db>(
                         // we should also recognise `@final`-decorated methods that don't end up
                         // as being function- or property-types (because they're wrapped by other
                         // decorators that transform the type into something else).
-                        let underlying_functions = extract_underlying_functions(
+                        let underlying_functions = extract_member_functions_from_type(
                             db,
                             own_class_member.ignore_possibly_undefined()?,
+                            &member.name,
+                            superclass_scope,
                         );
 
                         if underlying_functions.iter().any(|function| {
@@ -1425,6 +1427,11 @@ fn extract_underlying_functions<'db>(
             || smallvec::smallvec![],
             |getter| extract_underlying_functions(db, getter),
         ),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .flat_map(|positive| extract_underlying_functions(db, *positive))
+            .collect(),
         Type::Union(union) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {

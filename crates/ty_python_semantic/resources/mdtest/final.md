@@ -150,6 +150,46 @@ class Baz(Foo):
     def bar(self): ...  # error: [override-of-final-method]
 ```
 
+## Final method wrapped by intersection-returning decorator
+
+```py
+from ty_extensions import Intersection
+from typing_extensions import Any, Callable, TypeVar, cast, final
+
+_T = TypeVar("_T")
+_U = TypeVar("_U")
+
+def intersection_decorator(fn: _T) -> Intersection[_T, Any]:
+    return cast(Intersection[_T, Any], fn)
+
+def make_intersection_decorator(extra: _U) -> Callable[[_T], Intersection[Any, _U]]:
+    return cast(Callable[[_T], Intersection[Any, _U]], lambda fn: fn)
+
+class Parent:
+    @intersection_decorator
+    @final
+    def method(self) -> None:
+        pass
+
+class Child(Parent):
+    def method(self) -> None:  # error: [override-of-final-method]
+        pass
+
+class Other:
+    @final
+    def unrelated_final_method(self) -> None:
+        pass
+
+class DecoratedWithUnrelatedFinal:
+    @make_intersection_decorator(Other.unrelated_final_method)
+    def method(self) -> None:
+        pass
+
+class OverrideOfDecoratedWithUnrelatedFinal(DecoratedWithUnrelatedFinal):
+    def method(self) -> None:
+        pass
+```
+
 ## Diagnostic edge case: superclass with `@final` method has the same name as the subclass
 
 <!-- snapshot-diagnostics -->
