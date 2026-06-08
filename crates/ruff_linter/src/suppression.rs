@@ -143,14 +143,12 @@ pub(crate) enum InvalidSuppressionKind {
     NotModuleScope,
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Suppressions {
     /// Valid suppression ranges with associated comments
