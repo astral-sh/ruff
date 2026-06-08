@@ -1637,10 +1637,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::Dynamic(_) | Type::Divergent(_) => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
                 // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
+                // A `Recursive` cycle marker must pass through unchanged (like `Divergent`):
+                // losing it to `Unknown` here breaks fixed-point convergence for a self-referential
+                // generic alias (`Rec = dict[K, "Rec[K]"]`), causing the definition cycle to diverge.
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
                 }
