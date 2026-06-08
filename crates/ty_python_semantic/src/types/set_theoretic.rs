@@ -136,22 +136,31 @@ impl<'db> UnionType<'db> {
         }
     }
 
+    /// Return the sole union element if it needs no further normalization.
+    fn normalized_singleton(ty: Type<'db>) -> Option<Type<'db>> {
+        // The builder expands aliases, normalizes literals and unions, and turns
+        // `Top[Divergent]` into plain `object`.
+        if matches!(
+            ty,
+            Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_) | Type::Divergent(_)
+        ) {
+            return None;
+        }
+
+        ty.assert_not_recursive_var();
+        Some(ty)
+    }
+
     /// Normalize the types of a place across bindings, declarations, or narrowing alternatives.
     pub(crate) fn normalize_place_types(
         db: &'db dyn Db,
         env: &ProgramEnvironment<'db>,
         types: &[Type<'db>],
     ) -> Type<'db> {
-        // Most reads see one binding. The builder still needs to expand aliases,
-        // normalize literals and unions, and turn `Top[Divergent]` into plain `object`.
         if let [ty] = types
-            && !matches!(
-                ty,
-                Type::Union(_) | Type::TypeAlias(_) | Type::LiteralValue(_) | Type::Divergent(_)
-            )
+            && let Some(ty) = Self::normalized_singleton(*ty)
         {
-            ty.assert_not_recursive_var();
-            return *ty;
+            return ty;
         }
 
         // Successive reads often merge the same few bindings. Even two inputs can
@@ -200,6 +209,16 @@ impl<'db> UnionType<'db> {
                 .add(types.first(db))
                 .add(types.second(db))
                 .build()
+        }
+
+        // A duplicate or `Never` adds nothing to an already normalized union.
+        let singleton = match (a, b) {
+            (Type::Never, ty) | (ty, Type::Never) => Self::normalized_singleton(ty),
+            _ if a == b => Self::normalized_singleton(a),
+            _ => None,
+        };
+        if let Some(ty) = singleton {
+            return ty;
         }
 
         union_from_two_elements(db, TypePair::new(db, env.program(db), a, b))
