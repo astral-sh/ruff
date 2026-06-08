@@ -90,9 +90,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    definition_expression_type, walk_signature,
+    KnownClass, KnownInstanceType, RecursiveOrigin, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1329,6 +1329,10 @@ impl<'db> FunctionType<'db> {
             .unwrap_or_else(|| self.literal(db).signature(db))
     }
 
+    pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
+        function_recursive_type(db, self)
+    }
+
     /// Infer the variance of a type variable within this function's signature.
     ///
     /// This is tracked because signatures can contain recursive `TypeOf` references back to the
@@ -1477,6 +1481,74 @@ impl<'db> FunctionType<'db> {
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
         self.literal(db).as_abstract_method(db, enclosing_class)
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, function| Type::FunctionLiteral(function),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn function_recursive_type<'db>(db: &'db dyn Db, function: FunctionType<'db>) -> Type<'db> {
+    fn type_contains_origin<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        origin: RecursiveOrigin<'db>,
+    ) -> bool {
+        any_over_type(db, ty, false, |inner_ty| origin.matches_type(db, inner_ty))
+    }
+
+    fn signature_contains_origin<'db>(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+        origin: RecursiveOrigin<'db>,
+    ) -> bool {
+        signature.parameters().iter().any(|parameter| {
+            type_contains_origin(db, parameter.annotated_type(), origin)
+                || parameter
+                    .default_type()
+                    .is_some_and(|ty| type_contains_origin(db, ty, origin))
+        }) || type_contains_origin(db, signature.return_ty, origin)
+    }
+
+    let origin = RecursiveOrigin::Function(function);
+    let signature = function.signature(db);
+    let implementation_signature = function
+        .literal(db)
+        .has_separate_implementation(db)
+        .then(|| function.last_definition_signature(db).clone());
+
+    if !signature
+        .overloads
+        .iter()
+        .any(|signature| signature_contains_origin(db, signature, origin))
+        && !implementation_signature
+            .as_ref()
+            .is_some_and(|signature| signature_contains_origin(db, signature, origin))
+    {
+        return Type::FunctionLiteral(function);
+    }
+
+    let binder_id = function.as_id();
+    let mapping = TypeMapping::ReplaceRecursiveOrigin {
+        origin,
+        binder_id: crate::types::recursive::BinderId::new(binder_id),
+    };
+    let visitor = ApplyTypeMappingVisitor::default();
+    let updated_signature =
+        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
+    let updated_implementation_signature = implementation_signature.map(|signature| {
+        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
+    });
+    let body_function = FunctionType::new(
+        db,
+        function.literal(db),
+        UpdatedFunctionSignatures::new(Some(updated_signature), updated_implementation_signature),
+    );
+    let body = Type::FunctionLiteral(body_function);
+    if body.contains_divergent_with_id(db, binder_id) {
+        Type::function_recursive(db, binder_id, function, body)
+    } else {
+        Type::FunctionLiteral(function)
     }
 }
 

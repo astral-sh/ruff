@@ -210,7 +210,7 @@ impl<'db> PEP695TypeAliasType<'db> {
             let folded_raw = crate::types::recursive::substitute_self_alias_with_divergent(
                 db,
                 raw,
-                self.definition(db),
+                crate::types::TypeAliasType::PEP695(self),
                 binder_id,
             );
             let body = self.apply_function_specialization(db, folded_raw);

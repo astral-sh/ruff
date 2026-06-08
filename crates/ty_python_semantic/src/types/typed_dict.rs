@@ -19,8 +19,8 @@ use super::diagnostic::{
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
-    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_type, recursive::BinderId, visitor,
+    ApplyTypeMappingVisitor, ErrorContext, IntersectionType, RecursiveOrigin, Type, TypeMapping,
+    TypeQualifiers, UnionBuilder, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -282,19 +282,13 @@ fn typed_dict_recursive_type_impl<'db>(
         return Type::TypedDict(typed_dict);
     }
 
-    let mapping = TypeMapping::ReplaceSelfTypedDict {
-        typed_dict_id: BinderId::new(binder_id),
-        binder_id: BinderId::new(binder_id),
-    };
+    let origin = RecursiveOrigin::TypedDict(typed_dict);
     let items = typed_dict
         .items(db)
         .iter()
         .map(|(name, field)| {
             let mut field = field.clone();
-            field.declared_ty =
-                field
-                    .declared_ty
-                    .apply_type_mapping(db, &mapping, TypeContext::default());
+            field.declared_ty = origin.fold_self_references(db, field.declared_ty, binder_id);
             (name.clone(), field)
         })
         .collect();
