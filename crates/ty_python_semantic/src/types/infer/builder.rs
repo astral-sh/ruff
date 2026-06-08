@@ -4292,7 +4292,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let value_ty = value.as_ref().map(|value| {
                 self.infer_maybe_standalone_expression(
                     value,
-                    TypeContext::new(Some(annotated.inner_type())),
+                    TypeContext::for_annotated_assignment(annotated.inner_type()),
                 )
             });
 
@@ -4620,7 +4620,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::new(Some(declared.inner_type())),
+                TypeContext::for_annotated_assignment(declared.inner_type()),
             );
             let inferred_ty = if is_pep_613_type_alias && target.is_name_expr() {
                 // The post-inference pass emits the diagnostic, but this first-pass value is
@@ -8411,6 +8411,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 &call_arguments,
                                 call_expression,
                                 self.file(),
+                                call_expression_tcx,
                             );
                         }
                     }
