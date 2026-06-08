@@ -3775,37 +3775,6 @@ async def variant_two() -> int:
     return await second(first(123))
 ```
 
-## Recursive protocols
-
-Recursive protocols can be checked structurally without unbounded expansion:
-
-```py
-from __future__ import annotations
-
-from typing import Protocol, final
-from ty_extensions import is_assignable_to, is_disjoint_from, static_assert
-
-class ParentLink(Protocol):
-    @property
-    def parent(self) -> ParentLink | None: ...
-
-class Node:
-    def __init__(self, parent: Node | None) -> None:
-        self._parent = parent
-
-    @property
-    def parent(self) -> Node | None:
-        return self._parent
-
-static_assert(is_assignable_to(Node, ParentLink))
-
-@final
-class MissingParent:
-    pass
-
-static_assert(is_disjoint_from(MissingParent, ParentLink))
-```
-
 ## TODO
 
 Add tests for:
@@ -3830,7 +3799,6 @@ Add tests for:
 [mypy_protocol_tests]: https://github.com/python/mypy/blob/master/test-data/unit/check-protocols.test
 [protocol conformance tests]: https://github.com/python/typing/tree/main/conformance/tests
 [protocols_inside_type_spec]: https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols
-[recursive_protocols_spec]: https://typing.python.org/en/latest/spec/protocol.html#recursive-protocols
 [self_types_protocols_spec]: https://typing.python.org/en/latest/spec/protocol.html#self-types-in-protocols
 [spec_protocol_members]: https://typing.python.org/en/latest/spec/protocol.html#protocol-members
 [typing_spec_protocols]: https://typing.python.org/en/latest/spec/protocol.html
