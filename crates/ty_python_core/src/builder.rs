@@ -2448,7 +2448,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let mut use_def_maps: IndexVec<_, _> = self
             .use_def_maps
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(UseDefMapBuilder::finish)
             .collect();
 
         let ast_ids = super::ast_ids::AstIds::from_builders(self.ast_ids);

@@ -240,11 +240,16 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
+use std::mem::size_of_val;
 use std::ops::{Index, Range};
+use std::sync::Arc;
 
+use erasable::Thin;
+use get_size2::{GetSize, GetSizeTracker};
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use slice_dst::SliceWithHeader;
 use thin_vec::ThinVec;
 
 use crate::ast_ids::ScopedUseId;
@@ -487,13 +492,21 @@ enum InternedEnclosingSnapshotId {
     Bindings(InternedBindingsId),
 }
 
-/// Applicable definitions and constraints for every use of a name.
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+/// Pointer-sized shared handle to the applicable definitions and constraints for every use of a
+/// name.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UseDefMap<'db> {
-    /// Array of [`Definition`] in this scope. Only the first entry should be [`DefinitionState::Undefined`];
-    /// this represents the implicit "unbound"/"undeclared" definition of every place.
-    all_definitions: FrozenIndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    data: Thin<Arc<UseDefMapData<'db>>>,
+}
 
+/// Fixed use-def data followed by the definitions for the scope.
+///
+/// The trailing slice is never empty: its first entry is the implicit "unbound"/"undeclared"
+/// definition of every place.
+type UseDefMapData<'db> = SliceWithHeader<UseDefMapHeader<'db>, DefinitionState<'db>>;
+
+#[derive(Debug, PartialEq, Eq, get_size2::GetSize)]
+struct UseDefMapHeader<'db> {
     /// A bitset-like map indicating whether each binding definition has at least one use.
     ///
     /// This uses the same index as `all_definitions`.
@@ -572,6 +585,42 @@ pub struct UseDefMap<'db> {
     end_of_scope_reachability: ScopedReachabilityConstraintId,
 }
 
+#[expect(unsafe_code)]
+unsafe impl salsa::Update for UseDefMap<'_> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old = unsafe { &mut *old_pointer };
+        if Thin::ptr_eq(&old.data, &new_value.data) {
+            false
+        } else {
+            // Preserve the previous shared-`Arc` update behavior. Deeply comparing every retained
+            // use-def map here would add work to incremental updates.
+            *old = new_value;
+            true
+        }
+    }
+}
+
+impl GetSize for UseDefMap<'_> {
+    fn get_heap_size_with_tracker<Tracker: GetSizeTracker>(
+        &self,
+        mut tracker: Tracker,
+    ) -> (usize, Tracker) {
+        if !tracker.track(std::ptr::from_ref(&self.data.header)) {
+            return (0, tracker);
+        }
+
+        let mut size = size_of_val(&*self.data);
+        let (header_size, mut tracker) = self.data.header.get_heap_size_with_tracker(tracker);
+        size += header_size;
+        for definition in &self.data.slice {
+            let (definition_size, next_tracker) = definition.get_heap_size_with_tracker(tracker);
+            size += definition_size;
+            tracker = next_tracker;
+        }
+        (size, tracker)
+    }
+}
+
 /// Information about a given range of source code.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct RangeInfo {
@@ -606,38 +655,47 @@ pub enum ApplicableConstraints<'map, 'db> {
 }
 
 impl<'db> UseDefMap<'db> {
+    fn header(&self) -> &UseDefMapHeader<'db> {
+        &self.data.header
+    }
+
+    fn all_definitions(&self) -> &IndexSlice<ScopedDefinitionId, DefinitionState<'db>> {
+        IndexSlice::from_raw(&self.data.slice)
+    }
+
     pub fn reachability_constraints(&self) -> &ReachabilityConstraints {
-        &self.reachability_constraints
+        &self.header().reachability_constraints
     }
 
     pub fn predicates(&self) -> &Predicates<'db> {
-        &self.predicates
+        &self.header().predicates
     }
 
     pub fn range_reachability(
         &self,
     ) -> impl Iterator<Item = (TextRange, ScopedReachabilityConstraintId)> + '_ {
-        self.range_reachability
+        self.header()
+            .range_reachability
             .iter()
             .map(|&(range, RangeInfo { reachability, .. })| (range, reachability))
     }
 
     pub fn end_of_scope_reachability(&self) -> ScopedReachabilityConstraintId {
-        self.end_of_scope_reachability
+        self.header().end_of_scope_reachability
     }
 
     pub fn all_definitions_with_usage(
         &self,
     ) -> impl Iterator<Item = (ScopedDefinitionId, DefinitionState<'db>, bool)> + '_ {
-        self.all_definitions
+        self.all_definitions()
             .iter_enumerated()
-            .map(|(id, &state)| (id, state, self.used_bindings[id]))
+            .map(|(id, &state)| (id, state, self.header().used_bindings[id]))
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.bindings_by_use[use_id];
+        let bindings_id = self.header().bindings_by_use[use_id];
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            &self.header().interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -646,7 +704,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
-        self.multi_bindings_by_use
+        self.header()
+            .multi_bindings_by_use
             .get(use_id)
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
@@ -671,8 +730,8 @@ impl<'db> UseDefMap<'db> {
             ConstraintKey::NarrowingConstraint(constraint) => {
                 ApplicableConstraints::UnboundBinding(NarrowingEvaluator {
                     constraint,
-                    predicates: &self.predicates,
-                    reachability_constraints: &self.reachability_constraints,
+                    predicates: &self.header().predicates,
+                    reachability_constraints: &self.header().reachability_constraints,
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
@@ -692,7 +751,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
-        self.all_definitions[id]
+        self.all_definitions()[id]
     }
 
     pub fn narrowing_evaluator(
@@ -701,13 +760,14 @@ impl<'db> UseDefMap<'db> {
     ) -> NarrowingEvaluator<'_, 'db> {
         NarrowingEvaluator {
             constraint,
-            predicates: &self.predicates,
-            reachability_constraints: &self.reachability_constraints,
+            predicates: &self.header().predicates,
+            reachability_constraints: &self.header().reachability_constraints,
         }
     }
 
     pub(crate) fn is_range_in_type_checking_block(&self, range: TextRange) -> bool {
-        self.range_reachability
+        self.header()
+            .range_reachability
             .iter()
             .take_while(|(entry_range, _)| entry_range.start() <= range.start())
             .any(|&(entry_range, block)| {
@@ -728,9 +788,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
+        let place_state_id = self.header().symbol_states[symbol].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            &self.header().interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -739,9 +799,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
+        let place_state_id = self.header().member_states[member].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            &self.header().interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -760,8 +820,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
+        let place_state_id = self.header().symbol_states[symbol].reachable;
+        let bindings = &self.header().interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -769,8 +829,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
+        let place_state_id = self.header().member_states[member].reachable;
+        let bindings = &self.header().interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -786,17 +846,15 @@ impl<'db> UseDefMap<'db> {
             BoundnessAnalysis::AssumeBound
         };
 
-        match self.enclosing_snapshots.get(snapshot_id) {
+        match self.header().enclosing_snapshots.get(snapshot_id) {
             Some(InternedEnclosingSnapshotId::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
-                EnclosingSnapshotResult::FoundBindings(
-                    self.bindings_iterator(
-                        &self.interned_bindings[*bindings_id],
-                        boundness_analysis,
-                    ),
-                )
+                EnclosingSnapshotResult::FoundBindings(self.bindings_iterator(
+                    &self.header().interned_bindings[*bindings_id],
+                    boundness_analysis,
+                ))
             }
             None => EnclosingSnapshotResult::NotFound,
         }
@@ -806,9 +864,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.definitions_by_definition[&definition].bindings;
+        let bindings_id = self.header().definitions_by_definition[&definition].bindings;
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            &self.header().interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -817,11 +875,11 @@ impl<'db> UseDefMap<'db> {
         &self,
         binding: Definition<'db>,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations_id = self.definitions_by_definition[&binding]
+        let declarations_id = self.header().definitions_by_definition[&binding]
             .declarations
             .expect("binding definition should have retained declarations");
         self.declarations_iterator(
-            &self.interned_declarations[declarations_id],
+            &self.header().interned_declarations[declarations_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -840,8 +898,8 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
+        let place_state_id = self.header().symbol_states[symbol].end_of_scope;
+        let declarations = &self.header().interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
@@ -849,8 +907,8 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
+        let place_state_id = self.header().member_states[member].end_of_scope;
+        let declarations = &self.header().interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
@@ -858,8 +916,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
+        let place_state_id = self.header().symbol_states[symbol].reachable;
+        let declarations = &self.header().interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -867,8 +925,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
-        let declarations = &self.interned_declarations[place_state_id.declarations_id()];
+        let place_state_id = self.header().member_states[member].reachable;
+        let declarations = &self.header().interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -882,7 +940,8 @@ impl<'db> UseDefMap<'db> {
     pub fn all_end_of_scope_symbol_declarations<'map>(
         &'map self,
     ) -> impl Iterator<Item = (ScopedSymbolId, DeclarationsIterator<'map, 'db>)> + 'map {
-        self.symbol_states
+        self.header()
+            .symbol_states
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_declarations(symbol_id)))
     }
@@ -891,7 +950,8 @@ impl<'db> UseDefMap<'db> {
         &'map self,
     ) -> impl Iterator<Item = (ScopedSymbolId, BindingWithConstraintsIterator<'map, 'db>)> + 'map
     {
-        self.symbol_states
+        self.header()
+            .symbol_states
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
     }
@@ -905,14 +965,14 @@ impl<'db> UseDefMap<'db> {
             BindingWithConstraintsIterator<'map, 'db>,
         ),
     > + 'map {
-        self.symbol_states.iter_enumerated().map(
+        self.header().symbol_states.iter_enumerated().map(
             |(symbol_id, RetainedPlaceStates { reachable, .. })| {
                 let declarations = self.declarations_iterator(
-                    &self.interned_declarations[reachable.declarations_id()],
+                    &self.header().interned_declarations[reachable.declarations_id()],
                     BoundnessAnalysis::AssumeBound,
                 );
                 let bindings = self.bindings_iterator(
-                    &self.interned_bindings[reachable.bindings_id()],
+                    &self.header().interned_bindings[reachable.bindings_id()],
                     BoundnessAnalysis::AssumeBound,
                 );
                 (symbol_id, declarations, bindings)
@@ -926,9 +986,9 @@ impl<'db> UseDefMap<'db> {
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
-            all_definitions: &self.all_definitions,
-            predicates: &self.predicates,
-            reachability_constraints: &self.reachability_constraints,
+            all_definitions: self.all_definitions(),
+            predicates: &self.header().predicates,
+            reachability_constraints: &self.header().reachability_constraints,
             boundness_analysis,
             inner: bindings.iter(),
         }
@@ -940,9 +1000,9 @@ impl<'db> UseDefMap<'db> {
         boundness_analysis: BoundnessAnalysis,
     ) -> DeclarationsIterator<'map, 'db> {
         DeclarationsIterator {
-            all_definitions: &self.all_definitions,
-            predicates: &self.predicates,
-            reachability_constraints: &self.reachability_constraints,
+            all_definitions: self.all_definitions(),
+            predicates: &self.header().predicates,
+            reachability_constraints: &self.header().reachability_constraints,
             boundness_analysis,
             inner: declarations.iter(),
         }
@@ -1901,7 +1961,6 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
-        self.all_definitions.shrink_to_fit();
         self.used_bindings.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.member_states.shrink_to_fit();
@@ -1992,8 +2051,7 @@ impl<'db> UseDefMapBuilder<'db> {
             Self::zip_place_states(end_of_scope_members, reachable_definitions_by_member);
         let multi_bindings_by_use = MultiBindingsByUse::from_map(self.multi_bindings_by_use);
 
-        UseDefMap {
-            all_definitions: self.all_definitions.into(),
+        let header = UseDefMapHeader {
             used_bindings: self.used_bindings.into(),
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
@@ -2007,7 +2065,9 @@ impl<'db> UseDefMapBuilder<'db> {
             definitions_by_definition,
             enclosing_snapshots: enclosing_snapshots.into(),
             end_of_scope_reachability: self.reachability,
-        }
+        };
+        let data: Arc<UseDefMapData<'db>> = SliceWithHeader::new(header, self.all_definitions);
+        UseDefMap { data: data.into() }
     }
 
     fn zip_place_states<I: Idx, T>(
@@ -2147,5 +2207,30 @@ impl<'db> UseDefMapBuilder<'db> {
 
         interned_ids_by_snapshot.shrink_to_fit();
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn use_def_map_is_pointer_sized() {
+        assert_eq!(
+            std::mem::size_of::<UseDefMap<'_>>(),
+            std::mem::size_of::<usize>()
+        );
+    }
+
+    #[test]
+    fn use_def_map_clones_share_data() {
+        let map = UseDefMapBuilder::new(false).finish();
+        let cloned = map.clone();
+
+        assert!(Thin::ptr_eq(&map.data, &cloned.data));
+        assert_eq!(
+            cloned.definition(ScopedDefinitionId::UNBOUND),
+            DefinitionState::Undefined
+        );
     }
 }

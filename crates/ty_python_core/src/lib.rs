@@ -93,12 +93,12 @@ pub fn place_table<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<PlaceTable>
 /// Using [`use_def_map`] over [`semantic_index`] has the advantage that
 /// Salsa can avoid invalidating dependent queries if this scope's use-def map
 /// is unchanged.
-#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseDefMap<'db>> {
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+pub fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> UseDefMap<'db> {
     let file = scope.file(db);
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
-    Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+    index.use_def_maps[scope.file_scope_id(db)].clone()
 }
 
 /// All the bindings made in a loop, which are visible to the entire loop via "loop header
@@ -332,7 +332,7 @@ pub struct SemanticIndex<'db> {
     scope_ids_by_scope: FrozenIndexVec<FileScopeId, ScopeId<'db>>,
 
     /// Use-def map for each scope in this file.
-    use_def_maps: FrozenIndexVec<FileScopeId, Arc<UseDefMap<'db>>>,
+    use_def_maps: FrozenIndexVec<FileScopeId, UseDefMap<'db>>,
 
     /// Lookup table to map between node ids and ast nodes.
     ///
