@@ -24,7 +24,7 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
 use ty_python_core::program::UseDefaultStrategy;
@@ -34,7 +34,7 @@ pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceO
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, LanguageId, NotebookDocument};
-use crate::server::{Action, publish_settings_diagnostics};
+use crate::server::{Action, publish_diagnostics_if_needed, publish_settings_diagnostics};
 use crate::session::client::Client;
 use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
@@ -427,6 +427,61 @@ impl Session {
             .apply_changes(changes, overrides.as_ref())
     }
 
+    /// Creates a fallback project after the last workspace is removed.
+    ///
+    /// The fallback stays in `OpenFiles` mode so document requests keep working without
+    /// reintroducing full-workspace diagnostics for the removed folder.
+    fn fallback_project_state(&self, root: SystemPathBuf) -> ProjectState {
+        let system = LSPSystem::new(
+            self.index.as_ref().unwrap().clone(),
+            self.native_system.clone(),
+        );
+        let metadata =
+            ProjectMetadata::from_options(Options::default(), root, None, &UseDefaultStrategy)
+                .expect("default project metadata should always be valid");
+        let mut db = ProjectDatabase::use_defaults(metadata, system);
+        db.set_check_mode(CheckMode::OpenFiles);
+        ProjectState {
+            db,
+            untracked_files_with_pushed_diagnostics: Vec::new(),
+        }
+    }
+
+    fn replay_open_documents_for_workspace(
+        &mut self,
+        workspace_root: &SystemPath,
+    ) -> Vec<DocumentHandle> {
+        let open_documents: Vec<_> = self
+            .index()
+            .text_documents()
+            .filter_map(|(_, document)| {
+                let handle = DocumentHandle::from_text_document(document);
+                if let AnySystemPath::System(path) = handle.notebook_or_file_path()
+                    && path.starts_with(workspace_root)
+                {
+                    Some((handle, document.language_id()))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        for (document, language_id) in &open_documents {
+            self.open_document_in_db(document, Some(*language_id));
+        }
+
+        open_documents
+            .into_iter()
+            .map(|(document, _)| document)
+            .collect()
+    }
+
+    fn republish_open_documents_if_needed(&self, documents: &[DocumentHandle], client: &Client) {
+        for document in documents {
+            publish_diagnostics_if_needed(document, self, client);
+        }
+    }
+
     /// Returns a mutable iterator over all project databases.
     pub(crate) fn projects_mut(&mut self) -> impl Iterator<Item = &'_ mut ProjectDatabase> + '_ {
         self.project_states_mut().map(|project| &mut project.db)
@@ -650,6 +705,7 @@ impl Session {
 
         // Carry forward diagnostic state if any exists
         let previous = self.projects.remove(&root);
+        let should_replay_open_documents = previous.is_some();
         let untracked = previous
             .map(|state| state.untracked_files_with_pushed_diagnostics)
             .unwrap_or_default();
@@ -661,7 +717,12 @@ impl Session {
             },
         );
 
-        publish_settings_diagnostics(self, client, root);
+        publish_settings_diagnostics(self, client, root.clone());
+
+        if should_replay_open_documents {
+            let replayed_documents = self.replay_open_documents_for_workspace(&root);
+            self.republish_open_documents_if_needed(&replayed_documents, client);
+        }
     }
 
     /// Adds an uninitialized workspace to this session.
@@ -835,6 +896,14 @@ impl Session {
             }
         }
 
+        let replayed_documents = if self.projects.is_empty() {
+            let fallback = self.fallback_project_state(workspace_path.clone());
+            self.projects.insert(workspace_path.clone(), fallback);
+            self.replay_open_documents_for_workspace(&workspace_path)
+        } else {
+            Vec::new()
+        };
+
         // Collect all of the documents to clear upfront to
         // work around borrowck.
         let documents_to_clear: Vec<DocumentHandle> = self
@@ -852,6 +921,8 @@ impl Session {
         for doc in documents_to_clear {
             self.clear_diagnostics_if_needed(&doc, client);
         }
+
+        self.republish_open_documents_if_needed(&replayed_documents, client);
 
         self.bump_revision();
 

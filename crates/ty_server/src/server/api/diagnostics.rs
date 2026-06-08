@@ -181,7 +181,7 @@ impl LspDiagnostics {
 /// does not support pull diagnostics for notebooks or cells (as of 2025-11-12).
 ///
 /// [publish diagnostics notification]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
-pub(super) fn publish_diagnostics_if_needed(
+pub(crate) fn publish_diagnostics_if_needed(
     document: &DocumentHandle,
     session: &Session,
     client: &Client,

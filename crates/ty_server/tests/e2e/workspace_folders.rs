@@ -395,6 +395,114 @@ fn remove_only_workspace() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn open_document_after_removing_only_workspace() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let main1 = root1.join("main.py");
+    let main_content = "\
+def foo() -> int:
+    return 42
+foo()
+does_not_exist()
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_file(&main1, main_content)?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.change_workspace_folders([], [root1]);
+
+    server.open_text_document(&main1, main_content, 1);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"3:0..3:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    let hover = server.hover_request(&main1, Position::new(2, 0));
+    assert!(
+        hover.is_some(),
+        "expected hover information after removing the only workspace, got: {hover:?}",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn open_document_before_removing_only_workspace() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let main1 = root1.join("main.py");
+    let main_content = "does_not_exist()";
+
+    let mut server = TestServerBuilder::new()?
+        .with_file(&main1, main_content)?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&main1, main_content, 1);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"0:0..0:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    server.change_workspace_folders([], [root1]);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"0:0..0:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    Ok(())
+}
+
+#[test]
+fn open_document_after_readding_only_workspace() -> Result<()> {
+    let root1 = SystemPath::new("root1");
+    let main1 = root1.join("main.py");
+    let main_content = "does_not_exist()";
+
+    let mut server = TestServerBuilder::new()?
+        .with_file(&main1, main_content)?
+        .with_workspace(root1, None)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(&main1, main_content, 1);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"0:0..0:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    server.change_workspace_folders([], [root1]);
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"0:0..0:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    server.add_workspace_folder(root1, None)?;
+    server.change_workspace_folders([root1], []);
+    server = server.wait_until_workspaces_are_initialized();
+
+    let document_diagnostics = server.document_diagnostic_request(&main1, None);
+    assert_snapshot!(
+        condensed_document_diagnostic_snapshot(document_diagnostics),
+        @"0:0..0:14[ERROR]: Name `does_not_exist` used when not defined",
+    );
+
+    Ok(())
+}
+
 /// Test that we can have different settings for each workspace folder.
 #[test]
 fn different_settings() -> Result<()> {
