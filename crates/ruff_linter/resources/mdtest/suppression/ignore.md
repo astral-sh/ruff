@@ -101,3 +101,41 @@ not_suppressed = [  # ruff:ignore[F401]
     *range(10)
 ][0]
 ```
+
+## Own-line ignore covers trailing comments
+
+```toml
+[lint]
+preview = true
+select = [ "E" ]
+```
+
+```py
+# TODO:
+# ruff:ignore[E262]
+# error: [no-space-after-inline-comment]
+x = 1  #bad
+```
+
+## Respect parent suppression range
+
+```toml
+[lint]
+preview = true
+select = [ "F" ]
+```
+
+Some diagnostics have a "parent" range, which should also be accounted for when suppressing them
+with both `noqa` and `ruff:ignore`.
+
+```py
+from foo import (  # noqa: F401
+        bar
+)
+
+from foo import (  # ruff:ignore[F401]
+        # TODO:
+        # error: [unused-import]
+        baz
+)
+```
