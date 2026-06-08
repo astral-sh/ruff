@@ -577,6 +577,10 @@ impl<'db> NarrowingConstraint<'db> {
         self.replacement_disjuncts.is_empty()
     }
 
+    /// Returns the constrained type when this is exactly one single-conjunct intersection.
+    ///
+    /// Replacement constraints and intersections with multiple conjuncts or disjuncts return
+    /// `None`.
     pub(crate) fn single_intersection_type(&self) -> Option<Type<'db>> {
         let [disjunct] = &*self.intersection_disjuncts else {
             return None;
@@ -588,7 +592,10 @@ impl<'db> NarrowingConstraint<'db> {
         self.replacement_disjuncts.is_empty().then_some(*conjunct)
     }
 
-    /// Return whether these are single intersection constraints represented as `T` and `~T`.
+    /// Returns whether these constraints are represented directly as `T` and `~T`.
+    ///
+    /// This deliberately does not search for semantic equivalence: branch factoring relies on the
+    /// representation-level complement to preserve the original narrowing.
     pub(crate) fn is_direct_complement_of(&self, db: &'db dyn Db, other: &Self) -> bool {
         fn is_direct_negation<'db>(db: &'db dyn Db, ty: Type<'db>, negated: Type<'db>) -> bool {
             let Type::Intersection(intersection) = negated else {

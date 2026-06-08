@@ -518,7 +518,10 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     }
 }
 
-/// Cache the final narrowed type for projected roots with repeated continuations.
+/// Reprojects and narrows a factorizable constraint in a tracked query.
+///
+/// Reconstructing the projected graph from scoped IDs lets Salsa cache the final narrowed type for
+/// repeated loads without retaining each intermediate path prefix.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
@@ -670,6 +673,10 @@ struct ProjectedNarrowingNode {
     if_false: ProjectedNarrowingNodeId,
 }
 
+/// The two continuation subgraphs shared by every path through a factorizable region.
+///
+/// [`ProjectedBranchFactorPlan`] derives a condition that selects `if_true`; its complement selects
+/// `if_false`.
 #[derive(Clone, Copy)]
 struct ProjectedBranchFactor {
     if_true: ProjectedNarrowingNodeId,
@@ -730,7 +737,10 @@ impl ProjectedNarrowingGraph<'_> {
         self.repeated_branch_factors.as_ref()?[id.0]
     }
 
-    /// Interns a projected node, collapsing nodes with identical branches.
+    /// Interns a projected node and records repeated two-continuation regions bottom-up.
+    ///
+    /// This only recognizes graph shape. [`ProjectedBranchFactorPlan`] later verifies that the
+    /// predicates provide exact complementary narrowing constraints.
     fn add_node(&mut self, node: ProjectedNarrowingNode) -> ProjectedNarrowingNodeId {
         if node.if_true == node.if_false {
             return node.if_true;
@@ -972,7 +982,24 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Lazily builds exact conditions for structurally repeated projected branches.
+/// Builds exact conditions for projected regions that share two continuations.
+///
+/// For example, the final `consume` is reachable through either of the first two branches:
+///
+/// ```python
+/// if isinstance(value, A):
+///     pass
+/// elif isinstance(value, B):
+///     pass
+/// else:
+///     return
+///
+/// consume(value)
+/// ```
+///
+/// Instead of separately narrowing under `A` and `~A & B`, the plan combines them into `A | B`
+/// and evaluates the shared continuation once. Factoring is only available when every predicate
+/// contributes direct complementary intersection constraints `T` and `~T`.
 struct ProjectedBranchFactorPlan<'db> {
     conditions: Vec<Option<Type<'db>>>,
 }
@@ -992,6 +1019,9 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         })
     }
 
+    /// Returns the positive type for a predicate represented exactly by `T` and `~T`.
+    ///
+    /// Replacement, disjunctive, semantically equivalent, and gradual complements are rejected.
     fn atomic_condition(
         db: &'db dyn Db,
         graph: &ProjectedNarrowingGraph<'db>,
@@ -1023,6 +1053,7 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         Some((factor, self.condition(db, graph, id)?))
     }
 
+    /// Builds and memoizes the condition that selects a region's `if_true` continuation.
     fn condition(
         &mut self,
         db: &'db dyn Db,
@@ -1112,6 +1143,10 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
         result
     }
 
+    /// Evaluates a factored region by narrowing each continuation once.
+    ///
+    /// Returns `None` when the region has no exact condition or when the incoming constraint
+    /// contains replacement narrowing, which does not distribute over this rewrite.
     fn narrow_factored_branch(
         &mut self,
         id: ProjectedNarrowingNodeId,
