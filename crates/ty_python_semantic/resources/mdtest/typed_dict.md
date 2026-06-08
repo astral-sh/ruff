@@ -3099,6 +3099,12 @@ nested: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": "n3", 
 
 # error: [invalid-argument-type] "Invalid argument to key "name" with declared type `str` on TypedDict `Node`: value of type `Literal[3]`"
 nested_invalid: Node = {"name": "n1", "parent": {"name": "n2", "parent": {"name": 3, "parent": None}}}
+
+def inspect_node(node: Node) -> None:
+    parent = node["parent"]
+    if parent is not None:
+        # error: [invalid-assignment]
+        _: int = parent["name"]
 ```
 
 Structural assignment works for recursive `TypedDict`s too:

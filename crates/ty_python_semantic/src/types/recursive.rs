@@ -12,7 +12,7 @@
 use crate::Db;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
-use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping};
+use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping, TypedDictType};
 use ty_python_core::definition::Definition;
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
@@ -42,6 +42,8 @@ pub enum RecursiveOrigin<'db> {
     Function(FunctionType<'db>),
     /// A recursive `typing.NewType` definition.
     NewType(NewType<'db>),
+    /// A recursive `TypedDict` schema.
+    TypedDict(TypedDictType<'db>),
 }
 
 impl<'db> RecursiveOrigin<'db> {
@@ -51,6 +53,7 @@ impl<'db> RecursiveOrigin<'db> {
             Self::TypeAlias(alias) => Some(Type::TypeAlias(alias)),
             Self::Function(function) => Some(Type::FunctionLiteral(function)),
             Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
+            Self::TypedDict(typed_dict) => Some(Type::TypedDict(typed_dict)),
         }
     }
 }

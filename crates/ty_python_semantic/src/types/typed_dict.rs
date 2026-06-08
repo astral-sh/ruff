@@ -9,6 +9,7 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
+use salsa::plumbing::AsId;
 
 use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
@@ -19,7 +20,8 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
+    UnionBuilder, definition_expression_annotation, definition_expression_type, recursive::BinderId,
+    visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -621,6 +623,90 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Synthesized(_) => None,
         }
     }
+
+    pub(crate) fn recursive_binder_id(self) -> salsa::Id {
+        match self {
+            Self::Class(defining_class) => defining_class.as_id(),
+            Self::Synthesized(synthesized) => synthesized.as_id(),
+        }
+    }
+
+    pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Class(defining_class) => typed_dict_class_recursive_type(db, defining_class),
+            Self::Synthesized(synthesized) => {
+                typed_dict_synthesized_recursive_type(db, synthesized)
+            }
+        }
+    }
+
+    fn contains_self_reference(self, db: &'db dyn Db, binder_id: salsa::Id) -> bool {
+        self.items(db).values().any(|field| {
+            visitor::any_over_type(db, field.declared_ty, false, |ty| {
+                matches!(
+                    ty,
+                    Type::TypedDict(other) if other.recursive_binder_id() == binder_id
+                )
+            })
+        })
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, defining_class| Type::TypedDict(TypedDictType::Class(defining_class)),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn typed_dict_class_recursive_type<'db>(
+    db: &'db dyn Db,
+    defining_class: ClassType<'db>,
+) -> Type<'db> {
+    typed_dict_recursive_type_impl(db, TypedDictType::Class(defining_class))
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, synthesized| Type::TypedDict(TypedDictType::Synthesized(synthesized)),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn typed_dict_synthesized_recursive_type<'db>(
+    db: &'db dyn Db,
+    synthesized: SynthesizedTypedDictType<'db>,
+) -> Type<'db> {
+    typed_dict_recursive_type_impl(db, TypedDictType::Synthesized(synthesized))
+}
+
+fn typed_dict_recursive_type_impl<'db>(
+    db: &'db dyn Db,
+    typed_dict: TypedDictType<'db>,
+) -> Type<'db> {
+    let binder_id = typed_dict.recursive_binder_id();
+
+    if !typed_dict.contains_self_reference(db, binder_id) {
+        return Type::TypedDict(typed_dict);
+    }
+
+    let mapping = TypeMapping::ReplaceSelfTypedDict {
+        typed_dict_id: BinderId::new(binder_id),
+        binder_id: BinderId::new(binder_id),
+    };
+    let items = typed_dict
+        .items(db)
+        .iter()
+        .map(|(name, field)| {
+            let mut field = field.clone();
+            field.declared_ty =
+                field
+                    .declared_ty
+                    .apply_type_mapping(db, &mapping, TypeContext::default());
+            (name.clone(), field)
+        })
+        .collect();
+
+    let body = Type::TypedDict(TypedDictType::from_schema_items(db, items));
+    if body.contains_divergent_with_id(db, binder_id) {
+        Type::typed_dict_recursive(db, binder_id, typed_dict, body)
+    } else {
+        Type::TypedDict(typed_dict)
+    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -715,6 +801,14 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             && defining_class.is_subclass_of(db, target_defining_class)
         {
             return self.always();
+        }
+
+        let recursive_source = source.recursive_type(db);
+        let recursive_target = target.recursive_type(db);
+        if recursive_source != Type::TypedDict(source)
+            || recursive_target != Type::TypedDict(target)
+        {
+            return self.check_type_pair(db, recursive_source, recursive_target);
         }
 
         let source_items = source.items(db);
@@ -1041,6 +1135,12 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
         left: TypedDictType<'db>,
         right: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        let recursive_left = left.recursive_type(db);
+        let recursive_right = right.recursive_type(db);
+        if recursive_left != Type::TypedDict(left) || recursive_right != Type::TypedDict(right) {
+            return self.check_type_pair(db, recursive_left, recursive_right);
+        }
+
         let left_items = left.items(db);
         let right_items = right.items(db);
         let fields_in_common = btreemap_values_with_same_key(left_items, right_items);

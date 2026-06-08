@@ -2001,9 +2001,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::ProtocolInstance(_), _) => self.never(),
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_typeddict_pair(db, source_td, target_td)
-                })
+                self.check_typeddict_pair(db, source_td, target_td)
             }
 
             (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
@@ -3365,9 +3363,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 
             (Type::TypedDict(left_td), Type::TypedDict(right_td)) => {
-                self.with_recursion_guard(left, right, || {
-                    self.check_typeddict_pair(db, left_td, right_td)
-                })
+                self.check_typeddict_pair(db, left_td, right_td)
             }
 
             // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
