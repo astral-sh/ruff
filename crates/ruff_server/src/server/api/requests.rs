@@ -8,7 +8,7 @@ mod hover;
 mod shutdown;
 
 use super::{
-    define_document_url,
+    define_document_uri,
     traits::{
         BackgroundDocumentRequestHandler, BackgroundRequestHandler, RequestHandler,
         SyncRequestHandler,

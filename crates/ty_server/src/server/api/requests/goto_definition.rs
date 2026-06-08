@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::GotoDefinition;
-use lsp_types::{GotoDefinitionParams, GotoDefinitionResponse, Url};
+use lsp_types::DefinitionRequest;
+use lsp_types::{DefinitionParams, DefinitionResponse, Uri};
 use ty_ide::goto_definition;
 use ty_project::ProjectDatabase;
 
@@ -15,11 +15,11 @@ use crate::session::client::Client;
 pub(crate) struct GotoDefinitionRequestHandler;
 
 impl RequestHandler for GotoDefinitionRequestHandler {
-    type RequestType = GotoDefinition;
+    type RequestType = DefinitionRequest;
 }
 
 impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
-    fn document_url(params: &GotoDefinitionParams) -> Cow<'_, Url> {
+    fn document_uri(params: &DefinitionParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -27,8 +27,8 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: GotoDefinitionParams,
-    ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
+        params: DefinitionParams,
+    ) -> crate::server::Result<Option<DefinitionResponse>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -43,7 +43,7 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.url(),
+            snapshot.uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
@@ -63,14 +63,14 @@ impl BackgroundDocumentRequestHandler for GotoDefinitionRequestHandler {
                 .filter_map(|target| target.to_link(db, src, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Link(links)))
+            Ok(Some(links.into()))
         } else {
             let locations: Vec<_> = ranged
                 .into_iter()
                 .filter_map(|target| target.to_location(db, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Array(locations)))
+            Ok(Some(DefinitionResponse::Definition(locations.into())))
         }
     }
 }

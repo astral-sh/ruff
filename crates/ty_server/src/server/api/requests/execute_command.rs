@@ -6,7 +6,8 @@ use crate::server::api::traits::SyncRequestHandler;
 use crate::session::Session;
 use crate::session::client::Client;
 use lsp_server::ErrorCode;
-use lsp_types::{self as types, request as req};
+use lsp_types::ExecuteCommandRequest;
+use lsp_types::{self as types};
 use std::fmt::{self, Write};
 use std::str::FromStr;
 use ty_module_resolver::ModuleResolveMode;
@@ -16,7 +17,7 @@ use ty_python_core::program::Program;
 pub(crate) struct ExecuteCommand;
 
 impl RequestHandler for ExecuteCommand {
-    type RequestType = req::ExecuteCommand;
+    type RequestType = ExecuteCommandRequest;
 }
 
 impl SyncRequestHandler for ExecuteCommand {
@@ -59,7 +60,7 @@ fn debug_information(session: &Session) -> crate::Result<String> {
     writeln!(buffer)?;
 
     for (root, workspace) in session.workspaces() {
-        writeln!(buffer, "Workspace {root} ({})", workspace.url())?;
+        writeln!(buffer, "Workspace {root} ({})", workspace.uri())?;
         writeln!(buffer, "Settings: {:#?}", workspace.settings())?;
         writeln!(buffer)?;
     }

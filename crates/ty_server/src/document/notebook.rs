@@ -10,23 +10,23 @@ use crate::session::index::Index;
 ///
 /// This notebook document only stores the metadata about the notebook
 /// and the cell metadata. The cell contents are stored as separate
-/// [`super::TextDocument`]s (they can be looked up by the Cell's URL).
+/// [`super::TextDocument`]s (they can be looked up by the Cell's URI).
 #[derive(Clone, Debug)]
 pub struct NotebookDocument {
-    url: lsp_types::Url,
+    uri: lsp_types::Uri,
     cells: Vec<NotebookCell>,
     metadata: ruff_notebook::RawNotebookMetadata,
     version: DocumentVersion,
-    /// Map from Cell URL to their index in `cells`
-    cell_index: FxHashMap<lsp_types::Url, usize>,
+    /// Map from Cell URI to their index in `cells`
+    cell_index: FxHashMap<lsp_types::Uri, usize>,
 }
 
 /// The metadata of a single cell within a notebook.
 ///
-/// The cell's content are stored as a [`TextDocument`] and can be looked up by the Cell's URL.
+/// The cell's content are stored as a [`TextDocument`] and can be looked up by the Cell's URI.
 #[derive(Clone, Debug)]
 struct NotebookCell {
-    /// The URL uniquely identifying the cell.
+    /// The URI uniquely identifying the cell.
     ///
     /// > Cell text documents have a URI, but servers should not rely on any
     /// > format for this URI, since it is up to the client on how it will
@@ -34,14 +34,14 @@ struct NotebookCell {
     /// > cells and can therefore be used to uniquely identify a notebook cell
     /// >  or the cell’s text document.
     /// > <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.18/specification/#notebookDocument_synchronization>
-    url: lsp_types::Url,
+    uri: lsp_types::Uri,
     kind: NotebookCellKind,
     execution_summary: Option<lsp_types::ExecutionSummary>,
 }
 
 impl NotebookDocument {
     pub fn new(
-        url: lsp_types::Url,
+        uri: lsp_types::Uri,
         notebook_version: DocumentVersion,
         cells: Vec<lsp_types::NotebookCell>,
         metadata: serde_json::Map<String, serde_json::Value>,
@@ -50,20 +50,20 @@ impl NotebookDocument {
         let index = cells
             .iter()
             .enumerate()
-            .map(|(index, cell)| (cell.url.clone(), index))
+            .map(|(index, cell)| (cell.uri.clone(), index))
             .collect();
 
         Ok(Self {
             cell_index: index,
-            url,
+            uri,
             version: notebook_version,
             cells,
-            metadata: serde_json::from_value(serde_json::Value::Object(metadata))?,
+            metadata: serde_json::from_value(serde_json::to_value(metadata)?)?,
         })
     }
 
-    pub(crate) fn url(&self) -> &lsp_types::Url {
-        &self.url
+    pub(crate) fn uri(&self) -> &lsp_types::Uri {
+        &self.uri
     }
 
     /// Generates a pseudo-representation of a notebook that lacks per-cell metadata and contextual information
@@ -74,15 +74,15 @@ impl NotebookDocument {
             .iter()
             .map(|cell| {
                 let cell_text =
-                    if let Ok(document) = index.document(&DocumentKey::from_url(&cell.url)) {
+                    if let Ok(document) = index.document(&DocumentKey::from_uri(&cell.uri)) {
                         if let Some(text_document) = document.as_text() {
                             Some(text_document.contents().to_string())
                         } else {
-                            tracing::warn!("Non-text document found for cell `{}`", cell.url);
+                            tracing::warn!("Non-text document found for cell `{}`", cell.uri);
                             None
                         }
                     } else {
-                        tracing::warn!("Text document not found for cell `{}`", cell.url);
+                        tracing::warn!("Text document not found for cell `{}`", cell.uri);
                         None
                     }
                     .unwrap_or_default();
@@ -148,7 +148,7 @@ impl NotebookDocument {
                 self.cells
                     .iter()
                     .enumerate()
-                    .map(|(i, cell)| (cell.url.clone(), i)),
+                    .map(|(i, cell)| (cell.uri.clone(), i)),
             );
         }
 
@@ -159,7 +159,7 @@ impl NotebookDocument {
         }
 
         if let Some(metadata_change) = metadata_change {
-            self.metadata = serde_json::from_value(serde_json::Value::Object(metadata_change))?;
+            self.metadata = serde_json::from_value(serde_json::to_value(metadata_change)?)?;
         }
 
         Ok(())
@@ -171,20 +171,20 @@ impl NotebookDocument {
     }
 
     /// Get the URI for a cell by its index within the cell array.
-    pub(crate) fn cell_uri_by_index(&self, index: OneIndexed) -> Option<&lsp_types::Url> {
+    pub(crate) fn cell_uri_by_index(&self, index: OneIndexed) -> Option<&lsp_types::Uri> {
         self.cells
             .get(index.to_zero_indexed())
-            .map(|cell| &cell.url)
+            .map(|cell| &cell.uri)
     }
 
     /// Returns a list of cell URIs in the order they appear in the array.
-    pub(crate) fn cell_urls(&self) -> impl Iterator<Item = &lsp_types::Url> {
-        self.cells.iter().map(|cell| &cell.url)
+    pub(crate) fn cell_uris(&self) -> impl Iterator<Item = &lsp_types::Uri> {
+        self.cells.iter().map(|cell| &cell.uri)
     }
 
-    pub(crate) fn cell_index_by_uri(&self, cell_url: &lsp_types::Url) -> Option<OneIndexed> {
+    pub(crate) fn cell_index_by_uri(&self, cell_uri: &lsp_types::Uri) -> Option<OneIndexed> {
         Some(OneIndexed::from_zero_indexed(
-            self.cell_index.get(cell_url).copied()?,
+            self.cell_index.get(cell_uri).copied()?,
         ))
     }
 }
@@ -192,7 +192,7 @@ impl NotebookDocument {
 impl NotebookCell {
     pub(crate) fn new(cell: lsp_types::NotebookCell) -> Self {
         Self {
-            url: cell.document,
+            uri: cell.document,
             kind: cell.kind,
             execution_summary: cell.execution_summary,
         }

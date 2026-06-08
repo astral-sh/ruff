@@ -1,4 +1,4 @@
-use lsp_types::request::TypeHierarchySubtypes;
+use lsp_types::TypeHierarchySubtypesRequest;
 use lsp_types::{TypeHierarchyItem, TypeHierarchySubtypesParams};
 
 use crate::server::api::traits::{
@@ -16,7 +16,7 @@ use crate::session::client::Client;
 pub(crate) struct TypeHierarchySubtypesRequestHandler;
 
 impl RequestHandler for TypeHierarchySubtypesRequestHandler {
-    type RequestType = TypeHierarchySubtypes;
+    type RequestType = TypeHierarchySubtypesRequest;
 }
 
 impl BackgroundRequestHandler for TypeHierarchySubtypesRequestHandler {
