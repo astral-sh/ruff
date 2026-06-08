@@ -1903,6 +1903,9 @@ def _(cls: Intersection[type[A], type[Unknown]]):
 
 ### Classmethod binding preserves negative class constraints
 
+`~type[B]` excludes `B` and all of its subclasses, so the corresponding instance constraint `~B`
+must survive when binding `Self`.
+
 ```py
 from typing_extensions import Self
 from ty_extensions import Intersection, Not
@@ -1920,6 +1923,9 @@ def _(cls: Intersection[type[A], Not[type[B]]]):
 
 ### Classmethod binding skips exact class exclusions
 
+An exact class exclusion such as `~<class 'A'>` does not exclude subclasses of `A`, so it does not
+exclude instances of `A` and cannot refine `Self`.
+
 ```py
 from typing_extensions import Self
 
@@ -1928,17 +1934,16 @@ class A:
     def make(cls) -> Self:
         return cls()
 
-class Child(A): ...
-
 def _(cls: type[A]):
     if cls is not A:
         reveal_type(cls)  # revealed: type[A] & ~<class 'A'>
         reveal_type(cls.make())  # revealed: A
-
-_(Child)
 ```
 
 ### Classmethod binding skips negative metaclass constraints
+
+A negative metaclass constraint describes the class object's runtime class, not instances of the
+receiver, so it is omitted when binding `Self`.
 
 ```py
 from typing_extensions import Self

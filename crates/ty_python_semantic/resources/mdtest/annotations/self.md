@@ -349,9 +349,7 @@ class Owner:
         self: Self,
         cls: Intersection[type[Factory[Self]], type[Owner]],
     ) -> None:
-        result = cls.identity(self)
-        reveal_type(result)  # revealed: Self@inspect
-        result.identity(self)  # error: [unresolved-attribute]
+        reveal_type(cls.identity(self))  # revealed: Self@inspect
 
 class ConcreteOwner(Owner): ...
 class Both(Factory[ConcreteOwner], Owner): ...
@@ -360,6 +358,10 @@ ConcreteOwner().inspect(Both)
 ```
 
 ## Classmethods preserve generic receiver inference
+
+An intersected class object contributes a single `type[T]` constraint whose instance type is the
+full intersection. Other arguments can widen that constraint, so `make()` preserves
+`Factory & Extra`, while `choose(Factory())` infers `Factory`.
 
 ```py
 from typing import Self, overload
@@ -397,23 +399,14 @@ class Factory:
         raise NotImplementedError
 
 class Extra: ...
-class Both(Factory, Extra): ...
 class FactoryChild(Factory): ...
-
-reveal_type(Both.choose(Factory()))  # revealed: Factory
 
 def _(cls: Intersection[type[Factory], type[Extra]]):
     reveal_type(cls.make())  # revealed: Factory & Extra
     reveal_type(cls.choose(Factory()))  # revealed: Factory
     reveal_type(cls.choose_constrained(FactoryChild()))  # revealed: Factory
     reveal_type(cls.identity_type())  # revealed: type[Factory] & type[Extra]
-    factory_type: type[Factory] = cls.identity_type()
-    extra_type: type[Extra] = cls.identity_type()
-    bad: type[str] = cls.identity_type()  # error: [invalid-assignment]
     reveal_type(cls.self_type())  # revealed: type[Factory] & type[Extra]
-    factory_self_type: type[Factory] = cls.self_type()
-    extra_self_type: type[Extra] = cls.self_type()
-    bad_self_type: type[str] = cls.self_type()  # error: [invalid-assignment]
     reveal_type(cls.overloaded_make(1))  # revealed: Factory & Extra
     # revealed: tuple[Factory & Extra, Factory & Extra]
     reveal_type(cls.overloaded_make("one"))

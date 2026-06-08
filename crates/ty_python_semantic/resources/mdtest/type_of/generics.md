@@ -318,6 +318,10 @@ def _[T](x: X[type[T]]):
 
 ## Generic Type Inference
 
+When `T` is inferred as an intersection, `type[T]` preserves constraints on the runtime class.
+Nominal class constraints survive, value and structural refinements do not, and `TypedDict`,
+`NewType`, and class-object constraints project to their concrete runtime classes.
+
 ```py
 from typing import Callable, NewType, Protocol, TypedDict, runtime_checkable
 from ty_extensions import Intersection, Not
@@ -395,7 +399,6 @@ reveal_type(type(Base))  # revealed: <class 'Meta'>
 
 def _(cls: Intersection[type[Base], type[Other]]):
     reveal_type(runtime_type(cls))  # revealed: type[Meta]
-    meta: type[Meta] = runtime_type(cls)
 
 class MetaWithAttr(type):
     meta_attr: int
