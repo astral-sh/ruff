@@ -382,13 +382,29 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(feature = "clap")]
 pub mod clap_completion {
-    use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
+    use clap::builder::{
+        PossibleValue, PossibleValuesParser, TypedValueParser, ValueParserFactory,
+    };
+    use clap::error::ContextKind;
     use strum::IntoEnumIterator;
 
     use crate::registry::Rule;
 
     #[derive(Clone)]
     pub struct RuleParser;
+
+    impl RuleParser {
+        fn values() -> impl Iterator<Item = PossibleValue> {
+            Rule::iter().flat_map(|rule| {
+                let code = rule.noqa_code().to_string();
+                let name = rule.name().as_str();
+                [
+                    PossibleValue::new(&code).help(name),
+                    PossibleValue::new(name).help(code),
+                ]
+            })
+        }
+    }
 
     impl ValueParserFactory for Rule {
         type Parser = RuleParser;
@@ -407,38 +423,17 @@ pub mod clap_completion {
             arg: Option<&clap::Arg>,
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
-            let value = value
-                .to_str()
-                .ok_or_else(|| clap::Error::new(clap::error::ErrorKind::InvalidUtf8))?;
-
-            Rule::from_code(value)
-                .or_else(|_| value.parse())
-                .map_err(|_| {
-                    let mut error =
-                        clap::Error::new(clap::error::ErrorKind::ValueValidation).with_cmd(cmd);
-                    if let Some(arg) = arg {
-                        error.insert(
-                            clap::error::ContextKind::InvalidArg,
-                            clap::error::ContextValue::String(arg.to_string()),
-                        );
-                    }
-                    error.insert(
-                        clap::error::ContextKind::InvalidValue,
-                        clap::error::ContextValue::String(value.to_string()),
-                    );
+            PossibleValuesParser::new(Self::values())
+                .try_map(|value| Rule::from_code(&value).or_else(|_| value.parse()))
+                .parse_ref(cmd, arg, value)
+                .map_err(|mut error| {
+                    error.remove(ContextKind::ValidValue);
                     error
                 })
         }
 
         fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
-            Some(Box::new(Rule::iter().flat_map(|rule| {
-                let code = rule.noqa_code().to_string();
-                let name = rule.name().as_str();
-                [
-                    PossibleValue::new(&code).help(name),
-                    PossibleValue::new(name).help(code),
-                ]
-            })))
+            Some(Box::new(Self::values()))
         }
     }
 }

@@ -1028,13 +1028,15 @@ fn rule_f401_output_text() {
 
 #[test]
 fn rule_invalid_rule_name() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @"
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "unused-imports"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: invalid value 'RUF404' for '[RULE]'
+    error: invalid value 'unused-imports' for '[RULE]'
+
+      tip: a similar value exists: 'unused-import'
 
     For more information, try '--help'.
     ");
@@ -1050,6 +1052,8 @@ fn rule_invalid_rule_name_output_json() {
     ----- stderr -----
     error: invalid value 'RUF404' for '[RULE]'
 
+      tip: a similar value exists: 'RUF940'
+
     For more information, try '--help'.
     ");
 }
@@ -1063,6 +1067,8 @@ fn rule_invalid_rule_name_output_text() {
 
     ----- stderr -----
     error: invalid value 'RUF404' for '[RULE]'
+
+      tip: a similar value exists: 'RUF940'
 
     For more information, try '--help'.
     ");
