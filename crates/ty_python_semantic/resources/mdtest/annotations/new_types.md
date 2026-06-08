@@ -562,6 +562,11 @@ reveal_type(E(E(E(E(E([]))))))  # revealed: E
 reveal_type(E([E([E([]), E([E([])])]), E([])]))  # revealed: E
 E(["foo"])  # error: [invalid-argument-type]
 E(E(E(["foo"])))  # error: [invalid-argument-type]
+
+def inspect_e(value: E) -> None:
+    reveal_type(value[0])  # revealed: E
+    value[0] = E([])
+    value[0] = "foo"  # error: [invalid-assignment]
 ```
 
 ## `NewType` wrapping preserves singleton-ness and single-valued-ness

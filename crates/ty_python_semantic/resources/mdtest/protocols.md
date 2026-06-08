@@ -3863,6 +3863,37 @@ async def variant_two() -> int:
     return await second(first(123))
 ```
 
+## Recursive protocols
+
+Recursive protocols can be checked structurally without unbounded expansion:
+
+```py
+from __future__ import annotations
+
+from typing import Protocol, final
+from ty_extensions import is_assignable_to, is_disjoint_from, static_assert
+
+class ParentLink(Protocol):
+    @property
+    def parent(self) -> ParentLink | None: ...
+
+class Node:
+    def __init__(self, parent: Node | None) -> None:
+        self._parent = parent
+
+    @property
+    def parent(self) -> Node | None:
+        return self._parent
+
+static_assert(is_assignable_to(Node, ParentLink))
+
+@final
+class MissingParent:
+    pass
+
+static_assert(is_disjoint_from(MissingParent, ParentLink))
+```
+
 ## TODO
 
 Add tests for:
@@ -3877,7 +3908,6 @@ Add tests for:
     [Spec reference][self_types_protocols_spec].
 - Protocols with overloaded method members
 - `super()` on nominal subtypes (explicit and implicit) of protocol classes
-- [Recursive protocols][recursive_protocols_spec]
 - Generic protocols
 - Protocols with instance attributes annotated with `Callable` (can a nominal type with a method
     satisfy that protocol, and if so in what cases?)

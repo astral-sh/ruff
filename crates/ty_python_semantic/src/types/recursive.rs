@@ -12,8 +12,9 @@
 use crate::Db;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
-use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping, TypedDictType};
-use ty_python_core::definition::Definition;
+use crate::types::{
+    ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping, TypedDictType,
+};
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
 /// field of a `#[salsa::interned]` struct that uses `heap_size`.
@@ -44,17 +45,73 @@ pub enum RecursiveOrigin<'db> {
     NewType(NewType<'db>),
     /// A recursive `TypedDict` schema.
     TypedDict(TypedDictType<'db>),
+    /// A recursive protocol interface.
+    Protocol(ProtocolInstanceType<'db>),
 }
 
 impl<'db> RecursiveOrigin<'db> {
-    fn replacement_type(self) -> Option<Type<'db>> {
+    pub(crate) fn source_type(self) -> Option<Type<'db>> {
         match self {
             Self::Implicit => None,
             Self::TypeAlias(alias) => Some(Type::TypeAlias(alias)),
             Self::Function(function) => Some(Type::FunctionLiteral(function)),
             Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
             Self::TypedDict(typed_dict) => Some(Type::TypedDict(typed_dict)),
+            Self::Protocol(protocol) => Some(Type::ProtocolInstance(protocol)),
         }
+    }
+
+    /// Returns true if `ty` is the source-name occurrence bound by this origin.
+    ///
+    /// This must stay a shallow identity check: do not call recursive queries such as
+    /// alias value expansion, function signature inference, NewType base evaluation, or
+    /// protocol interface computation here.
+    pub(crate) fn matches_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match (self, ty) {
+            (Self::Implicit, _) => false,
+            (Self::TypeAlias(alias), Type::TypeAlias(other)) => {
+                alias.definition(db) == other.definition(db)
+            }
+            (Self::Function(function), Type::FunctionLiteral(other)) => {
+                function.literal(db) == other.literal(db)
+            }
+            (Self::NewType(newtype), Type::NewTypeInstance(other)) => {
+                newtype.definition(db) == other.definition(db)
+            }
+            (Self::TypedDict(typed_dict), Type::TypedDict(other)) => {
+                typed_dict.recursive_binder_id() == other.recursive_binder_id()
+            }
+            (Self::Protocol(protocol), Type::ProtocolInstance(other)) => {
+                protocol.is_same_recursive_origin_as(db, other)
+            }
+            _ => false,
+        }
+    }
+
+    pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
+        use salsa::plumbing::AsId;
+
+        match self {
+            Self::Implicit => None,
+            Self::TypeAlias(alias) => Some(alias.definition(db).as_id()),
+            Self::Function(function) => Some(function.as_id()),
+            Self::NewType(newtype) => Some(newtype.definition(db).as_id()),
+            Self::TypedDict(typed_dict) => Some(typed_dict.recursive_binder_id()),
+            Self::Protocol(protocol) => Some(protocol.recursive_binder_id(db)),
+        }
+    }
+
+    pub(crate) fn fold_self_references(
+        self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        binder_id: salsa::Id,
+    ) -> Type<'db> {
+        let mapping = TypeMapping::ReplaceRecursiveOrigin {
+            origin: self,
+            binder_id: BinderId::new(binder_id),
+        };
+        ty.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 }
 
@@ -126,7 +183,7 @@ impl<'db> RecursiveType<'db> {
     /// back to the source type when this μ-binder has an explicit origin.
     pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
-        let Some(replacement) = self.origin(db).replacement_type() else {
+        let Some(replacement) = self.origin(db).source_type() else {
             return body;
         };
         let mapping = TypeMapping::ReplaceDivergent {
@@ -178,12 +235,11 @@ impl<'db> RecursiveType<'db> {
 pub(crate) fn substitute_self_alias_with_divergent<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    alias_def: Definition<'db>,
+    alias: TypeAliasType<'db>,
     binder_id: salsa::Id,
 ) -> Type<'db> {
-    use salsa::plumbing::AsId;
-    let mapping = TypeMapping::ReplaceSelfAlias {
-        alias_def_id: BinderId::new(alias_def.as_id()),
+    let mapping = TypeMapping::ReplaceRecursiveOrigin {
+        origin: RecursiveOrigin::TypeAlias(alias),
         binder_id: BinderId::new(binder_id),
     };
     ty.apply_type_mapping(db, &mapping, TypeContext::default())

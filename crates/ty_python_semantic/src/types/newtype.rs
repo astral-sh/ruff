@@ -1,7 +1,9 @@
 use crate::Db;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
-use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
+use crate::types::{
+    ClassType, KnownUnion, RecursiveOrigin, Type, definition_expression_type, visitor,
+};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use rustc_hash::FxHashSet;
@@ -108,6 +110,10 @@ impl<'db> NewType<'db> {
         Type::object()
     }
 
+    pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
+        newtype_recursive_type(db, self)
+    }
+
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
         // Two instances of the "same" `NewType` won't compare == if one of them has an eagerly
         // evaluated base (or a normalized base, etc.) and the other doesn't, so we only check for
@@ -193,6 +199,43 @@ impl<'db> NewType<'db> {
             self.definition(db),
             eager_base,
         ))
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial=|_, _, newtype| Type::NewTypeInstance(newtype),
+    heap_size=ruff_memory_usage::heap_size
+)]
+fn newtype_recursive_type<'db>(db: &'db dyn Db, newtype: NewType<'db>) -> Type<'db> {
+    let NewTypeBase::ClassType(base_class) = newtype.base(db) else {
+        return Type::NewTypeInstance(newtype);
+    };
+
+    let base_ty = Type::instance(db, base_class);
+    let origin = RecursiveOrigin::NewType(newtype);
+    let Some(binder_id) = origin.binder_id(db) else {
+        return Type::NewTypeInstance(newtype);
+    };
+    if !visitor::any_over_type(db, base_ty, false, |ty| origin.matches_type(db, ty)) {
+        return Type::NewTypeInstance(newtype);
+    }
+
+    let Type::NominalInstance(mapped_base) = origin.fold_self_references(db, base_ty, binder_id)
+    else {
+        return Type::NewTypeInstance(newtype);
+    };
+
+    let body_newtype = NewType::new(
+        db,
+        newtype.name(db).clone(),
+        newtype.definition(db),
+        Some(NewTypeBase::ClassType(mapped_base.class(db))),
+    );
+    let body = Type::NewTypeInstance(body_newtype);
+    if body.contains_divergent_with_id(db, binder_id) {
+        Type::newtype_recursive(db, binder_id, newtype, body)
+    } else {
+        Type::NewTypeInstance(newtype)
     }
 }
 

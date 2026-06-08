@@ -379,8 +379,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::Materialize(_)
                 | TypeMapping::ReplaceParameterDefaults
                 | TypeMapping::EagerExpansion
-                | TypeMapping::ReplaceSelfAlias { .. }
-                | TypeMapping::ReplaceSelfTypedDict { .. }
+                | TypeMapping::ReplaceRecursiveOrigin { .. }
                 | TypeMapping::ReplaceDivergent { .. }
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
