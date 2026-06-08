@@ -15,7 +15,7 @@ pub use fixes::{fix_all_diagnostics, suppress_all_diagnostics};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_db::source::{SourceTextError, source_text};
+use ruff_db::source::{SourceTextError, read_source_text};
 use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, ExpectedStringLiteralCompletion, HasDefinition, HasOptionalDefinition, HasType,
@@ -175,7 +175,7 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
     let mut diagnostics: Vec<Diagnostic> = Vec::new();
 
     // Abort checking if there are IO errors.
-    let source = source_text(db, file);
+    let source = read_source_text(db, file);
 
     if let Some(read_error) = source.read_error() {
         return Err(IOErrorDiagnostic {

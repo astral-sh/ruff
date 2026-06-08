@@ -1,5 +1,4 @@
 use ruff_db::parsed::parsed_string_annotation;
-use ruff_db::source::source_text;
 use ruff_python_ast::{self as ast, ModExpression, StringFlags};
 use ruff_python_parser::{ParseError, ParseErrorType, Parsed};
 use ruff_text_size::Ranged;
@@ -129,12 +128,11 @@ pub(crate) fn parse_string_annotation(
     string_expr: &ast::ExprStringLiteral,
 ) -> Option<Parsed<ModExpression>> {
     let file = context.file();
-    let db = context.db();
 
     let _span = tracing::trace_span!("parse_string_annotation", string=?string_expr.range(), ?file)
         .entered();
 
-    let source = source_text(db, file);
+    let source = context.source_text();
 
     if let Some(string_literal) = string_expr.as_single_part_string() {
         let prefix = string_literal.flags.prefix();

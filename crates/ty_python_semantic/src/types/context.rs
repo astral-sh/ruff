@@ -1,8 +1,10 @@
+use std::cell::OnceCell;
 use std::fmt;
 
 use drop_bomb::DebugDropBomb;
 use ruff_db::diagnostic::DiagnosticTag;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::source::{SourceText, read_source_text};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span},
     files::File,
@@ -42,6 +44,7 @@ pub(crate) struct InferContext<'db, 'ast> {
     scope: ScopeId<'db>,
     file: File,
     module: &'ast ParsedModuleRef,
+    source_text: OnceCell<SourceText>,
     diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
     /// This field tracks various flags that control how type inference should behave in the current context.
     pub(crate) inference_flags: InferenceFlags,
@@ -55,6 +58,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
             scope,
             module,
             file: scope.file(db),
+            source_text: OnceCell::new(),
             diagnostics: std::cell::RefCell::new(TypeCheckDiagnostics::default()),
             inference_flags: InferenceFlags::empty(),
             bomb: DebugDropBomb::new(
@@ -71,6 +75,11 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     /// The module for which the types are inferred.
     pub(crate) fn module(&self) -> &'ast ParsedModuleRef {
         self.module
+    }
+
+    pub(crate) fn source_text(&self) -> &SourceText {
+        self.source_text
+            .get_or_init(|| read_source_text(self.db, self.file))
     }
 
     pub(crate) fn scope(&self) -> ScopeId<'db> {

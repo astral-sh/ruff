@@ -55,7 +55,6 @@ use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{self as ast, OperatorPrecedence, ParameterWithDefault};
@@ -2333,7 +2332,7 @@ impl KnownFunction {
                                     let value_precedence = OperatorPrecedence::from_expr(value);
                                     OperatorPrecedence::from_expr_ref(parent) >= value_precedence
                                 });
-                            let value_text = &source_text(db, file)[value.range()];
+                            let value_text = &context.source_text()[value.range()];
                             let replacement = if needs_parens {
                                 format!("({value_text})")
                             } else {

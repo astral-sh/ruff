@@ -33,7 +33,7 @@ use crate::types::{
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
-use ruff_db::source::source_text;
+use ruff_db::source::read_source_text;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
@@ -5074,7 +5074,7 @@ pub(super) fn abstract_method_span<'db>(
     let file = function.file(db);
     let module = parsed_module(db, file).load(db);
     let node = implementation.node(db, file, &module);
-    let source_text = source_text(db, file);
+    let source_text = read_source_text(db, file);
 
     if policy == AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         && source_text.line_start(node.name.end()) != source_text.line_start(node.end())

@@ -16,6 +16,17 @@ use crate::system::System;
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
     let _span = tracing::trace_span!("source_text", file = %path).entered();
+
+    read_source_text(db, file)
+}
+
+/// Reads the source text without caching it as a Salsa query result.
+///
+/// This still records dependencies on the file's revision and source override.
+/// Use this when a query only needs the source text transiently and should not
+/// retain the full source in Salsa's query cache.
+pub fn read_source_text(db: &dyn Db, file: File) -> SourceText {
+    let path = file.path(db);
     let mut read_error = None;
 
     if let Some(source) = file.source_text_override(db) {

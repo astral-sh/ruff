@@ -1,8 +1,5 @@
 use itertools::Itertools;
-use ruff_db::{
-    diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity},
-    source::source_text,
-};
+use ruff_db::diagnostic::{Annotation, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -292,7 +289,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             and use PEP 695 type variables",
                     );
                     if let ast::Expr::Subscript(node) = node {
-                        let source = source_text(db, context.file());
+                        let source = context.source_text();
                         let type_params_range = TextRange::new(
                             type_params.start().saturating_add(TextSize::new(1)),
                             type_params.end().saturating_sub(TextSize::new(1)),
@@ -475,7 +472,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                         && let Some(index) = *generic_index
                         && let [first_base, .., last_base] = class_node.bases()
                     {
-                        let source = source_text(db, context.file());
+                        let source = context.source_text();
                         let generic_base = &source[class_node.bases()[index].range()];
                         diagnostic.help(format_args!(
                             "Move `{generic_base}` to the end of the bases list"

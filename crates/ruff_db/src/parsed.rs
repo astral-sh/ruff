@@ -13,7 +13,7 @@ use ruff_python_parser::{
 
 use crate::Db;
 use crate::files::File;
-use crate::source::source_text;
+use crate::source::read_source_text;
 
 /// Returns the parsed AST of `file`, including its token stream.
 ///
@@ -21,7 +21,7 @@ use crate::source::source_text;
 /// AST even if the file contains syntax errors. The parse errors
 /// are then accessible through [`Parsed::errors`].
 ///
-/// The query is only cached when the [`source_text()`] hasn't changed. This is because
+/// The query is only cached when the file contents haven't changed. This is because
 /// comparing two ASTs is a non-trivial operation and every offset change is directly
 /// reflected in the changed AST offsets.
 /// The other reason is that Ruff's AST doesn't implement `Eq` which Salsa requires
@@ -40,7 +40,7 @@ pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
 }
 
 pub fn parsed_module_impl(db: &dyn Db, file: File) -> Parsed<ModModule> {
-    let source = source_text(db, file);
+    let source = read_source_text(db, file);
     let ty = file.source_type(db);
 
     let target_version = db.python_version();

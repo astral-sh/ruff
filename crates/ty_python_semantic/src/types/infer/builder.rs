@@ -4,7 +4,6 @@ use std::rc::Rc;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
-use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{
@@ -9611,8 +9610,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ty = defined_type.display(self.db())
                                 ));
                                 if is_dotted_name(value) {
-                                    let source =
-                                        &source_text(self.db(), self.file())[value.range()];
+                                    let source = &self.context.source_text()[value.range()];
                                     diag.help(format_args!(
                                         "This error may indicate that `{source}` was defined as \
                                         `{source} = {special_form}` when \

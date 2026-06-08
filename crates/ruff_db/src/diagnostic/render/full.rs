@@ -553,14 +553,7 @@ print()
             .primary("example.py", "1:24", "1:24", "")
             .build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r#"
-        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
-         --> example.py:1:25
-          |
-        1 | nested_fstrings = f'␈{f'{f'␛'}'}'
-          |                         ^
-          |
-        "#);
+        insta::assert_snapshot!(env.render(&diagnostic), @"error[invalid-character-sub]: Invalid unescaped character SUB, use \"\\x1a\" instead\n --> example.py:1:25\n  |\n1 | nested_fstrings = f'␈{f'\u{1a}{f'␛'}'}'\n  |                         ^\n  |");
     }
 
     #[test]
@@ -578,14 +571,7 @@ print()
             .primary("example.py", "1:1", "1:1", "")
             .build();
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r#"
-        error[invalid-character-sub]: Invalid unescaped character SUB, use "\x1a" instead
-         --> example.py:1:2
-          |
-        1 | ␈␛
-          |  ^
-          |
-        "#);
+        insta::assert_snapshot!(env.render(&diagnostic), @"error[invalid-character-sub]: Invalid unescaped character SUB, use \"\\x1a\" instead\n --> example.py:1:2\n  |\n1 | ␈\u{1a}␛\n  |  ^\n  |");
 
         Ok(())
     }

@@ -7,7 +7,7 @@ use std::fmt::{self, Display, Formatter, Write};
 use std::rc::Rc;
 
 use ruff_db::files::FilePath;
-use ruff_db::source::{line_index, source_text};
+use ruff_db::source::{line_index, read_source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
@@ -699,7 +699,7 @@ fn fmt_file_location<'db>(
         FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
     };
     let line_index = line_index(db, file);
-    let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file));
+    let LineColumn { line, column } = line_index.line_column(offset, &read_source_text(db, file));
     f.set_invalid_type_annotation();
     write!(f, " @ {path}:{line}:{column}")
 }
