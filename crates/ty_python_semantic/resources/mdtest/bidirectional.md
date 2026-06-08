@@ -563,6 +563,71 @@ def _(flag: bool):
     reveal_type(x2)  # revealed: list[int | None]
 ```
 
+## Peer type context for collection literals
+
+When a boolean or conditional expression combines a fresh collection literal with another operand,
+the other operand can provide type context for the literal:
+
+```py
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Literal, reveal_type
+
+type Key = Literal["foo", "bar"]
+
+def from_or(values: list[str] | None) -> None:
+    for value in reveal_type(values or []):  # revealed: list[str]
+        reveal_type(value)  # revealed: str
+
+def from_conditional(values: set[str], allowed: set[str] | None) -> None:
+    filtered = reveal_type(
+        sorted(value for value in values if value not in allowed)  # revealed: list[str]
+        if allowed is not None
+        else []
+    )
+    for value in filtered:
+        reveal_type(value)  # revealed: str
+
+def collection_literal_first(values: list[str], flag: bool) -> None:
+    reveal_type([] if flag else values)  # revealed: list[str]
+
+def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
+    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+
+def widened_non_empty_fallback(values: list[int] | None) -> None:
+    result = values or ["x"]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+
+def incompatible_collection_kind(values: set[str] | None) -> None:
+    reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
+
+def stored_literal_is_not_fresh(values: dict[Key, int] | None) -> None:
+    fallback = {"foo": 0}
+    reveal_type(fallback)  # revealed: dict[str, int]
+    result = values or fallback
+    reveal_type(result)  # revealed: (dict[Key, int] & ~AlwaysFalsy) | dict[str, int]
+
+@dataclass
+class SortParams[F]:
+    field: F
+    direction: Literal["asc", "desc"] = "desc"
+
+def build_sort_spec[T](
+    sort_params: SortParams[T] | None,
+) -> dict[T, Literal[1, -1]] | None:
+    if not sort_params:
+        return None
+    return {sort_params.field: 1}
+
+type Path = Literal["name", "age", "created"]
+
+def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
+
+params: SortParams[Path] | None = None
+sort = build_sort_spec(params) or {"name": -1}
+use_sort(sort)
+```
+
 ## Lambda expressions
 
 If a lambda expression is annotated as a `Callable` type, the body of the lambda is inferred with
