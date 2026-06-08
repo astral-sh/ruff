@@ -1504,28 +1504,19 @@ fn function_recursive_type<'db>(db: &'db dyn Db, function: FunctionType<'db>) ->
         return Type::FunctionLiteral(function);
     }
 
-    let binder_id = function.as_id();
-    let mapping = TypeMapping::ReplaceRecursiveOrigin {
-        origin,
-        binder_id: crate::types::recursive::BinderId::new(binder_id),
+    let Some(builder) = origin.builder(db) else {
+        return Type::FunctionLiteral(function);
     };
-    let visitor = ApplyTypeMappingVisitor::default();
-    let updated_signature =
-        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor);
-    let updated_implementation_signature = implementation_signature.map(|signature| {
-        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &visitor)
-    });
+    let updated_signature = builder.fold_callable_signature(db, &signature);
+    let updated_implementation_signature =
+        implementation_signature.map(|signature| builder.fold_signature(db, &signature));
     let body_function = FunctionType::new(
         db,
         function.literal(db),
         UpdatedFunctionSignatures::new(Some(updated_signature), updated_implementation_signature),
     );
     let body = Type::FunctionLiteral(body_function);
-    if body.contains_divergent_with_id(db, binder_id) {
-        Type::function_recursive(db, binder_id, function, body)
-    } else {
-        Type::FunctionLiteral(function)
-    }
+    builder.finish(db, body, Type::FunctionLiteral(function))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {

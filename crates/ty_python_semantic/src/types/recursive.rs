@@ -15,13 +15,13 @@ use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
-use crate::types::protocol_class::ProtocolMember;
+use crate::types::protocol_class::{ProtocolInterface, ProtocolMember};
 use crate::types::relation::TypeRelation;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor;
 use crate::types::{
-    DivergentType, PropertyInstanceType, ProtocolInstanceType, Type, TypeAliasType, TypeContext,
-    TypeMapping, TypedDictType,
+    ApplyTypeMappingVisitor, DivergentType, PropertyInstanceType, ProtocolInstanceType, Type,
+    TypeAliasType, TypeContext, TypeMapping, TypedDictType,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -339,17 +339,82 @@ impl<'db> RecursiveOrigin<'db> {
         }
     }
 
-    pub(crate) fn fold_self_references(
-        self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        binder_id: salsa::Id,
-    ) -> Type<'db> {
-        let mapping = TypeMapping::ReplaceRecursiveOrigin {
-            origin: self,
-            binder_id: BinderId::new(binder_id),
+    pub(crate) fn builder(self, db: &'db dyn Db) -> Option<RecursiveTypeBuilder<'db>> {
+        use salsa::plumbing::AsId;
+
+        let binder_id = match self {
+            Self::TypeAlias(TypeAliasType::PEP695(alias)) => alias.as_id(),
+            _ => self.binder_id(db)?,
         };
-        ty.apply_type_mapping(db, &mapping, TypeContext::default())
+        Some(RecursiveTypeBuilder {
+            origin: self,
+            binder_id,
+            visitor: ApplyTypeMappingVisitor::default(),
+        })
+    }
+}
+
+pub(crate) struct RecursiveTypeBuilder<'db> {
+    origin: RecursiveOrigin<'db>,
+    binder_id: salsa::Id,
+    visitor: ApplyTypeMappingVisitor<'db>,
+}
+
+impl<'db> RecursiveTypeBuilder<'db> {
+    pub(crate) fn binder_id(&self) -> salsa::Id {
+        self.binder_id
+    }
+
+    fn type_mapping<'a>(&self) -> TypeMapping<'a, 'db> {
+        TypeMapping::ReplaceRecursiveOrigin {
+            origin: self.origin,
+            binder_id: BinderId::new(self.binder_id),
+        }
+    }
+
+    pub(crate) fn fold_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        let mapping = self.type_mapping();
+        ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
+    }
+
+    pub(crate) fn fold_signature(
+        &self,
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+    ) -> Signature<'db> {
+        let mapping = self.type_mapping();
+        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
+    }
+
+    pub(crate) fn fold_callable_signature(
+        &self,
+        db: &'db dyn Db,
+        signature: &CallableSignature<'db>,
+    ) -> CallableSignature<'db> {
+        let mapping = self.type_mapping();
+        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
+    }
+
+    pub(super) fn fold_protocol_interface(
+        &self,
+        db: &'db dyn Db,
+        interface: ProtocolInterface<'db>,
+    ) -> ProtocolInterface<'db> {
+        let mapping = self.type_mapping();
+        interface.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
+    }
+
+    pub(crate) fn finish(
+        &self,
+        db: &'db dyn Db,
+        body: Type<'db>,
+        fallback: Type<'db>,
+    ) -> Type<'db> {
+        if body.contains_divergent_with_id(db, self.binder_id) {
+            Type::recursive(db, self.binder_id, self.origin, body)
+        } else {
+            fallback
+        }
     }
 }
 
@@ -472,25 +537,4 @@ impl<'db> RecursiveType<'db> {
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
         *self.body(db) == Type::divergent(self.binder_id(db))
     }
-}
-
-/// Folds a Type by replacing self-references to the given alias definition with
-/// `Type::Divergent(binder_id)` markers — used to build a `Type::Recursive` body
-/// from a raw alias body.
-///
-/// The resulting type has `Divergent(binder_id)` at recursive positions, making
-/// the structure finite (recursion is captured by the binder rather than by
-/// repeated `TypeAlias` references).
-#[allow(dead_code)]
-pub(crate) fn substitute_self_alias_with_divergent<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    alias: TypeAliasType<'db>,
-    binder_id: salsa::Id,
-) -> Type<'db> {
-    let mapping = TypeMapping::ReplaceRecursiveOrigin {
-        origin: RecursiveOrigin::TypeAlias(alias),
-        binder_id: BinderId::new(binder_id),
-    };
-    ty.apply_type_mapping(db, &mapping, TypeContext::default())
 }
