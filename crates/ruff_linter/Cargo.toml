@@ -74,9 +74,17 @@ url = { workspace = true }
 [dev-dependencies]
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+camino = { workspace = true }
+datatest-stable = { workspace = true }
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
+mdtest = { workspace = true }
+salsa = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
+
+[[test]]
+name = "mdtest"
+harness = false
 
 [features]
 default = []

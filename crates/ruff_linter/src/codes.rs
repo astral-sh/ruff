@@ -997,6 +997,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (FastApi, "001") => rules::fastapi::rules::FastApiRedundantResponseModel,
         (FastApi, "002") => rules::fastapi::rules::FastApiNonAnnotatedDependency,
         (FastApi, "003") => rules::fastapi::rules::FastApiUnusedPathParameter,
+        (FastApi, "004") => rules::fastapi::rules::FastApiUndocumentedErrorResponse,
 
         // pydoclint
         (Pydoclint, "102") => rules::pydoclint::rules::DocstringExtraneousParameter,

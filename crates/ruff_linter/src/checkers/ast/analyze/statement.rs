@@ -76,6 +76,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::FastApiUnusedPathParameter) {
                 fastapi::rules::fastapi_unused_path_parameter(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::FastApiUndocumentedErrorResponse) {
+                fastapi::rules::fastapi_undocumented_error_response(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::AmbiguousFunctionName) {
                 pycodestyle::rules::ambiguous_function_name(checker, name);
             }
