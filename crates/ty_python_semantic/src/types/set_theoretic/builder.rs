@@ -613,13 +613,7 @@ impl<'db> UnionBuilder<'db> {
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
             Type::TypeAlias(alias) if self.unpack_aliases => {
-                if seen_aliases.contains(&ty) {
-                    // Union contains itself recursively via a type alias. This is an error, just
-                    // leave out the recursive alias. TODO surface this error.
-                } else {
-                    seen_aliases.push(ty);
-                    self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
-                }
+                self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
             }
             Type::LiteralValue(literal) => {
                 self.recursively_defined =
@@ -1106,14 +1100,6 @@ impl<'db> IntersectionBuilder<'db> {
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
-                if seen_aliases.contains(&ty) {
-                    // Recursive alias, add it without expanding to avoid infinite recursion.
-                    for inner in &mut self.intersections {
-                        inner.positive.insert(ty);
-                    }
-                    return self;
-                }
-                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
@@ -1128,10 +1114,10 @@ impl<'db> IntersectionBuilder<'db> {
                 // Unfold the recursive type so that the `Type::Union` arm below can
                 // distribute over the body's union elements (the body is e.g.
                 // `int | tuple[Divergent, ...] | None` for `OptNestedInt`).
-                // Substitute the `Divergent` α-marker back to the source `TypeAlias`
-                // so that recursive references inside the body keep their alias-name
+                // Substitute the `Divergent` α-marker back to the source type
+                // so that recursive references inside the body keep their source-name
                 // display and re-trigger this recursive-unfold path if visited again.
-                let body = rec.body_with_alias_marker(self.db);
+                let body = rec.body_with_origin_marker(self.db);
                 self.add_positive_impl(body, seen_aliases)
             }
             Type::Union(union) => {
@@ -1190,14 +1176,6 @@ impl<'db> IntersectionBuilder<'db> {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
-                if seen_aliases.contains(&ty) {
-                    // Recursive alias, add it without expanding to avoid infinite recursion.
-                    for inner in &mut self.intersections {
-                        inner.negative.insert(ty);
-                    }
-                    return self;
-                }
-                seen_aliases.push(ty);
                 let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)
             }
@@ -1209,7 +1187,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return self;
                 }
                 seen_aliases.push(ty);
-                let body = rec.body_with_alias_marker(self.db);
+                let body = rec.body_with_origin_marker(self.db);
                 self.add_negative_impl(body, seen_aliases)
             }
             Type::Union(union) => {

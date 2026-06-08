@@ -81,6 +81,7 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
+pub(crate) use crate::types::recursive::RecursiveOrigin;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
@@ -972,23 +973,32 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
-    /// Construct a `Type::Recursive` with the given μ-binder id and body.
+    /// Construct a `Type::Recursive` with the given μ-binder id, origin, and body.
     /// The body may contain `Type::Divergent(binder_id)` at recursive positions.
-    ///
-    /// `source_alias` is `Some` when the recursive type came from folding a named
-    /// alias body; used for display lookup of the alias name at recursive positions.
     pub(crate) fn recursive(
         db: &'db dyn Db,
         binder_id: salsa::Id,
-        source_alias: Option<TypeAliasType<'db>>,
+        origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
-        Self::Recursive(recursive::RecursiveType::build(
-            db,
-            binder_id,
-            source_alias,
-            body,
-        ))
+        Self::Recursive(recursive::RecursiveType::build(db, binder_id, origin, body))
+    }
+
+    pub(crate) fn implicit_recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        body: Type<'db>,
+    ) -> Self {
+        Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
+    }
+
+    pub(crate) fn type_alias_recursive(
+        db: &'db dyn Db,
+        binder_id: salsa::Id,
+        alias: TypeAliasType<'db>,
+        body: Type<'db>,
+    ) -> Self {
+        Self::recursive(db, binder_id, RecursiveOrigin::TypeAlias(alias), body)
     }
 
     /// True if this type is a `Type::Recursive(_)` μ-binder. Used by future phases.
@@ -1101,15 +1111,14 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Strip a top-level implicit `Type::Recursive` (`source_alias = None`) μ-binder whose binder is
+    /// Strip a top-level implicit `Type::Recursive` μ-binder whose binder is
     /// one of `cycle`'s heads, returning its `Divergent`-form body. Used by cycle recovery to keep
     /// the fixed-point iteration in "Divergent-space": a previous iteration may have wrapped the
     /// provisional, but the union/normalization must run over the unwrapped body.
     pub(crate) fn unwrap_head_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         match self {
             Type::Recursive(rec)
-                if rec.source_alias(db).is_none()
-                    && cycle.head_ids().any(|id| id == rec.binder_id(db)) =>
+                if rec.is_implicit(db) && cycle.head_ids().any(|id| id == rec.binder_id(db)) =>
             {
                 *rec.body(db)
             }
@@ -1149,7 +1158,7 @@ impl<'db> Type<'db> {
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
             if ty.has_structural_divergent(db, id) {
-                Type::recursive(db, id, None, ty)
+                Type::implicit_recursive(db, id, ty)
             } else {
                 ty
             }
@@ -2228,17 +2237,17 @@ impl<'db> Type<'db> {
         if nested && self.same_divergent_marker(div) {
             return None;
         }
-        // An implicit recursive type (`source_alias = None`) is folded back to its own `Divergent`
+        // An implicit recursive type is folded back to its own `Divergent`
         // marker during normalization. This keeps the fixed-point iteration in "Divergent-space":
         // a wrapped provisional (`Type::Recursive`) read back into a fresh body collapses to a flat
         // marker rather than nesting. Crucially, this also flattens recursive types minted by
         // *other* cycles in the same strongly-connected component (cross-instance member lookups,
         // mutually-recursive attributes, loop-carried locals), so re-wrapping cannot nest μ-binders
         // and blow up. The binder's own id is preserved (unlike `None`, which would relabel the
-        // marker as the head currently being normalized). Named recursive aliases
-        // (`source_alias = Some`) are left intact.
+        // marker as the head currently being normalized). Recursive types with an explicit origin
+        // are left intact.
         if let Type::Recursive(rec) = self
-            && rec.source_alias(db).is_none()
+            && rec.is_implicit(db)
         {
             return Some(Type::divergent(rec.binder_id(db)));
         }
@@ -2780,7 +2789,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _, _| Place::bound(Type::recursive(db, id, None, Type::divergent(id))).into(),
+        cycle_initial=|db, id, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
             // Present a recursively-defined member (e.g. a cross-instance attribute
             // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
@@ -3510,7 +3519,7 @@ impl<'db> Type<'db> {
         #[salsa::tracked(
             // Seed the member cycle with the μα.α recursion marker (`Recursive`), matching
             // `place_by_id`'s seed, so every cycle-recovery query starts in the same shape.
-            cycle_initial=|db, id, _, _, _, _| Place::bound(Type::recursive(db, id, None, Type::divergent(id))).into(),
+            cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
                 // Present a recursively-defined member (e.g. a cross-instance attribute
                 // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
@@ -5813,12 +5822,12 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
-            // A named recursive *type alias* (`source_alias = Some`) is a valid recursive type. An
-            // *implicit* recursive type (`source_alias = None`) comes from a self-referential cyclic
+            // A recursive type with an explicit origin is a valid recursive type. An
+            // *implicit* recursive type comes from a self-referential cyclic
             // *value* — e.g. `X = NamedTuple("X", [("x", "X")]), None`, where `X` is bound to a tuple
             // value — and using such a runtime value as a type is invalid. Check its body so a
             // value-shaped body (a tuple/instance) yields `invalid-type-form`.
-            Type::Recursive(rec) if rec.source_alias(db).is_some() => Ok(*self),
+            Type::Recursive(rec) if rec.has_explicit_origin(db) => Ok(*self),
             Type::Recursive(rec) => rec
                 .body(db)
                 .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
@@ -6011,7 +6020,7 @@ impl<'db> Type<'db> {
     }
 
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, _| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -6732,7 +6741,7 @@ impl<'db> Type<'db> {
 
     #[allow(clippy::used_underscore_binding)]
     #[salsa::tracked(
-        cycle_initial=|db, id, _, ()| Type::recursive(db, id, None, Type::divergent(id)),
+        cycle_initial=|db, id, _, ()| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _, ()| {
             value.cycle_normalized(db, *previous, cycle)
         },
@@ -7414,7 +7423,7 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Replace `Type::Divergent(d)` markers where `d.id() == binder_id` with the
     /// `replacement` type. Used by display to substitute the α-binder marker with
-    /// the source alias name for nicer rendering.
+    /// the explicit origin's source type for nicer rendering.
     ///
     /// Other `Type::Divergent` (with different binder ids) pass through unchanged.
     ReplaceDivergent {

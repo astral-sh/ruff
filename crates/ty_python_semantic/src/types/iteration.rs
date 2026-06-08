@@ -153,9 +153,7 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => {
-                    non_async_special_case(db, alias.value_type(db))
-                }
+                Type::TypeAlias(alias) => non_async_special_case(db, alias.value_type(db)),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
@@ -332,32 +330,23 @@ impl<'db> Type<'db> {
             };
         }
 
-        // Iterating an opaque recursive type means iterating one-step unfold of
+        // Iterating a recursive type means iterating one-step unfold of
         // its body. Substituting the binder's `Divergent` α-markers with the
         // recursive type itself preserves the recursive structure for the
         // element types — `for item in (x: μα. list[α | str])` gives `item:
         // μα. list[α | str] | str`, not just `α | str`.
-        //
-        // The `Type::TypeAlias` case handles `for item in (x: A)` where
-        // `type A = list[A | str]`: `A.value_type` is `Type::Recursive` but
-        // without this branch, `non_async_special_case` below would unwrap
-        // `TypeAlias → value_type` and bottom out at `homogeneous(Recursive)`,
-        // dropping the `| str` element-type branch
-        // (`pep695_type_aliases.md:586,597,610`).
         // A non-contractive `μα.α` carries no structure to iterate; unfolding it loops, so leave it
         // for `non_async_special_case` below (which yields `homogeneous(μα.α)`, like `Divergent`).
-        let rec_to_unfold = match self {
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(rec),
-            Type::TypeAlias(alias) => match alias.value_type(db) {
-                Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(rec),
-                _ => None,
-            },
-            _ => None,
-        };
-        if let Some(rec) = rec_to_unfold {
+        if let Type::Recursive(rec) = self
+            && !rec.is_non_contractive(db)
+        {
             return rec
                 .unfold_preserving_binder(db)
                 .try_iterate_with_mode(db, mode);
+        }
+
+        if let Type::TypeAlias(alias) = self {
+            return alias.value_type(db).try_iterate_with_mode(db, mode);
         }
 
         if let Some(special_case) = non_async_special_case(db, self) {

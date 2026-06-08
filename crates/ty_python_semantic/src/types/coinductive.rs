@@ -1,8 +1,8 @@
 //! Co-inductive relation framework.
 //!
 //! This module provides the dispatch surface used by relation checkers
-//! (`has_relation_to`, `is_disjoint_from`, …) to handle opaque type names
-//! ([`Type::Recursive`] and [`Type::TypeAlias`]) co-inductively.
+//! (`has_relation_to`, `is_disjoint_from`, …) to handle [`Type::Recursive`]
+//! co-inductively.
 //!
 //! ## What this module provides
 //!
@@ -50,8 +50,7 @@ pub(crate) trait CoInductiveRelation<'db, 'c> {
     ) -> ConstraintSet<'db, 'c>;
 }
 
-/// Co-inductively delegate a relation through an opaque type name
-/// ([`Type::Recursive`] or [`Type::TypeAlias`]).
+/// Co-inductively delegate a relation through a [`Type::Recursive`] μ-binder.
 ///
 /// - Records `(source, target, relation_key)` in the visitor *before*
 ///   unfolding. Using the pre-unfold types as the key prevents nested
@@ -62,7 +61,7 @@ pub(crate) trait CoInductiveRelation<'db, 'c> {
 ///   to `checker.check_structural`.
 ///
 /// This is the canonical entry point used by `check_type_pair` arms to handle
-/// opaque type names without per-checker duplicated guard logic.
+/// recursive types without per-checker duplicated guard logic.
 pub(crate) fn delegate_recursive<'db, 'c, R>(
     db: &'db dyn Db,
     checker: &R,
@@ -83,23 +82,17 @@ where
     })
 }
 
-/// One-step unfold of an opaque type name.
+/// One-step unfold of a recursive type.
 ///
-/// Both [`Type::Recursive`] and [`Type::TypeAlias`] are "named opaque types"
-/// in the relation framework: their identity is not their structure. For
-/// recursive checks, the framework needs to step *inside* the name once, then
-/// detect cycles structurally via [`delegate_recursive`]'s visiting set.
+/// For recursive checks, the framework needs to step *inside* the binder once,
+/// then detect cycles structurally via [`delegate_recursive`]'s visiting set.
 ///
 /// - `Type::Recursive(r)` → `*r.body(db)` (which contains `Divergent` markers
 ///   at α positions; further recursion bottoms out at `Divergent`).
-/// - `Type::TypeAlias(alias)` → `alias.value_type(db)` (which, if the alias
-///   is self-referential, is itself a `Type::Recursive`; the next unfold step
-///   handles that).
 /// - All other types are returned unchanged.
 pub(crate) fn unfold_one<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     match ty {
         Type::Recursive(r) => *r.body(db),
-        Type::TypeAlias(alias) => alias.value_type(db),
         _ => ty,
     }
 }

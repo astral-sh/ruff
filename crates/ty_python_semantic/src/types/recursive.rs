@@ -10,6 +10,8 @@
 //! one step and recording the visiting pair to break cycles.
 
 use crate::Db;
+use crate::types::function::FunctionType;
+use crate::types::newtype::NewType;
 use crate::types::{Type, TypeAliasType, TypeContext, TypeMapping};
 use ty_python_core::definition::Definition;
 
@@ -29,10 +31,34 @@ impl BinderId {
     }
 }
 
+/// The source whose recursion is represented by a [`RecursiveType`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum RecursiveOrigin<'db> {
+    /// An inferred recursion cycle with no stable source name.
+    Implicit,
+    /// A recursive PEP 695 type alias.
+    TypeAlias(TypeAliasType<'db>),
+    /// A recursive function object, such as a `TypeOf` self-reference in annotations.
+    Function(FunctionType<'db>),
+    /// A recursive `typing.NewType` definition.
+    NewType(NewType<'db>),
+}
+
+impl<'db> RecursiveOrigin<'db> {
+    fn replacement_type(self) -> Option<Type<'db>> {
+        match self {
+            Self::Implicit => None,
+            Self::TypeAlias(alias) => Some(Type::TypeAlias(alias)),
+            Self::Function(function) => Some(Type::FunctionLiteral(function)),
+            Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
+        }
+    }
+}
+
 /// An explicit μ-binder. Represents `μα. body` where `α` is the
 /// `Type::Divergent(self.binder_id(db).into_id())` marker occurring inside `body`.
 ///
-/// Interned by `(binder_id, source_alias, body)` so that two structurally identical
+/// Interned by `(binder_id, origin, body)` so that two structurally identical
 /// recursive types share an identity.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
 pub struct RecursiveType<'db> {
@@ -40,10 +66,8 @@ pub struct RecursiveType<'db> {
     /// appear as `Type::Divergent(binder_id.into_id())`.
     pub binder: BinderId,
 
-    /// The PEP 695 (or manual) alias whose body this recursive type was constructed
-    /// from. Used for display: a `Divergent(binder_id)` inside `body` is rendered as
-    /// the alias's name. `None` for implicit recursive types from inference cycles.
-    pub source_alias: Option<TypeAliasType<'db>>,
+    /// The construct whose recursion this μ-binder represents.
+    pub origin: RecursiveOrigin<'db>,
 
     /// The body of the recursive type, possibly containing the binder's `Divergent`
     /// marker at the recursive positions.
@@ -58,22 +82,26 @@ impl<'db> RecursiveType<'db> {
     /// Construct a new μ-binder. The caller is responsible for ensuring that `body`
     /// references this binder via `Type::Divergent(binder_id)` at appropriate positions.
     ///
-    /// `source_alias` is `Some` when the recursive type came from folding a named
-    /// type alias body — used to display `Divergent(binder_id)` inside `body` as the
-    /// alias's name. Pass `None` for implicit recursive types from inference cycles.
-    #[allow(dead_code)]
     pub(crate) fn build(
         db: &'db dyn Db,
         binder_id: salsa::Id,
-        source_alias: Option<TypeAliasType<'db>>,
+        origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
-        Self::new(db, BinderId::new(binder_id), source_alias, body)
+        Self::new(db, BinderId::new(binder_id), origin, body)
     }
 
     /// The raw `salsa::Id` of the μ-binder.
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> salsa::Id {
         self.binder(db).into_id()
+    }
+
+    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
+        matches!(self.origin(db), RecursiveOrigin::Implicit)
+    }
+
+    pub(crate) fn has_explicit_origin(self, db: &'db dyn Db) -> bool {
+        !self.is_implicit(db)
     }
 
     /// One-step unfold: returns the body as-is. The body contains
@@ -92,20 +120,15 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Returns the body with its `Type::Divergent` α-binder markers substituted
-    /// back to the source `Type::TypeAlias` (when `source_alias` is `Some`).
-    /// Used by display and by `IntersectionBuilder`'s `Type::Recursive` arms.
-    ///
-    /// Re-tagging recursive positions as `Type::TypeAlias` lets downstream
-    /// `seen_aliases`-style cycle guards (and display) treat them as the same
-    /// opaque name rather than the bare `Divergent` marker.
-    pub(crate) fn body_with_alias_marker(self, db: &'db dyn Db) -> Type<'db> {
+    /// back to the source type when this μ-binder has an explicit origin.
+    pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
-        let Some(source_alias) = self.source_alias(db) else {
+        let Some(replacement) = self.origin(db).replacement_type() else {
             return body;
         };
         let mapping = TypeMapping::ReplaceDivergent {
             binder_id: self.binder(db),
-            replacement: Type::TypeAlias(source_alias),
+            replacement,
         };
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
@@ -115,9 +138,9 @@ impl<'db> RecursiveType<'db> {
     /// position so further structural operations (iteration, subscript, …) can
     /// continue to descend.
     ///
-    /// Compare with [`body_with_alias_marker`][Self::body_with_alias_marker],
-    /// which substitutes the source `TypeAlias` instead — used for display and
-    /// for `IntersectionBuilder`'s distribution where re-finding the alias name
+    /// Compare with [`body_with_origin_marker`][Self::body_with_origin_marker],
+    /// which substitutes the source type instead — used for display and for
+    /// `IntersectionBuilder`'s distribution where re-finding the recursive name
     /// matters.
     pub(crate) fn unfold_preserving_binder(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);

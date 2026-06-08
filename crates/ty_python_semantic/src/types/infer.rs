@@ -98,7 +98,7 @@ struct TypeAndRange<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::recursive(db, id, None, Type::divergent(id)))
+        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -233,7 +233,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::recursive(db, id, None, Type::divergent(id)))
+        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -306,7 +306,7 @@ pub(crate) fn infer_scope_types<'db>(
     returns(ref),
     // Seed the scope cycle with the μα.α recursion marker (`Recursive`), matching the other
     // cycle-recovery seeds, so every cycle-recovery query starts in the same shape.
-    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::recursive(db, id, None, Type::divergent(id))),
+    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -382,7 +382,7 @@ fn expression_cycle_initial<'db>(
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
     let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::recursive(db, id, None, Type::divergent(id));
+    let cycle_recovery = Type::implicit_recursive(db, id, Type::divergent(id));
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -416,7 +416,7 @@ pub(crate) fn infer_expression_type<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _| Type::recursive(db, id, None, Type::divergent(id)),
+    cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result
             .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
@@ -457,7 +457,7 @@ pub(super) fn infer_statement_types<'db>(
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::recursive(db, id, None, Type::divergent(id)))
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::implicit_recursive(db, id, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -633,7 +633,7 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::recursive(db, id, None, Type::divergent(id))),
+    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },
