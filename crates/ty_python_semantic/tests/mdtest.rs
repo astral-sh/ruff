@@ -1,6 +1,16 @@
 use anyhow::anyhow;
 use camino::Utf8Path;
 
+thread_local! {
+    // Restrict each fixture's Rayon work to one thread so concurrent tests do not compete for the
+    // same resources. When fixtures share a process, the harness reuses worker threads, so cache
+    // one pool per worker.
+    static RAYON_POOL: rayon::ThreadPool = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+}
+
 /// See `crates/ty_test/README.md` for documentation on these tests.
 #[expect(clippy::needless_pass_by_value)]
 fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
@@ -19,22 +29,17 @@ fn mdtest(fixture_path: &Utf8Path, content: String) -> datatest_stable::Result<(
         .unwrap_or(fixture_path)
         .as_str();
 
-    // Limit multithreading in tests to avoid that they compete
-    // for the same resources (tests are run concurrently most of the time).
-    let pool = rayon::ThreadPoolBuilder::new()
-        .num_threads(1)
-        .build()
-        .unwrap();
-
-    pool.install(|| {
-        ty_test::run(
-            &absolute_fixture_path,
-            &workspace_relative_fixture_path,
-            &content,
-            &snapshot_path,
-            short_title,
-            test_name,
-        )
+    RAYON_POOL.with(|pool| {
+        pool.install(|| {
+            ty_test::run(
+                &absolute_fixture_path,
+                &workspace_relative_fixture_path,
+                &content,
+                &snapshot_path,
+                short_title,
+                test_name,
+            )
+        })
     })?;
 
     Ok(())
