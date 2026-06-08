@@ -3119,10 +3119,10 @@ pub(crate) struct Parameters<'db> {
 }
 
 impl<'db> Parameters<'db> {
-    fn from_vec(value: Vec<Parameter<'db>>, kind: ParametersKind<'db>) -> Self {
+    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
         Self {
             data: Arc::new(ParametersData {
-                value: value.into_boxed_slice(),
+                value: value.into(),
                 kind,
             }),
         }
@@ -3253,12 +3253,12 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        Self::from_vec(value, kind)
+        Self::from_parts(value, kind)
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::from_vec(Vec::new(), ParametersKind::Standard)
+        Self::from_parts(Box::default(), ParametersKind::Standard)
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
@@ -3321,8 +3321,8 @@ impl<'db> Parameters<'db> {
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
-        Self::from_vec(
-            vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(todo_type!("todo signature *args")),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -3338,8 +3338,8 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self::from_vec(
-            vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -3350,8 +3350,8 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
-        Self::from_vec(
-            vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
                     typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                 )),
@@ -3386,7 +3386,7 @@ impl<'db> Parameters<'db> {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(kwargs_type),
         ]);
-        Self::from_vec(prefix_params, ParametersKind::Concatenate(concatenate_tail))
+        Self::from_parts(prefix_params, ParametersKind::Concatenate(concatenate_tail))
     }
 
     /// Return parameters that represents an unknown list of parameters.
@@ -3396,8 +3396,8 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self::from_vec(
-            vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
@@ -3410,8 +3410,8 @@ impl<'db> Parameters<'db> {
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
     pub(crate) fn bottom() -> Self {
-        Self::from_vec(
-            vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
@@ -3426,11 +3426,11 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self::from_vec(
+        Self::from_parts(
             // We always emit `called-top-callable` for any call to the top callable (based on the
             // `kind` below), so we otherwise give it the most permissive signature`(*object,
             // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            vec![
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
@@ -3583,14 +3583,14 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
-        Self::from_vec(
-            self.data
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-                .collect(),
-            self.data.kind,
-        )
+        let value: Box<[_]> = self
+            .data
+            .value
+            .iter()
+            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+            .collect();
+
+        Self::from_parts(value, self.data.kind)
     }
 
     pub(crate) fn len(&self) -> usize {
