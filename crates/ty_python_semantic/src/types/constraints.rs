@@ -473,8 +473,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Returns whether this constraint set never holds
     pub(crate) fn is_never_satisfied(self, db: &'db dyn Db) -> bool {
-        self.apply_deferred_quantification(db, self.builder)
-            .is_never_satisfied(db, self.builder)
+        // Existential quantification preserves satisfiability: `∃D. P` is unsatisfiable exactly
+        // when `P` is unsatisfiable. Avoid applying deferred quantification here, since doing so
+        // can be much more expensive and cannot affect this result.
+        self.node.is_never_satisfied(db, self.builder)
     }
 
     /// Returns whether this constraint set always holds
