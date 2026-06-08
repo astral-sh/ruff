@@ -12,7 +12,9 @@ use crate::types::constraints::{
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::recursive::{RecursiveRelation, RecursiveRelationVisitor};
+use crate::types::recursive::{
+    RecursiveRelation, RecursiveRelationVisitor, RecursiveType, check_divergent_relation,
+};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
@@ -1111,40 +1113,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of
-            // unions and intersections, but this is not true for divergent types (and moving
-            // this case any lower down appears to cause "too many cycle iterations" panics).
-            //
-            // Co-inductive resolution: if the `Divergent` marker is the α-binder of an
-            // in-flight `Type::Recursive` visit, replace the `Divergent` with the wrapping
-            // `Type::Recursive` and re-enter `check_type_pair`. The visitor's pair-key
-            // cycle detection then short-circuits if the exact (Recursive, other, relation)
-            // triple is already on the stack, otherwise the structural check continues into
-            // the body. Without this re-entry, the bare-`Divergent` fallback (assignability
-            // default) is too permissive — e.g. it would make `str <: Divergent` succeed
-            // under assignability, breaking invariance checks on `list[Recursive]`.
-            (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
-                // Only resolve the marker to its wrapping μ-binder for recursive types with an
-                // explicit origin. The strict structural unfold is what keeps `list[A]`
-                // invariance precise for named recursive aliases. Implicit recursive types from
-                // inference cycles stay gradual — like a bare `Divergent` — so that a
-                // self-referential implicit attribute's own assignments are not flagged (e.g.
-                // `self.x = [self.x[0].flip()]`, where `flip` widens the element type).
-                if let Some(wrapping) = self
-                    .relation_visitor
-                    .wrapping_recursive_for_divergent(db, divergent)
-                    && wrapping.has_explicit_origin(db)
-                {
-                    let is_left = matches!(source, Type::Divergent(d) if d.id() == divergent.id());
-                    let recursive_ty = Type::Recursive(wrapping);
-                    if is_left {
-                        self.check_type_pair(db, recursive_ty, other)
-                    } else {
-                        self.check_type_pair(db, other, recursive_ty)
-                    }
-                } else {
-                    ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
-                }
+            // Divergent markers are resolved by the recursive relation API.
+            (Type::Divergent(divergent), _) | (_, Type::Divergent(divergent)) => {
+                check_divergent_relation(db, self, source, target, divergent, self.relation_visitor)
             }
 
             (_, Type::ProtocolInstance(target_proto))
@@ -2447,6 +2418,21 @@ impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db
     ) -> ConstraintSet<'db, 'c> {
         self.check_type_pair(db, left, right)
     }
+
+    fn should_resolve_divergent_marker(
+        &self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> bool {
+        // Only resolve the marker to its wrapping μ-binder for recursive types with an
+        // explicit origin. Implicit recursive types from inference cycles stay gradual,
+        // like a bare `Divergent`.
+        recursive.has_explicit_origin(db)
+    }
+
+    fn unresolved_divergent_result(&self) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_bool(self.constraints, self.relation.is_assignability())
+    }
 }
 
 pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
@@ -2649,27 +2635,16 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            // Co-inductive resolution: replace `Divergent` with its wrapping
-            // `Type::Recursive` (looked up from the visitor's active seen set) and
-            // re-enter. The visitor short-circuits if the (Recursive, other) pair is
-            // already on the stack; otherwise structural disjointness reasoning continues
-            // into the body. Falls back to the legacy "Divergent is never-disjoint"
-            // semantics when no wrapping `Type::Recursive` is found.
-            (Type::Divergent(divergent), other) | (other, Type::Divergent(divergent)) => {
-                if let Some(wrapping) = self
-                    .disjointness_visitor
-                    .wrapping_recursive_for_divergent(db, divergent)
-                {
-                    let is_left = matches!(left, Type::Divergent(d) if d.id() == divergent.id());
-                    let recursive_ty = Type::Recursive(wrapping);
-                    if is_left {
-                        self.check_type_pair(db, recursive_ty, other)
-                    } else {
-                        self.check_type_pair(db, other, recursive_ty)
-                    }
-                } else {
-                    self.never()
-                }
+            // Divergent markers are resolved by the recursive relation API.
+            (Type::Divergent(divergent), _) | (_, Type::Divergent(divergent)) => {
+                check_divergent_relation(
+                    db,
+                    self,
+                    left,
+                    right,
+                    divergent,
+                    self.disjointness_visitor,
+                )
             }
             // Same delegation pattern as `TypeRelationChecker::check_type_pair`
             // for `Type::Recursive`, routed through the disjointness visitor
@@ -3439,5 +3414,17 @@ impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c> {
         self.check_type_pair(db, left, right)
+    }
+
+    fn should_resolve_divergent_marker(
+        &self,
+        _db: &'db dyn Db,
+        _recursive: RecursiveType<'db>,
+    ) -> bool {
+        true
+    }
+
+    fn unresolved_divergent_result(&self) -> ConstraintSet<'db, 'c> {
+        self.never()
     }
 }

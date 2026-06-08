@@ -67,7 +67,7 @@ impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
 
     /// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning
     /// the active relation pairs.
-    pub(crate) fn wrapping_recursive_for_divergent(
+    fn wrapping_recursive_for_divergent(
         &self,
         db: &'db dyn Db,
         divergent: DivergentType,
@@ -101,6 +101,18 @@ pub(crate) trait RecursiveRelation<'db, 'c> {
         left: Type<'db>,
         right: Type<'db>,
     ) -> ConstraintSet<'db, 'c>;
+
+    /// Return true if a bare `Divergent` marker should be resolved to `recursive`
+    /// for this relation.
+    fn should_resolve_divergent_marker(
+        &self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> bool;
+
+    /// Result to use when a `Divergent` marker cannot be resolved to a wrapping
+    /// recursive type, or when this relation rejects the wrapping type.
+    fn unresolved_divergent_result(&self) -> ConstraintSet<'db, 'c>;
 }
 
 /// Delegate a relation through a [`Type::Recursive`] μ-binder.
@@ -125,6 +137,39 @@ where
             target.unfold_recursive_once(db),
         )
     })
+}
+
+/// Delegate a relation through a bare [`Type::Divergent`] marker if it is the
+/// α-binder of an in-flight [`Type::Recursive`] visit.
+///
+/// Replacing the marker with its wrapping `Type::Recursive` lets relation checks
+/// re-enter through normal recursive pair detection. Without this, the bare
+/// fallback is too permissive for directional relations; for example,
+/// `str <: Divergent` would succeed under assignability and break invariance
+/// checks on `list[Recursive]`.
+pub(crate) fn check_divergent_relation<'db, 'c, R>(
+    db: &'db dyn Db,
+    checker: &R,
+    left: Type<'db>,
+    right: Type<'db>,
+    divergent: DivergentType,
+    visitor: &RecursiveRelationVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c>
+where
+    R: RecursiveRelation<'db, 'c>,
+{
+    if let Some(wrapping) = visitor.wrapping_recursive_for_divergent(db, divergent)
+        && checker.should_resolve_divergent_marker(db, wrapping)
+    {
+        let recursive_ty = Type::Recursive(wrapping);
+        if matches!(left, Type::Divergent(d) if d.id() == divergent.id()) {
+            checker.check_structural(db, recursive_ty, right)
+        } else {
+            checker.check_structural(db, left, recursive_ty)
+        }
+    } else {
+        checker.unresolved_divergent_result()
+    }
 }
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
