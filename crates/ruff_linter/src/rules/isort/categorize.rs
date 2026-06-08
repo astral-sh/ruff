@@ -199,7 +199,10 @@ pub(crate) fn categorize_imports<'a>(
 ) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
     let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `Stmt::Import`.
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (alias, comments) in block.import {
         let import_type = categorize(
             &alias.module_name(),
@@ -220,7 +223,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(alias, comments);
     }
     // Categorize `Stmt::ImportFrom` (without re-export).
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
             &import_from.module_name(),
@@ -241,7 +247,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert(import_from, aliases);
     }
     // Categorize `Stmt::ImportFrom` (with re-export).
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
             &import_from.module_name(),
@@ -262,7 +271,10 @@ pub(crate) fn categorize_imports<'a>(
             .insert((import_from, alias), aliases);
     }
     // Categorize `Stmt::ImportFrom` (with star).
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "categorization only moves entries between unordered import blocks"
+    )]
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
             &import_from.module_name(),

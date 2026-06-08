@@ -212,7 +212,10 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
                 }
             }
             Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                #[expect(clippy::iter_over_hash_type)]
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "each distinct exception name updates independent set and map entries"
+                )]
                 for (name, expr) in duplicate_handler_exceptions(checker, type_, elts) {
                     if seen.contains(&name) {
                         duplicates.entry(name).or_default().push(expr);
@@ -226,7 +229,10 @@ pub(crate) fn duplicate_exceptions(checker: &Checker, handlers: &[ExceptHandler]
     }
 
     if checker.is_rule_enabled(Rule::DuplicateTryBlockException) {
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "iteration order does not affect the diagnostics produced"
+        )]
         for (name, exprs) in duplicates {
             for expr in exprs {
                 let is_star = checker

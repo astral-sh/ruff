@@ -118,7 +118,10 @@ impl WorkspaceEditTracker {
         fixes: Fixes,
         version: DocumentVersion,
     ) -> crate::Result<()> {
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "edits for distinct document URIs are independent"
+        )]
         for (uri, edits) in fixes {
             self.set_edits_for_document(uri, version, edits)?;
         }

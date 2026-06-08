@@ -2426,7 +2426,10 @@ impl NodeId {
                 .is_always_satisfied(db, builder)
         };
 
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "all type variables must pass the check regardless of order"
+        )]
         for typevar in typevars {
             if typevar.is_inferable(db, inferable) {
                 // If the typevar is in inferable position, we need to verify that some valid
@@ -5688,7 +5691,10 @@ impl SequentMap {
                     }
                 };
 
-                #[expect(clippy::iter_over_hash_type)]
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "this debug-only formatter has no stable ordering contract"
+                )]
                 for (ante1, ante2) in &self.map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
@@ -5968,7 +5974,10 @@ impl PathAssignments {
 
         self.discover_constraint(db, builder, assignment.constraint());
 
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any matching tautology yields the same conflict result"
+        )]
         for ante in &self.map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
@@ -5988,7 +5997,10 @@ impl PathAssignments {
             }
         }
 
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any matching impossibility yields the same conflict result"
+        )]
         for (ante1, ante2) in &self.map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {

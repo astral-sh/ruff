@@ -213,7 +213,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each source statement gets an independent fix entry"
+    )]
     for entries in redefinitions.values() {
         let Some(source) = entries.iter().find_map(|info| info.runtime_import) else {
             continue;
@@ -257,7 +260,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     }
 
     // Create diagnostics for each statement.
-    #[expect(clippy::iter_over_hash_type)]
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "iteration order does not affect the diagnostics or fixes produced"
+    )]
     for entries in redefinitions.values() {
         for info in entries {
             let name = info.binding.name(checker.source());

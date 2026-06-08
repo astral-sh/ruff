@@ -27,7 +27,10 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
-            #[expect(clippy::iter_over_hash_type)]
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "Rayon task completion already makes result order unspecified"
+            )]
             for file in files.iter() {
                 let db = Db::dyn_clone(&*db);
                 s.spawn(move |_| {

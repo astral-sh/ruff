@@ -3103,7 +3103,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // If there are still unmatched keyword parameters from `source`, then they should be
         // optional otherwise the subtype relation is invalid.
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any required unmatched keyword parameter makes the relation invalid"
+        )]
         for (_, source_param) in source_keywords {
             if source_param.default_type().is_none() {
                 return self.never();

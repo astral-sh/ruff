@@ -160,7 +160,10 @@ impl FromIterator<(String, FixTable)> for FixMap {
 
 impl AddAssign for FixMap {
     fn add_assign(&mut self, rhs: Self) {
-        #[expect(clippy::iter_over_hash_type)]
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "fix counts are merged independently for each filename"
+        )]
         for (filename, fixed) in rhs.0 {
             if fixed.is_empty() {
                 continue;

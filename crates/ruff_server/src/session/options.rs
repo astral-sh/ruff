@@ -390,7 +390,10 @@ impl AllOptions {
     pub(crate) fn set_preview(&mut self, preview: bool) {
         self.global.set_preview(preview);
         if let Some(workspace_options) = self.workspace.as_mut() {
-            #[expect(clippy::iter_over_hash_type)]
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "the same preview value is applied independently to every workspace"
+            )]
             for options in workspace_options.values_mut() {
                 options.set_preview(preview);
             }
@@ -967,7 +970,10 @@ mod tests {
     fn assert_preview_all_options(all_options: &AllOptions, preview: bool) {
         assert_preview_client_options(all_options.global.client(), preview);
         if let Some(workspace_options) = all_options.workspace.as_ref() {
-            #[expect(clippy::iter_over_hash_type)]
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "each workspace is asserted independently"
+            )]
             for options in workspace_options.values() {
                 assert_preview_client_options(options, preview);
             }
