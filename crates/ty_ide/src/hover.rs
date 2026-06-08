@@ -4104,6 +4104,37 @@ def function():
     }
 
     #[test]
+    fn hover_callable_special_forms() {
+        let test = hover_test(
+            r#"
+            from collections.abc import Callable
+
+            Callable<CURSOR>
+            "#,
+        );
+
+        let hover = test.hover();
+        assert!(
+            hover.starts_with("<special-form 'collections.abc.Callable'>"),
+            "{hover}"
+        );
+
+        let test = hover_test(
+            r#"
+            from typing import Callable
+
+            Callable<CURSOR>
+            "#,
+        );
+
+        let hover = test.hover();
+        assert!(
+            hover.starts_with("<special-form 'typing.Callable'>"),
+            "{hover}"
+        );
+    }
+
+    #[test]
     fn hover_type_of_expression_with_type_var_type() {
         let test = hover_test(
             r#"
