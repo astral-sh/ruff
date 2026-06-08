@@ -4602,6 +4602,48 @@ def function():
     }
 
     #[test]
+    fn hover_imported_type_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "library.py",
+                r#"
+                from typing import TypeAlias
+
+                class Target: ...
+                Alias: TypeAlias = Target
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from library import Alias
+
+                def test(a: Ali<CURSOR>as) -> str:
+                    return "42"
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @r#"
+        Target
+        ---------------------------------------------
+        ```python
+        Target
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:4:13
+          |
+        4 | def test(a: Alias) -> str:
+          |             ^^^-^
+          |             |  |
+          |             |  Cursor offset
+          |             source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_final_variable() {
         let test = hover_test(
             r#"
