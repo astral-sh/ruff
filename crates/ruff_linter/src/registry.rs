@@ -424,7 +424,7 @@ pub mod clap_completion {
             value: &std::ffi::OsStr,
         ) -> Result<Self::Value, clap::Error> {
             PossibleValuesParser::new(Self::values())
-                .try_map(|value| Rule::from_code(&value).or_else(|_| value.parse()))
+                .try_map(|value| Rule::from_code(&value).or_else(|_| Rule::from_name(&value)))
                 .parse_ref(cmd, arg, value)
                 .map_err(|mut error| {
                     error.remove(ContextKind::ValidValue);
