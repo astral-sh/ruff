@@ -263,8 +263,8 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
-    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
+    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
@@ -285,10 +285,10 @@ impl<'db> DefinitionsByNode<'db> {
             }
         }
 
-        single.shrink_to_fit();
-        non_single.shrink_to_fit();
-
-        Self { single, non_single }
+        Self {
+            single: FrozenMap::from(single),
+            non_single: FrozenMap::from(non_single),
+        }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {
