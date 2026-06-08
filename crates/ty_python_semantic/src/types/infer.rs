@@ -98,6 +98,7 @@ struct TypeAndRange<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
+        // TODO: recursive initial
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
@@ -233,7 +234,7 @@ impl<'db> FunctionDecoratorInference<'db> {
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
+        DefinitionInference::cycle_initial(db, definition, Type::recursive(db, id, None, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -456,8 +457,8 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::divergent(id))
+    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
+        StatementInferenceInner::cycle_initial(statement.scope(db), Type::recursive(db, id, None, Type::divergent(id)))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
