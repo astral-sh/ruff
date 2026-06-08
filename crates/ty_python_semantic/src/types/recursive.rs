@@ -5,16 +5,90 @@
 //!
 //! For self-referential PEP 695 type aliases, `PEP695TypeAliasType::value_type`
 //! constructs a `Type::Recursive` whose `body` has each self-reference replaced
-//! by `Type::Divergent(binder_id)`. The co-inductive relation framework in
-//! [`crate::types::coinductive`] dispatches on `Type::Recursive` by unfolding
-//! one step and recording the visiting pair to break cycles.
+//! by `Type::Divergent(binder_id)`. Recursive relation checks dispatch on
+//! `Type::Recursive` by unfolding one step and recording the visiting pair to
+//! break cycles.
 
 use crate::Db;
+use crate::types::constraints::ConstraintSet;
+use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
+use crate::types::relation::TypeRelation;
 use crate::types::{
-    ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping, TypedDictType,
+    DivergentType, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypedDictType,
 };
+
+/// A relation that supports recursive reasoning over [`Type::Recursive`].
+pub(crate) trait RecursiveRelation<'db, 'c> {
+    /// The relation's value-level tag, used in the cycle-detection key.
+    fn relation_key(&self) -> TypeRelation;
+
+    /// Perform the structural check after one recursive unfold.
+    fn check_structural(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c>;
+}
+
+/// Delegate a relation through a [`Type::Recursive`] μ-binder.
+///
+/// Records the pre-unfold pair in the visitor before unfolding. This keeps
+/// recursive relation checks finite while allowing a real structural step for
+/// non-cyclic pairs.
+pub(crate) fn check_recursive_relation<'db, 'c, R>(
+    db: &'db dyn Db,
+    checker: &R,
+    source: Type<'db>,
+    target: Type<'db>,
+    visitor: &CycleDetector<
+        TypeRelation,
+        (Type<'db>, Type<'db>, TypeRelation),
+        ConstraintSet<'db, 'c>,
+    >,
+) -> ConstraintSet<'db, 'c>
+where
+    R: RecursiveRelation<'db, 'c>,
+{
+    let key = (source, target, checker.relation_key());
+    visitor.visit(key, || {
+        checker.check_structural(
+            db,
+            source.unfold_recursive_once(db),
+            target.unfold_recursive_once(db),
+        )
+    })
+}
+
+/// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning a
+/// relation visitor's active seen set.
+pub(crate) fn find_wrapping_recursive<'db>(
+    db: &'db dyn Db,
+    divergent: DivergentType,
+    visitor: &CycleDetector<
+        TypeRelation,
+        (Type<'db>, Type<'db>, TypeRelation),
+        ConstraintSet<'db, '_>,
+    >,
+) -> Option<RecursiveType<'db>> {
+    let binder_id = divergent.id();
+    let found = std::cell::Cell::new(None);
+    visitor.any_active(|(left, right, _)| {
+        for side in [*left, *right] {
+            if let Type::Recursive(rec) = side
+                && rec.binder_id(db) == binder_id
+            {
+                found.set(Some(rec));
+                return true;
+            }
+        }
+        false
+    });
+    found.into_inner()
+}
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
 /// field of a `#[salsa::interned]` struct that uses `heap_size`.

@@ -6,13 +6,13 @@ use rustc_hash::FxHashSet;
 
 use crate::place::{DefinedPlace, Place};
 use crate::types::callable::CallableTypeKind;
-use crate::types::coinductive::CoInductiveRelation;
 use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
+use crate::types::recursive::RecursiveRelation;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
@@ -893,14 +893,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 
     /// Find the `Type::Recursive` that wraps `divergent`'s α-binder on the
-    /// relation visitor's active seen set. See
-    /// [`coinductive::find_wrapping_recursive`] for details.
+    /// relation visitor's active seen set.
     fn find_wrapping_recursive(
         &self,
         db: &'db dyn Db,
         divergent: crate::types::DivergentType,
     ) -> Option<crate::types::recursive::RecursiveType<'db>> {
-        crate::types::coinductive::find_wrapping_recursive(db, divergent, self.relation_visitor)
+        crate::types::recursive::find_wrapping_recursive(db, divergent, self.relation_visitor)
     }
 
     /// Is `target` a metaclass instance (a nominal instance of a subclass of `builtins.type`)?
@@ -1100,13 +1099,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source_proto.recursive_type(db), target)
             }
 
-            // `Type::Recursive` is the only recursive-name type that
-            // `coinductive::delegate_recursive` handles:
-            // it records the pair on the visitor for cycle detection, unfolds
-            // one step (`Recursive` → body with `Divergent` leaves), and dispatches structurally via
-            // `<Self as CoInductiveRelation>::check_structural`.
+            // `Type::Recursive` is the recursive-name type handled by the
+            // recursive relation dispatcher. It records the pair on the visitor
+            // for cycle detection, unfolds one step, and dispatches structurally.
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
-                crate::types::coinductive::delegate_recursive(
+                crate::types::recursive::check_recursive_relation(
                     db,
                     self,
                     source,
@@ -2312,11 +2309,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 }
 
-// Dispatch the directional relation through the co-inductive framework.
+// Dispatch the directional relation through the recursive relation framework.
 // `check_structural` is the structural-comparison entry point that
-// `coinductive::delegate_recursive` calls after unfolding `Type::Recursive` and
+// `recursive::check_recursive_relation` calls after unfolding `Type::Recursive` and
 // after pair-visiting cycle detection has cleared the call.
-impl<'c, 'db: 'c> CoInductiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
+impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         self.relation
     }
@@ -2471,14 +2468,13 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 
     /// Find the wrapping `Type::Recursive` for `divergent`'s α-binder on the
-    /// disjointness visitor's active seen set. See
-    /// [`coinductive::find_wrapping_recursive`] for details.
+    /// disjointness visitor's active seen set.
     fn find_wrapping_recursive(
         &self,
         db: &'db dyn Db,
         divergent: crate::types::DivergentType,
     ) -> Option<crate::types::recursive::RecursiveType<'db>> {
-        crate::types::coinductive::find_wrapping_recursive(db, divergent, self.disjointness_visitor)
+        crate::types::recursive::find_wrapping_recursive(db, divergent, self.disjointness_visitor)
     }
 
     fn any_protocol_members_absent_or_disjoint(
@@ -2574,7 +2570,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // for `Type::Recursive`, routed through the disjointness visitor
             // (whose co-inductive fallback is `false`, "not disjoint when we loop").
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
-                crate::types::coinductive::delegate_recursive(
+                crate::types::recursive::check_recursive_relation(
                     db,
                     self,
                     left,
@@ -3302,10 +3298,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 }
 
-// Dispatch the symmetric disjointness relation through the co-inductive
+// Dispatch the symmetric disjointness relation through the recursive relation
 // framework. `relation_key()` is fixed to `TypeRelation::Disjointness`; the
 // structural step delegates to the existing `check_type_pair` implementation.
-impl<'c, 'db: 'c> CoInductiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
+impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         TypeRelation::Disjointness
     }

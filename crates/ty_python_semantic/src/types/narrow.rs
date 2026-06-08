@@ -293,11 +293,9 @@ impl ClassInfoConstraintFunction {
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
             // Recursive bodies contain `Divergent` leaves that bottom out via
             // the `Type::Divergent` arm above.
-            Type::Recursive(_) => self.generate_constraint(
-                db,
-                crate::types::coinductive::unfold_one(db, classinfo),
-                is_positive,
-            ),
+            Type::Recursive(_) => {
+                self.generate_constraint(db, classinfo.unfold_recursive_once(db), is_positive)
+            }
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
             }
