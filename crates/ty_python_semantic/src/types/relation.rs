@@ -1072,18 +1072,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::ProtocolInstance(source_proto), _)
-                if source_proto.try_to_recursive_type(db) != source =>
-            {
-                self.check_type_pair(db, source_proto.try_to_recursive_type(db), target)
-            }
-
-            (_, Type::ProtocolInstance(target_proto))
-                if target_proto.try_to_recursive_type(db) != target =>
-            {
-                self.check_type_pair(db, source, target_proto.try_to_recursive_type(db))
-            }
-
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)
             }),
@@ -1445,13 +1433,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
-                let recursive_source = source_newtype.try_to_recursive_type(db);
-                let recursive_target = target_newtype.try_to_recursive_type(db);
-                if recursive_source != source || recursive_target != target {
-                    self.check_type_pair(db, recursive_source, recursive_target)
-                } else {
-                    self.check_newtype_pair(db, source_newtype, target_newtype)
-                }
+                self.check_newtype_pair(db, source_newtype, target_newtype)
             }
 
             (Type::Union(union), _) => {
@@ -1699,12 +1681,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `NewType <: TypeVar`, we use the TypeVar handling rather than falling back
             // to the NewType's concrete base type.
             (Type::NewTypeInstance(source_newtype), _) => {
-                let recursive_source = source_newtype.try_to_recursive_type(db);
-                if recursive_source != source {
-                    self.check_type_pair(db, recursive_source, target)
-                } else {
-                    self.check_type_pair(db, source_newtype.concrete_base_type(db), target)
-                }
+                self.check_type_pair(db, source_newtype.concrete_base_type(db), target)
             }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
@@ -1727,16 +1704,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // our representation of a function literal includes any specialization that should be
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
-            (Type::FunctionLiteral(source_function), _)
-                if source_function.try_to_recursive_type(db) != source =>
-            {
-                self.check_type_pair(db, source_function.try_to_recursive_type(db), target)
-            }
-            (_, Type::FunctionLiteral(target_function))
-                if target_function.try_to_recursive_type(db) != target =>
-            {
-                self.check_type_pair(db, source, target_function.try_to_recursive_type(db))
-            }
             (Type::FunctionLiteral(source_function), Type::FunctionLiteral(target_function)) => {
                 self.check_function_pair(db, source_function, target_function)
             }
@@ -2528,24 +2495,6 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            (Type::FunctionLiteral(function), _) if function.try_to_recursive_type(db) != left => {
-                self.check_type_pair(db, function.try_to_recursive_type(db), right)
-            }
-
-            (_, Type::FunctionLiteral(function)) if function.try_to_recursive_type(db) != right => {
-                self.check_type_pair(db, left, function.try_to_recursive_type(db))
-            }
-
-            (Type::ProtocolInstance(protocol), _) if protocol.try_to_recursive_type(db) != left => {
-                self.check_type_pair(db, protocol.try_to_recursive_type(db), right)
-            }
-
-            (_, Type::ProtocolInstance(protocol))
-                if protocol.try_to_recursive_type(db) != right =>
-            {
-                self.check_type_pair(db, left, protocol.try_to_recursive_type(db))
-            }
-
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);
                 self.with_recursion_guard(left, right, || {
@@ -3182,23 +3131,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }),
 
             (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                let recursive_left = left.try_to_recursive_type(db);
-                let recursive_right = right.try_to_recursive_type(db);
-                if recursive_left != Type::NewTypeInstance(left)
-                    || recursive_right != Type::NewTypeInstance(right)
-                {
-                    self.check_type_pair(db, recursive_left, recursive_right)
-                } else {
-                    self.check_newtype_pair(db, left, right)
-                }
+                self.check_newtype_pair(db, left, right)
             }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-                let recursive_newtype = newtype.try_to_recursive_type(db);
-                if recursive_newtype != Type::NewTypeInstance(newtype) {
-                    self.check_type_pair(db, recursive_newtype, other)
-                } else {
-                    self.check_type_pair(db, newtype.concrete_base_type(db), other)
-                }
+                self.check_type_pair(db, newtype.concrete_base_type(db), other)
             }
 
             (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {

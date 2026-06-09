@@ -28,6 +28,7 @@ impl<'db> Type<'db> {
         match self {
             Type::FunctionLiteral(function) => function.try_to_recursive_type(db),
             Type::NewTypeInstance(newtype) => newtype.try_to_recursive_type(db),
+            Type::ProtocolInstance(protocol) => protocol.try_to_recursive_type(db),
             _ => self,
         }
     }
