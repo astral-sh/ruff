@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
@@ -10,18 +11,17 @@ use crate::types::constraints::{
     ConstraintSetBuilder, IteratorConstraintsExtension, OptionConstraintsExtension,
     OwnedConstraintSet,
 };
+use crate::types::cyclic::CycleDetector;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
-use crate::types::recursive::{
-    RecursiveRelation, RecursiveRelationVisitor, RecursiveType, check_divergent_relation,
-};
+use crate::types::recursive::RecursiveType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy,
-    PropertyInstanceType, ProtocolInstanceType, SubclassOfInner, SubclassOfType,
-    TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, DivergentType,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -263,6 +263,136 @@ impl TypeRelation {
             // directional checker's relation field.
             TypeRelation::Disjointness => false,
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct RecursiveRelationKey<'db> {
+    left: Type<'db>,
+    right: Type<'db>,
+    relation: TypeRelation,
+}
+
+pub(super) struct RecursiveRelationVisitor<'db, 'c> {
+    visitor: CycleDetector<TypeRelation, RecursiveRelationKey<'db>, ConstraintSet<'db, 'c>, 1>,
+}
+
+impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
+    /// Construct a visitor for directional relation checks. If we loop, assume
+    /// the relation currently being proven holds.
+    pub(super) fn assume_related_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
+        }
+    }
+
+    /// Construct a visitor for disjointness checks. If we loop, assume the
+    /// types are not disjoint.
+    pub(super) fn assume_not_disjoint_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self {
+            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, false)),
+        }
+    }
+
+    fn visit_pair(
+        &self,
+        left: Type<'db>,
+        right: Type<'db>,
+        relation: TypeRelation,
+        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.visitor.visit(
+            RecursiveRelationKey {
+                left,
+                right,
+                relation,
+            },
+            work,
+        )
+    }
+
+    /// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning
+    /// the active relation pairs.
+    fn wrapping_recursive_for_divergent(
+        &self,
+        db: &'db dyn Db,
+        divergent: DivergentType,
+    ) -> Option<RecursiveType<'db>> {
+        let binder_id = divergent.id();
+        let found = Cell::new(None);
+        self.visitor.any_active(|key| {
+            for side in [key.left, key.right] {
+                if let Type::Recursive(rec) = side
+                    && rec.binder_id(db) == binder_id
+                {
+                    found.set(Some(rec));
+                    return true;
+                }
+            }
+            false
+        });
+        found.into_inner()
+    }
+}
+
+trait RecursiveRelation<'db, 'c> {
+    fn relation_key(&self) -> TypeRelation;
+
+    fn check_structural(
+        &self,
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> ConstraintSet<'db, 'c>;
+
+    fn should_resolve_divergent_marker(
+        &self,
+        db: &'db dyn Db,
+        recursive: RecursiveType<'db>,
+    ) -> bool;
+
+    fn unresolved_divergent_result(&self) -> ConstraintSet<'db, 'c>;
+}
+
+fn check_recursive_relation<'db, 'c, R>(
+    db: &'db dyn Db,
+    checker: &R,
+    source: Type<'db>,
+    target: Type<'db>,
+    visitor: &RecursiveRelationVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c>
+where
+    R: RecursiveRelation<'db, 'c>,
+{
+    visitor.visit_pair(source, target, checker.relation_key(), || {
+        checker.check_structural(db, source.unwrap_recursive(db), target.unwrap_recursive(db))
+    })
+}
+
+/// Delegate a relation through a bare [`Type::Divergent`] marker if it is the
+/// α-binder of an in-flight [`Type::Recursive`] visit.
+fn check_divergent_relation<'db, 'c, R>(
+    db: &'db dyn Db,
+    checker: &R,
+    left: Type<'db>,
+    right: Type<'db>,
+    divergent: DivergentType,
+    visitor: &RecursiveRelationVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c>
+where
+    R: RecursiveRelation<'db, 'c>,
+{
+    if let Some(wrapping) = visitor.wrapping_recursive_for_divergent(db, divergent)
+        && checker.should_resolve_divergent_marker(db, wrapping)
+    {
+        let recursive_ty = Type::Recursive(wrapping);
+        if matches!(left, Type::Divergent(d) if d.id() == divergent.id()) {
+            checker.check_structural(db, recursive_ty, right)
+        } else {
+            checker.check_structural(db, left, recursive_ty)
+        }
+    } else {
+        checker.unresolved_divergent_result()
     }
 }
 
@@ -1113,7 +1243,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Divergent markers are resolved by the recursive relation API.
+            // Divergent markers are resolved against in-flight relation pairs.
             (Type::Divergent(divergent), _) | (_, Type::Divergent(divergent)) => {
                 check_divergent_relation(db, self, source, target, divergent, self.relation_visitor)
             }
@@ -1138,17 +1268,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // `Type::Recursive` is the recursive-name type handled by the
-            // recursive relation dispatcher. It records the pair on the visitor
-            // for cycle detection, unfolds one step, and dispatches structurally.
+            // `Type::Recursive` records the pair on the relation visitor,
+            // unfolds one step, and dispatches structurally.
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
-                crate::types::recursive::check_recursive_relation(
-                    db,
-                    self,
-                    source,
-                    target,
-                    self.relation_visitor,
-                )
+                check_recursive_relation(db, self, source, target, self.relation_visitor)
             }
 
             (Type::TypeAlias(alias), _) => self.check_type_pair(db, alias.value_type(db), target),
@@ -2401,10 +2524,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     }
 }
 
-// Dispatch the directional relation through the recursive relation framework.
-// `check_structural` is the structural-comparison entry point that
-// `recursive::check_recursive_relation` calls after unfolding `Type::Recursive` and
-// after pair-visiting cycle detection has cleared the call.
+// Dispatch the directional relation through the relation recursion guard.
 impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         self.relation
@@ -2635,7 +2755,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            // Divergent markers are resolved by the recursive relation API.
+            // Divergent markers are resolved against in-flight relation pairs.
             (Type::Divergent(divergent), _) | (_, Type::Divergent(divergent)) => {
                 check_divergent_relation(
                     db,
@@ -2650,13 +2770,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // for `Type::Recursive`, routed through the disjointness visitor
             // (whose co-inductive fallback is `false`, "not disjoint when we loop").
             (Type::Recursive(_), _) | (_, Type::Recursive(_)) => {
-                crate::types::recursive::check_recursive_relation(
-                    db,
-                    self,
-                    left,
-                    right,
-                    self.disjointness_visitor,
-                )
+                check_recursive_relation(db, self, left, right, self.disjointness_visitor)
             }
 
             (Type::FunctionLiteral(function), _) if function.recursive_type(db) != left => {
@@ -3399,9 +3513,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     }
 }
 
-// Dispatch the symmetric disjointness relation through the recursive relation
-// framework. `relation_key()` is fixed to `TypeRelation::Disjointness`; the
-// structural step delegates to the existing `check_type_pair` implementation.
+// Dispatch symmetric disjointness through the relation recursion guard.
+// `relation_key()` is fixed to `TypeRelation::Disjointness`; the structural
+// step delegates to the existing `check_type_pair` implementation.
 impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         TypeRelation::Disjointness

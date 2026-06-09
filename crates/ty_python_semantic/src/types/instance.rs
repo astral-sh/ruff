@@ -18,7 +18,7 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::recursive::RecursiveRelationVisitor;
+use crate::types::relation::RecursiveRelationVisitor;
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};

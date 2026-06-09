@@ -15,7 +15,7 @@ use crate::types::constraints::{
     PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
-use crate::types::recursive::RecursiveRelationVisitor;
+use crate::types::relation::RecursiveRelationVisitor;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
