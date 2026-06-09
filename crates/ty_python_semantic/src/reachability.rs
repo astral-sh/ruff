@@ -613,6 +613,7 @@ struct ProjectedNarrowingGraph<'db> {
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
+    reduction_cache: FxHashMap<ProjectedNarrowingNodeId, ProjectedNarrowingNodeId>,
     predicate_constraints_cache: FxHashMap<
         ScopedPredicateId,
         (
@@ -645,6 +646,58 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Removes conditions made redundant by another path through the graph.
+    ///
+    /// Resolving a call predicate can expose a formula such as `A or (not A and B)`. The earlier
+    /// `A` path means that `not A` no longer narrows the `B` path, so this reduces the formula to
+    /// `A or B`.
+    fn reduce(&mut self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNodeId {
+        if id.is_terminal() {
+            return id;
+        }
+        if let Some(cached) = self.reduction_cache.get(&id) {
+            return *cached;
+        }
+
+        let node = self.node(id);
+        let if_true = self.reduce(node.if_true);
+        let if_uncertain = self.reduce(node.if_uncertain);
+        let if_false = self.reduce(node.if_false);
+
+        let when_true = self.or(if_true, if_uncertain);
+        let when_true = self.reduce(when_true);
+        let when_false = self.or(if_false, if_uncertain);
+        let when_false = self.reduce(when_false);
+
+        let reduced = if when_true == when_false {
+            when_true
+        } else if when_true == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+                if_uncertain: when_false,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            })
+        } else if when_false == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+                if_uncertain: when_true,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            })
+        } else {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true,
+                if_uncertain,
+                if_false,
+            })
+        };
+
+        self.reduction_cache.insert(id, reduced);
+        reduced
     }
 
     /// Returns the projected nodes that join multiple incoming paths.
@@ -808,7 +861,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
                     let if_uncertain = self.project(node.if_uncertain());
-                    match analyze_single(self.db, &predicate) {
+                    let projected = match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => {
                             let if_true = self.project(node.if_true());
                             self.graph.or(if_true, if_uncertain)
@@ -820,7 +873,8 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         Truthiness::Ambiguous => {
                             unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
                         }
-                    }
+                    };
+                    self.graph.reduce(projected)
                 } else {
                     let if_true = self.project(node.if_true());
                     let if_uncertain = self.project(node.if_uncertain());

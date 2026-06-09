@@ -79,7 +79,7 @@ When two branches both reach the next statement, the later branch no longer need
 failed check that sent execution past the earlier branch.
 
 ```py
-from typing import Any
+from typing import Any, NoReturn
 from typing_extensions import TypeGuard, TypeIs
 
 class A: ...
@@ -110,6 +110,34 @@ def exact_narrowing(x: A | B | C | D):
         return
 
     reveal_type(x)  # revealed: C | B | A
+
+def noop() -> None:
+    pass
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def calls_in_branches(x: A | B | C | D):
+    if is_a(x):
+        noop()
+    elif is_b(x):
+        noop()
+    elif is_c(x):
+        noop()
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
+def noreturn_call_removes_branch(x: A | B | C):
+    if is_a(x):
+        stop()
+    elif is_b(x):
+        noop()
+    else:
+        return
+
+    reveal_type(x)  # revealed: B & ~A
 
 def one_sided_narrowing(x: A | B | C):
     if guard_a(x):

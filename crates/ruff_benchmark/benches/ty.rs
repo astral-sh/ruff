@@ -959,15 +959,24 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 /// class C1(Base): ...
 /// ...
 ///
+/// def noop() -> None: ...
+///
 /// def f(obj: Base) -> None:
 ///     if isinstance(obj, C0):
-///         pass
+///         noop()
 ///     elif isinstance(obj, C1):
-///         pass
+///         noop()
+///     ...
+///     else:
+///         return
+///
+///     obj
+///     obj
 ///     ...
 /// ```
 fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 50;
+    const NUM_USES: usize = 10;
 
     setup_rayon();
 
@@ -975,7 +984,7 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     for i in 0..NUM_CLASSES {
         writeln!(&mut code, "class C{i}(Base): ...").ok();
     }
-    code.push('\n');
+    code.push_str("\ndef noop() -> None: ...\n\n");
 
     code.push_str("def f(obj: Base) -> None:\n");
     for i in 0..NUM_CLASSES {
@@ -984,7 +993,11 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
         } else {
             writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
         }
-        code.push_str("        pass\n");
+        code.push_str("        noop()\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..NUM_USES {
+        code.push_str("    obj\n");
     }
 
     criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
