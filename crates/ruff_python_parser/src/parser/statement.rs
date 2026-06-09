@@ -3085,12 +3085,10 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = self.with_grown_stack(|parser| {
-            parser.parse_list_into_thin_vec(
-                RecoveryContextKind::BlockStatements,
-                Parser::parse_statement,
-            )
-        });
+        let statements = self.parse_list_into_thin_vec(
+            RecoveryContextKind::BlockStatements,
+            Parser::parse_statement,
+        );
 
         self.expect(TokenKind::Dedent);
 
