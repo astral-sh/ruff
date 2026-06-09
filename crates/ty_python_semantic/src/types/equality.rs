@@ -28,7 +28,7 @@ enum ComparisonResult<'db> {
 
     /// The comparison always evaluates to false.
     ///
-    /// Similar to [`AlwaysTrue`], this only describes the runtime comparison result; it does not
+    /// Similar to [`Self::AlwaysTrue`], this only describes the runtime comparison result; it does not
     /// necessarily indicate whether the two types are disjoint.
     AlwaysFalse,
 
