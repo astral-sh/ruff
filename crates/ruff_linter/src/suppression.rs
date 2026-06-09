@@ -896,13 +896,12 @@ impl<'a> SuppressionsBuilder<'a> {
         for next_token in after {
             match next_token.kind() {
                 TokenKind::Newline => {
+                    end = next_token.start();
                     break;
                 }
-                TokenKind::Comment => {
-                    // Extend the suppression range to include comments before the final newline.
-                    end = next_token.end();
-                }
+                TokenKind::Comment => {}
                 TokenKind::NonLogicalNewline if is_inner_comment => {
+                    end = next_token.start();
                     if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
                     }

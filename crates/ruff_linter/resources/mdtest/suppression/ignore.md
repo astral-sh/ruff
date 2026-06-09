@@ -192,3 +192,27 @@ from sys import ( # ruff:ignore[F401]
     argv # ruff:ignore[F401]
 )
 ```
+
+## Trailing whitespace is included in the suppression range
+
+```toml
+[lint]
+preview = true
+select = [ "W291" ]
+```
+
+For both logical and non-logical newlines:
+
+<!-- fmt:off -->
+
+```py
+# ruff:ignore[W291]
+foo    
+
+values = [
+    # ruff:ignore[W291]
+    bar    
+]
+```
+
+<!-- fmt:on -->
