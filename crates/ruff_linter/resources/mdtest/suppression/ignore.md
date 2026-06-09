@@ -165,3 +165,30 @@ from foo import (  # ruff:ignore[F401]
         baz
 )
 ```
+
+## Parent suppression range and unused comments
+
+```toml
+[lint]
+preview = true
+select = [ "F401", "RUF100" ]
+```
+
+For cases with both a parent and non-parent `noqa` comment, the parent is marked as used, while the
+non-parent, which falls later textually, is marked as unused.
+
+```py
+from math import ( # noqa: F401
+    # error: [unused-noqa]
+    cos # noqa: F401
+)
+```
+
+`ruff:ignore` should behave in the same way:
+
+```py
+from sys import ( # ruff:ignore[F401]
+    # error: [unused-noqa]
+    argv # ruff:ignore[F401]
+)
+```
