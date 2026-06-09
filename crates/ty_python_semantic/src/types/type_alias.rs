@@ -23,42 +23,6 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 
-/// Strip bare `Type::Divergent(binder_id)` leaves that sit as direct members of
-/// the top-level union in `ty`.
-///
-/// Mirrors the `Divergent`-stripping that the legacy `raw_value_type` cycle
-/// recovery path performs via `Union::recursive_type_normalized_impl`, but
-/// applied only at the body's outermost union level so that recursive markers
-/// nested inside generics (e.g. `list[Divergent | str]`,
-/// `tuple[Divergent, ...]`) are preserved.
-///
-/// - `int | Divergent(binder)` → `int`
-/// - `int | tuple[Divergent(binder), ...]` → unchanged
-/// - `list[Divergent(binder) | str]` → unchanged
-fn strip_top_level_divergent<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    binder_id: salsa::Id,
-) -> Type<'db> {
-    let Type::Union(union) = ty else {
-        return ty;
-    };
-    let kept: Vec<Type<'db>> = union
-        .elements(db)
-        .iter()
-        .copied()
-        .filter(|elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id))
-        .collect();
-    if kept.len() == union.elements(db).len() {
-        return ty;
-    }
-    match kept.len() {
-        0 => Type::divergent(binder_id),
-        1 => kept[0],
-        _ => UnionType::from_elements(db, kept),
-    }
-}
-
 #[derive(Clone, Copy)]
 struct TopLevelAliasExpansion<'db> {
     ty: Type<'db>,
@@ -144,16 +108,6 @@ impl<'db> TopLevelAliasExpander<'db> {
     }
 }
 
-fn expand_top_level_union_aliases<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    root_alias: TypeAliasType<'db>,
-) -> Type<'db> {
-    TopLevelAliasExpander::new(root_alias)
-        .expand_union_aliases(db, ty)
-        .ty
-}
-
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PEP695TypeAliasType<'db> {
     #[returns(ref)]
@@ -208,6 +162,38 @@ impl<'db> PEP695TypeAliasType<'db> {
             // proliferation that hangs/overflows on generic recursive aliases.
             origin
                 .build_recursive(db, |binder_id, type_mapping, visitor| {
+                    /// Strip bare `Type::Divergent(binder_id)` leaves that sit as direct members of
+                    /// the top-level union in `ty`.
+                    ///
+                    /// Mirrors the `Divergent`-stripping that the legacy `raw_value_type` cycle
+                    /// recovery path performs via `Union::recursive_type_normalized_impl`, but
+                    /// applied only at the body's outermost union level so that recursive markers
+                    /// nested inside generics (e.g. `list[Divergent | str]`,
+                    /// `tuple[Divergent, ...]`) are preserved.
+                    ///
+                    /// - `int | Divergent(binder)` → `int`
+                    /// - `int | tuple[Divergent(binder), ...]` → unchanged
+                    /// - `list[Divergent(binder) | str]` → unchanged
+                    fn strip_top_level_divergent<'db>(db: &'db dyn Db, ty: Type<'db>, binder_id: salsa::Id) -> Type<'db> {
+                        let Type::Union(union) = ty else {
+                            return ty;
+                        };
+                        let kept: Vec<Type<'db>> = union
+                            .elements(db)
+                            .iter()
+                            .copied()
+                            .filter(|elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id))
+                            .collect();
+                        if kept.len() == union.elements(db).len() {
+                            return ty;
+                        }
+                        match kept.len() {
+                            0 => Type::divergent(binder_id),
+                            1 => kept[0],
+                            _ => UnionType::from_elements(db, kept),
+                        }
+                    }
+
                     let folded_raw = raw.apply_type_mapping_impl(
                         db,
                         &type_mapping,
@@ -215,27 +201,20 @@ impl<'db> PEP695TypeAliasType<'db> {
                         visitor,
                     );
                     let body = self.apply_function_specialization(db, folded_raw);
+                    let root_alias = TypeAliasType::PEP695(self);
                     let simplified = strip_top_level_divergent(db, body, binder_id);
-                    let fallback = expand_top_level_union_aliases(
-                        db,
-                        simplified,
-                        crate::types::TypeAliasType::PEP695(self),
-                    );
+                    let fallback = root_alias.expand_top_level_union_aliases(db, simplified);
                     (simplified, fallback)
                 })
                 .unwrap_or_else(|| {
-                    expand_top_level_union_aliases(
+                    TypeAliasType::PEP695(self).expand_top_level_union_aliases(
                         db,
                         self.apply_function_specialization(db, raw),
-                        crate::types::TypeAliasType::PEP695(self),
                     )
                 })
         } else {
-            expand_top_level_union_aliases(
-                db,
-                self.apply_function_specialization(db, raw),
-                crate::types::TypeAliasType::PEP695(self),
-            )
+            TypeAliasType::PEP695(self)
+                .expand_top_level_union_aliases(db, self.apply_function_specialization(db, raw))
         }
     }
 
@@ -381,10 +360,9 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
             return Type::unknown();
         };
-        expand_top_level_union_aliases(
+        TypeAliasType::ManualPEP695(self).expand_top_level_union_aliases(
             db,
             definition_expression_type(db, definition, value_arg),
-            TypeAliasType::ManualPEP695(self),
         )
     }
 }
@@ -395,6 +373,14 @@ pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+}
+
+impl<'db> TypeAliasType<'db> {
+    fn expand_top_level_union_aliases(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        TopLevelAliasExpander::new(self)
+            .expand_union_aliases(db, ty)
+            .ty
+    }
 }
 
 pub(super) fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
