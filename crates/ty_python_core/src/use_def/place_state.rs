@@ -603,6 +603,10 @@ fn merge_narrowing_constraints(
     }
 
     let merged = constraints.add_or_constraint(accumulated, branch);
+    if merged == ScopedNarrowingConstraint::ALWAYS_TRUE {
+        return merged;
+    }
+
     let branch_without_preceding_predicates =
         constraints.remove_predicates(branch, preceding_branch_predicates);
     let merged_without_preceding_predicates =
