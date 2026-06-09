@@ -1,5 +1,8 @@
 #![cfg_attr(target_family = "wasm", allow(dead_code))]
 
+use ruff_python_ast::script::ScriptTag;
+use ruff_workspace::configuration::Configuration;
+use ruff_workspace::pyproject::{get_minimum_supported_version, parse_script_metadata};
 use std::borrow::Cow;
 use std::fs::File;
 use std::io;
@@ -245,6 +248,40 @@ pub(crate) fn lint_path(
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
         }
+    };
+
+    let settings = match source_kind {
+        SourceKind::Python { ref code, is_stub } if !is_stub => {
+            if let Some(script_tag) = ScriptTag::parse(code.as_bytes()) {
+                let metadata = parse_script_metadata(&script_tag.metadata)?;
+                let target_version = metadata
+                    .requires_python
+                    .as_ref()
+                    .and_then(get_minimum_supported_version);
+                let ruff = metadata.tool.and_then(|tool| tool.ruff);
+
+                match (ruff, target_version) {
+                    (None, None) => settings,
+                    (None, Some(target_version)) => {
+                        &settings.clone().with_target_version(target_version.into())
+                    }
+                    (Some(ruff), None) => {
+                        let configuration =
+                            Configuration::from_options(ruff, Some(path), &settings.project_root)?;
+                        &configuration.into_settings(&settings.project_root)?.linter
+                    }
+                    (Some(mut ruff), Some(target_version)) => {
+                        ruff.target_version = Some(target_version);
+                        let configuration =
+                            Configuration::from_options(ruff, Some(path), &settings.project_root)?;
+                        &configuration.into_settings(&settings.project_root)?.linter
+                    }
+                }
+            } else {
+                settings
+            }
+        }
+        _ => settings,
     };
 
     // Lint the file.
