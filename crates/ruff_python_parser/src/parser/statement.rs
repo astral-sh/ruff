@@ -3129,15 +3129,12 @@ impl<'src> Parser<'src> {
     fn parse_block(&mut self) -> Suite {
         self.bump(TokenKind::Indent);
 
-        let statements = self.with_grown_stack(|parser| {
-            let snapshot = parser.stmt_scratch.snapshot();
-            parser.parse_list(RecoveryContextKind::BlockStatements, |parser| {
-                let statement = parser.parse_statement();
-                parser.stmt_scratch.push(statement);
-            });
-
-            parser.stmt_scratch.take_thin_vec(snapshot)
+        let snapshot = self.stmt_scratch.snapshot();
+        self.parse_list(RecoveryContextKind::BlockStatements, |parser| {
+            let statement = parser.parse_statement();
+            parser.stmt_scratch.push(statement);
         });
+        let statements = self.stmt_scratch.take_thin_vec(snapshot);
 
         self.expect(TokenKind::Dedent);
 

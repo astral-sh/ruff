@@ -88,7 +88,7 @@ impl Parser<'_> {
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-pattern>
     fn parse_match_pattern(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
-        self.with_grown_stack(|parser| parser.parse_match_pattern_inner(allow_star_pattern))
+        self.parse_match_pattern_inner(allow_star_pattern)
     }
 
     fn parse_match_pattern_inner(&mut self, allow_star_pattern: AllowStarPattern) -> Pattern {
