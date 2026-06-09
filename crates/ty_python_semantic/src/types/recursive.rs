@@ -219,7 +219,7 @@ impl<'db> RecursiveType<'db> {
 
     /// Returns the body with its `Type::Divergent` α-binder markers substituted
     /// back to the source type when this μ-binder has an explicit origin.
-    pub(crate) fn unfold_with_source_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
         let Some(replacement) = self.origin(db).source_type() else {
             return body;
@@ -236,15 +236,16 @@ impl<'db> RecursiveType<'db> {
     /// position so further structural operations (iteration, subscript, …) can
     /// continue to descend.
     ///
-    /// Compare with [`unfold_with_source_type`][Self::unfold_with_source_type],
+    /// Compare with [`body_with_origin_marker`][Self::body_with_origin_marker],
     /// which substitutes the source type instead — used for display and for
     /// `IntersectionBuilder`'s distribution where re-finding the recursive name
     /// matters.
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
+        let replacement = self.origin(db).source_type().unwrap_or(Type::Recursive(self));
         let mapping = TypeMapping::ReplaceDivergent {
             binder_id: self.binder(db),
-            replacement: Type::Recursive(self),
+            replacement,
         };
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
