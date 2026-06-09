@@ -120,17 +120,16 @@ impl VendoredPathBuf {
 
 impl From<&VendoredPath> for Box<VendoredPath> {
     fn from(path: &VendoredPath) -> Self {
-        let path: Box<Utf8Path> = Box::from(&path.0);
-        let path = Box::into_raw(path) as *mut VendoredPath;
-        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
-        // *mut Utf8Path to a *mut VendoredPath is valid.
-        unsafe { Box::from_raw(path) }
+        Box::from(path.to_path_buf())
     }
 }
 
 impl From<VendoredPathBuf> for Box<VendoredPath> {
     fn from(path: VendoredPathBuf) -> Self {
-        Box::from(path.as_path())
+        let path = Box::into_raw(path.0.into_boxed_path()) as *mut VendoredPath;
+        // SAFETY: VendoredPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut Utf8Path to a *mut VendoredPath is valid.
+        unsafe { Box::from_raw(path) }
     }
 }
 
