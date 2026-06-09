@@ -292,6 +292,31 @@ but obviously continue working with rule codes:
 import math  # noqa: F401
 ```
 
+### `invalid-rule-code`
+
+Unknown rule names should emit `RUF102`, while preserving valid names in the same suppression:
+
+```py
+# snapshot: invalid-rule-code
+# ruff:ignore[unused-import, not-a-rule]
+import pathlib
+```
+
+```snapshot
+error[RUF102]: Invalid rule code in suppression: not-a-rule
+ --> src/mdtest_snippet.py:2:30
+  |
+2 | # ruff:ignore[unused-import, not-a-rule]
+  |                              ^^^^^^^^^^
+  |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
+help: Remove the rule code `not-a-rule`
+1 | # snapshot: invalid-rule-code
+  - # ruff:ignore[unused-import, not-a-rule]
+2 + # ruff:ignore[unused-import]
+3 | import pathlib
+```
+
 ### `unused-noqa`
 
 Unused suppressions with rule codes should still emit `RUF100` with an appropriate error message:
