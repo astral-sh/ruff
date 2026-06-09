@@ -1215,13 +1215,13 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
-/// Regression benchmark for repeated loads under a long `TypeIs` `elif` chain.
+/// Regression benchmark for repeated loads after a long `TypeIs` `elif` chain.
 ///
-/// Each branch adds one negative narrowing constraint to `source`. Without compacting the repeated
-/// branches and caching the factored result, every load rebuilds the accumulated intersection.
+/// Every matching branch reaches the shared loads while the `else` branch returns. Without factoring
+/// the matching paths and caching the narrowed result, every load rebuilds their accumulated union.
 fn benchmark_typeis_elif_narrowing(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 40;
-    const LOADS_PER_BRANCH: usize = 10;
+    const LOADS_AFTER_CHAIN: usize = 10;
 
     setup_rayon();
 
@@ -1256,9 +1256,11 @@ def check(source: Source) -> None:
         } else {
             writeln!(&mut code, "    elif istype(source, C{i}):").ok();
         }
-        for _ in 0..LOADS_PER_BRANCH {
-            code.push_str("        consume(source)\n");
-        }
+        code.push_str("        pass\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..LOADS_AFTER_CHAIN {
+        code.push_str("    consume(source)\n");
     }
 
     criterion.bench_function("ty_micro[typeis_elif_narrowing]", |b| {
