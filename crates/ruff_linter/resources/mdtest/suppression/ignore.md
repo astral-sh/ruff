@@ -266,6 +266,17 @@ import sys
 import traceback  # error: [unused-import]
 ```
 
+The `disable` and `enable` comments must match textually, even when a rule code and name identify
+the same rule:
+
+```py
+# error: [unmatched-suppression-comment]
+# ruff:disable[unused-import]
+import math
+# error: [invalid-suppression-comment]
+# ruff:enable[F401]
+```
+
 ### `noqa`
 
 Old-style `noqa` comments should continue to reject rule names:
@@ -313,4 +324,30 @@ help: Remove unused suppression
 8  + import math
 9  |
 10 | math.cos(1)
+11 | # snapshot: unused-noqa
+```
+
+A rule code and human-readable name for the same rule are treated as separate suppressions. The
+second suppression is therefore unused rather than duplicated:
+
+```py
+# snapshot: unused-noqa
+# ruff:ignore[F401, unused-import]
+import pathlib
+```
+
+```snapshot
+error[RUF100]: Unused suppression (unused: `unused-import`)
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | # ruff:ignore[F401, unused-import]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove unused suppression
+9  |
+10 | math.cos(1)
+11 | # snapshot: unused-noqa
+   - # ruff:ignore[F401, unused-import]
+12 + # ruff:ignore[F401]
+13 | import pathlib
 ```
