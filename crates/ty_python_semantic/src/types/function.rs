@@ -858,7 +858,7 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn last_definition_raw_signature(
+    pub(super) fn last_definition_raw_signature(
         self,
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,

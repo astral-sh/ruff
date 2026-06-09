@@ -132,6 +132,7 @@ pub(crate) fn bind_typevar<'db>(
                     .function_type(definition)
                     .and_then(|function_type| {
                         function_type
+                            .literal(db)
                             .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
                             .generic_context
                     })
