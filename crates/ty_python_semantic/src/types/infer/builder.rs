@@ -5882,6 +5882,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expression: &ast::Expr,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        if matches!(self.region, InferenceRegion::Scope(..)) {
+            return self.infer_expression_impl(expression, tcx);
+        }
+
         if let Some(standalone_expression) = self.index.try_expression(expression) {
             self.infer_standalone_expression_impl(expression, standalone_expression, tcx)
         } else {
