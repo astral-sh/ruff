@@ -1241,22 +1241,7 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        self.simplify_indexed_protocol_negatives()
-            .build_without_indexed_protocol_simplification()
-    }
-
-    /// Build the accumulated type without re-entering indexed-protocol simplification.
-    ///
-    /// The indexed-protocol pass uses ordinary intersection simplification to compute residual
-    /// tuple elements. Those nested builds must bypass the pass to keep the outer fixed-point
-    /// iteration in control.
-    fn build_without_indexed_protocol_simplification(self) -> Type<'db> {
-        UnionType::from_elements(
-            self.db,
-            self.intersections
-                .into_iter()
-                .map(|inner| inner.build(self.db)),
-        )
+        indexed_protocol::build(self)
     }
 }
 

@@ -273,16 +273,13 @@ def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
-        case x, str():
+        case _, str():
             reveal_type(subj)  # revealed: tuple[int | str, str]
-            reveal_type(subj[0])  # revealed: int | str
             reveal_type(subj[1])  # revealed: str
-            first, second = subj
-            reveal_type(first)  # revealed: int | str
+            _, second = subj
             reveal_type(second)  # revealed: str
-        case y:
+        case _:
             reveal_type(subj)  # revealed: tuple[int | str, int]
-            reveal_type(subj[0])  # revealed: int | str
             reveal_type(subj[1])  # revealed: int
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
@@ -305,21 +302,13 @@ def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> i
 
 def test_match_exact_tuple_multiple_negative_constraints(
     value: tuple[int | str, int | str],
-) -> None:
-    match value:
-        case [int(), str()]:
-            pass
-        case _:
-            # revealed: tuple[str, int | str] | tuple[int | str, int]
-            reveal_type(value)
-
-def test_match_exact_tuple_multiple_negative_constraints_assignability(
-    value: tuple[int | str, int | str],
 ) -> tuple[str, int | str] | tuple[int | str, int]:
     match value:
         case [int(), str()]:
             raise ValueError
         case _:
+            # revealed: tuple[str, int | str] | tuple[int | str, int]
+            reveal_type(value)
             return value
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:

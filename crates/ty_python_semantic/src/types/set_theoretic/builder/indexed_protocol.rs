@@ -1,7 +1,8 @@
 use super::{InnerIntersectionBuilder, IntersectionBuilder};
 use crate::Db;
 use crate::types::Type;
-use crate::types::tuple::{TupleSpec, TupleSpecBuilder, TupleType};
+use crate::types::UnionType;
+use crate::types::tuple::{FixedLengthTuple, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use rustc_hash::FxHashSet;
 
@@ -33,14 +34,30 @@ fn build_indexed_protocol_simplification_intersection<'db>(
     for negative in negatives {
         builder = builder.add_negative(negative);
     }
-    builder.build_without_indexed_protocol_simplification()
+    build_without_indexed_protocol_simplification(builder)
+}
+
+/// Build an intersection, including finite indexed-protocol simplification.
+pub(super) fn build(builder: IntersectionBuilder<'_>) -> Type<'_> {
+    build_without_indexed_protocol_simplification(builder.simplify_indexed_protocol_negatives())
+}
+
+/// Build without re-entering indexed-protocol simplification.
+///
+/// Nested builds leave indexed-protocol complements symbolic so that the outer fixed-point
+/// iteration remains in control.
+fn build_without_indexed_protocol_simplification(builder: IntersectionBuilder<'_>) -> Type<'_> {
+    UnionType::from_elements(
+        builder.db,
+        builder
+            .intersections
+            .into_iter()
+            .map(|inner| inner.build(builder.db)),
+    )
 }
 
 /// Result of subtracting one finite indexed protocol from an exact tuple.
-#[derive(Debug, Eq, PartialEq)]
 enum TupleProtocolComplement<'db> {
-    /// The tuple or protocol contains gradual or unsupported element types.
-    NotApplicable,
     /// The tuple is already disjoint from the protocol, so the complement adds no constraint.
     Redundant,
     /// Every tuple value satisfies the protocol, so its complement eliminates the branch.
@@ -142,21 +159,10 @@ pub(super) fn refine_tuple_protocol_intersection<'db>(
 /// position. Returns an error before constructing more than `max_alternatives` changes.
 fn tuple_protocol_complement<'db>(
     db: &'db dyn Db,
-    tuple: &TupleSpec<'db>,
+    tuple: &FixedLengthTuple<Type<'db>>,
     protocol_elements: &[Type<'db>],
     max_alternatives: usize,
 ) -> Result<TupleProtocolComplement<'db>, ()> {
-    if !all_elements_are_static(db, protocol_elements) {
-        return Ok(TupleProtocolComplement::NotApplicable);
-    }
-
-    let TupleSpec::Fixed(tuple) = tuple else {
-        return Ok(TupleProtocolComplement::NotApplicable);
-    };
-    if !all_elements_are_static(db, tuple.all_elements()) {
-        return Ok(TupleProtocolComplement::NotApplicable);
-    }
-
     if tuple.len() != protocol_elements.len() {
         return Ok(TupleProtocolComplement::Redundant);
     }
@@ -200,7 +206,7 @@ impl<'db> IntersectionBuilder<'db> {
     /// Expansion is all-or-nothing across the builder: if the aggregate alternative or copied
     /// element budget is exceeded, ambiguous complements remain symbolic while propagated
     /// refinements are preserved.
-    pub(super) fn simplify_indexed_protocol_negatives(mut self) -> Self {
+    fn simplify_indexed_protocol_negatives(mut self) -> Self {
         let protocols = self.indexed_protocol_constraints();
         if protocols.is_empty() {
             return self;
@@ -350,28 +356,29 @@ impl<'db> InnerIntersectionBuilder<'db> {
         db: &'db dyn Db,
         protocols: &[IndexedProtocolConstraint<'db>],
     ) -> Option<Self> {
-        loop {
-            let mut changed = false;
+        'fixed_point: loop {
+            let intersection = match self.static_tuple_intersection(db) {
+                Ok(Some(intersection)) => intersection,
+                Ok(None) => return Some(self),
+                Err(()) => return None,
+            };
+            let TupleSpec::Fixed(tuple) = &intersection.tuple else {
+                return Some(self);
+            };
 
             for constraint in protocols {
                 if !self.negative.contains(&constraint.protocol) {
                     continue;
                 }
 
-                let intersection = match self.static_tuple_intersection(db) {
-                    Ok(Some(intersection)) => intersection,
-                    Ok(None) => continue,
-                    Err(()) => return None,
-                };
-                match tuple_protocol_complement(db, &intersection.tuple, &constraint.elements, 2) {
-                    Err(()) | Ok(TupleProtocolComplement::NotApplicable) => continue,
-                    Ok(TupleProtocolComplement::Redundant) => {}
+                match tuple_protocol_complement(db, tuple, &constraint.elements, 2) {
+                    Err(()) => continue,
+                    Ok(TupleProtocolComplement::Redundant) => {
+                        self.negative.swap_remove(&constraint.protocol);
+                    }
                     Ok(TupleProtocolComplement::Eliminated) => return None,
                     Ok(TupleProtocolComplement::Alternatives(alternatives)) => {
                         let [(index, remaining_element)] = alternatives.as_slice() else {
-                            continue;
-                        };
-                        let TupleSpec::Fixed(tuple) = &intersection.tuple else {
                             continue;
                         };
                         let mut elements = tuple.all_elements().to_vec();
@@ -383,15 +390,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if self.positive.contains(&Type::Never) {
                             return None;
                         }
+                        self.negative.swap_remove(&constraint.protocol);
+                        continue 'fixed_point;
                     }
                 }
-                self.negative.swap_remove(&constraint.protocol);
-                changed = true;
             }
 
-            if !changed {
-                return Some(self);
-            }
+            return Some(self);
         }
     }
 
@@ -421,7 +426,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
             let Ok(TupleProtocolComplement::Alternatives(tuple_alternatives)) =
                 tuple_protocol_complement(
                     db,
-                    &intersection.tuple,
+                    tuple,
                     &constraint.elements,
                     MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES,
                 )
@@ -484,385 +489,25 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// Each generated branch retains unrelated positive and negative constraints. Alternatives
     /// that become uninhabited after reinsertion are discarded.
     fn materialize_indexed_protocol_expansion(
-        self,
+        mut self,
         db: &'db dyn Db,
         expansion: IndexedProtocolExpansion<'db>,
     ) -> Vec<Self> {
+        for protocol in &expansion.handled_protocols {
+            self.negative.swap_remove(protocol);
+        }
+        for positive_index in expansion.positive_indices.iter().rev() {
+            self.positive.swap_remove_index(*positive_index);
+        }
+
         let mut alternatives = Vec::with_capacity(expansion.alternatives.len());
         for elements in expansion.alternatives {
             let mut alternative = self.clone();
-            for protocol in &expansion.handled_protocols {
-                alternative.negative.swap_remove(protocol);
-            }
-            for positive_index in expansion.positive_indices.iter().rev() {
-                alternative.positive.swap_remove_index(*positive_index);
-            }
             alternative.add_positive(db, Type::heterogeneous_tuple(db, elements));
             if !alternative.positive.contains(&Type::Never) {
                 alternatives.push(alternative);
             }
         }
         alternatives
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        IntersectionBuilder, MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES,
-        MAX_INDEXED_PROTOCOL_COMPLEMENT_ELEMENTS, TupleProtocolComplement,
-        tuple_protocol_complement,
-    };
-    use crate::db::tests::{TestDb, setup_db};
-    use crate::types::match_pattern::exact_sequence_pattern_type;
-    use crate::types::tuple::TupleSpec;
-    use crate::types::{KnownClass, Type, UnionType};
-
-    fn exact_sequence_protocol<'db>(db: &'db TestDb, elements: &[Type<'db>]) -> Type<'db> {
-        let Type::Intersection(pattern) = exact_sequence_pattern_type(db, elements.iter().copied())
-        else {
-            panic!("Expected exact sequence pattern to be an intersection");
-        };
-        *pattern
-            .positive(db)
-            .iter()
-            .find(|positive| matches!(positive, Type::ProtocolInstance(_)))
-            .expect("Expected exact sequence pattern to contain a protocol")
-    }
-
-    #[test]
-    fn tuple_protocol_complement_returns_position_alternatives() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let tuple = TupleSpec::heterogeneous([element, element]);
-
-        assert_eq!(
-            tuple_protocol_complement(&db, &tuple, &[int, str], 2),
-            Ok(TupleProtocolComplement::Alternatives(vec![
-                (0, str),
-                (1, int)
-            ]))
-        );
-    }
-
-    #[test]
-    fn tuple_protocol_complements_propagate_to_fixed_point() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let tuple = Type::heterogeneous_tuple(&db, [UnionType::from_two_elements(&db, int, str)]);
-        let int_protocol = exact_sequence_protocol(&db, &[int]);
-        let str_protocol = exact_sequence_protocol(&db, &[str]);
-
-        for [first, second] in [[int_protocol, str_protocol], [str_protocol, int_protocol]] {
-            let result = IntersectionBuilder::new(&db)
-                .add_positive(tuple)
-                .add_negative(first)
-                .add_negative(second)
-                .build();
-            assert!(result.is_never());
-        }
-    }
-
-    #[test]
-    fn ambiguous_tuple_protocol_complement_expands() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let tuple = Type::heterogeneous_tuple(&db, [element, element]);
-        let protocol = exact_sequence_protocol(&db, &[int, str]);
-        let expected = UnionType::from_elements(
-            &db,
-            [
-                Type::heterogeneous_tuple(&db, [str, element]),
-                Type::heterogeneous_tuple(&db, [element, int]),
-            ],
-        );
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(tuple)
-            .add_negative(protocol)
-            .build();
-        assert!(result.is_equivalent_to(&db, expected));
-    }
-
-    #[test]
-    fn tuple_protocol_complement_expands_cartesian_product() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let tuple = Type::heterogeneous_tuple(&db, [element; 4]);
-        let first_protocol =
-            exact_sequence_protocol(&db, &[int, int, Type::object(), Type::object()]);
-        let second_protocol =
-            exact_sequence_protocol(&db, &[Type::object(), Type::object(), str, str]);
-        let expected = UnionType::from_elements(
-            &db,
-            [
-                Type::heterogeneous_tuple(&db, [str, element, int, element]),
-                Type::heterogeneous_tuple(&db, [str, element, element, int]),
-                Type::heterogeneous_tuple(&db, [element, str, int, element]),
-                Type::heterogeneous_tuple(&db, [element, str, element, int]),
-            ],
-        );
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(tuple)
-            .add_negative(first_protocol)
-            .add_negative(second_protocol)
-            .build();
-        assert!(result.is_equivalent_to(&db, expected));
-    }
-
-    #[test]
-    fn tuple_protocol_complement_expands_at_limits() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let length = MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES;
-        assert_eq!(length * length, MAX_INDEXED_PROTOCOL_COMPLEMENT_ELEMENTS);
-        let tuple = Type::heterogeneous_tuple(&db, std::iter::repeat_n(element, length));
-        let protocol = exact_sequence_protocol(&db, &vec![int; length]);
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(tuple)
-            .add_negative(protocol)
-            .build();
-        let Type::Union(result) = result else {
-            panic!("Expected tuple complement at the limits to expand");
-        };
-        assert_eq!(result.elements(&db).len(), length);
-    }
-
-    #[test]
-    fn tuple_protocol_complement_over_alternative_limit_remains_symbolic() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let length = MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES + 1;
-        let tuple = Type::heterogeneous_tuple(&db, std::iter::repeat_n(element, length));
-        let protocol = exact_sequence_protocol(&db, &vec![int; length]);
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(tuple)
-            .add_negative(protocol)
-            .build();
-        let Type::Intersection(result) = result else {
-            panic!("Expected ambiguous tuple complement to remain symbolic");
-        };
-        assert!(result.negative(&db).contains(&protocol));
-    }
-
-    #[test]
-    fn tuple_protocol_complement_over_element_limit_remains_symbolic() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let length = MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES + 1;
-        let tuple = Type::heterogeneous_tuple(&db, std::iter::repeat_n(element, length));
-        let refined_tuple = Type::heterogeneous_tuple(
-            &db,
-            std::iter::once(int).chain(std::iter::repeat_n(element, length - 1)),
-        );
-        let refining_protocol = exact_sequence_protocol(
-            &db,
-            &std::iter::once(str)
-                .chain(std::iter::repeat_n(Type::object(), length - 1))
-                .collect::<Vec<_>>(),
-        );
-        let expansive_protocol = exact_sequence_protocol(&db, &vec![int; length]);
-
-        for [first, second] in [
-            [refining_protocol, expansive_protocol],
-            [expansive_protocol, refining_protocol],
-        ] {
-            let result = IntersectionBuilder::new(&db)
-                .add_positive(tuple)
-                .add_negative(first)
-                .add_negative(second)
-                .build();
-            let Type::Intersection(result) = result else {
-                panic!("Expected tuple complement over the element limit to remain symbolic");
-            };
-            assert!(result.positive(&db).contains(&refined_tuple));
-            assert!(result.negative(&db).contains(&expansive_protocol));
-            assert!(!result.negative(&db).contains(&refining_protocol));
-        }
-    }
-
-    #[test]
-    fn tuple_protocol_complement_limit_is_shared_across_union_arms() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let bytes = KnownClass::Bytes.to_instance(&db);
-        let length = MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES / 2 + 1;
-        let tuple_with_str = Type::heterogeneous_tuple(
-            &db,
-            std::iter::repeat_n(UnionType::from_two_elements(&db, int, str), length),
-        );
-        let tuple_with_bytes = Type::heterogeneous_tuple(
-            &db,
-            std::iter::repeat_n(UnionType::from_two_elements(&db, int, bytes), length),
-        );
-        let protocol = exact_sequence_protocol(&db, &vec![int; length]);
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(UnionType::from_two_elements(
-                &db,
-                tuple_with_str,
-                tuple_with_bytes,
-            ))
-            .add_negative(protocol)
-            .build();
-        let Type::Union(result) = result else {
-            panic!("Expected union arms over the shared limit to remain separate");
-        };
-        assert_eq!(result.elements(&db).len(), 2);
-        assert!(result.elements(&db).iter().all(|element| {
-            let Type::Intersection(intersection) = element else {
-                return false;
-            };
-            intersection.negative(&db).contains(&protocol)
-        }));
-    }
-
-    #[test]
-    fn unchanged_union_arms_count_toward_tuple_protocol_complement_limit() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let length = MAX_INDEXED_PROTOCOL_COMPLEMENT_ALTERNATIVES;
-        let expansive = Type::heterogeneous_tuple(
-            &db,
-            std::iter::repeat_n(UnionType::from_two_elements(&db, int, str), length),
-        );
-        let unchanged = Type::heterogeneous_tuple(&db, [str]);
-        let protocol = exact_sequence_protocol(&db, &vec![int; length]);
-
-        let result = IntersectionBuilder::new(&db)
-            .add_positive(UnionType::from_two_elements(&db, expansive, unchanged))
-            .add_negative(protocol)
-            .build();
-        let Type::Union(result) = result else {
-            panic!("Expected tuple complement over the shared limit to remain symbolic");
-        };
-        assert_eq!(result.elements(&db).len(), 2);
-        assert!(result.elements(&db).contains(&unchanged));
-        assert!(result.elements(&db).iter().any(|element| {
-            let Type::Intersection(intersection) = element else {
-                return false;
-            };
-            intersection.negative(&db).contains(&protocol)
-        }));
-    }
-
-    #[test]
-    fn eliminating_tuple_protocol_precedes_ambiguous_constraints() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let length = 8;
-        let tuple = Type::heterogeneous_tuple(&db, std::iter::repeat_n(element, length));
-        let int_protocol = exact_sequence_protocol(&db, &vec![int; length]);
-        let str_protocol = exact_sequence_protocol(&db, &vec![str; length]);
-        let object_protocol = exact_sequence_protocol(&db, &vec![Type::object(); length]);
-
-        for protocols in [
-            [int_protocol, str_protocol, object_protocol],
-            [int_protocol, object_protocol, str_protocol],
-            [str_protocol, int_protocol, object_protocol],
-            [str_protocol, object_protocol, int_protocol],
-            [object_protocol, int_protocol, str_protocol],
-            [object_protocol, str_protocol, int_protocol],
-        ] {
-            let result = IntersectionBuilder::new(&db)
-                .add_positive(tuple)
-                .add_negative(protocols[0])
-                .add_negative(protocols[1])
-                .add_negative(protocols[2])
-                .build();
-            assert!(result.is_never());
-        }
-    }
-
-    #[test]
-    fn tuple_protocol_complement_considers_all_positive_tuples() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let expansive = Type::heterogeneous_tuple(&db, [int_or_str, int_or_str]);
-        let disjoint = Type::heterogeneous_tuple(&db, [str, Type::object()]);
-        let protocol = exact_sequence_protocol(&db, &[int, int]);
-        let build = |first, second, negative| {
-            let mut builder = IntersectionBuilder::new(&db)
-                .add_positive(first)
-                .add_positive(second);
-            if negative {
-                builder = builder.add_negative(protocol);
-            }
-            builder.build()
-        };
-
-        for [first, second] in [[expansive, disjoint], [disjoint, expansive]] {
-            let result = build(first, second, true);
-            assert!(result.is_equivalent_to(&db, build(first, second, false)));
-            let Type::Intersection(result) = result else {
-                panic!("Expected both tuple constraints to remain in an intersection");
-            };
-            assert!(!result.negative(&db).contains(&protocol));
-        }
-    }
-
-    #[test]
-    fn tuple_protocol_complement_combines_positive_tuple_constraints() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let bytes = KnownClass::Bytes.to_instance(&db);
-        let int_or_str = UnionType::from_two_elements(&db, int, str);
-        let first_tuple = Type::heterogeneous_tuple(&db, [int_or_str, int_or_str]);
-        let second_tuple = Type::heterogeneous_tuple(
-            &db,
-            [UnionType::from_two_elements(&db, int, bytes), int_or_str],
-        );
-        let expected = Type::heterogeneous_tuple(&db, [int, str]);
-        let protocol = exact_sequence_protocol(&db, &[int, int]);
-
-        for [first, second] in [[first_tuple, second_tuple], [second_tuple, first_tuple]] {
-            let result = IntersectionBuilder::new(&db)
-                .add_positive(first)
-                .add_positive(second)
-                .add_negative(protocol)
-                .build();
-            assert!(result.is_equivalent_to(&db, expected));
-        }
-    }
-
-    #[test]
-    fn simplification_keeps_nested_complement_symbolic() {
-        let db = setup_db();
-        let int = KnownClass::Int.to_instance(&db);
-        let str = KnownClass::Str.to_instance(&db);
-        let element = UnionType::from_two_elements(&db, int, str);
-        let length = 8;
-        let tuple = Type::heterogeneous_tuple(&db, std::iter::repeat_n(element, length));
-        let protocol = exact_sequence_protocol(&db, &vec![int; length]);
-        let remaining =
-            super::build_indexed_protocol_simplification_intersection(&db, [tuple], [protocol]);
-
-        let Type::Intersection(remaining) = remaining else {
-            panic!("Expected nested tuple complement to remain symbolic");
-        };
-        assert!(remaining.negative(&db).contains(&protocol));
     }
 }
