@@ -238,6 +238,32 @@ fn is_versioned_interpreter_path(file_name: &str) -> bool {
     !version.is_empty() && PythonVersion::from_str(version.trim_end_matches('t')).is_ok()
 }
 
+/// Extract the Python version from a path that looks like a versioned Python executable.
+///
+/// For example:
+/// - `/opt/bin/python3.14` -> `Some(PythonVersion(3, 14))`
+/// - `/usr/bin/python3` -> `None` (ambiguous, no minor version)
+/// - `/usr/bin/python` -> `None`
+/// - `.venv/bin/python3.12` -> `Some(PythonVersion(3, 12))`
+/// - `/opt/bin/python3.13t` -> `Some(PythonVersion(3, 13))` (free-threaded)
+/// - `C:\Python3.14\python3.14.exe` -> `Some(PythonVersion(3, 14))` (Windows)
+fn python_version_from_executable_path(path: &SystemPath) -> Option<PythonVersion> {
+    let file_name = path.file_name()?;
+    // Strip the platform-specific executable suffix (e.g. `.exe` on Windows)
+    // so that `python3.14.exe` is parsed the same as `python3.14`.
+    let file_name = file_name
+        .strip_suffix(std::env::consts::EXE_SUFFIX)
+        .unwrap_or(file_name);
+    let version_str = file_name
+        .strip_prefix("python")
+        .or_else(|| file_name.strip_prefix("pypy"))?
+        .trim_end_matches('t');
+    if version_str.is_empty() {
+        return None;
+    }
+    PythonVersion::from_str(version_str).ok()
+}
+
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
     fn from(paths: [SystemPathBuf; N]) -> Self {
         Self(
@@ -347,6 +373,10 @@ impl PythonEnvironment {
         origin: SysPrefixPathOrigin,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
+        // Extract the Python version from the executable path (e.g. `python3.14` → 3.14)
+        // BEFORE it gets resolved to sys.prefix, so we can still identify the correct
+        // site-packages directory even for system installations without pyvenv.cfg.
+        let python_version = python_version_from_executable_path(path.as_ref());
         let path = SysPrefixPath::new(path.as_ref(), origin, system)?;
 
         // Attempt to inspect as a virtual environment first
@@ -356,7 +386,7 @@ impl PythonEnvironment {
             Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(path, _, _))
                 if !path.origin.must_be_virtual_env() =>
             {
-                Ok(Self::System(SystemEnvironment::new(path)))
+                Ok(Self::System(SystemEnvironment::new(path, python_version)))
             }
             Err(err) => Err(err),
         }
@@ -980,16 +1010,22 @@ struct RawPyvenvCfg<'s> {
 #[derive(Debug)]
 pub struct SystemEnvironment {
     root_path: SysPrefixPath,
+    // we also need python version in the case of multiple versions of pythons are installed
+    // see [ty using incorrect site-packages]: https://github.com/astral-sh/ty/issues/3424
+    python_version: Option<PythonVersion>,
 }
 
 impl SystemEnvironment {
-    /// Create a new system environment from the given path.
+    /// Create a new system environment with an optionally known Python version.
     ///
-    /// At this time, there is no eager validation and this is infallible. Instead, validation
-    /// will occur in [`site_packages_directories_from_sys_prefix`] — which will fail if there is not
-    /// a Python environment at the given path.
-    pub(crate) fn new(path: SysPrefixPath) -> Self {
-        Self { root_path: path }
+    /// When the Python version is known (e.g., from `--python /opt/bin/python3.14`),
+    /// the site-packages discovery can target the exact version directory
+    /// instead of scanning all Python versions under `sys.prefix`.
+    pub(crate) fn new(path: SysPrefixPath, python_version: Option<PythonVersion>) -> Self {
+        Self {
+            root_path: path,
+            python_version,
+        }
     }
 
     /// Return a list of `site-packages` directories that are available from this environment.
@@ -999,11 +1035,14 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-        let SystemEnvironment { root_path } = self;
+        let SystemEnvironment {
+            root_path,
+            python_version,
+        } = self;
 
         let site_packages_directories = site_packages_directories_from_sys_prefix(
             root_path,
-            None,
+            *python_version,
             PythonImplementation::Unknown,
             system,
         )?;
@@ -1021,7 +1060,10 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> StdlibDiscoveryResult<SystemPathBuf> {
-        let SystemEnvironment { root_path } = self;
+        let SystemEnvironment {
+            root_path,
+            python_version: _,
+        } = self;
 
         let stdlib_directory = real_stdlib_directory_from_sys_prefix(
             root_path,
@@ -3568,21 +3610,16 @@ mod tests {
         let site_packages_314 = sys_prefix.join("lib/python3.14/site-packages");
         let site_packages_313 = sys_prefix.join("lib/python3.13/site-packages");
 
-        memory_fs.create_directory_all(sys_prefix.join("bin")).unwrap();
         memory_fs
-            .create_directory_all(&site_packages_314)
+            .create_directory_all(sys_prefix.join("bin"))
             .unwrap();
-        memory_fs
-            .create_directory_all(&site_packages_313)
-            .unwrap();
+        memory_fs.create_directory_all(&site_packages_314).unwrap();
+        memory_fs.create_directory_all(&site_packages_313).unwrap();
         memory_fs.write_file_all(&python_314_exe, "").unwrap();
 
-        let env = PythonEnvironment::new(
-            &python_314_exe,
-            SysPrefixPathOrigin::PythonCliFlag,
-            &system,
-        )
-        .unwrap();
+        let env =
+            PythonEnvironment::new(&python_314_exe, SysPrefixPathOrigin::PythonCliFlag, &system)
+                .unwrap();
 
         let PythonEnvironment::System(system_env) = &env else {
             panic!("Expected a system environment, got virtual: {env:?}");
