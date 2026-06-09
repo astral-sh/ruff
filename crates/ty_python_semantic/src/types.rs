@@ -1129,16 +1129,6 @@ impl<'db> Type<'db> {
         )
     }
 
-    /// Returns `true` if any recursion marker — a bare `Type::Divergent(_)` or a `Type::Recursive`
-    /// μ-binder (whose body holds the marker but is `Atomic` to `any_over_type`, so it is not
-    /// descended into) — appears anywhere inside `self`. Used by ambiguous-overload resolution to
-    /// keep preserving the recursion marker even after it has been wrapped in a `Type::Recursive`.
-    pub(crate) fn contains_any_divergent(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, false, |ty| {
-            matches!(ty, Type::Divergent(_) | Type::Recursive(_))
-        })
-    }
-
     /// Returns `true` if this type describes a runtime *value* (e.g. an instance, tuple, callable),
     /// as opposed to a *type used as a value* — a class object, `type[…]`, generic alias, special
     /// form, or named/known-instance type. Used to decide whether a recursive cycle result should
