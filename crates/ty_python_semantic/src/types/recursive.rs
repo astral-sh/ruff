@@ -16,6 +16,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
     TypedDictType,
 };
+use salsa::plumbing::AsId;
 
 impl<'db> Type<'db> {
     /// Return the key used by type-transform visitors for cycle detection.
@@ -109,8 +110,6 @@ impl<'db> RecursiveOrigin<'db> {
     }
 
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
-        use salsa::plumbing::AsId;
-
         match self {
             Self::Implicit => None,
             Self::TypeAlias(alias) => Some(alias.definition(db).as_id()),
@@ -133,8 +132,6 @@ impl<'db> RecursiveOrigin<'db> {
     where
         'db: 'a,
     {
-        use salsa::plumbing::AsId;
-
         let binder_id = match self {
             Self::TypeAlias(TypeAliasType::PEP695(alias)) => alias.as_id(),
             _ => self.binder_id(db)?,

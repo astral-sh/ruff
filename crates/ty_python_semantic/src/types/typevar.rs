@@ -1654,7 +1654,7 @@ impl<'db> TypeVarConstraints<'db> {
     /// Normalize for cycle recovery by combining with the previous value and
     /// removing divergent types introduced by the cycle.
     ///
-    /// See [`Type::recover_salsa_cycle`] for more details on how this works.
+    /// See [`Type::cycle_normalized`] for more details on how this works.
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         let current_elements = self.elements(db);
         let prev_elements = previous.elements(db);
@@ -1670,7 +1670,7 @@ impl<'db> TypeVarConstraints<'db> {
 
     /// Normalize recursive types for cycle recovery when there's no previous value.
     ///
-    /// See [`Type::recover_salsa_cycle`] for more details.
+    /// See [`Type::cycle_normalized`] for more details.
     fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         self.map(db, |ty| ty.cycle_normalized(db, None, cycle))
     }
