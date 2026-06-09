@@ -166,13 +166,12 @@ def _(answer: AmbiguousEnum):
 
 ```py
 from enum import Enum
-from typing import Literal
 
 class IndependentEquality(Enum):
     NO = 0
     YES = 1
 
-    def __ne__(self, other: object) -> Literal[True]:
+    def __ne__(self, other: object) -> bool:
         return True
 
 def _(answer: IndependentEquality):
@@ -184,7 +183,7 @@ def _(answer: IndependentEquality):
     if answer != IndependentEquality.NO:
         reveal_type(answer)  # revealed: IndependentEquality
     else:
-        reveal_type(answer)  # revealed: Never
+        reveal_type(answer)  # revealed: IndependentEquality
 ```
 
 ## Equality between concrete runtime classes
@@ -221,6 +220,39 @@ def narrow_typed_dict(value: Payload | None, other: Payload):
         reveal_type(value)  # revealed: Payload
     else:
         reveal_type(value)  # revealed: Payload | None
+```
+
+## Comparisons with user-defined methods
+
+Arbitrary user-defined comparison methods are not used for narrowing. This keeps both operand orders
+conservative without needing to model Python's reflected-comparison dispatch:
+
+```py
+class Left:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Right:
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def _(value: Right | None):
+    if Left() == value:
+        reveal_type(value)  # revealed: Right | None
+    else:
+        reveal_type(value)  # revealed: Right | None
+```
+
+Distinct objects with known identity-based comparison semantics remain definitively unequal:
+
+```py
+def callback() -> None: ...
+def _(flag: bool):
+    value = callback if flag else None
+    if value == int:
+        reveal_type(value)  # revealed: Never
+    else:
+        reveal_type(value)  # revealed: (def callback() -> None) | None
 ```
 
 ## `x != y` where `y` is of literal type
@@ -342,6 +374,17 @@ def _(x: Any | None, y: Any | None):
         reveal_type(x)  # revealed: (Any & ~Literal[1]) | None
     if y == 1:
         reveal_type(y)  # revealed: Any & ~None
+
+def _(x: Any):
+    if x == True:
+        reveal_type(x)  # revealed: Any
+    else:
+        reveal_type(x)  # revealed: Any & ~Literal[True] & ~Literal[1]
+
+    if x != True:
+        reveal_type(x)  # revealed: Any & ~Literal[True] & ~Literal[1]
+    else:
+        reveal_type(x)  # revealed: Any
 ```
 
 ## Booleans and integers
