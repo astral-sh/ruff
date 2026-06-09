@@ -1061,6 +1061,15 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
+    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
+    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
+    fn same_divergent_marker(self, other: Type<'db>) -> bool {
+        match (self, other) {
+            (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+            _ => false,
+        }
+    }
+
     /// Construct a `Type::Recursive` with the given μ-binder id, origin, and body.
     /// The body may contain `Type::Divergent(binder_id)` at recursive positions.
     pub(crate) fn recursive(
@@ -2353,9 +2362,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested
-            && matches!((self, div), (Type::Divergent(left), Type::Divergent(right)) if left.id() == right.id())
-        {
+        if nested && self.same_divergent_marker(div) {
             return None;
         }
         // A top-level implicit recursive type for the marker currently being normalized is folded
@@ -2365,8 +2372,7 @@ impl<'db> Type<'db> {
             && rec.is_implicit(db)
         {
             let marker = Type::divergent(rec.binder_id(db));
-            if matches!((marker, div), (Type::Divergent(left), Type::Divergent(right)) if left.id() == right.id())
-            {
+            if marker.same_divergent_marker(div) {
                 return Some(marker);
             }
             return Some(self);
@@ -7858,6 +7864,10 @@ impl get_size2::GetSize for DivergentType {}
 impl DivergentType {
     pub(crate) const fn new(id: salsa::Id) -> Self {
         Self { id }
+    }
+
+    fn same_marker(self, other: DivergentType) -> bool {
+        self.id == other.id
     }
 
     pub(crate) const fn id(self) -> salsa::Id {
