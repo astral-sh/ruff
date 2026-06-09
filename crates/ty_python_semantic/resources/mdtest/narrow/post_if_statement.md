@@ -73,6 +73,74 @@ def _(x: A | B | C):
     reveal_type(x)  # revealed: B | A
 ```
 
+## Factoring branches with exact complementary narrowing
+
+When several `TypeIs` branches continue to the same code, their narrowing can be combined. The
+`TypeGuard` and `Any` cases cannot use this simplification, so they retain the narrowing from each
+individual path.
+
+```py
+from typing import Any
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def is_a(x: object) -> TypeIs[A]:
+    return isinstance(x, A)
+
+def is_b(x: object) -> TypeIs[B]:
+    return isinstance(x, B)
+
+def is_c(x: object) -> TypeIs[C]:
+    return isinstance(x, C)
+
+def guard_a(x: object) -> TypeGuard[A]:
+    return isinstance(x, A)
+
+def exact_complements(x: A | B | C | D):
+    if is_a(x):
+        pass
+    elif is_b(x):
+        pass
+    elif is_c(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
+def compound_condition(x: A | B | C):
+    if is_a(x) or is_b(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: A | B
+
+def type_guard_fallback(x: A | B | C):
+    if guard_a(x):
+        pass
+    elif is_b(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: B | (A & ~B)
+
+def gradual_fallback(x: Any):
+    if is_a(x):
+        pass
+    elif is_b(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: (Any & B) | (Any & A & ~B)
+```
+
 ## Narrowing is preserved with multiple terminal branches
 
 ```py

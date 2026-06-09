@@ -578,9 +578,6 @@ impl<'db> NarrowingConstraint<'db> {
     }
 
     /// Returns the constrained type when this is exactly one single-conjunct intersection.
-    ///
-    /// Replacement constraints and intersections with multiple conjuncts or disjuncts return
-    /// `None`.
     pub(crate) fn single_intersection_type(&self) -> Option<Type<'db>> {
         let [disjunct] = &*self.intersection_disjuncts else {
             return None;
