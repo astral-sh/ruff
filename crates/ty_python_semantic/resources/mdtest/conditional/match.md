@@ -220,6 +220,31 @@ def _(target: int | str):
     reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
+### Subclass-of type
+
+A class pattern whose class expression has type `type[Base]` is not guaranteed to match a `Base`
+subject. `PatternClass` can evaluate to any subclass of `Base`, and a `Base` instance need not be an
+instance of that subclass. The `PatternClass` arm must therefore not be considered guaranteed to
+match, and the fallback arm remains reachable.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+PatternClass: type[Base] = Derived
+
+def _(target: Base):
+    match target:
+        case PatternClass():
+            reveal_type(target)  # revealed: Base
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: Base
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
 ### `collections.abc.Callable`
 
 ```py
