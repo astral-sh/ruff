@@ -113,6 +113,7 @@ impl<'db> RecursiveOrigin<'db> {
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
         match self {
             Self::Implicit => None,
+            Self::TypeAlias(TypeAliasType::PEP695(alias)) => Some(alias.as_id()),
             Self::TypeAlias(alias) => Some(alias.definition(db).as_id()),
             Self::Function(function) => Some(function.as_id()),
             Self::NewType(newtype) => Some(newtype.definition(db).as_id()),
@@ -133,10 +134,7 @@ impl<'db> RecursiveOrigin<'db> {
     where
         'db: 'a,
     {
-        let binder_id = match self {
-            Self::TypeAlias(TypeAliasType::PEP695(alias)) => alias.as_id(),
-            _ => self.binder_id(db)?,
-        };
+        let binder_id = self.binder_id(db)?;
         let type_mapping = TypeMapping::ReplaceRecursiveOrigin {
             origin: self,
             binder_id: BinderId::new(binder_id),
