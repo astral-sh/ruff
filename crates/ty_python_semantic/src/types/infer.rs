@@ -958,7 +958,7 @@ impl<'db> DefinitionTypes<'db> {
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        normalize_binding_for_cycle(db, ty, previous.binding_type(definition), cycle)
+        ty.cycle_normalized(db, previous.binding_type(definition), cycle)
     }
 
     fn normalize_declaration(
@@ -1095,19 +1095,6 @@ struct DefinitionInferenceExtra<'db> {
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
     /// Only populated for expressions that have non-empty qualifiers.
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
-}
-
-/// Normalize one binding's type during cycle recovery.
-fn normalize_binding_for_cycle<'db>(
-    db: &'db dyn Db,
-    binding_ty: Type<'db>,
-    previous: Option<Type<'db>>,
-    cycle: &salsa::Cycle,
-) -> Type<'db> {
-    match previous {
-        Some(previous) => binding_ty.cycle_normalized(db, Some(previous), cycle),
-        None => binding_ty.cycle_normalized(db, None, cycle),
-    }
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -1528,7 +1515,7 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
                 .map(|(_, ty)| *ty);
-            *binding_ty = normalize_binding_for_cycle(db, *binding_ty, previous_binding, cycle);
+            *binding_ty = binding_ty.cycle_normalized(db, previous_binding, cycle);
         }
         for (declaration, declaration_ty) in &mut self.declarations {
             if let Some((_, previous_declaration)) = previous_inference
