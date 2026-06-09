@@ -1655,13 +1655,6 @@ mod tests {
         errors: Vec<LexicalError>,
     }
 
-    #[derive(Debug, PartialEq, Eq)]
-    struct TestTokenShape {
-        kind: TokenKind,
-        range: TextRange,
-        flags: TokenFlags,
-    }
-
     impl std::fmt::Display for LexerOutput {
         fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
             writeln!(f, "## Tokens")?;
@@ -1735,43 +1728,6 @@ mod tests {
     #[track_caller]
     fn lex_jupyter_source(source: &str) -> LexerOutput {
         lex_valid(source, Mode::Ipython, TextSize::default())
-    }
-
-    fn lex_token_shapes(mut lexer: Lexer<'_>) -> (Vec<TestTokenShape>, Vec<LexicalError>) {
-        let mut tokens = Vec::new();
-
-        loop {
-            let kind = lexer.next_token();
-            if kind.is_eof() {
-                break;
-            }
-            tokens.push(TestTokenShape {
-                kind,
-                range: lexer.current_range(),
-                flags: lexer.current_flags(),
-            });
-        }
-
-        (tokens, lexer.finish())
-    }
-
-    fn assert_public_raw_lexer_matches_internal_tokenization(source: &str, mode: Mode) {
-        let internal = lex_token_shapes(Lexer::new(source, mode, TextSize::default()));
-        let raw = lex_token_shapes(super::lex(source, mode));
-
-        assert_eq!(raw, internal);
-    }
-
-    #[test]
-    fn public_raw_lexer_matches_internal_tokenization_without_cooked_values() {
-        assert_public_raw_lexer_matches_internal_tokenization(
-            r#"identifier long_identifier 𝒞 "string" r"raw" f"{{x}} {name!r}" t"{{x}} {name}" 0x2f 025"#,
-            Mode::Module,
-        );
-        assert_public_raw_lexer_matches_internal_tokenization(
-            "%timeit a = b\n%foo?\n!pwd \\\n  && ls -a",
-            Mode::Ipython,
-        );
     }
 
     #[test]
@@ -2166,19 +2122,6 @@ if first:
     fn test_escape_unicode_name() {
         let source = r#""\N{EN SPACE}""#;
         assert_snapshot!(lex_source(source));
-    }
-
-    fn get_tokens_only(source: &str) -> Vec<TokenKind> {
-        let output = lex(source, Mode::Module, TextSize::default());
-        assert!(output.errors.is_empty());
-        output.tokens.into_iter().map(|token| token.kind()).collect()
-    }
-
-    #[test]
-    fn test_nfkc_normalization() {
-        let source1 = "𝒞 = 500";
-        let source2 = "C = 500";
-        assert_eq!(get_tokens_only(source1), get_tokens_only(source2));
     }
 
     #[test]

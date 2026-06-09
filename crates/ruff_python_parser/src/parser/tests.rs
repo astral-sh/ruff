@@ -1,4 +1,4 @@
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Expr, IpyEscapeKind, Stmt};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -59,6 +59,45 @@ fn test_unicode_aliases() {
     let suite = parse_module(source).unwrap().into_suite();
 
     insta::assert_debug_snapshot!(suite);
+}
+
+#[test]
+fn nfkc_normalizes_names() {
+    let parsed = parse_expression("𝒞").unwrap();
+    let Expr::Name(name) = parsed.expr() else {
+        panic!("expected name expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(name.id.as_str(), "C");
+}
+
+#[test]
+fn ipython_escape_command_values() {
+    let cases = [
+        ("?foo?", IpyEscapeKind::Help, "foo"),
+        ("??   foo?", IpyEscapeKind::Help, "foo"),
+        ("??   foo  ?", IpyEscapeKind::Help2, "   foo  ?"),
+        ("?foo??", IpyEscapeKind::Help2, "foo"),
+        ("%foo?", IpyEscapeKind::Help, "%foo"),
+        ("%foo??", IpyEscapeKind::Help2, "%foo"),
+        ("%%foo???", IpyEscapeKind::Magic2, "foo???"),
+        ("!pwd?", IpyEscapeKind::Shell, "pwd?"),
+        ("?? \\\n    foo?", IpyEscapeKind::Help, "foo"),
+    ];
+
+    for (source, expected_kind, expected_value) in cases {
+        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+            .unwrap()
+            .try_into_module()
+            .unwrap()
+            .into_suite();
+        let [Stmt::IpyEscapeCommand(command)] = suite.as_slice() else {
+            panic!("expected one IPython escape command for {source:?}, got {suite:?}");
+        };
+
+        assert_eq!(command.kind, expected_kind, "source: {source:?}");
+        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+    }
 }
 
 #[test]
