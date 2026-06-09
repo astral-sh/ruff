@@ -313,9 +313,8 @@ fn primitive_literal_constraint<'db>(
         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
     };
 
-    (left_is_builtin_primitive
-        || (!condition_expects_equality && matches!(right.kind(), LiteralValueTypeKind::Bool(_))))
-    .then(|| equal_to_right.negate_if(db, !condition_expects_equality))
+    (left_is_builtin_primitive || !condition_expects_equality)
+        .then(|| equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
 fn inequality_result<'db>(
