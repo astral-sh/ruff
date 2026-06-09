@@ -1,5 +1,5 @@
 use crate::Db;
-use crate::reachability::ReachabilityConstraintsExtension;
+use crate::reachability::narrow_type_by_constraint;
 use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
@@ -2764,8 +2764,9 @@ pub(crate) trait NarrowingEvaluatorExtension<'db> {
 
 impl<'db> NarrowingEvaluatorExtension<'db> for NarrowingEvaluator<'_, 'db> {
     fn narrow(&self, db: &'db dyn Db, base_type: Type<'db>, place: ScopedPlaceId) -> Type<'db> {
-        self.reachability_constraints().narrow_by_constraint(
+        narrow_type_by_constraint(
             db,
+            self.narrowing_constraints(),
             self.predicates(),
             self.constraint(),
             base_type,

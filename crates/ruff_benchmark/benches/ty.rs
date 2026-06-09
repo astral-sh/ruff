@@ -1215,6 +1215,68 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for repeatedly using a value after a long `TypeIs` `elif` chain.
+///
+/// Every matching branch reaches the calls after the chain, while the `else` branch returns. The
+/// merged type should be `C0 | C1 | ...` instead of keeping `not C0`, `not C1`, and so on in each
+/// later branch.
+fn benchmark_typeis_elif_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 40;
+    const LOADS_AFTER_CHAIN: usize = 10;
+
+    setup_rayon();
+
+    let mut code = r#"
+from typing import TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+
+class Source: ...
+"#
+    .to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Source): ...").ok();
+    }
+
+    code.push_str(
+        r#"
+def istype(value: object, cls: type[T]) -> TypeIs[T]:
+    raise NotImplementedError
+
+def consume(value: object) -> None: ...
+
+def check(source: Source) -> None:
+"#,
+    );
+
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if istype(source, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif istype(source, C{i}):").ok();
+        }
+        code.push_str("        pass\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..LOADS_AFTER_CHAIN {
+        code.push_str("    consume(source)\n");
+    }
+
+    criterion.bench_function("ty_micro[typeis_elif_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_pandas_tdd(criterion: &mut Criterion) {
     setup_rayon();
 
@@ -1524,6 +1586,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
+    benchmark_typeis_elif_narrowing,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,

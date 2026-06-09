@@ -1209,6 +1209,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().merge(state);
     }
 
+    fn flow_merge_after_branches(
+        &mut self,
+        state: FlowSnapshot,
+        preceding_branch_predicates: &[ScopedPredicateId],
+    ) {
+        self.current_use_def_map_mut()
+            .merge_after_branches(state, preceding_branch_predicates);
+    }
+
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
@@ -1623,7 +1632,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .reachability_constraints
                     .mark_used(live_binding.reachability_constraint());
                 use_def
-                    .reachability_constraints
+                    .narrowing_constraints
                     .mark_used(live_binding.narrowing_constraint());
             }
         }
@@ -1773,7 +1782,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
     ///
     /// Returns the `ScopedPredicateId` for the positive predicate, which can later be passed to
-    /// `record_negated_narrowing_constraint` for TDD-level negation.
+    /// `record_negated_narrowing_constraint` to record the opposite result of the same check.
     fn record_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
@@ -1824,9 +1833,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Negates the given predicate and then adds it as a narrowing constraint to the places
     /// that could possibly be narrowed.
     ///
-    /// Takes the `ScopedPredicateId` from the positive recording so that TDD-level negation
-    /// (`add_not_constraint`) uses the same atom. This ensures `atom(P) OR NOT(atom(P))`
-    /// simplifies to `ALWAYS_TRUE`, correctly cancelling narrowing after complete if/else blocks.
+    /// Takes the `ScopedPredicateId` from the positive recording so that both constraints refer to
+    /// the same check. This lets the positive and negative cases cancel after a complete
+    /// `if`/`else`.
     fn record_negated_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
@@ -3117,7 +3126,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_body(&node.body);
 
-                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                let mut post_clauses: Vec<(FlowSnapshot, ScopedPredicateId)> = vec![];
                 let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
@@ -3137,7 +3146,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
-                    post_clauses.push(self.flow_snapshot());
+                    post_clauses.push((self.flow_snapshot(), last_narrowing_id));
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(condition_flow_snapshot.falsy());
@@ -3183,8 +3192,33 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_body(clause_body);
                 }
 
-                for post_clause_state in post_clauses {
-                    self.flow_merge(post_clause_state);
+                let final_clause = self.flow_snapshot();
+                let mut preceding_predicates = Vec::with_capacity(post_clauses.len());
+                let mut merged_reachable_clause = false;
+
+                for (post_clause_state, predicate) in post_clauses {
+                    if !post_clause_state.is_always_unreachable() {
+                        if merged_reachable_clause {
+                            self.flow_merge_after_branches(
+                                post_clause_state,
+                                &preceding_predicates,
+                            );
+                        } else {
+                            self.flow_restore(post_clause_state);
+                            merged_reachable_clause = true;
+                        }
+                    }
+                    preceding_predicates.push(predicate);
+                }
+
+                if !final_clause.is_always_unreachable() {
+                    if merged_reachable_clause {
+                        self.flow_merge_after_branches(final_clause, &preceding_predicates);
+                    } else {
+                        self.flow_restore(final_clause);
+                    }
+                } else if !merged_reachable_clause {
+                    self.flow_restore(final_clause);
                 }
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
@@ -3422,8 +3456,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         });
-                        // Add the predicate once, then use TDD-level negation for the failure
-                        // path. This ensures the positive and negative atoms share the same ID.
+                        // Use the same predicate ID for the successful and failed checks.
                         let guard_predicate_id = self.add_predicate(predicate);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         self.flow_restore(condition_flow_snapshot.falsy());
@@ -3857,10 +3890,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             is_positive: true,
                         };
 
+                        let predicate_id =
+                            self.add_predicate(PredicateOrLiteral::Predicate(predicate));
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+
                         if self.in_function_scope() {
-                            let constraint = self.record_reachability_constraint(
-                                PredicateOrLiteral::Predicate(predicate),
-                            );
+                            self.record_reachability_constraint_id(predicate_id);
 
                             // Also gate narrowing by this constraint: if the call returns
                             // `Never`, any narrowing in the current branch should be
@@ -3868,19 +3906,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             // narrowing to be preserved after if-statements where one branch
                             // calls a `NoReturn` function like `sys.exit()`.
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(constraint);
+                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
                             // (not a reachability constraint). Recording reachability for
                             // calls in module scope is simply too expensive, and it's not
                             // too important of a use case.
-                            let predicate_id =
-                                self.add_predicate(PredicateOrLiteral::Predicate(predicate));
-                            let constraint = self
-                                .current_reachability_constraints_mut()
-                                .add_atom(predicate_id);
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(constraint);
+                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         }
                     }
                 }
