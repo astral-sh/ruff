@@ -1269,7 +1269,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, target: ClassType<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
         let relation_visitor = HasRelationToVisitor::default(&constraints);
-        let disjointness_visitor = IsDisjointVisitor::disjoint_default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
@@ -2249,9 +2249,6 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                         ConstraintSet::from_bool(self.constraints, !target.is_final(db))
-                    }
-                    TypeRelation::Disjointness => {
-                        unreachable!("Disjointness is not a directional relation")
                     }
                 },
 
