@@ -7,7 +7,23 @@
 //! logic needs to be tolerant of variations.
 
 mod markdown;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "wired into parsed docstring rendering in follow-up changes"
+    )
+)]
+mod parsed;
 mod rest;
+#[cfg_attr(
+    not(test),
+    expect(
+        dead_code,
+        reason = "wired into parsed docstring rendering in follow-up changes"
+    )
+)]
+mod sections;
 
 use indexmap::IndexMap;
 use regex::Regex;
@@ -186,6 +202,10 @@ fn render_markdown(docstring: &str) -> String {
     // break out of it, even if they're writing python documentation about markdown
     // code fences and are showing off how you can use more than 3 backticks.
     const FENCE: &str = "```````````";
+    let parsed = parsed::ParsedDocstring::parse(docstring);
+    let docstring = parsed.render_markdown_source();
+    let docstring = docstring.as_ref();
+
     // TODO: there is a convention that `singletick` is for items that can
     // be looked up in-scope while ``multitick`` is for opaque inline code.
     // While rendering this we should make note of all the `singletick` locations
