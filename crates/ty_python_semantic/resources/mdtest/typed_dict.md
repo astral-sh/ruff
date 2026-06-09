@@ -1887,7 +1887,7 @@ static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
 
 ```py
 from typing_extensions import TypedDict
-from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to, is_disjoint_from
 
 class Node1(TypedDict):
     value: int
@@ -1910,6 +1910,20 @@ class Person2(TypedDict):
 
 static_assert(is_assignable_to(Person1, Person2))
 static_assert(is_equivalent_to(Person1, Person2))
+
+# Mutually-recursive `TypedDict`s. Regression test for a stack overflow: the
+# `(TypedDict, TypedDict)` subtyping and disjointness arms had lost their
+# `with_recursion_guard`, and only *self*-recursion is folded into `Type::Recursive`,
+# so the mutual cycle (`Ping.other: Pong`, `Pong.other: Ping`) recursed forever.
+class Ping(TypedDict):
+    other: "Pong"
+
+class Pong(TypedDict):
+    other: "Ping"
+
+static_assert(is_assignable_to(Ping, Pong))
+static_assert(is_equivalent_to(Ping, Pong))
+static_assert(not is_disjoint_from(Ping, Pong))
 ```
 
 ## Redundant cast warnings

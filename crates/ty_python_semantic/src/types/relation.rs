@@ -1859,7 +1859,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.check_typeddict_pair(db, source_td, target_td)
+                // Mutually-recursive TypedDicts (e.g. `A.x: B`, `B.x: A`) recurse through field
+                // comparison. Only *self*-recursion is folded into `Type::Recursive` by
+                // `try_to_recursive_type`; the mutual case has no μ-binder, so the pair must be
+                // recorded here for the co-inductive fallback to terminate the cycle.
+                self.with_recursion_guard(source, target, || {
+                    self.check_typeddict_pair(db, source_td, target_td)
+                })
             }
 
             // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
@@ -3217,7 +3223,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
 
             (Type::TypedDict(left_td), Type::TypedDict(right_td)) => {
-                self.check_typeddict_pair(db, left_td, right_td)
+                // Mutually-recursive TypedDicts recurse through field comparison; only
+                // self-recursion is folded into `Type::Recursive`. Record the pair so the
+                // co-inductive fallback terminates the cycle (mirrors the subtyping arm).
+                self.with_recursion_guard(left, right, || {
+                    self.check_typeddict_pair(db, left_td, right_td)
+                })
             }
 
             // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
