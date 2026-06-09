@@ -276,7 +276,7 @@ impl Suppressions {
             }
 
             // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
-            // its parent) is covered by the diagnostic. Range suppression comments must fully
+            // its parent) is covered by the suppression. Range suppression comments must fully
             // contain the diagnostic range.
             let suppressed = if suppression.is_ignore() {
                 suppression.range.contains(range.start())
