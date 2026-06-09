@@ -401,6 +401,7 @@ impl<'db> Type<'db> {
     }
 
     /// Return true if this type is a subtype of `target` using constraint-set typevar rules.
+    #[salsa::tracked(cycle_initial=|_, _, _, _| true, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn is_constraint_set_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
         self.when_constraint_set_subtype_of(db, target, &constraints)
