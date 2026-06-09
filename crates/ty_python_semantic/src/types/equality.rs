@@ -66,7 +66,8 @@ pub(super) fn evaluate_type_equality<'db>(
     right: Type<'db>,
     is_positive: bool,
 ) -> Option<Type<'db>> {
-    primitive_literal_constraint(db, left, right, is_positive)
+    enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
+        .or_else(|| primitive_literal_constraint(db, left, right, is_positive))
         .or_else(|| equality_result(db, left, right, is_positive).constraint(is_positive))
 }
 
@@ -76,8 +77,15 @@ pub(super) fn evaluate_type_inequality<'db>(
     right: Type<'db>,
     is_positive: bool,
 ) -> Option<Type<'db>> {
-    primitive_literal_constraint(db, left, right, !is_positive)
-        .or_else(|| inequality_result(db, left, right, is_positive).constraint(is_positive))
+    enum_literal_constraint(
+        db,
+        left,
+        right,
+        ComparisonOperator::Inequality,
+        !is_positive,
+    )
+    .or_else(|| primitive_literal_constraint(db, left, right, !is_positive))
+    .or_else(|| inequality_result(db, left, right, is_positive).constraint(is_positive))
 }
 
 pub(crate) fn equality_truthiness<'db>(
@@ -315,6 +323,50 @@ fn primitive_literal_constraint<'db>(
 
     (left_is_builtin_primitive || !condition_expects_equality)
         .then(|| equal_to_right.negate_if(db, !condition_expects_equality))
+}
+
+fn enum_literal_constraint<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    operator: ComparisonOperator,
+    condition_expects_equality: bool,
+) -> Option<Type<'db>> {
+    let LiteralValueTypeKind::Enum(right) = right.as_literal_value_kind()? else {
+        return None;
+    };
+    let enum_class = right.enum_class(db);
+
+    if !is_same_enum_domain(db, left, right)
+        || known_instance_semantics(db, right.enum_class_instance(db), operator).is_none()
+    {
+        return None;
+    }
+
+    let metadata = enum_metadata(db, enum_class)?;
+    let name = metadata.resolve_member(right.name(db))?.clone();
+    let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class, name));
+    Some(equal_to_right.negate_if(db, !condition_expects_equality))
+}
+
+fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralType<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::LiteralValue(literal) => matches!(
+            literal.kind(),
+            LiteralValueTypeKind::Enum(left)
+                if left.enum_class(db) == right.enum_class(db)
+        ),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_same_enum_domain(db, *element, right)),
+        Type::NominalInstance(instance) => instance.class_literal(db) == right.enum_class(db),
+        Type::EnumComplement(complement) => complement.enum_class(db) == right.enum_class(db),
+        Type::Intersection(intersection) => intersection
+            .enum_complement(db)
+            .is_some_and(|complement| complement.enum_class(db) == right.enum_class(db)),
+        _ => false,
+    }
 }
 
 fn inequality_result<'db>(
