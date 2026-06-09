@@ -2680,7 +2680,52 @@ impl<'db> Type<'db> {
     /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
     /// of union and intersection types.
     fn class_member(self, db: &'db dyn Db, name: Name) -> PlaceAndQualifiers<'db> {
-        self.class_member_with_policy(db, name, MemberLookupPolicy::default())
+        // Keep the default policy and the frequent `__get__` name out of the common Salsa keys.
+        if name == "__get__" {
+            self.class_member_dunder_get_inner(db, ())
+        } else {
+            self.class_member_inner(db, name)
+        }
+    }
+
+    fn class_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        if policy.is_empty() {
+            self.class_member(db, name)
+        } else {
+            self.class_member_with_policy_inner(db, name, policy)
+        }
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, ()| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, ()| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn class_member_dunder_get_inner(self, db: &'db dyn Db, unit: ()) -> PlaceAndQualifiers<'db> {
+        let () = unit;
+        self.class_member_impl(
+            db,
+            Name::new_static("__get__"),
+            MemberLookupPolicy::default(),
+        )
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _| {
+            member.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn class_member_inner(self, db: &'db dyn Db, name: Name) -> PlaceAndQualifiers<'db> {
+        self.class_member_impl(db, name, MemberLookupPolicy::default())
     }
 
     #[salsa::tracked(
@@ -2690,7 +2735,16 @@ impl<'db> Type<'db> {
         },
         heap_size=ruff_memory_usage::heap_size
     )]
-    fn class_member_with_policy(
+    fn class_member_with_policy_inner(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        self.class_member_impl(db, name, policy)
+    }
+
+    fn class_member_impl(
         self,
         db: &'db dyn Db,
         name: Name,
@@ -3457,6 +3511,38 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
+        // Keep the default policy and absent receiver out of the common Salsa key.
+        #[salsa::tracked(
+            cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _| {
+                member.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn member_lookup_inner<'db>(
+            db: &'db dyn Db,
+            this: Type<'db>,
+            name: Name,
+        ) -> PlaceAndQualifiers<'db> {
+            member_lookup_with_policy_impl(db, this, name, MemberLookupPolicy::default(), None)
+        }
+
+        #[salsa::tracked(
+            cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+                member.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn member_lookup_with_policy_inner<'db>(
+            db: &'db dyn Db,
+            this: Type<'db>,
+            name: Name,
+            policy: MemberLookupPolicy,
+        ) -> PlaceAndQualifiers<'db> {
+            member_lookup_with_policy_impl(db, this, name, policy, None)
+        }
+
         #[salsa::tracked(
             cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
@@ -3464,7 +3550,17 @@ impl<'db> Type<'db> {
             },
             heap_size=ruff_memory_usage::heap_size
         )]
-        fn member_lookup_with_policy_inner<'db>(
+        fn member_lookup_with_policy_and_receiver_inner<'db>(
+            db: &'db dyn Db,
+            this: Type<'db>,
+            name: Name,
+            policy: MemberLookupPolicy,
+            receiver: Type<'db>,
+        ) -> PlaceAndQualifiers<'db> {
+            member_lookup_with_policy_impl(db, this, name, policy, Some(receiver))
+        }
+
+        fn member_lookup_with_policy_impl<'db>(
             db: &'db dyn Db,
             this: Type<'db>,
             name: Name,
@@ -4008,7 +4104,13 @@ impl<'db> Type<'db> {
             }
         }
 
-        member_lookup_with_policy_inner(db, self, name, policy, receiver)
+        match receiver {
+            Some(receiver) => {
+                member_lookup_with_policy_and_receiver_inner(db, self, name, policy, receiver)
+            }
+            None if policy.is_empty() => member_lookup_inner(db, self, name),
+            None => member_lookup_with_policy_inner(db, self, name, policy),
+        }
     }
 
     /// Return the type of `len()` on a type if it is known more precisely than `int`,
