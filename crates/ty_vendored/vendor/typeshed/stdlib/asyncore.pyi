@@ -18,6 +18,7 @@ control than multi-threaded programming. The module documented here solves
 many of the difficult problems for you, making the task of building
 sophisticated high-performance network servers and clients a snap.
 """
+
 import sys
 from _typeshed import FileDescriptorLike, ReadableBuffer
 from socket import socket

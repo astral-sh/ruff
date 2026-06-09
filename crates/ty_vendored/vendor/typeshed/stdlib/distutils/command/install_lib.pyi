@@ -3,6 +3,7 @@
 Implements the Distutils 'install_lib' command
 (install all Python modules).
 """
+
 from _typeshed import Incomplete
 from typing import ClassVar, Final
 
@@ -32,6 +33,7 @@ class install_lib(Command):
         were actually run.  Not affected by the "dry-run" flag or whether
         modules have actually been built yet.
         """
+
     def get_inputs(self):
         """Get the list of files that are input to this command, ie. the
         files that get installed as they are named in the build tree.

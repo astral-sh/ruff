@@ -12,6 +12,7 @@ the "typical" Unix-style command-line C compiler:
   * link static library handled by 'ar' command (possibly with 'ranlib')
   * link shared library handled by 'cc -shared'
 """
+
 from distutils.ccompiler import CCompiler
 
 class UnixCCompiler(CCompiler): ...
