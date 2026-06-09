@@ -1648,8 +1648,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn infer_body(&mut self, suite: &[ast::Stmt]) {
-        for statement in suite {
-            self.infer_maybe_standalone_statement(statement);
+        for (index, statement) in suite.iter().enumerate() {
+            self.infer_maybe_standalone_statement(statement, index + 1 < suite.len());
 
             if let ast::Stmt::Expr(ast::StmtExpr {
                 range: _,
@@ -5834,9 +5834,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_maybe_standalone_statement(&mut self, statement: &ast::Stmt) {
+    fn infer_maybe_standalone_statement(
+        &mut self,
+        statement: &ast::Stmt,
+        has_following_statement: bool,
+    ) {
         if let Some(standalone_statement) = self.index.try_statement(statement) {
             self.infer_standalone_statement_impl(standalone_statement);
+        } else if has_following_statement
+            && matches!(self.region, InferenceRegion::Scope(..))
+            && let ast::Stmt::Expr(ast::StmtExpr { value, .. }) = statement
+            && let Some(standalone_expression) = self.index.try_expression(value)
+        {
+            // A following statement can consume this call's `IsNonTerminalCall` predicate.
+            // Preserve the standalone query so reachability reuses the inferred call type.
+            self.infer_standalone_expression_impl(
+                value,
+                standalone_expression,
+                TypeContext::default(),
+            );
         } else {
             self.infer_statement(statement);
         }
