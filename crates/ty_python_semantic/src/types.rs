@@ -6034,7 +6034,9 @@ impl<'db> Type<'db> {
             // *value* — e.g. `X = NamedTuple("X", [("x", "X")]), None`, where `X` is bound to a tuple
             // value — and using such a runtime value as a type is invalid. Check its body so a
             // value-shaped body (a tuple/instance) yields `invalid-type-form`.
-            Type::Recursive(rec) if rec.has_explicit_origin(db) || rec.is_non_contractive(db) => Ok(*self),
+            Type::Recursive(rec) if rec.has_explicit_origin(db) || rec.is_non_contractive(db) => {
+                Ok(*self)
+            }
             Type::Recursive(rec) => rec
                 .unfold(db)
                 .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)

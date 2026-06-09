@@ -219,6 +219,8 @@ impl<'db> RecursiveType<'db> {
 
     /// Returns the body with its `Type::Divergent` α-binder markers substituted
     /// back to the source type when this μ-binder has an explicit origin.
+    /// Use this when you do not need to perform type operations arbitrarily and would rather treat it as a finite type.
+    /// In this case, the source type should be consumed as the terminal element (otherwise the source type would be expanded infinitely).
     pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
         let Some(replacement) = self.origin(db).source_type() else {
