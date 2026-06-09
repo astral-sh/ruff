@@ -367,11 +367,11 @@ else:
 ## Union with `Any`
 
 ```py
-from typing import Any
+from typing import Any, Literal
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
-        reveal_type(x)  # revealed: (Any & ~Literal[1]) | None
+        reveal_type(x)  # revealed: (Any & ~Literal[1] & ~Literal[True]) | None
     if y == 1:
         reveal_type(y)  # revealed: Any & ~None
 
@@ -385,6 +385,12 @@ def _(x: Any):
         reveal_type(x)  # revealed: Any & ~Literal[True] & ~Literal[1]
     else:
         reveal_type(x)  # revealed: Any
+
+def _(x: Literal["foo", "bar"] | Any):
+    if x != "bar":
+        reveal_type(x)  # revealed: Literal["foo"] | (Any & ~Literal["bar"])
+    else:
+        reveal_type(x)  # revealed: Literal["bar"] | (Any & ~Literal["foo"])
 ```
 
 ## Booleans and integers
