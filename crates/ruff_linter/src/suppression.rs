@@ -103,6 +103,17 @@ impl Suppression {
     fn codes(&self) -> &[TextRange] {
         &self.comments.first().codes
     }
+
+    /// Returns whether or not the suppression is a standalone `ruff:ignore` comment.
+    fn is_ignore(&self) -> bool {
+        matches!(
+            self.comments,
+            SuppressionComments::Single(SuppressionComment {
+                action: SuppressionAction::Ignore,
+                ..
+            })
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -209,7 +220,38 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
-    /// Check if a diagnostic is suppressed by any known range suppressions
+    /// Check if a diagnostic is suppressed by any known range suppressions.
+    ///
+    /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
+    /// For example, noting that the `RUF015` diagnostic spans from the opening `[` to the end of
+    /// the subscript expression:
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    ///     *range(10)
+    /// ][0]
+    /// # ruff:enable[RUF015]
+    /// ```
+    ///
+    /// is suppressed, but
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    /// # ruff:enable[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
+    ///
+    /// is not. For `ruff:ignore`, this rule is augmented to check whether the diagnostic's start
+    /// offset is contained instead, meaning that this _will_ be suppressed:
+    ///
+    /// ```python
+    /// suppressed = [  # ruff:ignore[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
@@ -228,7 +270,25 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains_range(range) {
+
+            if *code != suppression_code {
+                continue;
+            }
+
+            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
+            // its parent) is covered by the suppression. Range suppression comments must fully
+            // contain the diagnostic range.
+            let suppressed = if suppression.is_ignore() {
+                suppression.range.contains(range.start())
+                    || range.is_empty() && suppression.range.end() == range.start()
+                    || diagnostic
+                        .parent()
+                        .is_some_and(|parent| suppression.range.contains(parent))
+            } else {
+                suppression.range.contains_range(range)
+            };
+
+            if suppressed {
                 suppression.used.set(true);
                 return true;
             }
@@ -836,10 +896,12 @@ impl<'a> SuppressionsBuilder<'a> {
         for next_token in after {
             match next_token.kind() {
                 TokenKind::Newline => {
+                    end = next_token.start();
                     break;
                 }
                 TokenKind::Comment => {}
                 TokenKind::NonLogicalNewline if is_inner_comment => {
+                    end = next_token.start();
                     if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
                     }
@@ -2593,6 +2655,37 @@ def foo():
                 reason: "",
             },
         )
+        "##,
+        );
+    }
+
+    #[test]
+    fn trailing_comment_own_line_ignore() {
+        let source = "# ruff: ignore[some-thing]
+x = 1 # trailing";
+        let comment = Suppressions::debug(source);
+        assert_debug_snapshot!(
+            comment,
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: ignore[some-thing]\nx = 1 # trailing",
+                    code: "some-thing",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: ignore[some-thing]",
+                        action: Ignore,
+                        codes: [
+                            "some-thing",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
         "##,
         );
     }
