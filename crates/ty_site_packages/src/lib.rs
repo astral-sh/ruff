@@ -3548,4 +3548,64 @@ mod tests {
             "Should NOT find python3.11 dist-packages when version=3.12 is known, got: {dirs:?}"
         );
     }
+
+    /// Regression test for <https://github.com/astral-sh/ty/issues/3424>.
+    ///
+    /// When `--python /opt/bin/python3.14` is passed, ty should only discover
+    /// the site-packages for Python 3.14, not for other Python versions
+    /// that happen to be installed in the same sys.prefix directory.
+    #[cfg(not(windows))]
+    #[test]
+    fn uses_correct_site_packages_when_python_executable_path_has_version() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+
+        // Simulate: /opt/ has Python 3.13 and 3.14 both installed
+        // and python 3.13 should not be found
+        let sys_prefix = SystemPathBuf::from("/opt");
+
+        let python_314_exe = sys_prefix.join("bin/python3.14");
+        let site_packages_314 = sys_prefix.join("lib/python3.14/site-packages");
+        let site_packages_313 = sys_prefix.join("lib/python3.13/site-packages");
+
+        memory_fs.create_directory_all(sys_prefix.join("bin")).unwrap();
+        memory_fs
+            .create_directory_all(&site_packages_314)
+            .unwrap();
+        memory_fs
+            .create_directory_all(&site_packages_313)
+            .unwrap();
+        memory_fs.write_file_all(&python_314_exe, "").unwrap();
+
+        let env = PythonEnvironment::new(
+            &python_314_exe,
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+
+        let PythonEnvironment::System(system_env) = &env else {
+            panic!("Expected a system environment, got virtual: {env:?}");
+        };
+
+        let site_packages = system_env.site_packages_directories(&system).unwrap();
+        let dirs: Vec<_> = site_packages.into_iter().collect();
+
+        assert!(
+            dirs.iter()
+                .any(|p| p.as_str() == "/opt/lib/python3.14/site-packages"),
+            "Expected to find /opt/lib/python3.14/site-packages, got: {dirs:?}"
+        );
+        assert!(
+            dirs.iter()
+                .all(|p| p.as_str() != "/opt/lib/python3.13/site-packages"),
+            "Should NOT include /opt/lib/python3.13/site-packages when --python points to python3.14, got: {dirs:?}"
+        );
+        assert_eq!(
+            dirs.len(),
+            1,
+            "Expected exactly one site-packages path, got {count}: {dirs:?}",
+            count = dirs.len(),
+        );
+    }
 }
