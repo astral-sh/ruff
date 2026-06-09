@@ -993,12 +993,6 @@ impl<'db> Type<'db> {
         Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
     }
 
-    /// True if this type is a `Type::Recursive(_)` μ-binder. Used by future phases.
-    #[allow(dead_code)]
-    pub(crate) const fn is_recursive(&self) -> bool {
-        matches!(self, Type::Recursive(_))
-    }
-
     /// One-step unfold of a recursive type.
     pub(crate) fn unfold_recursive_once(self, db: &'db dyn Db) -> Self {
         match self {
@@ -1019,26 +1013,16 @@ impl<'db> Type<'db> {
         self.is_divergent() || self.is_bottom_recursive(db)
     }
 
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+    /// Returns the α marker for either a bare `Divergent` or an implicit μ-binder.
+    pub(crate) fn as_recursion_marker_divergent(self, db: &'db dyn Db) -> Option<DivergentType> {
         match self {
             Type::Divergent(divergent) => Some(divergent),
+            Type::Recursive(rec) => Some(DivergentType::new(rec.binder_id(db))),
             _ => None,
         }
     }
 
-    /// Like [`as_divergent`][Self::as_divergent], but also recognizes a `Type::Recursive` μ-binder,
-    /// returning its α-variable `Divergent` marker. Bidirectional container inference uses this to
-    /// detect a self-referential collection use whether the cycle marker surfaces as a bare
-    /// `Divergent` or as a `Type::Recursive` wrapper.
-    pub(crate) fn as_recursion_marker_divergent(self, db: &'db dyn Db) -> Option<DivergentType> {
-        self.as_divergent().or_else(|| match self {
-            Type::Recursive(rec) => Some(DivergentType::new(rec.binder_id(db))),
-            _ => None,
-        })
-    }
-
-    /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
-    /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
+    /// Returns `true` if both types are the same bare `Divergent` marker.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
@@ -1067,25 +1051,6 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| {
             matches!(ty, Type::Divergent(_) | Type::Recursive(_))
         })
-    }
-
-    /// Returns `true` if a `Type::Divergent(binder_id)` marker appears at a *structural* (nested)
-    /// position — i.e. inside a constructor such as `tuple[…]` / `list[…]` — rather than only as a
-    /// bare top-level union member or as the whole type itself.
-    ///
-    /// A bare top-level `Divergent` (e.g. `int | Divergent`, which `recursive_type_normalized`
-    /// reduces to `int`) is a degenerate, non-structural recursion and should not be wrapped in a
-    /// `Type::Recursive` μ-binder; only structural recursion (e.g. `tuple[Divergent, int]`) benefits
-    /// from the binder, since that is what lets subscript/iteration unfold on demand.
-    pub(crate) fn has_structural_divergent(self, db: &'db dyn Db, binder_id: salsa::Id) -> bool {
-        match self {
-            Type::Divergent(_) => false,
-            Type::Union(union) => union.elements(db).iter().any(|element| {
-                !matches!(element, Type::Divergent(d) if d.id() == binder_id)
-                    && element.contains_divergent_with_id(db, binder_id)
-            }),
-            other => other.contains_divergent_with_id(db, binder_id),
-        }
     }
 
     /// Returns `true` if this type describes a runtime *value* (e.g. an instance, tuple, callable),
@@ -1126,56 +1091,32 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Finalize a recursively-defined value/attribute cycle result for each cycle head:
-    ///
-    /// - If the head's `Divergent` marker survives at a *structural* position (see
-    ///   [`has_structural_divergent`]) — e.g. `tuple[Divergent, int]`, `list[Divergent]` — wrap in an
-    ///   implicit `Type::Recursive` μ-binder, turning it into a true recursive type that unfolds on
-    ///   demand.
-    /// - If the result *is* the bare head marker itself (a structureless `μα.α` cycle, e.g.
-    ///   `self.x = other.x` with no base case), resolve it to `Never`: no value inhabits an infinite
-    ///   self-reference that carries no structure, so the cyclically-defined binding has no inhabitant
-    ///   and the bare `Divergent` marker does not escape as a standalone type. (A purely-cyclic
-    ///   attribute then reads as effectively unbound, which is the intended consequence.)
-    /// - Otherwise (the marker did not survive — e.g. `int | Divergent` already normalized to `int`),
-    ///   leave the result unchanged.
-    ///
-    /// [`has_structural_divergent`]: Type::has_structural_divergent
-    pub(crate) fn wrap_structural_recursive(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        self.wrap_structural_recursive_fold_only(db, cycle)
-            .resolve_structureless_cycle_to_never(cycle)
-    }
-
-    /// Like [`wrap_structural_recursive`] but **without** the structureless→`Never` finalization.
-    /// Folds any structural `Divergent` into an implicit `Type::Recursive` μ-binder so the cycle
-    /// result carries the binder (operations unfold it) instead of exposing a bare `Divergent`, but
-    /// leaves a structureless top-level `Divergent` as-is. Used by generic cycles (union/intersection/
-    /// inference) where the value-cycle Never-resolution would misfire on a mid-iteration provisional.
-    pub(crate) fn wrap_structural_recursive_fold_only(
+    /// Finalize cycle markers after fixed-point normalization.
+    pub(crate) fn finalize_recursive_cycle_markers(
         self,
         db: &'db dyn Db,
         cycle: &salsa::Cycle,
+        fold_structural: bool,
+        resolve_structureless: bool,
     ) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            if ty.has_structural_divergent(db, id) {
+            let has_structural_marker = match ty {
+                Type::Divergent(_) => false,
+                Type::Union(union) => union.elements(db).iter().any(|element| {
+                    !matches!(element, Type::Divergent(d) if d.id() == id)
+                        && element.contains_divergent_with_id(db, id)
+                }),
+                other => other.contains_divergent_with_id(db, id),
+            };
+
+            if fold_structural && has_structural_marker {
                 Type::implicit_recursive(db, id, ty)
+            } else if resolve_structureless && ty == Type::divergent(id) {
+                Type::Never
             } else {
                 ty
             }
         })
-    }
-
-    /// Resolve a converged *structureless* cycle — a value that is exactly the bare `Divergent`
-    /// α-marker for one of `cycle`'s heads (`μα.α`, e.g. `self.x = other.x` or `A = A` with no base
-    /// case) — to `Never`: such a cycle has no inhabitant, and the bare marker must not escape as a
-    /// standalone type. All other types (including structural recursion already wrapped in
-    /// `Type::Recursive`) are returned unchanged. Used by value/place cycle recovery.
-    pub(crate) fn resolve_structureless_cycle_to_never(self, cycle: &salsa::Cycle) -> Self {
-        if cycle.head_ids().any(|id| self == Type::divergent(id)) {
-            Type::Never
-        } else {
-            self
-        }
     }
 
     pub const fn is_unknown(&self) -> bool {

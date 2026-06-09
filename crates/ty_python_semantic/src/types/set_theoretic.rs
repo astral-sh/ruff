@@ -72,7 +72,7 @@ impl<'db> UnionType<'db> {
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result
                 .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-                .wrap_structural_recursive_fold_only(db, cycle)
+                .finalize_recursive_cycle_markers(db, cycle, true, false)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -742,7 +742,7 @@ impl<'db> IntersectionType<'db> {
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result
                 .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-                .wrap_structural_recursive_fold_only(db, cycle)
+                .finalize_recursive_cycle_markers(db, cycle, true, false)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
