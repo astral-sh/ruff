@@ -398,59 +398,6 @@ pub(crate) fn infer_same_file_expression_type<'db>(
     inference.expression_type(expression.node_ref(db))
 }
 
-/// Infers an expression for reachability without resolving flow-sensitive runtime bindings.
-///
-/// Reachability is conservative: if determining whether a call returns `Never` would require
-/// resolving a flow-sensitive binding, the binding is treated as `Unknown`. This prevents
-/// terminal-call analysis from adding definition-inference dependencies during cycle recovery.
-#[salsa::tracked(
-    cycle_initial=|_, _, _| false,
-    heap_size=ruff_memory_usage::heap_size
-)]
-pub(crate) fn infer_reachability_expression_is_terminal<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-) -> bool {
-    let file = expression.file(db);
-    let module = parsed_module(db, file).load(db);
-    let index = semantic_index(db, file);
-    let inference = TypeInferenceBuilder::new(
-        db,
-        InferenceRegion::ReachabilityExpression(expression),
-        index,
-        &module,
-    )
-    .finish_expression();
-
-    if inference
-        .expression_type(expression.node_ref(db))
-        .is_equivalent_to(db, Type::Never)
-    {
-        return true;
-    }
-
-    let call = match expression.node_ref(db).node(&module) {
-        ast::Expr::Call(call) => call,
-        ast::Expr::Await(await_expr) => {
-            let Some(call) = await_expr.value.as_call_expr() else {
-                return false;
-            };
-            call
-        }
-        _ => return false,
-    };
-
-    call.arguments
-        .args
-        .iter()
-        .chain(call.arguments.keywords.iter().map(|keyword| &keyword.value))
-        .any(|argument| {
-            inference
-                .expression_type(argument)
-                .is_equivalent_to(db, Type::Never)
-        })
-}
-
 /// Infers the type of an expression where the expression might come from another file.
 ///
 /// Use this over [`infer_expression_types`] if the expression might come from another file than the
@@ -776,8 +723,6 @@ pub(crate) enum InferenceRegion<'db> {
     Statement(StatementInner<'db>),
     /// infer types for a standalone [`Expression`]
     Expression(Expression<'db>, TypeContext<'db>),
-    /// infer an expression conservatively for terminal-call reachability
-    ReachabilityExpression(Expression<'db>),
     /// infer types for a [`Definition`]
     Definition(Definition<'db>),
     /// infer types for the decorators on a function [`Definition`]
@@ -792,8 +737,7 @@ impl<'db> InferenceRegion<'db> {
     fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self {
             InferenceRegion::Statement(statement) => statement.scope(db),
-            InferenceRegion::Expression(expression, _)
-            | InferenceRegion::ReachabilityExpression(expression) => expression.scope(db),
+            InferenceRegion::Expression(expression, _) => expression.scope(db),
             InferenceRegion::Definition(definition)
             | InferenceRegion::FunctionDecorators(definition)
             | InferenceRegion::Deferred(definition) => definition.scope(db),

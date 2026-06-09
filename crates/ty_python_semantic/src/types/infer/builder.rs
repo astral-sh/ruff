@@ -401,7 +401,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             InferenceRegion::Statement(_)
             | InferenceRegion::Expression(_, _)
-            | InferenceRegion::ReachabilityExpression(_)
             | InferenceRegion::FunctionDecorators(_)
             | InferenceRegion::Scope(_, _) => None,
         })
@@ -801,14 +800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Expression(expression, tcx) => {
                 self.infer_region_expression(expression, tcx);
             }
-            InferenceRegion::ReachabilityExpression(expression) => {
-                self.infer_region_expression(expression, TypeContext::default());
-            }
         }
-    }
-
-    fn is_reachability_inference(&self) -> bool {
-        matches!(self.region, InferenceRegion::ReachabilityExpression(_))
     }
 
     fn infer_region_scope(&mut self, scope: ScopeId<'db>, tcx: TypeContext<'db>) {
@@ -8786,10 +8778,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         mut ty: Type<'db>,
         constraint_keys: &[(FileScopeId, ConstraintKey)],
     ) -> Type<'db> {
-        if self.is_reachability_inference() {
-            return ty;
-        }
-
         let db = self.db();
         for (enclosing_scope_file_id, constraint_key) in constraint_keys {
             let use_def = self.index.use_def_map(*enclosing_scope_file_id);
@@ -9025,56 +9013,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, self.file());
-            let place = if self.is_reachability_inference() {
-                self.reachability_place_from_bindings(use_def.bindings_at_use(use_id))
-            } else {
-                place_from_bindings(db, use_def.bindings_at_use(use_id)).place
-            };
+            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
 
             (place, Some(use_id))
-        }
-    }
-
-    fn reachability_place_from_bindings<'map>(
-        &self,
-        bindings: impl Iterator<Item = ty_python_core::BindingWithConstraints<'map, 'db>>,
-    ) -> Place<'db>
-    where
-        'db: 'map,
-    {
-        let db = self.db();
-        let mut types = UnionBuilder::new(db);
-        let mut has_stable_binding = false;
-
-        for binding in bindings {
-            let DefinitionState::Defined(definition) = binding.binding else {
-                continue;
-            };
-
-            let kind = definition.kind(db);
-            let is_parameter = matches!(
-                kind,
-                DefinitionKind::Parameter(_) | DefinitionKind::LambdaParameter(_)
-            );
-            let is_stable_declaration = kind
-                .category(self.file().is_stub(db), self.module())
-                .is_declaration()
-                && !matches!(kind, DefinitionKind::AnnotatedAssignment(_));
-            if !is_parameter
-                && !is_stable_declaration
-                && !matches!(kind, DefinitionKind::ImportFromSubmodule(_))
-            {
-                return Place::bound(Type::unknown());
-            }
-
-            has_stable_binding = true;
-            types.add_in_place(binding_type(db, definition));
-        }
-
-        if has_stable_binding {
-            Place::bound(types.build())
-        } else {
-            Place::Undefined
         }
     }
 
@@ -9121,16 +9062,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place = if self.is_reachability_inference() {
-                        self.reachability_place_from_bindings(bindings)
-                    } else {
-                        place_from_bindings(db, bindings).place
-                    };
-                    if assume_bound && let Place::Defined(defined) = place {
-                        place =
+                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
+                        place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
                     }
-                    let place = place.map_type(|ty| {
+                    let place = place_and_qualifiers.place.map_type(|ty| {
                         self.narrow_place_with_applicable_constraints(
                             place_expr,
                             ty,

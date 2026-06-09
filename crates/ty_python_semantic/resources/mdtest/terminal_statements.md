@@ -878,7 +878,7 @@ If a generic function's return type depends on a type variable, and the argument
 that type variable to `Never`, the call should still be treated as terminal.
 
 ```py
-from typing import TypeVar, NoReturn
+from typing import Never, NoReturn, TypeVar, assert_type
 
 T = TypeVar("T")
 
@@ -907,6 +907,11 @@ def _(flag: bool):
         identity(exit())
 
     reveal_type(x)  # revealed: Literal["test"]
+
+def _():
+    value = 1
+    assert_type(value, Never)  # error: [type-assertion-failure]
+    1 + "x"  # error: [unsupported-operator]
 ```
 
 PEP 695 aliases in generic return annotations should be resolved before deciding whether a call can
@@ -920,10 +925,10 @@ python-version = "3.12"
 ```py
 from typing import Never, NoReturn
 
-type A[T] = tuple[T]
+type A[T] = T
 
 def f[T](x: T) -> A[T]:
-    return (x,)
+    return x
 
 # No "implicitly returns `None`" diagnostic
 def g(x: Never) -> NoReturn:

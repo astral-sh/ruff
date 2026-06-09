@@ -200,12 +200,14 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_reachability_expression_is_terminal,
+        enum_metadata, infer_expression_types, infer_narrowing_constraints,
         infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
         singleton_pattern_type,
     },
 };
+use ruff_db::parsed::parsed_module;
 use ruff_index::IndexSlice;
+use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -213,6 +215,7 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
+    expression::Expression,
     place::ScopedPlaceId,
     place_table,
     predicate::{
@@ -1122,14 +1125,12 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 Truthiness::AlwaysTrue
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
+            } else if any_overload_is_generic {
+                analyze_generic_call(db, call_expr)
             } else {
-                let is_terminal = if any_overload_is_generic {
-                    infer_reachability_expression_is_terminal(db, call_expr)
-                } else {
-                    infer_same_file_expression_type(db, call_expr, TypeContext::default())
-                        .is_equivalent_to(db, Type::Never)
-                };
-                if is_terminal {
+                let call_expr_ty =
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
+                if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {
                     Truthiness::AlwaysTrue
@@ -1178,6 +1179,49 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 Place::Undefined => Truthiness::AlwaysFalse,
             }
         }
+    }
+}
+
+#[salsa::tracked(
+    cycle_initial = |_, _, _| Truthiness::AlwaysTrue,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn analyze_generic_call<'db>(db: &'db dyn Db, call_expr: Expression<'db>) -> Truthiness {
+    let module = parsed_module(db, call_expr.file(db)).load(db);
+    let arguments = match call_expr.node_ref(db).node(&module) {
+        ast::Expr::Call(call) => &call.arguments,
+        ast::Expr::Await(await_expr) => {
+            let Some(call) = await_expr.value.as_call_expr() else {
+                return Truthiness::AlwaysTrue;
+            };
+            &call.arguments
+        }
+        _ => return Truthiness::AlwaysTrue,
+    };
+
+    let inference = infer_expression_types(db, call_expr, TypeContext::default());
+    let is_terminal_call = |expression: &ast::Expr| {
+        matches!(expression, ast::Expr::Call(_))
+            || matches!(expression, ast::Expr::Await(await_expr) if await_expr.value.is_call_expr())
+    };
+
+    if inference
+        .expression_type(call_expr.node_ref(db))
+        .is_equivalent_to(db, Type::Never)
+        || arguments
+            .args
+            .iter()
+            .chain(arguments.keywords.iter().map(|keyword| &keyword.value))
+            .filter(|argument| is_terminal_call(argument))
+            .any(|argument| {
+                inference
+                    .expression_type(argument)
+                    .is_equivalent_to(db, Type::Never)
+            })
+    {
+        Truthiness::AlwaysFalse
+    } else {
+        Truthiness::AlwaysTrue
     }
 }
 

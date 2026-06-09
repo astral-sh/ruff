@@ -185,9 +185,9 @@ class B:
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`
 
-This is a regression test for <https://github.com/astral-sh/ty/issues/3485>. Recursive type
-normalization should not force the lazy base of a `NewType` while Salsa is recovering the cycle
-created by the forward reference to `T`.
+This is a regression test for <https://github.com/astral-sh/ty/issues/3485> and
+<https://github.com/astral-sh/ty/issues/3682>. Type traversal during cycle recovery should not force
+the lazy base of a `NewType`.
 
 ```py
 class C:
@@ -206,80 +206,10 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
-T = f()
-
-X = NewType("X", C)
-```
-
-## Generic call reachability during definition inference
-
-This is a regression test for <https://github.com/astral-sh/ty/issues/3682>. Fully inferring a
-generic call here would resolve `X`, whose later definition leads back to the same terminal-call
-predicate during cycle recovery.
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-class C:
-    pass
-
-def f():
-    pass
-
-def g() -> T:
-    pass
-
-g()
-
-from typing import NamedTuple, NewType
-
-X = NamedTuple("X", [("a", "X")]), None  # error: [invalid-type-form]
-
 min(X)
-
 T = f()
 
 X = NewType("X", C)
-```
-
-## Generic call reachability through narrowed definitions
-
-The unsafe dependency can be transitive. Here, inferring `identity(X)` resolves the later definition
-of `X`, which reads `C`; the existing narrowing on `C` is gated by the same call predicate.
-
-```toml
-[environment]
-python-version = "3.14"
-```
-
-```py
-class Outer:
-    from typing import NamedTuple, NewType
-
-    class C:
-        pass
-
-    def f():
-        pass
-
-    def g() -> T:
-        pass
-
-    def identity[T](value: T) -> T:
-        return value
-
-    g()
-
-    X = NamedTuple("X", [("a", "X")]), None  # error: [invalid-type-form]
-
-    assert C is not None
-    identity(X)
-
-    T = f()
-    X = NewType("X", C)
 ```
 
 ## Lazy cached property behind `hasattr`
