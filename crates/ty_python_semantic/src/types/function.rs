@@ -1561,27 +1561,52 @@ fn function_recursive_type<'db>(db: &'db dyn Db, function: FunctionType<'db>) ->
         .has_separate_implementation(db)
         .then(|| function.last_definition_signature(db).clone());
 
-    if !origin.contains_in_callable_signature(db, &signature)
+    let signature_contains_origin = |signature: &Signature<'db>| {
+        signature.parameters().iter().any(|parameter| {
+            origin.contains_in_type(db, parameter.annotated_type())
+                || parameter
+                    .default_type()
+                    .is_some_and(|ty| origin.contains_in_type(db, ty))
+        }) || origin.contains_in_type(db, signature.return_ty)
+    };
+    if !signature.iter().any(signature_contains_origin)
         && !implementation_signature
             .as_ref()
-            .is_some_and(|signature| origin.contains_in_signature(db, signature))
+            .is_some_and(signature_contains_origin)
     {
         return Type::FunctionLiteral(function);
     }
 
-    let Some(builder) = origin.builder(db) else {
-        return Type::FunctionLiteral(function);
-    };
-    let updated_signature = builder.fold_callable_signature(db, &signature);
-    let updated_implementation_signature =
-        implementation_signature.map(|signature| builder.fold_signature(db, &signature));
-    let body_function = FunctionType::new(
-        db,
-        function.literal(db),
-        UpdatedFunctionSignatures::new(Some(updated_signature), updated_implementation_signature),
-    );
-    let body = Type::FunctionLiteral(body_function);
-    builder.finish(db, body, Type::FunctionLiteral(function))
+    origin
+        .build_recursive(db, |_binder_id, type_mapping, visitor| {
+            let updated_signature = signature.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                visitor,
+            );
+            let updated_implementation_signature = implementation_signature.map(|signature| {
+                signature.apply_type_mapping_impl(
+                    db,
+                    &type_mapping,
+                    TypeContext::default(),
+                    visitor,
+                )
+            });
+            let body_function = FunctionType::new(
+                db,
+                function.literal(db),
+                UpdatedFunctionSignatures::new(
+                    Some(updated_signature),
+                    updated_implementation_signature,
+                ),
+            );
+            (
+                Type::FunctionLiteral(body_function),
+                Type::FunctionLiteral(function),
+            )
+        })
+        .unwrap_or(Type::FunctionLiteral(function))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {

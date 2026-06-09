@@ -288,11 +288,11 @@ impl<'db> PatternSuccessTypes<'db> {
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         for (place, ty) in &mut self.bindings {
-            *ty = ty.cycle_normalized(db, previous.binding_type(*place), cycle);
+            *ty = ty.cycle_normalized(db, Some(previous.binding_type(*place)), cycle);
         }
         self.missing_binding_ty =
             self.missing_binding_ty
-                .cycle_normalized(db, previous.missing_binding_ty, cycle);
+                .cycle_normalized(db, Some(previous.missing_binding_ty), cycle);
         self
     }
 }

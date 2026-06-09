@@ -1329,8 +1329,8 @@ fn lazy_bound_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
-        (Some(prev), Some(current)) => Some(current.cycle_normalized(db, *prev, cycle)),
-        (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
+        (Some(prev), Some(current)) => Some(current.cycle_normalized(db, Some(*prev), cycle)),
+        (None, Some(current)) => Some(current.cycle_normalized(db, None, cycle)),
         (_, None) => None,
     }
 }
@@ -1362,8 +1362,8 @@ fn lazy_default_cycle_recover<'db>(
 ) -> Option<Type<'db>> {
     // Normalize the default to ensure cycle convergence.
     match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, Some(*prev), cycle)),
+        (None, Some(default)) => Some(default.cycle_normalized(db, None, cycle)),
         (_, None) => None,
     }
 }
@@ -1479,8 +1479,8 @@ fn bound_typevar_default_type_cycle_recover<'db>(
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
     match (previous_default, default) {
-        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, *previous, cycle)),
-        (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
+        (Some(previous), Some(default)) => Some(default.cycle_normalized(db, Some(*previous), cycle)),
+        (None, Some(default)) => Some(default.cycle_normalized(db, None, cycle)),
         (_, None) => None,
     }
 }
@@ -1654,7 +1654,7 @@ impl<'db> TypeVarConstraints<'db> {
     /// Normalize for cycle recovery by combining with the previous value and
     /// removing divergent types introduced by the cycle.
     ///
-    /// See [`Type::cycle_normalized`] for more details on how this works.
+    /// See [`Type::recover_salsa_cycle`] for more details on how this works.
     fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
         let current_elements = self.elements(db);
         let prev_elements = previous.elements(db);
@@ -1663,16 +1663,16 @@ impl<'db> TypeVarConstraints<'db> {
             current_elements
                 .iter()
                 .zip(prev_elements.iter())
-                .map(|(ty, prev_ty)| ty.cycle_normalized(db, *prev_ty, cycle))
+                .map(|(ty, prev_ty)| ty.cycle_normalized(db, Some(*prev_ty), cycle))
                 .collect::<Box<_>>(),
         )
     }
 
     /// Normalize recursive types for cycle recovery when there's no previous value.
     ///
-    /// See [`Type::recursive_type_normalized`] for more details.
+    /// See [`Type::recover_salsa_cycle`] for more details.
     fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        self.map(db, |ty| ty.recursive_type_normalized(db, cycle))
+        self.map(db, |ty| ty.cycle_normalized(db, None, cycle))
     }
 }
 

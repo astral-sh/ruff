@@ -70,7 +70,7 @@ impl<'db> UnionType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result.cycle_normalized(db, Some(*previous), cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -393,7 +393,8 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
-                if ty.same_divergent_marker(div) {
+                if matches!((ty, div), (Type::Divergent(left), Type::Divergent(right)) if left.id() == right.id())
+                {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
@@ -401,7 +402,8 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                if matches!((*ty, div), (Type::Divergent(left), Type::Divergent(right)) if left.id() == right.id())
+                {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
@@ -770,7 +772,7 @@ impl<'db> IntersectionType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result.cycle_normalized(db, *previous, cycle)
+            result.cycle_normalized(db, Some(*previous), cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]

@@ -542,7 +542,7 @@ impl<'db> Type<'db> {
             // substituted with the recursive type itself so element results
             // preserve the recursive structure.
             (Type::Recursive(rec), _) => Some(
-                rec.unfold_preserving_binder(db)
+                rec.unfold(db)
                     .subscript(db, slice_ty, expr_context),
             ),
 

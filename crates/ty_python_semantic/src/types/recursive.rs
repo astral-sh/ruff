@@ -10,18 +10,15 @@
 //! break cycles.
 
 use crate::Db;
-use crate::types::callable::CallableType;
 use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
-use crate::types::protocol_class::{ProtocolInterface, ProtocolMember};
 use crate::types::relation::TypeRelation;
-use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor;
 use crate::types::{
-    ApplyTypeMappingVisitor, DivergentType, PropertyInstanceType, ProtocolInstanceType, Type,
-    TypeAliasType, TypeContext, TypeMapping, TypedDictType,
+    ApplyTypeMappingVisitor, DivergentType, ProtocolInstanceType, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypedDictType,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -237,7 +234,7 @@ impl<'db> RecursiveOrigin<'db> {
     /// Returns true if `ty` is the source-name occurrence bound by this origin.
     ///
     /// This must stay a shallow identity check: do not call recursive queries such as
-    /// alias value expansion, function signature inference, NewType base evaluation, or
+    /// alias value expansion, function signature inference, `NewType` base evaluation, or
     /// protocol interface computation here.
     pub(crate) fn matches_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         match (self, ty) {
@@ -265,67 +262,6 @@ impl<'db> RecursiveOrigin<'db> {
         recursive_origin_contains_in_type(db, self, ty)
     }
 
-    pub(crate) fn contains_in_callable(self, db: &'db dyn Db, callable: CallableType<'db>) -> bool {
-        self.contains_in_type(db, Type::Callable(callable.bind_self(db, None)))
-    }
-
-    pub(crate) fn contains_in_signature(self, db: &'db dyn Db, signature: &Signature<'db>) -> bool {
-        signature.parameters().iter().any(|parameter| {
-            self.contains_in_type(db, parameter.annotated_type())
-                || parameter
-                    .default_type()
-                    .is_some_and(|ty| self.contains_in_type(db, ty))
-        }) || self.contains_in_type(db, signature.return_ty)
-    }
-
-    pub(crate) fn contains_in_callable_signature(
-        self,
-        db: &'db dyn Db,
-        signature: &CallableSignature<'db>,
-    ) -> bool {
-        signature
-            .iter()
-            .any(|signature| self.contains_in_signature(db, signature))
-    }
-
-    pub(crate) fn contains_in_property(
-        self,
-        db: &'db dyn Db,
-        property: PropertyInstanceType<'db>,
-    ) -> bool {
-        property
-            .getter(db)
-            .is_some_and(|accessor| self.contains_in_property_accessor(db, accessor))
-            || property
-                .setter(db)
-                .is_some_and(|accessor| self.contains_in_property_accessor(db, accessor))
-            || property
-                .deleter(db)
-                .is_some_and(|accessor| self.contains_in_property_accessor(db, accessor))
-    }
-
-    pub(super) fn contains_in_protocol_member(
-        self,
-        db: &'db dyn Db,
-        member: &ProtocolMember<'_, 'db>,
-    ) -> bool {
-        match member.ty() {
-            Type::Callable(callable) => self.contains_in_callable(db, callable),
-            Type::PropertyInstance(property) => self.contains_in_property(db, property),
-            ty => self.contains_in_type(db, ty),
-        }
-    }
-
-    fn contains_in_property_accessor(self, db: &'db dyn Db, accessor: Type<'db>) -> bool {
-        match accessor {
-            Type::FunctionLiteral(function) => {
-                self.contains_in_callable(db, function.into_callable_type(db))
-            }
-            Type::Callable(callable) => self.contains_in_callable(db, callable),
-            ty => self.contains_in_type(db, ty),
-        }
-    }
-
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
         use salsa::plumbing::AsId;
 
@@ -339,81 +275,39 @@ impl<'db> RecursiveOrigin<'db> {
         }
     }
 
-    pub(crate) fn builder(self, db: &'db dyn Db) -> Option<RecursiveTypeBuilder<'db>> {
+    pub(crate) fn build_recursive<'a>(
+        self,
+        db: &'db dyn Db,
+        build_body: impl FnOnce(
+            salsa::Id,
+            TypeMapping<'a, 'db>,
+            &ApplyTypeMappingVisitor<'db>,
+        ) -> (Type<'db>, Type<'db>),
+    ) -> Option<Type<'db>>
+    where
+        'db: 'a,
+    {
         use salsa::plumbing::AsId;
 
         let binder_id = match self {
             Self::TypeAlias(TypeAliasType::PEP695(alias)) => alias.as_id(),
             _ => self.binder_id(db)?,
         };
-        Some(RecursiveTypeBuilder {
+        let type_mapping = TypeMapping::ReplaceRecursiveOrigin {
             origin: self,
-            binder_id,
-            visitor: ApplyTypeMappingVisitor::default(),
-        })
-    }
-}
-
-pub(crate) struct RecursiveTypeBuilder<'db> {
-    origin: RecursiveOrigin<'db>,
-    binder_id: salsa::Id,
-    visitor: ApplyTypeMappingVisitor<'db>,
-}
-
-impl<'db> RecursiveTypeBuilder<'db> {
-    pub(crate) fn binder_id(&self) -> salsa::Id {
-        self.binder_id
-    }
-
-    fn type_mapping<'a>(&self) -> TypeMapping<'a, 'db> {
-        TypeMapping::ReplaceRecursiveOrigin {
-            origin: self.origin,
-            binder_id: BinderId::new(self.binder_id),
-        }
-    }
-
-    pub(crate) fn fold_type(&self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        let mapping = self.type_mapping();
-        ty.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
-    }
-
-    pub(crate) fn fold_signature(
-        &self,
-        db: &'db dyn Db,
-        signature: &Signature<'db>,
-    ) -> Signature<'db> {
-        let mapping = self.type_mapping();
-        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
-    }
-
-    pub(crate) fn fold_callable_signature(
-        &self,
-        db: &'db dyn Db,
-        signature: &CallableSignature<'db>,
-    ) -> CallableSignature<'db> {
-        let mapping = self.type_mapping();
-        signature.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
-    }
-
-    pub(super) fn fold_protocol_interface(
-        &self,
-        db: &'db dyn Db,
-        interface: ProtocolInterface<'db>,
-    ) -> ProtocolInterface<'db> {
-        let mapping = self.type_mapping();
-        interface.apply_type_mapping_impl(db, &mapping, TypeContext::default(), &self.visitor)
-    }
-
-    pub(crate) fn finish(
-        &self,
-        db: &'db dyn Db,
-        body: Type<'db>,
-        fallback: Type<'db>,
-    ) -> Type<'db> {
-        if body.contains_divergent_with_id(db, self.binder_id) {
-            Type::recursive(db, self.binder_id, self.origin, body)
+            binder_id: BinderId::new(binder_id),
+        };
+        let visitor = ApplyTypeMappingVisitor::default();
+        let (body, fallback) = build_body(binder_id, type_mapping, &visitor);
+        if visitor::any_over_type(
+            db,
+            body,
+            false,
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.id() == binder_id),
+        ) {
+            Some(Type::recursive(db, binder_id, self, body))
         } else {
-            fallback
+            Some(fallback)
         }
     }
 }
@@ -479,21 +373,6 @@ impl<'db> RecursiveType<'db> {
         !self.is_implicit(db)
     }
 
-    /// One-step unfold: returns the body as-is. The body contains
-    /// `Type::Divergent(binder_id)` markers at recursive positions; downstream
-    /// callers in the co-inductive framework rely on those markers bottoming
-    /// out at the `Type::Divergent` arm of relation checks.
-    ///
-    /// Note: this is not the textbook equi-recursive unfold
-    /// `μα.body → body[α := μα.body]` — that would re-introduce the recursive
-    /// type. The framework's cycle detection works by recording the pre-unfold
-    /// pair in the visitor, so the simpler "body with Divergent leaves" form
-    /// is sufficient.
-    #[allow(dead_code)]
-    pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
-        *self.body(db)
-    }
-
     /// Returns the body with its `Type::Divergent` α-binder markers substituted
     /// back to the source type when this μ-binder has an explicit origin.
     pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
@@ -517,7 +396,7 @@ impl<'db> RecursiveType<'db> {
     /// which substitutes the source type instead — used for display and for
     /// `IntersectionBuilder`'s distribution where re-finding the recursive name
     /// matters.
-    pub(crate) fn unfold_preserving_binder(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
         let mapping = TypeMapping::ReplaceDivergent {
             binder_id: self.binder(db),

@@ -55,7 +55,7 @@ fn oscillating_generic_alias_cycle_recover<'db>(
     previous: &Type<'db>,
     current: Type<'db>,
 ) -> Type<'db> {
-    current.cycle_normalized(db, *previous, cycle)
+    current.cycle_normalized(db, Some(*previous), cycle)
 }
 
 #[salsa::tracked(
