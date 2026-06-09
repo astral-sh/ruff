@@ -90,9 +90,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, RecursiveOrigin, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, definition_expression_type, walk_signature,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -1392,62 +1392,6 @@ impl<'db> FunctionType<'db> {
         self.updated_signature(db)
             .cloned()
             .unwrap_or_else(|| self.literal(db).signature(db))
-    }
-
-    pub(crate) fn try_to_recursive_type(self, db: &'db dyn Db) -> Type<'db> {
-        let origin = RecursiveOrigin::Function(self);
-        let signature = self.signature(db);
-        let implementation_signature = self
-            .literal(db)
-            .has_separate_implementation(db)
-            .then(|| self.last_definition_signature(db).clone());
-
-        let signature_contains_origin = |signature: &Signature<'db>| {
-            signature.parameters().iter().any(|parameter| {
-                origin.contains_in_type(db, parameter.annotated_type())
-                    || parameter
-                        .default_type()
-                        .is_some_and(|ty| origin.contains_in_type(db, ty))
-            }) || origin.contains_in_type(db, signature.return_ty)
-        };
-        if !signature.iter().any(signature_contains_origin)
-            && !implementation_signature
-                .as_ref()
-                .is_some_and(signature_contains_origin)
-        {
-            return Type::FunctionLiteral(self);
-        }
-
-        origin
-            .build_recursive(db, |_binder_id, type_mapping, visitor| {
-                let updated_signature = signature.apply_type_mapping_impl(
-                    db,
-                    &type_mapping,
-                    TypeContext::default(),
-                    visitor,
-                );
-                let updated_implementation_signature = implementation_signature.map(|signature| {
-                    signature.apply_type_mapping_impl(
-                        db,
-                        &type_mapping,
-                        TypeContext::default(),
-                        visitor,
-                    )
-                });
-                let body_function = FunctionType::new(
-                    db,
-                    self.literal(db),
-                    UpdatedFunctionSignatures::new(
-                        Some(updated_signature),
-                        updated_implementation_signature,
-                    ),
-                );
-                (
-                    Type::FunctionLiteral(body_function),
-                    Type::FunctionLiteral(self),
-                )
-            })
-            .unwrap_or(Type::FunctionLiteral(self))
     }
 
     /// Infer the variance of a type variable within this function's signature.

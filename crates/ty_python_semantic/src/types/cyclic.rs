@@ -29,6 +29,7 @@ use std::mem;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
+use crate::Db;
 use crate::types::Type;
 
 pub(crate) type TypeTransformer<'db, Tag> = CycleDetector<Tag, Type<'db>, Type<'db>, 3>;
@@ -152,10 +153,38 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone, const INLINE_CAPACITY: usize>
 }
 
 impl<'db, Tag> TypeTransformer<'db, Tag> {
-    pub fn visit_type(&self, ty: Type<'db>, func: impl FnOnce() -> Type<'db>) -> Type<'db> {
+    fn same_type_identity(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+        if left == right {
+            return true;
+        }
+
+        match (left, right) {
+            // Self-referential function types can include `TypeOf` of themselves.
+            (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+                left.literal(db) == right.literal(db)
+            }
+            // Similarly, `NewType("T", list["T"])` can be self-referential.
+            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+                left.definition(db) == right.definition(db)
+            }
+            _ => false,
+        }
+    }
+
+    pub fn visit_type(
+        &self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        func: impl FnOnce() -> Type<'db>,
+    ) -> Type<'db> {
         self.visit_or_else(
             ty,
-            <[Type<'db>]>::contains,
+            |seen, ty| {
+                seen.contains(ty)
+                    || seen
+                        .iter()
+                        .any(|seen_type| Self::same_type_identity(db, *seen_type, *ty))
+            },
             // When a cycle is encountered, the type being visited is returned as a fallback (typically a recursive type alias).
             |item| item,
             func,

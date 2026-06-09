@@ -9,30 +9,9 @@
 //! guards live with the relation checker.
 
 use crate::Db;
-use crate::types::function::FunctionType;
-use crate::types::newtype::NewType;
 use crate::types::visitor;
-use crate::types::{
-    ApplyTypeMappingVisitor, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
-    TypedDictType,
-};
+use crate::types::{ApplyTypeMappingVisitor, Type, TypeAliasType, TypeContext, TypeMapping};
 use salsa::plumbing::AsId;
-
-impl<'db> Type<'db> {
-    /// Return the key used by type-transform visitors for cycle detection.
-    ///
-    /// Recursive origins that can appear as ordinary `Type` variants are keyed by
-    /// their `Type::Recursive` wrapper, so the generic cycle detector does not need
-    /// origin-specific identity logic.
-    pub(crate) fn visit_key(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Type::FunctionLiteral(function) => function.try_to_recursive_type(db),
-            Type::NewTypeInstance(newtype) => newtype.try_to_recursive_type(db),
-            Type::ProtocolInstance(protocol) => protocol.try_to_recursive_type(db),
-            _ => self,
-        }
-    }
-}
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
 /// field of a `#[salsa::interned]` struct that uses `heap_size`.
@@ -57,14 +36,6 @@ pub enum RecursiveOrigin<'db> {
     Implicit,
     /// A recursive PEP 695 type alias.
     TypeAlias(TypeAliasType<'db>),
-    /// A recursive function object, such as a `TypeOf` self-reference in annotations.
-    Function(FunctionType<'db>),
-    /// A recursive `typing.NewType` definition.
-    NewType(NewType<'db>),
-    /// A recursive `TypedDict` schema.
-    TypedDict(TypedDictType<'db>),
-    /// A recursive protocol interface.
-    Protocol(ProtocolInstanceType<'db>),
 }
 
 impl<'db> RecursiveOrigin<'db> {
@@ -72,10 +43,6 @@ impl<'db> RecursiveOrigin<'db> {
         match self {
             Self::Implicit => None,
             Self::TypeAlias(alias) => Some(Type::TypeAlias(alias)),
-            Self::Function(function) => Some(Type::FunctionLiteral(function)),
-            Self::NewType(newtype) => Some(Type::NewTypeInstance(newtype)),
-            Self::TypedDict(typed_dict) => Some(Type::TypedDict(typed_dict)),
-            Self::Protocol(protocol) => Some(Type::ProtocolInstance(protocol)),
         }
     }
 
@@ -90,18 +57,6 @@ impl<'db> RecursiveOrigin<'db> {
             (Self::TypeAlias(alias), Type::TypeAlias(other)) => {
                 alias.definition(db) == other.definition(db)
             }
-            (Self::Function(function), Type::FunctionLiteral(other)) => {
-                function.literal(db) == other.literal(db)
-            }
-            (Self::NewType(newtype), Type::NewTypeInstance(other)) => {
-                newtype.definition(db) == other.definition(db)
-            }
-            (Self::TypedDict(typed_dict), Type::TypedDict(other)) => {
-                typed_dict.recursive_binder_id() == other.recursive_binder_id()
-            }
-            (Self::Protocol(protocol), Type::ProtocolInstance(other)) => {
-                protocol.is_same_recursive_origin_as(db, other)
-            }
             _ => false,
         }
     }
@@ -115,10 +70,6 @@ impl<'db> RecursiveOrigin<'db> {
             Self::Implicit => None,
             Self::TypeAlias(TypeAliasType::PEP695(alias)) => Some(alias.as_id()),
             Self::TypeAlias(alias) => Some(alias.definition(db).as_id()),
-            Self::Function(function) => Some(function.as_id()),
-            Self::NewType(newtype) => Some(newtype.definition(db).as_id()),
-            Self::TypedDict(typed_dict) => Some(typed_dict.recursive_binder_id()),
-            Self::Protocol(protocol) => Some(protocol.recursive_binder_id(db)),
         }
     }
 

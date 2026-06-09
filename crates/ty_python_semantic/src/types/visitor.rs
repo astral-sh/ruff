@@ -5,9 +5,8 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, RecursiveOrigin,
-        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
-        TypedDictType, UnionType,
+        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
+        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -356,11 +355,8 @@ where
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            // Only explicit, non-function origins have a finite body we can inspect here without
-            // re-entering cycle recovery or signature queries.
-            if recursive.is_implicit(db)
-                || matches!(recursive.origin(db), RecursiveOrigin::Function(_))
-            {
+            // Implicit cycle markers do not have a finite source body to inspect here.
+            if recursive.is_implicit(db) {
                 return;
             }
             self.visit_type(db, *recursive.body(db));
