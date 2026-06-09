@@ -245,14 +245,40 @@ import sys  # noqa: F401
 # ruff:enable[F401]
 ```
 
-This applies to own-line comments too:
+This applies to own-line comments and nested comments too:
 
 ```py
 # ruff:disable[F401]
 # error: [unused-noqa]
 # ruff:ignore[F401]
 import os
+
+# error: [unused-noqa]
+import sys  # noqa: F401
 # ruff:enable[F401]
+
+# ruff:disable[F401]
+# snapshot: unused-noqa
+import sys  # start # ruff:ignore[F401] # end
+# ruff:enable[F401]
+```
+
+```snapshot
+error[RUF100]: Unused suppression (unused: `F401`)
+  --> src/mdtest_snippet.py:21:21
+   |
+21 | import sys  # start # ruff:ignore[F401] # end
+   |                     ^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove unused suppression
+18 |
+19 | # ruff:disable[F401]
+20 | # snapshot: unused-noqa
+   - import sys  # start # ruff:ignore[F401] # end
+21 + import sys  # start # end
+22 | # ruff:enable[F401]
+23 | # ruff:disable[E501]
+24 | import os  # ruff:ignore[F401]
 ```
 
 and cases where the `disable` and `ignore` suppress different codes:
@@ -526,4 +552,178 @@ help: Remove unused suppression
    - # ruff:ignore[F401, unused-import]
 12 + # ruff:ignore[F401]
 13 | import pathlib
+```
+
+## Nested comments
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF10"]
+```
+
+`ruff:ignore` comments nested within other comments should still work:
+
+```py
+import math  # some comment # ruff:ignore[F401] # another comment
+```
+
+Invalid suppressions should only delete the suppression part:
+
+```py
+# snapshot: invalid-suppression-comment
+# error: [unused-import]
+import sys  # explanation # ruff:ignore # another
+```
+
+```snapshot
+error[RUF103]: Invalid suppression comment: missing suppression codes like `[E501, ...]`
+ --> src/mdtest_snippet.py:4:27
+  |
+4 | import sys  # explanation # ruff:ignore # another
+  |                           ^^^^^^^^^^^^^^
+  |
+help: Remove suppression comment
+1 | import math  # some comment # ruff:ignore[F401] # another comment
+2 | # snapshot: invalid-suppression-comment
+3 | # error: [unused-import]
+  - import sys  # explanation # ruff:ignore # another
+4 + import sys  # explanation # another
+5 | # error: [unmatched-suppression-comment]
+6 | # error: [invalid-suppression-comment]
+7 | # ruff:disable[F401] # ruff:enable[F401]
+note: This is an unsafe fix and may change runtime behavior
+```
+
+Nested `disable`/`enable` comments on the same line are invalid. Instead of trying to match them up
+to remove them in one operation, they are respectively treated as unmatched (`disable`) and invalid
+(trailing `enable`).
+
+```py
+# error: [unmatched-suppression-comment]
+# error: [invalid-suppression-comment]
+# ruff:disable[F401] # ruff:enable[F401]
+import foo
+```
+
+## Nested comments on comment-only lines
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF10", "FIX002"]
+```
+
+Nested suppression comments on a comment-only line are treated as trailing on the comment itself and
+don't suppress diagnostics on the following line:
+
+```py
+# error: [unused-noqa]
+# explanation # ruff:ignore[F401] # another
+# error: [unused-import]
+import pathlib
+
+def foo():
+    # error: [unused-noqa]
+    # explanation # ruff:ignore[F401] # another
+    # error: [unused-import]
+    import pathlib
+```
+
+This can still be useful if the comment itself has a diagnostic:
+
+```py
+# TODO this comment has a todo # noqa: FIX002
+# TODO this comment has a todo # ruff:ignore[FIX002]
+```
+
+## Invalid nested comments
+
+```toml
+[lint]
+preview = true
+select = ["RUF103"]
+```
+
+Parse errors should only highlight and delete the nested suppression:
+
+```py
+# snapshot: invalid-suppression-comment
+import os  # explanation # ruff:unknown[F401] # another
+# snapshot: invalid-suppression-comment
+import sys  # explanation # ruff:ignore[F401 F841] # another
+```
+
+```snapshot
+error[RUF103]: Invalid suppression comment: unknown ruff directive
+ --> src/mdtest_snippet.py:2:26
+  |
+2 | import os  # explanation # ruff:unknown[F401] # another
+  |                          ^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove suppression comment
+1 | # snapshot: invalid-suppression-comment
+  - import os  # explanation # ruff:unknown[F401] # another
+2 + import os  # explanation # another
+3 | # snapshot: invalid-suppression-comment
+4 | import sys  # explanation # ruff:ignore[F401 F841] # another
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[RUF103]: Invalid suppression comment: missing comma between codes
+ --> src/mdtest_snippet.py:4:27
+  |
+4 | import sys  # explanation # ruff:ignore[F401 F841] # another
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove suppression comment
+1 | # snapshot: invalid-suppression-comment
+2 | import os  # explanation # ruff:unknown[F401] # another
+3 | # snapshot: invalid-suppression-comment
+  - import sys  # explanation # ruff:ignore[F401 F841] # another
+4 + import sys  # explanation # another
+note: This is an unsafe fix and may change runtime behavior
+```
+
+## Recovery after invalid nested comments
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF103"]
+```
+
+A malformed nested suppression should not prevent a later valid suppression from being parsed:
+
+```py
+# error: [invalid-suppression-comment]
+import os  # before # ruff:ignore # ruff:ignore[F401] # after
+```
+
+## Fixing unused nested comments
+
+```toml
+[lint]
+preview = true
+select = ["RUF100"]
+```
+
+Fixes for unused nested suppressions should preserve the surrounding comment fragments:
+
+```py
+# snapshot: unused-noqa
+value = 1  # before # ruff:ignore[F401] # after
+```
+
+```snapshot
+error[RUF100]: Unused suppression (non-enabled: `F401`)
+ --> src/mdtest_snippet.py:2:21
+  |
+2 | value = 1  # before # ruff:ignore[F401] # after
+  |                     ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unused suppression
+1 | # snapshot: unused-noqa
+  - value = 1  # before # ruff:ignore[F401] # after
+2 + value = 1  # before # after
 ```
