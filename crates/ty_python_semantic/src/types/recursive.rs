@@ -3,171 +3,19 @@
 //! [`RecursiveType<'db>`] is an explicit μ-binder representation of recursive types:
 //! `μα. body` where `α` is referenced inside `body` as `Type::Divergent(binder_id)`.
 //!
-//! For self-referential PEP 695 type aliases, `PEP695TypeAliasType::value_type`
-//! constructs a `Type::Recursive` whose `body` has each self-reference replaced
-//! by `Type::Divergent(binder_id)`. Recursive relation checks dispatch on
-//! `Type::Recursive` by unfolding one step and recording the visiting pair to
-//! break cycles.
+//! This module owns recursive type operations: construction, origin folding,
+//! cycle recovery, and finite type-transform traversal. Type relations use
+//! recursive types through their public operations, but relation-specific cycle
+//! guards live with the relation checker.
 
 use crate::Db;
-use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
-use crate::types::cyclic::CycleDetector;
 use crate::types::function::FunctionType;
 use crate::types::newtype::NewType;
-use crate::types::relation::TypeRelation;
 use crate::types::visitor;
 use crate::types::{
-    ApplyTypeMappingVisitor, DivergentType, ProtocolInstanceType, Type, TypeAliasType, TypeContext,
-    TypeMapping, TypedDictType,
+    ApplyTypeMappingVisitor, ProtocolInstanceType, Type, TypeAliasType, TypeContext, TypeMapping,
+    TypedDictType,
 };
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecursiveRelationKey<'db> {
-    left: Type<'db>,
-    right: Type<'db>,
-    relation: TypeRelation,
-}
-
-pub(crate) struct RecursiveRelationVisitor<'db, 'c> {
-    visitor: CycleDetector<TypeRelation, RecursiveRelationKey<'db>, ConstraintSet<'db, 'c>>,
-}
-
-impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
-    /// Construct a visitor for directional relation checks. The fallback is
-    /// `true`: if we loop, assume the relation currently being proven holds.
-    pub(crate) fn assume_related_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self {
-            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
-        }
-    }
-
-    /// Construct a visitor for disjointness checks. The fallback is `false`:
-    /// if we loop, assume the types are not disjoint.
-    pub(crate) fn assume_not_disjoint_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
-        Self {
-            visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, false)),
-        }
-    }
-
-    pub(crate) fn visit_pair(
-        &self,
-        left: Type<'db>,
-        right: Type<'db>,
-        relation: TypeRelation,
-        work: impl FnOnce() -> ConstraintSet<'db, 'c>,
-    ) -> ConstraintSet<'db, 'c> {
-        self.visitor.visit(
-            RecursiveRelationKey {
-                left,
-                right,
-                relation,
-            },
-            work,
-        )
-    }
-
-    /// Find the `Type::Recursive` that wraps `divergent`'s α-binder by scanning
-    /// the active relation pairs.
-    fn wrapping_recursive_for_divergent(
-        &self,
-        db: &'db dyn Db,
-        divergent: DivergentType,
-    ) -> Option<RecursiveType<'db>> {
-        let binder_id = divergent.id();
-        let found = std::cell::Cell::new(None);
-        self.visitor.any_active(|key| {
-            for side in [key.left, key.right] {
-                if let Type::Recursive(rec) = side
-                    && rec.binder_id(db) == binder_id
-                {
-                    found.set(Some(rec));
-                    return true;
-                }
-            }
-            false
-        });
-        found.into_inner()
-    }
-}
-
-/// A relation that supports recursive reasoning over [`Type::Recursive`].
-pub(crate) trait RecursiveRelation<'db, 'c> {
-    /// The relation's value-level tag, used in the cycle-detection key.
-    fn relation_key(&self) -> TypeRelation;
-
-    /// Perform the structural check after one recursive unfold.
-    fn check_structural(
-        &self,
-        db: &'db dyn Db,
-        left: Type<'db>,
-        right: Type<'db>,
-    ) -> ConstraintSet<'db, 'c>;
-
-    /// Return true if a bare `Divergent` marker should be resolved to `recursive`
-    /// for this relation.
-    fn should_resolve_divergent_marker(
-        &self,
-        db: &'db dyn Db,
-        recursive: RecursiveType<'db>,
-    ) -> bool;
-
-    /// Result to use when a `Divergent` marker cannot be resolved to a wrapping
-    /// recursive type, or when this relation rejects the wrapping type.
-    fn unresolved_divergent_result(&self) -> ConstraintSet<'db, 'c>;
-}
-
-/// Delegate a relation through a [`Type::Recursive`] μ-binder.
-///
-/// Records the pre-unfold pair in the visitor before unfolding. This keeps
-/// recursive relation checks finite while allowing a real structural step for
-/// non-cyclic pairs.
-pub(crate) fn check_recursive_relation<'db, 'c, R>(
-    db: &'db dyn Db,
-    checker: &R,
-    source: Type<'db>,
-    target: Type<'db>,
-    visitor: &RecursiveRelationVisitor<'db, 'c>,
-) -> ConstraintSet<'db, 'c>
-where
-    R: RecursiveRelation<'db, 'c>,
-{
-    visitor.visit_pair(source, target, checker.relation_key(), || {
-        checker.check_structural(db, source.unwrap_recursive(db), target.unwrap_recursive(db))
-    })
-}
-
-/// Delegate a relation through a bare [`Type::Divergent`] marker if it is the
-/// α-binder of an in-flight [`Type::Recursive`] visit.
-///
-/// Replacing the marker with its wrapping `Type::Recursive` lets relation checks
-/// re-enter through normal recursive pair detection. Without this, the bare
-/// fallback is too permissive for directional relations; for example,
-/// `str <: Divergent` would succeed under assignability and break invariance
-/// checks on `list[Recursive]`.
-pub(crate) fn check_divergent_relation<'db, 'c, R>(
-    db: &'db dyn Db,
-    checker: &R,
-    left: Type<'db>,
-    right: Type<'db>,
-    divergent: DivergentType,
-    visitor: &RecursiveRelationVisitor<'db, 'c>,
-) -> ConstraintSet<'db, 'c>
-where
-    R: RecursiveRelation<'db, 'c>,
-{
-    if let Some(wrapping) = visitor.wrapping_recursive_for_divergent(db, divergent)
-        && checker.should_resolve_divergent_marker(db, wrapping)
-    {
-        let recursive_ty = Type::Recursive(wrapping);
-        if matches!(left, Type::Divergent(d) if d.id() == divergent.id()) {
-            checker.check_structural(db, recursive_ty, right)
-        } else {
-            checker.check_structural(db, left, recursive_ty)
-        }
-    } else {
-        checker.unresolved_divergent_result()
-    }
-}
 
 /// Return the key used by type-transform visitors for cycle detection.
 ///

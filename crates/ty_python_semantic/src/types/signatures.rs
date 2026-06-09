@@ -27,8 +27,7 @@ use crate::types::generics::{
     ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
-use crate::types::recursive::RecursiveRelationVisitor;
-use crate::types::relation::{TypeRelation, TypeRelationChecker};
+use crate::types::relation::{RecursiveRelationVisitor, TypeRelation, TypeRelationChecker};
 use crate::types::typed_dict::{
     UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     extract_unpacked_typed_dict_keys_from_value_type,

@@ -30,7 +30,7 @@ use crate::types::generics::{
 };
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
-use crate::types::recursive::RecursiveRelationVisitor;
+use crate::types::relation::RecursiveRelationVisitor;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
