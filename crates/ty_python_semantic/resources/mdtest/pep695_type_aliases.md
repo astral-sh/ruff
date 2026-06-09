@@ -763,6 +763,19 @@ type A2[T] = Callable[[A2[T]], A2[T | A2[T]]]
 
 def _(x: A2[int]):
     reveal_type(x)  # revealed: (A2[int], /) -> A2[int]
+
+type GrowingList[T] = list[GrowingList[T | GrowingList[T]]]
+
+def growing_list_operations(x: GrowingList[int]):
+    reveal_type(x.append)  # revealed: bound method list[GrowingList[int]].append(object: GrowingList[int], /) -> None
+    reveal_type(x.__class__)  # revealed: type[list[GrowingList[int]]]
+
+type GrowingCallable[T] = Callable[[], GrowingCallable[T | GrowingCallable[T]] | None]
+
+def growing_callable_operations(x: GrowingCallable[int]):
+    reveal_type(x())  # revealed: () -> GrowingCallable[int] | None | None
+    # error: [call-non-callable] "Object of type `None` is not callable"
+    x()()
 ```
 
 When the type argument does *not* grow through the recursion, distinct specializations stay distinct
