@@ -221,6 +221,24 @@ values = [
 
 <!-- fmt:on -->
 
+## Disallow human-readable names in stable
+
+```toml
+[lint]
+preview = false
+select = ["F401", "RUF102"]
+```
+
+With preview disabled, this should continue to emit `F401`, as well as `RUF102`:
+
+```py
+# error: [invalid-rule-code]
+# ruff:disable[unused-import]
+# error: [unused-import]
+import math
+# ruff:enable[unused-import]
+```
+
 ## Allow human-readable names in preview
 
 Enable preview, `unused-import` and several `RUF` rules to check for valid suppression comments:
