@@ -161,6 +161,68 @@ def _(answer: AmbiguousEnum):
         reveal_type(answer)  # revealed: AmbiguousEnum
 ```
 
+`==` and `!=` must use the semantics of their respective dunder methods. In particular, a custom
+`__ne__` method does not affect narrowing based on `__eq__`:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class IndependentEquality(Enum):
+    NO = 0
+    YES = 1
+
+    def __ne__(self, other: object) -> Literal[True]:
+        return True
+
+def _(answer: IndependentEquality):
+    if answer == IndependentEquality.NO:
+        reveal_type(answer)  # revealed: Literal[IndependentEquality.NO]
+    else:
+        reveal_type(answer)  # revealed: Literal[IndependentEquality.YES]
+
+    if answer != IndependentEquality.NO:
+        reveal_type(answer)  # revealed: IndependentEquality
+    else:
+        reveal_type(answer)  # revealed: Never
+```
+
+## Equality between concrete runtime classes
+
+Types such as `bool`, `LiteralString`, and `TypedDict` correspond to specific runtime classes.
+Equality with another instance of the same runtime class can therefore eliminate `None`:
+
+```py
+from typing import TypedDict
+from typing_extensions import LiteralString
+
+class Payload(TypedDict):
+    value: int
+
+def narrow_bool(value: bool | None, other: bool):
+    if value == other:
+        reveal_type(value)  # revealed: bool
+    else:
+        reveal_type(value)  # revealed: bool | None
+
+    if value != other:
+        reveal_type(value)  # revealed: bool | None
+    else:
+        reveal_type(value)  # revealed: bool
+
+def narrow_literal_string(value: LiteralString | None, other: LiteralString):
+    if value == other:
+        reveal_type(value)  # revealed: LiteralString
+    else:
+        reveal_type(value)  # revealed: LiteralString | None
+
+def narrow_typed_dict(value: Payload | None, other: Payload):
+    if value == other:
+        reveal_type(value)  # revealed: Payload
+    else:
+        reveal_type(value)  # revealed: Payload | None
+```
+
 ## `x != y` where `y` is of literal type
 
 ```py
@@ -326,8 +388,7 @@ def _(s: LiteralString | None, t: LiteralString | Any):
         reveal_type(s)  # revealed: Never
 
     if t == "foo":
-        # TODO could be `Literal["foo"] | Any`
-        reveal_type(t)  # revealed: LiteralString | Any
+        reveal_type(t)  # revealed: Literal["foo"] | Any
 ```
 
 ## Narrowing with tuple types
