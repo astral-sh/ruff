@@ -308,6 +308,10 @@ impl NarrowingConstraintsBuilder {
         a: ScopedNarrowingConstraint,
         b: ScopedNarrowingConstraint,
     ) -> ScopedNarrowingConstraint {
+        if a == b {
+            return a;
+        }
+
         let a = self.project_to_bdd(a);
         let b = self.project_to_bdd(b);
         self.add_bdd_or(a, b)
@@ -613,6 +617,17 @@ mod tests {
         assert_eq!(root.if_true, ALWAYS_TRUE);
         assert_eq!(root.if_uncertain, a);
         assert_eq!(root.if_false, ALWAYS_FALSE);
+    }
+
+    #[test]
+    fn ordinary_merge_preserves_an_identical_tdd() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let a = constraints.add_atom(predicate(0));
+        let b = constraints.add_atom(predicate(1));
+        let union = constraints.add_or_constraint(a, b);
+
+        assert_ne!(constraints.interiors[union].if_uncertain, ALWAYS_FALSE);
+        assert_eq!(constraints.add_bdd_or_constraint(union, union), union);
     }
 
     #[test]
