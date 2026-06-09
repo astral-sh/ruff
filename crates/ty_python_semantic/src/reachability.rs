@@ -522,11 +522,25 @@ fn predicate_scope<'db>(db: &'db dyn Db, predicate: Predicate<'db>) -> ScopeId<'
     }
 }
 
-/// Caches the narrowed type for a projected root with repeated continuations.
+/// Caches narrowing for code that can be reached from several branches.
 ///
-/// The caller has already detected the repeated-continuation shape. This query rebuilds the
-/// projected graph from scoped IDs and caches only the final type so repeated loads can reuse it;
-/// the graph and its intermediate path prefixes remain temporary.
+/// For example, both successful checks below continue to the same two loads:
+///
+/// ```python
+/// if isinstance(value, A):
+///     pass
+/// elif isinstance(value, B):
+///     pass
+/// else:
+///     return
+///
+/// consume(value)
+/// consume_again(value)
+/// ```
+///
+/// At either load, `value` arrived through `A` or through `~A & B`.
+/// [`ProjectedBranchFactorPlan`] combines those paths into the simpler condition `A | B`, so the
+/// type of `value` at the calls after the `if` statement only needs to be computed once.
 #[salsa::tracked(
     cycle_initial = |_, id, _, _, _, _| Type::divergent(id),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _, _, _| {
@@ -987,9 +1001,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     }
 }
 
-/// Builds exact conditions for projected regions that share two continuations.
+/// Combines several paths that eventually reach the same two destinations.
 ///
-/// For example, the final `consume` is reachable through either of the first two branches:
+/// Consider:
 ///
 /// ```python
 /// if isinstance(value, A):
@@ -1002,11 +1016,37 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
 /// consume(value)
 /// ```
 ///
-/// Instead of separately narrowing under `A` and `~A & B`, the plan combines them into `A | B`
-/// and evaluates the shared continuation once. Factoring is only available when every predicate
-/// contributes exact structurally complementary intersection constraints.
+/// There are three paths through this code:
+///
+/// - `A` reaches `consume`.
+/// - `~A & B` also reaches `consume`.
+/// - `~A & ~B` returns before `consume`.
+///
+/// Evaluating the first two paths separately gets expensive in a long `elif` chain because every
+/// later path repeats all the earlier negative checks. This plan combines the two conditions that
+/// reach `consume`:
+///
+/// ```text
+/// A | (~A & B) = A | B
+/// ```
+///
+/// The evaluator can then visit the shared `consume` path once under `A | B`. The other destination
+/// is selected by the exact opposite condition, `~A & ~B`.
+///
+/// This optimization only runs when a false result rules out exactly what a true result established:
+/// `T` on one branch and `~T` on the other. It also handles exact compound opposites such as `A | B`
+/// and `~A & ~B`. It does not run for `TypeGuard` (where `False` does not imply `~T`), `Any` or
+/// `Unknown`, replacement narrowing, or pairs that are equivalent only after more type reasoning.
+/// Those cases continue through the normal path-by-path evaluator.
+#[derive(Clone, Copy, Default)]
+enum ProjectedBranchCondition<'db> {
+    #[default]
+    Uncomputed,
+    Computed(Option<Type<'db>>),
+}
+
 struct ProjectedBranchFactorPlan<'db> {
-    conditions: Vec<Option<Type<'db>>>,
+    conditions: Vec<ProjectedBranchCondition<'db>>,
 }
 
 impl<'db> ProjectedBranchFactorPlan<'db> {
@@ -1020,7 +1060,7 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         }
 
         Some(Self {
-            conditions: vec![None; graph.nodes.len()],
+            conditions: vec![ProjectedBranchCondition::Uncomputed; graph.nodes.len()],
         })
     }
 
@@ -1061,10 +1101,21 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         graph: &ProjectedNarrowingGraph<'db>,
         id: ProjectedNarrowingNodeId,
     ) -> Option<Type<'db>> {
-        if let Some(cached) = self.conditions[id.0] {
-            return Some(cached);
+        if let ProjectedBranchCondition::Computed(cached) = self.conditions[id.0] {
+            return cached;
         }
 
+        let result = self.condition_uncached(db, graph, id);
+        self.conditions[id.0] = ProjectedBranchCondition::Computed(result);
+        result
+    }
+
+    fn condition_uncached(
+        &mut self,
+        db: &'db dyn Db,
+        graph: &ProjectedNarrowingGraph<'db>,
+        id: ProjectedNarrowingNodeId,
+    ) -> Option<Type<'db>> {
         let factor = graph.branch_factor(id)?;
         let node = graph.node(id);
         let predicate = Self::atomic_condition(db, graph, &node)?;
@@ -1094,7 +1145,6 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
                 .build();
             UnionType::from_two_elements(db, if_true, if_false)
         };
-        self.conditions[id.0] = Some(result);
         Some(result)
     }
 }
