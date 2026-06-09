@@ -129,6 +129,18 @@ def calls_in_branches(x: A | B | C | D):
 
     reveal_type(x)  # revealed: C | B | A
 
+def mixed_call_branches(x: A | B | C | D):
+    if is_a(x):
+        noop()
+    elif is_b(x):
+        pass
+    elif is_c(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
 def noreturn_call_removes_branch(x: A | B | C):
     if is_a(x):
         stop()

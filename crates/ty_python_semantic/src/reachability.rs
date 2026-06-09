@@ -559,6 +559,11 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 ) -> Type<'db> {
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
+    let projected_root = if projector.resolved_nonterminal_call {
+        projector.graph.reduce(projected_root)
+    } else {
+        projected_root
+    };
     let mut context = ProjectedNarrowingContext {
         db,
         base_ty,
@@ -804,6 +809,7 @@ struct NarrowingProjector<'a, 'db> {
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
+    resolved_nonterminal_call: bool,
 }
 
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
@@ -821,6 +827,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             place,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
+            resolved_nonterminal_call: false,
         }
     }
 
@@ -860,8 +867,9 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[node.atom()];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    self.resolved_nonterminal_call = true;
                     let if_uncertain = self.project(node.if_uncertain());
-                    let projected = match analyze_single(self.db, &predicate) {
+                    match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => {
                             let if_true = self.project(node.if_true());
                             self.graph.or(if_true, if_uncertain)
@@ -873,8 +881,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         Truthiness::Ambiguous => {
                             unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
                         }
-                    };
-                    self.graph.reduce(projected)
+                    }
                 } else {
                     let if_true = self.project(node.if_true());
                     let if_uncertain = self.project(node.if_uncertain());

@@ -974,11 +974,9 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 ///     obj
 ///     ...
 /// ```
-fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+fn large_isinstance_narrowing_code(mixed_calls: bool) -> String {
     const NUM_CLASSES: usize = 50;
     const NUM_USES: usize = 10;
-
-    setup_rayon();
 
     let mut code = "class Base: ...\n".to_string();
     for i in 0..NUM_CLASSES {
@@ -993,14 +991,38 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
         } else {
             writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
         }
-        code.push_str("        noop()\n");
+        if mixed_calls && i > 0 {
+            code.push_str("        pass\n");
+        } else {
+            code.push_str("        noop()\n");
+        }
     }
     code.push_str("    else:\n        return\n\n");
     for _ in 0..NUM_USES {
         code.push_str("    obj\n");
     }
 
+    code
+}
+
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    setup_rayon();
+
+    let code = large_isinstance_narrowing_code(false);
     criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+
+    let code = large_isinstance_narrowing_code(true);
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_mixed_calls]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
