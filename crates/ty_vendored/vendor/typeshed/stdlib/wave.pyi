@@ -15,15 +15,13 @@ This returns an instance of a class with the following public methods:
       getsampwidth()  -- returns sample width in bytes
       getframerate()  -- returns sampling frequency
       getnframes()    -- returns number of audio frames
+      getformat()     -- returns frame encoding (WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT
+                         or WAVE_FORMAT_EXTENSIBLE)
       getcomptype()   -- returns compression type ('NONE' for linear samples)
       getcompname()   -- returns human-readable version of
                          compression type ('not compressed' linear samples)
       getparams()     -- returns a namedtuple consisting of all of the
                          above in the above order
-      getmarkers()    -- returns None (for compatibility with the
-                         old aifc module)
-      getmark(id)     -- raises an error since the mark does not
-                         exist (for compatibility with the old aifc module)
       readframes(n)   -- returns at most n frames of audio
       rewind()        -- rewind to the beginning of the audio stream
       setpos(pos)     -- seek to the specified position
@@ -46,6 +44,9 @@ This returns an instance of a class with the following public methods:
       setsampwidth(n) -- set the sample width
       setframerate(n) -- set the frame rate
       setnframes(n)   -- set the number of frames
+      setformat(format)
+                      -- set the frame format. Only WAVE_FORMAT_PCM and
+                         WAVE_FORMAT_IEEE_FLOAT are supported.
       setcomptype(type, name)
                       -- set the compression type and the
                          human-readable compression type
@@ -117,6 +118,10 @@ class Wave_read:
               available through the getsampwidth() method
     _framerate -- the sampling frequency
               available through the getframerate() method
+    _format -- frame format
+              One of WAVE_FORMAT_PCM, WAVE_FORMAT_IEEE_FLOAT
+              or WAVE_FORMAT_EXTENSIBLE available through
+              getformat() method
     _comptype -- the AIFF-C compression type ('NONE' if AIFF)
               available through the getcomptype() method
     _compname -- the human-readable AIFF-C compression type
@@ -177,6 +182,8 @@ class Wave_write:
               set through the setsampwidth() or setparams() method
     _framerate -- the sampling frequency
               set through the setframerate() or setparams() method
+    _format -- frame format
+              set through setformat() method
     _nframes -- the number of audio frames written to the header
               set through the setnframes() or setparams() method
 

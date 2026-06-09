@@ -26,6 +26,7 @@ class Tcl_Obj:
     @property
     def typename(self) -> str:
         """name of the Tcl type"""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, value, /): ...
     def __ge__(self, value, /): ...

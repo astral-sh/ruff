@@ -84,6 +84,11 @@ impl Files {
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
+        // DashMap's entry API requires an owned key. Avoid cloning it for cached paths.
+        if let Some(file) = self.inner.system_by_path.get(absolute.as_path()) {
+            return *file;
+        }
+
         *self
             .inner
             .system_by_path
@@ -97,7 +102,7 @@ impl Files {
                     .root(db, &absolute)
                     .map_or(Durability::default(), |root| root.durability(db));
 
-                let builder = File::builder(FilePath::System(absolute))
+                let builder = File::builder(FilePath::from(absolute))
                     .durability(durability)
                     .path_durability(Durability::HIGH);
 
@@ -129,6 +134,10 @@ impl Files {
     /// Looks up a vendored file by its path. Returns `Some` if a vendored file for the given path
     /// exists and `None` otherwise.
     fn vendored(&self, db: &dyn Db, path: &VendoredPath) -> Result<File, FileError> {
+        if let Some(file) = self.inner.vendored_by_path.get(path) {
+            return Ok(*file);
+        }
+
         let file = match self.inner.vendored_by_path.entry(path.to_path_buf()) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
@@ -141,7 +150,7 @@ impl Files {
                 };
 
                 tracing::trace!("Adding vendored file `{}`", path);
-                let file = File::builder(FilePath::Vendored(path.to_path_buf()))
+                let file = File::builder(FilePath::from(path))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
                     .durability(Durability::HIGH)
@@ -163,7 +172,7 @@ impl Files {
     pub fn virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> VirtualFile {
         tracing::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
-            File::builder(FilePath::SystemVirtual(path.to_path_buf()))
+            File::builder(FilePath::from(path))
                 .path_durability(Durability::HIGH)
                 .status(FileStatus::Exists)
                 .revision(FileRevision::zero())
@@ -181,7 +190,7 @@ impl Files {
     pub fn try_virtual_file(&self, path: &SystemVirtualPath) -> Option<VirtualFile> {
         self.inner
             .system_virtual_by_path
-            .get(&path.to_path_buf())
+            .get(path)
             .map(|entry| *entry.value())
     }
 

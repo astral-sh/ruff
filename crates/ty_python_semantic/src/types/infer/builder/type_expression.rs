@@ -7,7 +7,7 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg,
+    report_invalid_concatenate_last_arg, report_missing_type_arguments,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -112,6 +112,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
+        report_missing_type_arguments(&self.context, ty, annotation);
         let result_ty = ty
             .default_specialize(self.db())
             .in_type_expression(

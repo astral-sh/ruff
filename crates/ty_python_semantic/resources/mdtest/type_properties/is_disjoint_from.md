@@ -249,20 +249,25 @@ from ty_extensions import static_assert, is_disjoint_from
 
 class Foo: ...
 
-static_assert(is_disjoint_from(list, dict))
-static_assert(is_disjoint_from(list[Foo], dict))
-static_assert(is_disjoint_from(list[Any], dict))
-static_assert(is_disjoint_from(list, dict[Foo, Foo]))
+# error: [missing-type-argument]
+static_assert(is_disjoint_from(list, dict))  # error: [missing-type-argument]
+static_assert(is_disjoint_from(list[Foo], dict))  # error: [missing-type-argument]
+static_assert(is_disjoint_from(list[Any], dict))  # error: [missing-type-argument]
+static_assert(is_disjoint_from(list, dict[Foo, Foo]))  # error: [missing-type-argument]
 static_assert(is_disjoint_from(list[Foo], dict[Foo, Foo]))
 static_assert(is_disjoint_from(list[Any], dict[Foo, Foo]))
-static_assert(is_disjoint_from(list, dict[Any, Any]))
+static_assert(is_disjoint_from(list, dict[Any, Any]))  # error: [missing-type-argument]
 static_assert(is_disjoint_from(list[Foo], dict[Any, Any]))
 static_assert(is_disjoint_from(list[Any], dict[Any, Any]))
-static_assert(is_disjoint_from(type[list], type[dict]))
+# error: [missing-type-argument]
+static_assert(is_disjoint_from(type[list], type[dict]))  # error: [missing-type-argument]
 
-static_assert(is_disjoint_from(asyncio.Task, dict))
-static_assert(not is_disjoint_from(asyncio.Task, asyncio.Future))
-static_assert(not is_disjoint_from(type[asyncio.Task], type[asyncio.Future]))
+# error: [missing-type-argument]
+static_assert(is_disjoint_from(asyncio.Task, dict))  # error: [missing-type-argument]
+# error: [missing-type-argument]
+static_assert(not is_disjoint_from(asyncio.Task, asyncio.Future))  # error: [missing-type-argument]
+# error: [missing-type-argument]
+static_assert(not is_disjoint_from(type[asyncio.Task], type[asyncio.Future]))  # error: [missing-type-argument]
 
 @disjoint_base
 class A: ...
@@ -701,7 +706,7 @@ class Foo: ...
 
 static_assert(is_disjoint_from(Foo, type[int]))
 static_assert(is_disjoint_from(type[object], Foo))
-static_assert(is_disjoint_from(type[dict], Foo))
+static_assert(is_disjoint_from(type[dict], Foo))  # error: [missing-type-argument]
 
 # Instance types can be disjoint from `type[]` types
 # even if the instance type is a subtype of `type`
@@ -880,8 +885,8 @@ from ty_extensions import static_assert, is_disjoint_from, TypeOf
 class GenericClass[T]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))  # error: [missing-type-argument]
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [missing-type-argument]
 static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
@@ -889,8 +894,11 @@ static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]
 class GenericClassIntBound[T: int]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))  # error: [missing-type-argument]
+static_assert(
+    # error: [missing-type-argument]
+    not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound])
+)
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
@@ -898,8 +906,8 @@ static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[Gener
 class GenericFinalClass[T]:
     x: T  # invariant
 
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [missing-type-argument]
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [missing-type-argument]
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))

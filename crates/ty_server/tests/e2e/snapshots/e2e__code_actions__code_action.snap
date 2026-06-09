@@ -30,6 +30,7 @@ expression: code_actions
         ]
       }
     ],
+    "isPreferred": true,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -48,8 +49,7 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": true
+    }
   },
   {
     "title": "Ignore 'unused-ignore-comment' for this line",
@@ -78,6 +78,7 @@ expression: code_actions
         ]
       }
     ],
+    "isPreferred": false,
     "edit": {
       "changes": {
         "file://<temp_dir>/src/foo.py": [
@@ -96,7 +97,6 @@ expression: code_actions
           }
         ]
       }
-    },
-    "isPreferred": false
+    }
   }
 ]

@@ -237,16 +237,14 @@ pub(super) struct Bindings {
 
 impl Bindings {
     pub(super) fn is_always_unbound(&self) -> bool {
+        let [binding] = self.live_bindings.as_slice() else {
+            return false;
+        };
         self.unbound_narrowing_constraint.is_none()
-            && matches!(
-                self.live_bindings.as_slice(),
-                [LiveBinding {
-                    binding: ScopedDefinitionId::UNBOUND,
-                    narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
-                    reachability_constraint: ScopedReachabilityConstraintId::ALWAYS_TRUE,
-                    can_be_shadowed: FutureDefinitions::ShadowThisOne,
-                }]
-            )
+            && binding.binding() == ScopedDefinitionId::UNBOUND
+            && binding.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
+            && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
+            && binding.can_be_shadowed() == FutureDefinitions::ShadowThisOne
     }
 
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
@@ -266,17 +264,65 @@ impl Bindings {
 /// One of the live bindings for a single place at some point in control flow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct LiveBinding {
-    binding: ScopedDefinitionId,
+    binding: PackedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
-    // TODO: This extra bit is responsible for 1% of our memory footprint in some projects. We
-    // could pack it into one of the fields above.
-    can_be_shadowed: FutureDefinitions,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct PackedDefinitionId(u32);
+
+impl PackedDefinitionId {
+    // Scope-local definition IDs cannot practically use the high bit, so retain the shadowing
+    // policy there instead of adding a byte plus padding to every `LiveBinding`.
+    const DONT_SHADOW: u32 = 1 << 31;
+    const DEFINITION_MASK: u32 = !Self::DONT_SHADOW;
+
+    fn new(binding: ScopedDefinitionId, can_be_shadowed: FutureDefinitions) -> Self {
+        let binding = binding.as_u32();
+        assert_eq!(
+            binding & Self::DONT_SHADOW,
+            0,
+            "scopes cannot contain more than 2^31 definitions"
+        );
+        Self(
+            binding
+                | match can_be_shadowed {
+                    FutureDefinitions::ShadowThisOne => 0,
+                    FutureDefinitions::DontShadowThisOne => Self::DONT_SHADOW,
+                },
+        )
+    }
+
+    const fn definition(self) -> ScopedDefinitionId {
+        ScopedDefinitionId::from_u32(self.0 & Self::DEFINITION_MASK)
+    }
+
+    const fn can_be_shadowed(self) -> FutureDefinitions {
+        if self.0 & Self::DONT_SHADOW == 0 {
+            FutureDefinitions::ShadowThisOne
+        } else {
+            FutureDefinitions::DontShadowThisOne
+        }
+    }
 }
 
 impl LiveBinding {
+    fn new(
+        binding: ScopedDefinitionId,
+        narrowing_constraint: ScopedNarrowingConstraint,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        can_be_shadowed: FutureDefinitions,
+    ) -> Self {
+        Self {
+            binding: PackedDefinitionId::new(binding, can_be_shadowed),
+            narrowing_constraint,
+            reachability_constraint,
+        }
+    }
+
     pub const fn binding(&self) -> ScopedDefinitionId {
-        self.binding
+        self.binding.definition()
     }
 
     pub const fn narrowing_constraint(&self) -> ScopedNarrowingConstraint {
@@ -286,18 +332,24 @@ impl LiveBinding {
     pub const fn reachability_constraint(&self) -> ScopedReachabilityConstraintId {
         self.reachability_constraint
     }
+
+    const fn can_be_shadowed(&self) -> FutureDefinitions {
+        self.binding.can_be_shadowed()
+    }
 }
+
+static_assertions::assert_eq_size!(LiveBinding, [u32; 3]);
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
     pub(super) fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
-        let initial_binding = LiveBinding {
-            binding: ScopedDefinitionId::UNBOUND,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+        let initial_binding = LiveBinding::new(
+            ScopedDefinitionId::UNBOUND,
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            can_be_shadowed: FutureDefinitions::ShadowThisOne,
-        };
+            FutureDefinitions::ShadowThisOne,
+        );
         Self {
             unbound_narrowing_constraint: None,
             live_bindings: smallvec![initial_binding],
@@ -316,21 +368,21 @@ impl Bindings {
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
-        if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
+        if is_class_scope && is_place_name && self.live_bindings[0].binding().is_unbound() {
             self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
         }
         // If the new binding is a shadowing type, it replaces previous live bindings in this path
         // (unless they're marked as not shadowable), and has no constraints.
         if previous_definitions.are_shadowed() {
             self.live_bindings
-                .retain(|b| b.can_be_shadowed == FutureDefinitions::DontShadowThisOne);
+                .retain(|b| b.can_be_shadowed() == FutureDefinitions::DontShadowThisOne);
         }
-        self.live_bindings.push(LiveBinding {
+        self.live_bindings.push(LiveBinding::new(
             binding,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
             can_be_shadowed,
-        });
+        ));
     }
 
     /// Add given constraint to all live bindings.
@@ -362,6 +414,10 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
+    pub(super) fn as_slice(&self) -> &[LiveBinding] {
+        &self.live_bindings
+    }
+
     pub(super) fn merge(
         &mut self,
         b: Self,
@@ -384,7 +440,7 @@ impl Bindings {
         // as-is.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
-        for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
+        for zipped in a.merge_join_by(b, |a, b| a.binding().cmp(&b.binding())) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
                     // If the same definition is visible through both paths, we OR the narrowing
@@ -396,13 +452,13 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
-                    debug_assert_eq!(a.can_be_shadowed, b.can_be_shadowed);
-                    self.live_bindings.push(LiveBinding {
-                        binding: a.binding,
+                    debug_assert_eq!(a.can_be_shadowed(), b.can_be_shadowed());
+                    self.live_bindings.push(LiveBinding::new(
+                        a.binding(),
                         narrowing_constraint,
                         reachability_constraint,
-                        can_be_shadowed: a.can_be_shadowed,
-                    });
+                        a.can_be_shadowed(),
+                    ));
                 }
 
                 EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
@@ -522,7 +578,7 @@ mod tests {
             .iter()
             .map(|live_binding| {
                 (
-                    live_binding.binding.as_u32(),
+                    live_binding.binding().as_u32(),
                     live_binding.narrowing_constraint,
                 )
             })
@@ -724,7 +780,7 @@ mod tests {
         let bindings: Vec<_> = sym3
             .bindings()
             .iter()
-            .map(|b| (b.binding.as_u32(), b.narrowing_constraint))
+            .map(|b| (b.binding().as_u32(), b.narrowing_constraint))
             .collect();
         assert_eq!(bindings.len(), 2);
         assert_eq!(bindings[0].0, 0); // unbound
@@ -737,7 +793,7 @@ mod tests {
         let bindings: Vec<_> = sym
             .bindings()
             .iter()
-            .map(|b| (b.binding.as_u32(), b.narrowing_constraint))
+            .map(|b| (b.binding().as_u32(), b.narrowing_constraint))
             .collect();
         assert_eq!(bindings.len(), 3);
         assert_eq!(bindings[0].0, 0); // unbound

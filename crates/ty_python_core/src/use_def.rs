@@ -240,6 +240,7 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
+use std::ops::{Index, Range};
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -293,7 +294,7 @@ impl InternedPlaceStateId {
 }
 
 struct PlaceStateInterner {
-    interned_bindings: IndexVec<InternedBindingsId, Bindings>,
+    interned_bindings: RetainedBindingsBuilder,
     interned_ids_by_bindings: FxHashMap<Bindings, InternedBindingsId>,
     interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
     interned_ids_by_declarations: FxHashMap<Declarations, InternedDeclarationsId>,
@@ -308,7 +309,7 @@ struct PlaceStateInterner {
 impl PlaceStateInterner {
     fn with_capacity(bindings: usize, declaration_map: usize, declarations: usize) -> Self {
         Self {
-            interned_bindings: IndexVec::with_capacity(bindings),
+            interned_bindings: RetainedBindingsBuilder::with_capacity(bindings),
             interned_ids_by_bindings: FxHashMap::with_capacity_and_hasher(bindings, FxBuildHasher),
             interned_declarations: IndexVec::with_capacity(declarations),
             interned_ids_by_declarations: FxHashMap::with_capacity_and_hasher(
@@ -327,7 +328,7 @@ impl PlaceStateInterner {
                 return interned_id;
             }
 
-            let interned_id = self.interned_bindings.push(bindings);
+            let interned_id = self.interned_bindings.push(&bindings);
             self.always_unbound_bindings = Some(interned_id);
             return interned_id;
         }
@@ -335,7 +336,7 @@ impl PlaceStateInterner {
         match self.interned_ids_by_bindings.entry(bindings) {
             Entry::Occupied(entry) => *entry.get(),
             Entry::Vacant(entry) => {
-                let interned_id = self.interned_bindings.push(entry.key().clone());
+                let interned_id = self.interned_bindings.push(entry.key());
                 entry.insert(interned_id);
                 interned_id
             }
@@ -409,6 +410,65 @@ impl PlaceStateInterner {
     }
 }
 
+/// Compact, retained representation of the interned binding vectors for a scope.
+///
+/// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
+/// binding state. Neither is needed after the semantic index is built, so the retained map stores
+/// ranges into one contiguous array instead.
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct RetainedBindings {
+    ranges: FrozenIndexVec<InternedBindingsId, Range<u32>>,
+    live_bindings: Box<[LiveBinding]>,
+}
+
+struct RetainedBindingsBuilder {
+    ranges: IndexVec<InternedBindingsId, Range<u32>>,
+    live_bindings: Vec<LiveBinding>,
+}
+
+impl RetainedBindingsBuilder {
+    fn with_capacity(bindings: usize) -> Self {
+        Self {
+            ranges: IndexVec::with_capacity(bindings),
+            live_bindings: Vec::with_capacity(bindings),
+        }
+    }
+
+    fn push(&mut self, bindings: &Bindings) -> InternedBindingsId {
+        // Definition IDs are also 32-bit and a single scope cannot practically approach this
+        // limit. Keeping offsets at the same width halves the retained range size.
+        let start = u32::try_from(self.live_bindings.len())
+            .expect("Expected live-bindings length to fit into a u32");
+        self.live_bindings.extend_from_slice(bindings.as_slice());
+        let end = u32::try_from(self.live_bindings.len())
+            .expect("Expected live-bindings length to fit into a u32");
+        self.ranges.push(start..end)
+    }
+
+    fn finish(
+        self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) -> RetainedBindings {
+        for binding in &self.live_bindings {
+            reachability_constraints.mark_used(binding.reachability_constraint());
+            reachability_constraints.mark_used(binding.narrowing_constraint());
+        }
+        RetainedBindings {
+            ranges: self.ranges.into(),
+            live_bindings: self.live_bindings.into_boxed_slice(),
+        }
+    }
+}
+
+impl Index<InternedBindingsId> for RetainedBindings {
+    type Output = [LiveBinding];
+
+    fn index(&self, index: InternedBindingsId) -> &Self::Output {
+        let Range { start, end } = self.ranges[index];
+        &self.live_bindings[start as usize..end as usize]
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 struct RetainedPlaceStates<T> {
     end_of_scope: T,
@@ -446,7 +506,7 @@ pub struct UseDefMap<'db> {
     reachability_constraints: ReachabilityConstraints,
 
     /// Interned [`Bindings`] values.
-    interned_bindings: FrozenIndexVec<InternedBindingsId, Bindings>,
+    interned_bindings: RetainedBindings,
     /// Interned [`Declarations`] values.
     interned_declarations: FrozenIndexVec<InternedDeclarationsId, Declarations>,
 
@@ -590,7 +650,10 @@ impl<'db> UseDefMap<'db> {
             .get(use_id)
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
-                    self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
+                    self.bindings_iterator(
+                        bindings.as_slice(),
+                        BoundnessAnalysis::BasedOnUnboundVisibility,
+                    )
                 })
             })
             .into_iter()
@@ -859,7 +922,7 @@ impl<'db> UseDefMap<'db> {
 
     fn bindings_iterator<'map>(
         &'map self,
-        bindings: &'map Bindings,
+        bindings: &'map [LiveBinding],
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
@@ -1897,19 +1960,16 @@ impl<'db> UseDefMapBuilder<'db> {
         let enclosing_snapshots =
             Self::intern_enclosing_snapshots(self.enclosing_snapshots, &mut place_state_interner);
         let PlaceStateInterner {
-            mut interned_bindings,
+            interned_bindings,
             mut interned_declarations,
             ..
         } = place_state_interner;
 
-        interned_bindings.shrink_to_fit();
         interned_declarations.shrink_to_fit();
 
         // We only walk the fields that are copied through to the UseDefMap when we finish building
         // it.
-        for bindings in &mut interned_bindings {
-            bindings.finish(&mut self.reachability_constraints);
-        }
+        let interned_bindings = interned_bindings.finish(&mut self.reachability_constraints);
         for declarations in &mut interned_declarations {
             declarations.finish(&mut self.reachability_constraints);
         }
@@ -1937,7 +1997,7 @@ impl<'db> UseDefMapBuilder<'db> {
             used_bindings: self.used_bindings.into(),
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
-            interned_bindings: interned_bindings.into(),
+            interned_bindings,
             interned_declarations: interned_declarations.into(),
             bindings_by_use: bindings_by_use.into(),
             multi_bindings_by_use,

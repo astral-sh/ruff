@@ -704,6 +704,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }) = ty
                         .invoke_descriptor_protocol(
                             db,
+                            ty,
                             member.name,
                             Place::Undefined.into(),
                             InstanceFallbackShadowsNonDataDescriptor::No,

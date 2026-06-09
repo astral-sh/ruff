@@ -1236,6 +1236,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e6d5a32815ae3f33302d95fdcb2ce17862f8c65363dcfd29360480ba1001fc9c"
 
 [[package]]
+name = "gen-lsp-types"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0af56ad77049db9a3ccf0ec5605561d71c674688b467c429175df54ea5886151"
+dependencies = [
+ "serde",
+ "serde_json",
+ "url",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1980,18 +1991,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
-]
-
-[[package]]
-name = "lsp-types"
-version = "0.95.1"
-source = "git+https://github.com/astral-sh/lsp-types.git?rev=e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c#e15db0593f0ecbbd80599c3f5880e4bf5da1ca0c"
-dependencies = [
- "bitflags 1.3.2",
- "serde",
- "serde_json",
- "serde_repr",
- "url",
 ]
 
 [[package]]
@@ -2920,7 +2919,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.15.15"
+version = "0.15.16"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3181,7 +3180,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.15.15"
+version = "0.15.16"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3517,12 +3516,12 @@ dependencies = [
  "anyhow",
  "crossbeam",
  "dunce",
+ "gen-lsp-types",
  "ignore",
  "insta",
  "jod-thread",
  "libc",
  "lsp-server",
- "lsp-types",
  "regex",
  "ruff_db",
  "ruff_diagnostics",
@@ -3574,13 +3573,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.15.15"
+version = "0.15.16"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
  "getrandom 0.4.2",
  "js-sys",
  "log",
+ "ruff_db",
  "ruff_formatter",
  "ruff_linter",
  "ruff_python_ast",
@@ -3847,17 +3847,6 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.20"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "175ee3e80ae9982737ca543e96133087cbd9a485eecc3bc4de9c1a37b47ea59c"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -4553,6 +4542,7 @@ dependencies = [
  "camino",
  "compact_str",
  "get-size2",
+ "indexmap",
  "insta",
  "itertools 0.14.0",
  "memchr",
@@ -4745,11 +4735,11 @@ dependencies = [
  "bitflags 2.11.1",
  "crossbeam",
  "dunce",
+ "gen-lsp-types",
  "insta",
  "jod-thread",
  "libc",
  "lsp-server",
- "lsp-types",
  "regex",
  "ruff_db",
  "ruff_diagnostics",

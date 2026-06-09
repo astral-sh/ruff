@@ -1,6 +1,6 @@
 """This module defines an object type which can efficiently represent
 an array of basic values: characters, integers, floating-point
-numbers.  Arrays are sequence types and behave very much like lists,
+numbers, complex numbers.  Arrays are sequence types and behave very much like lists,
 except that the type of objects stored in them is constrained.
 """
 
@@ -39,7 +39,7 @@ class array(MutableSequence[_T]):
 
     Arrays represent basic values and behave very much like lists, except
     the type of objects stored in them is constrained. The type is specified
-    at object creation time by using a type code, which is a single character.
+    at object creation time by using a type code, which is a string.
     The following type codes are defined:
 
         Type code   C Type             Minimum size in bytes
@@ -54,8 +54,11 @@ class array(MutableSequence[_T]):
         'L'         unsigned integer   4
         'q'         signed integer     8 (see note)
         'Q'         unsigned integer   8 (see note)
+        'e'         16-bit IEEE floats 2
         'f'         floating-point     4
         'd'         floating-point     8
+        'Zf'        float complex      8
+        'Zd'        double complex     16
 
     NOTE: The 'u' typecode corresponds to Python's unicode character. On
     narrow builds this is 2-bytes on wide builds this is 4-bytes.
@@ -140,8 +143,9 @@ class array(MutableSequence[_T]):
     def byteswap(self) -> None:
         """Byteswap all items of the array.
 
-        If the items in the array are not 1, 2, 4, or 8 bytes in size, RuntimeError is
-        raised.
+        If the items in the array are not 1, 2, 4, 8 or 16 bytes in size, RuntimeError
+        is raised.  Note, that for complex types the order of
+        components (the real part, followed by imaginary part) is preserved.
         """
 
     def count(self, v: _T, /) -> int:
@@ -201,6 +205,7 @@ class array(MutableSequence[_T]):
         otherwise a ValueError is raised.  Use array.tobytes().decode() to obtain a
         unicode string from an array of some other type.
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __contains__(self, value: object, /) -> bool:
         """Return bool(key in self)."""
@@ -254,6 +259,7 @@ class array(MutableSequence[_T]):
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
+
     if sys.version_info >= (3, 12):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """See PEP 585"""

@@ -3,7 +3,6 @@ source: crates/ty_server/tests/e2e/pull_diagnostics.rs
 expression: diagnostics
 ---
 {
-  "kind": "full",
   "resultId": "[RESULT_ID]",
   "items": [
     {
@@ -22,5 +21,6 @@ expression: diagnostics
       "source": "ty",
       "message": "Revealed type: `Literal[2000]`"
     }
-  ]
+  ],
+  "kind": "full"
 }

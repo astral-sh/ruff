@@ -395,7 +395,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         // Check if this dynamic class is dataclass-like (via dataclass_transform inheritance).
         if matches!(
-            CodeGeneratorKind::from_class(db, self.into(), None),
+            CodeGeneratorKind::from_class(db, self.into()),
             Some(CodeGeneratorKind::DataclassLike(_))
         ) {
             if name == "__dataclass_fields__" {
@@ -448,10 +448,10 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Look up an instance member defined directly on this class (not inherited).
     ///
-    /// For dynamic classes, instance members are the same as class members
-    /// since they come from the namespace dict.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        self.own_class_member(db, name)
+    /// Namespace entries are class attributes, not values stored directly on instances.
+    #[expect(clippy::unused_self)]
+    pub(super) fn own_instance_member(self, _db: &'db dyn Db, _name: &str) -> Member<'db> {
+        Member::unbound()
     }
 
     /// Try to compute the MRO for this dynamic class.

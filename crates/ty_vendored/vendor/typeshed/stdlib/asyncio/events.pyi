@@ -121,6 +121,7 @@ class AbstractServer:
     @abstractmethod
     def close(self) -> None:
         """Stop serving.  This leaves existing connections open."""
+
     if sys.version_info >= (3, 13):
         @abstractmethod
         def close_clients(self) -> None:
@@ -204,6 +205,7 @@ class AbstractEventLoop:
     @abstractmethod
     async def shutdown_asyncgens(self) -> None:
         """Shutdown all active asynchronous generators."""
+
     # Methods scheduling callbacks.  All these return Handles.
     # "context" added in 3.9.10/3.10.2 for call_*
     @abstractmethod
@@ -728,6 +730,7 @@ class AbstractEventLoop:
             the user should await Server.start_serving() or Server.serve_forever()
             to make the server to start accepting connections.
             """
+
     if sys.version_info >= (3, 11):
         async def connect_accepted_socket(
             self,
@@ -746,6 +749,7 @@ class AbstractEventLoop:
             This method is a coroutine.  When completed, the coroutine
             returns a (transport, protocol) pair.
             """
+
     else:
         async def connect_accepted_socket(
             self,
@@ -763,6 +767,7 @@ class AbstractEventLoop:
             This method is a coroutine.  When completed, the coroutine
             returns a (transport, protocol) pair.
             """
+
     if sys.version_info >= (3, 11):
         async def create_unix_connection(
             self,
@@ -843,6 +848,7 @@ class AbstractEventLoop:
         sock can optionally be specified in order to use a preexisting
         socket object.
         """
+
     # Pipes and subprocesses.
     @abstractmethod
     async def connect_read_pipe(self, protocol_factory: Callable[[], _ProtocolT], pipe: Any) -> tuple[ReadTransport, _ProtocolT]:

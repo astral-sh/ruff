@@ -167,6 +167,7 @@ class Executor:
         Returns:
             A Future representing the given call.
         """
+
     if sys.version_info >= (3, 14):
         def map(
             self,
@@ -202,6 +203,7 @@ class Executor:
                     before the given timeout.
                 Exception: If fn(*args) raises for any values.
             """
+
     else:
         def map(
             self, fn: Callable[..., _T], *iterables: Iterable[Any], timeout: float | None = None, chunksize: int = 1

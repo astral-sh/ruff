@@ -1310,8 +1310,8 @@ static_assert(
 
 static_assert(not is_equivalent_to(GenericProto[str], GenericProto[int]))
 static_assert(not is_equivalent_to(GenericProto[str], LegacyGenericProto[int]))
-static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))
-static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))
+static_assert(not is_equivalent_to(GenericProto, GenericProto[int]))  # error: [missing-type-argument]
+static_assert(not is_equivalent_to(LegacyGenericProto, LegacyGenericProto[int]))  # error: [missing-type-argument]
 ```
 
 ## Intersections of protocols
@@ -2183,7 +2183,8 @@ S = TypeVar("S")
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [missing-type-argument]
 static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
 
 class NominalGeneric[T]:
@@ -2198,23 +2199,23 @@ def _[T](x: T) -> T:
 class NominalConcrete:
     def method(self, input: int) -> None: ...
 
-static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))
-static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))
-static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))
-static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))
+static_assert(is_assignable_to(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric[int], LegacyClassScoped))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(is_assignable_to(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 # `NewStyleClassScoped` is implicitly `NewStyleClassScoped[Unknown]`,
 # and there exist fully static materializations of `NewStyleClassScoped[Unknown]`
 # where `Nominal` would not be a subtype of the given materialization,
 # hence there is no subtyping relation:
-static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))
-static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))
+static_assert(not is_subtype_of(NominalConcrete, NewStyleClassScoped))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalConcrete, LegacyClassScoped))  # error: [missing-type-argument]
 
 # Similarly, `NominalGeneric` is implicitly `NominalGeneric[Unknown`]
-static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))
-static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))
+static_assert(not is_subtype_of(NominalGeneric, NewStyleClassScoped[int]))  # error: [missing-type-argument]
+static_assert(not is_subtype_of(NominalGeneric, LegacyClassScoped[int]))  # error: [missing-type-argument]
 
 static_assert(is_subtype_of(NominalConcrete, NewStyleClassScoped[int]))
 static_assert(is_subtype_of(NominalConcrete, LegacyClassScoped[int]))
@@ -3027,14 +3028,14 @@ reveal_type(is_single_valued(WeirdAndWacky))  # revealed: Literal[False]
 `typing.SupportsIndex` and `typing.Sized` are two protocols that are very commonly used in the wild.
 
 ```py
-from typing import SupportsIndex, Sized, Literal
+from typing import Any, SupportsIndex, Sized, Literal
 
 def one(some_int: int, some_literal_int: Literal[1], some_indexable: SupportsIndex):
     a: SupportsIndex = some_int
     b: SupportsIndex = some_literal_int
     c: SupportsIndex = some_indexable
 
-def two(some_list: list, some_tuple: tuple[int, str], some_sized: Sized):
+def two(some_list: list[Any], some_tuple: tuple[int, str], some_sized: Sized):
     a: Sized = some_list
     b: Sized = some_tuple
     c: Sized = some_sized
@@ -3351,13 +3352,13 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
-from typing import cast, Protocol
+from typing import Any, cast, Protocol
 
 class Iterator[T](Protocol):
     def __iter__(self) -> Iterator[T]: ...
 
-def f(value: Iterator):
-    cast(Iterator, value)  # error: [redundant-cast]
+def f(value: Iterator[Any]):
+    cast(Iterator[Any], value)  # error: [redundant-cast]
 ```
 
 ### Recursive generic protocols
@@ -3450,13 +3451,13 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import Protocol
+from typing import Any, Protocol
 
 class Foo[T]: ...
 
 class A(Protocol):
     @property
-    def _(self: "A") -> Foo: ...
+    def _(self: "A") -> Foo[Any]: ...
 
 class B(Protocol):
     @property

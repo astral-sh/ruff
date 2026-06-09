@@ -4668,8 +4668,8 @@ Answer.<CURSOR>
                 NO :: Literal[Answer.NO]
                 YES :: Literal[Answer.YES]
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
-                name :: Any
-                value :: Any
+                name :: property
+                value :: property
                 __annotations__ :: dict[str, Any]
                 __base__ :: type | None
                 __bases__ :: tuple[type, ...]

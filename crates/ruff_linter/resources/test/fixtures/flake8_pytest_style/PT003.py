@@ -1,4 +1,4 @@
-import pytest
+import pytest, pytest_asyncio
 
 
 @pytest.fixture()
@@ -70,4 +70,8 @@ def error_multiple_args():
     name2=name, name3="my_fixture", **kwargs
 )
 def error_multiple_args():
+    ...
+
+@pytest_asyncio.fixture(scope="function")
+async def asyncio_error():
     ...

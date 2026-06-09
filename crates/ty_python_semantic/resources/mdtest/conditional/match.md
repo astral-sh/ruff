@@ -66,7 +66,31 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    reveal_type(paths)  # revealed: Sequence[str]
+    # Exact sequence alternatives remain as negative protocol constraints.
+    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'>) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+    reveal_type(paths)
+
+def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
+    match value:
+        case int(), str():
+            return 1
+
+def refutable_exact_sequence_pattern_is_not_exhaustive(value: tuple[int]) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(real=0)]:
+            return 1
+
+def guarded_exact_sequence_pattern_is_not_exhaustive(value: tuple[int, str], flag: bool) -> int:  # error: [invalid-return-type]
+    match value:
+        case [int(), str()] if flag:
+            return 1
+
+def guarded_then_unguarded_exact_sequence_patterns_are_exhaustive(value: tuple[int, str], flag: bool) -> int:
+    match value:
+        case [int(), str()] if flag:
+            return 1
+        case [int(), str()]:
+            return 2
 ```
 
 ## Basic match
@@ -172,6 +196,90 @@ def _(target: FooSub | str):
             y = 4
 
     reveal_type(y)  # revealed: Literal[1, 3, 4]
+```
+
+### Dynamic class
+
+A dynamically typed class pattern is not known to match every subject, so later cases remain
+reachable.
+
+```py
+from typing import Any
+
+DynamicClass: Any = int
+
+def _(target: int | str):
+    match target:
+        case DynamicClass():
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Subclass-of type
+
+A class pattern whose class expression has type `type[Base]` is not guaranteed to match a `Base`
+subject. `PatternClass` can evaluate to any subclass of `Base`, and a `Base` instance need not be an
+instance of that subclass. The `PatternClass` arm must therefore not be considered guaranteed to
+match, and the fallback arm remains reachable.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+PatternClass: type[Base] = Derived
+
+def _(target: Base):
+    match target:
+        case PatternClass():
+            reveal_type(target)  # revealed: Base
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: Base
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### `collections.abc.Callable`
+
+```py
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2]
+
+def _(subj: None) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1]
+
+def _(subj: int | abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2, 3]
 ```
 
 ### With arguments

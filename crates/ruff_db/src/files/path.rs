@@ -14,35 +14,25 @@ use std::fmt::{Display, Formatter};
 #[derive(Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
 pub enum FilePath {
     /// Path to a file on the [host system](crate::system::System).
-    System(SystemPathBuf),
+    System(Box<SystemPath>),
     /// Path to a virtual file on the [host system](crate::system::System).
-    SystemVirtual(SystemVirtualPathBuf),
+    SystemVirtual(Box<SystemVirtualPath>),
     /// Path to a file vendored as part of Ruff. Stored in the [vendored file system](crate::vendored::VendoredFileSystem).
-    Vendored(VendoredPathBuf),
+    Vendored(Box<VendoredPath>),
 }
 
 impl FilePath {
     /// Create a new path to a file on the file system.
     #[must_use]
     pub fn system(path: impl AsRef<SystemPath>) -> Self {
-        FilePath::System(path.as_ref().to_path_buf())
-    }
-
-    /// Returns `Some` if the path is a file system path that points to a path on disk.
-    #[must_use]
-    #[inline]
-    pub fn into_system_path_buf(self) -> Option<SystemPathBuf> {
-        match self {
-            FilePath::System(path) => Some(path),
-            FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
-        }
+        FilePath::from(path.as_ref())
     }
 
     #[must_use]
     #[inline]
     pub fn as_system_path(&self) -> Option<&SystemPath> {
         match self {
-            FilePath::System(path) => Some(path.as_path()),
+            FilePath::System(path) => Some(path),
             FilePath::Vendored(_) | FilePath::SystemVirtual(_) => None,
         }
     }
@@ -73,7 +63,7 @@ impl FilePath {
     #[inline]
     pub fn as_vendored_path(&self) -> Option<&VendoredPath> {
         match self {
-            FilePath::Vendored(path) => Some(path.as_path()),
+            FilePath::Vendored(path) => Some(path),
             FilePath::System(_) | FilePath::SystemVirtual(_) => None,
         }
     }
@@ -120,37 +110,37 @@ impl AsRef<str> for FilePath {
 
 impl From<SystemPathBuf> for FilePath {
     fn from(value: SystemPathBuf) -> Self {
-        Self::System(value)
+        Self::System(Box::from(value))
     }
 }
 
 impl From<&SystemPath> for FilePath {
     fn from(value: &SystemPath) -> Self {
-        FilePath::System(value.to_path_buf())
+        Self::System(Box::from(value))
     }
 }
 
 impl From<VendoredPathBuf> for FilePath {
     fn from(value: VendoredPathBuf) -> Self {
-        Self::Vendored(value)
+        Self::Vendored(Box::from(value))
     }
 }
 
 impl From<&VendoredPath> for FilePath {
     fn from(value: &VendoredPath) -> Self {
-        Self::Vendored(value.to_path_buf())
+        Self::Vendored(Box::from(value))
     }
 }
 
 impl From<&SystemVirtualPath> for FilePath {
     fn from(value: &SystemVirtualPath) -> Self {
-        FilePath::SystemVirtual(value.to_path_buf())
+        Self::SystemVirtual(Box::from(value))
     }
 }
 
 impl From<SystemVirtualPathBuf> for FilePath {
     fn from(value: SystemVirtualPathBuf) -> Self {
-        FilePath::SystemVirtual(value)
+        Self::SystemVirtual(Box::from(value))
     }
 }
 

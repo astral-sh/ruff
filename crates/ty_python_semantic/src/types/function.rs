@@ -286,6 +286,19 @@ impl get_size2::GetSize for OverloadLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> OverloadLiteral<'db> {
+    fn with_deprecated(self, db: &'db dyn Db, deprecated: DeprecatedInstance<'db>) -> Self {
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.known(db),
+            self.body_scope(db),
+            self.decorators(db),
+            Some(deprecated),
+            self.dataclass_transformer_params(db),
+            self.has_explicit_return_annotation(db),
+        )
+    }
+
     fn with_dataclass_transformer_params(
         self,
         db: &'db dyn Db,
@@ -950,25 +963,47 @@ impl AbstractMethodKind {
     }
 }
 
+/// Contains potentially modified signatures for a function literal.
+///
+/// This uncommon payload is boxed so that ordinary function types only retain the literal and one
+/// optional pointer.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct UpdatedFunctionSignatures<'db> {
+    /// Contains a potentially modified signature for this function literal, in case certain
+    /// operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::signature`].
+    signature: Option<CallableSignature<'db>>,
+
+    /// Contains a potentially modified signature for the implementation of an overloaded function,
+    /// in case certain operations (like type mappings) have been applied to it.
+    ///
+    /// See also: [`FunctionLiteral::last_definition_signature`].
+    implementation_signature: Option<Signature<'db>>,
+}
+
+impl<'db> UpdatedFunctionSignatures<'db> {
+    fn new(
+        signature: Option<CallableSignature<'db>>,
+        implementation_signature: Option<Signature<'db>>,
+    ) -> Option<Box<Self>> {
+        (signature.is_some() || implementation_signature.is_some()).then(|| {
+            Box::new(Self {
+                signature,
+                implementation_signature,
+            })
+        })
+    }
+}
+
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
-    /// Contains a potentially modified signature for this function literal, in case certain operations
-    /// (like type mappings) have been applied to it.
-    ///
-    /// See also: [`FunctionLiteral::updated_signature`].
     #[returns(as_ref)]
-    updated_signature: Option<CallableSignature<'db>>,
-
-    /// Contains a potentially modified signature for the implementation of an overloaded function,
-    /// in case certain operations (like type mappings) have been applied to it.
-    ///
-    /// See also: [`FunctionLiteral::last_definition_signature`].
-    #[returns(as_ref)]
-    updated_implementation_signature: Option<Signature<'db>>,
+    updated_signatures: Option<Box<UpdatedFunctionSignatures<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -991,6 +1026,16 @@ pub(super) fn walk_function_type<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 
 #[salsa::tracked]
 impl<'db> FunctionType<'db> {
+    fn updated_signature(self, db: &'db dyn Db) -> Option<&'db CallableSignature<'db>> {
+        self.updated_signatures(db)
+            .and_then(|updated| updated.signature.as_ref())
+    }
+
+    fn updated_implementation_signature(self, db: &'db dyn Db) -> Option<&'db Signature<'db>> {
+        self.updated_signatures(db)
+            .and_then(|updated| updated.implementation_signature.as_ref())
+    }
+
     pub(crate) fn with_inherited_generic_context(
         self,
         db: &'db dyn Db,
@@ -1008,8 +1053,10 @@ impl<'db> FunctionType<'db> {
         Self::new(
             db,
             literal,
-            Some(updated_signature),
-            updated_implementation_signature,
+            UpdatedFunctionSignatures::new(
+                Some(updated_signature),
+                updated_implementation_signature,
+            ),
         )
     }
 
@@ -1064,8 +1111,7 @@ impl<'db> FunctionType<'db> {
             Self::new(
                 db,
                 literal,
-                updated_signature,
-                updated_implementation_signature,
+                UpdatedFunctionSignatures::new(updated_signature, updated_implementation_signature),
             )
         }
     }
@@ -1082,7 +1128,20 @@ impl<'db> FunctionType<'db> {
             .last_definition
             .with_dataclass_transformer_params(db, params);
         let literal = FunctionLiteral { last_definition };
-        Self::new(db, literal, None, None)
+        Self::new(db, literal, None)
+    }
+
+    pub(crate) fn with_deprecated(
+        self,
+        db: &'db dyn Db,
+        deprecated: DeprecatedInstance<'db>,
+    ) -> Self {
+        // A decorator only applies to the specific overload that it is attached to, not to all
+        // previous overloads.
+        let literal = self.literal(db);
+        let last_definition = literal.last_definition.with_deprecated(db, deprecated);
+        let literal = FunctionLiteral { last_definition };
+        Self::new(db, literal, self.updated_signatures(db).cloned())
     }
 
     /// Returns the [`File`] in which this function is defined.
@@ -1429,8 +1488,10 @@ impl<'db> FunctionType<'db> {
                 Some(Self::new(
                     db,
                     literal,
-                    updated_signature,
-                    updated_implementation_signature,
+                    UpdatedFunctionSignatures::new(
+                        updated_signature,
+                        updated_implementation_signature,
+                    ),
                 ))
             },
         )
@@ -1921,10 +1982,6 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
-    /// `contextlib.asynccontextmanager`
-    #[strum(serialize = "asynccontextmanager")]
-    AsyncContextManager,
-
     /// `dataclasses.dataclass`
     Dataclass,
     /// `dataclasses.field`
@@ -2044,9 +2101,6 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
-            }
-            Self::AsyncContextManager => {
-                matches!(module, KnownModule::Contextlib)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -2576,8 +2630,6 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
-
-                KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 

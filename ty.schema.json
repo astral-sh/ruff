@@ -1120,6 +1120,16 @@
             }
           ]
         },
+        "missing-type-argument": {
+          "title": "detects generic types used without explicit type parameters in type expressions",
+          "description": "## What it does\nChecks for generic types used without type parameters in type expressions.\n\n## Why is this bad?\nUsing a generic type without specifying its type parameters results in the\ntype parameters being implicitly filled with `Unknown`, reducing the\nprecision of type checking. Explicit type parameters make the intended types\nclear and enable the type checker to catch more errors.\n\n## Examples\n\n```python\nimport re\n\ndef handle(m: re.Match) -> str:  # error: [missing-type-argument]\n    return m.string\n\n# Use explicit type parameters instead:\ndef handle(m: re.Match[str]) -> str:\n    return m.string\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "missing-typed-dict-key": {
           "title": "detects missing required keys in `TypedDict` constructors",
           "description": "## What it does\nDetects missing required keys in `TypedDict` constructor calls.\n\n## Why is this bad?\n`TypedDict` requires all non-optional keys to be provided during construction.\nMissing items can lead to a `KeyError` at runtime.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice: Person = {\"name\": \"Alice\"}  # missing required key 'age'\n\nalice[\"age\"]  # KeyError\n```",

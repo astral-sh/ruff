@@ -1,5 +1,5 @@
 use anyhow::Context;
-use lsp_types::{self as types, request as req};
+use lsp_types::{self as types, DocumentFormattingRequest};
 use types::TextEdit;
 
 use ruff_source_file::LineIndex;
@@ -16,11 +16,11 @@ use crate::{PositionEncoding, TextDocument};
 pub(crate) struct Format;
 
 impl super::RequestHandler for Format {
-    type RequestType = req::Formatting;
+    type RequestType = DocumentFormattingRequest;
 }
 
 impl super::BackgroundDocumentRequestHandler for Format {
-    super::define_document_url!(params: &types::DocumentFormattingParams);
+    super::define_document_uri!(params: &types::DocumentFormattingParams);
 
     fn run_with_snapshot(
         snapshot: Self::Snapshot,
@@ -29,9 +29,9 @@ impl super::BackgroundDocumentRequestHandler for Format {
     ) -> Result<super::FormatResponse> {
         let snapshot = match snapshot {
             Ok(snapshot) => snapshot,
-            Err(url) => {
+            Err(uri) => {
                 tracing::warn!(
-                    "Returning no formatting edits because document `{url}` isn't open."
+                    "Returning no formatting edits because document `{uri}` isn't open."
                 );
                 return Ok(None);
             }
@@ -52,9 +52,9 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client)
 
     match snapshot.query() {
         DocumentQuery::Notebook { notebook, .. } => {
-            for (url, text_document) in notebook
-                .urls()
-                .map(|url| (url.clone(), notebook.cell_document_by_uri(url).unwrap()))
+            for (uri, text_document) in notebook
+                .uris()
+                .map(|uri| (uri.clone(), notebook.cell_document_by_uri(uri).unwrap()))
             {
                 if let Some(changes) = format_text_document(
                     text_document,
@@ -64,7 +64,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client)
                     backend,
                     client,
                 )? {
-                    fixes.insert(url, changes);
+                    fixes.insert(uri, changes);
                 }
             }
         }
@@ -72,7 +72,7 @@ pub(super) fn format_full_document(snapshot: &DocumentSnapshot, client: &Client)
             if let Some(changes) =
                 format_text_document(document, query, snapshot.encoding(), false, backend, client)?
             {
-                fixes.insert(snapshot.query().make_key().into_url(), changes);
+                fixes.insert(snapshot.query().make_key().into_uri(), changes);
             }
         }
     }

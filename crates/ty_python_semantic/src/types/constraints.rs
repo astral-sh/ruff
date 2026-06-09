@@ -257,6 +257,15 @@ impl Default for OwnedConstraintSet<'_> {
 }
 
 impl<'db> OwnedConstraintSet<'db> {
+    pub(crate) fn always() -> Self {
+        Self {
+            node: ALWAYS_TRUE,
+            constraints: IndexVec::default(),
+            typevars: IndexVec::default(),
+            nodes: IndexVec::default(),
+        }
+    }
+
     /// Loads this constraint set into a new builder, invokes a callback with that builder, and
     /// returns the result.
     ///
@@ -687,6 +696,7 @@ struct ConstraintSetStorage<'db> {
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
+    constraint_implication_cache: FxHashMap<(ConstraintId, ConstraintId), bool>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
     or_cache: FxHashMap<(NodeId, NodeId, usize), NodeId>,
@@ -908,6 +918,25 @@ impl<'db> ConstraintSetBuilder<'db> {
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
         self.storage.borrow().constraints[constraint]
+    }
+
+    fn cached_constraint_implies(
+        &self,
+        db: &'db dyn Db,
+        ante: ConstraintId,
+        post: ConstraintId,
+    ) -> bool {
+        let key = (ante, post);
+        if let Some(result) = self.storage.borrow().constraint_implication_cache.get(&key) {
+            return *result;
+        }
+
+        let result = ante.implies(db, self, post);
+        self.storage
+            .borrow_mut()
+            .constraint_implication_cache
+            .insert(key, result);
+        result
     }
 
     fn interior_node_data(&self, node: NodeId) -> InteriorNodeData {
@@ -3025,6 +3054,20 @@ impl<'db> Type<'db> {
     }
 }
 
+#[salsa::tracked(
+    cycle_initial = |_, _, _, _| true,
+    heap_size = get_size2::GetSize::get_heap_size
+)]
+fn is_possibly_constraint_set_assignable<'db>(
+    db: &'db dyn Db,
+    source: Type<'db>,
+    target: Type<'db>,
+) -> bool {
+    source
+        .when_constraint_set_assignable_to_owned(db, target)
+        .query(|_builder, when| !when.is_never_satisfied(db))
+}
+
 /// Per-path bounds for all typevars. Each element is the set of typevar bounds for one BDD path.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum PathBounds<'db> {
@@ -3175,9 +3218,7 @@ impl<'db> PathBounds<'db> {
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
-                let when = lower.when_constraint_set_assignable_to_owned(db, bound);
-                let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
-                if is_never_satisfied {
+                if !is_possibly_constraint_set_assignable(db, lower, bound) {
                     // This path does not satisfy the typevar's upper bound, and is
                     // therefore not a valid specialization.
                     return Err(());
@@ -3207,8 +3248,8 @@ impl<'db> PathBounds<'db> {
                     let when_upper =
                         constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
                     let when = builder
-                        .load(db, when_lower)
-                        .and(db, builder, || builder.load(db, when_upper));
+                        .load(db, &when_lower)
+                        .and(db, builder, || builder.load(db, &when_upper));
                     !when.is_never_satisfied(db)
                 });
 
@@ -5562,7 +5603,7 @@ impl SequentMap {
         // identify constraints that are identical besides e.g. ordering of union/intersection
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
-        if left_constraint.implies(db, builder, right_constraint) {
+        if builder.cached_constraint_implies(db, left_constraint, right_constraint) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db, builder),
@@ -5571,7 +5612,7 @@ impl SequentMap {
             );
             self.add_single_implication(db, builder, left_constraint, right_constraint);
         }
-        if right_constraint.implies(db, builder, left_constraint) {
+        if builder.cached_constraint_implies(db, right_constraint, left_constraint) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db, builder),
@@ -6342,6 +6383,49 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    #[test]
+    fn constraint_implications_are_cached() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let t_int = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Int.to_instance(&db),
+        );
+        let t_bool = ConstraintId::new(
+            &db,
+            &builder,
+            t,
+            Type::Never,
+            KnownClass::Bool.to_instance(&db),
+        );
+
+        assert!(builder.cached_constraint_implies(&db, t_bool, t_int));
+        assert!(builder.cached_constraint_implies(&db, t_bool, t_int));
+
+        {
+            let storage = builder.storage.borrow();
+            assert_eq!(
+                storage.constraint_implication_cache.get(&(t_bool, t_int)),
+                Some(&true)
+            );
+            assert_eq!(storage.constraint_implication_cache.len(), 1);
+        }
+
+        assert!(!builder.cached_constraint_implies(&db, t_int, t_bool));
+        assert!(!builder.cached_constraint_implies(&db, t_int, t_bool));
+
+        let storage = builder.storage.borrow();
+        assert_eq!(
+            storage.constraint_implication_cache.get(&(t_int, t_bool)),
+            Some(&false)
+        );
+        assert_eq!(storage.constraint_implication_cache.len(), 2);
     }
 
     #[track_caller]

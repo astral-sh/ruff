@@ -391,6 +391,29 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+def recursive_identity(t: T) -> T:
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
+    return t
+
+def pair(a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair(t: T) -> T:
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
+    return t
+```
+
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
 all of the constraints.
 
@@ -676,9 +699,9 @@ def decorated(t: T) -> None:
 ## Attribute access on `Callable`-bounded TypeVars
 
 ```py
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
-F = TypeVar("F", bound=Callable)
+F = TypeVar("F", bound=Callable[..., Any])
 
 def my_decorator(f: F) -> None:
     # error: [unresolved-attribute]
@@ -689,7 +712,7 @@ def my_decorator(f: F) -> None:
 class Box(Generic[F]):
     cls: type[F]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable[..., Any]]) -> None:
     # error: [unresolved-attribute]
     box.cls.whatever
 ```

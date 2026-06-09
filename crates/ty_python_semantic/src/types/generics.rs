@@ -54,6 +54,21 @@ pub(crate) fn enclosing_generic_contexts<'db>(
         .filter_map(|(_, ancestor_scope)| GenericContext::of_node(db, ancestor_scope.node(), index))
 }
 
+/// Returns the binding contexts introduced by the given scope or any enclosing scope.
+pub(crate) fn enclosing_binding_contexts<'a, 'db>(
+    index: &'a SemanticIndex<'db>,
+    scope: FileScopeId,
+) -> impl Iterator<Item = BindingContext<'db>> + 'a {
+    index
+        .ancestor_scopes(scope)
+        .filter_map(|(_, ancestor_scope)| match ancestor_scope.node() {
+            NodeWithScopeKind::Class(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::Function(node) => Some(index.expect_single_definition(node).into()),
+            NodeWithScopeKind::TypeAlias(node) => Some(index.expect_single_definition(node).into()),
+            _ => None,
+        })
+}
+
 /// Binds an unbound typevar.
 ///
 /// When a typevar is first created, we will have a [`TypeVarInstance`] which does not have an
@@ -226,6 +241,11 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
+/// The set of bound typevar occurrences that can be solved by the current inference context.
+///
+/// Membership is keyed by [`BoundTypeVarIdentity`], including any freshness nonce. This lets a
+/// fresh generic-callable occurrence be inferable without making the surrounding source-level
+/// typevar inferable.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -307,7 +327,11 @@ impl<'db> InferableTypeVars<'db> {
     }
 }
 
-/// A list of formal type variables for a generic function, class, or type alias.
+/// A list of formal type variables for a generic function, class, type alias, or fresh callable
+/// occurrence.
+///
+/// Variables are keyed by bound occurrence identity, so freshened copies of the same source-level
+/// generic context can coexist without collapsing into each other.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
@@ -497,9 +521,13 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
     ) -> bool {
+        let bound_typevar = if bound_typevar.is_paramspec(db) {
+            bound_typevar.without_paramspec_attr(db)
+        } else {
+            bound_typevar
+        };
         self.variables_inner(db).contains_key(&bound_typevar)
     }
-
     /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
     /// variables.
     ///
@@ -2312,13 +2340,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let spec = &[KnownClass::Str.to_instance(self.db), Type::object()];
         let mapping = KnownClass::Mapping.to_specialized_instance(self.db, spec);
         let mapping_when = mapping.when_constraint_set_assignable_to_owned(self.db, formal);
-        let mapping_when = self.constraints.load(self.db, mapping_when);
+        let mapping_when = self.constraints.load(self.db, &mapping_when);
         typed_dicts
             .into_iter()
             .all(|element| {
                 let element_when = self.constraints.load(
                     self.db,
-                    element.when_constraint_set_assignable_to_owned(self.db, formal),
+                    &element.when_constraint_set_assignable_to_owned(self.db, formal),
                 );
                 element_when
                     .iff(self.db, self.constraints, mapping_when)
@@ -2839,7 +2867,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // eventually want this logic to be used for _all_ nominal instances
                         // (replacing the logic below).
                         let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                        let when = self.constraints.load(self.db, when);
+                        let when = self.constraints.load(self.db, &when);
                         // For protocol inference via constraint sets, we currently treat
                         // unsatisfiable results as "no inference" instead of an immediate
                         // specialization error. This matches the previous behavior (where
@@ -2904,7 +2932,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
 
             (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
-                let when = self.constraints.load(self.db, when);
+                let when = self.constraints.load(self.db, &when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
                 // for now, matching the protocol constraint-set path in the nominal-instance
                 // arm above.

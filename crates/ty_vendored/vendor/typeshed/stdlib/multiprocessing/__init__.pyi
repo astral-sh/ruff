@@ -134,7 +134,10 @@ start method.  Useful for people embedding Python.
 
 set_forkserver_preload = context._default_context.set_forkserver_preload
 """Set list of module names to try to load in forkserver process.
-This is really just a hint.
+
+The on_error parameter controls how import failures are handled:
+"ignore" (default) silently ignores failures, "warn" emits warnings,
+and "fail" raises exceptions breaking the forkserver context.
 """
 
 get_all_start_methods = context._default_context.get_all_start_methods

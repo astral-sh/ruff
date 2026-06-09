@@ -218,11 +218,10 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
-## No narrowing for the right-hand side (currently)
+## No present-key narrowing without a `TypedDict`
 
-No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
-"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
-future:
+We only synthesize a key-access protocol for string membership tests on right-hand-side values that
+include a `TypedDict`. Other membership tests can mean substring or element containment instead:
 
 ```py
 from typing import Literal

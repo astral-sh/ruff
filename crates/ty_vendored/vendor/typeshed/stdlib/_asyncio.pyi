@@ -200,6 +200,7 @@ class Task(Future[_T_co]):  # type: ignore[type-var]  # pyright: ignore[reportIn
         to which the output is written; by default output is written
         to sys.stderr.
         """
+
     if sys.version_info >= (3, 11):
         def cancelling(self) -> int:
             """Return the count of the task's cancellation requests.

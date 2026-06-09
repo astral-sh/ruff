@@ -82,7 +82,7 @@ typevar to its default value or `Any`. Since that base class is fully specialize
 the inheriting class generic.
 
 ```py
-class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
+class InheritedGenericDefaultSpecialization(MultipleTypevars): ...  # error: [missing-type-argument]
 
 # revealed: None
 reveal_type(generic_context(InheritedGenericDefaultSpecialization))

@@ -347,6 +347,7 @@ if sys.platform != "win32":
         termios.TCOON to restart output, termios.TCIOFF to suspend input,
         or termios.TCION to restart input.
         """
+
     if sys.version_info >= (3, 11):
         def tcgetwinsize(fd: FileDescriptorLike, /) -> tuple[int, int]:
             """Get the tty winsize for file descriptor fd.

@@ -63,6 +63,7 @@ use crate::types::diagnostic::{
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_mismatched_type_name,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
+    report_too_many_positional_patterns_for_callable_class_pattern,
     report_unsupported_augmented_assignment, report_unsupported_comparison,
 };
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
@@ -71,6 +72,7 @@ use crate::types::function::{
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
+    enclosing_binding_contexts,
 };
 use crate::types::infer::builder::named_tuple::NamedTupleKind;
 use crate::types::infer::builder::paramspec_validation::validate_paramspec_components;
@@ -562,6 +564,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.scope
     }
 
+    /// Returns call bindings annotated with the call site's enclosing binding contexts.
+    ///
+    /// Call binding uses this as an optimization hint to avoid freshening generic callable
+    /// signatures when the callable's generic context cannot collide with a containing scope.
+    fn bindings_for_call(&self, callable_type: Type<'db>) -> Bindings<'db> {
+        let db = self.db();
+        callable_type
+            .bindings(db)
+            .with_enclosing_binding_contexts(enclosing_binding_contexts(
+                self.index,
+                self.scope().file_scope_id(db),
+            ))
+    }
+
     fn settings(&self) -> &AnalysisSettings {
         self.db().analysis_settings(self.file())
     }
@@ -592,7 +608,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|params| SmallVec::from(params.field_specifiers(db)))
                 .or_else(|| {
                     Some(SmallVec::from(
-                        CodeGeneratorKind::from_class(db, class_literal.into(), None)?
+                        CodeGeneratorKind::from_class(db, class_literal.into())?
                             .dataclass_transformer_params()?
                             .field_specifiers(db),
                     ))
@@ -2268,6 +2284,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
+        if let Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) = cls_ty {
+            if let Some(first_excess_pattern) = pattern.arguments.patterns.first() {
+                report_too_many_positional_patterns_for_callable_class_pattern(
+                    &self.context,
+                    first_excess_pattern,
+                    pattern.arguments.patterns.len(),
+                );
+            }
+            return;
+        }
+
         if let Type::ClassLiteral(class) = cls_ty {
             if class.is_typed_dict(self.db()) {
                 report_match_pattern_against_typed_dict(&self.context, &*pattern.cls, class);
@@ -4498,7 +4525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let nearest_enclosing_class =
                     nearest_enclosing_class(self.db(), self.index, self.scope());
                 let class_kind = nearest_enclosing_class.and_then(|class| {
-                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class), None)
+                    CodeGeneratorKind::from_class(self.db(), ClassLiteral::Static(class))
                 });
 
                 match class_kind {
@@ -5250,6 +5277,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn callable_paramspec_and_return_typevar<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+        ) -> Option<(BoundTypeVarInstance<'db>, BoundTypeVarInstance<'db>)> {
+            let callable = ty.resolve_type_alias(db).as_callable()?;
+            if callable.kind(db) != CallableTypeKind::Regular {
+                return None;
+            }
+            let [signature] = callable.signatures(db).overloads.as_slice() else {
+                return None;
+            };
+            let paramspec = signature.parameters().as_paramspec()?;
+            Some((paramspec, signature.return_ty.as_typevar()?))
+        }
+
+        fn is_transparent_callable_decorator<'d>(
+            db: &'d dyn Db,
+            decorator_ty: Type<'d>,
+            decorated_ty: Type<'d>,
+        ) -> bool {
+            if !matches!(decorated_ty, Type::FunctionLiteral(_) | Type::Callable(_)) {
+                return false;
+            }
+            let decorator_signatures = match decorator_ty {
+                Type::FunctionLiteral(decorator_function) => decorator_function.signature(db),
+                Type::Callable(decorator_callable) => decorator_callable.signatures(db),
+                _ => return false,
+            };
+            let [decorator_signature] = decorator_signatures.overloads.as_slice() else {
+                return false;
+            };
+            let [parameter] = decorator_signature.parameters().as_slice() else {
+                return false;
+            };
+
+            let Some((parameter_callable_paramspec, parameter_callable_return_typevar)) =
+                callable_paramspec_and_return_typevar(db, parameter.annotated_type())
+            else {
+                return false;
+            };
+            let Some((return_callable_paramspec, return_callable_typevar)) =
+                callable_paramspec_and_return_typevar(db, decorator_signature.return_ty)
+            else {
+                return false;
+            };
+            parameter_callable_paramspec.is_same_typevar_as(db, return_callable_paramspec)
+                && parameter_callable_return_typevar.is_same_typevar_as(db, return_callable_typevar)
+        }
+
         // For FunctionLiteral, get the kind directly without computing the full signature.
         // This avoids a query cycle when the function has default parameter values, since
         // computing the signature requires evaluating those defaults which may trigger
@@ -5275,13 +5351,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let call_arguments = CallArguments::positional([decorated_ty]);
+        let mut decorator_call_succeeded = true;
         let return_ty = decorator_ty
             .try_call(self.db(), &call_arguments)
             .map(|bindings| bindings.return_type(self.db()))
             .unwrap_or_else(|CallError(_, bindings)| {
+                decorator_call_succeeded = false;
                 bindings.report_diagnostics(&self.context, decorator_node.into());
                 bindings.return_type(self.db())
             });
+
+        // TODO: Remove this special case once the new constraint solver can preserve
+        // per-overload ParamSpec/return correlations for `Callable[P, R] -> Callable[P, R]`.
+        if decorator_call_succeeded
+            && is_transparent_callable_decorator(self.db(), decorator_ty, decorated_ty)
+            && let Some(callable) = decorated_ty
+                .try_upcast_to_callable(self.db())
+                .and_then(CallableTypes::exactly_one)
+        {
+            return Type::Callable(callable);
+        }
 
         // When a method on a class is decorated with a function that returns a
         // `Callable`, assume that the returned callable is also function-like (or
@@ -5348,8 +5437,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 definedness: boundness,
                 ..
             }) => {
-                let mut bindings = dunder_callable
-                    .bindings(db)
+                let mut bindings = self
+                    .bindings_for_call(dunder_callable)
                     .match_parameters(db, argument_types);
 
                 if let Err(call_error) = self.infer_and_check_argument_types(
@@ -5932,10 +6021,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Avoid promoting explicitly annotated literal values.
         if let Type::LiteralValue(literal) = ty
             && let Some(tcx) = tcx.annotation
-            && let Type::Union(_) | Type::LiteralValue(_) = tcx
+            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
                 .resolve_type_alias(self.db())
                 .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
-            && ty.is_assignable_to(self.db(), tcx)
+            && ty.is_assignable_to(self.db(), literal_tcx)
         {
             ty = Type::LiteralValue(literal.to_unpromotable());
         }
@@ -6604,6 +6693,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     let mut narrowed_tys = Vec::new();
                     let mut item_types = FxHashMap::default();
+                    // Reuse nested expressions that receive the same field context across candidates.
+                    let teardown = self.setup_expression_cache();
                     for typed_dict in typed_dicts {
                         // Disable diagnostics as we attempt to narrow to specific `TypedDict`
                         // elements of the union. Mixed unions like `TypedDict | dict[str, Any]`
@@ -6618,6 +6709,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         item_types.clear();
+                    }
+                    if teardown {
+                        self.teardown_expression_cache();
                     }
 
                     // Successfully narrowed to a subset of typed dicts.
@@ -8298,8 +8392,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        let mut bindings = callable_type
-            .bindings(self.db())
+        let mut bindings = self
+            .bindings_for_call(callable_type)
             .match_parameters(self.db(), &call_arguments);
 
         report_missing_implicit_constructor_call(

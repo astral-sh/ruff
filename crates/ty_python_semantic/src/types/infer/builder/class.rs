@@ -106,6 +106,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
+        let has_explicit_bases = class_node
+            .arguments
+            .as_deref()
+            .is_some_and(|arguments| !arguments.args.is_empty());
+        let has_explicit_metaclass = class_node
+            .arguments
+            .as_deref()
+            .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
         let infer_original_class_ty = |deprecated,
                                        type_check_only,
                                        dataclass_params,
@@ -129,6 +137,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     dataclass_params,
                     dataclass_transformer_params,
                     total_ordering,
+                    !class_node.decorator_list.is_empty(),
+                    class_node.type_params.is_some(),
+                    has_explicit_bases,
+                    has_explicit_metaclass,
                 )),
             }
         };

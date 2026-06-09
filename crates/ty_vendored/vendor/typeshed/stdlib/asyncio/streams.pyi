@@ -159,6 +159,7 @@ class StreamWriter:
           w.write(data)
           await w.drain()
         """
+
     if sys.version_info >= (3, 12):
         async def start_tls(
             self,
@@ -169,11 +170,13 @@ class StreamWriter:
             ssl_shutdown_timeout: float | None = None,
         ) -> None:
             """Upgrade an existing stream-based connection to TLS."""
+
     elif sys.version_info >= (3, 11):
         async def start_tls(
             self, sslcontext: ssl.SSLContext, *, server_hostname: str | None = None, ssl_handshake_timeout: float | None = None
         ) -> None:
             """Upgrade an existing stream-based connection to TLS."""
+
     if sys.version_info >= (3, 13):
         def __del__(self, warnings: ModuleType = ...) -> None: ...
     elif sys.version_info >= (3, 11):
@@ -206,6 +209,7 @@ class StreamReader:
                 If stream was paused, this function will automatically resume it if
                 needed.
         """
+
     if sys.version_info >= (3, 13):
         async def readuntil(self, separator: _ReaduntilBuffer | tuple[_ReaduntilBuffer, ...] = b"\n") -> bytes:
             """Read data from the stream until ``separator`` is found.
@@ -233,6 +237,7 @@ class StreamReader:
             the shortest possible separator is considered to be the one that
             matched.
             """
+
     else:
         async def readuntil(self, separator: _ReaduntilBuffer = b"\n") -> bytes:
             """Read data from the stream until ``separator`` is found.

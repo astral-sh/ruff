@@ -35,7 +35,7 @@ use crate::{
             report_instance_layout_conflict, report_invalid_attribute_assignment,
             report_invalid_or_unsupported_base, report_invalid_total_ordering,
             report_invalid_type_param_order, report_invalid_typevar_default_reference,
-            report_named_tuple_field_with_leading_underscore,
+            report_missing_type_arguments, report_named_tuple_field_with_leading_underscore,
             report_namedtuple_field_without_default_after_field_with_default,
             report_shadowed_type_variable,
             report_subclass_of_class_with_non_callable_init_subclass, report_unsupported_base,
@@ -111,7 +111,7 @@ pub(crate) fn check_static_class_definitions<'db>(
         }
     }
 
-    let class_kind = CodeGeneratorKind::from_class(db, class.into(), None);
+    let class_kind = CodeGeneratorKind::from_class(db, class.into());
 
     // If it's a `NamedTuple` class, check that no field without a default value
     // appears after a field with a default value.
@@ -229,6 +229,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     for (i, entry) in expanded_base_entries.iter().enumerate() {
         let source_node = entry.source_node();
         let base_class = entry.ty();
+        report_missing_type_arguments(context, base_class, source_node);
 
         if class_kind == Some(CodeGeneratorKind::NamedTuple)
             && !matches!(
@@ -877,7 +878,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     // Check that a dataclass does not have more than one `KW_ONLY`
     // and that required fields are defined before default fields.
     if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
-        CodeGeneratorKind::from_class(db, class.into(), None)
+        CodeGeneratorKind::from_class(db, class.into())
     {
         let specialization = None;
 
@@ -1345,7 +1346,7 @@ fn check_class_final_without_value<'db>(
 
     // In dataclasses (and similar code-generated classes), Final fields without
     // defaults are initialized by the synthesized __init__, so they are valid.
-    if CodeGeneratorKind::from_class(db, class.into(), None).is_some() {
+    if CodeGeneratorKind::from_class(db, class.into()).is_some() {
         return;
     }
 

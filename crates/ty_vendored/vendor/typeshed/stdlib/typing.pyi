@@ -321,6 +321,7 @@ class TypeVar:
 
     def __ror__(self, left: Any, /) -> _SpecialForm:  # AnnotationForm
         """Return value|self."""
+
     if sys.version_info >= (3, 11):
         def __typing_subst__(self, arg: Any, /) -> Any: ...
     if sys.version_info >= (3, 13):
@@ -565,6 +566,32 @@ to mark individual keys as immutable for type checkers::
         id: ReadOnly[int]  # the "id" key must not be modified
         username: str      # the "username" key can be changed
 
+The closed argument controls whether the TypedDict allows additional
+non-required items during inheritance and assignability checks.
+If closed=True, the TypedDict does not allow additional items::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int}, closed=True)
+    class Point3D(Point2D):
+        z: int  # Type checker error
+
+Passing closed=False explicitly requests TypedDict's default open behavior.
+If closed is not provided, the behavior is inherited from the superclass.
+A type checker is only expected to support a literal False or True as the
+value of the closed argument.
+
+The extra_items argument can instead be used to specify the assignable type
+of unknown non-required keys::
+
+    Point2D = TypedDict('Point2D', {'x': int, 'y': int}, extra_items=int)
+    class Point3D(Point2D):
+        z: int      # OK
+        label: str  # Type checker error
+
+The extra_items argument is also inherited through subclassing. It is unset
+by default, and it may not be used with the closed argument at the same
+time.
+
+See PEP 728 for more information about closed and extra_items.
 """
 
 if sys.version_info >= (3, 11):
@@ -919,6 +946,7 @@ class ParamSpec:
         @property
         def __default__(self) -> Any:  # AnnotationForm
             """The default value for this ParamSpec."""
+
     if sys.version_info >= (3, 13):
         def __new__(
             cls,
@@ -956,6 +984,7 @@ class ParamSpec:
     @property
     def kwargs(self) -> ParamSpecKwargs:
         """Represents keyword arguments."""
+
     if sys.version_info >= (3, 11):
         def __typing_subst__(self, arg: Any, /) -> Any: ...
         def __typing_prepare_subst__(self, alias: Any, args: Any, /) -> tuple[Any, ...]: ...
@@ -965,6 +994,7 @@ class ParamSpec:
 
     def __ror__(self, left: Any, /) -> _SpecialForm:
         """Return value|self."""
+
     if sys.version_info >= (3, 13):
         def has_default(self) -> bool: ...
     if sys.version_info >= (3, 14):
@@ -1152,7 +1182,25 @@ if sys.version_info < (3, 15):
         """
 
 if sys.version_info >= (3, 15):
-    def disjoint_base(cls: _TC) -> _TC: ...
+    def disjoint_base(cls: _TC) -> _TC:
+        """This decorator marks a class as a disjoint base.
+
+        Child classes of a disjoint base cannot inherit from other disjoint bases that are
+        not parent or child classes of the disjoint base.
+
+        For example:
+
+            @disjoint_base
+            class Disjoint1: pass
+
+            @disjoint_base
+            class Disjoint2: pass
+
+            class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
+
+        Type checkers can use knowledge of disjoint bases to detect unreachable code
+        and determine when two types can overlap.
+        """
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -1246,6 +1294,25 @@ if sys.version_info >= (3, 15):
     NoExtraItems: _NoExtraItemsType
 
     TypeForm: _SpecialForm
+    """A special form representing the value that results from the evaluation
+    of a type expression.
+
+    This value encodes the information supplied in the type expression, and it
+    represents the type described by that type expression.
+
+    When used in a type expression, TypeForm describes a set of type form
+    objects. It accepts a single type argument, which must be a valid type
+    expression. ``TypeForm[T]`` describes the set of all type form objects that
+    represent the type T or types that are assignable to T.
+
+    Usage::
+
+        def cast[T](typ: TypeForm[T], value: Any) -> T: ...
+
+        reveal_type(cast(int, "x"))  # int
+
+    See PEP 747 for more information.
+    """
 
 # Predefined type variables.
 AnyStr = TypeVar("AnyStr", str, bytes)  # noqa: Y001
@@ -1432,6 +1499,7 @@ class Generator(Iterator[_YieldT_co], Protocol[_YieldT_co, _SendT_contra, _Retur
     if sys.version_info >= (3, 13):
         def close(self) -> _ReturnT_co | None:
             """Raise GeneratorExit inside generator."""
+
     else:
         def close(self) -> None:
             """Raise GeneratorExit inside generator."""
@@ -1671,6 +1739,7 @@ class AbstractSet(Collection[_T_co]):
         freedom for __eq__ or __hash__.  We match the algorithm used
         by the built-in frozenset type.
         """
+
     # Mixin methods
     @classmethod
     def _from_iterable(cls, it: Iterable[_S], /) -> AbstractSet[_S]:
@@ -1711,6 +1780,7 @@ class MutableSet(AbstractSet[_T]):
     @abstractmethod
     def discard(self, value: _T, /) -> None:
         """Remove an element.  Do not raise an exception if absent."""
+
     # Mixin methods
     def clear(self) -> None:
         """This is slow (creates N new iterators!) but effective."""
@@ -2528,7 +2598,9 @@ if sys.version_info >= (3, 12):
         At runtime, Alias is an instance of TypeAliasType. The __name__
         attribute holds the name of the type alias. The value of the type alias
         is stored in the __value__ attribute. It is evaluated lazily, so the
-        value is computed only if the attribute is accessed.
+        value is computed only if the attribute is accessed. The __module__
+        attribute holds the name of the module in which the type alias was
+        defined; it can be assigned to.
 
         Type aliases can also be generic::
 
@@ -2563,6 +2635,7 @@ if sys.version_info >= (3, 12):
 
         def __ror__(self, left: Any, /) -> _SpecialForm:
             """Return value|self."""
+
         if sys.version_info >= (3, 14):
             def __iter__(self) -> Any:  # Unpack[Self]
                 """Implement iter(self)."""
