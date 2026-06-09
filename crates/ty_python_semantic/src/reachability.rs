@@ -617,10 +617,11 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
         let mut projector = NarrowingProjector::new(db, self, predicates, place);
         let projected_root = projector.project(id);
 
-        if projector
-            .graph
-            .repeated_branch_factor(projected_root)
-            .is_some()
+        if !base_ty.has_dynamic(db)
+            && projector
+                .graph
+                .branch_factor_candidate(projected_root)
+                .is_some()
         {
             let node = self.get_interior_node(id);
             let scope = predicate_scope(db, predicates[node.atom()]);
@@ -692,14 +693,78 @@ struct ProjectedNarrowingNode {
     if_false: ProjectedNarrowingNodeId,
 }
 
-/// The two continuation subgraphs shared by every path through a factorizable region.
+/// A possible simplification of several nested branches into one condition.
 ///
-/// [`ProjectedBranchFactorPlan`] derives a condition that selects `if_true`; its complement selects
-/// `if_false`.
+/// For example:
+///
+/// ```python
+/// if is_a(value):
+///     pass
+/// elif is_b(value):
+///     pass
+/// else:
+///     return
+///
+/// consume(value)
+/// ```
+///
+/// `consume` is reached when `is_a(value)` is true or when `is_a(value)` is false and
+/// `is_b(value)` is true. Writing those two checks as `A` and `B`, the paths can be combined into
+/// one condition: `A | B`.
+///
+/// The factor remembers what happens in both cases. `if_true` represents the path where `A | B`
+/// matched and execution reaches `consume`. `if_false` represents the path where neither matched
+/// and execution returned.
 #[derive(Clone, Copy)]
 struct ProjectedBranchFactor {
     if_true: ProjectedNarrowingNodeId,
     if_false: ProjectedNarrowingNodeId,
+}
+
+/// Records where two or more nested tests can be replaced by one combined condition.
+///
+/// The example above produces this graph:
+///
+/// ```text
+/// A?
+/// ├── true  ──────────> reaches `consume`
+/// └── false ──> B?
+///                ├── true  ──> reaches `consume`
+///                └── false ──> returned before `consume`
+/// ```
+///
+/// The `B` node gets `None` because it contains only one test; there is nothing to combine. The `A`
+/// node gets `Some(ProjectedBranchFactor)` because the nested `A` and `B` tests can be replaced by
+/// `A | B`. If that combined condition is true, execution reaches `consume`; otherwise it has
+/// returned.
+///
+/// Entries are indexed by [`ProjectedNarrowingNodeId`]. The vector stays empty, without allocating,
+/// until the first candidate is found. At that point, earlier ordinary nodes are represented by
+/// `None`, and every subsequently added node receives either `Some(ProjectedBranchFactor)` or
+/// `None`.
+#[derive(Default)]
+struct ProjectedBranchFactorCandidates {
+    by_node: Vec<Option<ProjectedBranchFactor>>,
+}
+
+impl ProjectedBranchFactorCandidates {
+    fn is_empty(&self) -> bool {
+        self.by_node.is_empty()
+    }
+
+    fn get(&self, id: ProjectedNarrowingNodeId) -> Option<ProjectedBranchFactor> {
+        self.by_node.get(id.0).copied().flatten()
+    }
+
+    fn record(&mut self, id: ProjectedNarrowingNodeId, candidate: Option<ProjectedBranchFactor>) {
+        if candidate.is_some() || !self.by_node.is_empty() {
+            if self.by_node.is_empty() {
+                self.by_node.resize(id.0, None);
+            }
+            debug_assert_eq!(self.by_node.len(), id.0);
+            self.by_node.push(candidate);
+        }
+    }
 }
 
 /// Reduced reachability graph containing only predicates relevant to one place.
@@ -716,11 +781,7 @@ struct ProjectedNarrowingGraph<'db> {
             Option<NarrowingConstraint<'db>>,
         ),
     >,
-    /// Structurally repeated regions that can resolve to only two continuation subgraphs.
-    ///
-    /// This remains unallocated for graphs without repeated continuations. Exact-complement
-    /// validation and condition construction are deferred until narrowing evaluates a candidate.
-    repeated_branch_factors: Option<Vec<Option<ProjectedBranchFactor>>>,
+    branch_factor_candidates: ProjectedBranchFactorCandidates,
 }
 
 impl ProjectedNarrowingGraph<'_> {
@@ -734,32 +795,30 @@ impl ProjectedNarrowingGraph<'_> {
             return None;
         }
 
-        self.repeated_branch_factors
-            .as_ref()
-            .and_then(|factors| factors[id.0])
-            .or_else(|| {
-                let node = self.node(id);
-                Some(ProjectedBranchFactor {
-                    if_true: node.if_true,
-                    if_false: node.if_false,
-                })
+        self.branch_factor_candidates.get(id).or_else(|| {
+            let node = self.node(id);
+            Some(ProjectedBranchFactor {
+                if_true: node.if_true,
+                if_false: node.if_false,
             })
+        })
     }
 
-    fn repeated_branch_factor(
+    fn branch_factor_candidate(
         &self,
         id: ProjectedNarrowingNodeId,
     ) -> Option<ProjectedBranchFactor> {
         if id.is_terminal() {
             return None;
         }
-        self.repeated_branch_factors.as_ref()?[id.0]
+        self.branch_factor_candidates.get(id)
     }
 
-    /// Interns a projected node and records repeated two-continuation regions bottom-up.
+    /// Interns a projected node and records when several nested tests reach the same code.
     ///
-    /// This only recognizes graph shape. [`ProjectedBranchFactorPlan`] later verifies that the
-    /// predicates provide exact complementary narrowing constraints.
+    /// For example, this recognizes that both the `A` and `B` cases above reach `consume`.
+    /// [`ProjectedBranchFactorPlan`] later verifies that each test narrows predictably: passing the
+    /// test adds a type `T`, while failing it removes that same type `T`.
     fn add_node(&mut self, node: ProjectedNarrowingNode) -> ProjectedNarrowingNodeId {
         if node.if_true == node.if_false {
             return node.if_true;
@@ -804,11 +863,7 @@ impl ProjectedNarrowingGraph<'_> {
             None
         };
 
-        if factor.is_some() || self.repeated_branch_factors.is_some() {
-            self.repeated_branch_factors
-                .get_or_insert_with(|| vec![None; id.0])
-                .push(factor);
-        }
+        self.branch_factor_candidates.record(id, factor);
 
         id
     }
@@ -1055,7 +1110,7 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         graph: &ProjectedNarrowingGraph<'db>,
         base_ty: Type<'db>,
     ) -> Option<Self> {
-        if graph.repeated_branch_factors.is_none() || base_ty.has_dynamic(db) {
+        if graph.branch_factor_candidates.is_empty() || base_ty.has_dynamic(db) {
             return None;
         }
 
@@ -1090,11 +1145,11 @@ impl<'db> ProjectedBranchFactorPlan<'db> {
         graph: &ProjectedNarrowingGraph<'db>,
         id: ProjectedNarrowingNodeId,
     ) -> Option<(ProjectedBranchFactor, Type<'db>)> {
-        let factor = graph.repeated_branch_factor(id)?;
+        let factor = graph.branch_factor_candidate(id)?;
         Some((factor, self.condition(db, graph, id)?))
     }
 
-    /// Builds and memoizes the condition that selects a region's `if_true` continuation.
+    /// Builds and memoizes the condition that selects a candidate's `if_true` branch.
     fn condition(
         &mut self,
         db: &'db dyn Db,
