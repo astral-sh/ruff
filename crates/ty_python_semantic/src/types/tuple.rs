@@ -151,9 +151,34 @@ impl<'db> TupleType<'db> {
     pub(crate) fn new(db: &'db dyn Db, spec: &TupleSpec<'db>) -> Option<Self> {
         // If a fixed-length (i.e., mandatory) element of the tuple is `Never`, then it's not
         // possible to instantiate the tuple as a whole.
-        if spec.fixed_elements().any(Type::is_never) {
-            return None;
+        let mut unpacked_typevartuple = None;
+        for (index, element) in spec.fixed_elements().enumerate() {
+            if element.is_never() {
+                return None;
+            }
+            if matches!(spec, TupleSpec::Fixed(_))
+                && unpacked_typevartuple.is_none()
+                && let Type::TypeVar(typevar) = element
+                && typevar.is_typevartuple(db)
+            {
+                unpacked_typevartuple = Some((index, *typevar));
+            }
         }
+
+        // A `TypeVarTuple` can only reach a tuple spec as an unpacked element. Normalize it to the
+        // variable-length representation used for variadic matching and substitution.
+        let normalized = if let Some((index, typevar)) = unpacked_typevartuple
+            && let TupleSpec::Fixed(tuple) = spec
+        {
+            Some(VariableLengthTuple::mixed(
+                tuple.elements_slice()[..index].iter().copied(),
+                Type::TypeVar(typevar),
+                tuple.elements_slice()[index + 1..].iter().copied(),
+            ))
+        } else {
+            None
+        };
+        let spec = normalized.as_ref().unwrap_or(spec);
 
         // If the variable-length portion is Never, it can only be instantiated with zero elements.
         // That means this isn't a variable-length tuple after all!
@@ -1132,6 +1157,32 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
+        if let Type::TypeVar(typevar) = self.variable()
+            && typevar.is_typevartuple(db)
+        {
+            let prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let mapped =
+                Type::TypeVar(typevar).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            if let Some(mapped_tuple) = mapped.exact_tuple_instance_spec(db) {
+                let mut builder = TupleSpecBuilder::with_capacity(self.elements.len());
+                for element in prefix {
+                    builder.push(element);
+                }
+                builder = builder.concat(db, &mapped_tuple);
+                for element in suffix {
+                    builder.push(element);
+                }
+                return builder.build();
+            }
+        }
+
         Self::mixed(
             self.prefix_elements()
                 .iter()
@@ -1706,6 +1757,15 @@ impl<'db> TupleSpecBuilder<'db> {
             TupleSpecBuilder::Fixed(elements) => elements.push(element),
             TupleSpecBuilder::Variable { suffix, .. } => suffix.push(element),
         }
+    }
+
+    pub(crate) fn concat_variadic_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        let other = VariableLengthTuple::mixed([], Type::TypeVar(typevar), []);
+        self.concat(db, &other)
     }
 
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.

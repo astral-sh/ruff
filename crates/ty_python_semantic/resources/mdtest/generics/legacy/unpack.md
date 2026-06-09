@@ -21,12 +21,9 @@ Ts = TypeVarTuple("Ts")
 class Array(Generic[Unpack[Ts]]):
     value: tuple[Unpack[Ts]]
 
-# TODO: revealed: tuple[()]
-reveal_type(Array[()]().value)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
-# TODO: revealed: tuple[int, str]
-reveal_type(Array[int, str]().value)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
-# TODO: revealed: tuple[int, str]
-reveal_type(Array[Unpack[tuple[int, str]]]().value)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+reveal_type(Array[()]().value)  # revealed: tuple[()]
+reveal_type(Array[int, str]().value)  # revealed: tuple[int, str]
+reveal_type(Array[Unpack[tuple[int, str]]]().value)  # revealed: tuple[int, str]
 ```
 
 ## Variadic parameter inference
@@ -40,14 +37,11 @@ from typing import TypeVarTuple, Unpack
 Ts = TypeVarTuple("Ts")
 
 def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
-    # TODO: revealed: tuple[*Ts@collect]
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: revealed: tuple[()]
-reveal_type(collect())  # revealed: tuple[@Todo(TypeVarTuple), ...]
-# TODO: revealed: tuple[Literal[1], Literal["a"]]
-reveal_type(collect(1, "a"))  # revealed: tuple[@Todo(TypeVarTuple), ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
 ## Callable parameters
@@ -71,7 +65,7 @@ def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
-# TODO: error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
 reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
@@ -90,10 +84,8 @@ def f(
     fixed: Alias[str, bool],
     unbounded: Alias[Unpack[tuple[str, ...]]],
 ) -> None:
-    # TODO: revealed: tuple[int, str, bool]
-    reveal_type(fixed)  # revealed: tuple[@Todo(TypeVarTuple), ...]
-    # TODO: revealed: tuple[int, *tuple[str, ...]]
-    reveal_type(unbounded)  # revealed: tuple[@Todo(TypeVarTuple), ...]
+    reveal_type(fixed)  # revealed: tuple[int, str, bool]
+    reveal_type(unbounded)  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
 ## Concrete and nested tuple unpacking
@@ -109,7 +101,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
 ```
 
@@ -130,10 +122,8 @@ Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 class WithDefault(Generic[Unpack[Ts]]):
     value: tuple[Unpack[Ts]]
 
-# TODO: revealed: tuple[int, str]
-reveal_type(WithDefault().value)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
-# TODO: revealed: tuple[bool, bytes]
-reveal_type(WithDefault[bool, bytes]().value)  # revealed: @Todo(ParamSpecs and TypeVarTuples)
+reveal_type(WithDefault().value)  # revealed: tuple[int, str]
+reveal_type(WithDefault[bool, bytes]().value)  # revealed: tuple[bool, bytes]
 ```
 
 ## Validation
@@ -148,31 +138,28 @@ Ts = TypeVarTuple("Ts")
 
 class Pair(Generic[Unpack[Ts], U]): ...
 
-# TODO: error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
 class InvalidGeneric(Generic[U, Unpack[int]]): ...
 
 def invalid(
-    # TODO: error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+    # error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
     non_tuple: Pair[Unpack[int], str],
     # error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
     multiple: tuple[Unpack[Ts], Unpack[tuple[str, ...]]],
 ) -> None:
-    # TODO: revealed: Pair[*tuple[Unknown, ...], str]
-    reveal_type(non_tuple)  # revealed: @Todo(specialized non-generic class)
+    reveal_type(non_tuple)  # revealed: Pair[*tuple[Unknown, ...], str]
 
-# TODO: error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
 def invalid_vararg(*args: Unpack[int]) -> None:
-    # TODO: revealed: tuple[Unknown, ...]
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
 
-# TODO: error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
+# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
 def invalid_stringified_vararg(*args: "Unpack[int]") -> None:
-    # TODO: revealed: tuple[Unknown, ...]
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[Unknown, ...]
 
-# TODO: error: [invalid-type-form] "`Unpack` cannot be nested"
+# error: [invalid-type-form] "`Unpack` cannot be nested"
 def nested(*args: Unpack[Unpack[tuple[int, ...]]]) -> None: ...
 
-# TODO: error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a parameter annotation"
+# error: [invalid-type-form] "Bare TypeVarTuple `Ts` is not valid in this context in a parameter annotation"
 def nested_bare_typevartuple(*args: Unpack[tuple[Ts]]) -> None: ...
 ```

@@ -38,11 +38,14 @@ reveal_type(generic_context(SingleParamSpec))
 # revealed: ty_extensions.GenericContext[P@TypeVarAndParamSpec, T@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
 
-# TODO: support `TypeVarTuple` properly (these should not reveal `None`)
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredSingleTypeVarTuple))  # revealed: None
-reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))  # revealed: None
+# revealed: ty_extensions.GenericContext[Ts@SingleTypeVarTuple]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
+# revealed: ty_extensions.GenericContext[Ts@StarredSingleTypeVarTuple]
+reveal_type(generic_context(StarredSingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@StarredTypeVarAndTypeVarTuple, Ts@StarredTypeVarAndTypeVarTuple]
+reveal_type(generic_context(StarredTypeVarAndTypeVarTuple))
 ```
 
 Inheriting from `Generic` multiple times yields a `duplicate-base` diagnostic, just like any other
@@ -60,7 +63,7 @@ You cannot use the same typevar more than once.
 class RepeatedTypevar(Generic[T, T]): ...
 ```
 
-You can only specialize `typing.Generic` with typevars (TODO: or param specs or typevar tuples).
+You can only specialize `typing.Generic` with typevars, param specs, or typevar tuples.
 
 ```py
 # error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"

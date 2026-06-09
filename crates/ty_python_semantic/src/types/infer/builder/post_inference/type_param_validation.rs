@@ -2,7 +2,56 @@ use ruff_python_ast as ast;
 use ruff_text_size::Ranged;
 
 use crate::diagnostic::format_enumeration;
-use crate::types::{context::InferContext, diagnostic::INVALID_TYPE_VARIABLE_DEFAULT};
+use crate::types::{
+    context::InferContext,
+    diagnostic::{INVALID_TYPE_FORM, INVALID_TYPE_VARIABLE_DEFAULT},
+};
+
+/// Check that a PEP 695 type parameter list contains at most one `TypeVarTuple`.
+pub(crate) fn check_single_typevar_tuple_pep695(
+    context: &InferContext<'_, '_>,
+    type_params: &ast::TypeParams,
+) {
+    let mut first_typevar_tuple: Option<&ast::TypeParamTypeVarTuple> = None;
+
+    for type_param in type_params {
+        let ast::TypeParam::TypeVarTuple(typevar_tuple) = type_param else {
+            continue;
+        };
+
+        let Some(first_typevar_tuple) = first_typevar_tuple else {
+            first_typevar_tuple = Some(typevar_tuple);
+            continue;
+        };
+
+        let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, typevar_tuple) else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic("Only one TypeVarTuple parameter is allowed");
+
+        diagnostic.set_concise_message(format_args!(
+            "TypeVarTuple `{}` cannot appear after TypeVarTuple `{}`",
+            &typevar_tuple.name, &first_typevar_tuple.name
+        ));
+
+        diagnostic.set_primary_message(format_args!(
+            "`{}` is an additional TypeVarTuple",
+            &typevar_tuple.name
+        ));
+
+        diagnostic.annotate(context.secondary(first_typevar_tuple).message(format_args!(
+            "`{}` is the first TypeVarTuple",
+            &first_typevar_tuple.name
+        )));
+
+        diagnostic.info(
+            "See https://typing.python.org/en/latest/spec/generics.html#multiple-type-variable-tuples-not-allowed",
+        );
+
+        return;
+    }
+}
 
 /// Check that no type parameter with a default follows a `TypeVarTuple` in a PEP 695
 /// type parameter list. This is prohibited by the typing spec because a `TypeVarTuple`

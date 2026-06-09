@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{DynamicType, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::{KnownClass, SpecialFormType, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -56,10 +56,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let contextual_ty = self
                 .speculate()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
-            // TODO: Remove this exception once `Unpack` produces a precise type instead of a
-            // dynamic placeholder in ordinary expression inference.
             if contextual_ty.is_assignable_to(self.db(), target)
-                && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
+                && !self.is_unpack_subscript(expression)
             {
                 return None;
             }
@@ -92,6 +90,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .any(|element| self.contains_type_form_value(expression, *element)),
             _ => false,
         }
+    }
+
+    fn is_unpack_subscript(&self, expression: &ast::Expr) -> bool {
+        let ast::Expr::Subscript(subscript) = expression else {
+            return false;
+        };
+
+        self.speculate()
+            .infer_expression(&subscript.value, TypeContext::default())
+            == Type::SpecialForm(SpecialFormType::Unpack)
     }
 
     pub(super) fn infer_type_form_call_expression(

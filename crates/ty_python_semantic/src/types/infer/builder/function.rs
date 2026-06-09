@@ -28,6 +28,7 @@ use crate::{
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
         todo_type,
+        tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
@@ -883,10 +884,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let ty = if annotation.is_starred_expr() {
-                todo_type!("PEP 646")
+            let annotated_type = self.file_expression_type(annotation);
+            let has_unpacked_annotation = self
+                .file_type_expression_flags(annotation)
+                .contains(TypeExpressionFlags::UNPACK);
+            let ty = if annotation.is_starred_expr() || has_unpacked_annotation {
+                if let Type::TypeVar(typevar) = annotated_type
+                    && typevar.is_typevartuple(db)
+                {
+                    Type::tuple(TupleType::new(
+                        db,
+                        &TupleSpecBuilder::with_capacity(0)
+                            .concat_variadic_typevar(db, typevar)
+                            .build(),
+                    ))
+                } else if annotated_type.exact_tuple_instance_spec(db).is_some() {
+                    annotated_type
+                } else {
+                    todo_type!("PEP 646")
+                }
             } else {
-                let annotated_type = self.file_expression_type(annotation);
                 if let Type::TypeVar(typevar) = annotated_type
                     && typevar.is_paramspec(db)
                 {

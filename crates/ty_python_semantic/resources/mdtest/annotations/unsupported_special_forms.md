@@ -13,7 +13,7 @@ Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[*Ts@f]
     return args
 
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
@@ -45,8 +45,8 @@ def ex3(msg: str):
 def first_arg_int(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...
 
 first_arg_int(42, "42", "42")  # fine
-first_arg_int("not an int", "42", "42")  # TODO: should error
-first_arg_int(56, "42", 56)  # TODO: should error
+first_arg_int("not an int", "42", "42")  # error: [invalid-argument-type]
+first_arg_int(56, "42", 56)  # error: [invalid-argument-type]
 ```
 
 ## Allowed `Unpack` contexts
@@ -74,10 +74,10 @@ class Pair(Generic[T, U]): ...
 class Triple(Generic[T, U, Unpack[Us]]): ...
 
 def variadic_typevartuple(*args: Unpack[Ts]) -> None:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[*Ts@variadic_typevartuple]
 
 def variadic_tuple(*args: Unpack[tuple[int, str]]) -> None:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[int, str]
 
 def allowed(
     tuple_fixed: tuple[int, Unpack[tuple[str, bytes]]],
@@ -95,8 +95,8 @@ def allowed(
 ) -> None:
     reveal_type(tuple_fixed)  # revealed: tuple[int, str, bytes]
     reveal_type(tuple_variadic)  # revealed: tuple[int, *tuple[str, ...], bytes]
-    reveal_type(callable_typevartuple)  # revealed: (...) -> None
-    reveal_type(callable_tuple)  # revealed: (tuple[int, str], /) -> None
+    reveal_type(callable_typevartuple)  # revealed: (int, /, *Ts@allowed) -> None
+    reveal_type(callable_tuple)  # revealed: (*tuple[int, str]) -> None
     reveal_type(pair)  # revealed: Pair[int, str]
     reveal_type(quoted_pair_argument)  # revealed: Pair[int, str]
     reveal_type(quoted_tuple)  # revealed: tuple[int, str, bytes]
