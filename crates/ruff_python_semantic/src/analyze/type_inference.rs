@@ -49,6 +49,8 @@ impl ResolvedPythonType {
                 Self::Union(a)
             }
             (Self::Union(mut a), Self::Union(b)) => {
+                let mut b = b.into_iter().collect::<Vec<_>>();
+                b.sort_unstable();
                 for b_element in b {
                     // If `b_element` is a subtype of any of the types in `a`, then
                     // `b_element` is redundant.

@@ -258,6 +258,7 @@ unnecessary_debug_formatting = "allow" # too many instances, the display also do
 needless_raw_string_hashes = "allow"
 # Disallowed restriction lints
 ignore_without_reason = "allow" # Too many exsisting instances, and there's no auto fix.
+iter_over_hash_type = "warn"
 print_stdout = "warn"
 print_stderr = "warn"
 dbg_macro = "warn"
