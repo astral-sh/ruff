@@ -53,6 +53,13 @@ Enable uv integration.
 When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
 root.
 
+### `TY_UV_METADATA`
+
+Read `uv workspace metadata` output from stdin instead of invoking uv.
+
+When set to `"1"` or `"true"`, this is equivalent to the `--uv-metadata` command-line
+argument.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:

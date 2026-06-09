@@ -6,6 +6,17 @@ use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+fn command_with_uv(case: &CliTest) -> Command {
+    let mut command = case.command();
+    command
+        .env("TY_UV", "1")
+        .env("UV", "uv")
+        .env("UV_CACHE_DIR", case.root().join("cache"))
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default());
+
+    command
+}
+
 #[test]
 fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     let case = workspace_case()?;
@@ -140,6 +151,73 @@ fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn can_read_uv_workspace_metadata_from_stdin() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("UV", case.root().join("missing-uv"))
+        .env("TY_UV_METADATA", "false")
+        .arg("--uv-metadata");
+
+    assert_cmd_snapshot!(command.pass_stdin(workspace_metadata(&case)), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn uv_metadata_environment_variable_reads_metadata_from_stdin() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("UV", case.root().join("missing-uv"))
+        .env("TY_UV_METADATA", "1");
+
+    assert_cmd_snapshot!(command.pass_stdin(workspace_metadata(&case)), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+fn workspace_metadata(case: &CliTest) -> String {
+    serde_json::json!({
+        "schema": {
+            "version": "preview",
+        },
+        "workspace_root": case.root(),
+        "members": [
+            {
+                "path": case.root().join("packages/member"),
+            },
+            {
+                "path": case.root().join("packages/sibling"),
+            },
+        ],
+    })
+    .to_string()
+}
+
 fn workspace_case() -> anyhow::Result<CliTest> {
     CliTest::with_files([
         (
@@ -170,15 +248,4 @@ requires-python = ">=3.8"
         ),
         ("packages/sibling/sibling.py", "value: int = 'wrong'"),
     ])
-}
-
-fn command_with_uv(case: &CliTest) -> Command {
-    let mut command = case.command();
-    command
-        .env("TY_UV", "1")
-        .env("UV", "uv")
-        .env("UV_CACHE_DIR", case.root().join("cache"))
-        .env("PATH", std::env::var_os("PATH").unwrap_or_default());
-
-    command
 }

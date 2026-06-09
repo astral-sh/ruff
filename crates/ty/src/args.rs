@@ -85,6 +85,14 @@ pub(crate) struct CheckCommand {
     #[arg(long, value_name = "PROJECT")]
     pub(crate) project: Option<SystemPathBuf>,
 
+    /// Read `uv workspace metadata` output from stdin instead of invoking uv.
+    #[arg(
+        long,
+        env = EnvVars::TY_UV_METADATA,
+        value_parser = clap::builder::BoolishValueParser::new()
+    )]
+    pub(crate) uv_metadata: bool,
+
     /// Path to your project's Python environment or interpreter.
     ///
     /// ty uses your Python environment to resolve third-party imports in your code.

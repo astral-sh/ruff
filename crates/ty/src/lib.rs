@@ -130,7 +130,16 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .transpose()?;
     let uv_workspace = explicit_project_path
         .is_none()
-        .then(|| uv::discover_workspace(&cwd))
+        .then(|| {
+            uv::discover_workspace(
+                &cwd,
+                if args.uv_metadata {
+                    uv::WorkspaceMetadataSource::Stdin
+                } else {
+                    uv::WorkspaceMetadataSource::Command
+                },
+            )
+        })
         .flatten();
     let uv_workspace_member = uv_workspace
         .as_ref()

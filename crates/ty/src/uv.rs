@@ -1,3 +1,4 @@
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -10,36 +11,64 @@ pub(crate) struct UvWorkspace {
     pub(crate) member: Option<SystemPathBuf>,
 }
 
-pub(crate) fn discover_workspace(cwd: &SystemPath) -> Option<UvWorkspace> {
-    if !matches!(std::env::var(EnvVars::TY_UV).as_deref(), Ok("1" | "true")) {
-        return None;
-    }
+pub(crate) enum WorkspaceMetadataSource {
+    Command,
+    Stdin,
+}
 
-    let uv = std::env::var_os(EnvVars::UV).unwrap_or_else(|| "uv".into());
+pub(crate) fn discover_workspace(
+    cwd: &SystemPath,
+    metadata_source: WorkspaceMetadataSource,
+) -> Option<UvWorkspace> {
+    let metadata = match metadata_source {
+        WorkspaceMetadataSource::Command => {
+            if !matches!(std::env::var(EnvVars::TY_UV).as_deref(), Ok("1" | "true")) {
+                return None;
+            }
 
-    let output = match Command::new(uv)
-        .arg("workspace")
-        .arg("metadata")
-        .current_dir(cwd.as_std_path())
-        .output()
-    {
-        Ok(output) => output,
-        Err(error) => {
-            tracing::debug!("Failed to invoke `uv workspace metadata`: {error}");
-            return None;
+            let uv = std::env::var_os(EnvVars::UV).unwrap_or_else(|| "uv".into());
+
+            let output = match Command::new(uv)
+                .arg("workspace")
+                .arg("metadata")
+                .current_dir(cwd.as_std_path())
+                .output()
+            {
+                Ok(output) => output,
+                Err(error) => {
+                    tracing::debug!("Failed to invoke `uv workspace metadata`: {error}");
+                    return None;
+                }
+            };
+
+            if !output.status.success() {
+                tracing::debug!(
+                    "`uv workspace metadata` failed with status {}: {}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr)
+                );
+                return None;
+            }
+
+            output.stdout
+        }
+        WorkspaceMetadataSource::Stdin => {
+            let mut metadata = Vec::new();
+            if let Err(error) = std::io::stdin().read_to_end(&mut metadata) {
+                tracing::debug!(
+                    "Failed to read `uv workspace metadata` output from stdin: {error}"
+                );
+                return None;
+            }
+            metadata
         }
     };
 
-    if !output.status.success() {
-        tracing::debug!(
-            "`uv workspace metadata` failed with status {}: {}",
-            output.status,
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return None;
-    }
+    parse_workspace_metadata(cwd, &metadata)
+}
 
-    let metadata = match serde_json::from_slice::<WorkspaceMetadata>(&output.stdout) {
+fn parse_workspace_metadata(cwd: &SystemPath, metadata: &[u8]) -> Option<UvWorkspace> {
+    let metadata = match serde_json::from_slice::<WorkspaceMetadata>(metadata) {
         Ok(metadata) => metadata,
         Err(error) => {
             tracing::debug!("Failed to parse `uv workspace metadata` output: {error}");
