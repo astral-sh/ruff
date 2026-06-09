@@ -28,7 +28,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
@@ -535,7 +535,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     source_definition: Definition<'db>,
     target_definition: Definition<'db>,
     relation: TypeRelation,
-    use_constraint_set_rules: bool,
+    typevar_evaluation: TypeVarEvaluation,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -543,13 +543,13 @@ impl<'db> SignatureRelationKey<'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         relation: TypeRelation,
-        use_constraint_set_rules: bool,
+        typevar_evaluation: TypeVarEvaluation,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
-            use_constraint_set_rules,
+            typevar_evaluation,
         })
     }
 }
@@ -1588,7 +1588,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if self.use_constraint_set_rules {
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(source_overloads);
@@ -1698,7 +1698,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.use_constraint_set_rules
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && (source_signature
                         .parameters
                         .as_paramspec_with_prefix()
@@ -1833,7 +1833,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             source,
             target,
             self.relation,
-            self.use_constraint_set_rules,
+            self.typevar_evaluation,
         ) else {
             return work();
         };
@@ -2001,7 +2001,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        if self.use_constraint_set_rules {
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
             let target_paramspec = target.parameters.as_paramspec_with_prefix();
 

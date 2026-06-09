@@ -294,7 +294,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Tuple::Fixed(target) => {
                 let equal_length = source_tuple.0.len() == target.0.len();
 
-                if !equal_length && self.is_plain_assignability() {
+                if !equal_length && self.is_eager_assignability() {
                     self.provide_context(|| ErrorContext::TupleLengthMismatch {
                         source_len: source_tuple.0.len(),
                         target_len: target_tuple.len(),
@@ -390,7 +390,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                if !self.is_plain_assignability() || !source.variable().is_dynamic() {
+                if !self.is_eager_assignability() || !source.variable().is_dynamic() {
                     return self.never();
                 }
 
@@ -462,7 +462,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_plain_assignability() || !source.variable().is_dynamic() {
+                            if !self.is_eager_assignability() || !source.variable().is_dynamic() {
                                 return self.never();
                             }
                             self.check_type_pair(db, source.variable(), other_ty)
@@ -499,7 +499,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_plain_assignability() || !source.variable().is_dynamic() {
+                            if !self.is_eager_assignability() || !source.variable().is_dynamic() {
                                 return self.never();
                             }
                             self.check_type_pair(db, source.variable(), target_ty)
