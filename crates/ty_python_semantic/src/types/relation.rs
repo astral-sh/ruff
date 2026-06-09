@@ -217,8 +217,8 @@ pub(crate) enum TypeRelation {
     /// Unlike the other variants of this enum, this relation is symmetric and is
     /// **never** dispatched on by [`TypeRelationChecker`] — directional checkers
     /// only handle subtype-shaped relations. `Disjointness` exists here as a
-    /// value-level tag so that [`RecursiveRelationVisitor`] can carry cycle
-    /// detection for `is_disjoint_from` and `has_relation_to` in a single namespace.
+    /// value-level tag so that [`HasRelationToVisitor`] and [`IsDisjointVisitor`]
+    /// share one cycle-detection key namespace.
     Disjointness,
 }
 
@@ -267,20 +267,22 @@ impl TypeRelation {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-struct RecursiveRelationKey<'db> {
+struct RelationPairKey<'db> {
     left: Type<'db>,
     right: Type<'db>,
     relation: TypeRelation,
 }
 
-pub(super) struct RecursiveRelationVisitor<'db, 'c> {
-    visitor: CycleDetector<TypeRelation, RecursiveRelationKey<'db>, ConstraintSet<'db, 'c>, 1>,
+pub(super) struct HasRelationToVisitor<'db, 'c> {
+    visitor: CycleDetector<TypeRelation, RelationPairKey<'db>, ConstraintSet<'db, 'c>, 1>,
 }
 
-impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
+pub(super) type IsDisjointVisitor<'db, 'c> = HasRelationToVisitor<'db, 'c>;
+
+impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
     /// Construct a visitor for directional relation checks. If we loop, assume
     /// the relation currently being proven holds.
-    pub(super) fn assume_related_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+    pub(super) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         Self {
             visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, true)),
         }
@@ -288,7 +290,7 @@ impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
 
     /// Construct a visitor for disjointness checks. If we loop, assume the
     /// types are not disjoint.
-    pub(super) fn assume_not_disjoint_on_cycle(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
+    pub(super) fn disjoint_default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         Self {
             visitor: CycleDetector::new(ConstraintSet::from_bool(constraints, false)),
         }
@@ -302,7 +304,7 @@ impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
         self.visitor.visit(
-            RecursiveRelationKey {
+            RelationPairKey {
                 left,
                 right,
                 relation,
@@ -335,7 +337,7 @@ impl<'db, 'c> RecursiveRelationVisitor<'db, 'c> {
     }
 }
 
-trait RecursiveRelation<'db, 'c> {
+trait RelationWithRecursionGuard<'db, 'c> {
     fn relation_key(&self) -> TypeRelation;
 
     fn check_structural(
@@ -359,10 +361,10 @@ fn check_recursive_relation<'db, 'c, R>(
     checker: &R,
     source: Type<'db>,
     target: Type<'db>,
-    visitor: &RecursiveRelationVisitor<'db, 'c>,
+    visitor: &HasRelationToVisitor<'db, 'c>,
 ) -> ConstraintSet<'db, 'c>
 where
-    R: RecursiveRelation<'db, 'c>,
+    R: RelationWithRecursionGuard<'db, 'c>,
 {
     visitor.visit_pair(source, target, checker.relation_key(), || {
         checker.check_structural(db, source.unwrap_recursive(db), target.unwrap_recursive(db))
@@ -377,10 +379,10 @@ fn check_divergent_relation<'db, 'c, R>(
     left: Type<'db>,
     right: Type<'db>,
     divergent: DivergentType,
-    visitor: &RecursiveRelationVisitor<'db, 'c>,
+    visitor: &HasRelationToVisitor<'db, 'c>,
 ) -> ConstraintSet<'db, 'c>
 where
-    R: RecursiveRelation<'db, 'c>,
+    R: RelationWithRecursionGuard<'db, 'c>,
 {
     if let Some(wrapping) = visitor.wrapping_recursive_for_divergent(db, divergent)
         && checker.should_resolve_divergent_marker(db, wrapping)
@@ -499,9 +501,8 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(constraints);
-        let disjointness_visitor =
-            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
@@ -548,8 +549,8 @@ impl<'db> Type<'db> {
             typevar_evaluation: TypeVarEvaluation::Eager,
             context_tree: Some(ErrorContextTree::new()),
             given: ConstraintSet::from_bool(&builder, false),
-            relation_visitor: &RecursiveRelationVisitor::assume_related_on_cycle(&builder),
-            disjointness_visitor: &RecursiveRelationVisitor::assume_not_disjoint_on_cycle(&builder),
+            relation_visitor: &HasRelationToVisitor::default(&builder),
+            disjointness_visitor: &IsDisjointVisitor::disjoint_default(&builder),
             signature_relation_visitor: &SignatureRelationVisitor::default(),
             materialization_visitor: &ApplyTypeMappingVisitor::default(),
         };
@@ -741,9 +742,8 @@ impl<'db> Type<'db> {
         relation: TypeRelation,
         typevar_evaluation: TypeVarEvaluation,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(constraints);
-        let disjointness_visitor =
-            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker {
@@ -815,9 +815,8 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         materialization_visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(constraints);
-        let disjointness_visitor =
-            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let checker = EquivalenceChecker {
             constraints,
@@ -858,9 +857,8 @@ impl<'db> Type<'db> {
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(constraints);
-        let disjointness_visitor =
-            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(constraints);
+        let relation_visitor = HasRelationToVisitor::default(constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = DisjointnessChecker {
@@ -890,8 +888,8 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
     // generally only ever call `visit_pair` on the relation visitors from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-    disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     pub(super) signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     pub(super) materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
@@ -900,8 +898,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     pub(super) fn subtyping(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
-        relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-        disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
@@ -921,8 +919,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn constraint_set_assignability(
         constraints: &'c ConstraintSetBuilder<'db>,
-        relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-        disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
@@ -942,8 +940,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn constraint_set_assignability_with_context(
         constraints: &'c ConstraintSetBuilder<'db>,
-        relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-        disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
@@ -963,8 +961,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
     pub(super) fn assignability_with_context(
         constraints: &'c ConstraintSetBuilder<'db>,
-        relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-        disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
@@ -2525,7 +2523,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 }
 
 // Dispatch the directional relation through the relation recursion guard.
-impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
+impl<'c, 'db: 'c> RelationWithRecursionGuard<'db, 'c> for TypeRelationChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         self.relation
     }
@@ -2564,8 +2562,8 @@ pub(super) struct EquivalenceChecker<'a, 'c, 'db> {
     // generally only ever call `visit_pair` on the relation visitors from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-    disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
     signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
@@ -2629,8 +2627,8 @@ pub(super) struct DisjointnessChecker<'a, 'c, 'db> {
     // generally only ever call `visit_pair` on the relation visitors from
     // `check_type_pair`, never from `check_typeddict_pair` or
     // any other more "low-level" method.
-    disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-    relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+    disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
+    relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
     signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
     materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
 }
@@ -2639,8 +2637,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
     pub(super) fn new(
         constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
-        relation_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
-        disjointness_visitor: &'a RecursiveRelationVisitor<'db, 'c>,
+        relation_visitor: &'a HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &'a IsDisjointVisitor<'db, 'c>,
         signature_relation_visitor: &'a SignatureRelationVisitor<'db>,
         materialization_visitor: &'a ApplyTypeMappingVisitor<'db>,
     ) -> Self {
@@ -3516,7 +3514,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 // Dispatch symmetric disjointness through the relation recursion guard.
 // `relation_key()` is fixed to `TypeRelation::Disjointness`; the structural
 // step delegates to the existing `check_type_pair` implementation.
-impl<'c, 'db: 'c> RecursiveRelation<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
+impl<'c, 'db: 'c> RelationWithRecursionGuard<'db, 'c> for DisjointnessChecker<'_, 'c, 'db> {
     fn relation_key(&self) -> TypeRelation {
         TypeRelation::Disjointness
     }
