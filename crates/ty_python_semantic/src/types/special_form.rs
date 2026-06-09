@@ -744,6 +744,10 @@ impl SpecialFormType {
             )),
 
             Self::TypingSelf => {
+                if inference_flags.contains(InferenceFlags::IN_TYPE_ALIAS) {
+                    return Err(InvalidTypeExpression::TypingSelfInTypeAlias);
+                }
+
                 let index = semantic_index(db, scope_id.file(db));
                 let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
                     return Err(InvalidTypeExpression::InvalidType(

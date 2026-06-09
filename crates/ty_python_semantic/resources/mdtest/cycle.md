@@ -62,7 +62,7 @@ def _(x: JSONValue):
 ```py
 from typing import Generic, TypeVar
 
-B = TypeVar("B", bound="Base")
+B = TypeVar("B", bound="Base")  # error: [missing-type-argument]
 
 class Base(Generic[B]):
     pass
@@ -145,7 +145,7 @@ class C:
 
 ```py
 class Cyclic:
-    def __init__(self, data: str | dict):
+    def __init__(self, data: str | dict):  # error: [missing-type-argument]
         self.data = data
 
     def update(self):

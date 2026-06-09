@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
@@ -504,7 +504,7 @@ pub(crate) struct EnvironmentVersion {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     #[deprecated]
-    pub(crate) folder_uri: Option<Url>,
+    pub(crate) folder_uri: Option<Uri>,
     #[deprecated]
     #[serde(rename = "type")]
     pub(crate) kind: Option<String>,
@@ -516,6 +516,6 @@ pub(crate) struct PythonEnvironment {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[deprecated]
-    pub(crate) uri: Option<Url>,
+    pub(crate) uri: Option<Uri>,
     pub(crate) sys_prefix: SystemPathBuf,
 }

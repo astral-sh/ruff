@@ -1,6 +1,6 @@
 use std::{path::PathBuf, str::FromStr as _};
 
-use lsp_types::Url;
+use lsp_types::Uri;
 use rustc_hash::FxHashMap;
 use serde::Deserialize;
 use serde_json::{Map, Value};
@@ -15,7 +15,7 @@ use crate::{
     },
 };
 
-pub(crate) type WorkspaceOptionsMap = FxHashMap<Url, ClientOptions>;
+pub(crate) type WorkspaceOptionsMap = FxHashMap<Uri, ClientOptions>;
 
 /// Determines how multiple conflicting configurations should be resolved - in this
 /// case, the configuration from the client settings and configuration from local
@@ -247,7 +247,7 @@ pub(crate) struct TracingOptions {
 struct WorkspaceOptions {
     #[serde(flatten)]
     options: ClientOptions,
-    workspace: Url,
+    workspace: Uri,
 }
 
 #[derive(Clone, Debug, Default, Deserialize)]
@@ -772,7 +772,7 @@ mod tests {
             workspace: workspace_options,
         } = AllOptions::from_init_options(options);
         let path =
-            Url::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
+            Uri::from_str("file:///Users/test/projects/pandas").expect("path should be valid");
         let all_workspace_options = workspace_options.expect("workspace options should exist");
 
         let workspace_options = all_workspace_options
@@ -811,7 +811,7 @@ mod tests {
             }
         );
         let path =
-            Url::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
+            Uri::from_str("file:///Users/test/projects/scipy").expect("path should be valid");
         let workspace_options = all_workspace_options
             .get(&path)
             .expect("workspace setting should exist")

@@ -63,6 +63,142 @@ def _(x: tuple[int, ...]):
         reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysTruthy
 ```
 
+## Exact length comparisons
+
+Exact length constraints eliminate incompatible fixed-length tuples. Variable-length tuples remain
+intersected with `ExactlySized` until tuple/protocol intersections can be simplified generally:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Literal
+
+def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
+    if len(val) == 1:
+        # revealed: tuple[int] | (tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[1, True]])
+        reveal_type(val)
+
+    if len(val) == 2:
+        # revealed: tuple[str, str] | (tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[2]])
+        reveal_type(val)
+
+    if len(val) == 3:
+        # revealed: tuple[int, *tuple[str, ...], int] & ExactlySized[Literal[3]]
+        reveal_type(val)
+
+def _(val: tuple[int] | tuple[str, str]):
+    if 1 != len(val):
+        reveal_type(val)  # revealed: tuple[str, str]
+    else:
+        reveal_type(val)  # revealed: tuple[int]
+
+def _(val: tuple[int, ...]):
+    if val and len(val) == 2:
+        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[2]] & ~AlwaysFalsy
+
+def _(val: tuple[int] | tuple[str, str]):
+    if len(val) == True:
+        reveal_type(val)  # revealed: tuple[int]
+        one: tuple[int] = val
+
+def _(val: tuple[()] | tuple[int]):
+    if False == len(val):
+        reveal_type(val)  # revealed: tuple[()]
+        empty: tuple[()] = val
+
+def _(x: Literal[b"", b"a"], y: Literal["a", "ab"]):
+    if len(x) == 1:
+        reveal_type(x)  # revealed: Literal[b"a"]
+    else:
+        reveal_type(x)  # revealed: Literal[b""]
+
+    if len(y) == 1:
+        reveal_type(y)  # revealed: Literal["a"]
+    else:
+        reveal_type(y)  # revealed: Literal["ab"]
+```
+
+Exact length comparisons intersect arbitrary `Sized` values with `ExactlySized`. This persists the
+observed length even for mutable or stateful values, consistent with other forms of narrowing:
+
+```py
+from typing import Literal, Sized
+
+class LengthThree:
+    def __len__(self) -> Literal[3]:
+        return 3
+
+class LengthFour:
+    def __len__(self) -> Literal[4]:
+        return 4
+
+def _(value: LengthThree | LengthFour):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: LengthThree & ExactlySized[Literal[3]]
+    else:
+        reveal_type(value)  # revealed: LengthFour
+
+class TrueLength:
+    def __len__(self) -> Literal[True]:
+        return True
+
+class FalseLength:
+    def __len__(self) -> Literal[False]:
+        return False
+
+def _(value: TrueLength | FalseLength):
+    if len(value) == 1:
+        reveal_type(value)  # revealed: TrueLength & ExactlySized[Literal[1, True]]
+    else:
+        reveal_type(value)  # revealed: FalseLength
+
+def _(value: LengthThree | list[int]):
+    if len(value) == 3:
+        # revealed: (LengthThree & ExactlySized[Literal[3]]) | (list[int] & ExactlySized[Literal[3]])
+        reveal_type(value)
+    else:
+        reveal_type(value)  # revealed: list[int] & ~ExactlySized[Literal[3]]
+```
+
+The length constraint remains after mutation. This is an accepted limitation:
+
+```py
+def _(value: Sized):
+    if len(value) == 3:
+        reveal_type(value)  # revealed: ExactlySized[Literal[3]]
+        reveal_type(len(value))  # revealed: Literal[3]
+    else:
+        reveal_type(value)  # revealed: Sized & ~ExactlySized[Literal[3]]
+
+def _(items: list[int]):
+    if len(items) == 3:
+        reveal_type(items)  # revealed: list[int] & ExactlySized[Literal[3]]
+        items.clear()
+        reveal_type(len(items))  # revealed: Literal[3]
+```
+
+## Aliased exact lengths
+
+PEP 695 aliases are resolved before extracting literal lengths:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Two = Literal[2]
+
+def _(val: tuple[int, ...], n: Two):
+    if len(val) == n:
+        reveal_type(val)  # revealed: tuple[int, ...] & ExactlySized[Literal[2]]
+```
+
 ## Unions of narrowable types
 
 ```py

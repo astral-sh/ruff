@@ -317,7 +317,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
-        let mut deprecated = None;
         let mut dataclass_transformer_params = None;
         let mut final_decorator = None;
 
@@ -346,9 +345,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     _ => {}
                 },
-                Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
-                    deprecated = Some(deprecated_inst);
-                }
                 Type::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
@@ -413,7 +409,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             known_function,
             body_scope,
             function_decorators,
-            deprecated,
+            None,
             dataclass_transformer_params,
             function.returns.is_some(),
         );
@@ -421,8 +417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             last_definition: overload_literal,
         };
 
-        let mut inferred_ty =
-            Type::FunctionLiteral(FunctionType::new(db, function_literal, None, None));
+        let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {
             self.undecorated_type = Some(inferred_ty);
         }
@@ -449,7 +444,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = self.apply_decorator(*decorator_ty, inferred_ty, decorator_node);
+            inferred_ty = if let Type::KnownInstance(KnownInstanceType::Deprecated(deprecated)) =
+                decorator_ty
+                && let Type::FunctionLiteral(function) = inferred_ty
+            {
+                Type::FunctionLiteral(function.with_deprecated(db, *deprecated))
+            } else {
+                self.apply_decorator(*decorator_ty, inferred_ty, decorator_node)
+            };
         }
 
         self.add_declaration_with_binding(
@@ -1084,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in the lambda body scope.
     pub(super) fn infer_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter_with_default: &'ast ast::ParameterWithDefault,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1114,7 +1116,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// in a lambda expression.
     pub(super) fn infer_variadic_positional_lambda_parameter_definition(
         &mut self,
-        index: usize,
+        index: u32,
         parameter: &'ast ast::Parameter,
         lambda: &'ast ast::ExprLambda,
         definition: Definition<'db>,
@@ -1150,7 +1152,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// lambda expression, based on a `Callable` type annotation, if present.
     fn annotated_lambda_parameter_type(
         &mut self,
-        index: usize,
+        index: u32,
         lambda: &'ast ast::ExprLambda,
     ) -> Option<Type<'db>> {
         let enclosing_stmt = infer_statement_types(
@@ -1163,7 +1165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
-        let parameter_type = signature.parameters().as_slice()[index].annotated_type();
+        let parameter_type = signature.parameters().as_slice()[index as usize].annotated_type();
         if parameter_type.is_unknown() || parameter_type.has_unspecialized_type_var(self.db()) {
             None
         } else {

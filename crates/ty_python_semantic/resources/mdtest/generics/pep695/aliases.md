@@ -599,6 +599,22 @@ def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
     a: X.GenAlias[int] = y
 ```
 
+## Different specializations of the same generic type alias
+
+Different specializations of the same generic type alias refer to the same definition, so they
+should not be qualified:
+
+```py
+class Box[T]:
+    item: T
+
+type RefBox[T] = Box[T]
+
+def transmute_inner[T, V](x: RefBox[T]) -> RefBox[V]:
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RefBox[V@transmute_inner]`, found `RefBox[T@transmute_inner]`"
+    return x
+```
+
 ## Non-ambiguous type aliases should not be qualified
 
 Type aliases with unique names should NOT be qualified:

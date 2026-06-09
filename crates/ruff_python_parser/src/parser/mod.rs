@@ -572,7 +572,21 @@ impl<'src> Parser<'src> {
         recovery_context_kind: RecoveryContextKind,
         parse_element: impl Fn(&mut Parser<'src>) -> T,
     ) -> Vec<T> {
-        let mut elements = Vec::new();
+        self.parse_comma_separated_list_into_vec_with_capacity(
+            recovery_context_kind,
+            parse_element,
+            0,
+        )
+    }
+
+    /// Parses a comma separated list of elements into a vector with an initial capacity.
+    fn parse_comma_separated_list_into_vec_with_capacity<T>(
+        &mut self,
+        recovery_context_kind: RecoveryContextKind,
+        parse_element: impl Fn(&mut Parser<'src>) -> T,
+        capacity: usize,
+    ) -> Vec<T> {
+        let mut elements = Vec::with_capacity(capacity);
         self.parse_comma_separated_list(recovery_context_kind, |p| elements.push(parse_element(p)));
         elements
     }

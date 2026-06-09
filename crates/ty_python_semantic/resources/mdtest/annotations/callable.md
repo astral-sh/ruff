@@ -23,10 +23,10 @@ A bare `Callable` without any type arguments:
 from typing import Callable, Any
 from ty_extensions import is_equivalent_to, static_assert
 
-def _(c: Callable):
+def _(c: Callable):  # error: [missing-type-argument]
     reveal_type(c)  # revealed: (...) -> Unknown
 
-static_assert(is_equivalent_to(Callable, Callable[..., Any]))
+static_assert(is_equivalent_to(Callable, Callable[..., Any]))  # error: [missing-type-argument]
 ```
 
 ### Invalid parameter type argument
@@ -556,7 +556,8 @@ from typing import Any
 import typing
 import collections.abc
 
-def _(c1: typing.Callable, c2: collections.abc.Callable):
+# error: [missing-type-argument]
+def _(c1: typing.Callable, c2: collections.abc.Callable):  # error: [missing-type-argument]
     reveal_type(c1)  # revealed: (...) -> Unknown
     reveal_type(c2)  # revealed: (...) -> Unknown
 ```
@@ -580,7 +581,8 @@ import collections.abc
 from ty_extensions import is_equivalent_to, static_assert
 
 static_assert(is_equivalent_to(typing.Callable[[int], str], collections.abc.Callable[[int], str]))
-static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))
+# error: [missing-type-argument]
+static_assert(is_equivalent_to(typing.Callable, collections.abc.Callable))  # error: [missing-type-argument]
 ```
 
 ### Inside `type[...]`

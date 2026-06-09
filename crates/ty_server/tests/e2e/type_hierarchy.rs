@@ -1,8 +1,10 @@
-use lsp_types::request::{TypeHierarchyPrepare, TypeHierarchySubtypes, TypeHierarchySupertypes};
 use lsp_types::{
     PartialResultParams, Position, TextDocumentIdentifier, TextDocumentPositionParams,
     TypeHierarchyPrepareParams, TypeHierarchySubtypesParams, TypeHierarchySupertypesParams,
     WorkDoneProgressParams,
+};
+use lsp_types::{
+    TypeHierarchyPrepareRequest, TypeHierarchySubtypesRequest, TypeHierarchySupertypesRequest,
 };
 
 use crate::TestServerBuilder;
@@ -161,7 +163,7 @@ fn prepare(
     path: impl AsRef<ruff_db::system::SystemPath>,
     position: Position,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchyPrepare>(TypeHierarchyPrepareParams {
+    server.send_request_await::<TypeHierarchyPrepareRequest>(TypeHierarchyPrepareParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier {
                 uri: server.file_uri(path),
@@ -177,7 +179,7 @@ fn supertypes(
     server: &mut crate::TestServer,
     item: lsp_types::TypeHierarchyItem,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchySupertypes>(TypeHierarchySupertypesParams {
+    server.send_request_await::<TypeHierarchySupertypesRequest>(TypeHierarchySupertypesParams {
         item,
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),
@@ -189,7 +191,7 @@ fn subtypes(
     server: &mut crate::TestServer,
     item: lsp_types::TypeHierarchyItem,
 ) -> Option<Vec<lsp_types::TypeHierarchyItem>> {
-    server.send_request_await::<TypeHierarchySubtypes>(TypeHierarchySubtypesParams {
+    server.send_request_await::<TypeHierarchySubtypesRequest>(TypeHierarchySubtypesParams {
         item,
         work_done_progress_params: WorkDoneProgressParams::default(),
         partial_result_params: PartialResultParams::default(),

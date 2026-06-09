@@ -88,7 +88,7 @@ A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` 
 ```py
 from typing import Callable, Any, Protocol
 
-def takes_callable1(f: Callable):
+def takes_callable1(f: Callable[..., Any]):
     f()
 
 takes_callable1(SubclassOfAny())

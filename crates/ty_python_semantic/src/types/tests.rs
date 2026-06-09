@@ -328,6 +328,10 @@ type CovariantAlias[T] = Covariant[T]
 type ContravariantAlias[T] = Contravariant[T]
 type InvariantAlias[T] = Invariant[T]
 type BivariantAlias[T] = Bivariant[T]
+type CovariantAliasAlias[T] = CovariantAlias[T]
+type ContravariantAliasAlias[T] = ContravariantAlias[T]
+type InvariantAliasAlias[T] = InvariantAlias[T]
+type BivariantAliasAlias[T] = BivariantAlias[T]
 type ParamSpecContravariantAlias[**P] = Callable[P, None]
 type ParamSpecConcatenateAlias[**P] = Callable[Concatenate[int, P], None]
 type ParamSpecBivariantAlias[**P] = int
@@ -362,6 +366,34 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
     assert_eq!(
         KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant))
             .variance_of(&db, get_bound_typevar(&db, bivariant)),
+        TypeVarVariance::Bivariant
+    );
+
+    let covariant_alias = get_type_alias(&db, "CovariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(covariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, covariant_alias)),
+        TypeVarVariance::Covariant
+    );
+
+    let contravariant_alias = get_type_alias(&db, "ContravariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(contravariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, contravariant_alias)),
+        TypeVarVariance::Contravariant
+    );
+
+    let invariant_alias = get_type_alias(&db, "InvariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(invariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, invariant_alias)),
+        TypeVarVariance::Invariant
+    );
+
+    let bivariant_alias = get_type_alias(&db, "BivariantAliasAlias");
+    assert_eq!(
+        KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(bivariant_alias))
+            .variance_of(&db, get_bound_typevar(&db, bivariant_alias)),
         TypeVarVariance::Bivariant
     );
 

@@ -145,6 +145,45 @@ impl ClassPatternKind {
     }
 }
 
+/// Structural details for sequence patterns that affect narrowing and reachability.
+///
+/// `patterns` stores one predicate per syntactic element, with a starred element
+/// represented by [`PatternPredicateKind::MatchStar`]. `has_star` records
+/// whether the pattern accepts additional sequence elements.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct SequencePatternPredicateKind<'db> {
+    pub patterns: Box<[PatternPredicateKind<'db>]>,
+    pub has_star: bool,
+}
+
+impl<'db> SequencePatternPredicateKind<'db> {
+    /// Return `true` for `case [*rest]`, the only sequence pattern with no
+    /// length or element constraints.
+    pub fn is_irrefutable(&self) -> bool {
+        self.patterns.len() == 1 && self.has_star
+    }
+
+    pub const fn is_exact_length(&self) -> bool {
+        !self.has_star
+    }
+
+    /// Return the patterns before and after the starred element.
+    pub fn split_around_star(
+        &self,
+    ) -> Option<(&[PatternPredicateKind<'db>], &[PatternPredicateKind<'db>])> {
+        if !self.has_star {
+            return None;
+        }
+
+        let star_index = self
+            .patterns
+            .iter()
+            .position(|pattern| matches!(pattern, PatternPredicateKind::MatchStar))?;
+        let (prefix, star_and_suffix) = self.patterns.split_at(star_index);
+        Some((prefix, &star_and_suffix[1..]))
+    }
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
@@ -153,9 +192,9 @@ pub enum PatternPredicateKind<'db> {
     Or(Vec<PatternPredicateKind<'db>>),
     Class(Expression<'db>, ClassPatternKind),
     Mapping(ClassPatternKind),
-    Sequence(ClassPatternKind),
+    Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
-    Unsupported,
+    MatchStar,
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]

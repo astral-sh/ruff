@@ -2979,8 +2979,7 @@ class C: ...
                 if let Some(top) = top {
                     let top = SystemPath::new(top);
                     if db.system().is_directory(top) {
-                        db.files()
-                            .try_add_root(&db, top, FileRootKind::LibrarySearchPath);
+                        db.files().try_add_root(&db, top, FileRootKind::SearchPath);
                     }
                 }
             }

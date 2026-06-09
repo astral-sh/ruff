@@ -615,9 +615,9 @@ impl<'db> CallSignatureDetails<'db> {
         let argument_to_displayed_parameter_mapping = argument_to_parameter_mapping
             .iter()
             .map(|mapping| {
-                mapping.parameters.iter().find_map(|parameter_index| {
+                mapping.parameters.iter().find_map(|parameter| {
                     parameter_to_displayed_parameter_mapping
-                        .get(*parameter_index)
+                        .get(parameter.index)
                         .copied()
                         .flatten()
                 })
@@ -873,9 +873,9 @@ fn argument_form_from_successful_binding(
 ) -> CallArgumentForm {
     if let Some(argument_match) = binding.argument_matches().get(argument_index)
         && argument_match.matched
-        && let [parameter_index] = argument_match.parameters.as_slice()
+        && let [parameter] = argument_match.parameters.as_slice()
     {
-        return match binding.signature.parameters()[*parameter_index].form {
+        return match binding.signature.parameters()[parameter.index].form {
             ParameterForm::Value => CallArgumentForm::Value,
             ParameterForm::Type => CallArgumentForm::Type,
         };
@@ -1221,11 +1221,11 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         }
 
-        let Some(param_index) = arg_mapping.parameters.first() else {
+        let Some(parameter) = arg_mapping.parameters.first() else {
             continue;
         };
 
-        let Some(param) = parameters.get(*param_index) else {
+        let Some(param) = parameters.get(parameter.index) else {
             continue;
         };
 
@@ -1883,7 +1883,8 @@ mod resolve_definition {
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
             | DefinitionKind::TypeVarTuple(_)
-            | DefinitionKind::LoopHeader(_) => {
+            | DefinitionKind::LoopHeader(_)
+            | DefinitionKind::NestedBindings(_) => {
                 // Not yet implemented
                 return Err(());
             }

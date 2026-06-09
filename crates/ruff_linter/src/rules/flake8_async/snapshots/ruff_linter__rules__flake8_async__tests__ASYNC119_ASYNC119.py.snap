@@ -1,0 +1,87 @@
+---
+source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+---
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:14:9
+   |
+12 | async def unsafe_yield():
+13 |     with open(""):
+14 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:19:9
+   |
+17 | async def async_with():
+18 |     async with open(""):
+19 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:24:9
+   |
+22 | async def warn_on_each_yield():
+23 |     with open(""):
+24 |         yield  # ASYNC119
+   |         ^^^^^
+25 |         yield  # ASYNC119
+26 |     with open(""):
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:25:9
+   |
+23 |     with open(""):
+24 |         yield  # ASYNC119
+25 |         yield  # ASYNC119
+   |         ^^^^^
+26 |     with open(""):
+27 |         yield  # ASYNC119
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:27:9
+   |
+25 |         yield  # ASYNC119
+26 |     with open(""):
+27 |         yield  # ASYNC119
+   |         ^^^^^
+28 |         yield  # ASYNC119
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:28:9
+   |
+26 |     with open(""):
+27 |         yield  # ASYNC119
+28 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:34:13
+   |
+32 |     with open(""):
+33 |         with open(""):
+34 |             yield  # ASYNC119
+   |             ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor
+
+ASYNC119 Yield in context manager in async generator may not trigger cleanup
+  --> ASYNC119.py:62:9
+   |
+60 |         async def foo():
+61 |             yield
+62 |         yield  # ASYNC119
+   |         ^^^^^
+   |
+help: Use `@asynccontextmanager` if appropriate, or refactor

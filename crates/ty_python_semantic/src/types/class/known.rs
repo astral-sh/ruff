@@ -63,6 +63,7 @@ pub enum KnownClass {
     NotImplementedError,
     // enum
     Enum,
+    EnumProperty,
     EnumType,
     Auto,
     Member,
@@ -140,9 +141,14 @@ pub enum KnownClass {
     // functools
     FunctoolsPartial,
     // ty_extensions
+    ExactlySized,
     ConstraintSet,
     GenericContext,
     Specialization,
+    TyExtensionsAsyncIterable,
+    TyExtensionsAsyncIterator,
+    TyExtensionsIterable,
+    TyExtensionsIterator,
 }
 
 impl KnownClass {
@@ -226,6 +232,7 @@ impl KnownClass {
             | Self::Deque
             | Self::Float
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -236,7 +243,11 @@ impl KnownClass {
             | Self::IntFlag
             | Self::ABCMeta
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
@@ -254,6 +265,7 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -298,6 +310,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -333,7 +346,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -349,6 +366,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -393,6 +411,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -428,7 +447,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -444,6 +467,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -488,6 +512,7 @@ impl KnownClass {
             | KnownClass::Deprecated
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -523,7 +548,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -538,6 +567,7 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
@@ -566,10 +596,15 @@ impl KnownClass {
         match self {
             Self::SupportsIndex
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::AsyncGenerator
             | Self::Generator => true,
 
@@ -625,6 +660,7 @@ impl KnownClass {
             | Self::Deque
             | Self::OrderedDict
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -689,6 +725,7 @@ impl KnownClass {
             | KnownClass::Classmethod
             | KnownClass::Super
             | KnownClass::Enum
+            | KnownClass::EnumProperty
             | KnownClass::EnumType
             | KnownClass::Auto
             | KnownClass::Member
@@ -732,7 +769,11 @@ impl KnownClass {
             | KnownClass::NewType
             | KnownClass::SupportsIndex
             | KnownClass::Iterable
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator
+            | KnownClass::TyExtensionsIterable
             | KnownClass::Iterator
+            | KnownClass::TyExtensionsIterator
             | KnownClass::AsyncIterator
             | KnownClass::Sequence
             | KnownClass::Mapping
@@ -745,6 +786,7 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::NamedTupleLike
+            | KnownClass::ExactlySized
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
@@ -815,6 +857,7 @@ impl KnownClass {
             Self::Deque => "deque",
             Self::OrderedDict => "OrderedDict",
             Self::Enum => "Enum",
+            Self::EnumProperty => "property",
             Self::EnumType => {
                 if Program::get(db).python_version(db) >= PythonVersion::PY311 {
                     "EnumType"
@@ -832,7 +875,11 @@ impl KnownClass {
             Self::ABCMeta => "ABCMeta",
             Self::Super => "super",
             Self::Iterable => "Iterable",
+            Self::TyExtensionsAsyncIterable => "AsyncIterable",
+            Self::TyExtensionsAsyncIterator => "AsyncIterator",
+            Self::TyExtensionsIterable => "Iterable",
             Self::Iterator => "Iterator",
+            Self::TyExtensionsIterator => "Iterator",
             Self::AsyncIterator => "AsyncIterator",
             Self::Sequence => "Sequence",
             Self::Mapping => "Mapping",
@@ -850,6 +897,7 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
+            Self::ExactlySized => "ExactlySized",
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
@@ -1141,6 +1189,7 @@ impl KnownClass {
             Self::VersionInfo => KnownModule::Sys,
             Self::ABCMeta => KnownModule::Abc,
             Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1206,9 +1255,14 @@ impl KnownClass {
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
-            | Self::Specialization => KnownModule::TyExtensions,
+            | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
             Self::FunctoolsPartial => KnownModule::Functools,
@@ -1222,7 +1276,6 @@ impl KnownClass {
         match self {
             Self::NoneType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::EllipsisType
             | Self::NotImplementedType => Some(true),
 
@@ -1267,6 +1320,7 @@ impl KnownClass {
             | Self::DefaultDict
             | Self::Deque
             | Self::OrderedDict
+            | Self::VersionInfo
             | Self::SupportsIndex
             | Self::StdlibAlias
             | Self::TypeAliasType
@@ -1279,6 +1333,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1293,12 +1348,17 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1322,7 +1382,6 @@ impl KnownClass {
             Self::NoneType
             | Self::EllipsisType
             | Self::NoDefaultType
-            | Self::VersionInfo
             | Self::NotImplementedType => true,
 
             Self::Bool
@@ -1338,6 +1397,7 @@ impl KnownClass {
             | Self::FrozenSet
             | Self::Dict
             | Self::List
+            | Self::VersionInfo
             | Self::Type
             | Self::Slice
             | Self::Property
@@ -1379,6 +1439,7 @@ impl KnownClass {
             | Self::TypeVarTuple
             | Self::Sentinel
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1394,12 +1455,17 @@ impl KnownClass {
             | Self::Field
             | Self::KwOnly
             | Self::Iterable
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
             | Self::Iterator
+            | Self::TyExtensionsIterator
             | Self::AsyncIterator
             | Self::Sequence
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1435,7 +1501,7 @@ impl KnownClass {
             "dict" => &[Self::Dict],
             "list" => &[Self::List],
             "slice" => &[Self::Slice],
-            "property" => &[Self::Property],
+            "property" => &[Self::Property, Self::EnumProperty],
             "BaseException" => &[Self::BaseException],
             "BaseExceptionGroup" => &[Self::BaseExceptionGroup],
             "Exception" => &[Self::Exception],
@@ -1462,9 +1528,10 @@ impl KnownClass {
             "NewType" => &[Self::NewType],
             "TypeAliasType" => &[Self::TypeAliasType],
             "TypeVar" => &[Self::TypeVar, Self::ExtensionsTypeVar],
-            "Iterable" => &[Self::Iterable],
-            "Iterator" => &[Self::Iterator],
-            "AsyncIterator" => &[Self::AsyncIterator],
+            "Iterable" => &[Self::Iterable, Self::TyExtensionsIterable],
+            "Iterator" => &[Self::Iterator, Self::TyExtensionsIterator],
+            "AsyncIterable" => &[Self::TyExtensionsAsyncIterable],
+            "AsyncIterator" => &[Self::AsyncIterator, Self::TyExtensionsAsyncIterator],
             "Sequence" => &[Self::Sequence],
             "Mapping" => &[Self::Mapping],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
@@ -1504,6 +1571,7 @@ impl KnownClass {
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
+            "ExactlySized" => &[Self::ExactlySized],
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
@@ -1563,6 +1631,7 @@ impl KnownClass {
             | Self::MethodType
             | Self::MethodWrapperType
             | Self::Enum
+            | Self::EnumProperty
             | Self::EnumType
             | Self::Auto
             | Self::Member
@@ -1590,9 +1659,14 @@ impl KnownClass {
             | Self::ExtensionsParamSpec
             | Self::Sentinel
             | Self::NamedTupleLike
+            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
+            | Self::TyExtensionsAsyncIterable
+            | Self::TyExtensionsAsyncIterator
+            | Self::TyExtensionsIterable
+            | Self::TyExtensionsIterator
             | Self::Awaitable
             | Self::Generator
             | Self::AsyncGenerator
@@ -1648,7 +1722,7 @@ impl KnownClass {
                         };
 
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
-                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into(), None) {
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                             if let Some(builder) = context
                                 .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                             {
@@ -1702,11 +1776,7 @@ impl KnownClass {
                     [Some(pivot_class_type), Some(owner_type)] => {
                         // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
                         if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
-                            if CodeGeneratorKind::NamedTuple.matches(
-                                db,
-                                enclosing_class.into(),
-                                None,
-                            ) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class.into()) {
                                 if let Some(builder) = context
                                     .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
                                 {
@@ -1903,9 +1973,10 @@ mod tests {
                         PythonVersion::PY311
                     }
                     KnownClass::GenericAlias => PythonVersion::PY39,
-                    KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
-                        PythonVersion::PY311
-                    }
+                    KnownClass::EnumProperty
+                    | KnownClass::Member
+                    | KnownClass::Nonmember
+                    | KnownClass::StrEnum => PythonVersion::PY311,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

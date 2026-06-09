@@ -515,6 +515,63 @@ info: See the following page for a reference on valid type expressions:
 info: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions
 ```
 
+## `Self`
+
+`Self` is not allowed in an explicit type alias value, even when the alias is defined in a class
+body. Runtime-expression positions, such as `Annotated` metadata, are not part of the alias value's
+type expression.
+
+TODO: Reject `Self` introduced indirectly through runtime-expression forms such as `TypeOf[value]`.
+
+```py
+from typing_extensions import Annotated, Self, TypeAlias, cast
+
+class C:
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Alias: TypeAlias = tuple[Self]
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Simplified: TypeAlias = object | Self
+
+    # error: [invalid-type-form] "`Self` cannot be used in a type alias"
+    Stringified: TypeAlias = "tuple[Self]"
+
+    Metadata: TypeAlias = Annotated[int, cast(Self, object())]
+```
+
+## Disabled `invalid-type-form` `Self` fallback
+
+Rejected aliases recover as `Unknown` even when the diagnostic is disabled:
+
+```toml
+[rules]
+invalid-type-form = "ignore"
+```
+
+```py
+from typing_extensions import Self, TypeAlias
+
+class C:
+    Inner: TypeAlias = Self
+    Tuple: TypeAlias = tuple[Self]
+    Stringified: TypeAlias = "tuple[Self, int]"
+
+    def takes(self, value: Inner) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def takes_tuple(self, value: Tuple) -> None:
+        reveal_type(value)  # revealed: tuple[Unknown]
+
+    def takes_stringified(self, value: Stringified) -> None:
+        reveal_type(value)  # revealed: Unknown
+
+    def invalid_attribute(self) -> Self:
+        self.attribute: TypeAlias = Self
+        return self.attribute  # error: [invalid-return-type]
+
+C().takes(1)
+```
+
 ## Recursive `TypeIs` and `TypeGuard` aliases don't stack overflow
 
 ```py

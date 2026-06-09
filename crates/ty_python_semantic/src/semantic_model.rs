@@ -17,7 +17,8 @@ use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
-    CycleDetector, Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+    CycleDetector, Type, TypeQualifiers, binding_type, infer_complete_scope_types,
+    inferred_declaration,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::place_table;
@@ -79,8 +80,17 @@ impl<'db> SemanticModel<'db> {
         node: ast::AnyNodeRef<'_>,
     ) -> FxHashMap<Name, MemberDefinition<'db>> {
         let mut members = FxHashMap::default();
+        let index = semantic_index(self.db, self.file);
+        let Some(file_scope) = self.scope(node) else {
+            return members;
+        };
 
-        for (file_scope, _) in self.ancestor_scopes(node) {
+        for (file_scope, _) in index
+            .visible_ancestor_scopes(file_scope)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+        {
             for memberdef in
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
@@ -458,15 +468,19 @@ impl<'db> SemanticModel<'db> {
                 else {
                     return TypeQualifiers::empty();
                 };
-                let module = parsed_module(self.db, self.file).load(self.db);
+                let definition_file = definition.file(self.db);
+                let module = parsed_module(self.db, definition_file).load(self.db);
                 if !definition
                     .kind(self.db)
-                    .category(self.file.is_stub(self.db), &module)
+                    .category(definition_file.is_stub(self.db), &module)
                     .is_declaration()
                 {
                     return TypeQualifiers::empty();
                 }
-                declaration_type(self.db, definition).qualifiers()
+                let Some(declared) = inferred_declaration(self.db, definition).declared() else {
+                    return TypeQualifiers::empty();
+                };
+                declared.qualifiers()
             }
             ExprRef::Attribute(attr) => {
                 let Some(value_ty) = attr.value.inferred_type(self) else {

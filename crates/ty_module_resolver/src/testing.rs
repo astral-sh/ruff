@@ -273,11 +273,10 @@ impl TestCaseBuilder<MockedTypeshed> {
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
         db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
+            .try_add_root(&db, &stdlib, FileRootKind::SearchPath);
 
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {
@@ -336,8 +335,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
         for root in &roots {
-            db.files()
-                .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
+            db.files().try_add_root(&db, root, FileRootKind::SearchPath);
         }
 
         TestCase {

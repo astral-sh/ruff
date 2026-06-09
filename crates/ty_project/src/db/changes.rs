@@ -162,7 +162,7 @@ impl ProjectDatabase {
                                 // and then keying the submodule cache
                                 // off of that instead. ---AG
                                 FileRootKind::Project => {}
-                                FileRootKind::LibrarySearchPath => {
+                                FileRootKind::SearchPath => {
                                     root.set_revision(self).to(FileRevision::now());
                                 }
                             }
@@ -303,6 +303,8 @@ impl ProjectDatabase {
                     if let Some(overrides) = project_options_overrides {
                         metadata.apply_overrides(overrides);
                     }
+
+                    metadata.try_add_project_root(self);
 
                     let program_settings_diagnostics = match metadata.to_program_settings(
                         self.system(),

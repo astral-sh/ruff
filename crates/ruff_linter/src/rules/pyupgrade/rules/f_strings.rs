@@ -464,23 +464,28 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     let mut prev_end = call.start();
     for (range, conversion) in patches {
         let fstring = match conversion {
-            FStringConversion::Convert(fstring) => Some(fstring),
-            FStringConversion::EmptyLiteral => None,
+            FStringConversion::Convert(fstring) => fstring,
+            FStringConversion::EmptyLiteral => {
+                // Keep a leading empty literal to avoid orphaning a space, parenthesis, or comment
+                // before the first kept segment; drop later ones by advancing `prev_end`.
+                if !contents.is_empty() {
+                    prev_end = range.end();
+                }
+                continue;
+            }
             FStringConversion::NonEmptyLiteral => {
                 // Convert escaped curly brackets e.g. `{{` to `{` in literal string parts
-                Some(curly_unescape(checker.locator().slice(range)).to_string())
+                curly_unescape(checker.locator().slice(range)).to_string()
             }
             // We handled this in the previous loop.
             FStringConversion::SideEffects => unreachable!(),
         };
-        if let Some(fstring) = fstring {
-            contents.push_str(
-                checker
-                    .locator()
-                    .slice(TextRange::new(prev_end, range.start())),
-            );
-            contents.push_str(&fstring);
-        }
+        contents.push_str(
+            checker
+                .locator()
+                .slice(TextRange::new(prev_end, range.start())),
+        );
+        contents.push_str(&fstring);
         prev_end = range.end();
     }
     contents.push_str(checker.locator().slice(TextRange::new(prev_end, end)));

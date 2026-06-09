@@ -80,7 +80,7 @@ jobs:
           git config --global user.email '<>'
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          version: "0.11.16"
+          version: "0.11.18"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -136,7 +136,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          version: "0.11.16"
+          version: "0.11.18"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -177,7 +177,7 @@ jobs:
           ref: ${{ env.UPSTREAM_BRANCH}}
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
         with:
-          version: "0.11.16"
+          version: "0.11.18"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -198,7 +198,12 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          uvx black "${VENDORED_TYPESHED}/stdlib" --config "${VENDORED_TYPESHED}/pyproject.toml" || true
+          # TODO: Switch to a released version of Black once a release includes
+          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+          uvx \
+            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+            black "${VENDORED_TYPESHED}/stdlib" \
+            --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
       - name: Remove typeshed pyproject.toml file
         if: ${{ success() }}

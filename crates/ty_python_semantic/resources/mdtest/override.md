@@ -9,9 +9,10 @@ in fact override anything, a type checker should report a diagnostic on that met
 <!-- snapshot-diagnostics -->
 
 ```pyi
-from typing_extensions import override, Callable, TypeVar
+from typing_extensions import Any, Callable, TypeVar, override
 
-def lossy_decorator(fn: Callable) -> Callable: ...
+# Decorator intentionally erases the wrapped signature.
+def lossy_decorator(fn: Callable[..., Any]) -> Callable[..., Any]: ...
 
 class A:
     @override
@@ -354,6 +355,110 @@ class DynamicParent(Any): ...
 class DynamicChild(DynamicParent):
     def method(self) -> int:
         return 1
+
+class SameFilePropertyParent:
+    @property
+    def prop(self) -> int:
+        return 1
+
+class SameFilePropertyChild(SameFilePropertyParent):
+    @SameFilePropertyParent.prop.deleter
+    def prop(self) -> None:  # error: [missing-override-decorator]
+        pass
+```
+
+`base_property.py`:
+
+```py
+# This padding makes the inherited getter's AST index larger than the entire child module's AST,
+# so attempting to resolve the getter in the (incorrect) context of the child module will induce a panic.
+# This reproduces the bug reported in astral-sh/ty#3653.
+_padding = (
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+)
+
+class BaseProperty:
+    @property
+    def prop(self) -> int:
+        return 1
+```
+
+`property_setter.py`:
+
+```py
+from typing_extensions import override
+
+from base_property import BaseProperty
+
+class MissingOverride(BaseProperty):
+    @BaseProperty.prop.setter
+    def prop(self, value: int) -> None:  # error: [missing-override-decorator]
+        pass
+
+class InvalidExplicitOverride:
+    @BaseProperty.prop.setter
+    @override
+    def prop(self, value: int) -> None:  # error: [invalid-explicit-override]
+        pass
 ```
 
 `stub.pyi`:

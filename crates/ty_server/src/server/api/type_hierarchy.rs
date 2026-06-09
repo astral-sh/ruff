@@ -6,7 +6,7 @@ use ty_project::ProjectDatabase;
 use crate::PositionEncoding;
 use crate::document::{ToRangeExt, resolve_file_uri_range};
 use crate::session::SessionSnapshot;
-use crate::system::file_to_url;
+use crate::system::file_to_uri;
 
 /// The subtype and supertype implementation.
 ///
@@ -46,13 +46,13 @@ pub(crate) fn convert_to_lsp_item(
     item: ty_ide::TypeHierarchyItem,
     encoding: PositionEncoding,
 ) -> Option<TypeHierarchyItem> {
-    let uri = file_to_url(db, item.file)?;
+    let uri = file_to_uri(db, item.file)?;
     let full_range = item.full_range.to_lsp_range(db, item.file, encoding)?;
     let selection_range = item.selection_range.to_lsp_range(db, item.file, encoding)?;
 
     Some(TypeHierarchyItem {
         name: item.name.into(),
-        kind: SymbolKind::CLASS,
+        kind: SymbolKind::Class,
         tags: None,
         detail: item.detail,
         uri,

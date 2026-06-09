@@ -108,7 +108,7 @@ typevar to its default value or `Any`. Since that base class is fully specialize
 the inheriting class generic.
 
 ```py
-class InheritedGenericDefaultSpecialization(MultipleTypevars): ...
+class InheritedGenericDefaultSpecialization(MultipleTypevars): ...  # error: [missing-type-argument]
 
 reveal_type(generic_context(InheritedGenericDefaultSpecialization))  # revealed: None
 ```
@@ -172,25 +172,32 @@ class Parent4(Grandparent[T1, T2]): ...
 class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # Implicit specialization is fine:
-class Fine(Parent, Grandparent[T1, T2]): ...
-class AlsoFine(Parent3, Parent4[T1, T2]): ...
+class Fine(Parent, Grandparent[T1, T2]): ...  # error: [missing-type-argument]
+class AlsoFine(Parent3, Parent4[T1, T2]): ...  # error: [missing-type-argument]
+
+# error: [missing-type-argument]
+# error: [missing-type-argument]
+# error: [missing-type-argument]
 class Dandy(Parent, Parent3, Parent4): ...
 
 # Edge cases: the first class is implicitly specialized
 # (or explicitly specialized with `Any`s), but later classes are not:
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild4(Parent, Parent3[T1, T2], Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
 class BadChild5(Parent[Any, Any], Parent3[T1, T2], Parent4[T2, T1]): ...
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild6(Parent[T1, T2], Parent3, Parent4[T2, T1]): ...
 
 # error: [invalid-generic-class]
 class BadChild7(Parent[T1, T2], Parent3[Any, Any], Parent4[T2, T1]): ...
 
+# error: [missing-type-argument]
 # error: [invalid-generic-class]
 class BadChild8(Parent[T1, T2], Parent3[T2, T1], Parent4): ...
 
@@ -995,7 +1002,7 @@ reveal_type(Sub)  # revealed: <class 'Sub'>
 U = TypeVar("U")
 
 class Base2(Generic[T, U]): ...
-class Sub2(Base2["Sub2", U]): ...
+class Sub2(Base2["Sub2", U]): ...  # error: [missing-type-argument]
 ```
 
 #### Without string forward references

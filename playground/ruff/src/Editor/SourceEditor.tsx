@@ -17,6 +17,8 @@ import { Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
+export const PLAYGROUND_FILE_PATH = "<filename>";
+
 type MonacoEditorState = {
   monaco: Monaco;
   codeActionProvider: RuffCodeActionProvider;
@@ -182,20 +184,74 @@ function updateMarkers(monaco: Monaco, diagnostics: Array<Diagnostic>) {
   editor.setModelMarkers(
     model,
     "owner",
-    diagnostics.map((diagnostic) => ({
-      code: diagnostic.code ?? undefined,
-      startLineNumber: diagnostic.start_location.row,
-      startColumn: diagnostic.start_location.column,
-      endLineNumber: diagnostic.end_location.row,
-      endColumn: diagnostic.end_location.column,
-      message: diagnostic.code
-        ? `${diagnostic.code}: ${diagnostic.message}`
-        : diagnostic.message,
-      severity: MarkerSeverity.Error,
-      tags:
-        diagnostic.code === "F401" || diagnostic.code === "F841"
-          ? [MarkerTag.Unnecessary]
-          : [],
-    })),
+    diagnostics.map((diagnostic) => {
+      const message = diagnosticMarkerMessage(diagnostic);
+
+      return {
+        code: diagnostic.code ?? undefined,
+        startLineNumber: diagnostic.start_location.row,
+        startColumn: diagnostic.start_location.column,
+        endLineNumber: diagnostic.end_location.row,
+        endColumn: diagnostic.end_location.column,
+        message: diagnostic.code ? `${diagnostic.code}: ${message}` : message,
+        relatedInformation: diagnosticRelatedInformation(diagnostic, model.uri),
+        severity: MarkerSeverity.Error,
+        tags:
+          diagnostic.code === "F401" || diagnostic.code === "F841"
+            ? [MarkerTag.Unnecessary]
+            : [],
+      };
+    }),
   );
+}
+
+function diagnosticMarkerMessage(diagnostic: Diagnostic): string {
+  // Monaco renders same-file subdiagnostics as related information. Keep
+  // unlocated and other-file subdiagnostics in the marker message instead.
+  const markerMessageSubDiagnostics = diagnostic.subDiagnostics.filter(
+    (subDiagnostic) => subDiagnostic.location?.path !== PLAYGROUND_FILE_PATH,
+  );
+
+  if (markerMessageSubDiagnostics.length === 0) {
+    return diagnostic.message;
+  }
+
+  return `${diagnostic.message}\n\n${markerMessageSubDiagnostics.map(formatSubDiagnostic).join("\n")}`;
+}
+
+function diagnosticRelatedInformation(
+  diagnostic: Diagnostic,
+  resource: editor.ITextModel["uri"],
+): editor.IRelatedInformation[] {
+  return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
+    const location = subDiagnostic.location;
+
+    if (location?.path !== PLAYGROUND_FILE_PATH) {
+      return [];
+    }
+
+    return [
+      {
+        resource,
+        message: formatSubDiagnostic(subDiagnostic),
+        startLineNumber: location.start_location.row,
+        startColumn: location.start_location.column,
+        endLineNumber: location.end_location.row,
+        endColumn: location.end_location.column,
+      },
+    ];
+  });
+}
+
+function formatSubDiagnostic(
+  subDiagnostic: Diagnostic["subDiagnostics"][number],
+): string {
+  const message = `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+  const location = subDiagnostic.location;
+
+  if (location == null || location.path === PLAYGROUND_FILE_PATH) {
+    return message;
+  }
+
+  return `${message} (${location.path}:${location.start_location.row}:${location.start_location.column})`;
 }

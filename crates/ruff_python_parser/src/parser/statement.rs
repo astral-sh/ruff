@@ -614,16 +614,19 @@ impl<'src> Parser<'src> {
         // import ,
         // import x, y,
 
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::ImportNames, |p| {
-                p.parse_alias(ImportStyle::Import)
-            });
+        let mut names = self.parse_comma_separated_list_into_vec_with_capacity(
+            RecoveryContextKind::ImportNames,
+            |p| p.parse_alias(ImportStyle::Import),
+            1,
+        );
 
         if names.is_empty() {
             // test_err import_stmt_empty
             // import
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImport {
             names,
@@ -689,7 +692,7 @@ impl<'src> Parser<'src> {
         self.expect(TokenKind::Import);
 
         let names_start = self.node_start();
-        let mut names = vec![];
+        let mut names = Vec::new();
         let mut seen_star_import = false;
 
         let parenthesized = Parenthesized::from(self.eat(TokenKind::Lpar));
@@ -739,6 +742,8 @@ impl<'src> Parser<'src> {
             // 2 + 2
             self.expect(TokenKind::Rpar);
         }
+
+        names.shrink_to_fit();
 
         ast::StmtImportFrom {
             module,
@@ -1441,8 +1446,13 @@ impl<'src> Parser<'src> {
         });
 
         if self.at(TokenKind::Else) {
+            if elif_else_clauses.is_empty() {
+                elif_else_clauses.reserve_exact(1);
+            }
             elif_else_clauses.push(self.parse_elif_or_else_clause(ElifOrElse::Else));
         }
+
+        elif_else_clauses.shrink_to_fit();
 
         ast::StmtIf {
             test: Box::new(test.expr),
@@ -1539,7 +1549,7 @@ impl<'src> Parser<'src> {
         // except* ExceptionGroup:
         //     pass
         let mut mixed_except_ranges = Vec::new();
-        let handlers = self.parse_clauses(Clause::Except, |p| {
+        let mut handlers = self.parse_clauses(Clause::Except, |p| {
             let (handler, kind) = p.parse_except_clause();
             if let ExceptClauseKind::Star(range) = kind {
                 p.add_unsupported_syntax_error(UnsupportedSyntaxErrorKind::ExceptStar, range);
@@ -1551,6 +1561,8 @@ impl<'src> Parser<'src> {
             }
             handler
         });
+        handlers.shrink_to_fit();
+
         // Empty handler has `is_star` false.
         let is_star = is_star.unwrap_or_default();
         for handler_err_range in mixed_except_ranges {
@@ -2170,7 +2182,9 @@ impl<'src> Parser<'src> {
     fn parse_with_statement(&mut self, start: TextSize) -> ast::StmtWith {
         self.bump(TokenKind::With);
 
-        let items = self.parse_with_items();
+        let mut items = self.parse_with_items();
+        items.shrink_to_fit();
+
         self.expect(TokenKind::Colon);
 
         let body = self.parse_body(Clause::With);
@@ -2268,15 +2282,17 @@ impl<'src> Parser<'src> {
                 // with (a | b) << c | d: ...
                 // # Postfix should still be parsed first
                 // with (a)[0] + b * c: ...
-                self.parse_comma_separated_list_into_vec(
+                self.parse_comma_separated_list_into_vec_with_capacity(
                     RecoveryContextKind::WithItems(WithItemKind::ParenthesizedExpression),
                     |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                    1,
                 )
             }
         } else {
-            self.parse_comma_separated_list_into_vec(
+            self.parse_comma_separated_list_into_vec_with_capacity(
                 RecoveryContextKind::WithItems(WithItemKind::Unparenthesized),
                 |p| p.parse_with_item(WithItemParsingState::Regular).item,
+                1,
             )
         }
     }
@@ -2314,7 +2330,7 @@ impl<'src> Parser<'src> {
 
         self.bump(TokenKind::Lpar);
 
-        let mut parsed_with_items = vec![];
+        let mut parsed_with_items = Vec::with_capacity(1);
         let mut has_optional_vars = false;
 
         // test_err with_items_parenthesized_missing_comma
@@ -2985,6 +3001,8 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Newline);
         }
 
+        decorators.shrink_to_fit();
+
         match self.current_token_kind() {
             TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
             TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
@@ -3528,6 +3546,10 @@ impl<'src> Parser<'src> {
             self.expect(TokenKind::Rpar);
         }
 
+        parameters.args.shrink_to_fit();
+        parameters.kwonlyargs.shrink_to_fit();
+        parameters.posonlyargs.shrink_to_fit();
+
         parameters.range = self.node_range(start);
 
         parameters
@@ -3984,6 +4006,9 @@ impl<'src> Parser<'src> {
         while recovery_kind.is_list_element(self) {
             progress.assert_progressing(self);
 
+            if clauses.is_empty() {
+                clauses.reserve_exact(1);
+            }
             clauses.push(parse_clause(self));
         }
 
