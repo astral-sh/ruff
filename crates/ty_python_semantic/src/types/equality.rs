@@ -3,8 +3,8 @@ use ruff_python_ast::name::Name;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    CallArguments, EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
+    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -49,6 +49,13 @@ impl<'db> ComparisonResult<'db> {
             ComparisonResult::AlwaysFalse => is_positive.then_some(Type::Never),
             ComparisonResult::CanNarrow(narrowed) => Some(narrowed),
             ComparisonResult::Ambiguous => None,
+        }
+    }
+
+    fn discard_narrowing(self) -> Self {
+        match self {
+            ComparisonResult::CanNarrow(_) => ComparisonResult::Ambiguous,
+            result => result,
         }
     }
 }
@@ -159,14 +166,13 @@ fn equality_result<'db>(
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
-        (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-            match equality_result(db, newtype.concrete_base_type(db), other, is_positive) {
-                ComparisonResult::AlwaysTrue => ComparisonResult::AlwaysTrue,
-                ComparisonResult::AlwaysFalse => ComparisonResult::AlwaysFalse,
-                ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
-                    ComparisonResult::Ambiguous
-                }
-            }
+        (Type::NewTypeInstance(newtype), other) => {
+            equality_result(db, newtype.concrete_base_type(db), other, is_positive)
+                .discard_narrowing()
+        }
+        (other, Type::NewTypeInstance(newtype)) => {
+            equality_result(db, other, newtype.concrete_base_type(db), is_positive)
+                .discard_narrowing()
         }
 
         (Type::Union(union), other) => {
@@ -225,52 +231,24 @@ fn equality_result<'db>(
 
         (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
         (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-            match known_equality_semantics(db, other) {
+            match comparison_semantics(db, other, ComparisonOperator::Equality) {
                 Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
                 Some(_) => ComparisonResult::AlwaysFalse,
             }
         }
 
-        (Type::ClassLiteral(left_class), Type::ClassLiteral(right_class)) => {
-            if known_instance_semantics(
-                db,
-                left_class.metaclass_instance_type(db),
-                ComparisonOperator::Equality,
-            ) == Some(KnownComparisonSemantics::Object)
-                && known_instance_semantics(
-                    db,
-                    right_class.metaclass_instance_type(db),
-                    ComparisonOperator::Equality,
-                ) == Some(KnownComparisonSemantics::Object)
-            {
-                ComparisonResult::from_bool(left_class == right_class)
-            } else {
-                call_comparison_dunder(db, left, right, "__eq__")
-            }
-        }
-
-        (Type::ClassLiteral(class), other) | (other, Type::ClassLiteral(class)) => {
-            if known_instance_semantics(
-                db,
-                class.metaclass_instance_type(db),
-                ComparisonOperator::Equality,
-            ) == Some(KnownComparisonSemantics::Object)
-                && !matches!(other, Type::ClassLiteral(_))
-            {
-                ComparisonResult::AlwaysFalse
-            } else {
-                call_comparison_dunder(db, left, right, "__eq__")
-            }
-        }
-
-        (Type::FunctionLiteral(left_function), Type::FunctionLiteral(right_function)) => {
-            ComparisonResult::from_bool(left_function == right_function)
-        }
         (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
             ComparisonResult::from_bool(left_module.module(db) == right_module.module(db))
         }
-        (Type::SpecialForm(left_form), Type::SpecialForm(right_form)) => {
-            ComparisonResult::from_bool(left_form == right_form)
+        (left, right)
+            if has_known_identity_comparison_semantics(db, left, ComparisonOperator::Equality)
+                && has_known_identity_comparison_semantics(
+                    db,
+                    right,
+                    ComparisonOperator::Equality,
+                ) =>
+        {
+            ComparisonResult::from_bool(left == right)
         }
 
         (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
@@ -282,7 +260,7 @@ fn equality_result<'db>(
             )
         }
 
-        _ => call_comparison_dunder(db, left, right, "__eq__"),
+        _ => ComparisonResult::Ambiguous,
     }
 }
 
@@ -313,10 +291,6 @@ fn primitive_literal_constraint<'db>(
         Type::Union(union) => union.elements(db).iter().copied().all(is_builtin_primitive),
         left => is_builtin_primitive(left),
     };
-    if !left_is_builtin_primitive {
-        return None;
-    }
-
     let Type::LiteralValue(right) = right.resolve_type_alias(db) else {
         return None;
     };
@@ -339,7 +313,9 @@ fn primitive_literal_constraint<'db>(
         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
     };
 
-    Some(equal_to_right.negate_if(db, !condition_expects_equality))
+    (left_is_builtin_primitive
+        || (!condition_expects_equality && matches!(right.kind(), LiteralValueTypeKind::Bool(_))))
+    .then(|| equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
 fn inequality_result<'db>(
@@ -416,14 +392,13 @@ fn inequality_result<'db>(
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
-        (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-            match inequality_result(db, newtype.concrete_base_type(db), other, is_positive) {
-                ComparisonResult::AlwaysTrue => ComparisonResult::AlwaysTrue,
-                ComparisonResult::AlwaysFalse => ComparisonResult::AlwaysFalse,
-                ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => {
-                    ComparisonResult::Ambiguous
-                }
-            }
+        (Type::NewTypeInstance(newtype), other) => {
+            inequality_result(db, newtype.concrete_base_type(db), other, is_positive)
+                .discard_narrowing()
+        }
+        (other, Type::NewTypeInstance(newtype)) => {
+            inequality_result(db, other, newtype.concrete_base_type(db), is_positive)
+                .discard_narrowing()
         }
 
         (Type::Union(union), other) => evaluate_union_left(
@@ -491,52 +466,27 @@ fn inequality_result<'db>(
 
         (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
         (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-            match known_inequality_semantics(db, other) {
+            match comparison_semantics(db, other, ComparisonOperator::Inequality) {
                 Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
                 Some(_) => ComparisonResult::AlwaysTrue,
             }
         }
 
-        (Type::ClassLiteral(left_class), Type::ClassLiteral(right_class)) => {
-            if known_instance_semantics(
-                db,
-                left_class.metaclass_instance_type(db),
-                ComparisonOperator::Inequality,
-            ) == Some(KnownComparisonSemantics::Object)
-                && known_instance_semantics(
-                    db,
-                    right_class.metaclass_instance_type(db),
-                    ComparisonOperator::Inequality,
-                ) == Some(KnownComparisonSemantics::Object)
-            {
-                ComparisonResult::from_bool(left_class != right_class)
-            } else {
-                call_comparison_dunder(db, left, right, "__ne__")
-            }
-        }
-
-        (Type::ClassLiteral(class), other) | (other, Type::ClassLiteral(class)) => {
-            if known_instance_semantics(
-                db,
-                class.metaclass_instance_type(db),
-                ComparisonOperator::Inequality,
-            ) == Some(KnownComparisonSemantics::Object)
-                && !matches!(other, Type::ClassLiteral(_))
-            {
-                ComparisonResult::AlwaysTrue
-            } else {
-                call_comparison_dunder(db, left, right, "__ne__")
-            }
-        }
-
-        (Type::FunctionLiteral(left_function), Type::FunctionLiteral(right_function)) => {
-            ComparisonResult::from_bool(left_function != right_function)
-        }
         (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
             ComparisonResult::from_bool(left_module.module(db) != right_module.module(db))
         }
-        (Type::SpecialForm(left_form), Type::SpecialForm(right_form)) => {
-            ComparisonResult::from_bool(left_form != right_form)
+        (left, right)
+            if has_known_identity_comparison_semantics(
+                db,
+                left,
+                ComparisonOperator::Inequality,
+            ) && has_known_identity_comparison_semantics(
+                db,
+                right,
+                ComparisonOperator::Inequality,
+            ) =>
+        {
+            ComparisonResult::from_bool(left != right)
         }
 
         (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
@@ -548,7 +498,7 @@ fn inequality_result<'db>(
             )
         }
 
-        _ => call_comparison_dunder(db, left, right, "__ne__"),
+        _ => ComparisonResult::Ambiguous,
     }
 }
 
@@ -578,6 +528,21 @@ fn evaluate_union_left<'db>(
     is_positive: bool,
     evaluate: fn(&'db dyn Db, Type<'db>, Type<'db>, bool) -> ComparisonResult<'db>,
 ) -> ComparisonResult<'db> {
+    evaluate_target_union(db, elements, is_positive, |element| {
+        evaluate(db, element, other, is_positive)
+    })
+}
+
+fn evaluate_target_union<'db>(
+    db: &'db dyn Db,
+    elements: &[Type<'db>],
+    is_positive: bool,
+    mut evaluate: impl FnMut(Type<'db>) -> ComparisonResult<'db>,
+) -> ComparisonResult<'db> {
+    if elements.is_empty() {
+        return ComparisonResult::Ambiguous;
+    }
+
     let mut all_true = true;
     let mut all_false = true;
     let mut narrowed = Vec::with_capacity(elements.len());
@@ -585,8 +550,7 @@ fn evaluate_union_left<'db>(
     let mut removed_any = false;
 
     for element in elements {
-        let result = evaluate(db, *element, other, is_positive);
-        match result {
+        match evaluate(*element) {
             ComparisonResult::AlwaysTrue => {
                 all_false = false;
                 if is_positive {
@@ -653,22 +617,40 @@ fn evaluate_union_right<'db>(
     is_positive: bool,
     evaluate: fn(&'db dyn Db, Type<'db>, Type<'db>, bool) -> ComparisonResult<'db>,
 ) -> ComparisonResult<'db> {
+    evaluate_against_results(
+        db,
+        left,
+        is_positive,
+        elements
+            .iter()
+            .map(|element| evaluate(db, left, *element, is_positive)),
+    )
+}
+
+fn evaluate_against_results<'db>(
+    db: &'db dyn Db,
+    target: Type<'db>,
+    is_positive: bool,
+    results: impl IntoIterator<Item = ComparisonResult<'db>>,
+) -> ComparisonResult<'db> {
     let mut all_true = true;
     let mut all_false = true;
     let mut builder = UnionBuilder::new(db);
+    let mut any = false;
 
-    for element in elements {
-        match evaluate(db, left, *element, is_positive) {
+    for result in results {
+        any = true;
+        match result {
             ComparisonResult::AlwaysTrue => {
                 all_false = false;
                 if is_positive {
-                    builder = builder.add(left);
+                    builder = builder.add(target);
                 }
             }
             ComparisonResult::AlwaysFalse => {
                 all_true = false;
                 if !is_positive {
-                    builder = builder.add(left);
+                    builder = builder.add(target);
                 }
             }
             ComparisonResult::CanNarrow(narrowed) => {
@@ -679,12 +661,14 @@ fn evaluate_union_right<'db>(
             ComparisonResult::Ambiguous => {
                 all_true = false;
                 all_false = false;
-                builder = builder.add(left);
+                builder = builder.add(target);
             }
         }
     }
 
-    if all_true {
+    if !any {
+        ComparisonResult::Ambiguous
+    } else if all_true {
         ComparisonResult::AlwaysTrue
     } else if all_false {
         ComparisonResult::AlwaysFalse
@@ -703,6 +687,8 @@ fn evaluate_intersection_left<'db>(
 ) -> ComparisonResult<'db> {
     let mut any_true = false;
     let mut any_false = false;
+    let mut any_ambiguous = false;
+    let mut any_narrowing = false;
     let mut builder = IntersectionBuilder::new(db).add_positive(original);
 
     for element in positive {
@@ -710,10 +696,15 @@ fn evaluate_intersection_left<'db>(
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
+                any_narrowing = true;
                 builder = builder.add_positive(narrowed);
             }
-            ComparisonResult::Ambiguous => {}
+            ComparisonResult::Ambiguous => any_ambiguous = true,
         }
+    }
+
+    if any_ambiguous || (any_narrowing && (any_true || any_false)) {
+        return ComparisonResult::Ambiguous;
     }
 
     match (any_true, any_false) {
@@ -829,32 +820,32 @@ fn compare_literal_to_other<'db>(
         return match comparison_semantics(db, other, operator) {
             Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
             Some(_) => ComparisonResult::from_bool(operator == ComparisonOperator::Inequality),
-            None => call_comparison_dunder(db, literal_type, other, operator.dunder()),
+            None => ComparisonResult::Ambiguous,
         };
     }
 
     let Some(literal_semantics) = literal_semantics(db, literal, operator) else {
-        return call_comparison_dunder(db, literal_type, other, operator.dunder());
+        return ComparisonResult::Ambiguous;
     };
+    let condition_expects_equality = matches!(
+        (operator, is_positive),
+        (ComparisonOperator::Equality, true) | (ComparisonOperator::Inequality, false)
+    );
     match comparison_semantics(db, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
-        Some(_) => ComparisonResult::Ambiguous,
-        None => {
-            let comparison_proves_target_is_not_literal = matches!(
-                (operator, is_positive),
-                (ComparisonOperator::Equality, false) | (ComparisonOperator::Inequality, true)
-            );
-            if !literal_is_target
-                && comparison_proves_target_is_not_literal
-                && literal_type.is_single_valued(db)
-            {
-                ComparisonResult::CanNarrow(literal_type.negate(db))
-            } else {
-                call_comparison_dunder(db, literal_type, other, operator.dunder())
-            }
+        Some(_) if !literal_is_target && literal_type.is_single_valued(db) => {
+            ComparisonResult::CanNarrow(literal_type.negate_if(db, !condition_expects_equality))
         }
+        Some(_) => ComparisonResult::Ambiguous,
+        None if !literal_is_target
+            && !condition_expects_equality
+            && literal_type.is_single_valued(db) =>
+        {
+            ComparisonResult::CanNarrow(literal_type.negate(db))
+        }
+        None => ComparisonResult::Ambiguous,
     }
 }
 
@@ -867,10 +858,10 @@ fn compare_nominal_instances<'db>(
     let left = Type::NominalInstance(left_instance);
     let right = Type::NominalInstance(right_instance);
     let Some(left_semantics) = comparison_semantics(db, left, operator) else {
-        return call_comparison_dunder(db, left, right, operator.dunder());
+        return ComparisonResult::Ambiguous;
     };
     let Some(right_semantics) = comparison_semantics(db, right, operator) else {
-        return call_comparison_dunder(db, left, right, operator.dunder());
+        return ComparisonResult::Ambiguous;
     };
 
     let classes_differ = left_instance.class_literal(db) != right_instance.class_literal(db);
@@ -918,31 +909,6 @@ fn comparison_semantics<'db>(
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> Option<KnownComparisonSemantics> {
-    match operator {
-        ComparisonOperator::Equality => known_equality_semantics(db, ty),
-        ComparisonOperator::Inequality => known_inequality_semantics(db, ty),
-    }
-}
-
-fn known_equality_semantics<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<KnownComparisonSemantics> {
-    known_semantics(db, ty, ComparisonOperator::Equality)
-}
-
-fn known_inequality_semantics<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<KnownComparisonSemantics> {
-    known_semantics(db, ty, ComparisonOperator::Inequality)
-}
-
-fn known_semantics<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    operator: ComparisonOperator,
-) -> Option<KnownComparisonSemantics> {
     match ty {
         Type::LiteralValue(literal) => literal_semantics(db, literal.kind(), operator),
         Type::TypedDict(_) => Some(KnownComparisonSemantics::Dict),
@@ -952,12 +918,21 @@ fn known_semantics<'db>(
             operator,
         ),
         Type::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db)?;
-            known_instance_semantics(
-                db,
-                complement.enum_class(db).to_non_generic_instance(db),
-                operator,
-            )
+            if let Some(complement) = intersection.enum_complement(db) {
+                return known_instance_semantics(
+                    db,
+                    complement.enum_class(db).to_non_generic_instance(db),
+                    operator,
+                );
+            }
+            let mut semantics = intersection
+                .positive(db)
+                .iter()
+                .filter_map(|element| comparison_semantics(db, *element, operator));
+            let first = semantics.next()?;
+            semantics
+                .all(|semantics| semantics == first)
+                .then_some(first)
         }
         Type::NominalInstance(instance)
             if instance.class(db).is_final(db)
@@ -967,6 +942,24 @@ fn known_semantics<'db>(
             known_instance_semantics(db, ty, operator)
         }
         _ => None,
+    }
+}
+
+fn has_known_identity_comparison_semantics<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    operator: ComparisonOperator,
+) -> bool {
+    match ty {
+        Type::FunctionLiteral(_) | Type::ModuleLiteral(_) | Type::SpecialForm(_) => true,
+        Type::ClassLiteral(class) => {
+            known_instance_semantics(db, class.metaclass_instance_type(db), operator)
+                == Some(KnownComparisonSemantics::Object)
+        }
+        _ => {
+            ty.is_singleton(db)
+                && comparison_semantics(db, ty, operator) == Some(KnownComparisonSemantics::Object)
+        }
     }
 }
 
@@ -1041,8 +1034,8 @@ fn known_enum_semantics<'db>(
         KnownComparisonSemantics::Object
     };
 
+    let class = instance.to_meta_type(db);
     let has_custom_dunder = |name| {
-        let class = instance.to_meta_type(db);
         let dunder = class.member_lookup_with_policy(
             db,
             Name::new_static(name),
@@ -1195,25 +1188,4 @@ fn same_enum_member<'db>(
         return left == right;
     };
     metadata.resolve_member(left.name(db)) == metadata.resolve_member(right.name(db))
-}
-
-fn call_comparison_dunder<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-    dunder: &'static str,
-) -> ComparisonResult<'db> {
-    let Ok(bindings) = left.try_call_dunder(
-        db,
-        dunder,
-        CallArguments::positional([right]),
-        TypeContext::default(),
-    ) else {
-        return ComparisonResult::Ambiguous;
-    };
-    match bindings.return_type(db).bool(db) {
-        Truthiness::AlwaysTrue => ComparisonResult::AlwaysTrue,
-        Truthiness::AlwaysFalse => ComparisonResult::AlwaysFalse,
-        Truthiness::Ambiguous => ComparisonResult::Ambiguous,
-    }
 }
