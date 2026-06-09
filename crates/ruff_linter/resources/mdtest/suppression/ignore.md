@@ -220,3 +220,37 @@ values = [
 ```
 
 <!-- fmt:on -->
+
+## `ruff:ignore` comments with a `disable`/`enable` pair
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF10"]
+```
+
+An intervening `ruff:ignore` directive shouldn't cause a `disable`/`enable` pair to be reported as
+unmatched. Instead, the range suppression should take precedence, and the inner `ruff:ignore` should
+be unused, just like a `noqa` comment:
+
+```py
+# ruff:disable[F401]
+# error: [unused-noqa]
+import os  # ruff:ignore[F401]
+# ruff:enable[F401]
+
+# ruff:disable[F401]
+# error: [unused-noqa]
+import sys  # noqa: F401
+# ruff:enable[F401]
+```
+
+This applies to own-line comments too:
+
+```py
+# ruff:disable[F401]
+# error: [unused-noqa]
+# ruff:ignore[F401]
+import os
+# ruff:enable[F401]
+```
