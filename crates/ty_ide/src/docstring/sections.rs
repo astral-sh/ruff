@@ -7,6 +7,7 @@ pub(super) struct DocstringSections<'a> {
     parameters: Vec<DocstringItem<'a>>,
     attributes: Vec<DocstringItem<'a>>,
     returns: Vec<DocstringItem<'a>>,
+    yields: Vec<DocstringItem<'a>>,
     raises: Vec<DocstringItem<'a>>,
 }
 
@@ -20,6 +21,7 @@ impl<'a> DocstringSections<'a> {
             DocstringSectionKind::Parameters => self.parameters.push(item),
             DocstringSectionKind::Attributes => self.attributes.push(item),
             DocstringSectionKind::Returns => self.returns.push(item),
+            DocstringSectionKind::Yields => self.yields.push(item),
             DocstringSectionKind::Raises => self.raises.push(item),
         }
     }
@@ -29,6 +31,7 @@ impl<'a> DocstringSections<'a> {
         render_markdown_section(&mut output, "Parameters", &self.parameters);
         render_markdown_section(&mut output, "Attributes", &self.attributes);
         render_markdown_section(&mut output, "Returns", &self.returns);
+        render_markdown_section(&mut output, "Yields", &self.yields);
         render_markdown_section(&mut output, "Raises", &self.raises);
         output
     }
@@ -40,6 +43,7 @@ impl<'a> DocstringSections<'a> {
     ) {
         let Some(description) = [
             self.raises.last(),
+            self.yields.last(),
             self.returns.last(),
             self.attributes.last(),
             self.parameters.last(),
@@ -60,6 +64,7 @@ pub(super) enum DocstringSectionKind {
     Parameters,
     Attributes,
     Returns,
+    Yields,
     Raises,
 }
 
@@ -414,6 +419,10 @@ mod tests {
             DocstringItem::new(None, Some("bool"), "Whether validation passed."),
         );
         sections.push(
+            DocstringSectionKind::Yields,
+            DocstringItem::new(None, Some("int"), "Next value."),
+        );
+        sections.push(
             DocstringSectionKind::Attributes,
             DocstringItem::new(Some("cache"), Some("dict[str,\n object]"), "Cached data."),
         );
@@ -427,6 +436,9 @@ mod tests {
 
         ## Returns
         `bool`: Whether validation passed.
+
+        ## Yields
+        `int`: Next value.
 
         ## Raises
         `ValueError`: Invalid value.

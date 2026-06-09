@@ -25,10 +25,6 @@ impl<'a> PreformattedBlockScanner<'a> {
     }
 
     /// Returns whether the scanner is currently inside an accepted preformatted block.
-    #[expect(
-        dead_code,
-        reason = "used by parsed docstring rendering in follow-up changes"
-    )]
     pub(super) fn is_active(&self) -> bool {
         self.active_markdown_fence.is_some()
             || self.active_doctest

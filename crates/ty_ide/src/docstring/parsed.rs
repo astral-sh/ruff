@@ -1,9 +1,12 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
+use ruff_python_trivia::leading_indentation;
+use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use super::preformatted::PreformattedBlockScanner;
 use super::rest;
 use super::sections::{DocstringItem, DocstringSectionKind, DocstringSections};
 
@@ -16,7 +19,7 @@ pub(super) struct ParsedDocstring<'a> {
 impl<'a> ParsedDocstring<'a> {
     pub(super) fn parse(raw: &'a str) -> Self {
         let rest = rest::Docstring::parse(raw);
-        let blocks = parse_rest_blocks(raw, rest.field_lists());
+        let blocks = parse_blocks(raw, rest.field_lists());
 
         Self { raw, blocks }
     }
@@ -96,31 +99,24 @@ impl<'a> ParsedDocstring<'a> {
     }
 }
 
-fn parse_rest_blocks<'a>(raw: &'a str, field_lists: &[rest::FieldList]) -> Vec<Block<'a>> {
+fn parse_blocks<'a>(raw: &'a str, rest_field_lists: &[rest::FieldList]) -> Vec<Block<'a>> {
+    let mut sections = Vec::new();
+    sections.extend(rest_section_candidates(rest_field_lists));
+    sections.extend(google_section_candidates(raw));
+    sections.sort_by_key(|section| section.range.start);
     let mut blocks = Vec::new();
     let mut rendered_through = 0;
 
-    for field_list in field_lists {
-        if field_list.indent() != TextSize::default() {
+    for section in sections {
+        if section.range.start < rendered_through {
             continue;
         }
 
-        let range = field_list.range();
-        let start = range.start().to_usize();
-        let end = range.end().to_usize();
-        if start < rendered_through {
-            continue;
-        }
-
-        let Some(section) = rest_section_block(field_list) else {
-            continue;
-        };
-
-        if !push_raw_block(&mut blocks, raw, rendered_through..start) {
+        if !push_raw_block(&mut blocks, raw, rendered_through..section.range.start) {
             return Vec::new();
         }
-        blocks.push(Block::Section(section));
-        rendered_through = end;
+        rendered_through = section.range.end;
+        blocks.push(Block::Section(section.block));
     }
 
     if !blocks.is_empty() && !push_raw_block(&mut blocks, raw, rendered_through..raw.len()) {
@@ -128,6 +124,29 @@ fn parse_rest_blocks<'a>(raw: &'a str, field_lists: &[rest::FieldList]) -> Vec<B
     }
 
     blocks
+}
+
+fn rest_section_candidates(field_lists: &[rest::FieldList]) -> Vec<SectionCandidate> {
+    let mut sections = Vec::new();
+
+    for field_list in field_lists {
+        if field_list.indent() != TextSize::default() {
+            continue;
+        }
+
+        let range = field_list.range();
+
+        let Some(section) = rest_section_block(field_list) else {
+            continue;
+        };
+
+        sections.push(SectionCandidate {
+            range: range.start().to_usize()..range.end().to_usize(),
+            block: section,
+        });
+    }
+
+    sections
 }
 
 fn push_raw_block<'a>(blocks: &mut Vec<Block<'a>>, raw: &'a str, range: Range<usize>) -> bool {
@@ -140,6 +159,667 @@ fn push_raw_block<'a>(blocks: &mut Vec<Block<'a>>, raw: &'a str, range: Range<us
     };
     blocks.push(Block::Raw(raw));
     true
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SectionCandidate {
+    range: Range<usize>,
+    block: SectionBlock,
+}
+
+fn google_section_candidates(raw: &str) -> Vec<SectionCandidate> {
+    let lines = parsed_lines(raw);
+    let mut sections = Vec::new();
+    let mut preformatted_blocks = PreformattedBlockScanner::default();
+    let mut index = 0;
+
+    while index < lines.len() {
+        if preformatted_blocks.consume_preformatted_line(lines[index].text) {
+            index += 1;
+            continue;
+        }
+
+        let Some(header) = parse_google_section_like_header(&lines, index) else {
+            preformatted_blocks.observe_non_preformatted_line(lines[index].text);
+            index += 1;
+            continue;
+        };
+        if header.indent != 0 {
+            index += 1;
+            continue;
+        }
+
+        let (body_end, range_end) = google_section_body_end(&lines, header);
+        if let Some(kind) = header.kind
+            && let Some(section) = google_section_block(kind, &lines[header.body_start..body_end])
+        {
+            sections.push(SectionCandidate {
+                range: header.range_start..range_end,
+                block: section,
+            });
+        }
+        index = body_end;
+    }
+
+    sections
+}
+
+fn parsed_lines(raw: &str) -> Vec<ParsedLine<'_>> {
+    raw.universal_newlines()
+        .map(|line| ParsedLine {
+            text: line.as_str(),
+            start: line.start().to_usize(),
+            end: line.end().to_usize(),
+        })
+        .collect()
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ParsedLine<'a> {
+    text: &'a str,
+    start: usize,
+    end: usize,
+}
+
+fn google_section_body_end(
+    lines: &[ParsedLine<'_>],
+    header: GoogleSectionHeader,
+) -> (usize, usize) {
+    let mut body_end = header.body_start;
+    let mut range_end = header.range_end;
+    let mut body_preformatted_blocks = PreformattedBlockScanner::default();
+
+    while let Some(line) = lines.get(body_end) {
+        let previous_body = &lines[header.body_start..body_end];
+
+        if body_preformatted_blocks.is_active()
+            && body_preformatted_blocks.consume_preformatted_line(line.text)
+        {
+            range_end = line.end;
+            body_end += 1;
+            continue;
+        }
+
+        if line.text.trim().is_empty()
+            && !google_blank_line_continues_section(previous_body, &lines[body_end..], header)
+        {
+            break;
+        }
+
+        if parse_google_section_like_header(lines, body_end)
+            .is_some_and(|next| next.indent <= header.indent)
+        {
+            break;
+        }
+
+        if google_top_level_preformatted_block_follows_body(header, line, previous_body) {
+            break;
+        }
+
+        if !line.text.trim().is_empty()
+            && !google_line_belongs_to_body(header, line.text, previous_body)
+        {
+            break;
+        }
+
+        if !body_preformatted_blocks.consume_preformatted_line(line.text) {
+            body_preformatted_blocks.observe_non_preformatted_line(line.text);
+        }
+        range_end = line.end;
+        body_end += 1;
+    }
+
+    (body_end, range_end)
+}
+
+fn google_blank_line_continues_section(
+    previous_lines: &[ParsedLine<'_>],
+    lines: &[ParsedLine<'_>],
+    header: GoogleSectionHeader,
+) -> bool {
+    let Some((offset, non_blank_line)) = lines
+        .iter()
+        .enumerate()
+        .find(|(_, line)| !line.text.trim().is_empty())
+    else {
+        return false;
+    };
+
+    if parse_google_section_like_header(lines, offset)
+        .is_some_and(|next| next.indent <= header.indent)
+    {
+        return false;
+    }
+
+    google_line_belongs_to_body_after_blank(header, non_blank_line.text, previous_lines)
+}
+
+fn google_top_level_preformatted_block_follows_body(
+    header: GoogleSectionHeader,
+    line: &ParsedLine<'_>,
+    previous_lines: &[ParsedLine<'_>],
+) -> bool {
+    header.range_start == 0
+        && indentation(line.text) == header.indent
+        && previous_lines
+            .iter()
+            .any(|line| !line.text.trim().is_empty())
+        && PreformattedBlockScanner::line_starts_preformatted_block(line.text)
+}
+
+fn google_line_belongs_to_body(
+    header: GoogleSectionHeader,
+    line: &str,
+    previous_lines: &[ParsedLine<'_>],
+) -> bool {
+    let line_indent = indentation(line);
+    if line_indent > header.indent {
+        return true;
+    }
+
+    // `documentation_trim` ignores the first docstring line when computing common
+    // indentation, so the body of a first-line section can be dedented to the
+    // header's column before structured parsing sees it.
+    if header.range_start != 0
+        || line_indent != header.indent
+        || is_google_section_like_header(line.trim())
+    {
+        return false;
+    }
+
+    if previous_lines
+        .iter()
+        .any(|line| !line.text.trim().is_empty() && indentation(line.text) > header.indent)
+    {
+        return matches!(
+            header.kind,
+            Some(
+                kind @ (DocstringSectionKind::Parameters
+                | DocstringSectionKind::Attributes
+                | DocstringSectionKind::Raises)
+            ) if parse_google_named_item(kind, line.trim()).is_some()
+                && google_named_item_indent(kind, previous_lines) == Some(line_indent)
+        );
+    }
+
+    true
+}
+
+fn google_named_item_indent(kind: DocstringSectionKind, lines: &[ParsedLine<'_>]) -> Option<usize> {
+    lines.iter().find_map(|line| {
+        parse_google_named_item(kind, line.text.trim()).map(|_| indentation(line.text))
+    })
+}
+
+fn google_line_belongs_to_body_after_blank(
+    header: GoogleSectionHeader,
+    line: &str,
+    previous_lines: &[ParsedLine<'_>],
+) -> bool {
+    if !google_line_belongs_to_body(header, line, previous_lines) {
+        return false;
+    }
+
+    let line_indent = indentation(line);
+    if header.range_start != 0 || line_indent > header.indent {
+        return true;
+    }
+
+    match header.kind {
+        Some(
+            kind @ (DocstringSectionKind::Parameters
+            | DocstringSectionKind::Attributes
+            | DocstringSectionKind::Raises),
+        ) => parse_google_named_item(kind, line.trim()).is_some(),
+        Some(DocstringSectionKind::Returns | DocstringSectionKind::Yields) | None => true,
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct GoogleSectionHeader {
+    kind: Option<DocstringSectionKind>,
+    indent: usize,
+    body_start: usize,
+    range_start: usize,
+    range_end: usize,
+}
+
+fn parse_google_section_like_header(
+    lines: &[ParsedLine<'_>],
+    index: usize,
+) -> Option<GoogleSectionHeader> {
+    let line = lines.get(index)?;
+    let (kind, indent) = if let Some((kind, indent)) = parse_google_header(line.text) {
+        (Some(kind), indent)
+    } else if is_google_section_like_header(line.text.trim()) {
+        (None, indentation(line.text))
+    } else {
+        return None;
+    };
+
+    Some(GoogleSectionHeader {
+        kind,
+        indent,
+        body_start: index + 1,
+        range_start: line.start,
+        range_end: line.end,
+    })
+}
+
+fn parse_google_header(line: &str) -> Option<(DocstringSectionKind, usize)> {
+    let name = line.trim().strip_suffix(':')?.trim();
+    let kind = match normalized_google_section_name(name).as_str() {
+        "args" | "arguments" | "parameters" | "keyword args" | "keyword arguments" => {
+            DocstringSectionKind::Parameters
+        }
+        "attributes" => DocstringSectionKind::Attributes,
+        "returns" | "return" => DocstringSectionKind::Returns,
+        "yields" | "yield" => DocstringSectionKind::Yields,
+        "raises" | "raise" => DocstringSectionKind::Raises,
+        _ => return None,
+    };
+    Some((kind, indentation(line)))
+}
+
+fn is_google_section_like_header(line: &str) -> bool {
+    if parse_google_header(line).is_some() {
+        return true;
+    }
+
+    let Some(name) = line.strip_suffix(':') else {
+        return false;
+    };
+
+    matches!(
+        normalized_google_section_name(name).as_str(),
+        "example"
+            | "examples"
+            | "note"
+            | "notes"
+            | "other parameters"
+            | "references"
+            | "see also"
+            | "todo"
+            | "todos"
+            | "warning"
+            | "warnings"
+    )
+}
+
+fn normalized_google_section_name(name: &str) -> String {
+    name.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_ascii_lowercase()
+}
+
+fn google_section_block(
+    kind: DocstringSectionKind,
+    body: &[ParsedLine<'_>],
+) -> Option<SectionBlock> {
+    let items = if matches!(
+        kind,
+        DocstringSectionKind::Returns | DocstringSectionKind::Yields
+    ) {
+        parse_google_return_item(kind, body)?
+    } else {
+        parse_google_named_items(kind, body)?
+    };
+
+    Some(SectionBlock::new(items))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SectionItemBuilder {
+    display_name: Option<String>,
+    lookup_name: Option<String>,
+    ty: Option<String>,
+    description_lines: Vec<DescriptionLine>,
+}
+
+impl SectionItemBuilder {
+    fn finish(self, kind: DocstringSectionKind) -> SectionItem {
+        SectionItem::new(
+            kind,
+            self.display_name,
+            self.lookup_name,
+            self.ty,
+            normalize_description(self.description_lines),
+        )
+    }
+
+    fn push_description(&mut self, line: &str) {
+        self.description_lines
+            .push(DescriptionLine::Source(line.to_string()));
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DescriptionLine {
+    Normalized(String),
+    Source(String),
+}
+
+impl DescriptionLine {
+    fn normalized(line: &str) -> Self {
+        Self::Normalized(line.trim().to_string())
+    }
+}
+
+fn parse_google_named_items(
+    kind: DocstringSectionKind,
+    body: &[ParsedLine<'_>],
+) -> Option<Vec<SectionItem>> {
+    parse_named_items(kind, body, |line| parse_google_named_item(kind, line))
+}
+
+fn parse_named_items(
+    kind: DocstringSectionKind,
+    body: &[ParsedLine<'_>],
+    mut parse_item: impl FnMut(&str) -> Option<SectionItemBuilder>,
+) -> Option<Vec<SectionItem>> {
+    let mut items = Vec::new();
+    let mut current: Option<SectionItemBuilder> = None;
+    let mut item_indent = None;
+
+    for line in body {
+        let trimmed = line.text.trim();
+        if trimmed.is_empty() {
+            if let Some(current) = &mut current {
+                current.push_description("");
+            }
+            continue;
+        }
+
+        let line_indent = indentation(line.text);
+        if item_indent.is_none_or(|indent| line_indent == indent) {
+            if let Some(item) = parse_item(trimmed) {
+                if let Some(current) = current.replace(item) {
+                    items.push(current.finish(kind));
+                }
+                item_indent.get_or_insert(line_indent);
+                continue;
+            }
+            if item_indent.is_some() {
+                return None;
+            }
+        }
+        if item_indent.is_some_and(|indent| line_indent < indent) {
+            return None;
+        }
+
+        let current = current.as_mut()?;
+        current.push_description(line.text);
+    }
+
+    if let Some(current) = current {
+        items.push(current.finish(kind));
+    }
+    (!items.is_empty()).then_some(items)
+}
+
+fn parse_google_named_item(kind: DocstringSectionKind, line: &str) -> Option<SectionItemBuilder> {
+    if is_google_section_like_header(line) {
+        return None;
+    }
+
+    let (name, description) = split_once_unbracketed_colon(line)?;
+    let name = name.trim();
+    if name.is_empty() {
+        return None;
+    }
+
+    let (display_name, lookup_name, ty) = match kind {
+        DocstringSectionKind::Parameters => {
+            let (display_name, ty) = parse_parenthesized_type(name);
+            let lookup_name = google_parameter_lookup_name(display_name)?;
+            (
+                display_name.to_string(),
+                Some(lookup_name),
+                ty.map(str::to_string),
+            )
+        }
+        DocstringSectionKind::Attributes => {
+            let (display_name, ty) = parse_parenthesized_type(name);
+            (display_name.to_string(), None, ty.map(str::to_string))
+        }
+        DocstringSectionKind::Raises => (name.to_string(), None, None),
+        DocstringSectionKind::Returns | DocstringSectionKind::Yields => return None,
+    };
+
+    Some(SectionItemBuilder {
+        display_name: Some(display_name),
+        lookup_name,
+        ty,
+        description_lines: vec![DescriptionLine::normalized(description)],
+    })
+}
+
+fn parse_google_return_item(
+    kind: DocstringSectionKind,
+    body: &[ParsedLine<'_>],
+) -> Option<Vec<SectionItem>> {
+    let mut lines = body.iter().skip_while(|line| line.text.trim().is_empty());
+    let first_line = lines.next()?;
+    let first = first_line.text.trim();
+    if is_google_section_like_header(first) {
+        return None;
+    }
+
+    let (ty, first_description) = split_google_return_type(first)
+        .map_or((None, first), |(ty, description)| (Some(ty), description));
+
+    let mut description_lines = vec![DescriptionLine::normalized(first_description)];
+    let mut preformatted_blocks = PreformattedBlockScanner::default();
+    if !preformatted_blocks.consume_preformatted_line(first_line.text) {
+        preformatted_blocks.observe_non_preformatted_line(first_line.text);
+    }
+
+    for line in lines {
+        if preformatted_blocks.consume_preformatted_line(line.text) {
+            description_lines.push(DescriptionLine::Source(line.text.to_string()));
+            continue;
+        }
+        if is_google_section_like_header(line.text.trim()) {
+            return None;
+        }
+        preformatted_blocks.observe_non_preformatted_line(line.text);
+        description_lines.push(DescriptionLine::Source(line.text.to_string()));
+    }
+
+    Some(vec![SectionItem::new(
+        kind,
+        None,
+        None,
+        ty.map(str::to_string),
+        normalize_description(description_lines),
+    )])
+}
+
+fn google_parameter_lookup_name(display_name: &str) -> Option<String> {
+    comma_separated_lookup_names(display_name)
+        .into_iter()
+        .next()
+}
+
+fn split_once_unbracketed_colon(line: &str) -> Option<(&str, &str)> {
+    let mut parentheses = 0usize;
+    let mut brackets = 0usize;
+    let mut braces = 0usize;
+    let mut quote = None;
+    let mut escaped = false;
+
+    for (index, char) in line.char_indices() {
+        if let Some(quote_char) = quote {
+            if escaped {
+                escaped = false;
+            } else if char == '\\' {
+                escaped = true;
+            } else if char == quote_char {
+                quote = None;
+            }
+            continue;
+        }
+
+        match char {
+            '\'' | '"' => quote = Some(char),
+            '(' => parentheses += 1,
+            ')' => parentheses = parentheses.saturating_sub(1),
+            '[' => brackets += 1,
+            ']' => brackets = brackets.saturating_sub(1),
+            '{' => braces += 1,
+            '}' => braces = braces.saturating_sub(1),
+            ':' if parentheses == 0 && brackets == 0 && braces == 0 => {
+                return Some((&line[..index], &line[index + ':'.len_utf8()..]));
+            }
+            _ => {}
+        }
+    }
+
+    None
+}
+
+fn split_google_return_type(line: &str) -> Option<(&str, &str)> {
+    let (ty, description) = split_once_unbracketed_colon(line)?;
+    let ty = ty.trim();
+    if is_uri_scheme_prefix(ty, description) {
+        return None;
+    }
+
+    let description = description.trim();
+
+    if is_structured_return_type(ty) {
+        Some((ty, description))
+    } else {
+        None
+    }
+}
+
+fn is_uri_scheme_prefix(ty: &str, description: &str) -> bool {
+    if !is_uri_scheme(ty) {
+        return false;
+    }
+
+    if description.starts_with("//") {
+        return true;
+    }
+
+    let Some(first) = description.chars().next() else {
+        return false;
+    };
+    if first.is_whitespace() {
+        return false;
+    }
+
+    matches!(first, '/' | '?' | '#' | '@' | ':')
+        || description
+            .chars()
+            .skip(1)
+            .any(|char| matches!(char, '/' | '?' | '#' | '@' | ':'))
+}
+
+fn is_uri_scheme(scheme: &str) -> bool {
+    let mut chars = scheme.chars();
+    chars.next().is_some_and(|char| char.is_ascii_alphabetic())
+        && chars.all(|char| char.is_ascii_alphanumeric() || matches!(char, '+' | '-' | '.'))
+}
+
+fn is_structured_return_type(ty: &str) -> bool {
+    if ty.is_empty() || !ty.chars().all(is_structured_return_type_char) {
+        return false;
+    }
+
+    !ty.chars().any(char::is_whitespace) || ty.contains('[') || ty.contains(',') || ty.contains('|')
+}
+
+fn is_structured_return_type_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || "_.[](){},|\"':/ ".contains(ch)
+}
+
+fn parse_parenthesized_type(name: &str) -> (&str, Option<&str>) {
+    if !name.ends_with(')') {
+        return (name, None);
+    }
+
+    let mut depth = 0usize;
+    for (index, char) in name.char_indices().rev() {
+        match char {
+            ')' => depth += 1,
+            '(' => {
+                if depth == 0 {
+                    return (name, None);
+                }
+                depth -= 1;
+                if depth == 0 {
+                    let display_name = name[..index].trim();
+                    let ty = name[index + '('.len_utf8()..name.len() - ')'.len_utf8()].trim();
+                    return if display_name.is_empty() || ty.is_empty() {
+                        (name, None)
+                    } else {
+                        (display_name, Some(ty))
+                    };
+                }
+            }
+            _ => {}
+        }
+    }
+
+    (name, None)
+}
+
+fn normalize_description(lines: Vec<DescriptionLine>) -> String {
+    let dedent = lines
+        .iter()
+        .filter_map(|line| match line {
+            DescriptionLine::Source(line) if !line.trim().is_empty() => Some(indentation(line)),
+            DescriptionLine::Normalized(_) | DescriptionLine::Source(_) => None,
+        })
+        .min()
+        .unwrap_or(0);
+
+    let mut description = lines
+        .into_iter()
+        .map(|line| match line {
+            DescriptionLine::Normalized(line) => line,
+            DescriptionLine::Source(line) => {
+                strip_indentation(&line, dedent).trim_end().to_string()
+            }
+        })
+        .skip_while(String::is_empty)
+        .collect::<Vec<_>>();
+    while description.last().is_some_and(String::is_empty) {
+        description.pop();
+    }
+    description.join("\n")
+}
+
+fn strip_indentation(line: &str, width: usize) -> &str {
+    let mut indentation_width = 0;
+    for (index, char) in line.char_indices() {
+        let char_width = match char {
+            ' ' => 1,
+            '\t' => 8,
+            _ => return &line[index..],
+        };
+
+        if indentation_width + char_width > width {
+            return &line[index..];
+        }
+
+        indentation_width += char_width;
+        if indentation_width == width {
+            return &line[index + char.len_utf8()..];
+        }
+    }
+
+    ""
+}
+
+fn indentation(line: &str) -> usize {
+    leading_indentation(line)
+        .chars()
+        .map(|char| if char == '\t' { 8 } else { 1 })
+        .sum()
 }
 
 fn rest_section_block(field_list: &rest::FieldList) -> Option<SectionBlock> {
@@ -733,6 +1413,248 @@ Literal block::
     }
 
     #[test]
+    fn google_sections_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+Args:
+    value (str): The value.
+        More detail.
+    *items: Extra items.
+
+Returns:
+    bool: Whether validation passed.
+
+Yields:
+    int: Next value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value` (`str`): The value.
+            More detail.
+        `*items`: Extra items.
+
+        ## Returns
+        `bool`: Whether validation passed.
+
+        ## Yields
+        `int`: Next value.
+        ");
+
+        let parameters = parsed.parameter_documentation();
+        assert_eq!(parameters.len(), 2);
+        assert_eq!(parameters[0].name, "value");
+        assert_eq!(parameters[0].description, "The value.\nMore detail.");
+        assert_eq!(parameters[1].name, "items");
+        assert_eq!(parameters[1].description, "Extra items.");
+
+        let docstring = "\
+Args:
+    x, y: Coordinates.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+        let parameters = parsed.parameter_documentation();
+
+        assert_eq!(parameters.len(), 2);
+        assert_eq!(parameters[0].name, "x");
+        assert_eq!(parameters[0].description, "Coordinates.");
+        assert_eq!(parameters[1].name, "y");
+        assert_eq!(parameters[1].description, "Coordinates.");
+
+        let docstring = "\
+Args:
+    value: The value.
+Additional details.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Parameters
+        `value`: The value.
+        Additional details.
+        ");
+
+        let docstring = "\
+Args:
+    value: The value.
+Methods:
+    work: Does work.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Parameters
+        `value`: The value.
+        Methods:
+            work: Does work.
+        ");
+
+        let docstring = "\
+Returns:
+    bool: Whether validation passed.
+Additional details.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Returns
+        `bool`: Whether validation passed.
+        Additional details.
+        ");
+
+        let docstring = "\
+Returns:
+    str: Example output.
+        ```python
+        Args:
+            value: still code.
+        Returns:
+            still code.
+        ```
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Returns
+        `str`: Example output.
+
+        ```python
+        Args:
+            value: still code.
+        Returns:
+            still code.
+        ```
+        ");
+
+        let docstring = "\
+Yields:
+    int: Example output.
+        Example::
+            Args:
+                still code.
+            Yields:
+                still code.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Yields
+        `int`: Example output.
+            Example::
+                Args:
+                    still code.
+                Yields:
+                    still code.
+        ");
+    }
+
+    #[test]
+    fn unsupported_google_sections_stay_raw() {
+        let docstring = "\
+Summary.
+
+Args:
+    Inputs are normalized first.
+    value: The value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Examples:
+    Args:
+        value: demo input.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Returns:
+    bool: Whether validation passed.
+
+    Examples:
+        Use it.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Yields:
+    int: Next value.
+
+    Examples:
+        Use it.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Args:
+    Inputs are normalized first.
+    Args:
+        value: demo input.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Args:
+    value: The value.
+
+    Examples:
+        Use it.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Returns:
+    Examples:
+        Use it.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+Args:
+    value: Example.
+        ```python
+
+Args:
+    nested = 1
+        ```
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+    }
+
+    #[test]
     fn unsupported_rest_field_lists_stay_raw() {
         let docstring = "\
 Summary.
@@ -913,6 +1835,28 @@ Summary.
         ```python
         value = 1
         ```
+
+        After.
+        ");
+
+        let parsed = ParsedDocstring {
+            raw: "Yields:\n    int:\n        - Next value.\nAfter.",
+            blocks: vec![
+                Block::Section(SectionBlock::new(vec![SectionItem::new(
+                    DocstringSectionKind::Yields,
+                    None,
+                    None,
+                    Some("int".to_string()),
+                    "- Next value.".to_string(),
+                )])),
+                Block::Raw("After."),
+            ],
+        };
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Yields
+        `int`:
+        - Next value.
 
         After.
         ");
