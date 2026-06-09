@@ -1186,7 +1186,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // Substitute the `Divergent` α-marker back to the source type
                 // so that recursive references inside the body keep their source-name
                 // display and re-trigger this recursive-unfold path if visited again.
-                let body = rec.unfold_with_source_type(self.db);
+                let body = rec.body_with_origin_marker(self.db);
                 self.add_positive_impl(body, seen_aliases)
             }
             Type::Union(union) => {
@@ -1256,7 +1256,7 @@ impl<'db> IntersectionBuilder<'db> {
                     return self;
                 }
                 seen_aliases.push(ty);
-                let body = rec.unfold_with_source_type(self.db);
+                let body = rec.body_with_origin_marker(self.db);
                 self.add_negative_impl(body, seen_aliases)
             }
             Type::Union(union) => {

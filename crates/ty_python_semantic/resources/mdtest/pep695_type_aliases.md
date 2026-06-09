@@ -649,7 +649,7 @@ def overloaded_recursive_tuple_variadic(*args: object) -> object:
     return args
 
 def expand_recursive_variadic_tuple_argument(x: RecursiveTuple):
-    # error: [invalid-argument-type] "Argument to function `overloaded_recursive_tuple_variadic` is incorrect: Expected `int`, found `tuple[RecursiveTuple]`"
+    # error: [invalid-argument-type] "Argument to function `overloaded_recursive_tuple_variadic` is incorrect: Expected `int`, found `RecursiveTuple`"
     reveal_type(overloaded_recursive_tuple_variadic(*x))  # revealed: Unknown
 
 type RecursiveClassInfo = type[int] | RecursiveClassInfo
