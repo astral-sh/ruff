@@ -95,6 +95,8 @@ preview = true
 select = ["RUF015"]
 ```
 
+This case tests that both the range and suppression code are checked.
+
 ```py
 # error: [unnecessary-iterable-allocation-for-first-element]
 not_suppressed = [  # ruff:ignore[F401]
@@ -109,6 +111,8 @@ not_suppressed = [  # ruff:ignore[F401]
 preview = true
 select = [ "E" ]
 ```
+
+This should be suppressed:
 
 ```py
 # ruff:ignore[E262]
