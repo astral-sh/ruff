@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_async/mod.rs
+assertion_line: 41
 ---
 ASYNC119 Yield in context manager in async generator may not trigger cleanup
   --> ASYNC119.py:13:9
