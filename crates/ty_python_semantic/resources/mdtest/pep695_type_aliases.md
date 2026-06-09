@@ -533,7 +533,7 @@ def _(x: Bar[int]):
 ### Recursive aliases in operations
 
 ```py
-from typing import Callable, Iterator, Literal, TypedDict, overload
+from typing import Callable, Generator, Iterator, Literal, TypedDict, overload
 from ty_extensions import all_members, has_member
 
 class RecursiveItem: ...
@@ -581,6 +581,12 @@ def list_recursive_alias_members(x: RecursiveMembersAlias):
     all_members(x)
     reveal_type(has_member(x, "attr"))  # revealed: Literal[True]
 
+type RecursiveListMembersAlias = list[RecursiveListMembersAlias]
+
+def list_recursive_alias_list_members(x: RecursiveListMembersAlias):
+    all_members(x)
+    reveal_type(has_member(x, "append"))  # revealed: Literal[True]
+
 class RecursiveAttribute:
     attr: int
 
@@ -591,6 +597,22 @@ def assign_recursive_alias_attribute(x: RecursiveAttributeAlias):
 
 def delete_recursive_alias_attribute(x: RecursiveAttributeAlias):
     del x.attr
+
+type RecursiveAttributeAliasWithList = RecursiveAttribute | list[RecursiveAttributeAliasWithList]
+
+def assign_recursive_union_alias_attribute(x: RecursiveAttributeAliasWithList):
+    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `attr` on type `RecursiveAttribute | list[RecursiveAttributeAliasWithList]`"
+    x.attr = 1
+
+type RecursiveStringOrList = str | list[RecursiveStringOrList]
+
+def unary_recursive_alias(x: RecursiveStringOrList):
+    # error: [unsupported-operator] "Unary operator `+` is not supported for object of type `str | list[RecursiveStringOrList]`"
+    reveal_type(+x)  # revealed: Unknown
+
+def binary_recursive_alias(x: RecursiveStringOrList):
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `RecursiveStringOrList` and `Literal["a"]`"
+    reveal_type(x + "a")  # revealed: Unknown
 
 class RecursiveKwargs(TypedDict):
     kind: Literal["a"]
@@ -627,6 +649,15 @@ type RecursiveSuperOwnerAlias = RecursiveSuperOwner | RecursiveSuperOwnerAlias
 
 def recursive_super_owner(x: RecursiveSuperOwnerAlias):
     super(RecursiveSuperOwner, x).method()
+
+type RecursiveGenerator = Generator[int, None, RecursiveGenerator]
+
+def yield_from_recursive_generator(
+    g: RecursiveGenerator,
+) -> Generator[int, None, RecursiveGenerator]:
+    result = yield from g
+    reveal_type(result)  # revealed: Generator[int, None, RecursiveGenerator]
+    return result
 
 type RecursiveTuple = tuple[RecursiveTuple]
 

@@ -2803,6 +2803,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => self
+                .validate_attribute_assignment(
+                    target,
+                    rec.unfold(db),
+                    attribute,
+                    infer_value_ty,
+                    emit_diagnostics,
+                ),
+
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
                 infer_value_ty(self, TypeContext::default());
@@ -3452,6 +3461,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 attribute,
                 emit_diagnostics,
             ),
+
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => self
+                .validate_attribute_deletion(target, rec.unfold(db), attribute, emit_diagnostics),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -10381,7 +10393,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match (op, operand_type) {
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
-            | (_, Type::Divergent(_) | Type::Recursive(_)) => operand_type,
+            | (_, Type::Divergent(_)) => operand_type,
+            (_, Type::Recursive(rec)) if rec.is_non_contractive(self.db()) => operand_type,
+            (_, Type::Recursive(rec)) => {
+                self.infer_unary_expression_type(op, rec.unfold(self.db()), unary)
+            }
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
