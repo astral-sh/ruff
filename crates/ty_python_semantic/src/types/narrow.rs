@@ -522,7 +522,7 @@ impl ClassInfoConstraintFunction {
             // Recursive bodies contain `Divergent` leaves that bottom out via
             // the `Type::Divergent` arm above.
             Type::Recursive(_) => {
-                self.generate_constraint(db, classinfo.unfold_recursive_once(db), is_positive)
+                self.generate_constraint(db, classinfo.unwrap_recursive(db), is_positive)
             }
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
