@@ -442,7 +442,7 @@ pub(crate) fn infer_expression_type<'db>(
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result
             .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-            .wrap_structural_recursive_fold_only(db, cycle)
+            .finalize_recursive_cycle_markers(db, cycle, true, false)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1293,9 +1293,14 @@ fn normalize_binding_for_cycle<'db>(
         None => base.recursive_type_normalized(db, cycle),
     };
 
-    // Only value bindings are presented as a `Type::Recursive` μ-binder.
+    // Only value bindings are presented as a `Type::Recursive` μ-binder. Fold structural divergent
+    // into the binder, but do **not** finalize a structureless cycle to `Never` here: that belongs
+    // to the place-cycle recovery (`place_by_id` / `cycle_normalized_recursive`). Applying it to a
+    // binding would wrongly collapse a self-referential *declaration*'s binding cycle — e.g.
+    // `int: int = 0`, whose annotation refers to the field being declared — to `Never`, making the
+    // place fall back to its binding value and spuriously report the annotation as an invalid type.
     if is_value_binding {
-        normalized.wrap_structural_recursive(db, cycle)
+        normalized.finalize_recursive_cycle_markers(db, cycle, true, false)
     } else {
         normalized
     }

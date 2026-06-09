@@ -958,7 +958,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             }),
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
-            // A structureless value cycle is finalized to `Never` (see `wrap_structural_recursive`):
+            // A structureless value cycle is finalized to `Never`:
             // the cyclically-defined binding exists but its value type is uninhabited. Keep it
             // `Defined` as `Never` rather than treating the (unreachable, `Never`-valued) current
             // iteration as making the place unbound — so a purely-cyclic attribute reads cleanly as
@@ -999,7 +999,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         let previous = previous.map_type(|ty| ty.unwrap_head_recursive(db, cycle));
         current
             .cycle_normalized(db, previous, cycle)
-            .map_type(|ty| ty.wrap_structural_recursive(db, cycle))
+            .map_type(|ty| ty.finalize_recursive_cycle_markers(db, cycle, true, true))
     }
 }
 
@@ -1017,7 +1017,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
         // `Divergent` marker. Structural recursion is unaffected.
         place
             .cycle_normalized(db, *previous, cycle)
-            .map_type(|ty| ty.resolve_structureless_cycle_to_never(cycle))
+            .map_type(|ty| ty.finalize_recursive_cycle_markers(db, cycle, false, true))
     },
     heap_size=ruff_memory_usage::heap_size
 )]

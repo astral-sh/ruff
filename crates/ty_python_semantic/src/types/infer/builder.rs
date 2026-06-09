@@ -7316,7 +7316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if let Some(divergent) = statement_use_types
                     .expression_type(use_expression)
-                    .as_divergent()
+                    .as_recursion_marker_divergent(self.db())
                 {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
