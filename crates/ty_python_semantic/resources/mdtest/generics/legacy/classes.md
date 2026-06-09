@@ -12,7 +12,7 @@ python-version = "3.11"
 
 ```py
 from ty_extensions import generic_context
-from typing_extensions import Generic, TypeVar, TypeVarTuple, ParamSpec, Unpack
+from typing_extensions import Generic, ParamSpec, Protocol, TypeVar, TypeVarTuple, Unpack
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -68,6 +68,17 @@ You can only specialize `typing.Generic` with typevars, param specs, or typevar 
 ```py
 # error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
 class GenericOfType(Generic[int]): ...
+
+# error: [invalid-argument-type] "`<special-form 'typing.Unpack'>` is not a valid argument to `Generic`"
+class GenericOfInvalidUnpack(Generic[T, Unpack[int]]): ...
+
+# error: [invalid-argument-type] "`<special-form 'typing.Unpack'>` is not a valid argument to `Protocol`"
+class ProtocolOfInvalidUnpack(Protocol[T, Unpack[int]]): ...
+class GenericOfUnresolvedUnpack(Generic[T, Unpack[Missing]]): ...  # error: [unresolved-reference]
+
+# The first invalid argument takes priority over the later invalid `Unpack` operand.
+# error: [invalid-argument-type] "`<class 'int'>` is not a valid argument to `Generic`"
+class GenericOfMixedInvalidArguments(Generic[int, Unpack[str]]): ...
 ```
 
 You can also define a generic class by inheriting from some _other_ generic class, and specializing

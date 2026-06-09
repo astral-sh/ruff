@@ -11,7 +11,7 @@ use crate::types::call::CallErrorKind;
 use crate::types::call::bind::CallableDescription;
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::diagnostic::{
-    self, CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
+    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
     report_invalid_arguments_to_annotated, report_invalid_key_on_typed_dict,
@@ -364,16 +364,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ast::ExprRef::from(subscript),
                             TypeExpressionFlags::INVALID_UNPACK,
                         );
-                        if !inner_ty.is_unknown()
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            diagnostic::add_type_expression_reference_link(
-                                builder.into_diagnostic(
-                                    "`Unpack` can only unpack a tuple type or `TypeVarTuple`",
-                                ),
-                            );
-                        }
                         Type::unknown()
                     };
                 }
@@ -1339,7 +1329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        slice_ty: Type<'db>,
+        mut slice_ty: Type<'db>,
         expr_context: ExprContext,
     ) -> Type<'db> {
         let db = self.db();
@@ -1348,18 +1338,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value_ty,
             Type::SpecialForm(SpecialFormType::Generic | SpecialFormType::Protocol)
         ) {
-            let has_invalid_unpack_argument = match subscript.slice.as_ref() {
-                ast::Expr::Tuple(tuple) => tuple.elts.iter().any(|argument| {
-                    self.type_expression_flags(argument)
-                        .contains(TypeExpressionFlags::INVALID_UNPACK)
-                }),
-                argument => self
-                    .type_expression_flags(argument)
-                    .contains(TypeExpressionFlags::INVALID_UNPACK),
-            };
-            if has_invalid_unpack_argument {
-                return Type::unknown();
-            }
+            slice_ty = self.recover_invalid_legacy_generic_unpack_arguments(
+                subscript.slice.as_ref(),
+                slice_ty,
+            );
         }
 
         // Special typing forms for which subscriptions are context-dependent are parsed here,
@@ -1402,6 +1384,53 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             e.report_diagnostics(&self.context, subscript);
             e.result_type()
         })
+    }
+
+    fn recover_invalid_legacy_generic_unpack_arguments(
+        &self,
+        slice: &ast::Expr,
+        slice_ty: Type<'db>,
+    ) -> Type<'db> {
+        let recover_argument = |argument: &ast::Expr, argument_ty| {
+            if !self
+                .type_expression_flags(argument)
+                .contains(TypeExpressionFlags::INVALID_UNPACK)
+            {
+                return argument_ty;
+            }
+
+            let operand = match argument {
+                ast::Expr::Subscript(subscript) => subscript.slice.as_ref(),
+                ast::Expr::Starred(starred) => starred.value.as_ref(),
+                _ => return argument_ty,
+            };
+
+            if self.expression_type(operand).is_unknown() {
+                argument_ty
+            } else {
+                Type::SpecialForm(SpecialFormType::Unpack)
+            }
+        };
+
+        let ast::Expr::Tuple(tuple) = slice else {
+            return recover_argument(slice, slice_ty);
+        };
+        let tuple_spec = slice_ty.exact_tuple_instance_spec(self.db());
+        let Some(Tuple::Fixed(argument_types)) = tuple_spec.as_deref() else {
+            return slice_ty;
+        };
+        if tuple.elts.len() != argument_types.elements_slice().len() {
+            return slice_ty;
+        }
+
+        Type::heterogeneous_tuple(
+            self.db(),
+            tuple
+                .elts
+                .iter()
+                .zip(argument_types.elements_slice())
+                .map(|(argument, argument_ty)| recover_argument(argument, *argument_ty)),
+        )
     }
 
     pub(super) fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
@@ -2243,6 +2272,13 @@ fn infer_legacy_generic_subscript<'db>(
     match legacy_generic_class_context(db, index, file_scope_id, typevar_binding_context, slice_ty)
     {
         Ok(context) => Ok(Type::KnownInstance(wrap_ok(context))),
+        // An `Unknown` argument is the recovery type for a more specific diagnostic emitted while
+        // inferring the argument, such as an unresolved reference in `Unpack[Missing]`.
+        Err(LegacyGenericContextError::InvalidArgument(argument_ty))
+            if argument_ty.is_unknown() =>
+        {
+            Ok(Type::unknown())
+        }
         Err(LegacyGenericContextError::InvalidArgument(argument_ty)) => Err(SubscriptError::new(
             Type::unknown(),
             SubscriptErrorKind::InvalidLegacyGenericArgument {

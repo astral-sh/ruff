@@ -138,9 +138,6 @@ Ts = TypeVarTuple("Ts")
 
 class Pair(Generic[Unpack[Ts], U]): ...
 
-# error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
-class InvalidGeneric(Generic[U, Unpack[int]]): ...
-
 def invalid(
     # error: [invalid-type-form] "`Unpack` can only unpack a tuple type or `TypeVarTuple`"
     non_tuple: Pair[Unpack[int], str],
