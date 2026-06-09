@@ -2907,6 +2907,36 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
+        fn callable_dunder_get_result<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            callable: CallableType<'db>,
+            instance: Option<Type<'db>>,
+            owner: Type<'db>,
+        ) -> Option<(Type<'db>, AttributeKind)> {
+            if callable.is_staticmethod_like(db) {
+                return Some((ty, AttributeKind::NormalOrNonDataDescriptor));
+            }
+
+            if callable.is_function_like(db) || callable.is_classmethod_like(db) {
+                return if instance.is_none() && callable.is_function_like(db) {
+                    Some((ty, AttributeKind::NormalOrNonDataDescriptor))
+                } else {
+                    let self_type = instance.unwrap_or_else(|| {
+                        // For classmethod-like callables, bind to the owner class.
+                        owner.to_instance(db).unwrap_or(owner)
+                    });
+
+                    Some((
+                        Type::Callable(callable.bind_self(db, Some(self_type))),
+                        AttributeKind::NormalOrNonDataDescriptor,
+                    ))
+                };
+            }
+
+            None
+        }
+
         #[salsa::tracked(cycle_initial=|_, _, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
         fn try_call_dunder_get_inner<'db>(
             db: &'db dyn Db,
@@ -2918,38 +2948,10 @@ impl<'db> Type<'db> {
                 return fallback.try_call_dunder_get(db, instance, owner);
             }
 
-            match ty {
-                Type::Callable(callable) if callable.is_staticmethod_like(db) => {
-                    // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
-                    // The underlying function is returned as-is, without binding self.
-                    return Some((ty, AttributeKind::NormalOrNonDataDescriptor));
-                }
-                Type::Callable(callable)
-                    if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
-                {
-                    // For "function-like" or "classmethod-like" callables, model the behavior of
-                    // `FunctionType.__get__` or `classmethod.__get__`.
-                    //
-                    // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
-                    // we should instead return a new method-wrapper type variant for the synthesized `__get__`
-                    // method of these synthesized functions. The method-wrapper would then be returned from
-                    // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
-                    // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                    return if instance.is_none() && callable.is_function_like(db) {
-                        Some((ty, AttributeKind::NormalOrNonDataDescriptor))
-                    } else {
-                        let self_type = instance.unwrap_or_else(|| {
-                            // For classmethod-like callables, bind to the owner class.
-                            owner.to_instance(db).unwrap_or(owner)
-                        });
-
-                        Some((
-                            Type::Callable(callable.bind_self(db, Some(self_type))),
-                            AttributeKind::NormalOrNonDataDescriptor,
-                        ))
-                    };
-                }
-                _ => {}
+            if let Type::Callable(callable) = ty
+                && let Some(result) = callable_dunder_get_result(db, ty, callable, instance, owner)
+            {
+                return Some(result);
             }
 
             let descr_get = ty.class_member(db, "__get__".into()).place;
@@ -3007,6 +3009,14 @@ impl<'db> Type<'db> {
             };
 
             return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
+        }
+
+        // Callable descriptors also have fixed binding behavior, so avoid retaining a tracked
+        // query for every callable and access context.
+        if let Type::Callable(callable) = self
+            && let Some(result) = callable_dunder_get_result(db, self, callable, instance, owner)
+        {
+            return Some(result);
         }
 
         try_call_dunder_get_inner(db, self, instance, owner)
