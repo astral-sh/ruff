@@ -1,7 +1,7 @@
 from _typeshed import StrOrBytesPath
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
-from typing import TypeAlias
+from typing import ClassVar, TypeAlias
 
 from _remote_debugging import AwaitedInfo, FrameInfo, InterpreterInfo, LocationInfo
 
@@ -15,6 +15,7 @@ def filter_internal_frames(frames: Sequence[_Frame]) -> list[_Frame]: ...
 def iter_async_frames(awaited_info_list: Sequence[AwaitedInfo]) -> object: ...
 
 class Collector(ABC):
+    aggregating: ClassVar[bool]  # undocumented
     @abstractmethod
     def collect(
         self, stack_frames: Sequence[InterpreterInfo] | Sequence[AwaitedInfo], timestamps_us: _Timestamps = None
