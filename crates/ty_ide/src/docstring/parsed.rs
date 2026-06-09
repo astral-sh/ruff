@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
+use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::UniversalNewlines;
 use ruff_text_size::TextSize;
@@ -103,6 +104,7 @@ fn parse_blocks<'a>(raw: &'a str, rest_field_lists: &[rest::FieldList]) -> Vec<B
     let mut sections = Vec::new();
     sections.extend(rest_section_candidates(rest_field_lists));
     sections.extend(google_section_candidates(raw));
+    sections.extend(numpy_section_candidates(raw));
     sections.sort_by_key(|section| section.range.start);
     let mut blocks = Vec::new();
     let mut rendered_through = 0;
@@ -467,6 +469,371 @@ fn google_section_block(
     };
 
     Some(SectionBlock::new(items))
+}
+
+fn numpy_section_candidates(raw: &str) -> Vec<SectionCandidate> {
+    let lines = parsed_lines(raw);
+    let mut sections = Vec::new();
+    let mut preformatted_blocks = PreformattedBlockScanner::default();
+    let mut index = 0;
+
+    while index < lines.len() {
+        if preformatted_blocks.consume_preformatted_line(lines[index].text) {
+            index += 1;
+            continue;
+        }
+
+        let Some(header) = parse_numpy_section_header(&lines, index) else {
+            preformatted_blocks.observe_non_preformatted_line(lines[index].text);
+            index += 1;
+            continue;
+        };
+        if header.indent != 0 {
+            index += 1;
+            continue;
+        }
+
+        let (body_end, range_end) = numpy_section_body_end(&lines, header);
+        if let Some(section) = numpy_section_block(
+            header.kind,
+            header.indent,
+            &lines[header.body_start..body_end],
+        ) {
+            sections.push(SectionCandidate {
+                range: header.range_start..range_end,
+                block: section,
+            });
+            index = body_end;
+        } else {
+            index += 1;
+        }
+    }
+
+    sections
+}
+
+fn numpy_section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> (usize, usize) {
+    let mut body_end = header.body_start;
+    let mut range_end = header.range_end;
+    let mut body_preformatted_blocks = PreformattedBlockScanner::default();
+
+    while let Some(line) = lines.get(body_end) {
+        let previous_body = &lines[header.body_start..body_end];
+
+        if line.text.trim().is_empty()
+            && !numpy_blank_line_continues_section(previous_body, &lines[body_end..], header)
+        {
+            break;
+        }
+
+        if body_preformatted_blocks.is_active()
+            && body_preformatted_blocks.consume_preformatted_line(line.text)
+        {
+            range_end = line.end;
+            body_end += 1;
+            continue;
+        }
+
+        if parse_numpy_section_header(lines, body_end)
+            .is_some_and(|next| next.indent <= header.indent)
+        {
+            break;
+        }
+
+        if !line.text.trim().is_empty()
+            && !numpy_line_belongs_to_body(header, line, previous_body, &lines[body_end + 1..])
+        {
+            break;
+        }
+
+        if !body_preformatted_blocks.consume_preformatted_line(line.text) {
+            body_preformatted_blocks.observe_non_preformatted_line(line.text);
+        }
+        range_end = line.end;
+        body_end += 1;
+    }
+
+    (body_end, range_end)
+}
+
+fn numpy_blank_line_continues_section(
+    previous_lines: &[ParsedLine<'_>],
+    lines: &[ParsedLine<'_>],
+    header: NumpySectionHeader,
+) -> bool {
+    let Some((offset, non_blank_line)) = lines
+        .iter()
+        .enumerate()
+        .find(|(_, line)| !line.text.trim().is_empty())
+    else {
+        return false;
+    };
+
+    if parse_numpy_section_header(lines, offset).is_some_and(|next| next.indent <= header.indent) {
+        return false;
+    }
+
+    numpy_line_belongs_to_body(header, non_blank_line, previous_lines, &lines[offset + 1..])
+}
+
+fn numpy_line_belongs_to_body(
+    header: NumpySectionHeader,
+    line: &ParsedLine<'_>,
+    previous_lines: &[ParsedLine<'_>],
+    following_lines: &[ParsedLine<'_>],
+) -> bool {
+    let line_indent = indentation(line.text);
+    if line_indent > header.indent {
+        return true;
+    }
+
+    if line_indent != header.indent {
+        return false;
+    }
+
+    match header.kind {
+        DocstringSectionKind::Parameters | DocstringSectionKind::Attributes => {
+            numpy_named_item_starts(line, following_lines)
+        }
+        DocstringSectionKind::Returns | DocstringSectionKind::Yields => {
+            numpy_return_item_starts(line, previous_lines, following_lines)
+        }
+        DocstringSectionKind::Raises => numpy_raise_item_starts(line, following_lines),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct NumpySectionHeader {
+    kind: DocstringSectionKind,
+    indent: usize,
+    body_start: usize,
+    range_start: usize,
+    range_end: usize,
+}
+
+fn parse_numpy_section_header(
+    lines: &[ParsedLine<'_>],
+    index: usize,
+) -> Option<NumpySectionHeader> {
+    let line = lines.get(index)?;
+    let underline = lines.get(index + 1)?;
+    let indent = indentation(line.text);
+    if indentation(underline.text) != indent || !is_numpy_underline(underline.text) {
+        return None;
+    }
+
+    let kind = parse_numpy_header(line.text)?;
+    Some(NumpySectionHeader {
+        kind,
+        indent,
+        body_start: index + 2,
+        range_start: line.start,
+        range_end: underline.end,
+    })
+}
+
+fn parse_numpy_header(line: &str) -> Option<DocstringSectionKind> {
+    match line.trim().to_ascii_lowercase().as_str() {
+        "parameters" => Some(DocstringSectionKind::Parameters),
+        "attributes" => Some(DocstringSectionKind::Attributes),
+        "returns" | "return" => Some(DocstringSectionKind::Returns),
+        "yields" | "yield" => Some(DocstringSectionKind::Yields),
+        "raises" | "raise" => Some(DocstringSectionKind::Raises),
+        _ => None,
+    }
+}
+
+fn is_numpy_underline(line: &str) -> bool {
+    let line = line.trim();
+    line.len() >= 3 && line.chars().all(|char| char == '-')
+}
+
+fn numpy_section_block(
+    kind: DocstringSectionKind,
+    indent: usize,
+    body: &[ParsedLine<'_>],
+) -> Option<SectionBlock> {
+    let items = match kind {
+        DocstringSectionKind::Parameters | DocstringSectionKind::Attributes => {
+            parse_named_items(kind, body, |line| parse_numpy_named_item(kind, line))?
+        }
+        DocstringSectionKind::Returns | DocstringSectionKind::Yields => {
+            parse_numpy_return_items(kind, body, indent)?
+        }
+        DocstringSectionKind::Raises => parse_named_items(kind, body, parse_numpy_raise_item)?,
+    };
+
+    Some(SectionBlock::new(items))
+}
+
+fn numpy_named_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
+    let trimmed = line.text.trim();
+    split_numpy_type_separator(trimmed).is_some()
+        || numpy_untyped_item_starts(trimmed, line, following_lines)
+}
+
+fn numpy_untyped_item_starts(
+    trimmed: &str,
+    line: &ParsedLine<'_>,
+    following_lines: &[ParsedLine<'_>],
+) -> bool {
+    is_numpy_item_name(trimmed)
+        && following_lines
+            .iter()
+            .find(|line| !line.text.trim().is_empty())
+            .is_some_and(|next| indentation(next.text) > indentation(line.text))
+}
+
+fn parse_numpy_named_item(kind: DocstringSectionKind, line: &str) -> Option<SectionItemBuilder> {
+    let (name, ty) = split_numpy_type_separator(line).map_or_else(
+        || is_numpy_item_name(line.trim()).then_some((line.trim(), None)),
+        |(name, ty)| Some((name, Some(ty))),
+    )?;
+
+    Some(SectionItemBuilder {
+        display_name: Some(name.to_string()),
+        lookup_name: (kind == DocstringSectionKind::Parameters)
+            .then(|| numpy_parameter_lookup_name(name))
+            .flatten(),
+        ty: ty.map(str::to_string),
+        description_lines: Vec::new(),
+    })
+}
+
+fn numpy_parameter_lookup_name(display_name: &str) -> Option<String> {
+    comma_separated_lookup_names(display_name)
+        .into_iter()
+        .next()
+}
+
+fn parse_numpy_return_items(
+    kind: DocstringSectionKind,
+    body: &[ParsedLine<'_>],
+    section_indent: usize,
+) -> Option<Vec<SectionItem>> {
+    let first = body.iter().find(|line| !line.text.trim().is_empty())?;
+    if indentation(first.text) != section_indent {
+        return None;
+    }
+
+    parse_named_items(kind, body, parse_numpy_return_item)
+}
+
+fn numpy_return_item_starts(
+    line: &ParsedLine<'_>,
+    previous_lines: &[ParsedLine<'_>],
+    following_lines: &[ParsedLine<'_>],
+) -> bool {
+    let trimmed = line.text.trim();
+    parse_numpy_named_return_item(trimmed).is_some()
+        || (!previous_lines
+            .iter()
+            .any(|line| !line.text.trim().is_empty())
+            && is_numpy_anonymous_return_type(trimmed))
+        || (is_numpy_anonymous_return_type(trimmed)
+            && following_lines
+                .iter()
+                .find(|line| !line.text.trim().is_empty())
+                .is_some_and(|next| indentation(next.text) > indentation(line.text)))
+}
+
+fn parse_numpy_return_item(line: &str) -> Option<SectionItemBuilder> {
+    parse_numpy_named_return_item(line).or_else(|| {
+        is_numpy_anonymous_return_type(line).then(|| SectionItemBuilder {
+            display_name: None,
+            lookup_name: None,
+            ty: Some(line.to_string()),
+            description_lines: Vec::new(),
+        })
+    })
+}
+
+fn parse_numpy_named_return_item(line: &str) -> Option<SectionItemBuilder> {
+    let (name, ty) = split_numpy_type_separator(line)?;
+
+    Some(SectionItemBuilder {
+        display_name: Some(name.to_string()),
+        lookup_name: None,
+        ty: Some(ty.to_string()),
+        description_lines: Vec::new(),
+    })
+}
+
+fn is_numpy_anonymous_return_type(line: &str) -> bool {
+    !line.is_empty()
+        && !line.ends_with('.')
+        && !line.ends_with(':')
+        && (is_structured_return_type(line) || is_numpy_prose_return_type(line))
+}
+
+fn is_numpy_prose_return_type(line: &str) -> bool {
+    line.chars()
+        .next()
+        .is_some_and(|char| char.is_ascii_lowercase())
+        && line
+            .chars()
+            .all(|char| char.is_ascii_alphanumeric() || matches!(char, '_' | '-' | '.' | ' '))
+}
+
+fn numpy_raise_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
+    let trimmed = line.text.trim();
+    parse_numpy_raise_item(trimmed).is_some_and(|item| !item.description_lines.is_empty())
+        || numpy_untyped_item_starts(trimmed, line, following_lines)
+}
+
+fn parse_numpy_raise_item(line: &str) -> Option<SectionItemBuilder> {
+    let (name, description) = line
+        .split_once(':')
+        .map_or((line.trim(), None), |(name, description)| {
+            (name.trim(), Some(description.trim()))
+        });
+    if !is_numpy_item_name(name) {
+        return None;
+    }
+
+    Some(SectionItemBuilder {
+        display_name: Some(name.to_string()),
+        lookup_name: None,
+        ty: None,
+        description_lines: description
+            .filter(|description| !description.is_empty())
+            .map(DescriptionLine::normalized)
+            .into_iter()
+            .collect(),
+    })
+}
+
+fn split_numpy_type_separator(line: &str) -> Option<(&str, &str)> {
+    let (name, ty) = split_once_unbracketed_colon(line)?;
+    if !name.chars().last().is_some_and(char::is_whitespace)
+        && !ty.chars().next().is_some_and(char::is_whitespace)
+    {
+        return None;
+    }
+
+    let name = name.trim();
+    let ty = ty.trim();
+    if !is_numpy_item_name(name) || ty.is_empty() {
+        return None;
+    }
+
+    Some((name, ty))
+}
+
+fn is_numpy_item_name(name: &str) -> bool {
+    name.split(',').all(|part| {
+        let part = part.trim();
+        let part = part
+            .strip_prefix("**")
+            .or_else(|| part.strip_prefix('*'))
+            .unwrap_or(part);
+
+        !part.is_empty() && part.split('.').all(is_numpy_name_part)
+    })
+}
+
+fn is_numpy_name_part(part: &str) -> bool {
+    is_identifier(part)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1648,6 +2015,152 @@ Args:
 Args:
     nested = 1
         ```
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+    }
+
+    #[test]
+    fn numpy_sections_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+Parameters
+----------
+value, alias : str
+    The value.
+other
+    Another value.
+
+Returns
+-------
+result : bool
+    Whether validation passed.
+
+Yields
+------
+int
+    Next value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value, alias` (`str`): The value.
+        `other`: Another value.
+
+        ## Returns
+        `result` (`bool`): Whether validation passed.
+
+        ## Yields
+        `int`: Next value.
+        ");
+
+        let parameters = parsed.parameter_documentation();
+        assert_eq!(parameters.len(), 3);
+        assert_eq!(parameters[0].name, "value");
+        assert_eq!(parameters[0].description, "The value.");
+        assert_eq!(parameters[1].name, "alias");
+        assert_eq!(parameters[1].description, "The value.");
+        assert_eq!(parameters[2].name, "other");
+        assert_eq!(parameters[2].description, "Another value.");
+
+        let docstring = "\
+Summary.
+
+Parameters
+----------
+value: str
+    The value.
+
+Returns
+-------
+result: bool
+    Whether validation passed.
+
+Yields
+------
+item: int
+    Next value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value` (`str`): The value.
+
+        ## Returns
+        `result` (`bool`): Whether validation passed.
+
+        ## Yields
+        `item` (`int`): Next value.
+        ");
+
+        let parameters = parsed.parameter_documentation();
+        assert_eq!(parameters.len(), 1);
+        assert_eq!(parameters[0].name, "value");
+        assert_eq!(parameters[0].description, "The value.");
+
+        let docstring = "\
+Summary.
+
+Returns
+-------
+list of int
+    Primary values.
+list of node-like
+    Related nodes.
+
+Yields
+------
+str
+    Next label.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Returns
+        `list of int`: Primary values.
+        `list of node-like`: Related nodes.
+
+        ## Yields
+        `str`: Next label.
+        ");
+    }
+
+    #[test]
+    fn unsupported_numpy_sections_stay_raw() {
+        let docstring = "\
+Summary.
+
+Returns
+-------
+    The created object.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+    }
+
+    #[test]
+    fn indented_sections_stay_raw() {
+        let docstring = "\
+Summary.
+
+    Args:
+        value: The value.
+
+    Parameters
+    ----------
+    other : str
+        Another value.
 ";
         let parsed = ParsedDocstring::parse(docstring);
 
