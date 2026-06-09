@@ -11,9 +11,9 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, definite_sequence_pattern_type, exact_sequence_pattern_type,
-    infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -1989,6 +1989,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 Type::instance(self.db, class.top_materialization(self.db))
                     .negate_if(self.db, !is_positive)
             }
+            Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                callable_pattern_type(self.db).negate_if(self.db, !is_positive)
+            }
             dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,
         };
@@ -2052,6 +2055,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 match infer_same_file_expression_type(self.db, *cls, TypeContext::default()) {
                     Type::ClassLiteral(class) => {
                         Type::instance(self.db, class.top_materialization(self.db))
+                    }
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        callable_pattern_type(self.db)
                     }
                     _ => Type::object(),
                 }
