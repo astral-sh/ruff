@@ -384,7 +384,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
-            (rec @ Type::Recursive(_), _, _) | (_, rec @ Type::Recursive(_), _) => Some(rec),
+            (rec @ Type::Recursive(recursive), _, _)
+                if recursive.is_non_contractive(db) || recursive.is_implicit(db) =>
+            {
+                Some(rec)
+            }
+            (_, rec @ Type::Recursive(recursive), _)
+                if recursive.is_non_contractive(db) || recursive.is_implicit(db) =>
+            {
+                Some(rec)
+            }
+            (Type::Recursive(recursive), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    recursive.unfold(db),
+                    rhs,
+                    op,
+                    visitor,
+                )
+            }),
+
+            (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    lhs,
+                    recursive.unfold(db),
+                    op,
+                    visitor,
+                )
+            }),
 
             (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),

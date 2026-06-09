@@ -272,9 +272,16 @@ impl<'db> AllMembers<'db> {
                 }
             },
 
+            Type::Recursive(rec) if rec.is_non_contractive(db) => {
+                self.extend_with_type(db, Type::object());
+            }
+
+            Type::Recursive(rec) => {
+                self.extend_with_type(db, rec.unfold(db));
+            }
+
             Type::Dynamic(_)
             | Type::Divergent(_)
-            | Type::Recursive(_)
             | Type::Never
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy

@@ -5358,6 +5358,7 @@ impl<'db> Type<'db> {
         };
 
         match self {
+            Type::TypeAlias(alias) => alias.value_type(db).generator_types(db),
             Type::NominalInstance(instance) => {
                 instance.class(db).iter_mro(db).find_map(from_class_base)
             }
@@ -5438,6 +5439,9 @@ impl<'db> Type<'db> {
                     send_ty: send_builder.map(IntersectionBuilder::build),
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
+            }
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.unfold(db).generator_types(db)
             }
             ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
                 Some(GeneratorTypes {
