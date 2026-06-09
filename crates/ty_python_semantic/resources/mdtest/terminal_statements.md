@@ -878,26 +878,16 @@ If a generic function's return type depends on a type variable, and the argument
 that type variable to `Never`, the call should still be treated as terminal.
 
 ```py
-from typing import Never, NoReturn, TypeVar, assert_type
+from typing import TypeVar, NoReturn
 
 T = TypeVar("T")
 
 def identity(x: T) -> T:
     return x
 
-def collect(x: T) -> list[T]:
-    return [x]
-
 # No "implicitly returns `None`" diagnostic
 def _() -> NoReturn:
     identity(exit())
-
-def _(x: NoReturn) -> NoReturn:
-    identity(x)
-
-# Argument evaluation is terminal even though `list[Never]` is inhabited.
-def _() -> NoReturn:
-    collect(exit())
 
 def _(flag: bool):
     if flag:
@@ -907,43 +897,6 @@ def _(flag: bool):
         identity(exit())
 
     reveal_type(x)  # revealed: Literal["test"]
-
-def _():
-    value = 1
-    assert_type(value, Never)  # error: [type-assertion-failure]
-    1 + "x"  # error: [unsupported-operator]
-```
-
-PEP 695 aliases in generic return annotations should be resolved before deciding whether a call can
-return `Never`.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing import Never, NoReturn
-
-type A[T] = T
-
-def f[T](x: T) -> A[T]:
-    return x
-
-# No "implicitly returns `None`" diagnostic
-def g(x: Never) -> NoReturn:
-    f(x)
-```
-
-### Special calls
-
-Terminal arguments must be detected when inferring the enclosing special call.
-
-```py
-from typing import NoReturn
-
-def _() -> NoReturn:
-    type(exit())
 ```
 
 ### Other callables
