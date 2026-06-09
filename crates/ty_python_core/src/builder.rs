@@ -247,6 +247,8 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     generator_functions: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
+    /// Symbols in lazy enclosing scopes that are actually referenced by a nested scope.
+    used_lazy_captures: FxHashSet<(FileScopeId, ScopedSymbolId)>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -296,6 +298,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
+            used_lazy_captures: FxHashSet::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -541,7 +544,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn bound_scope(&self, enclosing_scope: FileScopeId, symbol: &Symbol) -> Option<FileScopeId> {
+    fn bound_scope(&self, enclosing_scope: FileScopeId, name: &str) -> Option<FileScopeId> {
         self.scope_stack
             .iter()
             .rev()
@@ -549,9 +552,20 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .find_map(|scope_info| {
                 let scope_id = scope_info.file_scope_id;
                 let place_table = &self.place_tables[scope_id];
-                let place_id = place_table.symbol_id(symbol.name())?;
+                let place_id = place_table.symbol_id(name)?;
                 place_table.place(place_id).is_bound().then_some(scope_id)
             })
+    }
+
+    fn scope_and_descendant_ids(
+        &self,
+        scope_id: FileScopeId,
+    ) -> impl Iterator<Item = FileScopeId> + '_ {
+        let descendants = self.scopes[scope_id].descendants();
+
+        std::iter::once(scope_id).chain(
+            (descendants.start.as_u32()..descendants.end.as_u32()).map(FileScopeId::from_u32),
+        )
     }
 
     // Records snapshots of the place states visible from the current lazy scope.
@@ -563,6 +577,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
+                let nested_symbol_name = nested_symbol.name();
+
                 // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
                 // forwarding declarations here; `snapshot_enclosing_state` stores only a
                 // constraint for those symbols. Also, if the enclosing scope allows its members to
@@ -577,8 +593,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Note that even if this place is bound in the popped scope,
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
-                let Some(enclosed_symbol_id) =
-                    enclosing_place_table.symbol_id(nested_symbol.name())
+                let Some(enclosed_symbol_id) = enclosing_place_table.symbol_id(nested_symbol_name)
                 else {
                     continue;
                 };
@@ -586,7 +601,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if !enclosing_place.is_bound() {
                     // If the bound scope of a place can be modified from elsewhere, the snapshot will not be recorded.
                     if self
-                        .bound_scope(enclosing_scope_id, nested_symbol)
+                        .bound_scope(enclosing_scope_id, nested_symbol_name.as_str())
                         .is_none_or(|scope| self.scopes[scope].visibility().is_public())
                     {
                         continue;
@@ -675,6 +690,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 {
                     self.use_def_maps[key.enclosing_scope]
                         .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
+
+                    if self
+                        .used_lazy_captures
+                        .contains(&(key.enclosing_scope, enclosing_symbol))
+                    {
+                        self.use_def_maps[key.enclosing_scope]
+                            .mark_symbol_bindings_used(enclosing_symbol);
+                    }
                 }
             }
         }
@@ -727,52 +750,49 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
-    /// Marks bindings in enclosing scopes as used when a nested scope resolves a reference to them.
+    /// Marks outer bindings captured by the popped scope or any descendant scope as used.
     ///
-    /// This reuses enclosing-snapshot data so lazy scopes account for later reassignments that can
-    /// also reach the nested reference.
-    fn mark_captured_bindings_used(&mut self) {
-        let mut resolved_scopes_by_nested_symbol =
-            FxHashMap::<(FileScopeId, ScopedSymbolId), Option<FileScopeId>>::default();
+    /// For lazy popped scopes, later reassignments can still reach the captured reference, so we
+    /// remember the captured symbol and mark future live bindings in `update_lazy_snapshots`.
+    fn mark_captured_bindings_used(
+        &mut self,
+        popped_scope_id: FileScopeId,
+        popped_scope_laziness: ScopeLaziness,
+    ) {
+        let mut used_captures = Vec::new();
 
-        let mut snapshots_to_mark = Vec::new();
+        for free_symbol_scope in self.scope_and_descendant_ids(popped_scope_id) {
+            for free_symbol in self.place_tables[free_symbol_scope].symbols() {
+                if !free_symbol.is_used() || free_symbol.is_local() || free_symbol.is_global() {
+                    continue;
+                }
 
-        for (&key, &snapshot_id) in &self.enclosing_snapshots {
-            let ScopedPlaceId::Symbol(enclosing_symbol_id) = key.enclosing_place else {
-                continue;
-            };
+                let name = free_symbol.name();
+                let Some(enclosing_scope_id) =
+                    self.resolve_nested_reference_scope(free_symbol_scope, name.as_str())
+                else {
+                    continue;
+                };
+                let Some(enclosing_symbol_id) =
+                    self.place_tables[enclosing_scope_id].symbol_id(name)
+                else {
+                    continue;
+                };
 
-            let enclosing_symbol =
-                self.place_tables[key.enclosing_scope].symbol(enclosing_symbol_id);
-            let nested_place_table = &self.place_tables[key.nested_scope];
-
-            let Some(nested_symbol_id) =
-                nested_place_table.symbol_id(enclosing_symbol.name().as_str())
-            else {
-                continue;
-            };
-
-            let nested_symbol = nested_place_table.symbol(nested_symbol_id);
-            if !nested_symbol.is_used() || nested_symbol.is_local() || nested_symbol.is_global() {
-                continue;
-            }
-
-            let resolved_scope = *resolved_scopes_by_nested_symbol
-                .entry((key.nested_scope, nested_symbol_id))
-                .or_insert_with(|| {
-                    self.resolve_nested_reference_scope(
-                        key.nested_scope,
-                        enclosing_symbol.name().as_str(),
-                    )
-                });
-
-            if resolved_scope == Some(key.enclosing_scope) {
-                snapshots_to_mark.push((key.enclosing_scope, snapshot_id));
+                used_captures.push((enclosing_scope_id, enclosing_symbol_id));
             }
         }
 
-        for (scope_id, snapshot_id) in snapshots_to_mark {
-            self.use_def_maps[scope_id].mark_enclosing_snapshot_bindings_used(snapshot_id);
+        used_captures.sort_unstable();
+        used_captures.dedup();
+
+        for (enclosing_scope_id, enclosing_symbol_id) in used_captures {
+            self.use_def_maps[enclosing_scope_id].mark_symbol_bindings_used(enclosing_symbol_id);
+
+            if popped_scope_laziness.is_lazy() {
+                self.used_lazy_captures
+                    .insert((enclosing_scope_id, enclosing_symbol_id));
+            }
         }
     }
 
@@ -800,11 +820,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         popped_scope.extend_descendants(children_end);
         let popped_scope_kind = popped_scope.kind();
 
-        if popped_scope.is_eager() {
+        let popped_scope_laziness = popped_scope.kind().laziness();
+
+        if popped_scope_laziness.is_eager() {
             self.record_eager_snapshots(popped_scope_id);
         } else {
             self.record_lazy_snapshots(popped_scope_id);
         }
+        self.mark_captured_bindings_used(popped_scope_id, popped_scope_laziness);
 
         // If we've popped the module scope, there is no enclosing scope that needs our nested
         // bindings. Short-circuit here and return an empty map.
@@ -2438,7 +2461,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.mark_captured_bindings_used();
         self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
