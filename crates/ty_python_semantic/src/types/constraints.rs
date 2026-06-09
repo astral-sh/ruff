@@ -1484,18 +1484,12 @@ impl ConstraintId {
             return IntersectionResult::CannotSimplify;
         }
 
-        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
-        let lower = match (self_constraint.bounds.lower, other_constraint.bounds.lower) {
-            (Some(left), Some(right)) => Some(UnionType::from_two_elements(db, left, right)),
-            (Some(lower), None) | (None, Some(lower)) => Some(lower),
-            (None, None) => None,
-        };
+        let lower_bounds = (self_constraint.bounds.lower, other_constraint.bounds.lower);
         let upper = match (self_constraint.bounds.upper, other_constraint.bounds.upper) {
             (Some(left), Some(right)) => Some(IntersectionType::from_two_elements(db, left, right)),
             (Some(upper), None) | (None, Some(upper)) => Some(upper),
             (None, None) => None,
         };
-        let effective_lower = lower.unwrap_or(Type::Never);
         let effective_upper = upper.unwrap_or(Type::object());
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
@@ -1504,17 +1498,51 @@ impl ConstraintId {
         // rather than a universal check ("is `lower ≤ upper` for *all* assignments?"), because the
         // bounds may mention typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable
         // when `int ≤ T`, even though it's not universally true for all `T`.
-        let when = effective_lower.when_constraint_set_assignable_to_owned(db, effective_upper);
-        let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
+        let is_never_satisfied = match lower_bounds {
+            (Some(left), Some(right)) => {
+                let constraints = ConstraintSetBuilder::new();
+                let mut when =
+                    left.when_constraint_set_assignable_to(db, effective_upper, &constraints);
+                let right_when =
+                    right.when_constraint_set_assignable_to(db, effective_upper, &constraints);
+                when = when.intersect(db, &constraints, right_when);
+                when.is_never_satisfied(db)
+            }
+            (Some(lower), None) | (None, Some(lower)) => {
+                let when = lower.when_constraint_set_assignable_to_owned(db, effective_upper);
+                when.query(|_builder, when| when.is_never_satisfied(db))
+            }
+            (None, None) => false,
+        };
         if is_never_satisfied {
             return IntersectionResult::Disjoint;
         }
 
+        // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂)).
+        //
+        // We do not retain lower bounds that are unions, so avoid materializing a union only to
+        // discard it below. Preserve the cases where the union collapses to one of its elements.
+        let lower = match lower_bounds {
+            (Some(left), Some(right)) if left == right => Some(left),
+            (Some(left), Some(right)) if left.is_never() => Some(right),
+            (Some(left), Some(right)) if right.is_never() => Some(left),
+            (Some(left), Some(right)) if left.is_object() || right.is_object() => {
+                Some(Type::object())
+            }
+            (Some(left), Some(right)) if left.is_constraint_set_assignable_to(db, right) => {
+                Some(right)
+            }
+            (Some(left), Some(right)) if right.is_constraint_set_assignable_to(db, left) => {
+                Some(left)
+            }
+            (Some(_), Some(_)) => return IntersectionResult::CannotSimplify,
+            (Some(lower), None) | (None, Some(lower)) => Some(lower),
+            (None, None) => None,
+        };
+
         // We do not create lower bounds that are unions, or upper bounds that are intersections,
         // since those can be broken apart into BDDs over simpler constraints.
-        if lower.is_some_and(Type::is_union)
-            || upper.is_some_and(|upper| upper.is_nontrivial_intersection(db))
-        {
+        if upper.is_some_and(|upper| upper.is_nontrivial_intersection(db)) {
             return IntersectionResult::CannotSimplify;
         }
 
