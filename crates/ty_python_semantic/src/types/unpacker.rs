@@ -336,7 +336,7 @@ impl<'db> UnpackResult<'db> {
     ) -> Self {
         for (expr, ty) in &mut self.targets {
             let previous_ty = previous_cycle_result.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, Some(previous_ty), cycle);
         }
 
         self

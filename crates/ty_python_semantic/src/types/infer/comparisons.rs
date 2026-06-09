@@ -279,12 +279,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // Mirror the `Type::TypeAlias` arms for an opaque μ-binder: compare the one-step unfold,
         // keyed on the pre-unfold pair so the visitor breaks the recursion.
         (Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
-            let unfolded = rec.unfold_preserving_binder(db);
+            let unfolded = rec.unfold(db);
             infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
         })),
 
         (left, Type::Recursive(rec)) => Some(visitor.visit((left, op, right), || {
-            let unfolded = rec.unfold_preserving_binder(db);
+            let unfolded = rec.unfold(db);
             infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
         })),
 

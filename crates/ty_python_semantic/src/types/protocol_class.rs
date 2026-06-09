@@ -559,24 +559,24 @@ impl<'db> ProtocolMemberKind<'db> {
             }
             (Self::Property(curr), Self::Property(prev)) => {
                 let getter = match (curr.getter(db), prev.getter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
+                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
                     (None, _) => None,
                 };
                 let setter = match (curr.setter(db), prev.setter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
+                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
                     (None, _) => None,
                 };
                 let deleter = match (curr.deleter(db), prev.deleter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, prev, cycle)),
-                    (Some(curr), None) => Some(curr.recursive_type_normalized(db, cycle)),
+                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
+                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
                     (None, _) => None,
                 };
                 Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))
             }
             (Self::Other(curr), Self::Other(prev)) => {
-                Self::Other(curr.cycle_normalized(db, *prev, cycle))
+                Self::Other(curr.cycle_normalized(db, Some(*prev), cycle))
             }
             _ => {
                 debug_assert!(matches!(previous, Self::Other(ty) if ty.is_divergent()));

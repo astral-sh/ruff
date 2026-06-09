@@ -197,13 +197,6 @@ impl<'db> PEP695TypeAliasType<'db> {
         let raw = self.raw_value_type(db);
         let origin = RecursiveOrigin::TypeAlias(crate::types::TypeAliasType::PEP695(self));
         if origin.contains_in_type(db, raw) {
-            let Some(builder) = origin.builder(db) else {
-                return expand_top_level_union_aliases(
-                    db,
-                    self.apply_function_specialization(db, raw),
-                    crate::types::TypeAliasType::PEP695(self),
-                );
-            };
             // Fold self-references to `Divergent(binder_id)` on the *raw* body **before** applying
             // the alias's own specialization. The fold matches recursive references by definition
             // (any specialization), so the folded body contains no `Type::TypeAlias(self)` node.
@@ -213,19 +206,30 @@ impl<'db> PEP695TypeAliasType<'db> {
             // argument is a *deeper* specialization (`A[T | A[T]]`, `A[Concatenate[int, P]]`),
             // recomputes `value_type` for it, and never reaches a fixed point — the type-argument
             // proliferation that hangs/overflows on generic recursive aliases.
-            let folded_raw = builder.fold_type(db, raw);
-            let body = self.apply_function_specialization(db, folded_raw);
-            let binder_id = builder.binder_id();
-            let simplified = strip_top_level_divergent(db, body, binder_id);
-            builder.finish(
-                db,
-                simplified,
-                expand_top_level_union_aliases(
-                    db,
-                    simplified,
-                    crate::types::TypeAliasType::PEP695(self),
-                ),
-            )
+            origin
+                .build_recursive(db, |binder_id, type_mapping, visitor| {
+                    let folded_raw = raw.apply_type_mapping_impl(
+                        db,
+                        &type_mapping,
+                        TypeContext::default(),
+                        visitor,
+                    );
+                    let body = self.apply_function_specialization(db, folded_raw);
+                    let simplified = strip_top_level_divergent(db, body, binder_id);
+                    let fallback = expand_top_level_union_aliases(
+                        db,
+                        simplified,
+                        crate::types::TypeAliasType::PEP695(self),
+                    );
+                    (simplified, fallback)
+                })
+                .unwrap_or_else(|| {
+                    expand_top_level_union_aliases(
+                        db,
+                        self.apply_function_specialization(db, raw),
+                        crate::types::TypeAliasType::PEP695(self),
+                    )
+                })
         } else {
             expand_top_level_union_aliases(
                 db,
@@ -240,7 +244,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, Some(*previous), cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -358,7 +362,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
-            value.cycle_normalized(db, *previous, cycle)
+            value.cycle_normalized(db, Some(*previous), cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]

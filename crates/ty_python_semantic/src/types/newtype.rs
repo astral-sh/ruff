@@ -2,7 +2,7 @@ use crate::Db;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{
-    ClassType, KnownUnion, RecursiveOrigin, Type, definition_expression_type, visitor,
+    ClassType, KnownUnion, RecursiveOrigin, Type, TypeContext, definition_expression_type, visitor,
 };
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
@@ -216,22 +216,23 @@ fn newtype_recursive_type<'db>(db: &'db dyn Db, newtype: NewType<'db>) -> Type<'
     if !origin.contains_in_type(db, base_ty) {
         return Type::NewTypeInstance(newtype);
     }
-    let Some(builder) = origin.builder(db) else {
-        return Type::NewTypeInstance(newtype);
-    };
-
-    let Type::NominalInstance(mapped_base) = builder.fold_type(db, base_ty) else {
-        return Type::NewTypeInstance(newtype);
-    };
-
-    let body_newtype = NewType::new(
-        db,
-        newtype.name(db).clone(),
-        newtype.definition(db),
-        Some(NewTypeBase::ClassType(mapped_base.class(db))),
-    );
-    let body = Type::NewTypeInstance(body_newtype);
-    builder.finish(db, body, Type::NewTypeInstance(newtype))
+    origin
+        .build_recursive(db, |_binder_id, type_mapping, visitor| {
+            let body = if let Type::NominalInstance(mapped_base) =
+                base_ty.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
+            {
+                Type::NewTypeInstance(NewType::new(
+                    db,
+                    newtype.name(db).clone(),
+                    newtype.definition(db),
+                    Some(NewTypeBase::ClassType(mapped_base.class(db))),
+                ))
+            } else {
+                Type::NewTypeInstance(newtype)
+            };
+            (body, Type::NewTypeInstance(newtype))
+        })
+        .unwrap_or(Type::NewTypeInstance(newtype))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {

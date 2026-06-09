@@ -275,21 +275,26 @@ fn typed_dict_recursive_type_impl<'db>(
         return Type::TypedDict(typed_dict);
     }
 
-    let Some(builder) = origin.builder(db) else {
-        return Type::TypedDict(typed_dict);
-    };
-    let items = typed_dict
-        .items(db)
-        .iter()
-        .map(|(name, field)| {
-            let mut field = field.clone();
-            field.declared_ty = builder.fold_type(db, field.declared_ty);
-            (name.clone(), field)
+    origin
+        .build_recursive(db, |_binder_id, type_mapping, visitor| {
+            let items = typed_dict
+                .items(db)
+                .iter()
+                .map(|(name, field)| {
+                    let mut field = field.clone();
+                    field.declared_ty = field.declared_ty.apply_type_mapping_impl(
+                        db,
+                        &type_mapping,
+                        TypeContext::default(),
+                        visitor,
+                    );
+                    (name.clone(), field)
+                })
+                .collect();
+            let body = Type::TypedDict(TypedDictType::from_schema_items(db, items));
+            (body, Type::TypedDict(typed_dict))
         })
-        .collect();
-
-    let body = Type::TypedDict(TypedDictType::from_schema_items(db, items));
-    builder.finish(db, body, Type::TypedDict(typed_dict))
+        .unwrap_or(Type::TypedDict(typed_dict))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {

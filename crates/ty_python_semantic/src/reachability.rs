@@ -229,7 +229,7 @@ use ty_python_core::{
 #[salsa::tracked(
     cycle_initial = |db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, Some(*previous), cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]
@@ -258,7 +258,7 @@ fn type_narrowed_by_previous_patterns<'db>(
 #[salsa::tracked(
     cycle_initial = |db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, Some(*previous), cycle)
     },
     heap_size = ruff_memory_usage::heap_size
 )]

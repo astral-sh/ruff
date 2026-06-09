@@ -418,7 +418,7 @@ pub(crate) fn infer_expression_type<'db>(
 #[salsa::tracked(
     cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
-        result.cycle_normalized(db, *previous, cycle)
+        result.cycle_normalized(db, Some(*previous), cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -798,7 +798,7 @@ impl<'db> ScopeInference<'db> {
     ) -> ScopeInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, Some(previous_ty), cycle);
         }
 
         self
@@ -969,9 +969,9 @@ impl<'db> DefinitionTypes<'db> {
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
         if let Some(previous_ty) = previous.declaration_type(definition) {
-            ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
+            ty.map_type(|inner| inner.cycle_normalized(db, Some(previous_ty.inner_type()), cycle))
         } else {
-            ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
+            ty.map_type(|inner| inner.cycle_normalized(db, None, cycle))
         }
     }
 
@@ -1105,8 +1105,8 @@ fn normalize_binding_for_cycle<'db>(
     cycle: &salsa::Cycle,
 ) -> Type<'db> {
     match previous {
-        Some(previous) => binding_ty.cycle_normalized(db, previous, cycle),
-        None => binding_ty.recursive_type_normalized(db, cycle),
+        Some(previous) => binding_ty.cycle_normalized(db, Some(previous), cycle),
+        None => binding_ty.cycle_normalized(db, None, cycle),
     }
 }
 
@@ -1164,7 +1164,7 @@ impl<'db> DefinitionInference<'db> {
     ) -> DefinitionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, Some(previous_ty), cycle);
         }
         self.types =
             std::mem::take(&mut self.types).cycle_normalized(db, &previous_inference.types, cycle);
@@ -1358,16 +1358,16 @@ impl<'db> ExpressionInference<'db> {
                         .iter()
                         .find(|(previous_binding, _)| previous_binding == binding)
                 }) {
-                    *binding_ty = binding_ty.cycle_normalized(db, *previous_binding, cycle);
+                    *binding_ty = binding_ty.cycle_normalized(db, Some(*previous_binding), cycle);
                 } else {
-                    *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
+                    *binding_ty = binding_ty.cycle_normalized(db, None, cycle);
                 }
             }
         }
 
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, Some(previous_ty), cycle);
         }
 
         self
@@ -1520,7 +1520,7 @@ impl<'db> StatementInferenceInner<'db> {
     ) -> StatementInferenceInner<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            *ty = ty.cycle_normalized(db, Some(previous_ty), cycle);
         }
         for (binding, binding_ty) in &mut self.bindings {
             let previous_binding = previous_inference
@@ -1537,11 +1537,11 @@ impl<'db> StatementInferenceInner<'db> {
                 .find(|(previous_declaration, _)| previous_declaration == declaration)
             {
                 *declaration_ty = declaration_ty.map_type(|decl_ty| {
-                    decl_ty.cycle_normalized(db, previous_declaration.inner_type(), cycle)
+                    decl_ty.cycle_normalized(db, Some(previous_declaration.inner_type()), cycle)
                 });
             } else {
                 *declaration_ty =
-                    declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+                    declaration_ty.map_type(|decl_ty| decl_ty.cycle_normalized(db, None, cycle));
             }
         }
 

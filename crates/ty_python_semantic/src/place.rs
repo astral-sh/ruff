@@ -804,7 +804,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // iteration into the current result; after the first couple iterations, the same
             // applies to boundness and qualifiers.
             (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ty: current.ty.cycle_normalized(db, Some(prev.ty), cycle),
                 definedness: if cycle.iteration() <= 1
                     || matches!(
                         (prev.definedness, current.definedness),
@@ -824,7 +824,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
             (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
-                ty: current.ty.recursive_type_normalized(db, cycle),
+                ty: current.ty.cycle_normalized(db, None, cycle),
                 definedness: if cycle.iteration() <= 1 {
                     current.definedness
                 } else {
@@ -846,7 +846,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
-                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        ty: prev.ty.cycle_normalized(db, None, cycle),
                         definedness: Definedness::PossiblyUndefined,
                         ..prev
                     })
@@ -1315,7 +1315,7 @@ impl<'db> LoopHeaderReachability<'db> {
         cycle: &salsa::Cycle,
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
-        // See [`Type::cycle_normalized`] for more details.
+        // See [`Type::recover_salsa_cycle`] for more details.
         let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
             self.reachable_bindings
         } else {

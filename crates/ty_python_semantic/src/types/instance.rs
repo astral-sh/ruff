@@ -24,8 +24,8 @@ use crate::types::signatures::SignatureRelationVisitor;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
-    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, RecursiveOrigin, TypeContext, TypeMapping,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, LiteralValueTypeKind, PropertyInstanceType, RecursiveOrigin,
+    TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -904,23 +904,45 @@ fn protocol_recursive_type_impl<'db>(
     interface: ProtocolInterface<'db>,
 ) -> Type<'db> {
     let origin = RecursiveOrigin::Protocol(protocol);
-    if !interface
-        .members(db)
-        .any(|member| origin.contains_in_protocol_member(db, &member))
-    {
+    let callable_has_origin = |callable: CallableType<'db>| {
+        origin.contains_in_type(db, Type::Callable(callable.bind_self(db, None)))
+    };
+    let accessor_has_origin = |accessor: Type<'db>| match accessor {
+        Type::FunctionLiteral(function) => callable_has_origin(function.into_callable_type(db)),
+        Type::Callable(callable) => callable_has_origin(callable),
+        ty => origin.contains_in_type(db, ty),
+    };
+    let property_has_origin = |property: PropertyInstanceType<'db>| {
+        property.getter(db).is_some_and(accessor_has_origin)
+            || property.setter(db).is_some_and(accessor_has_origin)
+            || property.deleter(db).is_some_and(accessor_has_origin)
+    };
+
+    if !interface.members(db).any(|member| match member.ty() {
+        Type::Callable(callable) => callable_has_origin(callable),
+        Type::PropertyInstance(property) => property_has_origin(property),
+        ty => origin.contains_in_type(db, ty),
+    }) {
         return Type::ProtocolInstance(protocol);
     }
 
-    let Some(builder) = origin.builder(db) else {
-        return Type::ProtocolInstance(protocol);
-    };
-    let mapped_interface = builder.fold_protocol_interface(db, interface);
-    // Preserve class-based protocols when no self-reference was replaced.
-    if mapped_interface == interface {
-        return Type::ProtocolInstance(protocol);
-    }
-    let body = Type::ProtocolInstance(protocol.with_interface(mapped_interface));
-    builder.finish(db, body, Type::ProtocolInstance(protocol))
+    origin
+        .build_recursive(db, |_binder_id, type_mapping, visitor| {
+            let mapped_interface = interface.apply_type_mapping_impl(
+                db,
+                &type_mapping,
+                TypeContext::default(),
+                visitor,
+            );
+            // Preserve class-based protocols when no self-reference was replaced.
+            let body = if mapped_interface == interface {
+                Type::ProtocolInstance(protocol)
+            } else {
+                Type::ProtocolInstance(protocol.with_interface(mapped_interface))
+            };
+            (body, Type::ProtocolInstance(protocol))
+        })
+        .unwrap_or(Type::ProtocolInstance(protocol))
 }
 
 #[salsa::tracked(

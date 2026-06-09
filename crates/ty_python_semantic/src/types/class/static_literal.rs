@@ -3097,7 +3097,7 @@ fn explicit_bases_cycle_fn<'db>(
         current
             .iter()
             .zip(previous.iter())
-            .map(|(curr, prev)| curr.cycle_normalized(db, *prev, cycle))
+            .map(|(curr, prev)| curr.cycle_normalized(db, Some(*prev), cycle))
             .collect()
     } else {
         // The length of bases has changed, presumably because we expanded a starred expression. We
