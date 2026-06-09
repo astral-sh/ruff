@@ -1004,7 +1004,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             // `int | tuple[OptNestedInt, ...] | None`. If no explicit origin is known
             // (implicit recursion from inference cycles), fall back to the body as-is.
             Type::Recursive(r) => r
-                .body_with_origin_marker(self.db)
+                .unfold_with_source_type(self.db)
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
             Type::Never => f.with_type(self.ty).write_str("Never"),
