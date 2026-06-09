@@ -160,7 +160,7 @@ impl<'db> CallableSignature<'db> {
                 if signature.generic_context.is_none()
                     && signature.definition.is_none()
                     && signature.parameters == Parameters::bottom()
-                    && matches!(signature.return_ty, Type::Recursive(rec) if rec.body(db).is_divergent())
+                    && matches!(signature.return_ty, Type::Recursive(rec) if rec.is_non_contractive(db))
         )
     }
 

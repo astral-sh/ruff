@@ -2198,7 +2198,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let expanded = narrowed.expand_eagerly(self.db());
 
                     if expanded.is_divergent()
-                        || matches!(expanded, Type::Recursive(rec) if rec.body(self.db()).is_divergent())
+                        || matches!(expanded, Type::Recursive(rec) if rec.is_non_contractive(self.db()))
                     {
                         expanded
                     } else {
