@@ -191,19 +191,16 @@ impl<'db> SubclassOfType<'db> {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
                 match mapped {
                     Type::Intersection(intersection) => {
-                        let mut builder = IntersectionBuilder::new(db);
-                        let mut found_positive = false;
-                        for element in intersection.positive(db) {
-                            if let Some(meta_type) =
+                        let mut meta_types =
+                            intersection.positive(db).iter().filter_map(|element| {
                                 Self::try_from_positive_instance_constraint(db, *element)
-                            {
-                                builder = builder.add_positive(meta_type);
-                                found_positive = true;
-                            }
-                        }
-                        if !found_positive {
-                            builder = builder.add_positive(KnownClass::Type.to_instance(db));
-                        }
+                            });
+                        let first_meta_type = meta_types
+                            .next()
+                            .unwrap_or_else(|| KnownClass::Type.to_instance(db));
+                        let mut builder = IntersectionBuilder::new(db)
+                            .add_positive(first_meta_type)
+                            .positive_elements(meta_types);
                         for element in intersection.negative(db) {
                             if let Some(meta_type) =
                                 Self::try_from_negative_instance_constraint(db, *element)

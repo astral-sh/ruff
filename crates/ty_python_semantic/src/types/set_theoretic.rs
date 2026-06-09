@@ -796,15 +796,13 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub(super) fn to_instance_for_class_receiver(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        let mut builder = IntersectionBuilder::new(db);
-        let mut found_instance = false;
-
-        for element in self.positive(db) {
-            if let Some(instance) = element.to_instance(db) {
-                builder = builder.add_positive(instance);
-                found_instance = true;
-            }
-        }
+        let mut instances = self
+            .positive(db)
+            .iter()
+            .filter_map(|element| element.to_instance(db));
+        let mut builder = IntersectionBuilder::new(db)
+            .add_positive(instances.next()?)
+            .positive_elements(instances);
 
         for element in self.negative(db) {
             // `~type[B]` excludes `B` and all of its subclasses, so their instances can be
@@ -815,7 +813,7 @@ impl<'db> IntersectionType<'db> {
             }
         }
 
-        found_instance.then(|| builder.build())
+        Some(builder.build())
     }
 
     /// Map a type transformation over all positive elements of the intersection. Leave the

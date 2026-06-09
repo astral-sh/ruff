@@ -3851,12 +3851,10 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                        .to_instance(db)
-                        .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                     let self_instance = receiver
                         .to_instance_for_class_receiver(db)
-                        .unwrap_or(self_instance);
+                        .or_else(|| this.to_instance(db))
+                        .expect("class-object member lookup always has an instance receiver");
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
