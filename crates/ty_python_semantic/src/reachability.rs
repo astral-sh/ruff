@@ -907,10 +907,42 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
 
+            if node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                    return self.narrow(node.if_false, false_accumulated);
+                }
+                if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                    return self.narrow(node.if_true, true_accumulated);
+                }
+
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_ty = self.narrow(node.if_true, true_accumulated);
+
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
+
+                return UnionType::from_two_elements(self.db, true_ty, false_ty);
+            }
+
+            let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    return uncertain_ty;
+                }
+
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
+                return UnionType::from_two_elements(self.db, uncertain_ty, false_ty);
+            }
+
             let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
             let true_ty = self.narrow(node.if_true, true_accumulated);
 
-            let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+            if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                return UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
+            }
 
             let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
             let false_ty = self.narrow(node.if_false, false_accumulated);
