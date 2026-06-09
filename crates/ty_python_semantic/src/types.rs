@@ -82,6 +82,7 @@ use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::recursive::RecursiveOrigin;
+use crate::types::recursive::RecursiveType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
@@ -825,7 +826,7 @@ pub enum Type<'db> {
     /// `RecursiveType` may contain `Type::Divergent(binder_id)` at recursive
     /// positions; α-binding via `binder_id` is what distinguishes one
     /// recursive type from another.
-    Recursive(recursive::RecursiveType<'db>),
+    Recursive(RecursiveType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -981,7 +982,7 @@ impl<'db> Type<'db> {
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
-        Self::Recursive(recursive::RecursiveType::build(db, binder_id, origin, body))
+        Self::Recursive(RecursiveType::build(db, binder_id, origin, body))
     }
 
     pub(crate) fn implicit_recursive(

@@ -1315,7 +1315,7 @@ impl<'db> LoopHeaderReachability<'db> {
         cycle: &salsa::Cycle,
     ) -> LoopHeaderReachability<'db> {
         // Avoid losing precision for cycles that are soon to converge.
-        // See [`Type::recover_salsa_cycle`] for more details.
+        // See [`Type::cycle_normalized`] for more details.
         let reachable_bindings = if cycle.iteration() <= crate::TAINTED_CYCLES {
             self.reachable_bindings
         } else {

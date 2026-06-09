@@ -149,7 +149,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// otherwise return the simplified body directly.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let raw = self.raw_value_type(db);
-        let origin = RecursiveOrigin::TypeAlias(crate::types::TypeAliasType::PEP695(self));
+        let origin = RecursiveOrigin::TypeAlias(TypeAliasType::PEP695(self));
         if origin.contains_in_type(db, raw) {
             // Fold self-references to `Divergent(binder_id)` on the *raw* body **before** applying
             // the alias's own specialization. The fold matches recursive references by definition
@@ -174,7 +174,11 @@ impl<'db> PEP695TypeAliasType<'db> {
                     /// - `int | Divergent(binder)` → `int`
                     /// - `int | tuple[Divergent(binder), ...]` → unchanged
                     /// - `list[Divergent(binder) | str]` → unchanged
-                    fn strip_top_level_divergent<'db>(db: &'db dyn Db, ty: Type<'db>, binder_id: salsa::Id) -> Type<'db> {
+                    fn strip_top_level_divergent<'db>(
+                        db: &'db dyn Db,
+                        ty: Type<'db>,
+                        binder_id: salsa::Id,
+                    ) -> Type<'db> {
                         let Type::Union(union) = ty else {
                             return ty;
                         };
@@ -182,7 +186,9 @@ impl<'db> PEP695TypeAliasType<'db> {
                             .elements(db)
                             .iter()
                             .copied()
-                            .filter(|elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id))
+                            .filter(
+                                |elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id),
+                            )
                             .collect();
                         if kept.len() == union.elements(db).len() {
                             return ty;
