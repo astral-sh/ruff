@@ -383,10 +383,11 @@ impl Suppressions {
 
             let code_str = suppression.code.as_str();
 
-            if !(code_is_valid(&suppression.code, &context.settings().external)
-                || is_human_readable_names_enabled(context.settings().preview)
-                    && Rule::from_name(&suppression.code).is_ok())
-            {
+            let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
+            let name_is_valid = is_human_readable_names_enabled(context.settings().preview)
+                && Rule::from_name(&suppression.code).is_ok();
+
+            if !code_is_valid && !name_is_valid {
                 // InvalidRuleCode
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
