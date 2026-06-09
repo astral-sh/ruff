@@ -71,7 +71,8 @@ pub(crate) struct PendingSuppressionComment<'a> {
 }
 
 impl PendingSuppressionComment<'_> {
-    /// Whether the comment "matches" another comment, based on indentation and suppressed codes
+    /// Whether the comment "matches" another comment, based on indentation and suppressed codes.
+    ///
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
     /// "disable" comment and other is the matching "enable" comment.
     fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
@@ -154,14 +155,12 @@ pub(crate) enum InvalidSuppressionKind {
     NotModuleScope,
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Suppressions {
     /// Valid suppression ranges with associated comments
@@ -303,63 +302,54 @@ impl Suppressions {
             context: &LintContext,
             locator: &Locator,
         ) -> bool {
-            if let Some((group_key, group)) = grouped_diagnostic
-                && key.is_none_or(|key| key != *group_key)
-            {
-                if group.any_invalid() {
-                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    ) {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
-                    }
-                }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
+            let Some((group_key, group)) = grouped_diagnostic else {
+                return false;
+            };
+
+            if key.is_some_and(|key| key == *group_key) {
+                return false;
+            }
+
+            if group.any_invalid() {
+                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &group.invalid_codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group.invalid_codes.iter().join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                ) {
+                    diagnostic.help(
+                        "Add non-Ruff rule codes to the `lint.external` configuration option",
                     );
                 }
-                true
-            } else {
-                false
             }
+
+            if group.any_unused() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: &group.disabled_codes,
+                            duplicated: &group.duplicated_codes,
+                            unmatched: &group.unused_codes,
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
+            }
+
+            true
         }
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
@@ -491,16 +481,16 @@ impl Suppressions {
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
-        let edit = if comment.codes.len() == 1 {
+        let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
-                range = comment.codes[0];
+                range = *code;
             }
             delete_comment(comment.range, locator)
-        } else if remove_codes.len() == 1 {
+        } else if let [remove_code] = remove_codes {
             let code_index = comment
                 .codes
                 .iter()
-                .position(|range| locator.slice(range) == remove_codes[0])
+                .position(|range| locator.slice(range) == *remove_code)
                 .unwrap();
             if highlight_only_code {
                 range = comment.codes[code_index];
@@ -518,14 +508,9 @@ impl Suppressions {
             };
             Edit::range_deletion(code_range)
         } else {
-            let first = comment
-                .codes
-                .first()
-                .expect("suppression comment without codes");
-            let last = comment
-                .codes
-                .last()
-                .expect("suppression comment without codes");
+            let [first, .., last] = comment.codes.as_slice() else {
+                unreachable!("suppression comment without codes");
+            };
             let code_range = TextRange::new(first.start(), last.end());
             let remaining = comment
                 .codes_as_str(locator.contents())
