@@ -11,10 +11,9 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     StringLiteralType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
-    definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type,
+    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
