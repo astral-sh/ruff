@@ -283,7 +283,7 @@ import math  # noqa: F401
 
 ### `unused-noqa`
 
-Unused suppressions with rule codes should still emit `RUF100`:
+Unused suppressions with rule codes should still emit `RUF100` with an appropriate error message:
 
 ```py
 # error: [unused-noqa]
@@ -292,8 +292,25 @@ import math  # noqa: F401
 # error: [unused-noqa]
 import math  # ruff:ignore[F401]
 
-# error: [unused-noqa]
+# snapshot: unused-noqa
 import math  # ruff:ignore[unused-import]
 
 math.cos(1)
+```
+
+```snapshot
+error[RUF100]: Unused suppression (unused: `unused-import`)
+ --> src/mdtest_snippet.py:8:14
+  |
+8 | import math  # ruff:ignore[unused-import]
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unused suppression
+5  | import math  # ruff:ignore[F401]
+6  |
+7  | # snapshot: unused-noqa
+   - import math  # ruff:ignore[unused-import]
+8  + import math
+9  |
+10 | math.cos(1)
 ```
