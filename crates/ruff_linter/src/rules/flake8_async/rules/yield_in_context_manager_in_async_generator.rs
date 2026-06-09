@@ -88,7 +88,7 @@ pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, exp
     };
 
     // If the function is decorated with a known-safe decorator
-    // (\@asynccontextmanager, \@pytest.fixture, or \@trio.as_safe_channel),
+    // (`@asynccontextmanager`, `@pytest.fixture`, or `@trio.as_safe_channel`),
     // the yield is safe.
     if has_safe_decorator(checker, function_def) {
         return;
