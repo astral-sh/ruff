@@ -31,7 +31,10 @@ pub fn round_trip(path: &Path) -> anyhow::Result<String> {
     })?;
     let code = notebook.source_code().to_string();
     let needs_rebuild = notebook.update_cell_content(&code);
-    debug_assert!(!needs_rebuild);
+    debug_assert!(
+        !needs_rebuild,
+        "round-tripping unchanged source cannot remove a synthetic cell separator"
+    );
     let mut writer = Vec::new();
     notebook.write(&mut writer)?;
     Ok(String::from_utf8(writer)?)
