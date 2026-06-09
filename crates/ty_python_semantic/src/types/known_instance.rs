@@ -182,7 +182,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            visitor.visit_type(db, newtype.concrete_base_type(db));
+            visitor.visit_newtype_instance_type(db, newtype);
         }
         KnownInstanceType::Sentinel(_) => {
             // Nothing to visit

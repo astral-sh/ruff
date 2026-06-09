@@ -212,6 +212,24 @@ T = f()
 X = NewType("X", C)
 ```
 
+The runtime callable returned by `NewType` also carries the lazy base and must use the same
+cycle-safe traversal.
+
+```py
+class C: ...
+
+def f(): ...
+def g() -> T: ...
+
+g()
+from typing import NamedTuple, NewType
+
+X = NewType("X", C)
+Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
+min(Y)
+T = f()
+```
+
 ## Lazy cached property behind `hasattr`
 
 This pattern used to panic with "too many cycle iterations".
