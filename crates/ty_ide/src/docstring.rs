@@ -510,6 +510,55 @@ mod tests {
         "#);
     }
 
+    #[test]
+    fn rest_hyperlinks() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        See `datetime-like <https://numpy.org/doc/stable/reference/arrays.datetime.html>`_ values.
+        Wrapped links render too: `timezone conversion and
+        localization
+        <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html
+        #time-zone-handling>`_.
+        Anonymous links work too: `project docs <https://example.com/docs>`__.
+        Raw placeholders still escape: <scheme>://<netloc>/<path>.
+        Link text escapes: `name_with_[chars] & <tags> <https://example.com/a path?q=(value)>`_.
+        Broken wrapped links stay raw: `not a
+        link <https://example.com/bad>` but `same-line
+        link <https://example.com/same-line>`_ also renders.
+        Later wrapped links still render: `later
+        link <https://example.com/good>`_.
+
+        Markdown code fences keep reST links literal:
+
+        ```text
+        `not a link <https://example.com>`_
+        ```
+
+        Missing underscores stay as inline code: `not a link <https://example.com>`.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        See [datetime-like](https://numpy.org/doc/stable/reference/arrays.datetime.html) values.<HB>
+        Wrapped links render too: [timezone conversion and localization](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#time-zone-handling).<HB>
+        Anonymous links work too: [project docs](https://example.com/docs).<HB>
+        Raw placeholders still escape: &lt;scheme&gt;://&lt;netloc&gt;/&lt;path&gt;.<HB>
+        Link text escapes: [name\_with\_\[chars\] &amp; &lt;tags&gt;](https://example.com/a%20path?q=\(value\)).<HB>
+        Broken wrapped links stay raw: `not a<HB>
+        link &lt;https://example.com/bad&gt;` but [same-line link](https://example.com/same-line) also renders.<HB>
+        Later wrapped links still render: [later link](https://example.com/good).<HB>
+        <HB>
+        Markdown code fences keep reST links literal:<HB>
+        <HB>
+        ```text
+        `not a link <https://example.com>`_
+        ```<HB>
+        <HB>
+        Missing underscores stay as inline code: `not a link <https://example.com>`.
+    ");
+    }
+
     // A literal block where the `::` is flush with the paragraph
     // and should become `:`
     #[test]

@@ -5255,6 +5255,56 @@ def function():
     }
 
     #[test]
+    fn hover_func_docstring_renders_rest_hyperlinks_in_markdown() {
+        let test = hover_test(
+            r#"
+        def to_<CURSOR>datetime():
+            """Convert argument to datetime.
+
+            See `timezone conversion and
+            localization
+            <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html
+            #time-zone-handling>`_
+            for details.
+            """
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def to_datetime() -> Unknown
+        ---------------------------------------------
+        Convert argument to datetime.
+
+        See `timezone conversion and
+        localization
+        <https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html
+        #time-zone-handling>`_
+        for details.
+
+        ---------------------------------------------
+        ```python
+        def to_datetime() -> Unknown
+        ```
+        ---
+        Convert argument to datetime.<HB>
+        <HB>
+        See [timezone conversion and localization](https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#time-zone-handling)<HB>
+        for details.
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def to_datetime():
+          |     ^^^-^^^^^^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_func_with_plus_docstring() {
         let test = hover_test(
             r#"
