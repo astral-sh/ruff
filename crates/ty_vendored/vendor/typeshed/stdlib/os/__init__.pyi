@@ -943,6 +943,7 @@ class stat_result(structseq[float], tuple[int, int, int, int, int, int, int, flo
     @property
     def st_mtime(self) -> float:  # time of most recent content modification,
         """time of last modification"""
+
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows)
     if sys.version_info >= (3, 12) and sys.platform == "win32":
         @property
@@ -963,10 +964,12 @@ In the future, this property will contain the last metadata change time.""")
     @property
     def st_mtime_ns(self) -> int:  # time of most recent content modification in nanoseconds
         """time of last modification in nanoseconds"""
+
     # platform dependent (time of most recent metadata change on Unix, or the time of creation on Windows) in nanoseconds
     @property
     def st_ctime_ns(self) -> int:
         """time of last change in nanoseconds"""
+
     if sys.platform == "win32":
         @property
         def st_file_attributes(self) -> int:
@@ -975,6 +978,7 @@ In the future, this property will contain the last metadata change time.""")
         @property
         def st_reparse_tag(self) -> int:
             """Windows reparse tag"""
+
         if sys.version_info >= (3, 12):
             @property
             def st_birthtime(self) -> float:  # time of file creation in seconds
@@ -983,6 +987,7 @@ In the future, this property will contain the last metadata change time.""")
             @property
             def st_birthtime_ns(self) -> int:  # time of file creation in nanoseconds
                 """time of creation in nanoseconds"""
+
     else:
         @property
         def st_blocks(self) -> int:  # number of blocks allocated for file
@@ -995,6 +1000,7 @@ In the future, this property will contain the last metadata change time.""")
         @property
         def st_rdev(self) -> int:  # type of device if an inode device
             """device type (if inode device)"""
+
         if sys.platform != "linux":
             # These properties are available on MacOS, but not Ubuntu.
             # On other Unix systems (such as FreeBSD), the following attributes may be
@@ -1006,10 +1012,12 @@ In the future, this property will contain the last metadata change time.""")
             @property
             def st_birthtime(self) -> float:  # time of file creation in seconds
                 """time of creation"""
+
     if sys.platform == "darwin":
         @property
         def st_flags(self) -> int:  # user defined flags for file
             """user defined flags for file"""
+
     # Attributes documented as sometimes appearing, but deliberately omitted from the stub: `st_creator`, `st_rsize`, `st_type`.
     # See https://github.com/python/typeshed/pull/6560#issuecomment-991253327
 
@@ -1078,6 +1086,7 @@ class DirEntry(Generic[AnyStr]):
 
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
+
     if sys.version_info >= (3, 12):
         def is_junction(self) -> bool:
             """Return True if the entry is a junction; cached per entry."""
@@ -1261,6 +1270,7 @@ if sys.platform != "win32":
 
     def setpriority(which: int, who: int, priority: int) -> None:
         """Set program scheduling priority."""
+
     if sys.platform != "darwin":
         def getresuid() -> tuple[int, int, int]:
             """Return a tuple of the current process's real, effective, and saved user ids."""
@@ -1291,6 +1301,7 @@ if sys.platform != "win32":
 
     def setregid(rgid: int, egid: int, /) -> None:
         """Set the current process's real and effective group ids."""
+
     if sys.platform != "darwin":
         def setresgid(rgid: int, egid: int, sgid: int, /) -> None:
             """Set the current process's real, effective, and saved group ids."""
@@ -1571,6 +1582,7 @@ if sys.platform != "win32":
         Return a tuple of (master_fd, slave_fd) containing open file descriptors
         for both the master and slave ends.
         """
+
     if sys.platform != "darwin":
         def fdatasync(fd: FileDescriptorLike) -> None:
             """Force write of fd to disk without forcing update of metadata."""
@@ -1618,6 +1630,7 @@ if sys.platform != "win32":
         the file.  Returns the number of bytes written.  Does not change the
         current file offset.
         """
+
     # In CI, stubtest sometimes reports that these are available on MacOS, sometimes not
     def preadv(fd: int, buffers: SupportsLenAndGetItem[WriteableBuffer], offset: int, flags: int = 0, /) -> int:
         """Reads from a file descriptor into a number of mutable bytes-like objects.
@@ -1633,6 +1646,7 @@ if sys.platform != "win32":
 
         - RWF_HIPRI
         - RWF_NOWAIT
+        - RWF_DONTCACHE
 
         Using non-zero flags requires Linux 4.6 or newer.
         """
@@ -1652,9 +1666,12 @@ if sys.platform != "win32":
         - RWF_DSYNC
         - RWF_SYNC
         - RWF_APPEND
+        - RWF_DONTCACHE
+        - RWF_ATOMIC
 
         Using non-zero flags requires Linux 4.7 or newer.
         """
+
     if sys.platform != "darwin":
         RWF_APPEND: Final[int]
         RWF_DSYNC: Final[int]
@@ -1665,6 +1682,7 @@ if sys.platform != "win32":
     if sys.platform == "linux":
         def sendfile(out_fd: FileDescriptor, in_fd: FileDescriptor, offset: int | None, count: int) -> int:
             """Copy count bytes from file descriptor in_fd to file descriptor out_fd."""
+
     else:
         def sendfile(
             out_fd: FileDescriptor,
@@ -1799,8 +1817,8 @@ def access(
       NotImplementedError.
 
     Note that most operations will use the effective uid/gid, therefore this
-      routine can be used in a suid/sgid environment to test if the invoking user
-      has the specified access to the path.
+      routine can be used in a suid/sgid environment to test if the invoking
+      user has the specified access to the path.
     """
 
 def chdir(path: FileDescriptorOrPath) -> None:
@@ -1959,16 +1977,29 @@ if sys.platform != "win32":
           If it is unavailable, using it will raise a NotImplementedError.
         """
 
-def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) -> None:
-    """makedirs(name [, mode=0o777][, exist_ok=False])
+if sys.version_info >= (3, 15):
+    def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False, *, parent_mode: int | None = None) -> None:
+        """makedirs(name [, mode=0o777][, exist_ok=False])
 
-    Super-mkdir; create a leaf directory and all intermediate ones.  Works like
-    mkdir, except that any intermediate path segment (not just the rightmost)
-    will be created if it does not exist. If the target directory already
-    exists, raise an OSError if exist_ok is False. Otherwise no exception is
-    raised.  This is recursive.
+        Super-mkdir; create a leaf directory and all intermediate ones.  Works like
+        mkdir, except that any intermediate path segment (not just the rightmost)
+        will be created if it does not exist. If the target directory already
+        exists, raise an OSError if exist_ok is False. Otherwise no exception is
+        raised.  This is recursive.
 
-    """
+        """
+
+else:
+    def makedirs(name: StrOrBytesPath, mode: int = 0o777, exist_ok: bool = False) -> None:
+        """makedirs(name [, mode=0o777][, exist_ok=False])
+
+        Super-mkdir; create a leaf directory and all intermediate ones.  Works like
+        mkdir, except that any intermediate path segment (not just the rightmost)
+        will be created if it does not exist. If the target directory already
+        exists, raise an OSError if exist_ok is False. Otherwise no exception is
+        raised.  This is recursive.
+
+        """
 
 if sys.platform != "win32":
     def mknod(path: StrOrBytesPath, mode: int = 0o600, device: int = 0, *, dir_fd: int | None = None) -> None:
@@ -2547,6 +2578,7 @@ if sys.platform != "win32":
         Like fork(), return pid of 0 to the child process,
         and pid of child to the parent process.
         To both, return fd of newly opened pseudo-terminal.
+        The master_fd is non-inheritable.
         """
 
     def killpg(pgid: int, signal: int, /) -> None:
@@ -2554,6 +2586,7 @@ if sys.platform != "win32":
 
     def nice(increment: int, /) -> int:
         """Add increment to the priority of process and return the new priority."""
+
     if sys.platform != "darwin" and sys.platform != "linux":
         def plock(op: int, /) -> None: ...
 
@@ -2786,6 +2819,7 @@ else:
         Returns a tuple of information about the child process:
             (pid, status)
         """
+
     # Added to MacOS in 3.13
     if sys.platform != "darwin" or sys.version_info >= (3, 13):
         @final
@@ -2826,6 +2860,7 @@ else:
             Returns either waitid_result or None if WNOHANG is specified and there are
             no children in a waitable state.
             """
+
     from resource import struct_rusage
 
     def wait3(options: int) -> tuple[int, int, struct_rusage]:
@@ -2869,6 +2904,7 @@ else:
 
     def WTERMSIG(status: int) -> int:
         """Return the signal that terminated the process that provided the status value."""
+
     if sys.version_info >= (3, 15):
         def posix_spawn(
             path: StrOrBytesPath,
@@ -2883,7 +2919,31 @@ else:
             setsigmask: Iterable[int] = (),
             setsigdef: Iterable[int] = (),
             scheduler: tuple[Any, sched_param] | None = None,  # None allowed starting in 3.15
-        ) -> int: ...
+        ) -> int:
+            """Execute the program specified by path in a new process.
+
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            file_actions
+              A sequence of file action tuples.
+            setpgroup
+              The pgroup to use with the POSIX_SPAWN_SETPGROUP flag.
+            resetids
+              If the value is `true` the POSIX_SPAWN_RESETIDS will be activated.
+            setsid
+              If the value is `true` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+            setsigmask
+              The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
+            setsigdef
+              The sigmask to use with the POSIX_SPAWN_SETSIGDEF flag.
+            scheduler
+              A tuple with the scheduler policy (optional) and parameters.
+            """
+
         def posix_spawnp(
             path: StrOrBytesPath,
             argv: _ExecVArgs,
@@ -2897,7 +2957,31 @@ else:
             setsigmask: Iterable[int] = (),
             setsigdef: Iterable[int] = (),
             scheduler: tuple[Any, sched_param] | None = None,  # None allowed starting in 3.15
-        ) -> int: ...
+        ) -> int:
+            """Execute the program specified by path in a new process.
+
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            file_actions
+              A sequence of file action tuples.
+            setpgroup
+              The pgroup to use with the POSIX_SPAWN_SETPGROUP flag.
+            resetids
+              If the value is `True` the POSIX_SPAWN_RESETIDS will be activated.
+            setsid
+              If the value is `True` the POSIX_SPAWN_SETSID or POSIX_SPAWN_SETSID_NP will be activated.
+            setsigmask
+              The sigmask to use with the POSIX_SPAWN_SETSIGMASK flag.
+            setsigdef
+              The sigmask to use with the POSIX_SPAWN_SETSIGDEF flag.
+            scheduler
+              A tuple with the scheduler policy (optional) and parameters.
+            """
+
     elif sys.version_info >= (3, 13):
         def posix_spawn(
             path: StrOrBytesPath,
@@ -2974,6 +3058,7 @@ else:
             scheduler
               A tuple with the scheduler policy (optional) and parameters.
             """
+
     else:
         def posix_spawn(
             path: StrOrBytesPath,
@@ -3050,6 +3135,7 @@ else:
             scheduler
               A tuple with the scheduler policy (optional) and parameters.
             """
+
     POSIX_SPAWN_OPEN: Final = 0
     POSIX_SPAWN_CLOSE: Final = 1
     POSIX_SPAWN_DUP2: Final = 2
@@ -3078,6 +3164,7 @@ if sys.platform != "win32":
 
     def sched_yield() -> None:  # some flavors of Unix
         """Voluntarily relinquish the CPU."""
+
     if sys.platform != "darwin":
         def sched_setscheduler(pid: int, policy: int, param: sched_param, /) -> None:  # some flavors of Unix
             """Set the scheduling policy for the process identified by pid.
@@ -3141,6 +3228,7 @@ if sys.version_info >= (3, 13):
             Return the number of logical CPUs usable by the calling thread of the
             current process. Return None if indeterminable.
             """
+
     else:
         def process_cpu_count() -> int | None:
             """Return the number of logical CPUs in the system.

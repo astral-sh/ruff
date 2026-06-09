@@ -38,6 +38,7 @@ class BaseProcess:
         """
         Start child process
         """
+
     if sys.version_info >= (3, 14):
         def interrupt(self) -> None:
             """

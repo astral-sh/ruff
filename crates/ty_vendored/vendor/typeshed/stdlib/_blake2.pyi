@@ -1,4 +1,4 @@
-"""_blake2b provides BLAKE2b for hashlib"""
+"""_blake2 provides BLAKE2b and BLAKE2s for hashlib"""
 
 import sys
 from _typeshed import ReadableBuffer

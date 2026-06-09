@@ -826,10 +826,12 @@ class socket:
     @property
     def proto(self) -> int:
         """the socket protocol"""
+
     # F811: "Redefinition of unused `timeout`"
     @property
     def timeout(self) -> float | None:
         """the socket timeout"""
+
     if sys.platform == "win32":
         def __init__(
             self, family: int = ..., type: int = ..., proto: int = ..., fileno: SupportsIndex | bytes | None = None
@@ -920,6 +922,7 @@ class socket:
         operations. A timeout of None indicates that timeouts on socket
         operations are disabled.
         """
+
     if sys.platform == "win32":
         def ioctl(self, control: int, option: int | tuple[int, int, int] | bool, /) -> None:
             """ioctl(cmd, option) -> long
@@ -953,6 +956,7 @@ class socket:
 
         Like recv(buffersize, flags) but also return the sender's address info.
         """
+
     if sys.platform != "win32":
         def recvmsg(self, bufsize: int, ancbufsize: int = 0, flags: int = 0, /) -> tuple[bytes, list[_CMSG], int, Any]:
             """recvmsg(bufsize[, ancbufsize[, flags]]) -> (data, ancdata, msg_flags, address)
@@ -1037,20 +1041,18 @@ class socket:
         """
 
     def send(self, data: ReadableBuffer, flags: int = 0, /) -> int:
-        """send(data[, flags]) -> count
+        """Send a data string to the socket.
 
-        Send a data string to the socket.  For the optional flags
-        argument, see the Unix manual.  Return the number of bytes
-        sent; this may be less than len(data) if the network is busy.
+        For the optional flags argument, see the Unix manual.
+        Return the number of bytes sent; this may be less than len(data) if the network is busy.
         """
 
     def sendall(self, data: ReadableBuffer, flags: int = 0, /) -> None:
-        """sendall(data[, flags])
+        """Send a data string to the socket.
 
-        Send a data string to the socket.  For the optional flags
-        argument, see the Unix manual.  This calls send() repeatedly
-        until all data is sent.  If an error occurs, it's impossible
-        to tell how much data has been sent.
+        For the optional flags argument, see the Unix manual.
+        This calls send() repeatedly until all data is sent.
+        If an error occurs, it's impossible to tell how much data has been sent.
         """
 
     @overload
@@ -1072,11 +1074,11 @@ class socket:
             address: _Address | None = None,
             /,
         ) -> int:
-            """sendmsg(buffers[, ancdata[, flags[, address]]]) -> count
+            """Send normal and ancillary data to the socket.
 
-            Send normal and ancillary data to the socket, gathering the
-            non-ancillary data from a series of buffers and concatenating it into
-            a single message.  The buffers argument specifies the non-ancillary
+            It gathering the non-ancillary data from a series of buffers
+            and concatenating it into a single message.
+            The buffers argument specifies the non-ancillary
             data as an iterable of bytes-like objects (e.g. bytes objects).
             The ancdata argument specifies the ancillary data (control messages)
             as an iterable of zero or more tuples (cmsg_level, cmsg_type,
@@ -1088,6 +1090,7 @@ class socket:
             the message.  The return value is the number of bytes of non-ancillary
             data sent.
             """
+
     if sys.platform == "linux":
         def sendmsg_afalg(
             self, msg: Iterable[ReadableBuffer] = ..., *, op: int, iv: Any = ..., assoclen: int = ..., flags: int = 0
@@ -1270,7 +1273,7 @@ def getdefaulttimeout() -> float | None:
 def setdefaulttimeout(timeout: float | None, /) -> None:
     """setdefaulttimeout(timeout)
 
-    Set the default timeout in seconds (float) for new socket objects.
+    Set the default timeout in seconds (real number) for new socket objects.
     A value of None indicates that new socket objects have no timeout.
     When the socket module is first imported, the default is None.
     """

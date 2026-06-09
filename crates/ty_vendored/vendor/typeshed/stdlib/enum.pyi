@@ -96,6 +96,7 @@ class _EnumDict(dict[str, Any]):
 
         Single underscore (sunder) names are reserved.
         """
+
     if sys.version_info >= (3, 11):
         # See comment above `typing.MutableMapping.update`
         # for why overloads are preferable to a Union here
@@ -147,6 +148,7 @@ class EnumMeta(type):
         """
         Return members in reverse definition order.
         """
+
     if sys.version_info >= (3, 12):
         def __contains__(self: type[Any], value: object) -> bool:
             """Return True if `value` is in `cls`.
@@ -156,6 +158,7 @@ class EnumMeta(type):
             2) `value` is the value of one of the `cls`'s members.
             3) `value` is a pseudo-member (flags)
             """
+
     elif sys.version_info >= (3, 11):
         def __contains__(self: type[Any], member: object) -> bool:
             """
@@ -165,6 +168,7 @@ class EnumMeta(type):
             note: in 3.12 TypeError will no longer be raised, and True will also be
             returned if member is the value of a member in this enum
             """
+
     else:
         def __contains__(self: type[Any], obj: object) -> bool: ...
 
@@ -300,6 +304,7 @@ class EnumMeta(type):
 
             `type`, if set, will be mixed in as the first base class.
             """
+
     # Overload 3 (py312+ only): Value lookup on an already existing enum class (complex case)
     #
     # >>> class Foo(enum.Enum):
@@ -336,6 +341,7 @@ class EnumMeta(type):
 
             `type`, if set, will be mixed in as the first base class.
             """
+
     if sys.version_info >= (3, 14):
         @property
         def __signature__(cls) -> _Signature: ...
@@ -413,6 +419,7 @@ class Enum(metaclass=EnumMeta):
     @_magic_enum_attr
     def value(self) -> Any:
         """The value of the Enum member."""
+
     _name_: str
     _value_: Any
     _ignore_: str | list[str]
@@ -430,6 +437,7 @@ class Enum(metaclass=EnumMeta):
         count: the number of existing members
         last_values: the list of values assigned
         """
+
     # It's not true that `__new__` will accept any argument type,
     # so ideally we'd use `Any` to indicate that the argument type is inexpressible.
     # However, using `Any` causes too many false-positives for those using mypy's `--disallow-any-expr`

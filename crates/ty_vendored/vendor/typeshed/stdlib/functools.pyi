@@ -404,7 +404,8 @@ def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]:
 class singledispatchmethod(Generic[_T]):
     """Single-dispatch generic method descriptor.
 
-    Supports wrapping existing descriptors.
+    Supports wrapping existing descriptors and handles non-descriptor
+    callables as instance methods.
     """
 
     dispatcher: _SingleDispatchCallable[_T]

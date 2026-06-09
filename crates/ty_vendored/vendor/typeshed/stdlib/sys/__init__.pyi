@@ -28,6 +28,7 @@ last_traceback -- traceback of last uncaught exception
 
 Static objects:
 
+abi_info -- Python ABI information.
 builtin_module_names -- tuple of module names built into this interpreter
 copyright -- copyright notice pertaining to this interpreter
 exec_prefix -- prefix used to find the machine-specific Python library
@@ -129,7 +130,7 @@ maxunicode: int
 meta_path: list[MetaPathFinderProtocol]
 modules: dict[str, ModuleType]
 if sys.version_info >= (3, 15):
-    lazy_modules: dict[str, set[str]]
+    lazy_modules: set[str]
 orig_argv: list[str]
 path: list[str]
 path_hooks: list[Callable[[str], PathEntryFinderProtocol]]
@@ -304,14 +305,17 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
     @property
     def warn_default_encoding(self) -> int:
         """-X warn_default_encoding"""
+
     if sys.version_info >= (3, 11):
         @property
         def safe_path(self) -> bool:
             """-P"""
+
     if sys.version_info >= (3, 13):
         @property
         def gil(self) -> Literal[0, 1]:
             """-X gil"""
+
     if sys.version_info >= (3, 14):
         @property
         def thread_inherit_context(self) -> Literal[0, 1]:
@@ -320,6 +324,7 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         @property
         def context_aware_warnings(self) -> Literal[0, 1]:
             """-X context_aware_warnings"""
+
     # Whether or not this exists on lower versions of Python
     # may depend on which patch release you're using
     # (it was backported to all Python versions on 3.8+ as a security fix)
@@ -704,8 +709,19 @@ def getfilesystemencodeerrors() -> LiteralString:
     """Return the error mode used Unicode to OS filename conversion."""
 
 if sys.version_info >= (3, 15):
-    def get_lazy_imports() -> _LazyImportMode: ...
-    def get_lazy_imports_filter() -> _LazyImportFilter | None: ...
+    def get_lazy_imports() -> _LazyImportMode:
+        """Gets the global lazy imports mode.
+
+        Returns "all" if all top level imports are potentially lazy.
+        Returns "none" if all explicitly marked lazy imports are suppressed.
+        Returns "normal" if only explicitly marked imports are lazy.
+        """
+
+    def get_lazy_imports_filter() -> _LazyImportFilter | None:
+        """Get the current lazy imports filter callback.
+
+        Returns the filter callable or None if no filter is set.
+        """
 
 def getrefcount(object: Any, /) -> int:
     """Return the reference count of object.
@@ -942,6 +958,7 @@ if sys.platform == "win32":
             This is equivalent to defining the PYTHONLEGACYWINDOWSFSENCODING
             environment variable before launching Python.
             """
+
     else:
         def _enablelegacywindowsfsencoding() -> None:
             """Changes the default filesystem encoding to mbcs:replace.
@@ -974,13 +991,35 @@ def get_int_max_str_digits() -> int:
     """Return the maximum string digits limit for non-binary int<->str conversions."""
 
 if sys.version_info >= (3, 15):
-    def set_lazy_imports(mode: _LazyImportMode) -> None: ...
-    def set_lazy_imports_filter(filter: _LazyImportFilter | None) -> None: ...
+    def set_lazy_imports(mode: _LazyImportMode) -> None:
+        """Sets the global lazy imports mode.
+
+        The mode parameter must be one of the following strings:
+        - "all": All top-level imports become potentially lazy
+        - "none": All lazy imports are suppressed (even explicitly marked ones)
+        - "normal": Only explicitly marked imports (with 'lazy' keyword) are lazy
+
+        In addition to the mode, lazy imports can be controlled via the filter
+        provided to sys.set_lazy_imports_filter
+        """
+
+    def set_lazy_imports_filter(filter: _LazyImportFilter | None) -> None:
+        """Set the lazy imports filter callback.
+
+        The filter is a callable which disables lazy imports when they
+        would otherwise be enabled. Returns True if the import is still enabled
+        or False to disable it. The callable is called with:
+
+        (importing_module_name, resolved_imported_module_name, [fromlist])
+
+        Pass None to clear the filter.
+        """
 
 if sys.version_info >= (3, 12):
     if sys.version_info >= (3, 13):
         def getunicodeinternedsize(*, _only_immortal: bool = False) -> int:
             """Return the number of elements of the unicode interned dictionary"""
+
     else:
         def getunicodeinternedsize() -> int:
             """Return the number of elements of the unicode interned dictionary"""
@@ -993,13 +1032,16 @@ if sys.version_info >= (3, 12):
 
     def is_stack_trampoline_active() -> bool:
         """Return *True* if a stack profiler trampoline is active."""
+
     # It always exists, but raises on non-linux platforms:
     if sys.platform == "linux":
         def activate_stack_trampoline(backend: str, /) -> None:
             """Activate stack profiler trampoline *backend*."""
+
     else:
         def activate_stack_trampoline(backend: str, /) -> NoReturn:
             """Activate stack profiler trampoline *backend*."""
+
     from . import _monitoring
 
     monitoring = _monitoring
@@ -1034,6 +1076,7 @@ if sys.version_info >= (3, 14):
 
         This function should be used for specialized purposes only.
         """
+
     from . import __jit
 
     _jit = __jit

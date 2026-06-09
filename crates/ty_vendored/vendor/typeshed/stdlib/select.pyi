@@ -63,7 +63,7 @@ def select(
     gotten from a fileno() method call on one of those.
 
     The optional 4th argument specifies a timeout in seconds; it may be
-    a floating-point number to specify fractions of seconds.  If it is absent
+    a non-integer to specify fractions of seconds.  If it is absent
     or None, the call will never time out.
 
     The return value is a tuple of three lists corresponding to the first three
@@ -146,7 +146,7 @@ if sys.platform != "linux" and sys.platform != "win32":
               The maximum number of events that the kernel will return.
             timeout
               The maximum time to wait in seconds, or else None to wait forever.
-              This accepts floats for smaller timeouts, too.
+              This accepts non-integers for smaller timeouts, too.
             """
 
         def fileno(self) -> int:
@@ -230,6 +230,7 @@ if sys.platform == "linux":
 
             Further operations on the epoll object will raise an exception.
             """
+
         closed: bool
         """True if the epoll handler is closed"""
 
@@ -267,7 +268,7 @@ if sys.platform == "linux":
             """Wait for events on the epoll file descriptor.
 
               timeout
-                the maximum time to wait in seconds (as float);
+                the maximum time to wait in seconds (with fractions);
                 a timeout of None or -1 makes poll wait indefinitely
               maxevents
                 the maximum number of events returned; -1 means no limit

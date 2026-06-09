@@ -389,6 +389,7 @@ class ZipFile:
         'zinfo_or_arcname' is either a ZipInfo instance or
         the name of the file in the archive.
         """
+
     if sys.version_info >= (3, 11):
         def mkdir(self, zinfo_or_directory_name: str | ZipInfo, mode: int = 0o777) -> None:
             """Creates a directory inside the zip archive."""
@@ -486,6 +487,7 @@ class ZipInfo:
         decide based upon the file_size and compress_size, if known,
         False otherwise.
         """
+
     if sys.version_info >= (3, 14):
         def _for_archive(self, archive: ZipFile) -> Self:
             """Resolve suitable defaults from the archive.

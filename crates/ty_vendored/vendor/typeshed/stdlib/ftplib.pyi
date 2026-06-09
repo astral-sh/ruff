@@ -185,6 +185,7 @@ class FTP:
 
     def login(self, user: str = "", passwd: str = "", acct: str = "") -> str:
         """Login, default anonymous."""
+
     # In practice, `rest` can actually be anything whose str() is an integer sequence, so to make it simple we allow integers
     def ntransfercmd(self, cmd: str, rest: int | str | None = None) -> tuple[socket, int | None]:
         """Initiate a transfer over the data connection.
@@ -276,6 +277,7 @@ class FTP:
 
     def nlst(self, *args: str) -> list[str]:
         """Return a list of files in a given directory (default the current)."""
+
     # Technically only the last arg can be a Callable but ...
     def dir(self, *args: str | Callable[[str], object]) -> None:
         """List a directory in long form.

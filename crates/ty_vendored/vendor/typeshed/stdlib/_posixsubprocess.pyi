@@ -54,6 +54,7 @@ if sys.platform != "win32":
 
             Raises: Only on an error in the parent process.
             """
+
     else:
         def fork_exec(
             args: Sequence[StrOrBytesPath] | None,

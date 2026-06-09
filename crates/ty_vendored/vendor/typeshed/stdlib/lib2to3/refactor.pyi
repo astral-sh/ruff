@@ -162,6 +162,7 @@ class RefactoringTool:
         then rewrites the file; the latter is only done if the write option is
         set.
         """
+
     PS1: Final = ">>> "
     PS2: Final = "... "
     def refactor_docstring(self, input: str, filename: StrPath) -> str:

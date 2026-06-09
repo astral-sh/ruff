@@ -134,6 +134,7 @@ if sys.version_info >= (3, 12):
 
             If False, read() will raise OSError.
             """
+
         read: Callable[..., Any]
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
@@ -183,6 +184,7 @@ if sys.version_info >= (3, 12):
 
             If False, write() will raise OSError.
             """
+
         write: Callable[..., Any]
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
@@ -280,6 +282,7 @@ else:
 
             If False, read() will raise OSError.
             """
+
         read: Callable[..., Any]
         def readlines(self, hint: int = -1, /) -> list[bytes]:
             """Return a list of lines from the stream.
@@ -329,6 +332,7 @@ else:
 
             If False, write() will raise OSError.
             """
+
         write: Callable[..., Any]
         def writelines(self, lines: Iterable[ReadableBuffer], /) -> None:
             """Write a list of lines to stream.
@@ -357,6 +361,7 @@ class _RawIOBase(_IOBase):
 
     def readall(self) -> bytes:
         """Read until EOF, using multiple read() call."""
+
     # The following methods can return None if the file is in non-blocking mode
     # and no data is available.
     def readinto(self, buffer: WriteableBuffer, /) -> int | MaybeNone: ...

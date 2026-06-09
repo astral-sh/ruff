@@ -22,6 +22,7 @@ class Loader(metaclass=ABCMeta):
         functionality for this method.
 
         """
+
     if sys.version_info < (3, 12):
         @deprecated(
             "Deprecated since Python 3.4; removed in Python 3.12. "
@@ -44,6 +45,7 @@ class Loader(metaclass=ABCMeta):
         from creating a new module.  It may return None to indicate
         that the spec should create the new module.
         """
+
     # Not defined on the actual class for backwards-compatibility reasons,
     # but expected in new code.
     def exec_module(self, module: types.ModuleType) -> None: ...

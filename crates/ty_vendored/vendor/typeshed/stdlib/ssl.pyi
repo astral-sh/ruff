@@ -10,6 +10,9 @@ Exceptions:
 
 Functions:
 
+  get_sigalgs          -- return a list of all available TLS signature
+                          algorithms (requires OpenSSL 3.4 or later)
+
   cert_time_to_seconds -- convert time string used for certificate
                           notBefore and notAfter functions to integer
                           seconds past the Epoch (the time values
@@ -478,10 +481,16 @@ class SSLSocket(socket.socket):
         """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
+
     if sys.version_info >= (3, 15):
-        def group(self) -> str | None: ...
-        def client_sigalg(self) -> str | None: ...
-        def server_sigalg(self) -> str | None: ...
+        def group(self) -> str | None:
+            """Return the currently selected key agreement group name."""
+
+        def client_sigalg(self) -> str | None:
+            """Return the selected client authentication signature algorithm."""
+
+        def server_sigalg(self) -> str | None:
+            """Return the selected server handshake signature algorithm."""
 
     def get_channel_binding(self, cb_type: str = "tls-unique") -> bytes | None:
         """Get channel binding data for current connection.  Raise ValueError
@@ -759,6 +768,7 @@ class SSLObject:
         """The currently set server hostname (for SNI), or ``None`` if no
         server hostname is set.
         """
+
     session: SSLSession | None
     """The SSLSession for client socket."""
 
@@ -821,10 +831,16 @@ class SSLObject:
         """Return the current compression algorithm in use, or ``None`` if
         compression was not negotiated or not supported by one of the peers.
         """
+
     if sys.version_info >= (3, 15):
-        def group(self) -> str | None: ...
-        def client_sigalg(self) -> str | None: ...
-        def server_sigalg(self) -> str | None: ...
+        def group(self) -> str | None:
+            """Return the currently selected key agreement group name."""
+
+        def client_sigalg(self) -> str | None:
+            """Return the selected client authentication signature algorithm."""
+
+        def server_sigalg(self) -> str | None:
+            """Return the selected server handshake signature algorithm."""
 
     def pending(self) -> int:
         """Return the number of bytes that can be read immediately."""

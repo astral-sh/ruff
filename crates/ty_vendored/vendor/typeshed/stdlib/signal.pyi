@@ -199,6 +199,7 @@ else:
         signals specified in the signal set sigset.  The function accepts the signal
         and returns the signal number.
         """
+
     if sys.platform != "darwin":
         SIGCLD: Final = Signals.SIGCHLD  # alias
         SIGPOLL: Final = Signals.SIGIO  # alias
@@ -250,7 +251,7 @@ else:
         def sigtimedwait(sigset: Iterable[int], timeout: float, /) -> struct_siginfo | None:
             """Like sigwaitinfo(), but with a timeout.
 
-            The timeout is specified in seconds, with floating-point numbers allowed.
+            The timeout is specified in seconds, rounded up to nanoseconds.
             """
 
         def sigwaitinfo(sigset: Iterable[int], /) -> struct_siginfo:
