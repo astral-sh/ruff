@@ -283,20 +283,19 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let visit_key = ty.visit_key(db);
         match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => self
                 .top_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit_type(visit_key, func),
+                .visit_type(db, ty, func),
             TypeMapping::Materialize(MaterializationKind::Bottom) => self
                 .bottom_materialization
                 .get_or_init(TypeTransformer::default)
-                .visit_type(visit_key, func),
+                .visit_type(db, ty, func),
             _ => self
                 .default
                 .get_or_init(TypeTransformer::default)
-                .visit_type(visit_key, func),
+                .visit_type(db, ty, func),
         }
     }
 
