@@ -1,3 +1,6 @@
+use std::fmt::Write as _;
+use std::time::{Duration, Instant};
+
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
@@ -93,6 +96,56 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
+    );
+
+    Ok(())
+}
+
+#[test]
+fn enum_comparison_narrowing_avoids_quadratic_expansion() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    let mut members = String::new();
+    for index in 0..250 {
+        writeln!(&mut members, "    MEMBER_{index} = {index}")
+            .expect("writing to a String cannot fail");
+    }
+    let source = format!(
+        r#"
+from enum import Enum
+
+class Left(Enum):
+{members}
+class Right(Enum):
+{members}
+def consume(value: object) -> None: ...
+
+def compare_same(left: Left, right: Left) -> None:
+    if left == right:
+        consume(left)
+    if left != right:
+        consume(left)
+
+def compare_optional(left: Left, right: Left | None) -> None:
+    if left == right:
+        consume(left)
+    if left != right:
+        consume(left)
+
+def compare_different(left: Left, right: Right) -> None:
+    if left == right:
+        consume(left)
+    if left != right:
+        consume(left)
+"#
+    );
+    db.write_file("/src/a.py", source)?;
+
+    let start = Instant::now();
+    assert_file_diagnostics(&db, "/src/a.py", &[]);
+    assert!(
+        start.elapsed() < Duration::from_secs(10),
+        "enum comparison narrowing took {:?}",
+        start.elapsed()
     );
 
     Ok(())

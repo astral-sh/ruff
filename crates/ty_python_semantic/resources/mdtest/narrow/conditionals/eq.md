@@ -269,6 +269,28 @@ def _(answer: IndependentEquality):
         reveal_type(answer)  # revealed: IndependentEquality
 ```
 
+Finite domains remain narrowable when the other operand also includes an identity singleton:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Finite(Enum):
+    FIRST = 1
+    SECOND = 2
+
+def _(value: Finite, other: Literal[Finite.FIRST] | None):
+    if value == other:
+        reveal_type(value)  # revealed: Literal[Finite.FIRST]
+    else:
+        reveal_type(value)  # revealed: Finite
+
+    if value != other:
+        reveal_type(value)  # revealed: Finite
+    else:
+        reveal_type(value)  # revealed: Literal[Finite.FIRST]
+```
+
 ## Equality between concrete runtime classes
 
 Types such as `bool`, `LiteralString`, and `TypedDict` correspond to specific runtime classes.
