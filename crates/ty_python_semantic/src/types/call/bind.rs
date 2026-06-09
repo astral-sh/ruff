@@ -3583,21 +3583,7 @@ impl<'db> CallableBinding<'db> {
         };
 
         if !are_return_types_equivalent_for_all_matching_overloads {
-            // Overload matching is ambiguous, so the call normally evaluates to the
-            // ambiguous-overload dynamic type. But if one of the candidate return types carries a
-            // `Divergent` recursion marker — which happens when a recursive type flows into the call
-            // (e.g. `list[Divergent].__add__([])` during fixed-point inference of a recursive
-            // attribute) — fall back to that structure-preserving return type instead. `Divergent`
-            // currently behaves like `Any`/`Unknown`, so this is semantically equivalent today, but it keeps
-            // the recursion marker in place so that `recursive_type_normalized` can still fold the
-            // recursion. Otherwise the marker is lost here and the recursive type proliferates
-            // without bound, causing the cycle to never converge.
-            let divergent_fallback = self
-                .matching_overloads()
-                .map(|(_, overload)| overload.return_type())
-                .find(|return_type| return_type.contains_any_divergent(db));
-            self.overload_call_return_type =
-                Some(OverloadCallReturnType::Ambiguous { divergent_fallback });
+            self.overload_call_return_type = Some(OverloadCallReturnType::Ambiguous);
         }
     }
 
@@ -3727,9 +3713,7 @@ impl<'db> CallableBinding<'db> {
         if let Some(overload_call_return_type) = self.overload_call_return_type {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
-                OverloadCallReturnType::Ambiguous { divergent_fallback } => {
-                    divergent_fallback.unwrap_or(Type::Dynamic(DynamicType::AmbiguousOverload))
-                }
+                OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::AmbiguousOverload),
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_) => Type::unknown(),
             };
         }
@@ -3983,14 +3967,7 @@ impl<'db> IntoIterator for CallableBinding<'db> {
 enum OverloadCallReturnType<'db> {
     ArgumentTypeExpansion(Type<'db>),
     ArgumentTypeExpansionLimitReached(usize),
-    /// Overload resolution was ambiguous (multiple candidates with differing return types due to a
-    /// gradual argument). Normally evaluates to the ambiguous-overload dynamic type.
-    /// `divergent_fallback` is `Some` when a candidate return type carried a `Divergent` recursion
-    /// marker; returning that type instead preserves the marker so recursive-type fixed points still
-    /// converge.
-    Ambiguous {
-        divergent_fallback: Option<Type<'db>>,
-    },
+    Ambiguous,
 }
 
 #[derive(Debug)]
