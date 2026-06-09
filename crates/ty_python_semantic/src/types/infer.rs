@@ -418,9 +418,7 @@ pub(crate) fn infer_expression_type<'db>(
 #[salsa::tracked(
     cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
-        result
-            .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-            .finalize_recursive_cycle_markers(db, cycle, true, false)
+        result.cycle_normalized(db, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -960,7 +958,7 @@ impl<'db> DefinitionTypes<'db> {
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        normalize_binding_for_cycle(db, definition, ty, previous.binding_type(definition), cycle)
+        normalize_binding_for_cycle(db, ty, previous.binding_type(definition), cycle)
     }
 
     fn normalize_declaration(
@@ -1099,48 +1097,16 @@ struct DefinitionInferenceExtra<'db> {
     qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
 }
 
-/// Normalize one binding's type during cycle recovery, presenting a recursively-defined *value*
-/// binding (a loop-carried local, an attribute assignment, …) as a `Type::Recursive` μ-binder so
-/// structural operations unfold it on demand instead of bottoming out at the bare `Divergent`
-/// marker.
-///
-/// The wrap is skipped for *type aliases*, whose value must stay in plain `Divergent`-form to be
-/// interpreted as a *type* rather than a value (feeding a `Type::Recursive` back into a type-alias
-/// value cycle changes the converged representation of the alias body). Two kinds are skipped:
-/// PEP 695 `type X = …` via its [`DefinitionKind`], and PEP 613 `X: TypeAlias = …` plus *implicit*
-/// aliases (`A = list["A"]`) via [`Type::is_recursion_value_like`] — their inferred value is a
-/// type-as-value (class object / generic alias / special form), not a runtime instance.
+/// Normalize one binding's type during cycle recovery.
 fn normalize_binding_for_cycle<'db>(
     db: &'db dyn Db,
-    binding: Definition<'db>,
     binding_ty: Type<'db>,
     previous: Option<Type<'db>>,
     cycle: &salsa::Cycle,
 ) -> Type<'db> {
-    let is_value_binding = !matches!(binding.kind(db), DefinitionKind::TypeAlias(_))
-        && binding_ty.is_recursion_value_like(db);
-
-    // Unwrapping is a no-op unless a previous iteration wrapped the provisional (which only happens
-    // for value bindings), so we can do it unconditionally and keep the iteration in
-    // "Divergent-space" — see `unwrap_head_recursive`.
-    let base = binding_ty.unwrap_head_recursive(db, cycle);
-    let normalized = match previous {
-        Some(previous) => {
-            base.cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-        }
-        None => base.recursive_type_normalized(db, cycle),
-    };
-
-    // Only value bindings are presented as a `Type::Recursive` μ-binder. Fold structural divergent
-    // into the binder, but do **not** finalize a structureless cycle to `Never` here: that belongs
-    // to the place-cycle recovery (`place_by_id` / `cycle_normalized_recursive`). Applying it to a
-    // binding would wrongly collapse a self-referential *declaration*'s binding cycle — e.g.
-    // `int: int = 0`, whose annotation refers to the field being declared — to `Never`, making the
-    // place fall back to its binding value and spuriously report the annotation as an invalid type.
-    if is_value_binding {
-        normalized.finalize_recursive_cycle_markers(db, cycle, true, false)
-    } else {
-        normalized
+    match previous {
+        Some(previous) => binding_ty.cycle_normalized(db, previous, cycle),
+        None => binding_ty.recursive_type_normalized(db, cycle),
     }
 }
 
@@ -1562,8 +1528,7 @@ impl<'db> StatementInferenceInner<'db> {
                 .iter()
                 .find(|(previous_binding, _)| previous_binding == binding)
                 .map(|(_, ty)| *ty);
-            *binding_ty =
-                normalize_binding_for_cycle(db, *binding, *binding_ty, previous_binding, cycle);
+            *binding_ty = normalize_binding_for_cycle(db, *binding_ty, previous_binding, cycle);
         }
         for (declaration, declaration_ty) in &mut self.declarations {
             if let Some((_, previous_declaration)) = previous_inference

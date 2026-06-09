@@ -70,9 +70,7 @@ impl<'db> UnionType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result
-                .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-                .finalize_recursive_cycle_markers(db, cycle, true, false)
+            result.cycle_normalized(db, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -740,9 +738,7 @@ impl<'db> IntersectionType<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
-            result
-                .cycle_normalized(db, previous.unwrap_head_recursive(db, cycle), cycle)
-                .finalize_recursive_cycle_markers(db, cycle, true, false)
+            result.cycle_normalized(db, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
