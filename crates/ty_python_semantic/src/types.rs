@@ -6696,7 +6696,18 @@ impl<'db> Type<'db> {
                 } if divergent.id() == binder_id.into_id() => *replacement,
                 _ => self,
             },
-            Type::Recursive(_) => self,
+            Type::Recursive(recursive) => match type_mapping {
+                TypeMapping::Materialize(_) => visitor.visit(db, self, type_mapping, || {
+                    let body = *recursive.body(db);
+                    let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if mapped == body {
+                        self
+                    } else {
+                        Type::recursive(db, recursive.binder_id(db), recursive.origin(db), mapped)
+                    }
+                }),
+                _ => self,
+            },
 
             Type::Never
             | Type::AlwaysTruthy
@@ -6779,7 +6790,14 @@ impl<'db> Type<'db> {
                 }
             }
             Type::Divergent(_) => {}
-            Type::Recursive(_) => {}
+            Type::Recursive(recursive) => visitor.visit(self, || {
+                recursive.body(db).find_legacy_typevars_impl(
+                    db,
+                    binding_context,
+                    typevars,
+                    visitor,
+                );
+            }),
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {

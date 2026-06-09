@@ -1549,7 +1549,10 @@ impl<'db> FunctionType<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        let signatures = self.signature(db);
+        let signatures = self
+            .updated_signature(db)
+            .cloned()
+            .unwrap_or_else(|| self.signature(db).clone());
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }

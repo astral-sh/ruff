@@ -1,9 +1,12 @@
 use super::*;
-use crate::db::tests::{TestDbBuilder, setup_db};
-use crate::place::{typing_extensions_symbol, typing_symbol};
+use crate::FxOrderSet;
+use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
+use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
+use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::Name;
 use test_case::test_case;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -307,9 +310,6 @@ fn divergent_type() {
 
 #[test]
 fn type_alias_variance() {
-    use crate::db::tests::TestDb;
-    use crate::place::global_symbol;
-
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
@@ -462,10 +462,90 @@ type RecursiveAlias2[T] = None | list[T] | list[RecursiveAlias2[T]]
 }
 
 #[test]
-fn eager_expansion() {
-    use crate::db::tests::TestDb;
-    use crate::place::global_symbol;
+fn recursive_alias_legacy_typevars() {
+    let db = setup_db();
+    let typevar = BoundTypeVarInstance::new(
+        &db,
+        TypeVarInstance::new(
+            &db,
+            TypeVarIdentity::new(&db, Name::new_static("T"), None, TypeVarKind::Legacy),
+            None,
+            None,
+            None,
+        ),
+        BindingContext::Synthetic,
+        None,
+    );
+    let binder_id = salsa::plumbing::Id::from_bits(1);
+    let recursive = Type::implicit_recursive(
+        &db,
+        binder_id,
+        KnownClass::List.to_specialized_instance(
+            &db,
+            &[UnionType::from_elements(
+                &db,
+                [Type::TypeVar(typevar), Type::divergent(binder_id)],
+            )],
+        ),
+    );
 
+    let mut typevars = FxOrderSet::default();
+    recursive.find_legacy_typevars(&db, None, &mut typevars);
+
+    assert_eq!(typevars.into_iter().collect::<Vec<_>>(), vec![typevar]);
+}
+
+#[test]
+fn any_over_type_visits_explicit_recursive_body() {
+    fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
+        let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
+        let ty = global_symbol(db, module, name).place.expect_type();
+        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+            type_alias,
+        ))) = ty
+        else {
+            panic!("Expected `{name}` to be a type alias");
+        };
+        type_alias
+    }
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+type RecursiveAlias = list[int | RecursiveAlias]
+"#,
+    )
+    .unwrap();
+
+    let recursive = get_type_alias(&db, "RecursiveAlias").value_type(&db);
+    assert!(visitor::any_over_type(&db, recursive, false, |ty| {
+        ty == KnownClass::Int.to_instance(&db)
+    }));
+}
+
+#[test]
+fn recursive_materialization_maps_body() {
+    let db = setup_db();
+    let binder_id = salsa::plumbing::Id::from_bits(1);
+    let recursive = Type::implicit_recursive(
+        &db,
+        binder_id,
+        Type::heterogeneous_tuple(&db, [Type::unknown(), Type::divergent(binder_id)]),
+    );
+
+    let top = recursive.top_materialization(&db);
+    let Type::Recursive(top_recursive) = top else {
+        panic!("Expected top materialization to preserve the recursive wrapper");
+    };
+    assert_eq!(
+        *top_recursive.body(&db),
+        Type::heterogeneous_tuple(&db, [Type::object(), Type::divergent(binder_id)])
+    );
+}
+
+#[test]
+fn eager_expansion() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
