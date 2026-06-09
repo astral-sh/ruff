@@ -578,6 +578,33 @@ impl SystemPathBuf {
     }
 }
 
+impl From<&SystemPath> for Box<SystemPath> {
+    fn from(path: &SystemPath) -> Self {
+        Box::from(path.to_path_buf())
+    }
+}
+
+impl From<SystemPathBuf> for Box<SystemPath> {
+    fn from(path: SystemPathBuf) -> Self {
+        let path = Box::into_raw(path.0.into_boxed_path()) as *mut SystemPath;
+        // SAFETY: SystemPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut Utf8Path to a *mut SystemPath is valid.
+        unsafe { Box::from_raw(path) }
+    }
+}
+
+impl Clone for Box<SystemPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
+    }
+}
+
 impl Borrow<SystemPath> for SystemPathBuf {
     fn borrow(&self) -> &SystemPath {
         self.as_path()
@@ -777,6 +804,33 @@ impl SystemVirtualPathBuf {
     #[inline]
     pub const fn as_path(&self) -> &SystemVirtualPath {
         SystemVirtualPath::new(self.0.as_str())
+    }
+}
+
+impl From<&SystemVirtualPath> for Box<SystemVirtualPath> {
+    fn from(path: &SystemVirtualPath) -> Self {
+        Box::from(path.to_path_buf())
+    }
+}
+
+impl From<SystemVirtualPathBuf> for Box<SystemVirtualPath> {
+    fn from(path: SystemVirtualPathBuf) -> Self {
+        let path = Box::into_raw(path.0.into_boxed_str()) as *mut SystemVirtualPath;
+        // SAFETY: SystemVirtualPath is marked as #[repr(transparent)] so the conversion from a
+        // *mut str to a *mut SystemVirtualPath is valid.
+        unsafe { Box::from_raw(path) }
+    }
+}
+
+impl Clone for Box<SystemVirtualPath> {
+    fn clone(&self) -> Self {
+        Box::from(&**self)
+    }
+}
+
+impl get_size2::GetSize for Box<SystemVirtualPath> {
+    fn get_heap_size_with_tracker<T: get_size2::GetSizeTracker>(&self, tracker: T) -> (usize, T) {
+        (std::mem::size_of_val(&**self), tracker)
     }
 }
 

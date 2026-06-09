@@ -429,8 +429,8 @@ mod tests {
                     // For snapshots, just normalize all paths to using
                     // Unix slashes for simplicity.
                     let path_components = match module.file(self.db).path(self.db) {
-                        FilePath::System(path) => path.as_path().components(),
-                        FilePath::Vendored(path) => path.as_path().components(),
+                        FilePath::System(path) => path.components(),
+                        FilePath::Vendored(path) => path.components(),
                         FilePath::SystemVirtual(path) => Utf8Path::new(path.as_str()).components(),
                     };
                     let nice_path = path_components
