@@ -17,16 +17,18 @@ use crate::types::{
     TypedDictType,
 };
 
-/// Return the key used by type-transform visitors for cycle detection.
-///
-/// Recursive origins that can appear as ordinary `Type` variants are keyed by
-/// their `Type::Recursive` wrapper, so the generic cycle detector does not need
-/// origin-specific identity logic.
-pub(crate) fn type_transform_visit_key<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    match ty {
-        Type::FunctionLiteral(function) => function.recursive_type(db),
-        Type::NewTypeInstance(newtype) => newtype.recursive_type(db),
-        _ => ty,
+impl<'db> Type<'db> {
+    /// Return the key used by type-transform visitors for cycle detection.
+    ///
+    /// Recursive origins that can appear as ordinary `Type` variants are keyed by
+    /// their `Type::Recursive` wrapper, so the generic cycle detector does not need
+    /// origin-specific identity logic.
+    pub(crate) fn visit_key(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(function) => function.try_to_recursive_type(db),
+            Type::NewTypeInstance(newtype) => newtype.try_to_recursive_type(db),
+            _ => self,
+        }
     }
 }
 
@@ -103,7 +105,7 @@ impl<'db> RecursiveOrigin<'db> {
     }
 
     pub(crate) fn contains_in_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        recursive_origin_contains_in_type(db, self, ty)
+        visitor::any_over_type(db, ty, false, |inner| self.matches_type(db, inner))
     }
 
     pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
@@ -154,18 +156,6 @@ impl<'db> RecursiveOrigin<'db> {
             Some(fallback)
         }
     }
-}
-
-#[salsa::tracked(
-    cycle_initial = |_, _, _, _| true,
-    heap_size = ruff_memory_usage::heap_size,
-)]
-fn recursive_origin_contains_in_type<'db>(
-    db: &'db dyn Db,
-    origin: RecursiveOrigin<'db>,
-    ty: Type<'db>,
-) -> bool {
-    visitor::any_over_type(db, ty, false, |inner| origin.matches_type(db, inner))
 }
 
 /// An explicit μ-binder. Represents `μα. body` where `α` is the
@@ -244,7 +234,10 @@ impl<'db> RecursiveType<'db> {
     /// matters.
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = *self.body(db);
-        let replacement = self.origin(db).source_type().unwrap_or(Type::Recursive(self));
+        let replacement = self
+            .origin(db)
+            .source_type()
+            .unwrap_or(Type::Recursive(self));
         let mapping = TypeMapping::ReplaceDivergent {
             binder_id: self.binder(db),
             replacement,
