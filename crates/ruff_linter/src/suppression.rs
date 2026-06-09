@@ -275,13 +275,20 @@ impl Suppressions {
                 continue;
             }
 
-            if suppression.range.contains_range(range)
-                || suppression.is_ignore()
-                    && (suppression.range.contains(range.start())
-                        || diagnostic
-                            .parent()
-                            .is_some_and(|parent| suppression.range.contains(parent)))
-            {
+            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
+            // its parent) is covered by the diagnostic. Range suppression comments must fully
+            // contain the diagnostic range.
+            let suppressed = if suppression.is_ignore() {
+                suppression.range.contains(range.start())
+                    || range.is_empty() && suppression.range.end() == range.start()
+                    || diagnostic
+                        .parent()
+                        .is_some_and(|parent| suppression.range.contains(parent))
+            } else {
+                suppression.range.contains_range(range)
+            };
+
+            if suppressed {
                 suppression.used.set(true);
                 return true;
             }
