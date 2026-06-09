@@ -535,6 +535,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     source_definition: Definition<'db>,
     target_definition: Definition<'db>,
     relation: TypeRelation,
+    use_constraint_set_rules: bool,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -542,11 +543,13 @@ impl<'db> SignatureRelationKey<'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         relation: TypeRelation,
+        use_constraint_set_rules: bool,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
+            use_constraint_set_rules,
         })
     }
 }
@@ -1585,7 +1588,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if self.relation.is_constraint_set_assignability() {
+        if self.use_constraint_set_rules {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(source_overloads);
@@ -1695,7 +1698,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.relation.is_constraint_set_assignability()
+                if self.use_constraint_set_rules
                     && (source_signature
                         .parameters
                         .as_paramspec_with_prefix()
@@ -1826,7 +1829,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(key) = SignatureRelationKey::from_signatures(source, target, self.relation) else {
+        let Some(key) = SignatureRelationKey::from_signatures(
+            source,
+            target,
+            self.relation,
+            self.use_constraint_set_rules,
+        ) else {
             return work();
         };
 
@@ -1993,7 +2001,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        if self.relation.is_constraint_set_assignability() {
+        if self.use_constraint_set_rules {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
             let target_paramspec = target.parameters.as_paramspec_with_prefix();
 
@@ -2751,7 +2759,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
                 ),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
+                TypeRelation::Assignability => result,
             };
         }
 

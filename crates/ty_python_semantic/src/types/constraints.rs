@@ -4997,6 +4997,9 @@ impl SequentMap {
         let bound_typevar = bound_constraint_data.typevar;
         let constrained_constraint_data = builder.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
+
+        // Transitive pivots require subtyping; classes with dynamic bases can be assignable to
+        // unrelated types without being subtypes.
         let (new_lower, new_upper) = match (
             constrained_constraint_data.bounds.lower,
             constrained_constraint_data.bounds.upper,
@@ -5038,7 +5041,7 @@ impl SequentMap {
                     && !constrained_upper.is_object()
                     && constrained_upper
                         .top_materialization(db)
-                        .is_constraint_set_assignable_to(
+                        .is_constraint_set_subtype_of(
                             db,
                             bound_lower.bottom_materialization(db),
                         ) =>
@@ -5052,7 +5055,7 @@ impl SequentMap {
                     && !constrained_lower.is_object()
                     && bound_upper
                         .top_materialization(db)
-                        .is_constraint_set_assignable_to(
+                        .is_constraint_set_subtype_of(
                             db,
                             constrained_lower.bottom_materialization(db),
                         ) =>
