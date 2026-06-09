@@ -25,8 +25,8 @@ use crate::checkers::ast::Checker;
 /// holding context managers open across yields.
 ///
 /// The rule also suppresses diagnostics for functions decorated with
-/// `@pytest.fixture` or `@pytest_asyncio.fixture`, as the pytest runner
-/// handles generator cleanup automatically.
+/// `@pytest.fixture`, `@pytest_asyncio.fixture`, or `@trio.as_safe_channel`,
+/// as these handle async generator cleanup safely.
 ///
 /// ## Example
 ///
@@ -87,8 +87,9 @@ pub(crate) fn yield_in_context_manager_in_async_generator(checker: &Checker, exp
         return;
     };
 
-    // If the function is decorated with `@asynccontextmanager` or `@pytest.fixture`,
-    // the yield is safe — these decorators handle async generator cleanup properly.
+    // If the function is decorated with a known-safe decorator
+    // (`@asynccontextmanager`, `@pytest.fixture`, or `@trio.as_safe_channel`),
+    // the yield is safe.
     if has_safe_decorator(checker, function_def) {
         return;
     }
@@ -122,9 +123,9 @@ fn enclosing_async_function<'a>(checker: &Checker<'a>) -> Option<&'a ast::StmtFu
     None
 }
 
-/// Returns `true` if the function is decorated with `@asynccontextmanager`
-/// or `@pytest.fixture`, which are known to handle async generator cleanup
-/// safely.
+/// Returns `true` if the function is decorated with `@asynccontextmanager`,
+/// `@pytest.fixture`, or `@trio.as_safe_channel`, which are known to handle
+/// async generator cleanup safely.
 fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         checker
@@ -135,6 +136,7 @@ fn has_safe_decorator(checker: &Checker, function_def: &ast::StmtFunctionDef) ->
                     qualified_name.segments(),
                     ["contextlib", "asynccontextmanager"]
                         | ["pytest" | "pytest_asyncio", "fixture"]
+                        | ["trio", "as_safe_channel"]
                 )
             })
     })
