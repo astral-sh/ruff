@@ -1035,31 +1035,23 @@ fn large_isinstance_narrowing_across_calls_code(mixed_calls: bool) -> String {
 fn benchmark_large_isinstance_narrowing_across_calls(criterion: &mut Criterion) {
     setup_rayon();
 
-    let code = large_isinstance_narrowing_across_calls_code(false);
-    criterion.bench_function("ty_micro[large_isinstance_narrowing_across_calls]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
-
-    let code = large_isinstance_narrowing_across_calls_code(true);
-    criterion.bench_function("ty_micro[large_isinstance_narrowing_mixed_calls]", |b| {
-        b.iter_batched_ref(
-            || setup_micro_case(&code),
-            |case| {
-                let Case { db, .. } = case;
-                let result = db.check();
-                assert_eq!(result.len(), 0);
-            },
-            BatchSize::SmallInput,
-        );
-    });
+    for (name, mixed_calls) in [
+        ("ty_micro[large_isinstance_narrowing_across_calls]", false),
+        ("ty_micro[large_isinstance_narrowing_mixed_calls]", true),
+    ] {
+        let code = large_isinstance_narrowing_across_calls_code(mixed_calls);
+        criterion.bench_function(name, |b| {
+            b.iter_batched_ref(
+                || setup_micro_case(&code),
+                |case| {
+                    let Case { db, .. } = case;
+                    let result = db.check();
+                    assert_eq!(result.len(), 0);
+                },
+                BatchSize::SmallInput,
+            );
+        });
+    }
 }
 
 const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;

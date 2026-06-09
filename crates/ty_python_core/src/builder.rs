@@ -3899,22 +3899,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         if self.in_function_scope() {
                             self.record_reachability_constraint_id(predicate_id);
-
-                            // Also gate narrowing by this constraint: if the call returns
-                            // `Never`, any narrowing in the current branch should be
-                            // invalidated (since this path is unreachable). This enables
-                            // narrowing to be preserved after if-statements where one branch
-                            // calls a `NoReturn` function like `sys.exit()`.
-                            self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
-                        } else {
-                            // In non-function scopes, we only record a narrowing constraint
-                            // (not a reachability constraint). Recording reachability for
-                            // calls in module scope is simply too expensive, and it's not
-                            // too important of a use case.
-                            self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         }
+
+                        // Gate narrowing by this constraint: if the call returns `Never`, any
+                        // narrowing in the current branch should be invalidated. In non-function
+                        // scopes, only record narrowing because call reachability is too expensive.
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_all_places(narrowing_constraint);
                     }
                 }
             }

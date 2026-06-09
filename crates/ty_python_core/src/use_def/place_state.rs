@@ -598,6 +598,10 @@ fn merge_narrowing_constraints(
     branch: ScopedNarrowingConstraint,
     preceding_branch_predicates: &[ScopedPredicateId],
 ) -> ScopedNarrowingConstraint {
+    if accumulated == branch {
+        return accumulated;
+    }
+
     if preceding_branch_predicates.is_empty() {
         return constraints.add_bdd_or_constraint(accumulated, branch);
     }
