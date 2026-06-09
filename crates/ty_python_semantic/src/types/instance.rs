@@ -745,7 +745,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
-    pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn try_to_recursive_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
             Protocol::FromClass(class) if class.has_interface_override() => {
                 Type::ProtocolInstance(self)
@@ -755,11 +755,63 @@ impl<'db> ProtocolInstanceType<'db> {
             {
                 Type::ProtocolInstance(self)
             }
-            Protocol::FromClass(class) => protocol_class_recursive_type(db, class.class_type()),
-            Protocol::Synthesized(synthesized) => {
-                synthesized_protocol_recursive_type(db, synthesized.interface())
+            Protocol::FromClass(class) => {
+                let Some(protocol_class) = class.class_type().into_protocol_class(db) else {
+                    return Type::instance(db, class.class_type());
+                };
+                ProtocolInstanceType::from_class(protocol_class)
+                    .protocol_recursive_type_impl(db, protocol_class.interface(db))
             }
+            Protocol::Synthesized(synthesized) => ProtocolInstanceType::synthesized(synthesized)
+                .protocol_recursive_type_impl(db, synthesized.interface()),
         }
+    }
+
+    fn protocol_recursive_type_impl(
+        &self,
+        db: &'db dyn Db,
+        interface: ProtocolInterface<'db>,
+    ) -> Type<'db> {
+        let origin = RecursiveOrigin::Protocol(*self);
+        let callable_has_origin = |callable: CallableType<'db>| {
+            origin.contains_in_type(db, Type::Callable(callable.bind_self(db, None)))
+        };
+        let accessor_has_origin = |accessor: Type<'db>| match accessor {
+            Type::FunctionLiteral(function) => callable_has_origin(function.into_callable_type(db)),
+            Type::Callable(callable) => callable_has_origin(callable),
+            ty => origin.contains_in_type(db, ty),
+        };
+        let property_has_origin = |property: PropertyInstanceType<'db>| {
+            property.getter(db).is_some_and(accessor_has_origin)
+                || property.setter(db).is_some_and(accessor_has_origin)
+                || property.deleter(db).is_some_and(accessor_has_origin)
+        };
+
+        if !interface.members(db).any(|member| match member.ty() {
+            Type::Callable(callable) => callable_has_origin(callable),
+            Type::PropertyInstance(property) => property_has_origin(property),
+            ty => origin.contains_in_type(db, ty),
+        }) {
+            return Type::ProtocolInstance(*self);
+        }
+
+        origin
+            .build_recursive(db, |_binder_id, type_mapping, visitor| {
+                let mapped_interface = interface.apply_type_mapping_impl(
+                    db,
+                    &type_mapping,
+                    TypeContext::default(),
+                    visitor,
+                );
+                // Preserve class-based protocols when no self-reference was replaced.
+                let body = if mapped_interface == interface {
+                    Type::ProtocolInstance(*self)
+                } else {
+                    Type::ProtocolInstance(self.with_interface(mapped_interface))
+                };
+                (body, Type::ProtocolInstance(*self))
+            })
+            .unwrap_or(Type::ProtocolInstance(*self))
     }
 
     /// Return the meta-type of this protocol-instance type.
@@ -896,88 +948,6 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.inner.variance_of(db, typevar)
     }
-}
-
-fn protocol_recursive_type_impl<'db>(
-    db: &'db dyn Db,
-    protocol: ProtocolInstanceType<'db>,
-    interface: ProtocolInterface<'db>,
-) -> Type<'db> {
-    let origin = RecursiveOrigin::Protocol(protocol);
-    let callable_has_origin = |callable: CallableType<'db>| {
-        origin.contains_in_type(db, Type::Callable(callable.bind_self(db, None)))
-    };
-    let accessor_has_origin = |accessor: Type<'db>| match accessor {
-        Type::FunctionLiteral(function) => callable_has_origin(function.into_callable_type(db)),
-        Type::Callable(callable) => callable_has_origin(callable),
-        ty => origin.contains_in_type(db, ty),
-    };
-    let property_has_origin = |property: PropertyInstanceType<'db>| {
-        property.getter(db).is_some_and(accessor_has_origin)
-            || property.setter(db).is_some_and(accessor_has_origin)
-            || property.deleter(db).is_some_and(accessor_has_origin)
-    };
-
-    if !interface.members(db).any(|member| match member.ty() {
-        Type::Callable(callable) => callable_has_origin(callable),
-        Type::PropertyInstance(property) => property_has_origin(property),
-        ty => origin.contains_in_type(db, ty),
-    }) {
-        return Type::ProtocolInstance(protocol);
-    }
-
-    origin
-        .build_recursive(db, |_binder_id, type_mapping, visitor| {
-            let mapped_interface = interface.apply_type_mapping_impl(
-                db,
-                &type_mapping,
-                TypeContext::default(),
-                visitor,
-            );
-            // Preserve class-based protocols when no self-reference was replaced.
-            let body = if mapped_interface == interface {
-                Type::ProtocolInstance(protocol)
-            } else {
-                Type::ProtocolInstance(protocol.with_interface(mapped_interface))
-            };
-            (body, Type::ProtocolInstance(protocol))
-        })
-        .unwrap_or(Type::ProtocolInstance(protocol))
-}
-
-#[salsa::tracked(
-    cycle_initial=|db: &'db dyn Db, _, class: ClassType<'db>| class.into_protocol_class(db).map_or_else(
-        || Type::instance(db, class),
-        |protocol| Type::ProtocolInstance(ProtocolInstanceType::from_class(protocol))
-    ),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn protocol_class_recursive_type<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Type<'db> {
-    let Some(protocol_class) = class.into_protocol_class(db) else {
-        return Type::instance(db, class);
-    };
-    protocol_recursive_type_impl(
-        db,
-        ProtocolInstanceType::from_class(protocol_class),
-        protocol_class.interface(db),
-    )
-}
-
-#[salsa::tracked(
-    cycle_initial=|_, _, interface| Type::ProtocolInstance(ProtocolInstanceType::synthesized(
-        SynthesizedProtocolType::new(interface)
-    )),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn synthesized_protocol_recursive_type<'db>(
-    db: &'db dyn Db,
-    interface: ProtocolInterface<'db>,
-) -> Type<'db> {
-    protocol_recursive_type_impl(
-        db,
-        ProtocolInstanceType::synthesized(SynthesizedProtocolType::new(interface)),
-        interface,
-    )
 }
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class

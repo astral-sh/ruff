@@ -82,7 +82,6 @@ use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::recursive::RecursiveOrigin;
-use crate::types::recursive::type_transform_visit_key;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
@@ -283,7 +282,7 @@ impl<'db> ApplyTypeMappingVisitor<'db> {
         type_mapping: &TypeMapping<'_, 'db>,
         func: impl FnOnce() -> Type<'db>,
     ) -> Type<'db> {
-        let visit_key = type_transform_visit_key(db, ty);
+        let visit_key = ty.visit_key(db);
         match type_mapping {
             TypeMapping::Materialize(MaterializationKind::Top) => self
                 .top_materialization

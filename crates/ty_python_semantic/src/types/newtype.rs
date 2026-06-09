@@ -110,8 +110,33 @@ impl<'db> NewType<'db> {
         Type::object()
     }
 
-    pub(crate) fn recursive_type(self, db: &'db dyn Db) -> Type<'db> {
-        newtype_recursive_type(db, self)
+    pub(crate) fn try_to_recursive_type(self, db: &'db dyn Db) -> Type<'db> {
+        let NewTypeBase::ClassType(base_class) = self.base(db) else {
+            return Type::NewTypeInstance(self);
+        };
+
+        let base_ty = Type::instance(db, base_class);
+        let origin = RecursiveOrigin::NewType(self);
+        if !origin.contains_in_type(db, base_ty) {
+            return Type::NewTypeInstance(self);
+        }
+        origin
+            .build_recursive(db, |_binder_id, type_mapping, visitor| {
+                let body = if let Type::NominalInstance(mapped_base) = base_ty
+                    .apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
+                {
+                    Type::NewTypeInstance(NewType::new(
+                        db,
+                        self.name(db).clone(),
+                        self.definition(db),
+                        Some(NewTypeBase::ClassType(mapped_base.class(db))),
+                    ))
+                } else {
+                    Type::NewTypeInstance(self)
+                };
+                (body, Type::NewTypeInstance(self))
+            })
+            .unwrap_or(Type::NewTypeInstance(self))
     }
 
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Self) -> bool {
@@ -200,39 +225,6 @@ impl<'db> NewType<'db> {
             eager_base,
         ))
     }
-}
-
-#[salsa::tracked(
-    cycle_initial=|_, _, newtype| Type::NewTypeInstance(newtype),
-    heap_size=ruff_memory_usage::heap_size
-)]
-fn newtype_recursive_type<'db>(db: &'db dyn Db, newtype: NewType<'db>) -> Type<'db> {
-    let NewTypeBase::ClassType(base_class) = newtype.base(db) else {
-        return Type::NewTypeInstance(newtype);
-    };
-
-    let base_ty = Type::instance(db, base_class);
-    let origin = RecursiveOrigin::NewType(newtype);
-    if !origin.contains_in_type(db, base_ty) {
-        return Type::NewTypeInstance(newtype);
-    }
-    origin
-        .build_recursive(db, |_binder_id, type_mapping, visitor| {
-            let body = if let Type::NominalInstance(mapped_base) =
-                base_ty.apply_type_mapping_impl(db, &type_mapping, TypeContext::default(), visitor)
-            {
-                Type::NewTypeInstance(NewType::new(
-                    db,
-                    newtype.name(db).clone(),
-                    newtype.definition(db),
-                    Some(NewTypeBase::ClassType(mapped_base.class(db))),
-                ))
-            } else {
-                Type::NewTypeInstance(newtype)
-            };
-            (body, Type::NewTypeInstance(newtype))
-        })
-        .unwrap_or(Type::NewTypeInstance(newtype))
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
