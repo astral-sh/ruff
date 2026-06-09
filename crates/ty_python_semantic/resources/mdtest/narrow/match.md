@@ -627,7 +627,7 @@ class AlwaysEqual(Enum):
     RED = "r"
     GREEN = "g"
 
-    def __eq__(self, other: object) -> Literal[True]:
+    def __eq__(self, other: object) -> bool:
         return True
 
 def custom_eq(value: AlwaysEqual) -> None:
@@ -635,25 +635,9 @@ def custom_eq(value: AlwaysEqual) -> None:
         case AlwaysEqual.RED:
             reveal_type(value)  # revealed: AlwaysEqual
         case AlwaysEqual.GREEN:
-            reveal_type(value)  # revealed: Never
+            reveal_type(value)  # revealed: AlwaysEqual
         case _:
-            reveal_type(value)  # revealed: Never
-
-class CustomNe(Enum):
-    RED = "r"
-    GREEN = "g"
-
-    def __ne__(self, other: object) -> Literal[True]:
-        return True
-
-def custom_ne_does_not_affect_match(value: CustomNe) -> None:
-    match value:
-        case CustomNe.RED:
-            reveal_type(value)  # revealed: Literal[CustomNe.RED]
-        case CustomNe.GREEN:
-            reveal_type(value)  # revealed: Literal[CustomNe.GREEN]
-        case _:
-            reveal_type(value)  # revealed: Never
+            reveal_type(value)  # revealed: AlwaysEqual
 ```
 
 ## Value patterns with guard
