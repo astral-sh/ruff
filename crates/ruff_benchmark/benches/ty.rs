@@ -959,22 +959,49 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
 /// class C1(Base): ...
 /// ...
 ///
-/// def noop() -> None: ...
-///
 /// def f(obj: Base) -> None:
 ///     if isinstance(obj, C0):
-///         noop()
+///         pass
 ///     elif isinstance(obj, C1):
-///         noop()
-///     ...
-///     else:
-///         return
-///
-///     obj
-///     obj
+///         pass
 ///     ...
 /// ```
-fn large_isinstance_narrowing_code(mixed_calls: bool) -> String {
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+
+    setup_rayon();
+
+    let mut code = "class Base: ...\n".to_string();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    code.push('\n');
+
+    code.push_str("def f(obj: Base) -> None:\n");
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        code.push_str("        pass\n");
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Benchmark for preserving compact narrowing across calls in a long `isinstance` elif chain.
+fn large_isinstance_narrowing_across_calls_code(mixed_calls: bool) -> String {
     const NUM_CLASSES: usize = 50;
     const NUM_USES: usize = 10;
 
@@ -1005,11 +1032,11 @@ fn large_isinstance_narrowing_code(mixed_calls: bool) -> String {
     code
 }
 
-fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+fn benchmark_large_isinstance_narrowing_across_calls(criterion: &mut Criterion) {
     setup_rayon();
 
-    let code = large_isinstance_narrowing_code(false);
-    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+    let code = large_isinstance_narrowing_across_calls_code(false);
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_across_calls]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -1021,7 +1048,7 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
         );
     });
 
-    let code = large_isinstance_narrowing_code(true);
+    let code = large_isinstance_narrowing_across_calls_code(true);
     criterion.bench_function("ty_micro[large_isinstance_narrowing_mixed_calls]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
@@ -1617,6 +1644,7 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_large_isinstance_narrowing_across_calls,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
