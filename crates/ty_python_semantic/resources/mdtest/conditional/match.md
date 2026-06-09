@@ -198,6 +198,28 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
+### Dynamic class
+
+A dynamically typed class pattern is not known to match every subject, so later cases remain
+reachable.
+
+```py
+from typing import Any
+
+DynamicClass: Any = int
+
+def _(target: int | str):
+    match target:
+        case DynamicClass():
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
 ### `collections.abc.Callable`
 
 ```py
