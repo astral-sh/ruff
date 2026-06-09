@@ -1177,34 +1177,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    /// Finalize cycle markers after fixed-point normalization.
-    pub(crate) fn finalize_recursive_cycle_markers(
-        self,
-        db: &'db dyn Db,
-        cycle: &salsa::Cycle,
-        fold_structural: bool,
-        resolve_structureless: bool,
-    ) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
-            let has_structural_marker = match ty {
-                Type::Divergent(_) => false,
-                Type::Union(union) => union.elements(db).iter().any(|element| {
-                    !matches!(element, Type::Divergent(d) if d.id() == id)
-                        && element.contains_divergent_with_id(db, id)
-                }),
-                other => other.contains_divergent_with_id(db, id),
-            };
-
-            if fold_structural && has_structural_marker {
-                Type::implicit_recursive(db, id, ty)
-            } else if resolve_structureless && ty == Type::divergent(id) {
-                Type::Never
-            } else {
-                ty
-            }
-        })
-    }
-
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
@@ -1269,6 +1241,8 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let previous = previous.unwrap_head_recursive(db, cycle);
+
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -2389,10 +2363,54 @@ impl<'db> Type<'db> {
     /// Then `tuple[tuple[Divergent, Literal[1]], Literal[1]]` is replaced with `tuple[Divergent, Literal[1]]` and the query converges.
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
-        cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
-                .unwrap_or(Type::divergent(id))
-        })
+        cycle
+            .head_ids()
+            .fold(self.unwrap_head_recursive(db, cycle), |ty, id| {
+                let marker = Type::divergent(id);
+                let normalized = ty
+                    .recursive_type_normalized_impl(db, marker, false)
+                    .unwrap_or(marker);
+                normalized.fold_structural_cycle_marker(db, id)
+            })
+    }
+
+    fn fold_structural_cycle_marker(self, db: &'db dyn Db, id: salsa::Id) -> Self {
+        let has_structural_marker = match self {
+            Type::Divergent(_) => false,
+            Type::Union(union) => union.elements(db).iter().any(|element| {
+                !matches!(element, Type::Divergent(d) if d.id() == id)
+                    && element.contains_divergent_with_id(db, id)
+            }),
+            other => other.contains_divergent_with_id(db, id),
+        };
+
+        if has_structural_marker && self.supports_implicit_cycle_marker_fold(db) {
+            let body = self.without_bare_cycle_marker(db, id);
+            Type::implicit_recursive(db, id, body)
+        } else {
+            self
+        }
+    }
+
+    fn without_bare_cycle_marker(self, db: &'db dyn Db, id: salsa::Id) -> Self {
+        match self {
+            Type::Union(union) => UnionType::from_elements_cycle_recovery(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .copied()
+                    .filter(|element| !matches!(element, Type::Divergent(d) if d.id() == id)),
+            ),
+            _ => self,
+        }
+    }
+
+    fn supports_implicit_cycle_marker_fold(self, db: &'db dyn Db) -> bool {
+        // Function recursion is represented by explicit `RecursiveOrigin::Function` wrappers.
+        // Implicit callable cycles should stay in `Divergent` form for signature recovery.
+        !matches!(self, Type::Callable(_) | Type::FunctionLiteral(_))
+            && self.is_recursion_value_like(db)
     }
 
     /// Normalizes types including divergent types (recursive types), which is necessary for convergence of fixed-point iteration.
@@ -2420,19 +2438,17 @@ impl<'db> Type<'db> {
         if nested && self.same_divergent_marker(div) {
             return None;
         }
-        // An implicit recursive type is folded back to its own `Divergent`
-        // marker during normalization. This keeps the fixed-point iteration in "Divergent-space":
-        // a wrapped provisional (`Type::Recursive`) read back into a fresh body collapses to a flat
-        // marker rather than nesting. Crucially, this also flattens recursive types minted by
-        // *other* cycles in the same strongly-connected component (cross-instance member lookups,
-        // mutually-recursive attributes, loop-carried locals), so re-wrapping cannot nest μ-binders
-        // and blow up. The binder's own id is preserved (unlike `None`, which would relabel the
-        // marker as the head currently being normalized). Recursive types with an explicit origin
-        // are left intact.
+        // A top-level implicit recursive type for the marker currently being normalized is folded
+        // back to its own `Divergent` marker. Implicit recursive types for other cycle heads are
+        // already canonical markers for those heads and must be preserved.
         if let Type::Recursive(rec) = self
             && rec.is_implicit(db)
         {
-            return Some(Type::divergent(rec.binder_id(db)));
+            let marker = Type::divergent(rec.binder_id(db));
+            if marker.same_divergent_marker(div) {
+                return Some(marker);
+            }
+            return Some(self);
         }
         match self {
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
@@ -2977,9 +2993,7 @@ impl<'db> Type<'db> {
     #[salsa::tracked(
         cycle_initial=|db, id, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
         cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            // Present a recursively-defined member (e.g. a cross-instance attribute
-            // `self.x = (other.x, …)`) as a true `Type::Recursive` so it unfolds on demand.
-            member.cycle_normalized_recursive(db, *previous, cycle)
+            member.cycle_normalized(db, *previous, cycle)
         },
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -3761,7 +3775,7 @@ impl<'db> Type<'db> {
             // `place_by_id`'s seed, so every cycle-recovery query starts in the same shape.
             cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
-                member.cycle_normalized_recursive(db, *previous, cycle)
+                member.cycle_normalized(db, *previous, cycle)
             },
             heap_size=ruff_memory_usage::heap_size
         )]

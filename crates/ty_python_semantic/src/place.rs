@@ -978,28 +978,17 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers { place, qualifiers }
+        PlaceAndQualifiers { place, qualifiers }.resolve_structureless_cycle_marker(cycle)
     }
 
-    /// Like [`cycle_normalized`][Self::cycle_normalized], but presents a recursively-defined place
-    /// type as a true `Type::Recursive` μ-binder so structural operations (subscript, iteration, …)
-    /// unfold it on demand instead of bottoming out at the bare `Divergent` marker.
-    ///
-    /// Used by *value*-level place cycles: implicit instance attributes and attribute access
-    /// through an instance. The wrap is stripped from both operands before the union and the body
-    /// is folded back to `Divergent`-space by `recursive_type_normalized`, so convergence is
-    /// unchanged. Must **not** be used for type-alias value resolution.
-    pub(crate) fn cycle_normalized_recursive(
-        self,
-        db: &'db dyn Db,
-        previous: Self,
-        cycle: &salsa::Cycle,
-    ) -> Self {
-        let current = self.map_type(|ty| ty.unwrap_head_recursive(db, cycle));
-        let previous = previous.map_type(|ty| ty.unwrap_head_recursive(db, cycle));
-        current
-            .cycle_normalized(db, previous, cycle)
-            .map_type(|ty| ty.finalize_recursive_cycle_markers(db, cycle, true, true))
+    fn resolve_structureless_cycle_marker(self, cycle: &salsa::Cycle) -> Self {
+        self.map_type(|ty| {
+            if cycle.head_ids().any(|id| ty == Type::divergent(id)) {
+                Type::Never
+            } else {
+                ty
+            }
+        })
     }
 }
 
@@ -1012,12 +1001,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 #[salsa::tracked(
     cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
-        // A structureless place cycle (e.g. a cyclic import `A = A`, or a loop-carried local with
-        // no base case) has no inhabitant; resolve it to `Never` rather than exposing the bare
-        // `Divergent` marker. Structural recursion is unaffected.
-        place
-            .cycle_normalized(db, *previous, cycle)
-            .map_type(|ty| ty.finalize_recursive_cycle_markers(db, cycle, false, true))
+        place.cycle_normalized(db, *previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]

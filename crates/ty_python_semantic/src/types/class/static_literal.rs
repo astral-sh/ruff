@@ -3220,11 +3220,8 @@ fn implicit_attribute_cycle_recover<'db>(
     member: Member<'db>,
     _attribute: ImplicitAttributeName<'db>,
 ) -> Member<'db> {
-    // Present a recursively-defined implicit attribute as a true `Type::Recursive` μ-binder so
-    // structural operations (subscript, iteration, …) unfold it on demand instead of bottoming out
-    // at the bare `Divergent` marker.
     let inner = member
         .inner
-        .cycle_normalized_recursive(db, previous_member.inner, cycle);
+        .cycle_normalized(db, previous_member.inner, cycle);
     Member { inner }
 }
