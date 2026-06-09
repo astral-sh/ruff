@@ -198,7 +198,12 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          uvx black "${VENDORED_TYPESHED}/stdlib" --config "${VENDORED_TYPESHED}/pyproject.toml" || true
+          # TODO: Switch to a released version of Black once a release includes
+          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+          uvx \
+            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+            black "${VENDORED_TYPESHED}/stdlib" \
+            --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
       - name: Remove typeshed pyproject.toml file
         if: ${{ success() }}
