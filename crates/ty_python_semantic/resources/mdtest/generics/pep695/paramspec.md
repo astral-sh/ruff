@@ -681,6 +681,17 @@ def keyword_only2(*, y: int) -> int:
 # common supertype, so it should result in an error.
 # error: [invalid-argument-type] "Argument to function `multiple` is incorrect: Expected `(*, x: int) -> int`, found `def keyword_only2(*, y: int) -> int`"
 reveal_type(multiple(keyword_only1, keyword_only2))  # revealed: (*, x: int) -> bool
+
+def takes_int(value: int) -> int:
+    return value
+
+def takes_str(value: str) -> int:
+    return len(value)
+
+# A return-type context must not change the first-seen behavior for actual arguments.
+# error: [invalid-assignment]
+# error: [invalid-argument-type]
+preferred_second: Callable[[str], bool] = multiple(takes_int, takes_str)
 ```
 
 ### Constructors of user-defined generic class on `ParamSpec`
