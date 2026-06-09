@@ -993,8 +993,11 @@ impl<'db> Type<'db> {
         Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
     }
 
-    /// One-step unfold of a recursive type.
-    pub(crate) fn unfold_recursive_once(self, db: &'db dyn Db) -> Self {
+    /// One-step unwrapping of a recursive type.
+    /// Unlike `unfold`, this is not binder-preserving.
+    /// Use `unfold` when applying type operations like subscript/iteration to recursive types. The operated type is also a recursive type.
+    /// Use `unwrap_recursive` when walking types, such as relation checking. In the case of walking, the operated type must be a finite type.
+    pub(crate) fn unwrap_recursive(self, db: &'db dyn Db) -> Self {
         match self {
             Type::Recursive(rec) => *rec.body(db),
             _ => self,

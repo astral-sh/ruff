@@ -132,11 +132,7 @@ where
     R: RecursiveRelation<'db, 'c>,
 {
     visitor.visit_pair(source, target, checker.relation_key(), || {
-        checker.check_structural(
-            db,
-            source.unfold_recursive_once(db),
-            target.unfold_recursive_once(db),
-        )
+        checker.check_structural(db, source.unwrap_recursive(db), target.unwrap_recursive(db))
     })
 }
 
