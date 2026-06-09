@@ -200,8 +200,9 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        enum_metadata, infer_narrowing_constraints, infer_reachability_expression_is_terminal,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -1110,10 +1111,11 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             let mut any_overload_is_generic = false;
 
             for overload in overloads_iterator {
-                let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
+                let return_ty = overload.return_ty.resolve_type_alias(db);
+                let returns_never = return_ty.is_equivalent_to(db, Type::Never);
                 no_overloads_return_never &= !returns_never;
                 all_overloads_return_never &= returns_never;
-                any_overload_is_generic |= overload.return_ty.has_typevar(db);
+                any_overload_is_generic |= return_ty.has_typevar(db);
             }
 
             if no_overloads_return_never && !any_overload_is_generic && !is_await {
@@ -1121,9 +1123,13 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty =
-                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
-                if call_expr_ty.is_equivalent_to(db, Type::Never) {
+                let is_terminal = if any_overload_is_generic {
+                    infer_reachability_expression_is_terminal(db, call_expr)
+                } else {
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default())
+                        .is_equivalent_to(db, Type::Never)
+                };
+                if is_terminal {
                     Truthiness::AlwaysFalse
                 } else {
                     Truthiness::AlwaysTrue
