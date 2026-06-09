@@ -1639,7 +1639,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         nested_bindings: NestedGlobalOrNonlocalDeclarations,
     ) {
         let mut nested_bindings = nested_bindings.into_iter().collect::<Vec<_>>();
-        nested_bindings.sort_unstable_by_key(|(name, _)| name.clone());
+        nested_bindings.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
 
         for (name, mut declarations) in nested_bindings {
             // Filter down to only the declarations with `is_bound: true`. If there are none left,
