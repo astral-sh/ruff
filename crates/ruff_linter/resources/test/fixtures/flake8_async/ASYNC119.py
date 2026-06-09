@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 import pytest
 import pytest_asyncio
 from trio import as_safe_channel
+import trio
 
 
 # Errors
@@ -92,5 +93,10 @@ async def safe_pytest_asyncio_fixture():
 
 @as_safe_channel
 async def safe_trio_as_safe_channel():
+    with open(""):
+        yield
+
+@trio.as_safe_channel
+async def safe_trio_as_safe_channel_qualified():
     with open(""):
         yield
