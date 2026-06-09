@@ -1562,14 +1562,14 @@ a: float<CURSOR> = 3.14
           |    ^^^^^ Clicking here
           |
         info: Found 2 definitions
-           --> stdlib/builtins.pyi:344:7
+           --> stdlib/builtins.pyi:348:7
             |
-        344 | class int:
+        348 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:658:7
+           ::: stdlib/builtins.pyi:667:7
             |
-        658 | class float:
+        667 | class float:
             |       -----
             |
         ");
@@ -1594,19 +1594,19 @@ a: complex<CURSOR> = 3.14
           |    ^^^^^^^ Clicking here
           |
         info: Found 3 definitions
-           --> stdlib/builtins.pyi:344:7
+           --> stdlib/builtins.pyi:348:7
             |
-        344 | class int:
+        348 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:658:7
+           ::: stdlib/builtins.pyi:667:7
             |
-        658 | class float:
+        667 | class float:
             |       -----
             |
-           ::: stdlib/builtins.pyi:820:7
+           ::: stdlib/builtins.pyi:830:7
             |
-        820 | class complex:
+        830 | class complex:
             |       -------
             |
         ");
@@ -2077,9 +2077,9 @@ p = Point<CURSOR>(1, 2)
           |     ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:256:9
+           --> stdlib/builtins.pyi:257:9
             |
-        256 |     def __dictoffset__(self) -> int: ...
+        257 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");
@@ -2165,9 +2165,9 @@ p = Point<CURSOR>(1, 2)
           |      ^^^^^^^^^^^^^^ Clicking here
           |
         info: Found 1 definition
-           --> stdlib/builtins.pyi:256:9
+           --> stdlib/builtins.pyi:257:9
             |
-        256 |     def __dictoffset__(self) -> int: ...
+        257 |     def __dictoffset__(self) -> int: ...
             |         --------------
             |
         ");
