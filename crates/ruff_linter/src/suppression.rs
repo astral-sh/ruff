@@ -115,6 +115,19 @@ impl Suppression {
             })
         )
     }
+
+    /// Return the [`Rule`] associated with this suppression.
+    fn rule(&self, preview: PreviewMode) -> Option<Rule> {
+        if let Ok(rule) = Rule::from_code(get_redirect_target(&self.code).unwrap_or(&self.code)) {
+            return Some(rule);
+        }
+
+        if is_human_readable_names_enabled(preview) {
+            return Rule::from_name(&self.code).ok();
+        }
+
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -384,7 +397,7 @@ impl Suppressions {
             let code_str = suppression.code.as_str();
 
             let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
-            let name_is_valid = is_human_readable_names_enabled(context.settings().preview)
+            let name_is_valid = is_human_readable_names_enabled(self.preview)
                 && Rule::from_name(&suppression.code).is_ok();
 
             if !code_is_valid && !name_is_valid {
@@ -394,15 +407,7 @@ impl Suppressions {
                 group.invalid_codes.push(code_str);
             } else if !suppression.used.get() {
                 // UnusedNOQA
-                let rule = if let Ok(rule) = Rule::from_code(
-                    get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                ) {
-                    rule
-                } else if is_human_readable_names_enabled(context.settings().preview)
-                    && let Ok(rule) = Rule::from_name(&suppression.code)
-                {
-                    rule
-                } else {
+                let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
 
