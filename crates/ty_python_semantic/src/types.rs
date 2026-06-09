@@ -2543,7 +2543,10 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
-            Type::Recursive(_) => Some(Place::bound(self).into()),
+            Type::Recursive(rec) if rec.is_non_contractive(db) => Some(Place::bound(self).into()),
+            Type::Recursive(rec) => rec
+                .unfold(db)
+                .find_name_in_mro_with_policy(db, name, policy),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -2851,7 +2854,8 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
-            Type::Recursive(_) => Place::bound(self).into(),
+            Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
+            Type::Recursive(rec) => rec.unfold(db).instance_member(db, name),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3448,9 +3452,11 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
-                    Place::bound(this).into()
-                }
+                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+                Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(this).into(),
+                Type::Recursive(rec) => rec
+                    .unfold(db)
+                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4340,9 +4346,13 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
+            Type::Recursive(rec) if rec.is_non_contractive(db) => {
+                Binding::single(self, Signature::dynamic(self)).into()
+            }
+            Type::Recursive(rec) => rec.unfold(db).bindings(db),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5797,7 +5807,8 @@ impl<'db> Type<'db> {
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
-            Type::Recursive(_) => self,
+            Type::Recursive(rec) if rec.is_non_contractive(db) => self,
+            Type::Recursive(rec) => rec.unfold(db).to_meta_type(db),
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -5834,6 +5845,12 @@ impl<'db> Type<'db> {
     /// instances of `dict` at runtime.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
+        if let Type::Recursive(rec) = self
+            && !rec.is_non_contractive(db)
+        {
+            return rec.unfold(db).dunder_class(db);
+        }
+
         if self.is_typed_dict() {
             return KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
