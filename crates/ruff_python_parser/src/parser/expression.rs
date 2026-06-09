@@ -27,10 +27,7 @@ use crate::{
     UnsupportedSyntaxErrorKind,
 };
 
-use super::{
-    InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind,
-    STACK_GROWTH_NESTING_THRESHOLD,
-};
+use super::{InterpolatedStringElementsKind, Parenthesized, RecoveryContextKind};
 
 /// A token set consisting of a newline or end of file.
 const NEWLINE_EOF_SET: TokenSet = TokenSet::new([TokenKind::Newline, TokenKind::EndOfFile]);
@@ -305,17 +302,7 @@ impl<'src> Parser<'src> {
                 BinaryLikeOperator::Binary(bin_op) => {
                     self.bump(TokenKind::from(bin_op));
 
-                    let right = if new_precedence.is_right_associative() {
-                        // For right-associative operators (`**`), the right
-                        // operand recursion is unbounded in `a**a**a**...`,
-                        // and it bypasses stack growth in `parse_lhs_expression`
-                        // (that scope is exited once the atom is parsed).
-                        self.with_grown_stack(|parser| {
-                            parser.parse_binary_expression_or_higher(new_precedence, context)
-                        })
-                    } else {
-                        self.parse_binary_expression_or_higher(new_precedence, context)
-                    };
+                    let right = self.parse_binary_expression_or_higher(new_precedence, context);
 
                     Expr::BinOp(ast::ExprBinOp {
                         left: Box::new(left.expr),
@@ -346,31 +333,7 @@ impl<'src> Parser<'src> {
         context: ExpressionContext,
     ) -> ParsedExpr {
         let token = self.current_token_kind();
-        if self.tokens.nesting() < STACK_GROWTH_NESTING_THRESHOLD
-            && !Self::token_starts_unnested_recursive_lhs(token)
-        {
-            return self.parse_lhs_expression_inner(left_precedence, context, token);
-        }
-
-        self.with_grown_stack(|parser| {
-            parser.parse_lhs_expression_inner(left_precedence, context, token)
-        })
-    }
-
-    /// Returns whether parsing an expression that starts with `token` can recurse without
-    /// first increasing delimiter nesting.
-    #[inline]
-    fn token_starts_unnested_recursive_lhs(token: TokenKind) -> bool {
-        token.as_unary_operator().is_some()
-            || matches!(
-                token,
-                TokenKind::Star
-                    | TokenKind::Await
-                    | TokenKind::Lambda
-                    | TokenKind::Yield
-                    | TokenKind::FStringStart
-                    | TokenKind::TStringStart
-            )
+        self.parse_lhs_expression_inner(left_precedence, context, token)
     }
 
     fn parse_lhs_expression_inner(
@@ -689,10 +652,10 @@ impl<'src> Parser<'src> {
                 self.parse_strings()
             }
             TokenKind::Lpar => {
-                return self.parse_parenthesized_expression();
+                return self.with_grown_stack(Self::parse_parenthesized_expression);
             }
-            TokenKind::Lsqb => self.parse_list_like_expression(),
-            TokenKind::Lbrace => self.parse_set_or_dict_like_expression(),
+            TokenKind::Lsqb => self.with_grown_stack(Self::parse_list_like_expression),
+            TokenKind::Lbrace => self.with_grown_stack(Self::parse_set_or_dict_like_expression),
 
             kind => {
                 if kind.is_keyword() {
@@ -722,6 +685,22 @@ impl<'src> Parser<'src> {
     ///
     /// This method does nothing if the current token is not a candidate for a postfix expression.
     pub(super) fn parse_postfix_expression(
+        &mut self,
+        lhs: Expr,
+        start: TextSize,
+        context: ExpressionContext,
+    ) -> Expr {
+        if !matches!(
+            self.current_token_kind(),
+            TokenKind::Lpar | TokenKind::Lsqb | TokenKind::Dot
+        ) {
+            return lhs;
+        }
+
+        self.with_grown_stack(|parser| parser.parse_postfix_expression_inner(lhs, start, context))
+    }
+
+    fn parse_postfix_expression_inner(
         &mut self,
         mut lhs: Expr,
         start: TextSize,
@@ -2989,9 +2968,7 @@ impl<'src> Parser<'src> {
         // lambda x: yield y
         // lambda x: yield from y
 
-        // `lambda: lambda: lambda: ...` recurses through the lambda body at
-        // the conditional layer, bypassing stack growth in `parse_lhs_expression`.
-        let body = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
+        let body = self.parse_conditional_expression_or_higher();
 
         ast::ExprLambda {
             body: Box::new(body.expr),
@@ -3015,9 +2992,7 @@ impl<'src> Parser<'src> {
 
         self.expect(TokenKind::Else);
 
-        // `a if b else a if b else ...` recurses through `orelse` at the
-        // conditional layer, which is not covered by stack growth in
-        // `parse_lhs_expression` (that scope is released once each atom is parsed).
+        // `a if b else a if b else ...` recurses through the `orelse` expression.
         let orelse = self.with_grown_stack(Self::parse_conditional_expression_or_higher);
 
         ast::ExprIf {

@@ -34,14 +34,11 @@ mod statement;
 #[cfg(test)]
 mod tests;
 
-// `STACK_RED_ZONE` reserves enough headroom to amortize stack checks across multiple guarded
-// recursion edges. `STACK_SIZE` is the stack segment allocated when that threshold is crossed.
+// This is the amount of bytes that need to be left on the stack before increasing the size.
+// It must be at least as large as the stack required by any code that does not call
+// `with_grown_stack`.
 const STACK_RED_ZONE: usize = 100 * 1024;
 const STACK_SIZE: usize = 1024 * 1024;
-const STACK_CHECK_INTERVAL: u8 = 16;
-// Avoid stack checks on ordinary shallow expressions inside delimiters such as calls and
-// subscripts. Nested content re-enters `parse_lhs_expression` after the opening delimiter.
-const STACK_GROWTH_NESTING_THRESHOLD: u32 = 64;
 
 #[derive(Debug)]
 pub(crate) struct Parser<'src> {
@@ -71,10 +68,6 @@ pub(crate) struct Parser<'src> {
 
     /// The start offset in the source code from which to start parsing at.
     start_offset: TextSize,
-
-    /// Number of guarded recursive parser edges that can be traversed before checking
-    /// the remaining stack again.
-    stack_checks_remaining: u8,
 }
 
 impl<'src> Parser<'src> {
@@ -101,31 +94,13 @@ impl<'src> Parser<'src> {
             prev_token_end: TextSize::new(0),
             start_offset,
             current_token_id: TokenId::default(),
-            stack_checks_remaining: 0,
         }
     }
 
     /// Runs a recursive parser edge on a stack with sufficient remaining space.
     #[inline]
     fn with_grown_stack<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        if self.stack_checks_remaining > 0 {
-            self.stack_checks_remaining -= 1;
-            return f(self);
-        }
-
-        if stacker::remaining_stack().is_some_and(|remaining| remaining >= STACK_RED_ZONE) {
-            self.stack_checks_remaining = STACK_CHECK_INTERVAL;
-            return f(self);
-        }
-
-        stacker::grow(STACK_SIZE, || {
-            self.stack_checks_remaining = STACK_CHECK_INTERVAL;
-            let result = f(self);
-            // The cached headroom belongs to the grown stack segment. The caller's
-            // stack still needs to be checked when parsing recurses again.
-            self.stack_checks_remaining = 0;
-            result
-        })
+        stacker::maybe_grow(STACK_RED_ZONE, STACK_SIZE, || f(self))
     }
 
     /// Consumes the [`Parser`] and returns the parsed [`Parsed`].

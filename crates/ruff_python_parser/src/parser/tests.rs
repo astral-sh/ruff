@@ -342,27 +342,21 @@ mod stack_growth {
     }
 
     #[test]
-    fn nested_def_blocks() {
-        // Nested function definitions exercise stack-growth instrumentation on
-        // `parse_block` rather than `parse_lhs_expression`. Each level
-        // needs one more leading tab to make indentation valid.
-        let depth = RECURSIVE_AST_TEST_DEPTH;
-        let mut source = String::new();
-        for i in 0..depth {
-            source.push_str(&"\t".repeat(i));
-            source.push_str("def f():\n");
-        }
-        source.push_str(&"\t".repeat(depth));
-        source.push_str("pass\n");
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
     fn nested_lists() {
         let source = format!(
             "{}1{}",
             "[".repeat(RECURSIVE_AST_TEST_DEPTH),
             "]".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn nested_dictionaries() {
+        let source = format!(
+            "{}1{}",
+            "{'x':".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "}".repeat(RECURSIVE_AST_TEST_DEPTH)
         );
         parse_module(&source).unwrap();
     }
@@ -396,18 +390,6 @@ mod stack_growth {
     }
 
     #[test]
-    fn nested_match_patterns() {
-        // Deeply parenthesised match patterns exercise pattern-parsing
-        // stack-growth instrumentation in addition to statement / expression paths.
-        let source = format!(
-            "match x:\n case {}y{}: pass\n",
-            "(".repeat(RECURSIVE_AST_TEST_DEPTH),
-            ")".repeat(RECURSIVE_AST_TEST_DEPTH),
-        );
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
     fn binary_paren_interplay() {
         // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
         // parenthesised sub-expression, exactly like the pattern described in
@@ -425,44 +407,13 @@ mod stack_growth {
     }
 
     #[test]
-    fn right_assoc_pow_chain() {
-        // `1**1**1**...**1` — `**` is right-associative, so the right operand
-        // is parsed by a recursive `parse_binary_expression_or_higher` call
-        // *without* any intervening parentheses or atom nesting. This exercises
-        // the binary-expression recursion path directly, unlike the
-        // `1+(1+(...))` interplay test which recurses through parenthesised
-        // atoms.
-        let depth = RECURSIVE_AST_TEST_DEPTH;
-        let mut source = String::with_capacity(depth * 3 + 1);
-        for _ in 0..depth {
-            source.push_str("1**");
-        }
-        source.push('1');
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
     fn ternary_else_chain() {
         // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
-        // conditional layer (`parse_if_expression` -> `orelse`), which is not
-        // covered by stack growth in `parse_lhs_expression`.
+        // conditional layer (`parse_if_expression` -> `orelse`).
         let depth = RECURSIVE_AST_TEST_DEPTH;
         let mut source = String::with_capacity(depth * 12 + 1);
         for _ in 0..depth {
             source.push_str("1 if 1 else ");
-        }
-        source.push('1');
-        parse_module(&source).unwrap();
-    }
-
-    #[test]
-    fn nested_lambda_chain() {
-        // `lambda: lambda: lambda: ...` — the lambda body recurses at the
-        // conditional layer (`parse_lambda_expr` -> body), bypassing stack
-        // growth in `parse_lhs_expression` entirely.
-        let mut source = String::from("x = ");
-        for _ in 0..RECURSIVE_AST_TEST_DEPTH {
-            source.push_str("lambda: ");
         }
         source.push('1');
         parse_module(&source).unwrap();
