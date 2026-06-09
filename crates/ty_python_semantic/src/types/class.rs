@@ -30,8 +30,9 @@ use crate::types::generics::{
 };
 use crate::types::known_instance::DeprecatedInstance;
 use crate::types::member::Member;
-use crate::types::relation::RecursiveRelationVisitor;
-use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
+use crate::types::relation::{
+    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+};
 use crate::types::signatures::{
     CallableSignature, Parameter, Parameters, Signature, SignatureRelationVisitor,
 };
@@ -1200,9 +1201,8 @@ impl<'db> ClassType<'db> {
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, target: ClassType<'db>) -> bool {
         let constraints = ConstraintSetBuilder::new();
-        let relation_visitor = RecursiveRelationVisitor::assume_related_on_cycle(&constraints);
-        let disjointness_visitor =
-            RecursiveRelationVisitor::assume_not_disjoint_on_cycle(&constraints);
+        let relation_visitor = HasRelationToVisitor::default(&constraints);
+        let disjointness_visitor = IsDisjointVisitor::disjoint_default(&constraints);
         let signature_relation_visitor = SignatureRelationVisitor::default();
         let materialization_visitor = ApplyTypeMappingVisitor::default();
         let checker = TypeRelationChecker::subtyping(
