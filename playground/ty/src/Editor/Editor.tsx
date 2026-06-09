@@ -22,7 +22,7 @@ import {
   Hint,
   Position as TyPosition,
   Range as TyRange,
-  SemanticTokens,
+  SemanticToken,
   Severity,
   type Workspace,
   CompletionKind,
@@ -249,8 +249,8 @@ class PlaygroundServer
 
   getLegend(): languages.SemanticTokensLegend {
     return {
-      tokenTypes: SemanticTokens.kinds(),
-      tokenModifiers: SemanticTokens.modifiers(),
+      tokenTypes: SemanticToken.kinds(),
+      tokenModifiers: SemanticToken.modifiers(),
     };
   }
 
@@ -262,7 +262,8 @@ class PlaygroundServer
       return null;
     }
 
-    return this.props.workspace.semanticTokens(fileHandle);
+    const tokens = this.props.workspace.semanticTokens(fileHandle);
+    return generateMonacoTokens(tokens, model);
   }
 
   releaseDocumentSemanticTokens() {}
@@ -277,7 +278,11 @@ class PlaygroundServer
     }
 
     const tyRange = monacoRangeToTyRange(range);
-    return this.props.workspace.semanticTokensInRange(fileHandle, tyRange);
+    const tokens = this.props.workspace.semanticTokensInRange(
+      fileHandle,
+      tyRange,
+    );
+    return generateMonacoTokens(tokens, model);
   }
 
   provideCompletionItems(
@@ -967,6 +972,39 @@ function monacoRangeToTyRange(range: IRange): TyRange {
     new TyPosition(range.startLineNumber, range.startColumn),
     new TyPosition(range.endLineNumber, range.endColumn),
   );
+}
+
+function generateMonacoTokens(
+  semantic: SemanticToken[],
+  model: editor.ITextModel,
+): languages.SemanticTokens {
+  const result = [];
+
+  let prevLine = 0;
+  let prevChar = 0;
+
+  for (const token of semantic) {
+    // Convert from 1-based to 0-based indexing for Monaco
+    const line = token.range.start.line - 1;
+    const char = token.range.start.column - 1;
+
+    const length = model.getValueLengthInRange(
+      tyRangeToMonacoRange(token.range),
+    );
+
+    result.push(
+      line - prevLine,
+      prevLine === line ? char - prevChar : char,
+      length,
+      token.kind,
+      token.modifiers,
+    );
+
+    prevLine = line;
+    prevChar = char;
+  }
+
+  return { data: Uint32Array.from(result) };
 }
 
 function mapCompletionKind(kind: CompletionKind): CompletionItemKind {
