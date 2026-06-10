@@ -10,7 +10,9 @@
 
 use crate::Db;
 use crate::types::visitor;
-use crate::types::{ApplyTypeMappingVisitor, Type, TypeAliasType, TypeContext, TypeMapping};
+use crate::types::{
+    ApplyTypeMappingVisitor, Type, TypeAliasType, TypeContext, TypeMapping, UnionType,
+};
 use salsa::plumbing::AsId;
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
@@ -80,7 +82,8 @@ impl<'db> RecursiveOrigin<'db> {
             salsa::Id,
             TypeMapping<'a, 'db>,
             &ApplyTypeMappingVisitor<'db>,
-        ) -> (Type<'db>, Type<'db>),
+        ) -> Type<'db>,
+        build_fallback: impl FnOnce(Type<'db>) -> Type<'db>,
     ) -> Option<Type<'db>>
     where
         'db: 'a,
@@ -91,7 +94,31 @@ impl<'db> RecursiveOrigin<'db> {
             binder_id: BinderId::new(binder_id),
         };
         let visitor = ApplyTypeMappingVisitor::default();
-        let (body, fallback) = build_body(binder_id, type_mapping, &visitor);
+        let body = build_body(binder_id, type_mapping, &visitor);
+        let marker = Type::divergent(binder_id);
+        // A marker that is a direct union element represents the current cycle
+        // head, not recursive structure inside the body.
+        let body = match body {
+            Type::Union(union) => {
+                let elements = union.elements(db);
+                let kept: Vec<Type<'db>> = elements
+                    .iter()
+                    .copied()
+                    .filter(|ty| !ty.is_top_level_cycle_marker(db, marker))
+                    .collect();
+
+                if kept.len() == elements.len() {
+                    Type::Union(union)
+                } else {
+                    match kept.len() {
+                        0 => marker,
+                        1 => kept[0],
+                        _ => UnionType::from_elements(db, kept),
+                    }
+                }
+            }
+            _ => body,
+        };
         if visitor::any_over_type(
             db,
             body,
@@ -100,7 +127,7 @@ impl<'db> RecursiveOrigin<'db> {
         ) {
             Some(Type::recursive(db, binder_id, self, body))
         } else {
-            Some(fallback)
+            Some(build_fallback(body))
         }
     }
 }

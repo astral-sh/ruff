@@ -140,11 +140,11 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     ///
     /// For self-referential aliases, the body is folded so that each recursive
-    /// position becomes `Type::Divergent(binder_id)`, then any bare
-    /// `Divergent` leaf that sits as a direct member of the body's top-level
-    /// union is stripped (so `int | Divergent` collapses to `int` for
-    /// `IntOr`-style aliases). If the body still contains the binder's
-    /// `Divergent` anywhere — nested inside `tuple[Divergent, ...]`,
+    /// position becomes `Type::Divergent(binder_id)`, then any cycle marker
+    /// that sits as a direct member of the body's top-level union is stripped
+    /// (so `int | Divergent` collapses to `int` for `IntOr`-style aliases).
+    /// If the body still contains the binder's `Divergent` anywhere — nested
+    /// inside `tuple[Divergent, ...]`,
     /// `list[Divergent | str]`, etc. — wrap the result in `Type::Recursive`;
     /// otherwise return the simplified body directly.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
@@ -161,57 +161,19 @@ impl<'db> PEP695TypeAliasType<'db> {
             // recomputes `value_type` for it, and never reaches a fixed point — the type-argument
             // proliferation that hangs/overflows on generic recursive aliases.
             origin
-                .build_recursive(db, |binder_id, type_mapping, visitor| {
-                    /// Strip bare `Type::Divergent(binder_id)` leaves that sit as direct members of
-                    /// the top-level union in `ty`.
-                    ///
-                    /// Mirrors the `Divergent`-stripping that the legacy `raw_value_type` cycle
-                    /// recovery path performs via `Union::recursive_type_normalized_impl`, but
-                    /// applied only at the body's outermost union level so that recursive markers
-                    /// nested inside generics (e.g. `list[Divergent | str]`,
-                    /// `tuple[Divergent, ...]`) are preserved.
-                    ///
-                    /// - `int | Divergent(binder)` → `int`
-                    /// - `int | tuple[Divergent(binder), ...]` → unchanged
-                    /// - `list[Divergent(binder) | str]` → unchanged
-                    fn strip_top_level_divergent<'db>(
-                        db: &'db dyn Db,
-                        ty: Type<'db>,
-                        binder_id: salsa::Id,
-                    ) -> Type<'db> {
-                        let Type::Union(union) = ty else {
-                            return ty;
-                        };
-                        let kept: Vec<Type<'db>> = union
-                            .elements(db)
-                            .iter()
-                            .copied()
-                            .filter(
-                                |elem| !matches!(elem, Type::Divergent(d) if d.id() == binder_id),
-                            )
-                            .collect();
-                        if kept.len() == union.elements(db).len() {
-                            return ty;
-                        }
-                        match kept.len() {
-                            0 => Type::divergent(binder_id),
-                            1 => kept[0],
-                            _ => UnionType::from_elements(db, kept),
-                        }
-                    }
-
-                    let folded_raw = raw.apply_type_mapping_impl(
-                        db,
-                        &type_mapping,
-                        TypeContext::default(),
-                        visitor,
-                    );
-                    let body = self.apply_function_specialization(db, folded_raw);
-                    let root_alias = TypeAliasType::PEP695(self);
-                    let simplified = strip_top_level_divergent(db, body, binder_id);
-                    let fallback = root_alias.expand_top_level_union_aliases(db, simplified);
-                    (simplified, fallback)
-                })
+                .build_recursive(
+                    db,
+                    |_, type_mapping, visitor| {
+                        let folded_raw = raw.apply_type_mapping_impl(
+                            db,
+                            &type_mapping,
+                            TypeContext::default(),
+                            visitor,
+                        );
+                        self.apply_function_specialization(db, folded_raw)
+                    },
+                    |body| TypeAliasType::PEP695(self).expand_top_level_union_aliases(db, body),
+                )
                 .unwrap_or_else(|| {
                     TypeAliasType::PEP695(self).expand_top_level_union_aliases(
                         db,

@@ -983,6 +983,16 @@ impl<'db> Type<'db> {
         }
     }
 
+    fn is_top_level_cycle_marker(self, db: &'db dyn Db, div: Type<'db>) -> bool {
+        self.same_divergent_marker(div)
+            || matches!(
+                self,
+                Type::Recursive(recursive)
+                    if recursive.is_non_contractive(db)
+                        && Type::divergent(recursive.binder_id(db)).same_divergent_marker(div)
+            )
+    }
+
     /// Construct a `Type::Recursive` with the given μ-binder id, origin, and body.
     /// The body may contain `Type::Divergent(binder_id)` at recursive positions.
     pub(crate) fn recursive(
