@@ -51,7 +51,7 @@ use rustc_hash::FxHashMap;
 use salsa;
 use salsa::plumbing::AsId;
 use std::borrow::Cow;
-pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
+pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet, FrozenValueMap};
 
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
@@ -750,7 +750,7 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
@@ -787,7 +787,7 @@ impl<'db> ScopeInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
-            expressions: FrozenMap::default(),
+            expressions: FrozenValueMap::default(),
         }
     }
 
@@ -797,10 +797,9 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
-        }
+        self.expressions.map_values(|expr, ty| {
+            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+        });
 
         self
     }
