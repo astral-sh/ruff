@@ -103,7 +103,7 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
-    pub(crate) fn has_diagnostics(&self) -> bool {
+    pub(super) fn has_diagnostics(&self) -> bool {
         !self.diagnostics.borrow().is_empty()
     }
 

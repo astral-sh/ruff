@@ -5724,7 +5724,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         peer_ty: Option<Type<'db>>,
         mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let Some(peer_tcx) = collection_literal_peer_context(expression, tcx, peer_ty) else {
+        let peer_tcx = if allows_collection_literal_peer_context(tcx)
+            && is_collection_literal(expression)
+            && let Some(peer_ty) = peer_ty
+        {
+            TypeContext::new(Some(peer_ty))
+        } else {
             return infer_expression(self, tcx);
         };
 
@@ -10525,21 +10530,6 @@ fn is_collection_literal(expression: &ast::Expr) -> bool {
         expression,
         ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_)
     )
-}
-
-fn collection_literal_peer_context<'db>(
-    expression: &ast::Expr,
-    tcx: TypeContext<'db>,
-    peer_ty: Option<Type<'db>>,
-) -> Option<TypeContext<'db>> {
-    if allows_collection_literal_peer_context(tcx)
-        && is_collection_literal(expression)
-        && let Some(peer_ty) = peer_ty
-    {
-        Some(TypeContext::new(Some(peer_ty)))
-    } else {
-        None
-    }
 }
 
 /// Returns `true` if `tcx` cannot provide useful type context for a collection literal.

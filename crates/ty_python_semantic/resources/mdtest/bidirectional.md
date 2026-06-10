@@ -604,6 +604,19 @@ def collection_literal_first(values: list[str], flag: bool) -> None:
 def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
     reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
 
+def non_empty_set_fallback(values: set[Key] | None) -> None:
+    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+
+def preserve_generic[T](value: T) -> T:
+    return value
+
+def preserve_partially_specialized[T](value: list[T | int]) -> list[T | int]:
+    return value
+
+def generic_type_context(values: list[int | str] | None) -> None:
+    reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
+    reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
+
 def widened_non_empty_fallback(values: list[int] | None) -> None:
     result = values or ["x"]
     reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
