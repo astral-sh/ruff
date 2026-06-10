@@ -6313,6 +6313,9 @@ def _(
     # For backwards compatibility, implicit extra items on an ordinary open TypedDict are ignored
     # when checking whether unpacking may supply unexpected arguments. Explicit extra items are not.
     accepts_name(**open_source)
+
+    # TODO: This should arguably be rejected because `open_source` may contain a hidden `label`
+    # whose value is not assignable to `int`, but no other type checker rejects it.
     accepts_optional_int_label(**open_source)
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
 
