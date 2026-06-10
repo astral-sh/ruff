@@ -338,22 +338,35 @@ impl NarrowingConstraintsBuilder {
                 let a_node = self.interiors[a];
                 let b_node = self.interiors[b];
 
-                let b_true_or_uncertain =
-                    self.add_or_constraint(b_node.if_true, b_node.if_uncertain);
-                let true_from_a = self.add_and_constraint(a_node.if_true, b_true_or_uncertain);
-                let true_from_uncertain =
-                    self.add_and_constraint(a_node.if_uncertain, b_node.if_true);
-                let if_true = self.add_or_constraint(true_from_a, true_from_uncertain);
+                let (if_true, if_uncertain, if_false) = if a_node.if_uncertain == ALWAYS_FALSE
+                    && b_node.if_uncertain == ALWAYS_FALSE
+                {
+                    (
+                        self.add_and_constraint(a_node.if_true, b_node.if_true),
+                        ALWAYS_FALSE,
+                        self.add_and_constraint(a_node.if_false, b_node.if_false),
+                    )
+                } else {
+                    let b_true_or_uncertain =
+                        self.add_or_constraint(b_node.if_true, b_node.if_uncertain);
+                    let true_from_a = self.add_and_constraint(a_node.if_true, b_true_or_uncertain);
+                    let true_from_uncertain =
+                        self.add_and_constraint(a_node.if_uncertain, b_node.if_true);
+                    let if_true = self.add_or_constraint(true_from_a, true_from_uncertain);
 
-                let if_uncertain =
-                    self.add_and_constraint(a_node.if_uncertain, b_node.if_uncertain);
+                    let if_uncertain =
+                        self.add_and_constraint(a_node.if_uncertain, b_node.if_uncertain);
 
-                let b_false_or_uncertain =
-                    self.add_or_constraint(b_node.if_false, b_node.if_uncertain);
-                let false_from_a = self.add_and_constraint(a_node.if_false, b_false_or_uncertain);
-                let false_from_uncertain =
-                    self.add_and_constraint(a_node.if_uncertain, b_node.if_false);
-                let if_false = self.add_or_constraint(false_from_a, false_from_uncertain);
+                    let b_false_or_uncertain =
+                        self.add_or_constraint(b_node.if_false, b_node.if_uncertain);
+                    let false_from_a =
+                        self.add_and_constraint(a_node.if_false, b_false_or_uncertain);
+                    let false_from_uncertain =
+                        self.add_and_constraint(a_node.if_uncertain, b_node.if_false);
+                    let if_false = self.add_or_constraint(false_from_a, false_from_uncertain);
+
+                    (if_true, if_uncertain, if_false)
+                };
 
                 self.add_interior(InteriorNode {
                     atom: a_node.atom,
@@ -365,7 +378,11 @@ impl NarrowingConstraintsBuilder {
             Ordering::Less => {
                 let node = self.interiors[a];
                 let if_true = self.add_and_constraint(node.if_true, b);
-                let if_uncertain = self.add_and_constraint(node.if_uncertain, b);
+                let if_uncertain = if node.if_uncertain == ALWAYS_FALSE {
+                    ALWAYS_FALSE
+                } else {
+                    self.add_and_constraint(node.if_uncertain, b)
+                };
                 let if_false = self.add_and_constraint(node.if_false, b);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
@@ -377,7 +394,11 @@ impl NarrowingConstraintsBuilder {
             Ordering::Greater => {
                 let node = self.interiors[b];
                 let if_true = self.add_and_constraint(a, node.if_true);
-                let if_uncertain = self.add_and_constraint(a, node.if_uncertain);
+                let if_uncertain = if node.if_uncertain == ALWAYS_FALSE {
+                    ALWAYS_FALSE
+                } else {
+                    self.add_and_constraint(a, node.if_uncertain)
+                };
                 let if_false = self.add_and_constraint(a, node.if_false);
                 self.add_interior(InteriorNode {
                     atom: node.atom,
