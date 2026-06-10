@@ -65,8 +65,9 @@ def _(x: tuple[int, ...]):
 
 ## Exact length comparisons
 
-Exact length constraints eliminate types whose encoded length is incompatible with the comparison.
-Types that do not encode their length remain unchanged:
+Exact length constraints specialize exact tuple types to the observed length and eliminate types
+whose encoded length is incompatible with the comparison. Types that do not encode their length
+remain unchanged:
 
 ```toml
 [environment]
@@ -81,8 +82,10 @@ def _(val: tuple[int] | tuple[str, str] | tuple[int, *tuple[str, ...], int]):
         reveal_type(val)  # revealed: tuple[int]
 
     if len(val) == 2:
-        # revealed: tuple[str, str] | tuple[int, *tuple[str, ...], int]
-        reveal_type(val)
+        reveal_type(val)  # revealed: tuple[str, str] | tuple[int, int]
+
+    if len(val) == 3:
+        reveal_type(val)  # revealed: tuple[int, str, int]
 
 def _(val: tuple[int] | tuple[str, str]):
     if 1 != len(val):
@@ -92,7 +95,13 @@ def _(val: tuple[int] | tuple[str, str]):
 
 def _(val: tuple[int, ...]):
     if val and len(val) == 2:
-        reveal_type(val)  # revealed: tuple[int, ...] & ~AlwaysFalsy
+        reveal_type(val)  # revealed: tuple[int, int]
+
+def _(val: tuple[int, ...]):
+    if len(val) != 2:
+        reveal_type(val)  # revealed: tuple[int, ...]
+    else:
+        reveal_type(val)  # revealed: tuple[int, int]
 
 def _(val: tuple[int] | tuple[str, str]):
     if len(val) == True:

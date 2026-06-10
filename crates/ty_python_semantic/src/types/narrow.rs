@@ -4,6 +4,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
+use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -1060,8 +1061,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Filter a type based on an equality or inequality comparison against an exact length.
     ///
-    /// Only types that encode their possible lengths are filtered. Other types are left unchanged
-    /// because persisting an observed length would become stale after mutation.
+    /// Exact tuple types are specialized to the observed length. Other types that encode their
+    /// possible lengths are filtered. Unknown-length types are left unchanged because persisting
+    /// an observed length would become stale after mutation.
     fn narrow_type_by_exact_len(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1078,40 +1080,47 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
             }),
             _ => {
-                let tuple_length = resolved
-                    .as_nominal_instance()
-                    .and_then(|instance| instance.tuple_spec(db))
-                    .map(|spec| spec.len());
-                let satisfies_comparison = |length_type: Type<'db>| {
-                    length_type
-                        .as_int_literal()
-                        .and_then(|actual| usize::try_from(actual).ok())
-                        .is_some_and(|actual| (actual == length) == is_equality)
-                };
-                let comparison_possible = resolved
-                    .len(db)
-                    .map(|length_type| match length_type {
-                        Type::Union(union) => union
-                            .elements(db)
-                            .iter()
-                            .any(|element| satisfies_comparison(*element)),
-                        _ => satisfies_comparison(length_type),
-                    })
-                    .or_else(|| {
-                        tuple_length
-                            .and_then(|length| length.into_fixed_length())
-                            .map(|actual| (actual == length) == is_equality)
-                    });
-
-                match comparison_possible {
-                    Some(false) => Type::Never,
-                    None if is_equality
-                        && tuple_length
-                            .is_some_and(|tuple_length| length < tuple_length.minimum()) =>
-                    {
-                        Type::Never
+                if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
+                    match tuple.resize(db, TupleLength::Fixed(length)) {
+                        Ok(tuple) => Type::tuple(TupleType::new(db, &tuple)),
+                        Err(_) => Type::Never,
                     }
-                    _ => resolved,
+                } else {
+                    let tuple_length = resolved
+                        .as_nominal_instance()
+                        .and_then(|instance| instance.tuple_spec(db))
+                        .map(|spec| spec.len());
+                    let satisfies_comparison = |length_type: Type<'db>| {
+                        length_type
+                            .as_int_literal()
+                            .and_then(|actual| usize::try_from(actual).ok())
+                            .is_some_and(|actual| (actual == length) == is_equality)
+                    };
+                    let comparison_possible = resolved
+                        .len(db)
+                        .map(|length_type| match length_type {
+                            Type::Union(union) => union
+                                .elements(db)
+                                .iter()
+                                .any(|element| satisfies_comparison(*element)),
+                            _ => satisfies_comparison(length_type),
+                        })
+                        .or_else(|| {
+                            tuple_length
+                                .and_then(TupleLength::into_fixed_length)
+                                .map(|actual| (actual == length) == is_equality)
+                        });
+
+                    match comparison_possible {
+                        Some(false) => Type::Never,
+                        None if is_equality
+                            && tuple_length
+                                .is_some_and(|tuple_length| length < tuple_length.minimum()) =>
+                        {
+                            Type::Never
+                        }
+                        _ => resolved,
+                    }
                 }
             }
         };
