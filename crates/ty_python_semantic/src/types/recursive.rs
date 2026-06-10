@@ -226,14 +226,4 @@ impl<'db> RecursiveType<'db> {
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
         *self.body(db) == Type::divergent(self.binder_id(db))
     }
-
-    pub(crate) fn contains_non_contractive(self, db: &'db dyn Db) -> bool {
-        self.is_non_contractive(db)
-            || visitor::any_over_type(
-                db,
-                *self.body(db),
-                false,
-                |ty| matches!(ty, Type::Recursive(recursive) if recursive.is_non_contractive(db)),
-            )
-    }
 }

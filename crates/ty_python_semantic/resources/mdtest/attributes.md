@@ -3053,18 +3053,22 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        reveal_type(self.x3)  # revealed: list[Divergent]
+        reveal_type(self.x3)  # revealed: list[int] | list[Divergent]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
         self.x3 = [self.x1] + [self.x2]
 
     def f2(self: "ManyCycles2"):
+        # TODO: no error
+        # error: [invalid-assignment] "Object of type `list[int] | list[list[int] | list[Divergent] | int] | list[list[int] | list[Divergent]]` is not assignable to attribute `x1` of type `list[int] | list[Divergent]`"
         self.x1 = self.x2 + self.x3
         self.x2 = self.x1 + self.x3
         self.x3 = self.x1 + self.x2
 
     def f3(self: "ManyCycles2"):
+        # TODO: no error
+        # error: [invalid-assignment] "Object of type `list[int] | list[list[int] | list[Divergent] | int] | list[list[int] | list[Divergent]]` is not assignable to attribute `x1` of type `list[int] | list[Divergent]`"
         self.x1 = self.x2 + self.x3
         self.x2 = self.x1 + self.x3
         self.x3 = self.x1 + self.x2
