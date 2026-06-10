@@ -10,8 +10,8 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::{Ranged, TextRange};
 use ty_module_resolver::KnownModule;
 
+use crate::place::PlaceAndQualifiers;
 use crate::place::known_module_symbol;
-use crate::place::{Place, PlaceAndQualifiers};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::generics::GenericContext;
 use crate::types::member::Member;
@@ -23,8 +23,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeQualifiers, TypeVarVariance,
-    TypedDictType, UnionType, determine_upper_bound,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType, UnionType,
+    determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -1012,19 +1012,19 @@ pub(super) fn typed_dict_class_member<'db>(
         return fallback_member;
     }
 
-    // TODO: Remove this fallback once typeshed's `TypedDictFallback` includes these PEP 728
-    // attributes.
-    let synthesized_member = match name {
-        "__closed__" => Some(UnionType::from_two_elements(
-            db,
-            KnownClass::Bool.to_instance(db),
-            Type::none(db),
-        )),
-        "__extra_items__" => Some(Type::any()),
-        _ => None,
-    };
-    if let Some(member) = synthesized_member {
-        return Place::declared(member).with_qualifiers(TypeQualifiers::CLASS_VAR);
+    // `typing_extensions.TypedDict` backports these attributes to Python versions before 3.15,
+    // where the stdlib fallback intentionally omits them.
+    if matches!(name, "__closed__" | "__extra_items__")
+        && let Some(typing_extensions_fallback) =
+            known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
+                .place
+                .ignore_possibly_undefined()
+                .and_then(Type::as_class_literal)
+    {
+        let member = typing_extensions_fallback.class_member(db, name, lookup_policy);
+        if !member.is_undefined() {
+            return member;
+        }
     }
 
     if let Some(value_ty) = typed_dict.dict_value_type(db)
