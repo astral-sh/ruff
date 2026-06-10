@@ -5999,6 +5999,51 @@ def _(extra: Extra, key: str) -> None:
     del extra[key]
 ```
 
+### Deleting optional items from closed TypedDicts is permitted
+
+A closed TypedDict with only non-required, mutable items can safely support operations that may
+delete any item:
+
+```py
+from typing_extensions import ReadOnly, TypedDict
+
+class ClosedPartial(TypedDict, total=False, closed=True):
+    name: str
+    year: int
+
+FunctionalClosedPartial = TypedDict(
+    "FunctionalClosedPartial",
+    {"name": str, "year": int},
+    total=False,
+    closed=True,
+)
+
+class ClosedRequired(TypedDict, closed=True):
+    name: str
+
+class ClosedReadOnly(TypedDict, total=False, closed=True):
+    name: ReadOnly[str]
+
+def _(
+    partial: ClosedPartial,
+    functional: FunctionalClosedPartial,
+    required: ClosedRequired,
+    read_only: ClosedReadOnly,
+    key: str,
+) -> None:
+    partial.clear()
+    reveal_type(partial.popitem())  # revealed: tuple[str, str | int]
+    reveal_type(partial.pop(key))  # revealed: str | int
+    del partial[key]
+
+    functional.clear()
+    reveal_type(functional.popitem())  # revealed: tuple[str, str | int]
+    del functional[key]
+
+    required.clear()  # error: [unresolved-attribute]
+    read_only.clear()  # error: [unresolved-attribute]
+```
+
 ### `pop` and `setdefault` support literal extra-item keys
 
 Extra items behave like non-required items for methods that mutate a specific literal key.

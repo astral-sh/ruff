@@ -393,11 +393,16 @@ impl<'db> TypedDictType<'db> {
 
     /// Returns whether operations that delete an arbitrary key are safe.
     ///
-    /// Operations such as `clear()` and `popitem()` require mutable explicit extra items and cannot
-    /// be exposed when any declared item is required or read-only.
+    /// Operations such as `clear()` and `popitem()` require a closed `TypedDict` or mutable explicit
+    /// extra items, and cannot be exposed when any declared item is required or read-only.
     pub(crate) fn supports_arbitrary_key_deletion(self, db: &'db dyn Db) -> bool {
-        self.explicit_extra_items(db)
-            .is_some_and(|extra_items| !extra_items.is_read_only())
+        let openness_supports_deletion = match self.openness(db) {
+            TypedDictOpenness::Open => false,
+            TypedDictOpenness::Closed => true,
+            TypedDictOpenness::Extra(extra_items) => !extra_items.is_read_only(),
+        };
+
+        openness_supports_deletion
             && self
                 .items(db)
                 .values()
