@@ -81,8 +81,13 @@ impl Docstring {
         // NumPy-style docstrings
         param_docs.extend(extract_numpy_style_params(&self.0));
 
-        // reST/Sphinx-style docstrings
-        param_docs.extend(extract_rest_style_params(&self.0));
+        let trimmed = documentation_trim(&self.0);
+        param_docs.extend(
+            parsed::ParsedDocstring::parse(&trimmed)
+                .parameter_documentation()
+                .into_iter()
+                .map(|parameter| (parameter.name, parameter.description)),
+        );
 
         param_docs
     }
@@ -756,17 +761,6 @@ fn extract_numpy_style_params(docstring: &str) -> IndexMap<String, String> {
     // Don't forget the last parameter
     if let Some(param_name) = current_param {
         param_docs.insert(param_name, current_doc.trim().to_string());
-    }
-
-    param_docs
-}
-
-/// Extract parameter documentation from reST/Sphinx-style docstrings.
-fn extract_rest_style_params(docstring: &str) -> IndexMap<String, String> {
-    let mut param_docs = IndexMap::new();
-
-    for parameter in rest::Docstring::parse(docstring).parameter_documentation() {
-        param_docs.insert(parameter.name.into_string(), parameter.description);
     }
 
     param_docs

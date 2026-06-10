@@ -20,6 +20,7 @@ impl Docstring {
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
+    #[cfg(test)]
     pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
         let mut parameters = Vec::new();
 
@@ -614,6 +615,7 @@ pub(super) enum Field {
 }
 
 /// Parameter documentation extracted from a reST field list.
+#[cfg(test)]
 pub(super) struct ParameterDocumentation {
     pub(super) name: CompactString,
     pub(super) description: String,
