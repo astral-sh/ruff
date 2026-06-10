@@ -1859,6 +1859,8 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     def get(self, key: object, /) -> _VT_co | None:
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
     @overload
+    def get(self, key: object, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    @overload
     def get(self, key: object, default: _T, /) -> _VT_co | _T: ...
 
     def items(self) -> ItemsView[_KT, _VT_co]:
