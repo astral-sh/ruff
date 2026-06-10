@@ -3192,33 +3192,41 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_body(clause_body);
                 }
 
-                let final_clause = self.flow_snapshot();
-                let mut preceding_predicates = Vec::with_capacity(post_clauses.len());
-                let mut merged_reachable_clause = false;
+                // An ordinary `if` only has one saved branch. Keep the final branch in place so
+                // that we avoid cloning the entire flow state just to merge the two branches.
+                if post_clauses.len() == 1
+                    && let Some((post_clause_state, _)) = post_clauses.pop()
+                {
+                    self.flow_merge(post_clause_state);
+                } else {
+                    let final_clause = self.flow_snapshot();
+                    let mut preceding_predicates = Vec::with_capacity(post_clauses.len());
+                    let mut merged_reachable_clause = false;
 
-                for (post_clause_state, predicate) in post_clauses {
-                    if !post_clause_state.is_always_unreachable() {
-                        if merged_reachable_clause {
-                            self.flow_merge_after_branches(
-                                post_clause_state,
-                                &preceding_predicates,
-                            );
-                        } else {
-                            self.flow_restore(post_clause_state);
-                            merged_reachable_clause = true;
+                    for (post_clause_state, predicate) in post_clauses {
+                        if !post_clause_state.is_always_unreachable() {
+                            if merged_reachable_clause {
+                                self.flow_merge_after_branches(
+                                    post_clause_state,
+                                    &preceding_predicates,
+                                );
+                            } else {
+                                self.flow_restore(post_clause_state);
+                                merged_reachable_clause = true;
+                            }
                         }
+                        preceding_predicates.push(predicate);
                     }
-                    preceding_predicates.push(predicate);
-                }
 
-                if !final_clause.is_always_unreachable() {
-                    if merged_reachable_clause {
-                        self.flow_merge_after_branches(final_clause, &preceding_predicates);
-                    } else {
+                    if !final_clause.is_always_unreachable() {
+                        if merged_reachable_clause {
+                            self.flow_merge_after_branches(final_clause, &preceding_predicates);
+                        } else {
+                            self.flow_restore(final_clause);
+                        }
+                    } else if !merged_reachable_clause {
                         self.flow_restore(final_clause);
                     }
-                } else if !merged_reachable_clause {
-                    self.flow_restore(final_clause);
                 }
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
