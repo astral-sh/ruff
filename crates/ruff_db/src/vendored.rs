@@ -81,11 +81,10 @@ impl VendoredFileSystem {
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            if let Ok(zip_file) = archive.lookup_path_raw(&normalized) {
-                return Ok(Metadata::from_zip_file(zip_file));
+            if let Ok(metadata) = archive.metadata_for_path(&normalized) {
+                return Ok(metadata);
             }
-            let zip_file = archive.lookup_path_raw(&normalized.with_trailing_slash())?;
-            Ok(Metadata::from_zip_file(zip_file))
+            archive.metadata_for_path(&normalized.with_trailing_slash())
         }
 
         metadata(self, path.as_ref())
@@ -371,12 +370,9 @@ impl VendoredZipArchive {
         Ok(self.0.by_name(path.as_str())?)
     }
 
-    fn lookup_path_raw(
-        &mut self,
-        path: &NormalizedVendoredPath,
-    ) -> Result<ZipFile<'_, io::Cursor<Cow<'static, [u8]>>>> {
+    fn metadata_for_path(&mut self, path: &NormalizedVendoredPath) -> Result<Metadata> {
         let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
-        Ok(self.0.by_index_raw(index)?)
+        Ok(Metadata::from_zip_file(self.0.by_index_raw(index)?))
     }
 
     fn len(&self) -> usize {
