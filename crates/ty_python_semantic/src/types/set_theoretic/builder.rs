@@ -1040,6 +1040,28 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
+        // `μα.α` still acts as a gradual cycle marker unless the bare `α`
+        // marker is also present. Only remove the redundant wrapper.
+        if !cycle_recovery {
+            let divergent_ids: Vec<_> = types
+                .iter()
+                .filter_map(|ty| match ty {
+                    Type::Divergent(divergent) => Some(divergent.id()),
+                    _ => None,
+                })
+                .collect();
+            if !divergent_ids.is_empty() {
+                types.retain(|ty| {
+                    !matches!(
+                        ty,
+                        Type::Recursive(recursive)
+                            if recursive.is_non_contractive(db)
+                                && divergent_ids.contains(&recursive.binder_id(db))
+                    )
+                });
+            }
+        }
+
         if normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
@@ -1802,6 +1824,7 @@ mod tests {
     use crate::types::{KnownClass, KnownInstanceType, Truthiness};
 
     use ruff_db::system::DbWithWritableSystem as _;
+    use salsa::plumbing::Id;
     use ty_module_resolver::KnownModule;
 
     #[test]
@@ -1830,6 +1853,52 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    #[test]
+    fn build_union_keeps_non_contractive_recursive_without_marker() {
+        let db = setup_db();
+        let binder_id = Id::from_bits(1);
+        let non_contractive = Type::implicit_recursive(&db, binder_id, Type::divergent(binder_id));
+        let int = KnownClass::Int.to_instance(&db);
+
+        let union = UnionType::from_elements(&db, [int, non_contractive]).expect_union();
+
+        assert_eq!(union.elements(&db), &[int, non_contractive]);
+    }
+
+    #[test]
+    fn build_union_drops_non_contractive_recursive_with_matching_marker() {
+        let db = setup_db();
+        let binder_id = Id::from_bits(1);
+        let marker = Type::divergent(binder_id);
+        let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
+
+        assert_eq!(
+            UnionType::from_elements(&db, [marker, non_contractive]),
+            marker
+        );
+        assert_eq!(
+            UnionType::from_elements(&db, [non_contractive, marker]),
+            marker
+        );
+    }
+
+    #[test]
+    fn build_cycle_recovery_union_keeps_non_contractive_recursive() {
+        let db = setup_db();
+        let binder_id = Id::from_bits(1);
+        let marker = Type::divergent(binder_id);
+        let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
+
+        let union = UnionBuilder::new(&db)
+            .cycle_recovery(true)
+            .add(marker)
+            .add(non_contractive)
+            .build()
+            .expect_union();
+
+        assert_eq!(union.elements(&db), &[marker, non_contractive]);
     }
 
     fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
