@@ -624,6 +624,10 @@ fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
     from: NarrowingConstraints<'db>,
 ) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct places are merged independently"
+    )]
     for (key, from_constraint) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
@@ -652,6 +656,10 @@ fn merge_constraints_or<'db>(
     // For places that appear in `into` but not in `from`, widen to object
     into.retain(|key, _| from.contains_key(key));
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct places are merged independently"
+    )]
     for (key, from_constraint) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {

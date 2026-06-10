@@ -1094,9 +1094,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         };
                         f.set_invalid_type_annotation();
                         f.write_str("bound method ")?;
-                        self_ty
-                            .display_with(self.db, self.settings.singleline())
-                            .fmt_detailed(f)?;
+                        DisplayMaybeParenthesizedType {
+                            ty: self_ty,
+                            db: self.db,
+                            settings: self.settings.singleline(),
+                        }
+                        .fmt_detailed(f)?;
                         f.write_char('.')?;
                         f.with_type(self.ty).write_str(function.name(self.db))?;
                         type_parameters.fmt_detailed(f)?;

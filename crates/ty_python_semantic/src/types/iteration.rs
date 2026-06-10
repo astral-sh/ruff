@@ -584,14 +584,14 @@ impl<'db> IterationError<'db> {
         iterable_type: Type<'db>,
         iterable_node: ast::AnyNodeRef,
     ) {
-        /// A little helper type for emitting a diagnostic
-        /// based on the variant of iteration error.
         #[derive(Copy, Clone)]
         enum ErrorContext {
             Enabled,
             Disabled,
         }
 
+        /// A little helper type for emitting a diagnostic
+        /// based on the variant of iteration error.
         struct Reporter<'a> {
             db: &'a dyn Db,
             builder: LintDiagnosticGuardBuilder<'a, 'a>,
