@@ -89,8 +89,8 @@ class date:
     def fromtimestamp(cls, timestamp: float, /) -> Self:
         """Create a date from a POSIX timestamp.
 
-        The timestamp is a number, e.g. created via time.time(), that is interpreted
-        as local time.
+        The timestamp is a number, e.g. created via time.time(), that is
+        interpreted as local time.
         """
 
     @classmethod
@@ -258,8 +258,8 @@ class time:
     def isoformat(self, timespec: str = "auto") -> str:
         """Return the time formatted according to ISO.
 
-        The full format is 'HH:MM:SS.mmmmmm+zz:zz'. By default, the fractional
-        part is omitted if self.microsecond == 0.
+        The full format is 'HH:MM:SS.mmmmmm+zz:zz'. By default, the
+        fractional part is omitted if self.microsecond == 0.
 
         The optional argument timespec specifies the number of additional
         terms of the time to include. Valid options are 'auto', 'hours',
@@ -296,7 +296,8 @@ class time:
         def strftime(self, format: str) -> str:
             """Format using strftime().
 
-            The date part of the timestamp passed to underlying strftime should not be used.
+            The date part of the timestamp passed to underlying strftime should
+            not be used.
 
             For a list of supported format codes, see the documentation:
                 https://docs.python.org/3/library/datetime.html#format-codes
@@ -442,8 +443,8 @@ class timedelta:
 class datetime(date):
     """A combination of a date and a time.
 
-    The year, month and day arguments are required. tzinfo may be None, or an
-    instance of a tzinfo subclass. The remaining arguments may be ints.
+    The year, month and day arguments are required. tzinfo may be None, or
+    an instance of a tzinfo subclass. The remaining arguments may be ints.
     """
 
     min: ClassVar[datetime]
@@ -481,8 +482,8 @@ class datetime(date):
         def fromtimestamp(cls, timestamp: float, tz: _TzInfo | None = None) -> Self:
             """Create a datetime from a POSIX timestamp.
 
-            The timestamp is a number, e.g. created via time.time(), that is interpreted
-            as local time.
+            The timestamp is a number, e.g. created via time.time(), that is
+            interpreted as local time.
             """
     else:
         @classmethod

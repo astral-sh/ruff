@@ -73,8 +73,8 @@ if sys.version_info < (3, 12):
 def RAND_status() -> bool:
     """Returns True if the OpenSSL PRNG has been seeded with enough data and False if not.
 
-    It is necessary to seed the PRNG with RAND_add() on some platforms before
-    using the ssl() function.
+    It is necessary to seed the PRNG with RAND_add() on some platforms
+    before using the ssl() function.
     """
 
 def get_default_verify_paths() -> tuple[str, str, str, str]:
@@ -91,11 +91,11 @@ if sys.platform == "win32":
     def enum_certificates(store_name: str) -> _EnumRetType:
         """Retrieve certificates from Windows' cert store.
 
-        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may provide
-        more cert storages, too.  The function returns a list of (bytes,
-        encoding_type, trust) tuples.  The encoding_type flag can be interpreted
-        with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING. The trust setting is either
-        a set of OIDs or the boolean True.
+        store_name may be one of 'CA', 'ROOT' or 'MY'.  The system may
+        provide more cert storages, too.  The function returns a list of
+        (bytes, encoding_type, trust) tuples.  The encoding_type flag can be
+        interpreted with X509_ASN_ENCODING or PKCS_7_ASN_ENCODING.  The
+        trust setting is either a set of OIDs or the boolean True.
         """
 
     def enum_crls(store_name: str) -> _EnumRetType:
@@ -135,8 +135,9 @@ class _SSLContext:
     sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
     """Set a callback that will be called when a server name is provided by the SSL/TLS client in the SNI extension.
 
-    If the argument is None then the callback is disabled. The method is called
-    with the SSLSocket, the server name as a string, and the SSLContext object.
+    If the argument is None then the callback is disabled.  The method
+    is called with the SSLSocket, the server name as a string, and the
+    SSLContext object.
 
     See RFC 6066 for details of the SNI extension.
     """
@@ -147,22 +148,22 @@ class _SSLContext:
     def cert_store_stats(self) -> dict[str, int]:
         """Returns quantities of loaded X.509 certificates.
 
-        X.509 certificates with a CA extension and certificate revocation lists
-        inside the context's cert store.
+        X.509 certificates with a CA extension and certificate revocation
+        lists inside the context's cert store.
 
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
+        NOTE: Certificates in a capath directory aren't loaded unless they
+        have been used at least once.
         """
 
     @overload
     def get_ca_certs(self, binary_form: Literal[False] = False) -> list[_PeerCertRetDictType]:
         """Returns a list of dicts with information of loaded CA certs.
 
-        If the optional argument is True, returns a DER-encoded copy of the CA
-        certificate.
+        If the optional argument is True, returns a DER-encoded copy of the
+        CA certificate.
 
-        NOTE: Certificates in a capath directory aren't loaded unless they have
-        been used at least once.
+        NOTE: Certificates in a capath directory aren't loaded unless they
+        have been used at least once.
         """
     @overload
     def get_ca_certs(self, binary_form: Literal[True]) -> list[bytes]: ...

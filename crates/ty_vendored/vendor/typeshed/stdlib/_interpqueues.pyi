@@ -41,7 +41,8 @@ else:
 def destroy(qid: SupportsIndex) -> None:
     """Clear and destroy the queue.
 
-    Afterward attempts to use the queue will behave as though it never existed.
+    Afterward attempts to use the queue will behave as though it never
+    existed.
     """
 
 def get(qid: SupportsIndex) -> tuple[Any, int, _UnboundOp | None]:

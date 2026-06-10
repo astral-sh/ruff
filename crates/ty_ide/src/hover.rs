@@ -1602,9 +1602,9 @@ mod tests {
         ---------------------------------------------
         Return a str with the given suffix string removed if present.
 
-        If the string ends with the suffix string and that suffix is not empty,
-        return string[:-len(suffix)]. Otherwise, return a copy of the original
-        string.
+        If the string ends with the suffix string and that suffix is not
+        empty, return string[:-len(suffix)].  Otherwise, return a copy of
+        the original string.
 
         ---------------------------------------------
         ```python
@@ -1613,9 +1613,9 @@ mod tests {
         ---
         Return a str with the given suffix string removed if present.<HB>
         <HB>
-        If the string ends with the suffix string and that suffix is not empty,<HB>
-        return string[:-len(suffix)]. Otherwise, return a copy of the original<HB>
-        string.
+        If the string ends with the suffix string and that suffix is not<HB>
+        empty, return string[:-len(suffix)].  Otherwise, return a copy of<HB>
+        the original string.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:12
@@ -1642,9 +1642,9 @@ mod tests {
         ---------------------------------------------
         Return a str with the given suffix string removed if present.
 
-        If the string ends with the suffix string and that suffix is not empty,
-        return string[:-len(suffix)]. Otherwise, return a copy of the original
-        string.
+        If the string ends with the suffix string and that suffix is not
+        empty, return string[:-len(suffix)].  Otherwise, return a copy of
+        the original string.
 
         ---------------------------------------------
         ```python
@@ -1653,9 +1653,9 @@ mod tests {
         ---
         Return a str with the given suffix string removed if present.<HB>
         <HB>
-        If the string ends with the suffix string and that suffix is not empty,<HB>
-        return string[:-len(suffix)]. Otherwise, return a copy of the original<HB>
-        string.
+        If the string ends with the suffix string and that suffix is not<HB>
+        empty, return string[:-len(suffix)].  Otherwise, return a copy of<HB>
+        the original string.
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:5:12

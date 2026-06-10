@@ -1562,14 +1562,14 @@ a: float<CURSOR> = 3.14
           |    ^^^^^ Clicking here
           |
         info: Found 2 definitions
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:667:7
+           ::: stdlib/builtins.pyi:672:7
             |
-        667 | class float:
+        672 | class float:
             |       -----
             |
         ");
@@ -1594,19 +1594,19 @@ a: complex<CURSOR> = 3.14
           |    ^^^^^^^ Clicking here
           |
         info: Found 3 definitions
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ---
             |
-           ::: stdlib/builtins.pyi:667:7
+           ::: stdlib/builtins.pyi:672:7
             |
-        667 | class float:
+        672 | class float:
             |       -----
             |
-           ::: stdlib/builtins.pyi:830:7
+           ::: stdlib/builtins.pyi:835:7
             |
-        830 | class complex:
+        835 | class complex:
             |       -------
             |
         ");

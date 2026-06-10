@@ -1032,9 +1032,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1045,9 +1045,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1058,9 +1058,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1084,9 +1084,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:1498:7
+            --> stdlib/builtins.pyi:1512:7
              |
-        1498 | class bytes(Sequence[int]):
+        1512 | class bytes(Sequence[int]):
              |       ^^^^^
              |
         info: Source
@@ -1160,9 +1160,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1186,9 +1186,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1199,9 +1199,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1212,9 +1212,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1225,9 +1225,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1238,9 +1238,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1268,9 +1268,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1281,9 +1281,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -1294,9 +1294,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1358,9 +1358,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1371,9 +1371,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1405,9 +1405,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1471,9 +1471,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1497,9 +1497,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1510,9 +1510,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1523,9 +1523,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1536,9 +1536,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1549,9 +1549,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1593,9 +1593,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -1619,9 +1619,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1645,9 +1645,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1658,9 +1658,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -1671,9 +1671,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1684,9 +1684,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1697,9 +1697,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -1710,9 +1710,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1723,9 +1723,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1796,9 +1796,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1822,9 +1822,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1848,9 +1848,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1861,9 +1861,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1874,9 +1874,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1887,9 +1887,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1900,9 +1900,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1913,9 +1913,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -1926,9 +1926,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1977,9 +1977,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -1990,9 +1990,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2037,9 +2037,9 @@ Source with applied edits:
         z = x
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2435,9 +2435,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2448,9 +2448,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2461,9 +2461,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2474,9 +2474,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2487,9 +2487,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:667:7
+           --> stdlib/builtins.pyi:672:7
             |
-        667 | class float:
+        672 | class float:
             |       ^^^^^
             |
         info: Source
@@ -2500,9 +2500,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2513,9 +2513,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2707:7
+            --> stdlib/builtins.pyi:2734:7
              |
-        2707 | class bool(int):
+        2734 | class bool(int):
              |       ^^^^
              |
         info: Source
@@ -2526,9 +2526,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2539,9 +2539,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:994:7
+           --> stdlib/types.pyi:995:7
             |
-        994 | class NoneType:
+        995 | class NoneType:
             |       ^^^^^^^^
             |
         info: Source
@@ -2565,9 +2565,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2578,9 +2578,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -2591,9 +2591,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2604,9 +2604,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -2617,9 +2617,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2630,9 +2630,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -2643,9 +2643,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2669,9 +2669,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2682,9 +2682,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:1498:7
+            --> stdlib/builtins.pyi:1512:7
              |
-        1498 | class bytes(Sequence[int]):
+        1512 | class bytes(Sequence[int]):
              |       ^^^^^
              |
         info: Source
@@ -2695,9 +2695,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2708,9 +2708,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2721,9 +2721,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:667:7
+           --> stdlib/builtins.pyi:672:7
             |
-        667 | class float:
+        672 | class float:
             |       ^^^^^
             |
         info: Source
@@ -2734,9 +2734,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -2747,9 +2747,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -2760,9 +2760,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:667:7
+           --> stdlib/builtins.pyi:672:7
             |
-        667 | class float:
+        672 | class float:
             |       ^^^^^
             |
         info: Source
@@ -2897,9 +2897,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -3030,9 +3030,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -3043,9 +3043,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -3069,9 +3069,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3082,9 +3082,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3121,9 +3121,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2818:7
+            --> stdlib/builtins.pyi:2847:7
              |
-        2818 | class tuple(Sequence[_T_co]):
+        2847 | class tuple(Sequence[_T_co]):
              |       ^^^^^
              |
         info: Source
@@ -3147,9 +3147,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3160,9 +3160,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3186,9 +3186,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3199,9 +3199,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3277,9 +3277,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3290,9 +3290,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3316,9 +3316,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3329,9 +3329,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3407,9 +3407,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3420,9 +3420,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3446,9 +3446,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3459,9 +3459,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -3884,9 +3884,9 @@ Source with applied edits:
         foo([x=]y[0])
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -3897,9 +3897,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -3910,9 +3910,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -3923,9 +3923,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -4842,9 +4842,9 @@ Source with applied edits:
         total[: int] = add([x=]3, [b=]2, y=4)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -5438,9 +5438,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -5451,9 +5451,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -5464,9 +5464,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -5477,9 +5477,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -5490,9 +5490,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:994:7
+           --> stdlib/types.pyi:995:7
             |
-        994 | class NoneType:
+        995 | class NoneType:
             |       ^^^^^^^^
             |
         info: Source
@@ -5547,9 +5547,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -5588,9 +5588,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -5601,9 +5601,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -5873,9 +5873,9 @@ Source with applied edits:
         b[: Sequence[str]] = S('x', 'y')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:1627:7
+            --> stdlib/typing.pyi:1626:7
              |
-        1627 | class Sequence(Reversible[_T_co], Collection[_T_co]):
+        1626 | class Sequence(Reversible[_T_co], Collection[_T_co]):
              |       ^^^^^^^^
              |
         info: Source
@@ -5886,9 +5886,9 @@ Source with applied edits:
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6344,9 +6344,9 @@ Source with applied edits:
         a[: def foo(x: int, *y: bool, *, z: str | int | list[str]) -> Unknown] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -6357,9 +6357,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2707:7
+            --> stdlib/builtins.pyi:2734:7
              |
-        2707 | class bool(int):
+        2734 | class bool(int):
              |       ^^^^
              |
         info: Source
@@ -6370,9 +6370,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6383,9 +6383,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -6396,9 +6396,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -6409,9 +6409,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6510,9 +6510,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6523,9 +6523,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6536,9 +6536,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -6928,9 +6928,9 @@ Source with applied edits:
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2615:26
+            --> stdlib/typing.pyi:2624:26
              |
-        2615 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2624 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
              |
         info: Source
@@ -6941,9 +6941,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2615:37
+            --> stdlib/typing.pyi:2624:37
              |
-        2615 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2624 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
              |
         info: Source
@@ -7030,9 +7030,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -7147,9 +7147,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -7160,9 +7160,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -7173,9 +7173,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -7212,9 +7212,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -7315,9 +7315,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -7328,9 +7328,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -7341,9 +7341,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -7380,9 +7380,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
+           --> stdlib/builtins.pyi:349:7
             |
-        348 | class int:
+        349 | class int:
             |       ^^^
             |
         info: Source
@@ -7538,9 +7538,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:926:7
+           --> stdlib/builtins.pyi:931:7
             |
-        926 | class str(Sequence[str]):
+        931 | class str(Sequence[str]):
             |       ^^^
             |
         info: Source
@@ -7590,9 +7590,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:3049:7
+            --> stdlib/builtins.pyi:3078:7
              |
-        3049 | class dict(MutableMapping[_KT, _VT]):
+        3078 | class dict(MutableMapping[_KT, _VT]):
              |       ^^^^
              |
         info: Source
@@ -7629,9 +7629,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:994:7
+           --> stdlib/types.pyi:995:7
             |
-        994 | class NoneType:
+        995 | class NoneType:
             |       ^^^^^^^^
             |
         info: Source
@@ -7815,9 +7815,9 @@ Source with applied edits:
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source
@@ -8064,9 +8064,9 @@ Source with applied edits:
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2925:7
+            --> stdlib/builtins.pyi:2954:7
              |
-        2925 | class list(MutableSequence[_T]):
+        2954 | class list(MutableSequence[_T]):
              |       ^^^^
              |
         info: Source

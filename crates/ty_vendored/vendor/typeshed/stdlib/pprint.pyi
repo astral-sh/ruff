@@ -161,6 +161,12 @@ class PrettyPrinter:
 
             compact
                 If true, several items will be combined in one line.
+                Incompatible with expand mode.
+
+            expand
+                If true, the output will be formatted similar to
+                pretty-printed json.dumps() when ``indent`` is supplied.
+                Incompatible with compact mode.
 
             sort_dicts
                 If true, dict keys are sorted.

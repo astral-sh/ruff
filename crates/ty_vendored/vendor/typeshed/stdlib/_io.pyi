@@ -55,8 +55,8 @@ open = builtins.open
 def open_code(path: str) -> IO[bytes]:
     """Opens the provided file with the intent to import the contents.
 
-    This may perform extra validation beyond open(), but is otherwise interchangeable
-    with calling open(path, 'rb').
+    This may perform extra validation beyond open(), but is otherwise
+    interchangeable with calling open(path, 'rb').
     """
 
 BlockingIOError = builtins.BlockingIOError
@@ -152,11 +152,13 @@ if sys.version_info >= (3, 12):
               whence
                 The relative position to seek from.
 
-            The offset is interpreted relative to the position indicated by whence.
-            Values for whence are:
+            The offset is interpreted relative to the position indicated by
+            whence.  Values for whence are:
 
-            * os.SEEK_SET or 0 -- start of stream (the default); offset should be zero or positive
-            * os.SEEK_CUR or 1 -- current stream position; offset may be negative
+            * os.SEEK_SET or 0 -- start of stream (the default); offset should
+              be zero or positive
+            * os.SEEK_CUR or 1 -- current stream position; offset may be
+              negative
             * os.SEEK_END or 2 -- end of stream; offset is usually negative
 
             Return the new absolute position.
@@ -175,8 +177,8 @@ if sys.version_info >= (3, 12):
         def truncate(self, size: int | None = None, /) -> int:
             """Truncate file to size bytes.
 
-            File pointer is left unchanged. Size defaults to the current IO position
-            as reported by tell(). Return the new size.
+            File pointer is left unchanged.  Size defaults to the current IO
+            position as reported by tell().  Return the new size.
             """
 
         def writable(self) -> bool:
@@ -434,16 +436,19 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     """Open a file.
 
     The mode can be 'r' (default), 'w', 'x' or 'a' for reading,
-    writing, exclusive creation or appending.  The file will be created if it
-    doesn't exist when opened for writing or appending; it will be truncated
-    when opened for writing.  A FileExistsError will be raised if it already
-    exists when opened for creating. Opening a file for creating implies
-    writing so this mode behaves in a similar way to 'w'.Add a '+' to the mode
-    to allow simultaneous reading and writing. A custom opener can be used by
-    passing a callable as *opener*. The underlying file descriptor for the file
-    object is then obtained by calling opener with (*name*, *flags*).
-    *opener* must return an open file descriptor (passing os.open as *opener*
-    results in functionality similar to passing None).
+    writing, exclusive creation or appending.  The file will be created
+    if it doesn't exist when opened for writing or appending; it will be
+    truncated when opened for writing.  A FileExistsError will be raised
+    if it already exists when opened for creating.  Opening a file for
+    creating implies writing so this mode behaves in a similar way to
+    'w'.  Add a '+' to the mode to allow simultaneous reading and
+    writing.
+
+    A custom opener can be used by passing a callable as *opener*.
+    The underlying file descriptor for the file object is then obtained
+    by calling opener with (*name*, *flags*).  *opener* must return
+    an open file descriptor (passing os.open as *opener* results in
+    functionality similar to passing None).
     """
 
     mode: str
@@ -463,11 +468,12 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     def seek(self, pos: int, whence: int = 0, /) -> int:
         """Move to new file position and return the file position.
 
-        Argument offset is a byte count.  Optional argument whence defaults to
-        SEEK_SET or 0 (offset from start of file, offset should be >= 0); other values
-        are SEEK_CUR or 1 (move relative to current position, positive or negative),
-        and SEEK_END or 2 (move relative to end of file, usually negative, although
-        many platforms allow seeking beyond the end of a file).
+        Argument offset is a byte count.  Optional argument whence defaults
+        to SEEK_SET or 0 (offset from start of file, offset should be >= 0);
+        other values are SEEK_CUR or 1 (move relative to current position,
+        positive or negative), and SEEK_END or 2 (move relative to end of
+        file, usually negative, although many platforms allow seeking beyond
+        the end of a file).
 
         Note that not all file objects are seekable.
         """
@@ -475,14 +481,14 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     def read(self, size: int | None = -1, /) -> bytes | MaybeNone:
         """Read at most size bytes, returned as bytes.
 
-        If size is less than 0, read all bytes in the file making multiple read calls.
-        See ``FileIO.readall``.
+        If size is less than 0, read all bytes in the file making multiple
+        read calls.  See ``FileIO.readall``.
 
-        Attempts to make only one system call, retrying only per PEP 475 (EINTR). This
-        means less data may be returned than requested.
+        Attempts to make only one system call, retrying only per PEP 475
+        (EINTR).  This means less data may be returned than requested.
 
-        In non-blocking mode, returns None if no data is available. Return an empty
-        bytes object at EOF.
+        In non-blocking mode, returns None if no data is available.  Return
+        an empty bytes object at EOF.
         """
 
 @disjoint_base
@@ -503,8 +509,8 @@ class BytesIO(BufferedIOBase, _BufferedIOBase, BinaryIO):  # type: ignore[misc] 
     def read1(self, size: int | None = -1, /) -> bytes:
         """Read at most size bytes, returned as a bytes object.
 
-        If the size argument is negative or omitted, read until EOF is reached.
-        Return an empty bytes object at EOF.
+        If the size argument is negative or omitted, read until EOF is
+        reached.  Return an empty bytes object at EOF.
         """
 
     def readlines(self, size: int | None = None, /) -> list[bytes]:
@@ -694,7 +700,8 @@ class _TextIOBase(_IOBase):
     def detach(self) -> BinaryIO:
         """Separate the underlying buffer from the TextIOBase and return it.
 
-        After the underlying buffer has been detached, the TextIO is in an unusable state.
+        After the underlying buffer has been detached, the TextIO is in
+        an unusable state.
         """
 
     def write(self, s: str, /) -> int:
@@ -729,8 +736,8 @@ class _TextIOBase(_IOBase):
     def read(self, size: int | None = -1, /) -> str:
         """Read at most size characters from stream.
 
-        Read from underlying buffer until we have size characters or we hit EOF.
-        If size is negative or omitted, read until EOF.
+        Read from underlying buffer until we have size characters or we hit
+        EOF.  If size is negative or omitted, read until EOF.
         """
 
 @type_check_only
@@ -869,7 +876,8 @@ class StringIO(TextIOBase, _TextIOBase, TextIO):  # type: ignore[misc]  # incomp
     def seek(self, pos: int, whence: int = 0, /) -> int:
         """Change stream position.
 
-        Seek to character offset pos relative to position indicated by whence:
+        Seek to character offset pos relative to position indicated by
+        whence:
             0  Start of stream (the default).  pos should be >= 0;
             1  Current position - pos must be 0;
             2  End of stream - pos must be 0.

@@ -851,10 +851,11 @@ class TarFile:
         """
 
     def list(self, verbose: bool = True, *, members: Iterable[TarInfo] | None = None) -> None:
-        """Print a table of contents to sys.stdout. If 'verbose' is False, only
-        the names of the members are printed. If it is True, an 'ls -l'-like
-        output is produced. 'members' is optional and must be a subset of the
-        list returned by getmembers().
+        """Print a table of contents to sys.stdout.
+
+        If 'verbose' is False, only the names of the members are printed.
+        If it is True, an 'ls -l'-like output is produced.  'members' is
+        optional and must be a subset of the list returned by getmembers().
         """
 
     def next(self) -> TarInfo | None:
@@ -1000,10 +1001,12 @@ class TarFile:
         """
 
     def addfile(self, tarinfo: TarInfo, fileobj: SupportsRead[bytes] | None = None) -> None:
-        """Add the TarInfo object 'tarinfo' to the archive. If 'tarinfo' represents
-        a non zero-size regular file, the 'fileobj' argument should be a binary file,
-        and tarinfo.size bytes are read from it and added to the archive.
-        You can create TarInfo objects directly, or by using gettarinfo().
+        """Add the TarInfo object 'tarinfo' to the archive.
+
+        If 'tarinfo' represents a non zero-size regular file, the 'fileobj'
+        argument should be a binary file, and tarinfo.size bytes are read
+        from it and added to the archive. You can create TarInfo objects
+        directly, or by using gettarinfo().
         """
 
     def gettarinfo(

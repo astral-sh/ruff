@@ -1044,7 +1044,8 @@ class socket:
         """Send a data string to the socket.
 
         For the optional flags argument, see the Unix manual.
-        Return the number of bytes sent; this may be less than len(data) if the network is busy.
+        Return the number of bytes sent; this may be less than len(data) if
+        the network is busy.
         """
 
     def sendall(self, data: ReadableBuffer, flags: int = 0, /) -> None:
@@ -1052,7 +1053,8 @@ class socket:
 
         For the optional flags argument, see the Unix manual.
         This calls send() repeatedly until all data is sent.
-        If an error occurs, it's impossible to tell how much data has been sent.
+        If an error occurs, it's impossible to tell how much data has been
+        sent.
         """
 
     @overload
@@ -1082,13 +1084,13 @@ class socket:
             data as an iterable of bytes-like objects (e.g. bytes objects).
             The ancdata argument specifies the ancillary data (control messages)
             as an iterable of zero or more tuples (cmsg_level, cmsg_type,
-            cmsg_data), where cmsg_level and cmsg_type are integers specifying the
-            protocol level and protocol-specific type respectively, and cmsg_data
-            is a bytes-like object holding the associated data.  The flags
-            argument defaults to 0 and has the same meaning as for send().  If
-            address is supplied and not None, it sets a destination address for
-            the message.  The return value is the number of bytes of non-ancillary
-            data sent.
+            cmsg_data), where cmsg_level and cmsg_type are integers specifying
+            the protocol level and protocol-specific type respectively, and
+            cmsg_data is a bytes-like object holding the associated data.  The
+            flags argument defaults to 0 and has the same meaning as for send().
+            If address is supplied and not None, it sets a destination address
+            for the message.  The return value is the number of bytes of
+            non-ancillary data sent.
             """
 
     if sys.platform == "linux":

@@ -22,10 +22,11 @@ class SimpleQueue(Generic[_T]):
     def get(self, block: bool = True, timeout: float | None = None) -> _T:
         """Remove and return an item from the queue.
 
-        If optional args 'block' is true and 'timeout' is None (the default),
-        block if necessary until an item is available. If 'timeout' is
-        a non-negative number, it blocks at most 'timeout' seconds and raises
-        the Empty exception if no item was available within that time.
+        If optional args 'block' is true and 'timeout' is None (the
+        default), block if necessary until an item is available.  If
+        'timeout' is a non-negative number, it blocks at most 'timeout'
+        seconds and raises the Empty exception if no item was available
+        within that time.
         Otherwise ('block' is false), return an item if one is immediately
         available, else raise the Empty exception ('timeout' is ignored
         in that case).
@@ -41,8 +42,9 @@ class SimpleQueue(Generic[_T]):
     def put(self, item: _T, block: bool = True, timeout: float | None = None) -> None:
         """Put the item on the queue.
 
-        The optional 'block' and 'timeout' arguments are ignored, as this method
-        never blocks.  They are provided for compatibility with the Queue class.
+        The optional 'block' and 'timeout' arguments are ignored, as this
+        method never blocks.  They are provided for compatibility with the
+        Queue class.
         """
 
     def put_nowait(self, item: _T) -> None:

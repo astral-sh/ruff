@@ -110,10 +110,10 @@ def extract_tb(tb: TracebackType | None, limit: int | None = None) -> StackSumma
     This is useful for alternate formatting of stack traces.  If
     'limit' is omitted or None, all entries are extracted.  A
     pre-processed stack trace entry is a FrameSummary object
-    containing attributes filename, lineno, name, and line
-    representing the information that is usually printed for a stack
-    trace.  The line is a string with leading and trailing
-    whitespace stripped; if the source is not available it is None.
+    representing the information that is usually printed for a
+    stack trace. The line attribute is a string with
+    leading and trailing whitespace stripped; if the source is not
+    available the corresponding attribute is None.
     """
 
 def extract_stack(f: FrameType | None = None, limit: int | None = None) -> StackSummary:
@@ -121,9 +121,8 @@ def extract_stack(f: FrameType | None = None, limit: int | None = None) -> Stack
 
     The return value has the same format as for extract_tb().  The
     optional 'f' and 'limit' arguments have the same meaning as for
-    print_stack().  Each item in the list is a quadruple (filename,
-    line number, function name, text), and the entries are in order
-    from oldest to newest stack frame.
+    print_stack().  Each item in the list is a FrameSummary object,
+    and the entries are in order from oldest to newest stack frame.
     """
 
 def format_list(extracted_list: Iterable[FrameSummary | _FrameSummaryTuple]) -> list[str]:
@@ -424,7 +423,7 @@ class FrameSummary:
       active when the frame was captured.
     - :attr:`name` The name of the function or method that was executing
       when the frame was captured.
-    - :attr:`line` The text from the linecache module for the
+    - :attr:`line` The text from the linecache module for the line
       of code that was running when the frame was captured.
     - :attr:`locals` Either None if locals were not supplied, or a dict
       mapping the name to the repr() of the variable.

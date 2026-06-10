@@ -182,8 +182,8 @@ class EnumMeta(type):
         """
         Returns a mapping of member name->value.
 
-        This mapping lists all enum members, including aliases. Note that this
-        is a read-only view of the internal mapping.
+        This mapping lists all enum members, including aliases.  Note that
+        this is a read-only view of the internal mapping.
         """
 
     def __len__(self) -> int:
@@ -204,9 +204,9 @@ class EnumMeta(type):
         """
         Either returns an existing member, or creates a new enum class.
 
-        This method is used both when an enum class is given a value to match
-        to an enumeration member (i.e. Color(3)) and for the functional API
-        (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+        This method is used both when an enum class is given a value to
+        match to an enumeration member (i.e. Color(3)) and for the
+        functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
         The value lookup branch is chosen if the enum is final.
 
@@ -214,16 +214,17 @@ class EnumMeta(type):
 
         `value` will be the name of the new class.
 
-        `names` should be either a string of white-space/comma delimited names
-        (values will start at `start`), or an iterator/mapping of name, value pairs.
+        `names` should be either a string of white-space/comma delimited
+        names (values will start at `start`), or an iterator/mapping of
+        name, value pairs.
 
         `module` should be set to the module this class is being created in;
-        if it is not set, an attempt to find that module will be made, but if
-        it fails the class will not be picklable.
+        if it is not set, an attempt to find that module will be made, but
+        if it fails the class will not be picklable.
 
-        `qualname` should be set to the actual location this class can be found
-        at in its module; by default it is set to the global scope.  If this is
-        not correct, unpickling will fail in some circumstances.
+        `qualname` should be set to the actual location this class can be
+        found at in its module; by default it is set to the global scope.
+        If this is not correct, unpickling will fail in some circumstances.
 
         `type`, if set, will be mixed in as the first base class.
         """
@@ -245,9 +246,9 @@ class EnumMeta(type):
             """
             Either returns an existing member, or creates a new enum class.
 
-            This method is used both when an enum class is given a value to match
-            to an enumeration member (i.e. Color(3)) and for the functional API
-            (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+            This method is used both when an enum class is given a value to
+            match to an enumeration member (i.e. Color(3)) and for the
+            functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
             The value lookup branch is chosen if the enum is final.
 
@@ -255,16 +256,17 @@ class EnumMeta(type):
 
             `value` will be the name of the new class.
 
-            `names` should be either a string of white-space/comma delimited names
-            (values will start at `start`), or an iterator/mapping of name, value pairs.
+            `names` should be either a string of white-space/comma delimited
+            names (values will start at `start`), or an iterator/mapping of
+            name, value pairs.
 
             `module` should be set to the module this class is being created in;
-            if it is not set, an attempt to find that module will be made, but if
-            it fails the class will not be picklable.
+            if it is not set, an attempt to find that module will be made, but
+            if it fails the class will not be picklable.
 
-            `qualname` should be set to the actual location this class can be found
-            at in its module; by default it is set to the global scope.  If this is
-            not correct, unpickling will fail in some circumstances.
+            `qualname` should be set to the actual location this class can be
+            found at in its module; by default it is set to the global scope.
+            If this is not correct, unpickling will fail in some circumstances.
 
             `type`, if set, will be mixed in as the first base class.
             """
@@ -318,9 +320,9 @@ class EnumMeta(type):
             """
             Either returns an existing member, or creates a new enum class.
 
-            This method is used both when an enum class is given a value to match
-            to an enumeration member (i.e. Color(3)) and for the functional API
-            (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
+            This method is used both when an enum class is given a value to
+            match to an enumeration member (i.e. Color(3)) and for the
+            functional API (i.e. Color = Enum('Color', names='RED GREEN BLUE')).
 
             The value lookup branch is chosen if the enum is final.
 
@@ -328,16 +330,17 @@ class EnumMeta(type):
 
             `value` will be the name of the new class.
 
-            `names` should be either a string of white-space/comma delimited names
-            (values will start at `start`), or an iterator/mapping of name, value pairs.
+            `names` should be either a string of white-space/comma delimited
+            names (values will start at `start`), or an iterator/mapping of
+            name, value pairs.
 
             `module` should be set to the module this class is being created in;
-            if it is not set, an attempt to find that module will be made, but if
-            it fails the class will not be picklable.
+            if it is not set, an attempt to find that module will be made, but
+            if it fails the class will not be picklable.
 
-            `qualname` should be set to the actual location this class can be found
-            at in its module; by default it is set to the global scope.  If this is
-            not correct, unpickling will fail in some circumstances.
+            `qualname` should be set to the actual location this class can be
+            found at in its module; by default it is set to the global scope.
+            If this is not correct, unpickling will fail in some circumstances.
 
             `type`, if set, will be mixed in as the first base class.
             """
