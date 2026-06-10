@@ -99,7 +99,7 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
 }
 
 #[test]
-fn parameter_inference_is_memoized_per_function() -> anyhow::Result<()> {
+fn parameter_inference_is_not_memoized_per_definition() -> anyhow::Result<()> {
     let mut db = setup_db();
     db.write_dedented(
         "/src/a.py",
@@ -134,15 +134,7 @@ fn parameter_inference_is_memoized_per_function() -> anyhow::Result<()> {
         let function = module.syntax().body[0].as_function_def_stmt().unwrap();
         let parameter = function.parameters.iter().nth(parameter_index).unwrap();
         let definition = semantic_index(&db, file).expect_single_definition(parameter);
-        let key = parameter_inference_key(&db, definition);
-        if parameter_index == 0 {
-            assert_eq!(key, definition);
-            assert_function_query_was_run(&db, infer_definition_types, key, &events);
-        } else {
-            assert_ne!(key, definition);
-            assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
-            assert_function_query_was_not_run(&db, infer_definition_types, key, &events);
-        }
+        assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
     }
 
     Ok(())

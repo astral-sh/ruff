@@ -23,8 +23,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorators, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            function_known_decorators, infer_parameter_types_untracked, infer_statement_types,
+            nearest_enclosing_function, original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -129,11 +129,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
-        // Parameters are Definitions in the function body scope, but have no constituent nodes in
-        // the body. Explicitly merge their grouped inference result to include diagnostics.
-        if let Some(first_parameter) = function.parameters.iter().next() {
-            let definition = self.index.expect_single_definition(first_parameter);
-            self.extend_definition(infer_definition_types(db, definition));
+        // Parameters are odd: they are Definitions in the function body scope, but have no
+        // constituent nodes that are part of the function body. In order to get diagnostics
+        // merged/emitted for them, we need to explicitly infer their definitions here.
+        for parameter in &function.parameters {
+            let definition = self.index.expect_single_definition(parameter);
+            let inference = infer_parameter_types_untracked(db, definition);
+            self.extend_definition(&inference);
         }
 
         validate_paramspec_components(&self.context, &function.parameters, |expr| {
