@@ -141,7 +141,6 @@ pub enum KnownClass {
     // functools
     FunctoolsPartial,
     // ty_extensions
-    ExactlySized,
     ConstraintSet,
     GenericContext,
     Specialization,
@@ -265,7 +264,6 @@ impl KnownClass {
             | Self::KwOnly
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -366,7 +364,6 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
-            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -467,7 +464,6 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::NamedTupleFallback
             | KnownClass::NamedTupleLike
-            | KnownClass::ExactlySized
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
@@ -567,7 +563,6 @@ impl KnownClass {
             | KnownClass::KwOnly
             | KnownClass::TypedDictFallback
             | KnownClass::NamedTupleLike
-            | KnownClass::ExactlySized
             | KnownClass::NamedTupleFallback
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
@@ -604,7 +599,6 @@ impl KnownClass {
             | Self::AsyncIterator
             | Self::Awaitable
             | Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::AsyncGenerator
             | Self::Generator => true,
 
@@ -786,7 +780,6 @@ impl KnownClass {
             | KnownClass::Field
             | KnownClass::KwOnly
             | KnownClass::NamedTupleLike
-            | KnownClass::ExactlySized
             | KnownClass::Template
             | KnownClass::Path
             | KnownClass::FunctoolsPartial
@@ -897,7 +890,6 @@ impl KnownClass {
             Self::KwOnly => "KW_ONLY",
             Self::NamedTupleFallback => "NamedTupleFallback",
             Self::NamedTupleLike => "NamedTupleLike",
-            Self::ExactlySized => "ExactlySized",
             Self::ConstraintSet => "ConstraintSet",
             Self::GenericContext => "GenericContext",
             Self::Specialization => "Specialization",
@@ -1255,7 +1247,6 @@ impl KnownClass {
             Self::Field | Self::KwOnly => KnownModule::Dataclasses,
             Self::NamedTupleFallback | Self::TypedDictFallback => KnownModule::TypeCheckerInternals,
             Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1358,7 +1349,6 @@ impl KnownClass {
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1465,7 +1455,6 @@ impl KnownClass {
             | Self::Mapping
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
@@ -1571,7 +1560,6 @@ impl KnownClass {
             "KW_ONLY" => &[Self::KwOnly],
             "NamedTupleFallback" => &[Self::NamedTupleFallback],
             "NamedTupleLike" => &[Self::NamedTupleLike],
-            "ExactlySized" => &[Self::ExactlySized],
             "ConstraintSet" => &[Self::ConstraintSet],
             "GenericContext" => &[Self::GenericContext],
             "Specialization" => &[Self::Specialization],
@@ -1659,7 +1647,6 @@ impl KnownClass {
             | Self::ExtensionsParamSpec
             | Self::Sentinel
             | Self::NamedTupleLike
-            | Self::ExactlySized
             | Self::ConstraintSet
             | Self::GenericContext
             | Self::Specialization
