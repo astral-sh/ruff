@@ -955,9 +955,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// `TypedDict` `C` that's fully-static and assignable to both of them.
     ///
     /// `TypedDict` assignability is determined field-by-field, so we determine disjointness
-    /// similarly. Fields that are present in both `A` and `B` can conflict directly. A required
-    /// field that's only in one side can also conflict with the other side's openness: a closed
-    /// `TypedDict` rejects it, and explicit extra items constrain whether it can be present.
+    /// similarly. Fields that are present in both `A` and `B` can conflict directly. A required or
+    /// mutable optional field that's only in one side can also conflict with the other side's
+    /// openness: a closed `TypedDict` rejects it, and explicit extra items constrain whether it can
+    /// be present.
     ///
     /// There are three properties of each field to consider: the declared type, whether it's
     /// mutable ("mut" vs "imm" below), and whether it's required ("req" vs "opt" below). Here's a
@@ -1110,13 +1111,22 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                     if field.is_required() || other_items.contains_key(name) {
                         return None;
                     }
-                    let TypedDictOpenness::Extra(extra_items) = other_openness else {
-                        return None;
-                    };
-                    (!field.is_read_only() || !extra_items.is_read_only())
-                        .then_some((field, extra_items))
+                    match other_openness {
+                        TypedDictOpenness::Closed if !field.is_read_only() => Some((field, None)),
+                        TypedDictOpenness::Extra(extra_items)
+                            if !field.is_read_only() || !extra_items.is_read_only() =>
+                        {
+                            Some((field, Some(extra_items)))
+                        }
+                        TypedDictOpenness::Open
+                        | TypedDictOpenness::Closed
+                        | TypedDictOpenness::Extra(_) => None,
+                    }
                 })
                 .when_any(db, self.constraints, |(field, extra_items)| {
+                    let Some(extra_items) = extra_items else {
+                        return self.always();
+                    };
                     let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
                     if field.is_read_only() {
                         relation_checker

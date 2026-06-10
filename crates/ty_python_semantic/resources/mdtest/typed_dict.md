@@ -6372,7 +6372,7 @@ static_assert(not is_assignable_to(SourceWithStrExtra, Target))
 ### Disjointness accounts for openness
 
 A required item on one side can conflict with the other side's closed or extra-items policy. An
-optional mutable item can also conflict with a mutable extra-items policy.
+optional mutable item can also conflict with a closed or explicit extra-items policy.
 
 ```py
 from typing_extensions import NotRequired, ReadOnly, TypedDict
@@ -6405,6 +6405,12 @@ class OptionalReadOnlyInt(TypedDict):
 class OptionalReadOnlyObject(TypedDict):
     value: NotRequired[ReadOnly[object]]
 
+class ClosedOptionalInt(TypedDict, closed=True):
+    value: NotRequired[int]
+
+class ClosedOptionalReadOnlyInt(TypedDict, closed=True):
+    value: NotRequired[ReadOnly[int]]
+
 static_assert(is_disjoint_from(RequiredInt, ClosedEmpty))
 static_assert(not is_disjoint_from(RequiredInt, ReadOnlyIntExtras))
 static_assert(is_disjoint_from(RequiredStr, ReadOnlyIntExtras))
@@ -6431,6 +6437,14 @@ static_assert(is_disjoint_from(OptionalReadOnlyInt, MutableObjectExtras))
 static_assert(not is_disjoint_from(OptionalReadOnlyObject, MutableIntExtras))
 static_assert(not is_disjoint_from(OptionalReadOnlyInt, OpenEmpty))
 static_assert(not is_disjoint_from(OpenEmpty, OptionalReadOnlyInt))
+static_assert(is_disjoint_from(ClosedOptionalInt, ClosedEmpty))
+static_assert(is_disjoint_from(ClosedEmpty, ClosedOptionalInt))
+static_assert(not is_disjoint_from(ClosedOptionalInt, OpenEmpty))
+static_assert(not is_disjoint_from(OpenEmpty, ClosedOptionalInt))
+static_assert(not is_disjoint_from(ClosedOptionalReadOnlyInt, ClosedEmpty))
+static_assert(not is_disjoint_from(ClosedEmpty, ClosedOptionalReadOnlyInt))
+static_assert(not is_disjoint_from(ClosedOptionalReadOnlyInt, ReadOnlyStrExtras))
+static_assert(not is_disjoint_from(ReadOnlyStrExtras, ClosedOptionalReadOnlyInt))
 ```
 
 ### A `TypedDict` with `extra_items: T` is a subtype of `Mapping[str, T1]`, where `T1` is the union of `T` and all declared item types
