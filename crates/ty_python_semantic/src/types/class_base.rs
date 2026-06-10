@@ -128,7 +128,7 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
-                if let Some(module) = ty.typed_dict_module(db) {
+                if let Some(module) = TypedDictModule::from_type(db, ty) {
                     return Some(ClassBase::TypedDict(module));
                 }
 
