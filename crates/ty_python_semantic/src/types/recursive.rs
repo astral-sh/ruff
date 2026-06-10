@@ -148,7 +148,6 @@ pub struct RecursiveType<'db> {
 
     /// The body of the recursive type, possibly containing the binder's `Divergent`
     /// marker at the recursive positions.
-    #[returns(ref)]
     pub body: Type<'db>,
 }
 
@@ -178,7 +177,7 @@ impl<'db> RecursiveType<'db> {
     /// Use this when you do not need to perform type operations arbitrarily and would rather treat it as a finite type.
     /// In this case, the source type should be consumed as the terminal element (otherwise the source type would be expanded infinitely).
     pub(crate) fn body_with_origin_marker(self, db: &'db dyn Db) -> Type<'db> {
-        let body = *self.body(db);
+        let body = self.body(db);
         let Some(replacement) = self.origin(db).source_type() else {
             return body;
         };
@@ -199,7 +198,7 @@ impl<'db> RecursiveType<'db> {
     /// `IntersectionBuilder`'s distribution where re-finding the recursive name
     /// matters.
     pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
-        let body = *self.body(db);
+        let body = self.body(db);
         let replacement = self
             .origin(db)
             .source_type()
@@ -220,6 +219,6 @@ impl<'db> RecursiveType<'db> {
     /// `Divergent`. This only arises as a not-yet-converged cycle provisional; a converged,
     /// structureless cycle is resolved away rather than wrapped.
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
-        *self.body(db) == Type::divergent(self.binder_id(db))
+        self.body(db) == Type::divergent(self.binder_id(db))
     }
 }

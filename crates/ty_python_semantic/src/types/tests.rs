@@ -590,7 +590,7 @@ fn recursive_materialization_maps_body() {
         panic!("Expected top materialization to preserve the recursive wrapper");
     };
     assert_eq!(
-        *top_recursive.body(&db),
+        top_recursive.body(&db),
         Type::heterogeneous_tuple(&db, [Type::object(), Type::divergent(binder_id)])
     );
 }

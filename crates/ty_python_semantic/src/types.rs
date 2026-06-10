@@ -1102,7 +1102,7 @@ impl<'db> Type<'db> {
     /// Use `unwrap_recursive` when walking types, such as relation checking. In the case of walking, the operated type must be a finite type.
     pub(crate) fn unwrap_recursive(self, db: &'db dyn Db) -> Self {
         match self {
-            Type::Recursive(rec) => *rec.body(db),
+            Type::Recursive(rec) => rec.body(db),
             _ => self,
         }
     }
@@ -1198,7 +1198,7 @@ impl<'db> Type<'db> {
     ) -> Self {
         let cycle_head_body = |ty: Self| match ty {
             Type::Recursive(rec) if cycle.head_ids().any(|id| id == rec.binder_id(db)) => {
-                *rec.body(db)
+                rec.body(db)
             }
             _ => ty,
         };
@@ -6629,7 +6629,7 @@ impl<'db> Type<'db> {
             Type::Recursive(recursive) => match type_mapping {
                 TypeMapping::Materialize(_) => {
                     visitor.visit(db, self, type_mapping, || {
-                        let body = *recursive.body(db);
+                        let body = recursive.body(db);
                         let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                         if mapped == body {
                             self
