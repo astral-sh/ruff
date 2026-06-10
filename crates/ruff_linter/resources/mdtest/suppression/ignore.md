@@ -347,8 +347,23 @@ the same rule:
 # error: [unmatched-suppression-comment]
 # ruff:disable[unused-import]
 import math
-# error: [invalid-suppression-comment]
+# snapshot: invalid-suppression-comment
 # ruff:enable[F401]
+```
+
+```snapshot
+error[RUF103]: Invalid suppression comment: no matching 'disable' comment
+  --> src/mdtest_snippet.py:12:1
+   |
+12 | # ruff:enable[F401]
+   | ^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove suppression comment
+9  | # ruff:disable[unused-import]
+10 | import math
+11 | # snapshot: invalid-suppression-comment
+   - # ruff:enable[F401]
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ### `noqa`
