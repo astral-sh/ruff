@@ -6417,10 +6417,14 @@ class ExtraInt(TypedDict, extra_items=int):
 class ExtraStr(TypedDict, extra_items=str):
     name: str
 
-# Mutable extra items must be equivalent, not just assignable
-#
+class ExtraBool(TypedDict, extra_items=bool):
+    name: str
+
+# Mutable extra items must be equivalent, not just assignable.
 static_assert(not is_assignable_to(ExtraInt, ExtraStr))
 static_assert(not is_assignable_to(ExtraStr, ExtraInt))
+static_assert(not is_assignable_to(ExtraBool, ExtraInt))
+static_assert(not is_assignable_to(ExtraInt, ExtraBool))
 
 class ReadOnlyExtraInt(TypedDict, extra_items=ReadOnly[int]):
     name: str
@@ -6428,9 +6432,14 @@ class ReadOnlyExtraInt(TypedDict, extra_items=ReadOnly[int]):
 class ReadOnlyExtraIntStr(TypedDict, extra_items=ReadOnly[int | str]):
     name: str
 
-# Read-only extra items: covariant, so narrower is assignable to wider
+class ReadOnlyExtraBool(TypedDict, extra_items=ReadOnly[bool]):
+    name: str
+
+# Read-only extra items are covariant, so narrower is assignable to wider.
 static_assert(is_subtype_of(ReadOnlyExtraInt, ReadOnlyExtraIntStr))
 static_assert(not is_assignable_to(ReadOnlyExtraIntStr, ReadOnlyExtraInt))
+static_assert(is_assignable_to(ReadOnlyExtraBool, ReadOnlyExtraInt))
+static_assert(not is_assignable_to(ReadOnlyExtraInt, ReadOnlyExtraBool))
 
 # A closed TypedDict is assignable to an open one (open implicitly has ReadOnly[object] extras)
 class Closed(TypedDict, closed=True):
@@ -6451,6 +6460,43 @@ static_assert(is_assignable_to(ExtraInt, Open))
 # But not vice versa
 #
 static_assert(not is_assignable_to(Open, ExtraInt))
+
+class ClosedWithBool(TypedDict, closed=True):
+    name: str
+    source_only: bool
+
+class ClosedWithInt(TypedDict, closed=True):
+    name: str
+    source_only: int
+
+# A closed target rejects source-only items.
+static_assert(not is_assignable_to(ClosedWithInt, Closed))
+
+# Read-only extra items accept source-only fields covariantly.
+static_assert(is_assignable_to(ClosedWithBool, ReadOnlyExtraInt))
+static_assert(not is_assignable_to(ClosedWithInt, ReadOnlyExtraBool))
+
+class MutableSourceValid(TypedDict, extra_items=int):
+    name: str
+    source_only: NotRequired[int]
+
+class MutableSourceReadOnly(TypedDict, extra_items=int):
+    name: str
+    source_only: NotRequired[ReadOnly[int]]
+
+class MutableSourceRequired(TypedDict, extra_items=int):
+    name: str
+    source_only: int
+
+class MutableSourceBool(TypedDict, extra_items=int):
+    name: str
+    source_only: NotRequired[bool]
+
+# Mutable extra items require source-only fields to be mutable, non-required, and equivalent.
+static_assert(is_assignable_to(MutableSourceValid, ExtraInt))
+static_assert(not is_assignable_to(MutableSourceReadOnly, ExtraInt))
+static_assert(not is_assignable_to(MutableSourceRequired, ExtraInt))
+static_assert(not is_assignable_to(MutableSourceBool, ExtraInt))
 ```
 
 Non-required items in the target that are absent in the source must be accounted for by the source's
