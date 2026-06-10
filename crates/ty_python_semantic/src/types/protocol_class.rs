@@ -579,12 +579,7 @@ impl<'db> ProtocolMemberKind<'db> {
                 Self::Other(curr.cycle_normalized(db, Some(*prev), cycle))
             }
             _ => {
-                debug_assert!(matches!(
-                    previous,
-                    Self::Other(ty)
-                        if ty.is_divergent()
-                            || matches!(ty, Type::Recursive(recursive) if recursive.is_non_contractive(db))
-                ));
+                debug_assert!(false);
                 *self
             }
         }
