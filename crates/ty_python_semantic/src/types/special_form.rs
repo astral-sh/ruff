@@ -109,8 +109,8 @@ pub enum SpecialFormType {
     TypeAlias,
     /// The symbol `typing.TypeGuard` (which can also be found as `typing_extensions.TypeGuard`)
     TypeGuard,
-    /// The symbol `typing.TypedDict` (which can also be found as `typing_extensions.TypedDict`)
-    TypedDict,
+    /// The symbol `typing.TypedDict` or `typing_extensions.TypedDict`.
+    TypedDict(TypedDictModule),
     /// The symbol `typing.TypeIs` (which can also be found as `typing_extensions.TypeIs`)
     TypeIs,
 
@@ -132,7 +132,27 @@ pub enum SpecialFormType {
     NamedTuple,
 }
 
+/// The module from which `TypedDict` was imported.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub enum TypedDictModule {
+    /// `typing.TypedDict`.
+    Typing,
+    /// `typing_extensions.TypedDict`.
+    TypingExtensions,
+}
+
 impl SpecialFormType {
+    pub(crate) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+        match self {
+            Self::TypedDict(module) => Some(module),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn is_typed_dict(self) -> bool {
+        self.typed_dict_module().is_some()
+    }
+
     /// Return the [`KnownClass`] which this symbol is an instance of
     pub(crate) const fn class(self) -> KnownClass {
         match self {
@@ -153,7 +173,7 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypeAlias
             | Self::TypeGuard
-            | Self::TypedDict
+            | Self::TypedDict(_)
             | Self::TypeIs
             | Self::TypeOf
             | Self::Not
@@ -238,12 +258,10 @@ impl SpecialFormType {
     /// imported the symbol from (`import_module`), return the variant that matches the
     /// import path — or `self` if there's no better match.
     ///
-    /// This exists because typeshed defines `_collections_abc.Callable` as
-    /// `from typing import Callable as Callable`, then re-exports it from `collections.abc`.
-    /// Following the alias chain to the definition site lands on `SpecialFormType::TypingCallable`
-    /// for both `from typing import Callable` and `from collections.abc import Callable`, erasing
-    /// the distinction. This method substitutes `CollectionsAbcCallable` at the `_collections_abc`
-    /// module boundary, restoring it before `collections.abc` star-reexports it.
+    /// This exists because typeshed defines some special forms as re-exports from other modules.
+    /// Following the alias chain to the definition site would otherwise erase distinctions such as
+    /// `typing.Callable` versus `collections.abc.Callable`, or `typing.TypedDict` versus
+    /// `typing_extensions.TypedDict`.
     ///
     /// Called at module-attribute resolution — the one boundary where the import-path
     /// module is still observable.
@@ -251,6 +269,12 @@ impl SpecialFormType {
         match (self, name, import_module) {
             (Self::TypingCallable, "Callable", KnownModule::CollectionsAbcInternal) => {
                 Self::CollectionsAbcCallable
+            }
+            (Self::TypedDict(_), "TypedDict", KnownModule::Typing) => {
+                Self::TypedDict(TypedDictModule::Typing)
+            }
+            (Self::TypedDict(_), "TypedDict", KnownModule::TypingExtensions) => {
+                Self::TypedDict(TypedDictModule::TypingExtensions)
             }
             _ => self,
         }
@@ -356,7 +380,7 @@ impl SpecialFormType {
                     SpecialFormType::Top => Self::Top,
                     SpecialFormType::Unpack => Self::Unpack,
                     SpecialFormType::Tuple => Self::Tuple,
-                    SpecialFormType::TypedDict => Self::TypedDict,
+                    SpecialFormType::TypedDict(_) => Self::TypedDict,
                     SpecialFormType::TypeOf => Self::TypeOf,
                     SpecialFormType::LegacyStdlibAlias(alias) => match alias {
                         LegacyStdlibAlias::List => Self::List,
@@ -416,7 +440,7 @@ impl SpecialFormType {
                 SpecialFormTypeBuilder::Top => Self::Top,
                 SpecialFormTypeBuilder::Unpack => Self::Unpack,
                 SpecialFormTypeBuilder::Tuple => Self::Tuple,
-                SpecialFormTypeBuilder::TypedDict => Self::TypedDict,
+                SpecialFormTypeBuilder::TypedDict => Self::TypedDict(TypedDictModule::Typing),
                 SpecialFormTypeBuilder::TypeOf => Self::TypeOf,
                 SpecialFormTypeBuilder::List => Self::LegacyStdlibAlias(LegacyStdlibAlias::List),
                 SpecialFormTypeBuilder::Dict => Self::LegacyStdlibAlias(LegacyStdlibAlias::Dict),
@@ -472,7 +496,7 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypeAlias
             | Self::TypeGuard
-            | Self::TypedDict
+            | Self::TypedDict(_)
             | Self::TypeIs
             | Self::TypeForm
             | Self::TypingSelf
@@ -512,7 +536,7 @@ impl SpecialFormType {
     pub(super) const fn is_callable(self) -> bool {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
-            Self::TypedDict
+            Self::TypedDict(_)
 
             // Collection constructors are callable
             // TODO actually implement support for calling them
@@ -606,7 +630,7 @@ impl SpecialFormType {
             | Self::Optional
             | Self::Top
             | Self::TypeIs
-            | Self::TypedDict
+            | Self::TypedDict(_)
             | Self::TypingSelf
             | Self::Union
             | Self::Unknown
@@ -640,7 +664,7 @@ impl SpecialFormType {
             SpecialFormType::Unpack => "Unpack",
             SpecialFormType::TypeAlias => "TypeAlias",
             SpecialFormType::TypeGuard => "TypeGuard",
-            SpecialFormType::TypedDict => "TypedDict",
+            SpecialFormType::TypedDict(_) => "TypedDict",
             SpecialFormType::TypeIs => "TypeIs",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::List) => "List",
             SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Dict) => "Dict",
@@ -689,7 +713,7 @@ impl SpecialFormType {
             | SpecialFormType::Unpack
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypeGuard
-            | SpecialFormType::TypedDict
+            | SpecialFormType::TypedDict(_)
             | SpecialFormType::TypeIs
             | SpecialFormType::Protocol
             | SpecialFormType::Generic
@@ -822,7 +846,7 @@ impl SpecialFormType {
             // annotated assignment statement) doesn't reach here. Using it in any other type
             // expression is an error.
             Self::TypeAlias => Err(InvalidTypeExpression::TypeAlias),
-            Self::TypedDict => Err(InvalidTypeExpression::TypedDict),
+            Self::TypedDict(_) => Err(InvalidTypeExpression::TypedDict),
 
             Self::Literal | Self::Union | Self::Intersection => {
                 Err(InvalidTypeExpression::RequiresArguments(self))

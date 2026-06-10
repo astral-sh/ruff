@@ -5,7 +5,7 @@ use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DivergentType, DynamicType, KnownClass,
     KnownInstanceType, MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    TypeMapping, TypedDictModule, todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -271,7 +271,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Unknown => Some(Self::unknown()),
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
-                SpecialFormType::TypedDict => Some(Self::TypedDict),
+                SpecialFormType::TypedDict(_) => Some(Self::TypedDict),
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
@@ -484,7 +484,9 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
-            ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
+            ClassBase::TypedDict => {
+                Type::SpecialForm(SpecialFormType::TypedDict(TypedDictModule::Typing))
+            }
         }
     }
 }

@@ -39,8 +39,8 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -372,6 +372,33 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+fn typed_dict_module_from_bases<'db>(
+    db: &'db dyn Db,
+    bases: &[Type<'db>],
+) -> Option<TypedDictModule> {
+    let mut module = None;
+
+    for base in bases {
+        let base_module = match base {
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(*module),
+            Type::ClassLiteral(base) => base.typed_dict_module(db),
+            Type::GenericAlias(alias) => {
+                ClassLiteral::Static(alias.origin(db)).typed_dict_module(db)
+            }
+            _ => None,
+        };
+
+        if let Some(base_module) = base_module {
+            if module.is_some_and(|module| module != base_module) {
+                return None;
+            }
+            module = Some(base_module);
+        }
+    }
+
+    module
+}
+
 #[salsa::tracked]
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
@@ -419,6 +446,29 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the known class, if any.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         self.as_static()?.known(db)
+    }
+
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn typed_dict_module_inner<'db>(
+            db: &'db dyn Db,
+            class: ClassLiteral<'db>,
+        ) -> Option<TypedDictModule> {
+            match class {
+                ClassLiteral::Static(class) => {
+                    typed_dict_module_from_bases(db, class.explicit_bases(db))
+                }
+                ClassLiteral::Dynamic(class) => {
+                    typed_dict_module_from_bases(db, class.explicit_bases(db))
+                }
+                ClassLiteral::DynamicTypedDict(typed_dict) => {
+                    Some(typed_dict.typed_dict_module(db))
+                }
+                ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicEnum(_) => None,
+            }
+        }
+
+        typed_dict_module_inner(db, self)
     }
 
     /// Returns whether this class has PEP 695 type parameters.
