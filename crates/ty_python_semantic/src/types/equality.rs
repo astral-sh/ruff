@@ -8,6 +8,11 @@ use super::{
     enums::{enum_member_literals, enum_metadata},
 };
 
+/// The result of evaluating a runtime comparison between two types.
+///
+/// Definite truthiness is represented separately from a constraint for the operand currently being
+/// narrowed. A comparison can therefore be ambiguous at runtime while still constraining that
+/// operand in either branch.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ComparisonResult<'db> {
     /// The comparison always evaluates to true.
@@ -18,7 +23,7 @@ enum ComparisonResult<'db> {
     /// object of type `Literal[Foo.X]` in the following example, despite the fact that
     /// `Literal[1]` is disjoint from `Literal[Foo.X]`:
     ///
-    /// ```py
+    /// ```python
     /// from enum import IntEnum
     ///
     /// class Foo(IntEnum):
@@ -43,6 +48,7 @@ enum ComparisonResult<'db> {
 }
 
 impl<'db> ComparisonResult<'db> {
+    /// Convert this result into a constraint for a branch with the given truthiness.
     fn constraint(self, is_positive: bool) -> Option<Type<'db>> {
         match self {
             ComparisonResult::AlwaysTrue => (!is_positive).then_some(Type::Never),
@@ -52,6 +58,7 @@ impl<'db> ComparisonResult<'db> {
         }
     }
 
+    /// Preserve definite truthiness while discarding a conditional narrowing result.
     fn discard_narrowing(self) -> Self {
         match self {
             ComparisonResult::CanNarrow(_) => ComparisonResult::Ambiguous,
@@ -60,6 +67,10 @@ impl<'db> ComparisonResult<'db> {
     }
 }
 
+/// Return a constraint for `left` in a branch where `left == right` has the given truthiness.
+///
+/// Returns `None` when the comparison behavior of either operand is not precise enough to safely
+/// constrain `left`.
 pub(super) fn evaluate_type_equality<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -79,6 +90,10 @@ pub(super) fn evaluate_type_equality<'db>(
         })
 }
 
+/// Return a constraint for `left` in a branch where `left != right` has the given truthiness.
+///
+/// Returns `None` when the comparison behavior of either operand is not precise enough to safely
+/// constrain `left`.
 pub(super) fn evaluate_type_inequality<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -96,6 +111,9 @@ pub(super) fn evaluate_type_inequality<'db>(
     .or_else(|| inequality_result(db, left, right, is_positive).constraint(is_positive))
 }
 
+/// Return the truthiness of `left == right` when it is known for every represented runtime value.
+///
+/// A result that only permits narrowing remains ambiguous because it can still evaluate either way.
 pub(crate) fn equality_truthiness<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -108,6 +126,10 @@ pub(crate) fn equality_truthiness<'db>(
     }
 }
 
+/// Evaluate equality recursively, treating `left` as the operand being constrained.
+///
+/// `is_positive` selects the branch whose constraint is accumulated when either operand expands
+/// into multiple alternatives.
 fn equality_result<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -280,12 +302,6 @@ fn equality_result<'db>(
     }
 }
 
-/// Return a constraint that does not depend on the target's currently inferred literal union.
-///
-/// Narrowing constraints participate in cyclic inference. Filtering `"B" | "C"` to `"B"` for the
-/// false branch of `x == "C"` can freeze a loop before later iterations widen `x`. Constraining the
-/// target with `~Literal["C"]` instead describes the predicate itself and remains valid as the cycle
-/// reaches its fixed point.
 fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
     match ty.resolve_type_alias(db) {
         Type::LiteralValue(literal) => matches!(
@@ -300,6 +316,15 @@ fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
     }
 }
 
+/// Return a predicate-shaped constraint for comparison with a primitive literal.
+///
+/// Narrowing constraints participate in cyclic inference. Filtering `"B" | "C"` to `"B"` for the
+/// false branch of `x == "C"` can freeze a loop before later iterations widen `x`. Constraining the
+/// target with `~Literal["C"]` instead describes the predicate itself and remains valid as the cycle
+/// reaches its fixed point.
+///
+/// The constraint also follows Python's equality between booleans and integers: `x != 0` excludes
+/// both `Literal[0]` and `Literal[False]`, while `x != 1` excludes `Literal[1]` and `Literal[True]`.
 fn primitive_literal_constraint<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -381,6 +406,10 @@ fn primitive_literal_constraint<'db>(
     .then_some(equal_to_right)
 }
 
+/// Return a direct enum-member constraint when the target is entirely from the same enum domain.
+///
+/// This is only valid when the enum inherits comparison behavior that `ty` understands; custom
+/// equality or inequality methods make the result ambiguous.
 fn enum_literal_constraint<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -425,6 +454,10 @@ fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralTy
     }
 }
 
+/// Evaluate inequality recursively, treating `left` as the operand being constrained.
+///
+/// `is_positive` selects the branch whose constraint is accumulated when either operand expands
+/// into multiple alternatives.
 fn inequality_result<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -640,6 +673,10 @@ fn evaluate_union_left<'db>(
     })
 }
 
+/// Combine comparison results for the alternatives of the union being constrained.
+///
+/// Alternatives that cannot satisfy the selected branch are removed. Dynamic alternatives retain
+/// negative constraints for removed arms so that the result still describes the branch predicate.
 fn evaluate_target_union<'db>(
     db: &'db dyn Db,
     elements: &[Type<'db>],
@@ -734,6 +771,10 @@ fn evaluate_union_right<'db>(
     )
 }
 
+/// Combine comparison results produced by alternatives of the non-target operand.
+///
+/// The target remains possible when any alternative can satisfy the selected branch; definite
+/// truthiness is reported only when every alternative agrees.
 fn evaluate_against_results<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
@@ -830,6 +871,10 @@ fn inequality_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Ty
     finite_alternatives(db, ty, ComparisonOperator::Inequality)
 }
 
+/// Expand a type into its finite runtime alternatives when its comparison semantics are known.
+///
+/// Enum classes with custom comparison methods are deliberately not expanded because their members
+/// may compare equal to values outside the enum domain.
 fn finite_alternatives<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -887,6 +932,7 @@ fn narrow_literal_comparison<'db>(
     }
 }
 
+/// Narrow `LiteralString` against a string-valued enum member with inherited `str` semantics.
 fn narrow_literal_string_against_enum<'db>(
     db: &'db dyn Db,
     enum_literal: EnumLiteralType<'db>,
@@ -1001,6 +1047,10 @@ impl ComparisonOperator {
     }
 }
 
+/// A known builtin implementation that determines the runtime behavior of a comparison.
+///
+/// Two types with different known semantics cannot compare equal. Types with custom or otherwise
+/// unknown comparison methods are not assigned a value of this enum.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum KnownComparisonSemantics {
     Object,
@@ -1067,6 +1117,9 @@ fn comparison_domain<'db>(
     }
 }
 
+/// Determine the builtin comparison implementation inherited by `ty`.
+///
+/// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
 fn comparison_semantics<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1108,6 +1161,7 @@ fn comparison_semantics<'db>(
     }
 }
 
+/// Return whether `ty` is a singleton whose comparison uses object identity semantics.
 fn has_known_identity_comparison_semantics<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1243,6 +1297,10 @@ fn lookup_dunder<'db>(
     )
 }
 
+/// Return the comparison result for two literals when their runtime values determine it.
+///
+/// This accounts for integer/boolean equality and enum aliases or enum values. `None` means custom
+/// or insufficiently known comparison behavior prevents a definitive result.
 fn known_literal_equality<'db>(
     db: &'db dyn Db,
     left: LiteralValueTypeKind<'db>,
@@ -1323,6 +1381,9 @@ fn known_type_value_equality<'db>(
     )
 }
 
+/// Return the statically known runtime value of an enum member.
+///
+/// Custom enum construction can replace the declared value, so members of such enums return `None`.
 fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
     let metadata = enum_metadata(db, literal.enum_class(db))?;
     let name = metadata.resolve_member(literal.name(db))?;
@@ -1339,6 +1400,7 @@ fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Op
     }
 }
 
+/// Return whether two enum literals resolve to the same member, including aliases.
 fn same_enum_member<'db>(
     db: &'db dyn Db,
     left: EnumLiteralType<'db>,
