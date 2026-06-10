@@ -616,6 +616,39 @@ to remove them in one operation, they are respectively treated as unmatched (`di
 import foo
 ```
 
+## Invalid nested block and file comments
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF10"]
+```
+
+Nested `disable` and `file-ignore` comments are also invalid and don't suppress diagnostics on the
+following line:
+
+```py
+# error: [invalid-suppression-comment]
+# explanation # ruff:disable[F401]
+# error: [unused-import]
+import os
+
+# error: [invalid-suppression-comment]
+# explanation # ruff:file-ignore[F401]
+# error: [unused-import]
+import sys
+```
+
+Similarly, a nested `enable` is invalid and doesn't re-enable a disabled rule:
+
+```py
+# error: [unmatched-suppression-comment]
+# ruff:disable[F401]
+# error: [invalid-suppression-comment]
+# comment # ruff:enable[F401]
+import foo
+```
+
 ## Nested comments on comment-only lines
 
 ```toml
