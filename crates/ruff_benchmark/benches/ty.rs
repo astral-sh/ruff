@@ -1000,10 +1000,32 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
-/// Benchmark for preserving compact narrowing across calls in a long `isinstance` elif chain.
-fn large_isinstance_narrowing_across_calls_code(mixed_calls: bool) -> String {
+/// Regression benchmark for dropping failed earlier `isinstance` checks after branches that
+/// contain ordinary calls merge.
+///
+/// Every matching branch reaches the statements after the chain, so the merged type should be
+/// `C0 | C1 | ...` without retaining the failed checks from the preceding branches.
+///
+/// Sample code structure:
+/// ```python
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         noop()
+///     elif isinstance(obj, C1):
+///         noop()
+///     ...
+///     else:
+///         return
+///
+///     obj
+///     obj
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing_across_calls(criterion: &mut Criterion) {
     const NUM_CLASSES: usize = 50;
     const NUM_USES: usize = 10;
+
+    setup_rayon();
 
     let mut code = "class Base: ...\n".to_string();
     for i in 0..NUM_CLASSES {
@@ -1018,10 +1040,68 @@ fn large_isinstance_narrowing_across_calls_code(mixed_calls: bool) -> String {
         } else {
             writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
         }
-        if mixed_calls && i > 0 {
-            code.push_str("        pass\n");
-        } else {
+        code.push_str("        noop()\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..NUM_USES {
+        code.push_str("    obj\n");
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_across_calls]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for dropping failed earlier `isinstance` checks when branches with and
+/// without ordinary calls merge.
+///
+/// Every matching branch reaches the statements after the chain, but only the first branch
+/// contains a call. The merged type should still be `C0 | C1 | ...` without retaining the failed
+/// checks from the preceding branches.
+///
+/// Sample code structure:
+/// ```python
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         noop()
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+///     else:
+///         return
+///
+///     obj
+///     obj
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing_mixed_calls(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+    const NUM_USES: usize = 10;
+
+    setup_rayon();
+
+    let mut code = "class Base: ...\n".to_string();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    code.push_str("\ndef noop() -> None: ...\n\n");
+
+    code.push_str("def f(obj: Base) -> None:\n");
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
             code.push_str("        noop()\n");
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+            code.push_str("        pass\n");
         }
     }
     code.push_str("    else:\n        return\n\n");
@@ -1029,29 +1109,17 @@ fn large_isinstance_narrowing_across_calls_code(mixed_calls: bool) -> String {
         code.push_str("    obj\n");
     }
 
-    code
-}
-
-fn benchmark_large_isinstance_narrowing_across_calls(criterion: &mut Criterion) {
-    setup_rayon();
-
-    for (name, mixed_calls) in [
-        ("ty_micro[large_isinstance_narrowing_across_calls]", false),
-        ("ty_micro[large_isinstance_narrowing_mixed_calls]", true),
-    ] {
-        let code = large_isinstance_narrowing_across_calls_code(mixed_calls);
-        criterion.bench_function(name, |b| {
-            b.iter_batched_ref(
-                || setup_micro_case(&code),
-                |case| {
-                    let Case { db, .. } = case;
-                    let result = db.check();
-                    assert_eq!(result.len(), 0);
-                },
-                BatchSize::SmallInput,
-            );
-        });
-    }
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_mixed_calls]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
 }
 
 const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;
@@ -1637,6 +1705,7 @@ criterion_group!(
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
     benchmark_large_isinstance_narrowing_across_calls,
+    benchmark_large_isinstance_narrowing_mixed_calls,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
