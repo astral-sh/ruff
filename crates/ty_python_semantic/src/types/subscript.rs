@@ -465,9 +465,9 @@ where
     ))
 }
 
-// `TypedDict` subscripts need custom handling because invalid keys should still
-// recover with `Unknown` while emitting `invalid-key`, which is not naturally
-// representable via synthesized `__getitem__` overloads alone.
+// `TypedDict` subscripts need custom handling because invalid keys should emit `invalid-key` while
+// recovering with the union of value types for non-literal string keys on closed `TypedDict`s and
+// `Unknown` otherwise. This is not naturally representable via synthesized `__getitem__` overloads.
 fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
@@ -490,8 +490,15 @@ fn typed_dict_subscript<'db>(
         {
             return Ok(typed_dict.value_type(db));
         }
+        let result_ty = if typed_dict.openness(db).is_closed()
+            && slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        {
+            typed_dict.value_type(db)
+        } else {
+            Type::unknown()
+        };
         return Err(SubscriptError::new(
-            Type::unknown(),
+            result_ty,
             SubscriptErrorKind::InvalidTypedDictKey {
                 typed_dict,
                 slice_ty,

@@ -58,13 +58,20 @@ pub(super) fn synthesize_typed_dict_method<'db>(
                 db, typed_dict, return_ty,
             ))
         }
-        "items" if typed_dict.explicit_extra_items(db).is_some() => Some(
+        "__iter__" if typed_dict.openness(db).is_closed() => {
+            let return_ty =
+                KnownClass::Iterator.to_specialized_instance(db, &[typed_dict.key_type(db)]);
+            Some(synthesize_typed_dict_no_argument_method(
+                db, typed_dict, return_ty,
+            ))
+        }
+        "items" if !typed_dict.openness(db).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, typed_dict, "dict_items"),
         ),
-        "keys" if typed_dict.explicit_extra_items(db).is_some() => Some(
+        "keys" if !typed_dict.openness(db).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, typed_dict, "dict_keys"),
         ),
-        "values" if typed_dict.explicit_extra_items(db).is_some() => Some(
+        "values" if !typed_dict.openness(db).is_implicitly_open() => Some(
             synthesize_typed_dict_view_method(db, typed_dict, "dict_values"),
         ),
         "__or__" | "__ror__" | "__ior__" => {
@@ -667,7 +674,7 @@ fn synthesize_typed_dict_no_argument_method<'db>(
     )
 }
 
-/// Synthesize `items`, `keys`, or `values` for a `TypedDict` with explicit extra items.
+/// Synthesize `items`, `keys`, or `values` for a closed or extra-items `TypedDict`.
 fn synthesize_typed_dict_view_method<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
@@ -679,10 +686,8 @@ fn synthesize_typed_dict_view_method<'db>(
         .and_then(Type::as_class_literal)
         .map(|class| {
             class.apply_specialization(db, |generic_context| {
-                generic_context.specialize(
-                    db,
-                    &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
-                )
+                generic_context
+                    .specialize(db, &[typed_dict.key_type(db), typed_dict.value_type(db)])
             })
         })
         .and_then(|class| Type::from(class).to_instance(db))
