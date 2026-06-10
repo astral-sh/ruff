@@ -5154,6 +5154,21 @@ impl SequentMap {
         left_constraint: ConstraintId,
         right_constraint: ConstraintId,
     ) {
+        // Keep this precheck aligned with `variance_of`, which visits lazy types.
+        let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
+            bounds
+                .lower
+                .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
+                || bounds
+                    .upper
+                    .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
+        };
+        if !has_typevar_bound(builder.constraint_data(left_constraint).bounds)
+            && !has_typevar_bound(builder.constraint_data(right_constraint).bounds)
+        {
+            return;
+        }
+
         let mut try_tightening =
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
