@@ -992,8 +992,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         // This mirrors the behavior of StaticClassLiteral::typed_dict_member.
         typed_dict_class_member(
             db,
-            TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self))),
-            ClassLiteral::DynamicTypedDict(self),
+            ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self)),
             self.typed_dict_module(db),
             policy,
             name,
@@ -1034,28 +1033,23 @@ pub(super) fn typed_dict_fallback_class_member<'db>(
 
 pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
-    typed_dict: TypedDictType<'db>,
-    self_class: ClassLiteral<'db>,
+    class: ClassType<'db>,
     module: TypedDictModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
-    let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
-    let apply_self_mapping = |member: PlaceAndQualifiers<'db>| {
-        member.map_type(|ty| ty.apply_type_mapping(db, &mapping, TypeContext::default()))
-    };
-    let fallback_member = apply_self_mapping(typed_dict_fallback_class_member(
-        db,
-        module,
-        lookup_policy,
-        name,
-    ));
+    let self_class = class.class_literal(db);
+    let fallback_member = typed_dict_fallback_class_member(db, module, lookup_policy, name)
+        .map_type(|ty| {
+            let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
+            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+            ty.apply_type_mapping(db, &mapping, TypeContext::default())
+        });
     if !fallback_member.is_undefined() {
         return fallback_member;
     }
 
-    if let Some(value_ty) = typed_dict.dict_value_type(db)
+    if let Some(value_ty) = TypedDictType::new(class).dict_value_type(db)
         && let Some(dict_class) = KnownClass::Dict
             .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), value_ty])
     {

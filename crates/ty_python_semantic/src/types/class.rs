@@ -88,7 +88,7 @@ pub(crate) enum CodeGeneratorKind<'db> {
     DataclassLike(Option<DataclassTransformerParams<'db>>),
     /// Classes inheriting from `typing.NamedTuple`
     NamedTuple,
-    /// Classes inheriting from `typing.TypedDict`
+    /// Classes inheriting from `typing.TypedDict` or `typing_extensions.TypedDict`
     TypedDict,
 }
 
@@ -419,18 +419,6 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the known class, if any.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         self.as_static()?.known(db)
-    }
-
-    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
-        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn typed_dict_module_inner<'db>(
-            db: &'db dyn Db,
-            class: ClassLiteral<'db>,
-        ) -> Option<TypedDictModule> {
-            class.iter_mro(db).find_map(ClassBase::typed_dict_module)
-        }
-
-        typed_dict_module_inner(db, self)
     }
 
     /// Returns whether this class has PEP 695 type parameters.

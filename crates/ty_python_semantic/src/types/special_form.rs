@@ -146,7 +146,7 @@ pub enum TypedDictModule {
 impl TypedDictModule {
     /// Return the module for a `TypedDict` special form, including a union of the special forms
     /// exported by `typing` and `typing_extensions`.
-    pub(crate) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+    pub(super) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         match ty {
             Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(module),
             Type::Union(union) => {
@@ -166,7 +166,7 @@ impl TypedDictModule {
         }
     }
 
-    pub(crate) const fn union(self, other: Self) -> Self {
+    const fn union(self, other: Self) -> Self {
         match (self, other) {
             (Self::Typing, Self::Typing) => Self::Typing,
             (Self::TypingExtensions, Self::TypingExtensions) => Self::TypingExtensions,
