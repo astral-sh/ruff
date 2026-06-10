@@ -6258,6 +6258,9 @@ def _(
     accepts_ints(**strings)  # error: [invalid-argument-type]
     accepts_ints(**open_source)  # error: [invalid-argument-type]
     accepts_name(**ints)  # error: [unknown-argument]
+
+    # For backwards compatibility, implicit extra items on an ordinary open TypedDict are ignored
+    # when checking whether unpacking may supply unexpected arguments. Explicit extra items are not.
     accepts_name(**open_source)
     accepts_optional_int_label(**open_source)
     accepts_optional_label(**extra_only)  # error: [invalid-argument-type]
