@@ -854,17 +854,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
         };
-        PlaceAndQualifiers { place, qualifiers }.resolve_structureless_cycle_marker(cycle)
-    }
-
-    fn resolve_structureless_cycle_marker(self, cycle: &salsa::Cycle) -> Self {
-        self.map_type(|ty| {
-            if cycle.head_ids().any(|id| ty == Type::divergent(id)) {
-                Type::Never
-            } else {
-                ty
-            }
-        })
+        PlaceAndQualifiers { place, qualifiers }
     }
 }
 
