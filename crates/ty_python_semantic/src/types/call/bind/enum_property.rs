@@ -23,6 +23,9 @@ impl<'db> Bindings<'db> {
                 ))
             };
 
+        // TODO: Preserve subclasses of `enum.property`. `PropertyInstanceType` currently records
+        // only a known property class, so this rewrite collapses subclass instances to
+        // `enum.property`.
         for constructor in self.iter_constructor_items_mut() {
             if !constructor
                 .constructed_instance_type()
