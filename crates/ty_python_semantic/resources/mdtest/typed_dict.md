@@ -5494,7 +5494,7 @@ static_assert(is_equivalent_to(AliasedExtra, Closed))
 ### Empty closed TypedDict truthiness
 
 An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy,
-but inferring that precisely is outside the scope of `extra_items` support.
+but inferring that precisely is still TODO.
 
 ```py
 from typing_extensions import TypedDict
