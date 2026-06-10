@@ -86,9 +86,12 @@ bad_key_updates: list[tuple[int, str]] = [(1, "Bobby")]
 
 bob.update(name_update)
 bob.update({"name": "Robert"})
+# error: [invalid-argument-type]
 bob.update([("name", "Bobby")])
+# error: [invalid-argument-type]
 bob.update([("age", 27)])
 bob.update(name_update, age=26)
+# error: [invalid-argument-type]
 bob.update([("name", "Bobby")], age=26)
 
 # error: [invalid-argument-type]
@@ -111,10 +114,13 @@ bob.update({"other": 1})
 # error: [invalid-argument-type]
 bob.update({"age": "bad"})
 
+# error: [invalid-argument-type]
 bob.update([("other", 1)])
 
+# error: [invalid-argument-type]
 bob.update([("age", "bad")])
 
+# error: [invalid-argument-type]
 bob.update(string_key_updates)
 
 # error: [invalid-argument-type]
@@ -6025,6 +6031,11 @@ class MutableExtra(TypedDict, extra_items=int):
 class ReadOnlyExtra(TypedDict, extra_items=ReadOnly[int]):
     name: str
 
+class ReadOnlyExtraOnly(TypedDict, extra_items=ReadOnly[int]): ...
+
+class AllIntItems(TypedDict, extra_items=int):
+    year: int
+
 class IntPatch(TypedDict, extra_items=int):
     name: NotRequired[str]
 
@@ -6040,8 +6051,10 @@ class OpenWithName(TypedDict):
 def _(
     mutable: MutableExtra,
     mutable_extra_only: MutableExtraOnly,
+    all_int_items: AllIntItems,
     open_with_name: OpenWithName,
     read_only: ReadOnlyExtra,
+    read_only_extra_only: ReadOnlyExtraOnly,
     ints: IntPatch,
     strings: StrPatch,
     open_patch: OpenPatch,
@@ -6051,12 +6064,20 @@ def _(
     mutable.update(year="not an int")  # error: [invalid-argument-type]
     mutable.update(strings)  # error: [invalid-argument-type]
     mutable_extra_only.update(open_patch)  # error: [invalid-argument-type]
+    mutable_extra_only.update([("year", 1982)])
+    mutable_extra_only.update([("year", "not an int")])  # error: [invalid-argument-type]
+    all_int_items.update([("other", 1982)])
+
+    # An arbitrary key may refer to either the declared `name` item or an extra item.
+    mutable.update([("year", 1982)])  # error: [invalid-argument-type]
 
     # The source's extra items may contain the target's declared `name` key with an incompatible type.
     open_with_name.update(mutable_extra_only)  # error: [invalid-argument-type]
 
     read_only.update(year=1982)  # error: [unknown-argument]
     read_only.update(ints)  # error: [invalid-argument-type]
+    read_only.update([("year", 1982)])  # error: [invalid-argument-type]
+    read_only_extra_only.update([("year", 1982)])  # error: [invalid-argument-type]
 ```
 
 ### Unpacking accounts for extra items
