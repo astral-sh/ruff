@@ -15,6 +15,7 @@ mod markdown;
     )
 )]
 mod parsed;
+mod preformatted;
 mod rest;
 #[cfg_attr(
     not(test),
