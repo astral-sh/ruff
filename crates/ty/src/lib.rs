@@ -27,6 +27,7 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
+use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -128,25 +129,29 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             }
         })
         .transpose()?;
-    let uv_workspace = explicit_project_path
-        .is_none()
-        .then(|| {
-            uv::discover_workspace(
-                &cwd,
-                if args.uv_metadata {
-                    uv::WorkspaceMetadataSource::Stdin
-                } else {
-                    uv::WorkspaceMetadataSource::Command
-                },
-            )
-        })
-        .flatten();
-    let uv_workspace_member = uv_workspace
-        .as_ref()
-        .and_then(|workspace| workspace.member.clone());
-    let project_path = explicit_project_path
-        .or_else(|| uv_workspace.map(|workspace| workspace.root))
-        .unwrap_or_else(|| cwd.clone());
+    let uv_workspace = if args.uv_metadata {
+        uv::discover_workspace(&cwd, uv::WorkspaceMetadataSource::Stdin)
+    } else if explicit_project_path.is_none() {
+        uv::discover_workspace(&cwd, uv::WorkspaceMetadataSource::Command)
+    } else {
+        None
+    };
+    let (project_path, uv_workspace_member, uv_environment) =
+        match (explicit_project_path, uv_workspace) {
+            (Some(project_path), Some(uv::UvWorkspace { environment, .. })) => {
+                (project_path, None, environment)
+            }
+            (Some(project_path), None) => (project_path, None, None),
+            (
+                None,
+                Some(uv::UvWorkspace {
+                    root,
+                    member,
+                    environment,
+                }),
+            ) => (root, member, environment),
+            (None, None) => (cwd.clone(), None, None),
+        };
 
     let mut check_paths: Vec<_> = args
         .paths
@@ -187,7 +192,9 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     project_metadata.apply_configuration_files(&system)?;
 
-    let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
+    let mut project_options_overrides =
+        ProjectOptionsOverrides::new(config_file, args.into_options());
+    project_options_overrides.fallback_python = uv_environment.map(RelativePathBuf::cli);
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;

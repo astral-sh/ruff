@@ -9,6 +9,7 @@ use ty_static::EnvVars;
 pub(crate) struct UvWorkspace {
     pub(crate) root: SystemPathBuf,
     pub(crate) member: Option<SystemPathBuf>,
+    pub(crate) environment: Option<SystemPathBuf>,
 }
 
 pub(crate) enum WorkspaceMetadataSource {
@@ -84,23 +85,11 @@ fn parse_workspace_metadata(cwd: &SystemPath, metadata: &[u8]) -> Option<UvWorks
         return None;
     }
 
-    let root = match SystemPathBuf::from_path_buf(metadata.workspace_root) {
-        Ok(root) => root,
-        Err(root) => {
-            tracing::debug!(
-                "Ignoring non-Unicode workspace root returned by `uv workspace metadata`: `{}`",
-                root.display()
-            );
-            return None;
-        }
-    };
+    let root = existing_directory(metadata.workspace_root, "workspace root")?;
 
-    if !root.as_std_path().is_dir() {
-        tracing::debug!(
-            "Ignoring missing workspace root returned by `uv workspace metadata`: `{root}`"
-        );
-        return None;
-    }
+    let environment = metadata
+        .environment
+        .and_then(|environment| existing_directory(environment.root, "environment root"));
 
     let member = metadata
         .members
@@ -109,43 +98,55 @@ fn parse_workspace_metadata(cwd: &SystemPath, metadata: &[u8]) -> Option<UvWorks
         .filter(|member| cwd.as_std_path().starts_with(member))
         .max_by_key(|member| member.components().count());
     let member = match member {
-        Some(member) => {
-            let member = match SystemPathBuf::from_path_buf(member) {
-                Ok(member) => member,
-                Err(member) => {
-                    tracing::debug!(
-                        "Ignoring non-Unicode workspace member returned by `uv workspace metadata`: `{}`",
-                        member.display()
-                    );
-                    return None;
-                }
-            };
-
-            if !member.as_std_path().is_dir() {
-                tracing::debug!(
-                    "Ignoring missing workspace member returned by `uv workspace metadata`: `{member}`"
-                );
-                return None;
-            }
-
-            Some(member)
-        }
+        Some(member) => Some(existing_directory(member, "workspace member")?),
         None => None,
     };
 
-    Some(UvWorkspace { root, member })
+    Some(UvWorkspace {
+        root,
+        member,
+        environment,
+    })
+}
+
+fn existing_directory(path: PathBuf, description: &str) -> Option<SystemPathBuf> {
+    let path = match SystemPathBuf::from_path_buf(path) {
+        Ok(path) => path,
+        Err(path) => {
+            tracing::debug!(
+                "Ignoring non-Unicode {description} returned by `uv workspace metadata`: `{}`",
+                path.display()
+            );
+            return None;
+        }
+    };
+
+    if !path.as_std_path().is_dir() {
+        tracing::debug!(
+            "Ignoring missing {description} returned by `uv workspace metadata`: `{path}`"
+        );
+        return None;
+    }
+
+    Some(path)
 }
 
 #[derive(Deserialize)]
 struct WorkspaceMetadata {
     schema: WorkspaceMetadataSchema,
     workspace_root: PathBuf,
+    environment: Option<WorkspaceEnvironment>,
     members: Vec<WorkspaceMember>,
 }
 
 #[derive(Deserialize)]
 struct WorkspaceMetadataSchema {
     version: String,
+}
+
+#[derive(Deserialize)]
+struct WorkspaceEnvironment {
+    root: PathBuf,
 }
 
 #[derive(Deserialize)]
