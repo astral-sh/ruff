@@ -124,22 +124,28 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
-/// Infer a parameter without retaining a separate Salsa memo for its definition.
+/// Return the definition used to cache parameter inference for a function.
 ///
-/// Parameter inference is small and is already repeated when function-body inference merges the
-/// parameter diagnostics, so retaining every result costs more than recomputing it.
-pub(crate) fn infer_parameter_types_untracked<'db>(
+/// All parameters in a function are inferred together and cached using the first parameter's
+/// definition. This avoids retaining a separate Salsa memo for every parameter.
+pub(crate) fn parameter_inference_key<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> DefinitionInference<'db> {
+) -> Definition<'db> {
     debug_assert!(matches!(definition.kind(db), DefinitionKind::Parameter(_)));
 
+    let scope = definition.scope(db);
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
+    let function = scope.node(db).expect_function().node(&module);
+    let first_parameter = function
+        .parameters
+        .iter()
+        .next()
+        .expect("a parameter definition must belong to a function with parameters");
 
-    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_definition()
+    index.expect_single_definition(first_parameter)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.

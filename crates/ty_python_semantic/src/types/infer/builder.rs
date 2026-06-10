@@ -997,7 +997,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_statement(statement.node_ref(self.db()).node(self.module()));
     }
 
+    fn infer_region_function_parameters(&mut self, scope: ScopeId<'db>) {
+        let function = scope.node(self.db()).expect_function().node(self.module());
+        for parameter in &function.parameters {
+            let definition = self.index.expect_single_definition(parameter);
+            self.infer_single_definition(definition);
+        }
+    }
+
     fn infer_region_definition(&mut self, definition: Definition<'db>) {
+        if matches!(definition.kind(self.db()), DefinitionKind::Parameter(_)) {
+            self.infer_region_function_parameters(definition.scope(self.db()));
+        } else {
+            self.infer_single_definition(definition);
+        }
+    }
+
+    fn infer_single_definition(&mut self, definition: Definition<'db>) {
         match definition.kind(self.db()) {
             DefinitionKind::Function(function) => {
                 self.infer_function_definition(function.node(self.module()), definition);
