@@ -750,15 +750,15 @@ impl<'a> SuppressionsBuilder<'a> {
         match suppression.action {
             SuppressionAction::Ignore => {
                 if is_ruff_ignore_enabled(self.settings) {
-                    let (before, after) = tokens.split_at(suppression.token_range.start());
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
+                    let token_range = suppression.token_range;
+                    let (before, after) = tokens.split_at(token_range.start());
+                    let range = if indentation_at_offset(token_range.start(), self.source).is_some()
                     {
                         // own-line ignore
-                        Self::standalone_comment_range(suppression.range, before, after)
+                        Self::standalone_comment_range(token_range, before, after)
                     } else {
                         // trailing ignore
-                        self.trailing_comment_range(suppression.token_range, before)
+                        self.trailing_comment_range(token_range, before)
                     };
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {

@@ -649,35 +649,60 @@ Similarly, a nested `enable` is invalid and doesn't re-enable a disabled rule:
 import foo
 ```
 
-## Nested comments on comment-only lines
+## Nested own-line comments
 
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10", "FIX002"]
+select = ["E501", "F401", "F821", "RUF10", "FIX002"]
 ```
 
-Nested suppression comments on a comment-only line are treated as trailing on the comment itself and
-don't suppress diagnostics on the following line:
+Nested suppression comments on an own-line comment suppress diagnostics on the following line:
 
 ```py
-# error: [unused-noqa]
 # explanation # ruff:ignore[F401] # another
-# error: [unused-import]
 import pathlib
 
 def foo():
-    # error: [unused-noqa]
     # explanation # ruff:ignore[F401] # another
-    # error: [unused-import]
     import pathlib
 ```
 
-This can still be useful if the comment itself has a diagnostic:
+And on the comment itself:
 
 ```py
 # TODO this comment has a todo # noqa: FIX002
 # TODO this comment has a todo # ruff:ignore[FIX002]
+```
+
+Removing another suppression from the same comment token doesn't change the nested `ruff:ignore`
+semantics:
+
+```py
+# snapshot: unused-noqa
+# ruff:disable[E501] # ruff:ignore[F821]
+undefined_name
+# ruff:enable[E501]
+```
+
+```snapshot
+error[RUF100]: Unused suppression (unused: `E501`)
+  --> src/mdtest_snippet.py:10:1
+   |
+10 | # ruff:disable[E501] # ruff:ignore[F821]
+   | ^^^^^^^^^^^^^^^^^^^^^
+11 | undefined_name
+12 | # ruff:enable[E501]
+   | -------------------
+   |
+help: Remove unused suppression
+7  | # TODO this comment has a todo # noqa: FIX002
+8  | # TODO this comment has a todo # ruff:ignore[FIX002]
+9  | # snapshot: unused-noqa
+   - # ruff:disable[E501] # ruff:ignore[F821]
+10 + # ruff:ignore[F821]
+11 | undefined_name
+   - # ruff:enable[E501]
 ```
 
 ## Invalid nested comments
