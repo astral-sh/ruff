@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -157,11 +158,10 @@ impl<'db> ProtocolClass<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self(
-            self.0.recursive_type_normalized_impl(db, div, nested)?,
+            self.0.recursive_type_normalized_impl(db, normalization)?,
         ))
     }
 }
@@ -337,8 +337,7 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
@@ -347,7 +346,7 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     Some((
                         name.clone(),
-                        data.recursive_type_normalized_impl(db, div, nested)?,
+                        data.recursive_type_normalized_impl(db, normalization)?,
                     ))
                 })
                 .collect::<Option<BTreeMap<_, _>>>()?,
@@ -441,23 +440,24 @@ impl<'db> ProtocolMemberData<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self {
             kind: match &self.kind {
                 ProtocolMemberKind::Method(callable) => ProtocolMemberKind::Method(
-                    callable.recursive_type_normalized_impl(db, div, nested)?,
+                    callable.recursive_type_normalized_impl(db, normalization)?,
                 ),
                 ProtocolMemberKind::Property(property) => ProtocolMemberKind::Property(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, normalization)?,
                 ),
-                ProtocolMemberKind::Other(ty) if nested => {
-                    ProtocolMemberKind::Other(ty.recursive_type_normalized_impl(db, div, true)?)
+                ProtocolMemberKind::Other(ty) if normalization.is_nested() => {
+                    ProtocolMemberKind::Other(
+                        ty.recursive_type_normalized_impl(db, normalization.nested())?,
+                    )
                 }
                 ProtocolMemberKind::Other(ty) => ProtocolMemberKind::Other(
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div),
+                    ty.recursive_type_normalized_impl(db, normalization.nested())
+                        .unwrap_or(normalization.marker()),
                 ),
             },
             qualifiers: self.qualifiers,

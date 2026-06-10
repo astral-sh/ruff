@@ -1,4 +1,5 @@
 use crate::Db;
+use crate::types::RecursiveTypeNormalization;
 use crate::types::constraints::ConstraintSet;
 use crate::types::relation::{DisjointnessChecker, TypeRelation, TypeRelationChecker};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
@@ -179,11 +180,10 @@ impl<'db> NewType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let eager_base = match self.eager_base(db) {
-            Some(base) => Some(base.recursive_type_normalized_impl(db, div, nested)?),
+            Some(base) => Some(base.recursive_type_normalized_impl(db, normalization)?),
             None => None,
         };
 
@@ -281,15 +281,14 @@ impl<'db> NewTypeBase<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             NewTypeBase::ClassType(class_type) => class_type
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(NewTypeBase::ClassType),
             NewTypeBase::NewType(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(NewTypeBase::NewType),
             NewTypeBase::Float | NewTypeBase::Complex => Some(self),
         }

@@ -113,7 +113,10 @@ fn divergent_type() {
     assert_eq!(IntersectionBuilder::new(&db).add_negative(div).build(), div);
 
     // Normalizing the bare α-marker at a nested position propagates `None` (it collapses).
-    assert_eq!(div.recursive_type_normalized_impl(&db, div, true), None);
+    assert_eq!(
+        div.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(div).nested()),
+        None
+    );
 
     // The `Divergent` type must not be eliminated in union with other dynamic types,
     // as this would prevent detection of divergent type inference using `Divergent`.
@@ -179,7 +182,7 @@ fn divergent_type() {
         "list[list[Divergent] | None]"
     );
     let normalized = nested_rec
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(div))
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "list[Divergent]");
 
@@ -203,7 +206,7 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_tuple
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(div))
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "tuple[Divergent, str]");
 
@@ -227,14 +230,14 @@ fn divergent_type() {
         ],
     );
     let normalized = recursive_dict
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(div))
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "dict[str, Divergent]");
 
     let union = UnionType::from_elements(&db, [div, KnownClass::Int.to_instance(&db)]);
     assert_eq!(union.display(&db).to_string(), "Divergent | int");
     let normalized = union
-        .recursive_type_normalized_impl(&db, div, false)
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(div))
         .unwrap();
     assert_eq!(normalized.display(&db).to_string(), "int");
 
@@ -257,7 +260,7 @@ fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() 
     let union = UnionType::from_elements(&db, [int, non_contractive]).expect_union();
 
     assert_eq!(
-        union.recursive_type_normalized_impl(&db, marker, false),
+        union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker)),
         Some(int)
     );
 }
@@ -270,9 +273,9 @@ fn top_level_union_cycle_normalization_drops_other_cycle_markers() {
         Type::implicit_recursive(&db, Id::from_bits(3), Type::divergent(Id::from_bits(3)));
     let int = KnownClass::Int.to_instance(&db);
 
-    let union =
-        UnionType::from_elements(&db, [int, other_non_contractive]).expect_union();
-    let normalized = union.recursive_type_normalized_impl(&db, marker, false);
+    let union = UnionType::from_elements(&db, [int, other_non_contractive]).expect_union();
+    let normalized =
+        union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker));
 
     assert_eq!(normalized, Some(int));
 }
@@ -290,8 +293,61 @@ fn nested_union_cycle_normalization_preserves_non_contractive_recursive_marker()
     let union = UnionType::from_elements(&db, [int, list_recursive]).expect_union();
 
     assert_eq!(
-        union.recursive_type_normalized_impl(&db, marker, false),
+        union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker)),
         Some(UnionType::from_elements(&db, [int, list_marker]))
+    );
+}
+
+#[test]
+fn recursive_cycle_normalization_folds_nested_body_exact_match() {
+    let db = setup_db();
+    let marker = Type::divergent(Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db);
+    let body = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let normalization = RecursiveTypeNormalization::new(marker).with_fold_body(Some(body));
+
+    assert_eq!(
+        body.recursive_type_normalized_impl(&db, normalization.nested()),
+        Some(marker)
+    );
+    assert_eq!(
+        body.recursive_type_normalized_impl(&db, normalization),
+        Some(body)
+    );
+}
+
+#[test]
+fn recursive_cycle_normalization_folds_flattened_nested_union_body() {
+    let db = setup_db();
+    let marker = Type::divergent(Id::from_bits(1));
+    let int = KnownClass::Int.to_instance(&db);
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let list_marker = KnownClass::List.to_specialized_instance(&db, &[marker]);
+    let body = UnionType::from_elements(&db, [list_int, list_marker]);
+    let flattened = UnionType::from_elements(&db, [list_int, list_marker, int]);
+    let normalization = RecursiveTypeNormalization::new(marker).with_fold_body(Some(body));
+
+    assert_eq!(
+        flattened.recursive_type_normalized_impl(&db, normalization.nested()),
+        Some(marker)
+    );
+    assert_eq!(
+        body.recursive_type_normalized_impl(&db, normalization),
+        Some(body)
+    );
+}
+
+#[test]
+fn recursive_cycle_normalization_treats_non_contractive_recursive_as_marker() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
+
+    assert_eq!(
+        non_contractive
+            .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker).nested()),
+        Some(marker)
     );
 }
 

@@ -9,6 +9,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
+use crate::types::RecursiveTypeNormalization;
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
 };
@@ -362,17 +363,16 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
                 Some(Self(NominalInstanceInner::ExactTuple(
-                    tuple.recursive_type_normalized_impl(db, div, nested)?,
+                    tuple.recursive_type_normalized_impl(db, normalization)?,
                 )))
             }
             NominalInstanceInner::NonTuple(class) => Some(Self(NominalInstanceInner::NonTuple(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalization)?,
             ))),
             NominalInstanceInner::SysVersionInfo => {
                 Some(Self(NominalInstanceInner::SysVersionInfo))
@@ -780,11 +780,12 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self {
-            inner: self.inner.recursive_type_normalized_impl(db, div, nested)?,
+            inner: self
+                .inner
+                .recursive_type_normalized_impl(db, normalization)?,
             _phantom: PhantomData,
         })
     }
@@ -910,13 +911,12 @@ impl<'db> ClassBasedProtocol<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self {
             origin: self
                 .origin
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
         })
     }
 
@@ -937,15 +937,14 @@ impl<'db> Protocol<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::FromClass(class) => Some(Self::FromClass(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::Synthesized(synthesized) => Some(Self::Synthesized(
-                synthesized.recursive_type_normalized_impl(db, div, nested)?,
+                synthesized.recursive_type_normalized_impl(db, normalization)?,
             )),
         }
     }
@@ -969,8 +968,8 @@ impl<'db> VarianceInferable<'db> for Protocol<'db> {
 mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
-        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
+        RecursiveTypeNormalization, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
     use ty_python_core::definition::Definition;
@@ -1015,11 +1014,10 @@ mod synthesized_protocol {
         pub(in crate::types) fn recursive_type_normalized_impl(
             self,
             db: &'db dyn Db,
-            div: Type<'db>,
-            nested: bool,
+            normalization: RecursiveTypeNormalization<'db>,
         ) -> Option<Self> {
             Some(Self(
-                self.0.recursive_type_normalized_impl(db, div, nested)?,
+                self.0.recursive_type_normalized_impl(db, normalization)?,
             ))
         }
     }

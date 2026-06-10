@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use itertools::Either;
 
 use std::convert::Infallible;
@@ -349,39 +350,47 @@ impl<'db> UnionType<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
+        if normalization.is_nested()
+            && let Some(Type::Union(fold_body)) = normalization.fold_body()
+            && fold_body
+                .elements(db)
+                .iter()
+                .all(|fold_element| self.elements(db).contains(fold_element))
+        {
+            return Some(normalization.marker());
+        }
         let mut empty = true;
         for ty in self.elements(db) {
-            if nested {
+            if normalization.is_nested() {
                 // list[T | Divergent] => list[Divergent]
-                let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
-                if ty.same_divergent_marker(div) {
+                let ty = ty.recursive_type_normalized_impl(db, normalization)?;
+                if ty.same_divergent_marker(normalization.marker()) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
                 empty = false;
             } else {
+                let ty = ty
+                    .recursive_type_normalized_impl(db, normalization)
+                    .unwrap_or(normalization.marker());
                 // Top-level cycle markers in a union do not mean true divergence, so we skip
                 // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
-                if ty.is_top_level_cycle_marker(db, div) {
+                if ty.is_top_level_cycle_marker(db, normalization.marker()) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
-                builder = builder.add(
-                    ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div),
-                );
+                builder = builder.add(ty);
                 empty = false;
             }
         }
         if empty {
-            builder = builder.add(div);
+            builder = builder.add(normalization.marker());
         }
         Some(builder.build())
     }
@@ -751,31 +760,30 @@ impl<'db> IntersectionType<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        let positive = if nested {
+        let positive = if normalization.is_nested() {
             self.positive(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                .map(|ty| ty.recursive_type_normalized_impl(db, normalization))
                 .collect::<Option<FxOrderSet<Type<'db>>>>()?
         } else {
             self.positive(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div)
+                    ty.recursive_type_normalized_impl(db, normalization)
+                        .unwrap_or(normalization.marker())
                 })
                 .collect()
         };
 
-        let negative = if nested {
+        let negative = if normalization.is_nested() {
             self.negative(db)
-                .try_map(|ty| ty.recursive_type_normalized_impl(db, div, nested))?
+                .try_map(|ty| ty.recursive_type_normalized_impl(db, normalization))?
         } else {
             self.negative(db).map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, nested)
-                    .unwrap_or(div)
+                ty.recursive_type_normalized_impl(db, normalization)
+                    .unwrap_or(normalization.marker())
             })
         };
 

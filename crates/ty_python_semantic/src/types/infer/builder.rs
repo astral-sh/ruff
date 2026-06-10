@@ -2527,6 +2527,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
         let ensure_assignable_to =
             |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
+                let value_ty = match attr_ty {
+                    Type::Recursive(rec) => rec.fold_unfolded(db, value_ty),
+                    _ => value_ty,
+                };
                 let assignable = value_ty.is_assignable_to(db, attr_ty);
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
@@ -7169,8 +7173,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let inferred_elt_ty =
                     infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
-
-                // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
                     elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
                     && inferred_elt_ty.is_assignable_to(self.db(), elt_tcx)

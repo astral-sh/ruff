@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 use smallvec::{SmallVec, smallvec_inline};
@@ -568,13 +569,12 @@ impl<'db> CallableType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(CallableType::new(
             db,
             self.signatures(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
             self.kind(db),
             self.provenance(db),
         ))
