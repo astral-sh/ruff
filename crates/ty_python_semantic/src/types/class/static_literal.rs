@@ -1136,10 +1136,11 @@ impl<'db> StaticClassLiteral<'db> {
 
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
-            ClassMemberResult::TypedDict => typed_dict_class_member(
+            ClassMemberResult::TypedDict(module) => typed_dict_class_member(
                 db,
                 TypedDictType::new(self.identity_specialization(db)),
                 ClassLiteral::Static(self),
+                module,
                 policy,
                 name,
             ),
@@ -1808,7 +1809,18 @@ impl<'db> StaticClassLiteral<'db> {
                 }
                 None => self.identity_specialization(db),
             };
-            typed_dict_class_member(db, TypedDictType::new(class), self.into(), policy, name)
+            let self_class = ClassLiteral::Static(self);
+            let Some(module) = self_class.typed_dict_module(db) else {
+                return Place::Undefined.into();
+            };
+            typed_dict_class_member(
+                db,
+                TypedDictType::new(class),
+                self_class,
+                module,
+                policy,
+                name,
+            )
         }
     }
 

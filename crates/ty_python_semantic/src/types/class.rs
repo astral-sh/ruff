@@ -519,10 +519,9 @@ impl<'db> ClassLiteral<'db> {
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
                     ClassMemberResult::Done(result) => result.finalize(db),
-                    ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal"),
+                    ClassMemberResult::TypedDict(module) => {
+                        typed_dict::typed_dict_fallback_class_member(db, module, policy, name)
+                    }
                 }
             }
         }
@@ -2449,8 +2448,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     /// - `inherited_generic_context`: Generic context for `own_class_member` calls
     /// - `is_self_object`: Whether the class itself is `object` (affects policy filtering)
     ///
-    /// Returns `ClassMemberResult::TypedDict` if a `TypedDict` base is encountered,
-    /// allowing the caller to handle this case specially.
+    /// Returns `ClassMemberResult::TypedDict` with the originating module if a `TypedDict` base is
+    /// encountered, allowing the caller to handle this case specially.
     ///
     /// If we encounter a dynamic type in the MRO, we save it and after traversal:
     /// 1. Use it as the type if no other classes define the attribute, or
@@ -2512,8 +2511,8 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         )
                     });
                 }
-                ClassBase::TypedDict(_) => {
-                    return ClassMemberResult::TypedDict;
+                ClassBase::TypedDict(module) => {
+                    return ClassMemberResult::TypedDict(module);
                 }
             }
             if lookup_result.is_ok() {
@@ -2622,7 +2621,7 @@ pub(super) enum ClassMemberResult<'db> {
     /// Found the member or exhausted the MRO.
     Done(CompletedMemberLookup<'db>),
     /// Encountered a `TypedDict` base.
-    TypedDict,
+    TypedDict(TypedDictModule),
 }
 
 pub(super) struct CompletedMemberLookup<'db> {

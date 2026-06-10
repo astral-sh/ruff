@@ -994,36 +994,49 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             db,
             TypedDictType::new(ClassType::NonGeneric(ClassLiteral::DynamicTypedDict(self))),
             ClassLiteral::DynamicTypedDict(self),
+            self.typed_dict_module(db),
             policy,
             name,
         )
     }
 }
 
-pub(super) fn typing_extensions_typed_dict_class_member<'db>(
+pub(super) fn typed_dict_fallback_class_member<'db>(
     db: &'db dyn Db,
-    self_class: ClassLiteral<'db>,
+    module: TypedDictModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
-) -> Option<PlaceAndQualifiers<'db>> {
-    if self_class.typed_dict_module(db) != Some(TypedDictModule::TypingExtensions) {
-        return None;
+) -> PlaceAndQualifiers<'db> {
+    let fallback_member = KnownClass::TypedDictFallback
+        .to_class_literal(db)
+        .find_name_in_mro_with_policy(db, name, lookup_policy)
+        .expect("Will return Some() when called on class literal");
+    if !fallback_member.is_undefined() || module != TypedDictModule::TypingExtensions {
+        return fallback_member;
     }
 
-    let fallback = known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
+    let Some(fallback) = known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
         .place
         .ignore_possibly_undefined()
-        .filter(|ty| ty.as_class_literal().is_some())?;
+        .filter(|ty| ty.as_class_literal().is_some())
+    else {
+        return fallback_member;
+    };
     let member = fallback
         .find_name_in_mro_with_policy(db, name, lookup_policy)
         .expect("Will return Some() when called on class literal");
-    (!member.is_undefined()).then_some(member)
+    if member.is_undefined() {
+        fallback_member
+    } else {
+        member
+    }
 }
 
 pub(super) fn typed_dict_class_member<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
     self_class: ClassLiteral<'db>,
+    module: TypedDictModule,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
@@ -1032,20 +1045,14 @@ pub(super) fn typed_dict_class_member<'db>(
     let apply_self_mapping = |member: PlaceAndQualifiers<'db>| {
         member.map_type(|ty| ty.apply_type_mapping(db, &mapping, TypeContext::default()))
     };
-    let fallback_member = apply_self_mapping(
-        KnownClass::TypedDictFallback
-            .to_class_literal(db)
-            .find_name_in_mro_with_policy(db, name, lookup_policy)
-            .expect("Will return Some() when called on class literal"),
-    );
+    let fallback_member = apply_self_mapping(typed_dict_fallback_class_member(
+        db,
+        module,
+        lookup_policy,
+        name,
+    ));
     if !fallback_member.is_undefined() {
         return fallback_member;
-    }
-
-    if let Some(member) =
-        typing_extensions_typed_dict_class_member(db, self_class, lookup_policy, name)
-    {
-        return apply_self_mapping(member);
     }
 
     if let Some(value_ty) = typed_dict.dict_value_type(db)
