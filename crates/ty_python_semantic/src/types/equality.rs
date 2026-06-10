@@ -69,38 +69,14 @@ pub(super) fn evaluate_type_equality<'db>(
     enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
         .or_else(|| primitive_literal_constraint(db, left, right, is_positive))
         .or_else(|| {
-            if is_equality_narrowing_operand(db, left, right) {
+            if comparison_domain(db, left, right, ComparisonOperator::Equality)
+                == ComparisonDomain::Known
+            {
                 equality_result(db, left, right, is_positive).constraint(is_positive)
             } else {
                 None
             }
         })
-}
-
-/// Return whether `ty` can constrain `left` through equality.
-///
-/// The general evaluator distributes over unions, so avoid invoking it for ordinary nominal types
-/// whose comparison semantics are unknown.
-fn is_equality_narrowing_operand<'db>(db: &'db dyn Db, left: Type<'db>, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .all(|element| is_equality_narrowing_operand(db, left, *element)),
-        Type::LiteralValue(_) | Type::EnumComplement(_) => true,
-        Type::Intersection(intersection) if intersection.enum_complement(db).is_some() => true,
-        Type::TypedDict(_) => true,
-        Type::NominalInstance(instance) => {
-            instance.tuple_spec(db).is_some()
-                || instance
-                    .class(db)
-                    .known(db)
-                    .is_some_and(|known| known == KnownClass::Bool || known.is_singleton())
-                || left.resolve_type_alias(db).is_union()
-                    && comparison_semantics(db, ty, ComparisonOperator::Equality).is_some()
-        }
-        ty => ty.is_single_valued(db),
-    }
 }
 
 pub(super) fn evaluate_type_inequality<'db>(
@@ -1033,6 +1009,62 @@ enum KnownComparisonSemantics {
     Bytes,
     Tuple,
     Dict,
+}
+
+/// Whether the non-target operand has a comparison domain that can safely constrain the target.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComparisonDomain {
+    /// The operand may use comparison behavior that `ty` does not model.
+    Unknown,
+    /// The operand can be handled by `ty`'s equality-narrowing evaluator.
+    Known,
+}
+
+/// Classify whether `ty` has comparison behavior that can constrain `target`.
+///
+/// Unions only have a known domain if every arm does. Broad nominal types require full dunder
+/// analysis, which is only useful here when it can eliminate an arm from a union target.
+fn comparison_domain<'db>(
+    db: &'db dyn Db,
+    target: Type<'db>,
+    ty: Type<'db>,
+    operator: ComparisonOperator,
+) -> ComparisonDomain {
+    let target = target.resolve_type_alias(db);
+    let ty = ty.resolve_type_alias(db);
+
+    match ty {
+        Type::Union(union) => {
+            if union.elements(db).iter().all(|element| {
+                comparison_domain(db, target, *element, operator) == ComparisonDomain::Known
+            }) {
+                ComparisonDomain::Known
+            } else {
+                ComparisonDomain::Unknown
+            }
+        }
+        Type::LiteralValue(_) | Type::EnumComplement(_) | Type::TypedDict(_) => {
+            ComparisonDomain::Known
+        }
+        Type::Intersection(intersection) if intersection.enum_complement(db).is_some() => {
+            ComparisonDomain::Known
+        }
+        Type::NominalInstance(instance) => {
+            if instance.tuple_spec(db).is_some()
+                || instance
+                    .class(db)
+                    .known(db)
+                    .is_some_and(|known| known == KnownClass::Bool || known.is_singleton())
+                || target.is_union() && comparison_semantics(db, ty, operator).is_some()
+            {
+                ComparisonDomain::Known
+            } else {
+                ComparisonDomain::Unknown
+            }
+        }
+        _ if ty.is_single_valued(db) => ComparisonDomain::Known,
+        _ => ComparisonDomain::Unknown,
+    }
 }
 
 fn comparison_semantics<'db>(
