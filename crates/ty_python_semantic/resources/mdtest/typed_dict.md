@@ -189,6 +189,40 @@ bob |= {"age": 27}
 bob |= name_update
 ```
 
+In-place merges cannot supply read-only items, while non-mutating merges can:
+
+```py
+from typing_extensions import NotRequired, ReadOnly, TypedDict
+
+class R(TypedDict):
+    readonly: NotRequired[ReadOnly[int]]
+    mutable: int
+
+class MutableExtras(TypedDict, extra_items=int): ...
+class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]): ...
+
+def _(
+    r: R,
+    another_r: R,
+    mutable_extras: MutableExtras,
+    readonly_extras: ReadOnlyExtras,
+    value: int,
+) -> None:
+    reveal_type(r | {"readonly": value})  # revealed: R
+
+    # error: [unsupported-operator] "Operator `|=` is not supported between objects of type `R` and `dict[str, int]`"
+    r |= {"readonly": value}
+
+    # error: [unsupported-operator] "Operator `|=` is not supported between two objects of type `R`"
+    r |= another_r
+
+    r |= {"mutable": value}
+    mutable_extras |= {"x": value}
+
+    # error: [unsupported-operator] "Operator `|=` is not supported between objects of type `ReadOnlyExtras` and `dict[str, int]`"
+    readonly_extras |= {"x": value}
+```
+
 TODO: protocol matching for synthesized `TypedDict.__or__` should also accept these cases:
 
 ```py

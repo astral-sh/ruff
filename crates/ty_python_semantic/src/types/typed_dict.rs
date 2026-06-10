@@ -549,9 +549,9 @@ impl<'db> TypedDictType<'db> {
     }
 
     /// Returns a partial version of this `TypedDict` where all fields are optional. This is used
-    /// to model PEP 584 update operands, accepting dictionary literals that update any subset of
-    /// known keys, and also accepting other `TypedDict`s as long as any overlapping keys are
-    /// compatible.
+    /// to model non-mutating PEP 584 merge operands, accepting dictionary literals that supply any
+    /// subset of known keys, and also accepting other `TypedDict`s as long as any overlapping keys
+    /// are compatible.
     pub(crate) fn to_partial(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)
@@ -562,11 +562,12 @@ impl<'db> TypedDictType<'db> {
         Self::from_patch_items_with_openness(db, items, self.openness(db))
     }
 
-    /// Returns a patch version of this `TypedDict` for `TypedDict.update()`.
+    /// Returns a patch version of this `TypedDict` for in-place mutations such as `update()` and
+    /// `__ior__` (`|=`).
     ///
     /// All fields become optional, and read-only fields become bottom-typed. This preserves the
-    /// PEP 705 rule that `update()` must reject any source that can write a read-only key, while
-    /// still accepting `NotRequired[Never]` placeholders for keys that cannot be present.
+    /// PEP 705 rule that these operations must reject any source that can write a read-only key,
+    /// while still accepting `NotRequired[Never]` placeholders for keys that cannot be present.
     pub(crate) fn to_update_patch(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)

@@ -699,10 +699,18 @@ fn synthesize_typed_dict_merge<'db>(
 ) -> Type<'db> {
     let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]>;
 
+    let first_overload_value_ty = if name == "__ior__"
+        && let Type::TypedDict(typed_dict) = instance_ty
+    {
+        Type::TypedDict(typed_dict.to_update_patch(db))
+    } else {
+        instance_ty
+    };
+
     let first_overload_parameters = [
         Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),
         Parameter::positional_only(Some(Name::new_static("value")))
-            .with_annotated_type(instance_ty),
+            .with_annotated_type(first_overload_value_ty),
     ];
 
     overloads = smallvec::smallvec![Signature::new(
