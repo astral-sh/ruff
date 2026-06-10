@@ -468,7 +468,7 @@ fn recursive_alias_legacy_typevars() {
         &db,
         TypeVarInstance::new(
             &db,
-            TypeVarIdentity::new(&db, Name::new_static("T"), None, TypeVarKind::Legacy),
+            TypeVarIdentity::new(&db, Name::new_static("T"), None, TypeVarKind::LegacyTypeVar),
             None,
             None,
             None,

@@ -2074,8 +2074,6 @@ impl<'db> Type<'db> {
             // A divergent marker is a gradual leaf; its negation is itself (like `~Any == Any`).
             Type::Divergent(_) => *self,
 
-            Type::Recursive(r) => Type::divergent(r.binder_id(db)),
-
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
             Type::AlwaysTruthy
@@ -2110,9 +2108,10 @@ impl<'db> Type<'db> {
                 NegativeIntersectionElements::Single(*self),
             )),
 
-            Type::Union(_) | Type::Intersection(_) | Type::EnumComplement(_) => {
-                IntersectionBuilder::new(db).add_negative(*self).build()
-            }
+            Type::Union(_)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_)
+            | Type::Recursive(_) => IntersectionBuilder::new(db).add_negative(*self).build(),
         }
     }
 
@@ -2369,7 +2368,7 @@ impl<'db> Type<'db> {
                 } else {
                     Some(self)
                 }
-            },
+            }
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, div, nested)
@@ -6527,50 +6526,6 @@ impl<'db> Type<'db> {
                             | ApplySpecialization::Partial { .. }
                     ) =>
                     {
-                        // α-binding short-circuit: for self-referential PEP 695 aliases,
-                        // composing the inner specialization with the new one triggers
-                        // `Specialization::apply_type_mapping_impl`, which queries
-                        // `typevar.variance(db)`, which walks the alias body and may
-                        // re-enter this arm with a progressively-deeper nested
-                        // specialization (`R[T]` → `R[list[T]]` → `R[list[list[T]]]`
-                        // → …). The `ApplyTypeMappingVisitor`'s cycle detector keys on
-                        // `Type`, so each new specialization is a fresh key and the
-                        // cycle is never broken.
-                        //
-                        // Returning `self` treats the alias's existing specialization
-                        // as the α-bound name: applying a further mapping leaves it
-                        // unchanged. The alias still resolves to a finite shape via
-                        // `value_type` when actually consumed.
-                        //
-                        // Only fire when the incoming specialization originates from
-                        // THE ALIAS'S OWN generic context — that is the proliferation
-                        // pattern. When the specialization comes from a *different*
-                        // generic context (e.g. `R[T@R2]` inside `R2`'s body being
-                        // specialized with `R2`'s typevars `{T@R2 := int}`), the
-                        // composition produces a finite shape `R[int]` and must be
-                        // propagated; otherwise the inner alias keeps its outer-scope
-                        // typevars and structural equivalence with a differently-shaped
-                        // recursive alias fails (`aliases.md:405,409`).
-                        if let TypeAliasType::PEP695(pep695_alias) = alias
-                            && RecursiveOrigin::TypeAlias(alias)
-                                .contains_in_type(db, alias.raw_value_type(db))
-                        {
-                            let alias_context = pep695_alias.generic_context(db);
-                            let spec_context = match specialization {
-                                ApplySpecialization::Specialization(s)
-                                | ApplySpecialization::TypeAlias(s) => {
-                                    Some(s.generic_context(db))
-                                }
-                                ApplySpecialization::Partial {
-                                    generic_context, ..
-                                } => Some(*generic_context),
-                                _ => None,
-                            };
-                            if spec_context == alias_context {
-                                return self;
-                            }
-                        }
-
                         let mut current_specialization = specialization.as_specialization(db).unwrap();
                         if let TypeMapping::ApplySpecializationWithMaterialization {
                             materialization_kind,
@@ -6591,23 +6546,6 @@ impl<'db> Type<'db> {
                         ))
                     }
                     _ => {
-                        // `BindSelf` / `ReplaceSelf` cannot affect a PEP 695 type
-                        // alias body: `Self` is only valid inside class scopes and
-                        // PEP 695 aliases live at module scope. Short-circuit to
-                        // preserve the alias name in display. Without this, a
-                        // recursive PEP 695 alias's `value_type` (which wraps the
-                        // body in `Type::Recursive`) compares unequal to `mapped`
-                        // (the unfolded body without the wrapping), so the
-                        // fall-through below returns the unfolded form and loses
-                        // the alias name (`callable.md:114`).
-                        if matches!(
-                            type_mapping,
-                            TypeMapping::BindSelf(..) | TypeMapping::ReplaceSelf { .. },
-                        ) && matches!(alias, TypeAliasType::PEP695(_))
-                        {
-                            return self;
-                        }
-
                         // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
                         // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                         // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
@@ -6681,8 +6619,7 @@ impl<'db> Type<'db> {
                 _ => self,
             },
             Type::Recursive(recursive) => match type_mapping {
-                TypeMapping::Materialize(_)
-                | TypeMapping::ApplySpecializationWithMaterialization { .. } => {
+                TypeMapping::Materialize(_) => {
                     visitor.visit(db, self, type_mapping, || {
                         let body = *recursive.body(db);
                         let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
