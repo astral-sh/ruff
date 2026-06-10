@@ -591,7 +591,7 @@ pub enum PropertyAccessorRole {
     Deleter,
 }
 
-/// Represents an instance of a property-like descriptor.
+/// Represents an instance of `builtins.property` or `enum.property`.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
@@ -2565,13 +2565,13 @@ impl<'db> Type<'db> {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
                         Some(Place::Undefined.into())
                     }
-                    (Some(KnownClass::Property), "__get__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__get__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderGet,
                         ))
                         .into(),
                     ),
-                    (Some(KnownClass::Property), "__set__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__set__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderSet,
                         ))
@@ -3016,13 +3016,7 @@ impl<'db> Type<'db> {
                 _ => {}
             }
 
-            let descr_get = if ty.is_property_instance() {
-                Place::bound(Type::WrapperDescriptor(
-                    WrapperDescriptorKind::PropertyDunderGet,
-                ))
-            } else {
-                ty.class_member(db, "__get__".into()).place
-            };
+            let descr_get = ty.class_member(db, "__get__".into()).place;
 
             if let Place::Defined(DefinedPlace {
                 ty: descr_get,

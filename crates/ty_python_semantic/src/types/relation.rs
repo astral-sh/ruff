@@ -3121,19 +3121,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (None | Some(_), None | Some(_)) => self.always(),
         };
 
-        self.check_type_pair(db, left.instance_fallback(db), right.instance_fallback(db))
-            .or(db, self.constraints, || {
-                check_optional_methods(left.getter(db), right.getter(db)).or(
-                    db,
-                    self.constraints,
-                    || {
-                        check_optional_methods(left.setter(db), right.setter(db)).or(
-                            db,
-                            self.constraints,
-                            || check_optional_methods(left.deleter(db), right.deleter(db)),
-                        )
-                    },
-                )
-            })
+        check_optional_methods(left.getter(db), right.getter(db)).or(db, self.constraints, || {
+            check_optional_methods(left.setter(db), right.setter(db)).or(
+                db,
+                self.constraints,
+                || check_optional_methods(left.deleter(db), right.deleter(db)),
+            )
+        })
     }
 }
