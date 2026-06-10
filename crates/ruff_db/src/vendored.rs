@@ -4,7 +4,7 @@ use std::fmt::{self, Debug};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use zip::result::ZipResult;
+use zip::result::{ZipError, ZipResult};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
@@ -57,16 +57,16 @@ impl VendoredFileSystem {
     pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {
         fn exists(fs: &VendoredFileSystem, path: &VendoredPath) -> bool {
             let normalized = NormalizedVendoredPath::from(path);
-            let mut archive = fs.lock_archive();
+            let archive = fs.lock_archive();
 
             // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            archive.lookup_path(&normalized).is_ok()
+            archive.index_for_path(&normalized).is_some()
                 || archive
-                    .lookup_path(&normalized.with_trailing_slash())
-                    .is_ok()
+                    .index_for_path(&normalized.with_trailing_slash())
+                    .is_some()
         }
 
         exists(self, path.as_ref())
@@ -81,10 +81,10 @@ impl VendoredFileSystem {
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            if let Ok(zip_file) = archive.lookup_path(&normalized) {
+            if let Ok(zip_file) = archive.lookup_path_raw(&normalized) {
                 return Ok(Metadata::from_zip_file(zip_file));
             }
-            let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
+            let zip_file = archive.lookup_path_raw(&normalized.with_trailing_slash())?;
             Ok(Metadata::from_zip_file(zip_file))
         }
 
@@ -360,11 +360,23 @@ impl VendoredZipArchive {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
+    fn index_for_path(&self, path: &NormalizedVendoredPath) -> Option<usize> {
+        self.0.index_for_name(path.as_str())
+    }
+
     fn lookup_path(
         &mut self,
         path: &NormalizedVendoredPath,
     ) -> Result<ZipFile<'_, io::Cursor<Cow<'static, [u8]>>>> {
         Ok(self.0.by_name(path.as_str())?)
+    }
+
+    fn lookup_path_raw(
+        &mut self,
+        path: &NormalizedVendoredPath,
+    ) -> Result<ZipFile<'_, io::Cursor<Cow<'static, [u8]>>>> {
+        let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
+        Ok(self.0.by_index_raw(index)?)
     }
 
     fn len(&self) -> usize {
