@@ -5110,6 +5110,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
                     let return_ty = func
+                        .literal(self.db())
                         .last_definition_raw_signature(
                             self.db(),
                             ReturnCallableTypeVarScope::Lexical,
@@ -8704,6 +8705,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let declared_return_ty = enclosing_function
+            .literal(self.db())
             .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
             .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
@@ -8752,6 +8754,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let annotated_return_ty = enclosing_function
+            .literal(self.db())
             .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
             .return_ty;
 
