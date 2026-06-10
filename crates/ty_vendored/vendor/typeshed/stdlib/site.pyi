@@ -18,55 +18,26 @@ sys.prefix and sys.exec_prefix are set to that directory and
 it is also checked for site-packages (sys.base_prefix and
 sys.base_exec_prefix will always be the "real" prefixes of the Python
 installation). If "pyvenv.cfg" (a bootstrap configuration file) contains
-the key "include-system-site-packages" set to anything other than "false"
-(case-insensitive), the system-level prefixes will still also be
-searched for site-packages; otherwise they won't.
+the key "include-system-site-packages" set to "true" (case-insensitive),
+the system-level prefixes will still also be searched for site-packages;
+otherwise they won't.
 
-All of the resulting site-specific directories, if they exist, are
-appended to sys.path, and also inspected for path configuration
-files.
+Two kinds of configuration files are processed in each site-packages
+directory:
 
-A path configuration file is a file whose name has the form
-<package>.pth; its contents are additional directories (one per line)
-to be added to sys.path.  Non-existing directories (or
-non-directories) are never added to sys.path; no directory is added to
-sys.path more than once.  Blank lines and lines beginning with
-'#' are skipped. Lines starting with 'import' are executed.
+- <name>.pth files extend sys.path with additional directories (one per
+  line).  Lines starting with "import" are deprecated (see PEP 829).
 
-For example, suppose sys.prefix and sys.exec_prefix are set to
-/usr/local and there is a directory /usr/local/lib/python2.5/site-packages
-with three subdirectories, foo, bar and spam, and two path
-configuration files, foo.pth and bar.pth.  Assume foo.pth contains the
-following:
+- <name>.start files specify startup entry points using the pkg.mod:callable
+  syntax.  These are resolved via pkgutil.resolve_name() and called with no
+  arguments.
 
-  # foo package configuration
-  foo
-  bar
-  bletch
+When called from main(), all .pth path extensions are applied before any
+.start entry points are executed, ensuring that paths are available before
+startup code runs.
 
-and bar.pth contains:
-
-  # bar package configuration
-  bar
-
-Then the following directories are added to sys.path, in this order:
-
-  /usr/local/lib/python2.5/site-packages/bar
-  /usr/local/lib/python2.5/site-packages/foo
-
-Note that bletch is omitted because it doesn't exist; bar precedes foo
-because bar.pth comes alphabetically before foo.pth; and spam is
-omitted because it is not mentioned in either path configuration file.
-
-The readline module is also automatically configured to enable
-completion for systems that support it.  This can be overridden in
-sitecustomize, usercustomize or PYTHONSTARTUP.  Starting Python in
-isolated mode (-I) disables automatic readline configuration.
-
-After these operations, an attempt is made to import a module
-named sitecustomize, which can perform arbitrary additional
-site-specific customizations.  If this import fails with an
-ImportError exception, it is silently ignored.
+See the documentation for the site module for full details:
+https://docs.python.org/3/library/site.html
 """
 
 import sys
@@ -86,39 +57,34 @@ def main() -> None:
     """
 
 def abs_paths() -> None:  # undocumented
-    """Set all module __file__ and __cached__ attributes to an absolute path"""
+    """Set __file__ to an absolute path."""
 
 def addpackage(sitedir: StrPath, name: StrPath, known_paths: set[str] | None) -> set[str] | None:  # undocumented
-    """Process a .pth file within the site-packages directory:
-    For each line in the file, either combine it with sitedir to a path
-    and add that to known_paths, or execute it if it starts with 'import '.
-    """
+    """Process a .pth file within the site-packages directory."""
 
 if sys.version_info >= (3, 15):
-    def process_startup_files() -> None: ...  # undocumented
-    def addsitedir(sitedir: str, known_paths: set[str] | None = None, *, defer_processing_start_files: bool = False) -> None: ...
-    def addsitepackages(
-        known_paths: set[str] | None, prefixes: Iterable[str] | None = None, *, defer_processing_start_files: bool = False
-    ) -> set[str] | None: ...  # undocumented
-    def addusersitepackages(
-        known_paths: set[str] | None, *, defer_processing_start_files: bool = False
-    ) -> set[str] | None: ...  # undocumented
+    class StartupState:
+        __slots__ = ("_known_paths", "_processed_sitedirs", "_path_entries", "_importexecs", "_entrypoints")
+        def __init__(self, known_paths: set[str] | None = None) -> None: ...
+        def addsitedir(self, sitedir: str) -> None: ...
+        def addusersitepackages(self) -> None: ...
+        def addsitepackages(self, prefixes: Iterable[str] | None = None) -> None: ...
+        def process(self) -> None: ...
 
-else:
-    def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
-        """Add 'sitedir' argument to sys.path if missing and handle .pth files in
-        'sitedir'
-        """
+def addsitedir(sitedir: str, known_paths: set[str] | None = None) -> None:
+    """Add 'sitedir' argument to sys.path if missing and handle startup
+    files.
+    """
 
-    def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
-        """Add site-packages to sys.path"""
+def addsitepackages(known_paths: set[str] | None, prefixes: Iterable[str] | None = None) -> set[str] | None:  # undocumented
+    """Add site-packages to sys.path"""
 
-    def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
-        """Add a per user site-package to sys.path
+def addusersitepackages(known_paths: set[str] | None) -> set[str] | None:  # undocumented
+    """Add a per user site-package to sys.path
 
-        Each user has its own python directory with site-packages in the
-        home directory.
-        """
+    Each user has its own python directory with site-packages in the
+    home directory.
+    """
 
 def check_enableusersite() -> bool | None:  # undocumented
     """Check if user site directory is safe for inclusion

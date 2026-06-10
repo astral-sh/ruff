@@ -312,6 +312,7 @@ class _TemporaryFileWrapper(IO[AnyStr]):
         """
         Close the temporary file, possibly deleting it.
         """
+
     # These methods don't exist directly on this object, but
     # are delegated to the underlying IO object through __getattr__.
     # We need to add them here so that this class is concrete.

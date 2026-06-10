@@ -63,12 +63,12 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           path: ruff
           persist-credentials: true
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout typeshed
         with:
           repository: python/typeshed
@@ -78,9 +78,9 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.18"
+          version: "0.11.19"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -129,14 +129,14 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.18"
+          version: "0.11.19"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -170,14 +170,14 @@ jobs:
       contents: write # to push back to the repository
       pull-requests: write # to create a PR
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
         with:
-          version: "0.11.18"
+          version: "0.11.19"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -198,7 +198,12 @@ jobs:
           # consistent with the other typeshed stubs around them.
           # Typeshed formats code using black in their CI, so we just invoke
           # black on the stubs the same way that typeshed does.
-          uvx black "${VENDORED_TYPESHED}/stdlib" --config "${VENDORED_TYPESHED}/pyproject.toml" || true
+          # TODO: Switch to a released version of Black once a release includes
+          # https://github.com/psf/black/commit/f665703258bfa1916f8a6c1cbab0bc384b90cbac.
+          uvx \
+            --from="git+https://github.com/psf/black.git@e34bb1bef70e83410c2816dfd07485ec026959aa" \
+            black "${VENDORED_TYPESHED}/stdlib" \
+            --config "${VENDORED_TYPESHED}/pyproject.toml" || true
           git commit -am "Format codemodded docstrings" --allow-empty
       - name: Remove typeshed pyproject.toml file
         if: ${{ success() }}

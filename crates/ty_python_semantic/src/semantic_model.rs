@@ -181,6 +181,10 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "completion order is determined later by relevance ranking"
+        )]
         for Member { name, ty } in all_members(self.db, ty) {
             completions.push(Completion {
                 name,
@@ -468,10 +472,11 @@ impl<'db> SemanticModel<'db> {
                 else {
                     return TypeQualifiers::empty();
                 };
-                let module = parsed_module(self.db, self.file).load(self.db);
+                let definition_file = definition.file(self.db);
+                let module = parsed_module(self.db, definition_file).load(self.db);
                 if !definition
                     .kind(self.db)
-                    .category(self.file.is_stub(self.db), &module)
+                    .category(definition_file.is_stub(self.db), &module)
                     .is_declaration()
                 {
                     return TypeQualifiers::empty();

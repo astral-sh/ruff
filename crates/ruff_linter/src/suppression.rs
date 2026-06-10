@@ -71,7 +71,8 @@ pub(crate) struct PendingSuppressionComment<'a> {
 }
 
 impl PendingSuppressionComment<'_> {
-    /// Whether the comment "matches" another comment, based on indentation and suppressed codes
+    /// Whether the comment "matches" another comment, based on indentation and suppressed codes.
+    ///
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
     /// "disable" comment and other is the matching "enable" comment.
     fn matches(&self, other: &PendingSuppressionComment, source: &str) -> bool {
@@ -102,6 +103,17 @@ pub(crate) struct Suppression {
 impl Suppression {
     fn codes(&self) -> &[TextRange] {
         &self.comments.first().codes
+    }
+
+    /// Returns whether or not the suppression is a standalone `ruff:ignore` comment.
+    fn is_ignore(&self) -> bool {
+        matches!(
+            self.comments,
+            SuppressionComments::Single(SuppressionComment {
+                action: SuppressionAction::Ignore,
+                ..
+            })
+        )
     }
 }
 
@@ -143,14 +155,12 @@ pub(crate) enum InvalidSuppressionKind {
     NotModuleScope,
 }
 
-#[allow(unused)]
 #[derive(Clone, Debug)]
 pub(crate) struct InvalidSuppression {
     kind: InvalidSuppressionKind,
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 #[derive(Debug, Default)]
 pub struct Suppressions {
     /// Valid suppression ranges with associated comments
@@ -209,7 +219,38 @@ impl Suppressions {
         self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
-    /// Check if a diagnostic is suppressed by any known range suppressions
+    /// Check if a diagnostic is suppressed by any known range suppressions.
+    ///
+    /// A suppression applies for the given diagnostic if it fully contains the diagnostic's range.
+    /// For example, noting that the `RUF015` diagnostic spans from the opening `[` to the end of
+    /// the subscript expression:
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    ///     *range(10)
+    /// ][0]
+    /// # ruff:enable[RUF015]
+    /// ```
+    ///
+    /// is suppressed, but
+    ///
+    /// ```py
+    /// # ruff:disable[RUF015]
+    /// value = [
+    /// # ruff:enable[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
+    ///
+    /// is not. For `ruff:ignore`, this rule is augmented to check whether the diagnostic's start
+    /// offset is contained instead, meaning that this _will_ be suppressed:
+    ///
+    /// ```python
+    /// suppressed = [  # ruff:ignore[RUF015]
+    ///     *range(10)
+    /// ][0]
+    /// ```
     pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
@@ -228,7 +269,25 @@ impl Suppressions {
         for suppression in &self.valid {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
-            if *code == suppression_code && suppression.range.contains_range(range) {
+
+            if *code != suppression_code {
+                continue;
+            }
+
+            // For `ruff:ignore` comments, only require that the start of the diagnostic range (or
+            // its parent) is covered by the suppression. Range suppression comments must fully
+            // contain the diagnostic range.
+            let suppressed = if suppression.is_ignore() {
+                suppression.range.contains(range.start())
+                    || range.is_empty() && suppression.range.end() == range.start()
+                    || diagnostic
+                        .parent()
+                        .is_some_and(|parent| suppression.range.contains(parent))
+            } else {
+                suppression.range.contains_range(range)
+            };
+
+            if suppressed {
                 suppression.used.set(true);
                 return true;
             }
@@ -243,63 +302,54 @@ impl Suppressions {
             context: &LintContext,
             locator: &Locator,
         ) -> bool {
-            if let Some((group_key, group)) = grouped_diagnostic
-                && key.is_none_or(|key| key != *group_key)
-            {
-                if group.any_invalid() {
-                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    ) {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
-                    }
-                }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
+            let Some((group_key, group)) = grouped_diagnostic else {
+                return false;
+            };
+
+            if key.is_some_and(|key| key == *group_key) {
+                return false;
+            }
+
+            if group.any_invalid() {
+                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &group.invalid_codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group.invalid_codes.iter().join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                ) {
+                    diagnostic.help(
+                        "Add non-Ruff rule codes to the `lint.external` configuration option",
                     );
                 }
-                true
-            } else {
-                false
             }
+
+            if group.any_unused() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: &group.disabled_codes,
+                            duplicated: &group.duplicated_codes,
+                            unmatched: &group.unused_codes,
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
+            }
+
+            true
         }
 
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
@@ -431,16 +481,16 @@ impl Suppressions {
         highlight_only_code: bool,
     ) -> (TextRange, Edit) {
         let mut range = comment.range;
-        let edit = if comment.codes.len() == 1 {
+        let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
-                range = comment.codes[0];
+                range = *code;
             }
             delete_comment(comment.range, locator)
-        } else if remove_codes.len() == 1 {
+        } else if let [remove_code] = remove_codes {
             let code_index = comment
                 .codes
                 .iter()
-                .position(|range| locator.slice(range) == remove_codes[0])
+                .position(|range| locator.slice(range) == *remove_code)
                 .unwrap();
             if highlight_only_code {
                 range = comment.codes[code_index];
@@ -458,14 +508,9 @@ impl Suppressions {
             };
             Edit::range_deletion(code_range)
         } else {
-            let first = comment
-                .codes
-                .first()
-                .expect("suppression comment without codes");
-            let last = comment
-                .codes
-                .last()
-                .expect("suppression comment without codes");
+            let [first, .., last] = comment.codes.as_slice() else {
+                unreachable!("suppression comment without codes");
+            };
             let code_range = TextRange::new(first.start(), last.end());
             let remaining = comment
                 .codes_as_str(locator.contents())
@@ -836,10 +881,12 @@ impl<'a> SuppressionsBuilder<'a> {
         for next_token in after {
             match next_token.kind() {
                 TokenKind::Newline => {
+                    end = next_token.start();
                     break;
                 }
                 TokenKind::Comment => {}
                 TokenKind::NonLogicalNewline if is_inner_comment => {
+                    end = next_token.start();
                     if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
                     }
@@ -2593,6 +2640,37 @@ def foo():
                 reason: "",
             },
         )
+        "##,
+        );
+    }
+
+    #[test]
+    fn trailing_comment_own_line_ignore() {
+        let source = "# ruff: ignore[some-thing]
+x = 1 # trailing";
+        let comment = Suppressions::debug(source);
+        assert_debug_snapshot!(
+            comment,
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: ignore[some-thing]\nx = 1 # trailing",
+                    code: "some-thing",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: ignore[some-thing]",
+                        action: Ignore,
+                        codes: [
+                            "some-thing",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
         "##,
         );
     }

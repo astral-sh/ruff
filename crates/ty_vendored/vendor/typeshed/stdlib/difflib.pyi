@@ -325,15 +325,17 @@ class SequenceMatcher(Generic[_T]):
         >>> b[23:28] = []      # Make a deletion
         >>> b[30] += 'y'       # Make another replacement
         >>> pprint(list(SequenceMatcher(None,a,b).get_grouped_opcodes()))
-        [[('equal', 5, 8, 5, 8), ('insert', 8, 8, 8, 9), ('equal', 8, 11, 9, 12)],
-         [('equal', 16, 19, 17, 20),
-          ('replace', 19, 20, 20, 21),
-          ('equal', 20, 22, 21, 23),
-          ('delete', 22, 27, 23, 23),
-          ('equal', 27, 30, 23, 26)],
-         [('equal', 31, 34, 27, 30),
-          ('replace', 34, 35, 30, 31),
-          ('equal', 35, 38, 31, 34)]]
+        [
+            [('equal', 5, 8, 5, 8), ('insert', 8, 8, 8, 9), ('equal', 8, 11, 9, 12)],
+            [
+                ('equal', 16, 19, 17, 20),
+                ('replace', 19, 20, 20, 21),
+                ('equal', 20, 22, 21, 23),
+                ('delete', 22, 27, 23, 23),
+                ('equal', 27, 30, 23, 26),
+            ],
+            [('equal', 31, 34, 27, 30), ('replace', 34, 35, 30, 31), ('equal', 35, 38, 31, 34)],
+        ]
         """
 
     def ratio(self) -> float:
@@ -472,16 +474,18 @@ class Differ:
 
     >>> from pprint import pprint as _pprint
     >>> _pprint(result)
-    ['    1. Beautiful is better than ugly.\\n',
-     '-   2. Explicit is better than implicit.\\n',
-     '-   3. Simple is better than complex.\\n',
-     '+   3.   Simple is better than complex.\\n',
-     '?     ++\\n',
-     '-   4. Complex is better than complicated.\\n',
-     '?            ^                     ---- ^\\n',
-     '+   4. Complicated is better than complex.\\n',
-     '?           ++++ ^                      ^\\n',
-     '+   5. Flat is better than nested.\\n']
+    [
+        '    1. Beautiful is better than ugly.\\n',
+        '-   2. Explicit is better than implicit.\\n',
+        '-   3. Simple is better than complex.\\n',
+        '+   3.   Simple is better than complex.\\n',
+        '?     ++\\n',
+        '-   4. Complex is better than complicated.\\n',
+        '?            ^                     ---- ^\\n',
+        '+   4. Complicated is better than complex.\\n',
+        '?           ++++ ^                      ^\\n',
+        '+   5. Flat is better than nested.\\n',
+    ]
 
     As a single multi-line string it looks like this:
 
@@ -602,7 +606,49 @@ if sys.version_info >= (3, 15):
         lineterm: str = "\n",
         *,
         color: bool = False,
-    ) -> Iterator[str]: ...
+    ) -> Iterator[str]:
+        """
+        Compare two sequences of lines; generate the delta as a unified diff.
+
+        Unified diffs are a compact way of showing line changes and a few
+        lines of context.  The number of context lines is set by 'n' which
+        defaults to three.
+
+        By default, the diff control lines (those with ---, +++, or @@) are
+        created with a trailing newline.  This is helpful so that inputs
+        created from file.readlines() result in diffs that are suitable for
+        file.writelines() since both the inputs and outputs have trailing
+        newlines.
+
+        For inputs that do not have trailing newlines, set the lineterm
+        argument to "" so that the output will be uniformly newline free.
+
+        Set 'color' to True to enable output in color, similar to
+        'git diff --color'. Even if enabled, it can be
+        controlled using environment variables such as 'NO_COLOR'.
+
+        The unidiff format normally has a header for filenames and modification
+        times.  Any or all of these may be specified using strings for
+        'fromfile', 'tofile', 'fromfiledate', and 'tofiledate'.
+        The modification times are normally expressed in the ISO 8601 format.
+
+        Example:
+
+        >>> for line in unified_diff('one two three four'.split(),
+        ...             'zero one tree four'.split(), 'Original', 'Current',
+        ...             '2005-01-26 23:30:50', '2010-04-02 10:20:52',
+        ...             lineterm=''):
+        ...     print(line)                 # doctest: +NORMALIZE_WHITESPACE
+        --- Original        2005-01-26 23:30:50
+        +++ Current         2010-04-02 10:20:52
+        @@ -1,4 +1,4 @@
+        +zero
+         one
+        -two
+        -three
+        +tree
+         four
+        """
 
 else:
     def unified_diff(
@@ -760,7 +806,7 @@ class HtmlDiff:
     make_table -- generates HTML for a single side by side table
     make_file -- generates complete HTML file with a single side by side table
 
-    See tools/scripts/diff.py for an example usage of this class.
+    See Doc/includes/diff.py for an example usage of this class.
     """
 
     def __init__(

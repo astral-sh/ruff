@@ -6,7 +6,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -182,7 +182,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            visitor.visit_type(db, newtype.concrete_base_type(db));
+            visitor.visit_newtype_instance_type(db, newtype);
         }
         KnownInstanceType::Sentinel(_) => {
             // Nothing to visit
@@ -360,12 +360,19 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Type<'db> {
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => Type::TypeVar(
-                    BoundTypeVarInstance::new(db, typevar, *binding_context, None),
-                ),
+                TypeMapping::BindLegacyTypevars(binding_context) => {
+                    Type::TypeVar(BoundTypeVarInstance::new(
+                        db,
+                        typevar,
+                        *binding_context,
+                        None,
+                        TypeVarNonce::NONE,
+                    ))
+                }
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
+                | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)

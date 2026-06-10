@@ -1226,3 +1226,9 @@ impl std::fmt::Display for Rule {
         f.write_str(self.into())
     }
 }
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromNameError {
+    #[error("unknown rule name")]
+    Unknown,
+}

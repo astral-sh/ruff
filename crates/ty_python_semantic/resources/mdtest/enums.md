@@ -714,7 +714,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, property as enum_property
-from typing import Any
+from typing import Any, assert_type
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -725,8 +725,15 @@ class Answer(Enum):
     def some_property(self) -> str:
         return "property value"
 
+    def direct_property_getter(self) -> int:
+        return 1
+
+    direct_property = enum_property(fget=direct_property_getter)
+
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+assert_type(Answer.YES.some_property, str)
+assert_type(Answer.YES.direct_property, int)
 ```
 
 Enum attributes defined using `enum.property` take precedence over generated attributes.
@@ -741,8 +748,17 @@ class Choices(Enum):
     @enum_property
     def value(self) -> Any: ...
 
-# TODO: This should be `Any` - overridden by `@enum_property`
-reveal_type(Choices.A.value)  # revealed: Literal[1]
+reveal_type(Choices.A.value)  # revealed: Any
+
+class BaseChoices(Enum):
+    @enum_property
+    def value(self) -> str:
+        return "custom value"
+
+class InheritedChoices(BaseChoices):
+    A = 1
+
+reveal_type(InheritedChoices.A.value)  # revealed: str
 ```
 
 ### `types.DynamicClassAttribute`

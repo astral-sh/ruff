@@ -22,9 +22,13 @@ pub(super) fn publish_diagnostics_for_document(
     snapshot: &DocumentSnapshot,
     client: &Client,
 ) -> crate::server::Result<()> {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "diagnostic notifications for distinct document URIs are independent"
+    )]
     for (uri, diagnostics) in generate_diagnostics(snapshot) {
         client
-            .send_notification::<lsp_types::notification::PublishDiagnostics>(
+            .send_notification::<lsp_types::PublishDiagnosticsNotification>(
                 lsp_types::PublishDiagnosticsParams {
                     uri,
                     diagnostics,
@@ -42,9 +46,9 @@ pub(super) fn clear_diagnostics_for_document(
     client: &Client,
 ) -> crate::server::Result<()> {
     client
-        .send_notification::<lsp_types::notification::PublishDiagnostics>(
+        .send_notification::<lsp_types::PublishDiagnosticsNotification>(
             lsp_types::PublishDiagnosticsParams {
-                uri: query.make_key().into_url(),
+                uri: query.make_key().into_uri(),
                 diagnostics: vec![],
                 version: Some(query.version()),
             },

@@ -34,9 +34,9 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    definite_match_pattern_type, definite_sequence_pattern_type, exact_sequence_pattern_type,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
+    exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type,
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
@@ -91,7 +91,8 @@ pub use crate::types::type_alias::TypeAliasType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
-    BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints, TypeVarKind,
+    BindingContext, BoundTypeVarInstance, ParamSpecAttrKind, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarNonce,
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -1623,13 +1624,6 @@ impl<'db> Type<'db> {
             submodule,
             submodule.kind(db).is_package().then_some(importing_file),
         ))
-    }
-
-    pub(crate) const fn as_module_literal(self) -> Option<ModuleLiteralType<'db>> {
-        match self {
-            Type::ModuleLiteral(module) => Some(module),
-            _ => None,
-        }
     }
 
     pub(crate) const fn is_union(self) -> bool {
@@ -3702,8 +3696,14 @@ impl<'db> Type<'db> {
                 ),
 
                 Type::LiteralValue(literal)
-                    if literal.as_enum().is_some()
-                        && matches!(name_str, "name" | "_name_" | "value" | "_value_") =>
+                    if matches!(name_str, "name" | "_name_" | "value" | "_value_")
+                        && literal.as_enum().is_some_and(|enum_literal| {
+                            !enums::class_defines_property(
+                                db,
+                                enum_literal.enum_class(db),
+                                name_str,
+                            )
+                        }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
                     let enum_class = enum_literal.enum_class(db);
@@ -3741,7 +3741,12 @@ impl<'db> Type<'db> {
 
                 Type::NominalInstance(instance)
                     if matches!(name_str, "name" | "_name_" | "value" | "_value_")
-                        && enum_metadata(db, instance.class_literal(db)).is_some() =>
+                        && enum_metadata(db, instance.class_literal(db)).is_some()
+                        && !enums::class_defines_property(
+                            db,
+                            instance.class_literal(db),
+                            name_str,
+                        ) =>
                 {
                     let class_literal = instance.class_literal(db);
                     let is_enum_subclass = Type::ClassLiteral(class_literal)
@@ -6287,6 +6292,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
@@ -6304,6 +6310,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::ApplySpecializationWithMaterialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
+                TypeMapping::FreshenBoundTypeVars { .. } |
                 TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Promote(..) |
@@ -7325,6 +7332,11 @@ pub enum TypeMapping<'a, 'db> {
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
+    /// Freshens typevars bound by a generic context occurrence by adding a shared delta.
+    FreshenBoundTypeVars {
+        generic_context: GenericContext<'db>,
+        delta: u32,
+    },
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
@@ -7367,6 +7379,15 @@ impl<'db> TypeMapping<'_, 'db> {
         context: GenericContext<'db>,
     ) -> GenericContext<'db> {
         match self {
+            TypeMapping::FreshenBoundTypeVars { .. } => GenericContext::from_typevar_instances(
+                db,
+                context.variables(db).map(|bound_typevar| {
+                    Type::TypeVar(bound_typevar)
+                        .apply_type_mapping(db, self, TypeContext::default())
+                        .as_typevar()
+                        .unwrap_or(bound_typevar)
+                }),
+            ),
             TypeMapping::ApplySpecialization(specialization)
             | TypeMapping::ApplySpecializationWithMaterialization { specialization, .. } => {
                 // Filter out type variables that are already specialized
@@ -7435,6 +7456,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::Promote(mode, kind) => TypeMapping::Promote(mode.flip(), *kind),
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::BindLegacyTypevars(_)
+            | TypeMapping::FreshenBoundTypeVars { .. }
             | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults

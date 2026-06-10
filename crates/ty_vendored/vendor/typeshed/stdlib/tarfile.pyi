@@ -156,7 +156,16 @@ class TarFile:
             copybufsize: int | None = None,  # undocumented
             stream: bool = False,
             mtime: float | None = None,
-        ) -> None: ...
+        ) -> None:
+            """Open an (uncompressed) tar archive 'name'. 'mode' is either 'r' to
+            read from an existing archive, 'a' to append data to an existing
+            file or 'w' to create a new file overwriting an existing one. 'mode'
+            defaults to 'r'.
+            If 'fileobj' is given, it is used for reading or writing data. If it
+            can be determined, 'mode' is overridden by 'fileobj's mode.
+            'fileobj' is not closed, when TarFile is closed.
+            """
+
     elif sys.version_info >= (3, 13):
         def __init__(
             self,
@@ -183,6 +192,7 @@ class TarFile:
             can be determined, 'mode' is overridden by 'fileobj's mode.
             'fileobj' is not closed, when TarFile is closed.
             """
+
     else:
         def __init__(
             self,
@@ -777,6 +787,7 @@ class TarFile:
         """Open lzma compressed tar archive name for reading or writing.
         Appending is not allowed.
         """
+
     if sys.version_info >= (3, 14):
         @overload
         @classmethod
@@ -851,6 +862,7 @@ class TarFile:
         TarFile is opened for reading. Return None if there is no more
         available.
         """
+
     # Calling this method without `filter` is deprecated, but it may be set either on the class or in an
     # individual call, so we can't mark it as @deprecated here.
     def extractall(
@@ -873,6 +885,7 @@ class TarFile:
         It can return a changed TarInfo or None to skip the member.
         String names of common filters are accepted.
         """
+
     # Same situation as for `extractall`.
     def extract(
         self,

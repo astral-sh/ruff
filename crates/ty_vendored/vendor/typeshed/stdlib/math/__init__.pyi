@@ -78,7 +78,6 @@ def comb(n: SupportsIndex, k: SupportsIndex, /) -> int:
     to the coefficient of k-th term in polynomial expansion of the
     expression (1 + x)**n.
 
-    Raises TypeError if either of the arguments are not integers.
     Raises ValueError if either of the arguments are negative.
     """
 
@@ -153,8 +152,11 @@ def fmod(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
     """
 
 if sys.version_info >= (3, 15):
-    def fmax(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
-    def fmin(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float: ...
+    def fmax(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
+        """Return the larger of two floating-point arguments."""
+
+    def fmin(x: _SupportsFloatOrIndex, y: _SupportsFloatOrIndex, /) -> float:
+        """Return the smaller of two floating-point arguments."""
 
 def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]:
     """Return the mantissa and exponent of x, as pair (m, e).
@@ -226,8 +228,11 @@ def isnan(x: _SupportsFloatOrIndex, /) -> bool:
     """Return True if x is a NaN (not a number), and False otherwise."""
 
 if sys.version_info >= (3, 15):
-    def isnormal(x: _SupportsFloatOrIndex, /) -> bool: ...
-    def issubnormal(x: _SupportsFloatOrIndex, /) -> bool: ...
+    def isnormal(x: _SupportsFloatOrIndex, /) -> bool:
+        """Return True if x is normal, and False otherwise."""
+
+    def issubnormal(x: _SupportsFloatOrIndex, /) -> bool:
+        """Return True if x is subnormal, and False otherwise."""
 
 def isqrt(n: SupportsIndex, /) -> int:
     """Return the integer part of the square root of the input."""
@@ -292,7 +297,6 @@ def perm(n: SupportsIndex, k: SupportsIndex | None = None, /) -> int:
     If k is not specified or is None, then k defaults to n
     and the function returns n!.
 
-    Raises TypeError if either of the arguments are not integers.
     Raises ValueError if either of the arguments are negative.
     """
 
@@ -346,7 +350,8 @@ def sin(x: _SupportsFloatOrIndex, /) -> float:
     """Return the sine of x (measured in radians)."""
 
 if sys.version_info >= (3, 15):
-    def signbit(x: _SupportsFloatOrIndex, /) -> bool: ...
+    def signbit(x: _SupportsFloatOrIndex, /) -> bool:
+        """Return True if the sign of x is negative and False otherwise."""
 
 def sinh(x: _SupportsFloatOrIndex, /) -> float:
     """Return the hyperbolic sine of x."""

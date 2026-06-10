@@ -11,9 +11,9 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, definite_sequence_pattern_type, exact_sequence_pattern_type,
-    infer_expression_types, mapping_pattern_type, sequence_pattern_type_builder,
-    singleton_pattern_type, starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
@@ -629,6 +629,10 @@ fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
     from: NarrowingConstraints<'db>,
 ) {
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct places are merged independently"
+    )]
     for (key, from_constraint) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
@@ -657,6 +661,10 @@ fn merge_constraints_or<'db>(
     // For places that appear in `into` but not in `from`, widen to object
     into.retain(|key, _| from.contains_key(key));
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "constraints for distinct places are merged independently"
+    )]
     for (key, from_constraint) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
@@ -1994,6 +2002,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 Type::instance(self.db, class.top_materialization(self.db))
                     .negate_if(self.db, !is_positive)
             }
+            Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                callable_pattern_type(self.db).negate_if(self.db, !is_positive)
+            }
             dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,
         };
@@ -2057,6 +2068,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 match infer_same_file_expression_type(self.db, *cls, TypeContext::default()) {
                     Type::ClassLiteral(class) => {
                         Type::instance(self.db, class.top_materialization(self.db))
+                    }
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        callable_pattern_type(self.db)
                     }
                     _ => Type::object(),
                 }

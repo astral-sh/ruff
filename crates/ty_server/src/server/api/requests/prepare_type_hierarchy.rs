@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
-use lsp_types::request::TypeHierarchyPrepare;
-use lsp_types::{TypeHierarchyItem, TypeHierarchyPrepareParams, Url};
+use lsp_types::TypeHierarchyPrepareRequest;
+use lsp_types::{TypeHierarchyItem, TypeHierarchyPrepareParams, Uri};
 use ty_project::ProjectDatabase;
 
 use crate::document::PositionExt;
@@ -24,11 +24,11 @@ use crate::session::client::Client;
 pub(crate) struct PrepareTypeHierarchyRequestHandler;
 
 impl RequestHandler for PrepareTypeHierarchyRequestHandler {
-    type RequestType = TypeHierarchyPrepare;
+    type RequestType = TypeHierarchyPrepareRequest;
 }
 
 impl BackgroundDocumentRequestHandler for PrepareTypeHierarchyRequestHandler {
-    fn document_url(params: &TypeHierarchyPrepareParams) -> Cow<'_, Url> {
+    fn document_uri(params: &TypeHierarchyPrepareParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for PrepareTypeHierarchyRequestHandler {
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.url(),
+            snapshot.uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);

@@ -169,6 +169,7 @@ class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
 
     def output(self, attrs: Container[str] | None = None, header: str = "Set-Cookie:", sep: str = "\r\n") -> str:
         """Return a string suitable for HTTP."""
+
     __str__ = output
     def js_output(self, attrs: Container[str] | None = None) -> str:
         """Return a string suitable for JavaScript."""

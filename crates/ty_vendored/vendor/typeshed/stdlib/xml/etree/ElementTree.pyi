@@ -193,6 +193,7 @@ class Element(Generic[_Tag]):
 
     def __len__(self) -> int:
         """Return len(self)."""
+
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
 

@@ -273,6 +273,10 @@ impl<'db> DefinitionsByNode<'db> {
         let mut non_single = FxHashMap::default();
         single.reserve(definitions_by_node.len());
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each node is independently partitioned by definition count"
+        )]
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
                 single.insert(key, definitions[0]);

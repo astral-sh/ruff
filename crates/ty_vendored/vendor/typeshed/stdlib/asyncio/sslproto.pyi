@@ -184,6 +184,7 @@ class _SSLProtocolTransport(transports._FlowControlMixin, transports.Transport):
 
     def can_write_eof(self) -> Literal[False]:
         """Return True if this transport supports write_eof(), False if not."""
+
     if sys.version_info >= (3, 11):
         def get_write_buffer_limits(self) -> tuple[int, int]: ...
         def get_read_buffer_limits(self) -> tuple[int, int]: ...

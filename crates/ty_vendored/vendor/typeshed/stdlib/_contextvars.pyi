@@ -65,6 +65,7 @@ class Token(Generic[_T]):
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
+
     if sys.version_info >= (3, 14):
         def __enter__(self) -> Self:
             """Enter into Token context manager."""
@@ -97,6 +98,7 @@ class Context(Mapping[ContextVar[Any], Any]):
     def run(self, callable: Callable[_P, _T], *args: _P.args, **kwargs: _P.kwargs) -> _T: ...
     def copy(self) -> Context:
         """Return a shallow copy of the context object."""
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __getitem__(self, key: ContextVar[_T], /) -> _T:
         """Return self[key]."""

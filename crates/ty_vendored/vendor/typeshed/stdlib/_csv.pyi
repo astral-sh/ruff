@@ -95,6 +95,7 @@ class Writer:
 
             Non-string elements will be converted to string.
             """
+
     else:
         def writerow(self, row: Iterable[Any]) -> Any:
             """writerow(iterable)

@@ -327,7 +327,7 @@ def disjoint_base(cls: _TC) -> _TC:
     """This decorator marks a class as a disjoint base.
 
     Child classes of a disjoint base cannot inherit from other disjoint bases that are
-    not parent classes of the disjoint base.
+    not parent or child classes of the disjoint base.
 
     For example:
 
@@ -341,8 +341,6 @@ def disjoint_base(cls: _TC) -> _TC:
 
     Type checkers can use knowledge of disjoint bases to detect unreachable code
     and determine when two types can overlap.
-
-    See PEP 800.
     """
 
 Literal: _SpecialForm
@@ -656,6 +654,7 @@ else:
 
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
         """Return all defined overloads for *func* as a sequence."""
+
     Required: _SpecialForm
     """A special typing construct to mark a key of a total=False TypedDict
     as required. For example:
@@ -934,6 +933,7 @@ else:
             assert get_original_bases(Spam) == (TypedDict,)
             assert get_original_bases(int) == (object,)
         """
+
     # mypy and pyright object to this being both ABC and Protocol.
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
@@ -1201,6 +1201,7 @@ else:
 
         def __ror__(self, left: Any) -> _SpecialForm:
             """Return value|self."""
+
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
 
@@ -1397,15 +1398,17 @@ NoExtraItems: _NoExtraItemsType
 # PEP 747
 TypeForm: _SpecialForm
 """A special form representing the value that results from the evaluation
-of a type expression. This value encodes the information supplied in the
-type expression, and it represents the type described by that type expression.
+of a type expression.
 
-When used in a type expression, TypeForm describes a set of type form objects.
-It accepts a single type argument, which must be a valid type expression.
-``TypeForm[T]`` describes the set of all type form objects that represent
-the type T or types that are assignable to T.
+This value encodes the information supplied in the type expression, and it
+represents the type described by that type expression.
 
-Usage:
+When used in a type expression, TypeForm describes a set of type form
+objects. It accepts a single type argument, which must be a valid type
+expression. ``TypeForm[T]`` describes the set of all type form objects that
+represent the type T or types that are assignable to T.
+
+Usage::
 
     def cast[T](typ: TypeForm[T], value: Any) -> T: ...
 

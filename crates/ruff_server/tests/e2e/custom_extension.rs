@@ -92,8 +92,8 @@ fn lint_custom_extension_mapped_to_markdown_emits_no_diagnostics() -> Result<()>
         diagnostics,
         @r#"
     {
-      "kind": "full",
-      "items": []
+      "items": [],
+      "kind": "full"
     }
     "#
     );
