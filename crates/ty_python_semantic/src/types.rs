@@ -1629,15 +1629,11 @@ impl<'db> Type<'db> {
         match self {
             Type::SpecialForm(special_form) => special_form.typed_dict_module(),
             Type::Union(union) => {
-                let mut module: Option<TypedDictModule> = None;
-                for element in union.elements(db) {
-                    let element_module = element.typed_dict_module(db)?;
-                    module = Some(match module {
-                        None => element_module,
-                        Some(module) => module.union(element_module),
-                    });
-                }
-                module
+                let mut elements = union.elements(db).iter();
+                let module = elements.next()?.as_special_form()?.typed_dict_module()?;
+                elements.try_fold(module, |module, element| {
+                    Some(module.union(element.as_special_form()?.typed_dict_module()?))
+                })
             }
             _ => None,
         }
