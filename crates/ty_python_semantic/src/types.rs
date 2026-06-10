@@ -248,23 +248,33 @@ fn definition_expression_type<'db>(
     }
 }
 
-/// Return the qualifiers for a deferred annotation expression that is a sub-expression of a
-/// [`Definition`].
+/// Infer the type and qualifiers of a deferred annotation expression that is a sub-expression of
+/// a [`Definition`].
 ///
 /// Supports expressions that are evaluated within a type-params sub-scope.
-fn definition_expression_qualifiers<'db>(
+fn definition_expression_annotation<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
     expression: &ast::Expr,
-) -> TypeQualifiers {
+) -> TypeAndQualifiers<'db> {
     let file = definition.file(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
-        infer_deferred_types(db, definition).qualifiers(expression)
+        let inference = infer_deferred_types(db, definition);
+        TypeAndQualifiers::new(
+            inference.expression_type(expression),
+            TypeOrigin::Declared,
+            inference.qualifiers(expression),
+        )
     } else {
-        infer_complete_scope_types(db, scope).qualifiers(expression)
+        let inference = infer_complete_scope_types(db, scope);
+        TypeAndQualifiers::new(
+            inference.expression_type(expression),
+            TypeOrigin::Declared,
+            inference.qualifiers(expression),
+        )
     }
 }
 

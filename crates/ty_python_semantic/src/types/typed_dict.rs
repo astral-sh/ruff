@@ -19,7 +19,7 @@ use super::diagnostic::{
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_qualifiers, definition_expression_type, visitor,
+    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -263,15 +263,13 @@ impl<'db> TypedDictType<'db> {
 
             if let Some(arguments) = &class_stmt.arguments {
                 if let Some(extra_items) = arguments.find_keyword("extra_items") {
-                    let declared_ty =
-                        definition_expression_type(db, class_definition, &extra_items.value)
-                            .apply_optional_specialization(db, specialization);
-                    let qualifiers =
-                        definition_expression_qualifiers(db, class_definition, &extra_items.value);
+                    let annotation =
+                        definition_expression_annotation(db, class_definition, &extra_items.value)
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
                     return TypedDictOpenness::extra(
                         db,
-                        declared_ty,
-                        qualifiers.contains(TypeQualifiers::READ_ONLY),
+                        annotation.inner_type(),
+                        annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
                     );
                 }
 
