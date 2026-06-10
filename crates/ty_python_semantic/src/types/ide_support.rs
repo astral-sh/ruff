@@ -8,7 +8,7 @@ use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTup
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, CycleDetector, KnownClass,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownFunction,
     KnownUnion, Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
@@ -866,62 +866,21 @@ fn full_type_bindings_for_call<'db>(
         .unwrap_or_else(|CallError(_, bindings)| *bindings)
 }
 
-fn annotation_form<'db>(db: &'db dyn Db, annotation: Type<'db>) -> CallArgumentForm {
-    struct AnnotationForm;
-    type AnnotationFormVisitor<'db> = CycleDetector<AnnotationForm, Type<'db>, CallArgumentForm>;
-
-    fn classify<'db>(
-        db: &'db dyn Db,
-        annotation: Type<'db>,
-        visitor: &AnnotationFormVisitor<'db>,
-    ) -> CallArgumentForm {
-        match annotation {
-            Type::TypeForm(_) => CallArgumentForm::Type,
-            Type::TypeAlias(alias) => {
-                visitor.visit(annotation, || classify(db, alias.value_type(db), visitor))
-            }
-            Type::Union(union) => {
-                let mut forms = union
-                    .elements(db)
-                    .iter()
-                    .map(|element| classify(db, *element, visitor));
-                let Some(first) = forms.next() else {
-                    return CallArgumentForm::Unknown;
-                };
-                if forms.all(|form| form == first) {
-                    first
-                } else {
-                    CallArgumentForm::Unknown
-                }
-            }
-            Type::Intersection(intersection) => {
-                let mut form = CallArgumentForm::Value;
-                for element in intersection.iter_positive(db) {
-                    match classify(db, element, visitor) {
-                        CallArgumentForm::Type => return CallArgumentForm::Type,
-                        CallArgumentForm::Unknown => form = CallArgumentForm::Unknown,
-                        CallArgumentForm::Value => {}
-                    }
-                }
-                form
-            }
-            Type::TypeVar(typevar) => visitor.visit(annotation, || {
-                typevar
-                    .typevar(db)
-                    .bound_or_constraints(db)
-                    .map_or(CallArgumentForm::Value, |bound_or_constraints| {
-                        classify(db, bound_or_constraints.as_type(db), visitor)
-                    })
-            }),
-            _ => CallArgumentForm::Value,
-        }
+// These are the callables whose arguments were historically classified as type expressions.
+// TODO: Generalize this once call binding records the interpretation selected for each argument.
+// Inspecting only the declared annotation is insufficient because `type[T]` values may remain
+// values, while aliases, unions, intersections, and specialized generics require more context.
+// `TypeForm(...)` also bypasses callable bindings and needs separate handling.
+fn known_type_form_parameter_index(db: &dyn Db, callable_type: Type<'_>) -> Option<usize> {
+    match callable_type {
+        Type::FunctionLiteral(function) => match function.known(db) {
+            Some(KnownFunction::Cast) => Some(0),
+            Some(KnownFunction::AssertType) => Some(1),
+            _ => None,
+        },
+        Type::ClassLiteral(class) if class.is_known(db, KnownClass::TypeAliasType) => Some(1),
+        _ => None,
     }
-
-    classify(
-        db,
-        annotation,
-        &AnnotationFormVisitor::new(CallArgumentForm::Unknown),
-    )
 }
 
 /// Returns the form for a single argument from a binding.
@@ -931,15 +890,17 @@ fn argument_form_from_binding<'db>(
     binding: &crate::types::call::Binding<'db>,
     argument_index: usize,
 ) -> CallArgumentForm {
-    if let Some(argument_match) =
-        binding.matched_argument_for_call_argument(callable_binding, argument_index)
+    if let Some(argument_match) = binding.argument_matches().get(argument_index)
         && argument_match.matched
         && let [parameter] = argument_match.parameters.as_slice()
     {
-        return annotation_form(
-            db,
-            binding.signature.parameters()[parameter.index].annotated_type(),
-        );
+        return if known_type_form_parameter_index(db, callable_binding.callable_type)
+            == Some(parameter.index)
+        {
+            CallArgumentForm::Type
+        } else {
+            CallArgumentForm::Value
+        };
     }
 
     CallArgumentForm::Unknown
@@ -960,18 +921,12 @@ pub fn call_argument_forms(
     let argument_count = call_expr.arguments.len();
     let db = model.db();
 
-    // If the function doesn't contain any type forms, for any overloads, short-circuit.
-    if !func_type.bindings(db).iter_flat().any(|binding| {
-        binding.overloads().iter().any(|overload| {
-            overload
-                .signature
-                .parameters()
-                .into_iter()
-                .any(|parameter| {
-                    annotation_form(db, parameter.annotated_type()) != CallArgumentForm::Value
-                })
-        })
-    }) {
+    // Ordinary callables have only value-form arguments for IDE purposes, so skip full binding.
+    if !func_type
+        .bindings(db)
+        .iter_flat()
+        .any(|binding| known_type_form_parameter_index(db, binding.callable_type).is_some())
+    {
         return vec![CallArgumentForm::Value; argument_count];
     }
 
@@ -2456,13 +2411,13 @@ f(int, x)
     }
 
     #[test]
-    fn call_argument_forms_distinguish_parameter_annotations() -> anyhow::Result<()> {
+    fn call_argument_forms_preserve_known_type_form_parameters() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
                 r#"
 from typing import cast
-from typing_extensions import TypeForm
+from typing_extensions import TypeAliasType, TypeForm
 
 def f(x: type[int], y: int) -> None:
     pass
@@ -2470,15 +2425,10 @@ def f(x: type[int], y: int) -> None:
 def g(form: TypeForm[int], value: int) -> None:
     pass
 
-type RecursiveForm = RecursiveForm | TypeForm[int]
-
-def h(form: RecursiveForm) -> None:
-    pass
-
 cast(int, 1)
 f(int, 1)
 g(int, 1)
-h(int)
+TypeAliasType("Alias", int)
 "#,
             )
             .build()?;
@@ -2503,11 +2453,11 @@ h(int)
         );
         assert_eq!(
             call_argument_forms(&model, calls[2]),
-            [CallArgumentForm::Type, CallArgumentForm::Value]
+            [CallArgumentForm::Value, CallArgumentForm::Value]
         );
         assert_eq!(
             call_argument_forms(&model, calls[3]),
-            [CallArgumentForm::Unknown]
+            [CallArgumentForm::Value, CallArgumentForm::Type]
         );
 
         Ok(())
@@ -2545,83 +2495,6 @@ cast(*args)
             call_argument_forms(&model, call),
             [CallArgumentForm::Unknown]
         );
-
-        Ok(())
-    }
-
-    #[test]
-    fn bound_method_call_argument_forms_exclude_synthetic_receiver() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
-from typing_extensions import TypeForm
-
-class C:
-    def method(self, form: TypeForm[int], value: int) -> None:
-        pass
-
-C().method(int, 1)
-"#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(
-            call_argument_forms(&model, call),
-            [CallArgumentForm::Type, CallArgumentForm::Value]
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn intersection_call_argument_forms_use_type_form_facet() -> anyhow::Result<()> {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                r#"
-from typing import Protocol
-from typing_extensions import TypeForm
-from ty_extensions import Intersection
-
-class HasX(Protocol):
-    x: int
-
-def f(form: Intersection[TypeForm[int], HasX]) -> None:
-    pass
-
-f(int)
-"#,
-            )
-            .build()?;
-
-        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
-        let parsed = parsed_module(&db, file).load(&db);
-        let call = parsed
-            .suite()
-            .last()
-            .unwrap()
-            .as_expr_stmt()
-            .unwrap()
-            .value
-            .as_call_expr()
-            .unwrap();
-        let model = SemanticModel::new(&db, file);
-
-        assert_eq!(call_argument_forms(&model, call), [CallArgumentForm::Type]);
 
         Ok(())
     }
