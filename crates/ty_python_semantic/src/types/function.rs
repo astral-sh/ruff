@@ -720,9 +720,18 @@ impl<'db> OverloadLiteral<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
+    overloaded: bool,
 }
 
 impl<'db> FunctionLiteral<'db> {
+    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
+        Self {
+            last_definition,
+            overloaded: last_definition.is_overload(db)
+                || last_definition.previous_overload(db).is_some(),
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition.name(db)
@@ -792,6 +801,10 @@ impl<'db> FunctionLiteral<'db> {
             };
 
             (overloads.into_boxed_slice(), implementation)
+        }
+
+        if !self.overloaded {
+            return (&[], Some(self.last_definition));
         }
 
         let (overloads, implementation) =
@@ -1124,10 +1137,12 @@ impl<'db> FunctionType<'db> {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
         let literal = self.literal(db);
-        let last_definition = literal
-            .last_definition
-            .with_dataclass_transformer_params(db, params);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition: literal
+                .last_definition
+                .with_dataclass_transformer_params(db, params),
+            ..literal
+        };
         Self::new(db, literal, None)
     }
 
@@ -1139,8 +1154,10 @@ impl<'db> FunctionType<'db> {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
         let literal = self.literal(db);
-        let last_definition = literal.last_definition.with_deprecated(db, deprecated);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition: literal.last_definition.with_deprecated(db, deprecated),
+            ..literal
+        };
         Self::new(db, literal, self.updated_signatures(db).cloned())
     }
 
