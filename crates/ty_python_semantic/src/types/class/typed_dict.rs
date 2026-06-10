@@ -505,12 +505,20 @@ fn synthesize_typed_dict_update<'db>(
 
     let update_patch_ty = Type::TypedDict(typed_dict.to_update_patch(db));
 
+    let mapping_ty = typed_dict.dict_value_type(db).map(|value_ty| {
+        KnownClass::Mapping
+            .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), value_ty])
+    });
     let iterable_ty = typed_dict.arbitrary_key_write_type(db).map(|value_ty| {
         let item_ty = Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(db), value_ty]);
         KnownClass::Iterable.to_specialized_instance(db, &[item_ty])
     });
-    let value_ty =
-        UnionType::from_elements(db, std::iter::once(update_patch_ty).chain(iterable_ty));
+    let value_ty = UnionType::from_elements(
+        db,
+        std::iter::once(update_patch_ty)
+            .chain(mapping_ty)
+            .chain(iterable_ty),
+    );
 
     let parameters = [
         Parameter::positional_only(Some(Name::new_static("self"))).with_annotated_type(instance_ty),

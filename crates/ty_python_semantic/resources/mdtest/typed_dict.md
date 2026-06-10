@@ -6105,6 +6105,8 @@ def _(
 Mutable extra items can be updated, while read-only extra items cannot:
 
 ```py
+from collections.abc import Mapping
+
 from typing_extensions import NotRequired, ReadOnly, TypedDict
 
 class MutableExtra(TypedDict, extra_items=int):
@@ -6140,6 +6142,9 @@ def _(
     ints: IntPatch,
     strings: StrPatch,
     open_patch: OpenPatch,
+    int_dict: dict[str, int],
+    int_mapping: Mapping[str, int],
+    str_mapping: Mapping[str, str],
 ) -> None:
     mutable.update(year=1982)
     mutable.update(ints)
@@ -6148,6 +6153,9 @@ def _(
     mutable_extra_only.update(open_patch)  # error: [invalid-argument-type]
     mutable_extra_only.update([("year", 1982)])
     mutable_extra_only.update([("year", "not an int")])  # error: [invalid-argument-type]
+    mutable_extra_only.update(int_dict)
+    mutable_extra_only.update(int_mapping)
+    mutable_extra_only.update(str_mapping)  # error: [invalid-argument-type]
     all_int_items.update([("other", 1982)])
 
     # An arbitrary key may refer to either the declared `name` item or an extra item.
