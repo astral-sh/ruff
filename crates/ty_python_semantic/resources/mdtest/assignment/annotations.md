@@ -554,7 +554,8 @@ x4: TD | None = first([{"y": 0}, {"x": 1}])
 x5: ObjectCallback | IntCallback = make_callback(lambda value: consume(value.bit_length()))
 ```
 
-But not in a way that leads to assignability errors:
+The generic `dict.get` overload preserves the inferred default type alongside `Any` in its return
+type, which can lead to assignability errors:
 
 ```py
 from typing import TypedDict, Any
@@ -563,27 +564,33 @@ class TD2(TypedDict):
     x: str
 
 def _(dt: dict[str, Any], key: str):
+    # error: [invalid-assignment] "Object of type `Any | dict[Unknown, Unknown]` is not assignable to `TD`"
     x1: TD = dt.get(key, {})
     reveal_type(x1)  # revealed: TD
 
     x2: TD = dt.get(key, {"x": 0})
     reveal_type(x2)  # revealed: TD
 
+    # error: [invalid-assignment] "Object of type `Any | dict[Unknown, Unknown]` is not assignable to `TD | None`"
     x3: TD | None = dt.get(key, {})
     reveal_type(x3)  # revealed: TD | None
 
     x4: TD | None = dt.get(key, {"x": 0})
     reveal_type(x4)  # revealed: TD | None
 
+    # error: [invalid-assignment] "Object of type `Any | dict[Unknown, Unknown]` is not assignable to `TD2`"
     x5: TD2 = dt.get(key, {})
     reveal_type(x5)  # revealed: TD2
 
+    # error: [invalid-assignment] "Object of type `Any | dict[Literal["x"], int]` is not assignable to `TD2`"
     x6: TD2 = dt.get(key, {"x": 0})
     reveal_type(x6)  # revealed: TD2
 
+    # error: [invalid-assignment] "Object of type `Any | dict[Unknown, Unknown]` is not assignable to `TD2 | None`"
     x7: TD2 | None = dt.get(key, {})
     reveal_type(x7)  # revealed: TD2 | None
 
+    # error: [invalid-assignment] "Object of type `Any | dict[Literal["x"], int]` is not assignable to `TD2 | None`"
     x8: TD2 | None = dt.get(key, {"x": 0})
     reveal_type(x8)  # revealed: TD2 | None
 ```
