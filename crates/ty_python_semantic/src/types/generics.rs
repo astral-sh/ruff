@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use std::borrow::Cow;
 use std::cell::{Cell, RefCell};
 use std::collections::hash_map::Entry;
@@ -1357,25 +1358,24 @@ impl<'db> Specialization<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        let types = if nested {
+        let types = if normalization.is_nested() {
             self.types(db)
                 .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                .map(|ty| ty.recursive_type_normalized_impl(db, normalization.nested()))
                 .collect::<Option<Box<[_]>>>()?
         } else {
             self.types(db)
                 .iter()
                 .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
+                    ty.recursive_type_normalized_impl(db, normalization.nested())
+                        .unwrap_or(normalization.marker())
                 })
                 .collect::<Box<[_]>>()
         };
         let tuple_inner = match self.tuple_inner(db) {
-            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
+            Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, normalization)?),
             None => None,
         };
         let context = self.generic_context(db);

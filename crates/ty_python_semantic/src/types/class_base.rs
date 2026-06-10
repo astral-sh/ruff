@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
@@ -45,14 +46,13 @@ impl<'db> ClassBase<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::Divergent(_) => Some(self),
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::Any | Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }

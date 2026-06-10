@@ -18,6 +18,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
+use crate::types::RecursiveTypeNormalization;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -245,14 +246,13 @@ impl<'db> CallableSignature<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self {
             overloads: self
                 .overloads
                 .iter()
-                .map(|signature| signature.recursive_type_normalized_impl(db, div, nested))
+                .map(|signature| signature.recursive_type_normalized_impl(db, normalization))
                 .collect::<Option<SmallVec<_>>>()?,
         })
     }
@@ -784,21 +784,20 @@ impl<'db> Signature<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        let return_ty = if nested {
+        let return_ty = if normalization.is_nested() {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)?
+                .recursive_type_normalized_impl(db, normalization.nested())?
         } else {
             self.return_ty
-                .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, normalization.nested())
+                .unwrap_or(normalization.marker())
         };
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
+                parameters.push(param.recursive_type_normalized_impl(db, normalization)?);
             }
             Parameters::new(db, parameters)
         };
@@ -3972,8 +3971,7 @@ impl<'db> Parameter<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let Parameter {
             annotated_type,
@@ -3983,22 +3981,24 @@ impl<'db> Parameter<'db> {
             kind,
         } = self;
 
-        let annotated_type = if nested {
-            annotated_type.recursive_type_normalized_impl(db, div, true)?
+        let annotated_type = if normalization.is_nested() {
+            annotated_type.recursive_type_normalized_impl(db, normalization.nested())?
         } else {
             annotated_type
-                .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div)
+                .recursive_type_normalized_impl(db, normalization.nested())
+                .unwrap_or(normalization.marker())
         };
 
         let kind = match kind {
             ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
                 name: name.clone(),
                 default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+                    Some(ty) if normalization.is_nested() => {
+                        Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
+                    }
                     Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
+                        ty.recursive_type_normalized_impl(db, normalization.nested())
+                            .unwrap_or(normalization.marker()),
                     ),
                     None => None,
                 },
@@ -4007,12 +4007,12 @@ impl<'db> Parameter<'db> {
                 ParameterKind::PositionalOrKeyword {
                     name: name.clone(),
                     default_type: match default_type {
-                        Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
+                        Some(ty) if normalization.is_nested() => {
+                            Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
                         }
                         Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
-                                .unwrap_or(div),
+                            ty.recursive_type_normalized_impl(db, normalization.nested())
+                                .unwrap_or(normalization.marker()),
                         ),
                         None => None,
                     },
@@ -4021,10 +4021,12 @@ impl<'db> Parameter<'db> {
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
                 default_type: match default_type {
-                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+                    Some(ty) if normalization.is_nested() => {
+                        Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
+                    }
                     Some(ty) => Some(
-                        ty.recursive_type_normalized_impl(db, div, true)
-                            .unwrap_or(div),
+                        ty.recursive_type_normalized_impl(db, normalization.nested())
+                            .unwrap_or(normalization.marker()),
                     ),
                     None => None,
                 },

@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use std::borrow::Cow;
 
 use itertools::Either;
@@ -806,8 +807,7 @@ impl<'db> DynamicTypedDictAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::Definition(definition) => Some(Self::Definition(*definition)),
@@ -819,8 +819,8 @@ impl<'db> DynamicTypedDictAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                schema: schema.recursive_type_normalized_impl(db, div, nested)?,
-                openness: openness.recursive_type_normalized_impl(db, div, nested)?,
+                schema: schema.recursive_type_normalized_impl(db, normalization)?,
+                openness: openness.recursive_type_normalized_impl(db, normalization)?,
             }),
         }
     }
@@ -849,14 +849,13 @@ impl<'db> DynamicTypedDictLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
         ))
     }
 }

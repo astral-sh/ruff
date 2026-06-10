@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -143,19 +144,18 @@ impl<'db> TypedDictOpenness<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::ImplicitlyOpen | Self::Closed => Some(self),
             Self::Extra(extra_items) => {
                 let declared_ty = extra_items
                     .declared_ty
-                    .recursive_type_normalized_impl(db, div, true);
-                let declared_ty = if nested {
+                    .recursive_type_normalized_impl(db, normalization.nested());
+                let declared_ty = if normalization.is_nested() {
                     declared_ty?
                 } else {
-                    declared_ty.unwrap_or(div)
+                    declared_ty.unwrap_or(normalization.marker())
                 };
                 Some(Self::extra(db, declared_ty, extra_items.is_read_only))
             }
@@ -2939,18 +2939,17 @@ impl<'db> TypedDictSchema<'db> {
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         self.iter()
             .map(|(name, field)| {
                 let declared_ty = field
                     .declared_ty
-                    .recursive_type_normalized_impl(db, div, true);
-                let declared_ty = if nested {
+                    .recursive_type_normalized_impl(db, normalization.nested());
+                let declared_ty = if normalization.is_nested() {
                     declared_ty?
                 } else {
-                    declared_ty.unwrap_or(div)
+                    declared_ty.unwrap_or(normalization.marker())
                 };
                 let mut field = field.clone();
                 field.declared_ty = declared_ty;

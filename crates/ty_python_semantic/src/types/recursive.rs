@@ -11,7 +11,8 @@
 use crate::Db;
 use crate::types::visitor;
 use crate::types::{
-    ApplyTypeMappingVisitor, Type, TypeAliasType, TypeContext, TypeMapping, UnionType,
+    ApplyTypeMappingVisitor, RecursiveTypeNormalization, Type, TypeAliasType, TypeContext,
+    TypeMapping, UnionType,
 };
 use salsa::plumbing::AsId;
 
@@ -208,6 +209,14 @@ impl<'db> RecursiveType<'db> {
             replacement,
         };
         body.apply_type_mapping(db, &mapping, TypeContext::default())
+    }
+
+    pub(crate) fn fold_unfolded(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        let marker = Type::divergent(self.binder_id(db));
+        let normalization =
+            RecursiveTypeNormalization::new(marker).with_fold_body(Some(self.body(db)));
+        ty.recursive_type_normalized_impl(db, normalization)
+            .unwrap_or(marker)
     }
 
     /// Whether this μ-binder is *non-contractive*: its body is the bare α-binder marker itself

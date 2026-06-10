@@ -90,9 +90,9 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
     ClassLiteral, ClassType, DynamicType, FindLegacyTypeVarsVisitor, IntersectionBuilder,
-    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
-    definition_expression_type, walk_signature,
+    KnownClass, KnownInstanceType, RecursiveTypeNormalization, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, UnionType, definition_expression_type, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_python_core::ast_ids::HasScopedUseId;
@@ -120,7 +120,7 @@ std::thread_local! {
 ///
 /// `TypeOf` can make a function signature refer back to the same function through many different
 /// type components. Keeping this guard scoped here lets those components keep their ordinary
-/// `recursive_type_normalized_impl(db, div, nested)` signatures.
+/// `recursive_type_normalized_impl(db, normalization)` signatures.
 fn visit_recursive_type_normalization<R>(
     function_literal: FunctionLiteral<'_>,
     nested: bool,
@@ -1505,25 +1505,24 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         visit_recursive_type_normalization(
             self.literal(db),
-            nested,
+            normalization.is_nested(),
             || None,
             || {
                 let literal = self.literal(db);
                 let updated_signature = match self.updated_signature(db) {
                     Some(signature) => {
-                        Some(signature.recursive_type_normalized_impl(db, div, nested)?)
+                        Some(signature.recursive_type_normalized_impl(db, normalization)?)
                     }
                     None => None,
                 };
                 let updated_implementation_signature =
                     match self.updated_implementation_signature(db) {
                         Some(signature) => {
-                            Some(signature.recursive_type_normalized_impl(db, div, nested)?)
+                            Some(signature.recursive_type_normalized_impl(db, normalization)?)
                         }
                         None => None,
                     };

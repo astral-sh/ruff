@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use std::fmt::Write;
 
 pub(crate) use self::dynamic_literal::{
@@ -253,14 +254,13 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
         ))
     }
 
@@ -385,21 +385,20 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::Dynamic(dynamic) => Some(Self::Dynamic(
-                dynamic.recursive_type_normalized_impl(db, div, nested)?,
+                dynamic.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::DynamicNamedTuple(named_tuple) => Some(Self::DynamicNamedTuple(
-                named_tuple.recursive_type_normalized_impl(db, div, nested)?,
+                named_tuple.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::DynamicTypedDict(typed_dict) => Some(Self::DynamicTypedDict(
-                typed_dict.recursive_type_normalized_impl(db, div, nested)?,
+                typed_dict.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::DynamicEnum(enum_literal) => Some(Self::DynamicEnum(
-                enum_literal.recursive_type_normalized_impl(db, div, nested)?,
+                enum_literal.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::Static(_) => Some(self),
         }
@@ -934,15 +933,14 @@ impl<'db> ClassType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(class) => Some(Self::NonGeneric(
-                class.recursive_type_normalized_impl(db, div, nested)?,
+                class.recursive_type_normalized_impl(db, normalization)?,
             )),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested)?,
+                generic.recursive_type_normalized_impl(db, normalization)?,
             )),
         }
     }

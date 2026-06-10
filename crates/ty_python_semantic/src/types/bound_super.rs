@@ -4,6 +4,7 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::{AnyNodeRef, name::Name};
 
+use crate::types::RecursiveTypeNormalization;
 use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
@@ -262,16 +263,15 @@ impl<'db> ResolvedSuperOwner<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self {
             owner_type: self
                 .owner_type
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
             lookup_anchor: self
                 .lookup_anchor
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
             receiver: self.receiver,
         })
     }
@@ -297,8 +297,7 @@ impl<'db> SuperOwnerKind<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
@@ -306,7 +305,7 @@ impl<'db> SuperOwnerKind<'db> {
             }
             SuperOwnerKind::Divergent(_) => Some(self.clone()),
             SuperOwnerKind::Resolved(resolved_owner) => Some(SuperOwnerKind::Resolved(
-                resolved_owner.recursive_type_normalized_impl(db, div, nested)?,
+                resolved_owner.recursive_type_normalized_impl(db, normalization)?,
             )),
         }
     }
@@ -947,15 +946,14 @@ impl<'db> BoundSuperType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.pivot_class(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
             self.owner(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
         ))
     }
 }

@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
@@ -109,8 +110,7 @@ impl<'db> DynamicClassAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::Definition(definition) => Some(Self::Definition(*definition)),
@@ -122,11 +122,11 @@ impl<'db> DynamicClassAnchor<'db> {
                 let explicit_bases = explicit_bases
                     .iter()
                     .map(|base| {
-                        let base = base.recursive_type_normalized_impl(db, div, true);
-                        if nested {
+                        let base = base.recursive_type_normalized_impl(db, normalization.nested());
+                        if normalization.is_nested() {
                             base
                         } else {
-                            Some(base.unwrap_or(div))
+                            Some(base.unwrap_or(normalization.marker()))
                         }
                     })
                     .collect::<Option<Box<_>>>()?;
@@ -538,23 +538,26 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let anchor = self
             .anchor(db)
-            .recursive_type_normalized_impl(db, div, nested)?;
+            .recursive_type_normalized_impl(db, normalization)?;
         let members = self
             .members(db)
             .iter()
             .map(|(name, ty)| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let ty = ty.recursive_type_normalized_impl(db, normalization.nested());
+                let ty = if normalization.is_nested() {
+                    ty?
+                } else {
+                    ty.unwrap_or(normalization.marker())
+                };
                 Some((name.clone(), ty))
             })
             .collect::<Option<Box<_>>>()?;
         let dataclass_params = match self.dataclass_params(db) {
-            Some(params) => Some(params.recursive_type_normalized_impl(db, div, nested)?),
+            Some(params) => Some(params.recursive_type_normalized_impl(db, normalization)?),
             None => None,
         };
 

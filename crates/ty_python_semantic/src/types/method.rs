@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use itertools::Either;
 use ruff_python_ast::name::Name;
 
@@ -115,15 +116,14 @@ impl<'db> BoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.function(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
             self.self_instance(db)
-                .recursive_type_normalized_impl(db, div, true)?,
+                .recursive_type_normalized_impl(db, normalization.nested())?,
         ))
     }
 }
@@ -220,33 +220,32 @@ impl<'db> KnownBoundMethodType<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderGet(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(db, normalization)?,
                 ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
                 Some(KnownBoundMethodType::FunctionTypeDunderCall(
-                    function.recursive_type_normalized_impl(db, div, nested)?,
+                    function.recursive_type_normalized_impl(db, normalization)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderGet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, normalization)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
                 Some(KnownBoundMethodType::PropertyDunderSet(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, normalization)?,
                 ))
             }
             KnownBoundMethodType::PropertyDunderDelete(property) => {
                 Some(KnownBoundMethodType::PropertyDunderDelete(
-                    property.recursive_type_normalized_impl(db, div, nested)?,
+                    property.recursive_type_normalized_impl(db, normalization)?,
                 ))
             }
             KnownBoundMethodType::StrStartswith(_)

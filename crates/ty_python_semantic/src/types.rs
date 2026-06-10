@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -100,7 +100,9 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::any_over_type;
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -727,30 +729,35 @@ impl<'db> PropertyInstanceType<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let getter = match self.getter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if normalization.is_nested() => {
+                Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div),
+                ty.recursive_type_normalized_impl(db, normalization.nested())
+                    .unwrap_or(normalization.marker()),
             ),
             None => None,
         };
         let setter = match self.setter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if normalization.is_nested() => {
+                Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div),
+                ty.recursive_type_normalized_impl(db, normalization.nested())
+                    .unwrap_or(normalization.marker()),
             ),
             None => None,
         };
         let deleter = match self.deleter(db) {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) if normalization.is_nested() => {
+                Some(ty.recursive_type_normalized_impl(db, normalization.nested())?)
+            }
             Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div),
+                ty.recursive_type_normalized_impl(db, normalization.nested())
+                    .unwrap_or(normalization.marker()),
             ),
             None => None,
         };
@@ -880,15 +887,18 @@ impl<'db> DataclassParams<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let field_specifiers = self
             .field_specifiers(db)
             .iter()
             .map(|ty| {
-                let ty = ty.recursive_type_normalized_impl(db, div, true);
-                if nested { ty } else { Some(ty.unwrap_or(div)) }
+                let ty = ty.recursive_type_normalized_impl(db, normalization.nested());
+                if normalization.is_nested() {
+                    ty
+                } else {
+                    Some(ty.unwrap_or(normalization.marker()))
+                }
             })
             .collect::<Option<Box<_>>>()?;
 
@@ -1014,18 +1024,17 @@ pub enum Type<'db> {
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
     guard: T,
-    div: Type<'db>,
-    nested: bool,
+    normalization: RecursiveTypeNormalization<'db>,
 ) -> Option<Type<'db>> {
-    let ty = if nested {
+    let ty = if normalization.is_nested() {
         guard
             .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true)?
+            .recursive_type_normalized_impl(db, normalization.nested())?
     } else {
         guard
             .type_argument(db)
-            .recursive_type_normalized_impl(db, div, true)
-            .unwrap_or(div)
+            .recursive_type_normalized_impl(db, normalization.nested())
+            .unwrap_or(normalization.marker())
     };
     Some(guard.with_type(db, ty))
 }
@@ -1036,6 +1045,93 @@ struct GeneratorTypes<'db> {
     yield_ty: Option<Type<'db>>,
     send_ty: Option<Type<'db>>,
     return_ty: Option<Type<'db>>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RecursiveTypeNormalization<'db> {
+    marker: Type<'db>,
+    fold_body: Option<Type<'db>>,
+    nested: bool,
+}
+
+impl<'db> RecursiveTypeNormalization<'db> {
+    fn new(marker: Type<'db>) -> Self {
+        Self {
+            marker,
+            fold_body: None,
+            nested: false,
+        }
+    }
+
+    fn with_fold_body(self, fold_body: Option<Type<'db>>) -> Self {
+        Self { fold_body, ..self }
+    }
+
+    pub(super) fn marker(self) -> Type<'db> {
+        self.marker
+    }
+
+    pub(super) const fn nested(self) -> Self {
+        Self {
+            nested: true,
+            ..self
+        }
+    }
+
+    fn is_nested(self) -> bool {
+        self.nested
+    }
+
+    pub(super) fn fold_body(self) -> Option<Type<'db>> {
+        self.fold_body
+    }
+
+    fn matches_marker(self, ty: Type<'db>) -> bool {
+        ty.same_divergent_marker(self.marker)
+    }
+
+    fn should_fold_exact(self, ty: Type<'db>) -> bool {
+        self.nested && self.fold_body == Some(ty)
+    }
+
+    fn contains_marker(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        struct ContainsMarkerVisitor<'db> {
+            normalization: RecursiveTypeNormalization<'db>,
+            found: Cell<bool>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for ContainsMarkerVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if self.found.get() {
+                    return;
+                }
+
+                if self.normalization.matches_marker(ty) {
+                    self.found.set(true);
+                    return;
+                }
+
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                self.visit_type(db, recursive.body(db));
+            }
+        }
+
+        let visitor = ContainsMarkerVisitor {
+            normalization: self,
+            found: Cell::new(false),
+            recursion_guard: TypeCollector::default(),
+        };
+        visitor.visit_type(db, ty);
+        visitor.found.get()
+    }
 }
 
 fn object_type_form(db: &dyn Db) -> Type<'_> {
@@ -1196,8 +1292,9 @@ impl<'db> Type<'db> {
         previous: Option<Self>,
         cycle: &salsa::Cycle,
     ) -> Self {
+        let head_ids: Vec<_> = cycle.head_ids().collect();
         let cycle_head_body = |ty: Self| match ty {
-            Type::Recursive(rec) if cycle.head_ids().any(|id| id == rec.binder_id(db)) => {
+            Type::Recursive(rec) if head_ids.iter().any(|id| *id == rec.binder_id(db)) => {
                 rec.body(db)
             }
             _ => ty,
@@ -1246,48 +1343,51 @@ impl<'db> Type<'db> {
             self
         };
 
-        cycle.head_ids().fold(cycle_head_body(recovered), |ty, id| {
-            let marker = Type::divergent(id);
-            let normalized = ty
-                .recursive_type_normalized_impl(db, marker, false)
-                .unwrap_or(marker);
-
-            let contains_marker = |ty| {
-                any_over_type(
-                    db,
-                    ty,
-                    false,
-                    |inner| matches!(inner, Type::Divergent(d) if d.id() == id),
-                )
-            };
-            let has_structural_marker = match normalized {
-                Type::Divergent(_) => false,
-                Type::Union(union) => union.elements(db).iter().any(|element| {
-                    !matches!(element, Type::Divergent(d) if d.id() == id)
-                        && contains_marker(*element)
-                }),
-                other => contains_marker(other),
-            };
-
-            // Implicit callable cycles stay in `Divergent` form for signature recovery.
-            if has_structural_marker
-                && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
-                && normalized.is_recursion_value_like(db)
-            {
-                let body = match normalized {
-                    Type::Union(union) => UnionType::from_elements_cycle_recovery(
-                        db,
-                        union.elements(db).iter().copied().filter(
-                            |element| !matches!(element, Type::Divergent(d) if d.id() == id),
-                        ),
-                    ),
-                    _ => normalized,
+        head_ids
+            .iter()
+            .copied()
+            .fold(cycle_head_body(recovered), |ty, id| {
+                let marker = Type::divergent(id);
+                let normalization = RecursiveTypeNormalization::new(marker);
+                let fold_body = previous
+                    .and_then(|previous| match previous {
+                        Type::Recursive(rec) if rec.binder_id(db) == id => Some(rec.body(db)),
+                        _ => None,
+                    })
+                    .filter(|body| normalization.contains_marker(db, *body));
+                let normalization = normalization.with_fold_body(fold_body);
+                let normalized = ty
+                    .recursive_type_normalized_impl(db, normalization)
+                    .unwrap_or(marker);
+                let contains_marker = |ty| normalization.contains_marker(db, ty);
+                let has_structural_marker = match normalized {
+                    Type::Divergent(_) => false,
+                    Type::Union(union) => union.elements(db).iter().any(|element| {
+                        !matches!(element, Type::Divergent(d) if d.id() == id)
+                            && contains_marker(*element)
+                    }),
+                    other => contains_marker(other),
                 };
-                Type::implicit_recursive(db, id, body)
-            } else {
-                normalized
-            }
-        })
+
+                // Implicit callable cycles stay in `Divergent` form for signature recovery.
+                if has_structural_marker
+                    && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
+                    && normalized.is_recursion_value_like(db)
+                {
+                    let body = match normalized {
+                        Type::Union(union) => UnionType::from_elements_cycle_recovery(
+                            db,
+                            union.elements(db).iter().copied().filter(
+                                |element| !matches!(element, Type::Divergent(d) if d.id() == id),
+                            ),
+                        ),
+                        _ => normalized,
+                    };
+                    Type::implicit_recursive(db, id, body)
+                } else {
+                    normalized
+                }
+            })
     }
 
     /// Normalizes nominal growth that wraps the previous cycle result in one or more
@@ -2362,74 +2462,84 @@ impl<'db> Type<'db> {
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if normalization.should_fold_exact(self) {
+            return Some(normalization.marker());
+        }
+        if normalization.is_nested() && normalization.matches_marker(self) {
             return None;
         }
         match self {
             Type::Recursive(rec) => {
                 let marker = Type::divergent(rec.binder_id(db));
-                if marker.same_divergent_marker(div) {
+                if normalization.matches_marker(marker) {
                     Some(marker)
                 } else {
-                    Some(self)
+                    let body = rec
+                        .body(db)
+                        .recursive_type_normalized_impl(db, normalization.nested())
+                        .unwrap_or(normalization.marker());
+                    if body == rec.body(db) {
+                        Some(self)
+                    } else {
+                        Some(Type::recursive(db, rec.binder_id(db), rec.origin(db), body))
+                    }
                 }
             }
-            Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
+            Type::Union(union) => union.recursive_type_normalized_impl(db, normalization),
             Type::Intersection(intersection) => intersection
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::Intersection),
             Type::EnumComplement(complement) => complement
                 .to_intersection(db)
-                .recursive_type_normalized_impl(db, div, nested),
+                .recursive_type_normalized_impl(db, normalization),
             Type::Callable(callable) => callable
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::Callable),
             Type::ProtocolInstance(protocol) => protocol
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::ProtocolInstance),
             Type::NominalInstance(instance) => instance
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::NominalInstance),
             Type::FunctionLiteral(function) => function
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::FunctionLiteral),
             Type::PropertyInstance(property) => property
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::PropertyInstance),
             Type::KnownBoundMethod(method_kind) => method_kind
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::KnownBoundMethod),
             Type::BoundMethod(method) => method
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::BoundMethod),
             Type::BoundSuper(bound_super) => bound_super
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::BoundSuper),
             Type::GenericAlias(generic) => generic
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::GenericAlias),
             Type::ClassLiteral(class) => class
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::ClassLiteral),
             Type::SubclassOf(subclass_of) => subclass_of
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::SubclassOf),
             Type::TypeVar(_) => Some(self),
             Type::KnownInstance(known_instance) => known_instance
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::KnownInstance),
             Type::TypeIs(type_is) => {
-                recursive_type_normalize_type_guard_like(db, type_is, div, nested)
+                recursive_type_normalize_type_guard_like(db, type_is, normalization)
             }
             Type::TypeGuard(type_guard) => {
-                recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
+                recursive_type_normalize_type_guard_like(db, type_guard, normalization)
             }
             Type::TypeForm(typeform) => typeform
                 .type_argument(db)
-                .recursive_type_normalized_impl(db, div, true)
+                .recursive_type_normalized_impl(db, normalization.nested())
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
@@ -2439,7 +2549,7 @@ impl<'db> Type<'db> {
             }
             Type::TypeAlias(_) => Some(self),
             Type::NewTypeInstance(newtype) => newtype
-                .recursive_type_normalized_impl(db, div, nested)
+                .recursive_type_normalized_impl(db, normalization)
                 .map(Type::NewTypeInstance),
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -6503,6 +6613,21 @@ impl<'db> Type<'db> {
             Type::TypeAlias(alias) => {
                 match type_mapping {
                     TypeMapping::ReplaceDivergent { .. } => {
+                        if let Some(specialization) = alias.specialization(db) {
+                            let mapped_specialization =
+                                specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
+                            if mapped_specialization == specialization {
+                                self
+                            } else {
+                                Type::TypeAlias(
+                                    alias.apply_specialization(db, |_| mapped_specialization),
+                                )
+                            }
+                        } else {
+                            self
+                        }
+                    }
+                    TypeMapping::ReplaceRecursiveOrigin { .. } => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);

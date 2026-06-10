@@ -1,3 +1,4 @@
+use crate::types::RecursiveTypeNormalization;
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast as ast;
 use ruff_python_ast::{NodeIndex, PythonVersion, name::Name};
@@ -165,14 +166,13 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.name(db),
             self.anchor(db)
-                .recursive_type_normalized_impl(db, div, nested)?,
+                .recursive_type_normalized_impl(db, normalization)?,
         ))
     }
 }
@@ -537,13 +537,12 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         match self {
             Self::CollectionsDefinition { definition, spec } => Some(Self::CollectionsDefinition {
                 definition: *definition,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, normalization)?,
             }),
             Self::TypingDefinition(definition) => Some(Self::TypingDefinition(*definition)),
             Self::ScopeOffset {
@@ -553,7 +552,7 @@ impl<'db> DynamicNamedTupleAnchor<'db> {
             } => Some(Self::ScopeOffset {
                 scope: *scope,
                 offset: *offset,
-                spec: spec.recursive_type_normalized_impl(db, div, nested)?,
+                spec: spec.recursive_type_normalized_impl(db, normalization)?,
             }),
         }
     }
@@ -583,22 +582,27 @@ impl<'db> NamedTupleSpec<'db> {
     pub(crate) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
-        div: Type<'db>,
-        nested: bool,
+        normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
         let fields = self
             .fields(db)
             .iter()
             .map(|f| {
-                let ty = f.ty.recursive_type_normalized_impl(db, div, true);
-                let ty = if nested { ty? } else { ty.unwrap_or(div) };
+                let ty =
+                    f.ty.recursive_type_normalized_impl(db, normalization.nested());
+                let ty = if normalization.is_nested() {
+                    ty?
+                } else {
+                    ty.unwrap_or(normalization.marker())
+                };
                 let default = match f.default {
                     Some(default) => {
-                        let default = default.recursive_type_normalized_impl(db, div, true);
-                        Some(if nested {
+                        let default =
+                            default.recursive_type_normalized_impl(db, normalization.nested());
+                        Some(if normalization.is_nested() {
                             default?
                         } else {
-                            default.unwrap_or(div)
+                            default.unwrap_or(normalization.marker())
                         })
                     }
                     None => None,
