@@ -1,3 +1,8 @@
+use std::hash::Hash;
+
+use ruff_index::Idx;
+use rustc_hash::FxHashMap;
+
 /// Compact immutable key-value entries stored in key order.
 ///
 /// Analysis builds these tables with hash maps, but after construction they only need keyed
@@ -100,22 +105,59 @@ impl<'a, K, V> IntoIterator for &'a mut FrozenMap<K, V> {
     }
 }
 
-/// Compact immutable key-value entries stored in parallel key and value slices.
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct FrozenValueIndex(u32);
+
+impl Idx for FrozenValueIndex {
+    fn new(value: usize) -> Self {
+        assert!(u32::try_from(value).is_ok());
+        #[expect(clippy::cast_possible_truncation)]
+        Self(value as u32)
+    }
+
+    fn index(self) -> usize {
+        self.0 as usize
+    }
+}
+
+fn index_values<K, V>(
+    entries: impl IntoIterator<Item = (K, V)>,
+) -> (Vec<(K, FrozenValueIndex)>, Vec<V>)
+where
+    V: Copy + Eq + Hash,
+{
+    let mut values = Vec::new();
+    let mut value_indices = FxHashMap::default();
+    let entries = entries
+        .into_iter()
+        .map(|(key, value)| {
+            let index = *value_indices.entry(value).or_insert_with(|| {
+                let index = FrozenValueIndex::new(values.len());
+                values.push(value);
+                index
+            });
+            (key, index)
+        })
+        .collect();
+
+    (entries, values)
+}
+
+/// Compact immutable key-value entries that deduplicate repeated values.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub struct FrozenParallelMap<K, V> {
-    keys: Box<[K]>,
+pub struct FrozenValueMap<K, V> {
+    entries: FrozenMap<K, FrozenValueIndex>,
     values: Box<[V]>,
 }
 
-impl<K, V> FrozenParallelMap<K, V> {
+impl<K, V> FrozenValueMap<K, V> {
     pub fn get(&self, key: &K) -> Option<&V>
     where
         K: Ord,
     {
-        self.keys
-            .binary_search(key)
-            .ok()
-            .map(|index| &self.values[index])
+        self.entries
+            .get(key)
+            .map(|index| &self.values[index.index()])
     }
 
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = (K, V)> + ExactSizeIterator + '_
@@ -123,56 +165,63 @@ impl<K, V> FrozenParallelMap<K, V> {
         K: Copy,
         V: Copy,
     {
-        self.keys.iter().copied().zip(self.values.iter().copied())
+        self.entries
+            .iter()
+            .map(|(key, index)| (*key, self.values[index.index()]))
     }
 
     pub fn map_values<F>(&mut self, mut map: F)
     where
-        K: Copy,
-        V: Copy,
+        K: Copy + Ord,
+        V: Copy + Eq + Hash,
         F: FnMut(K, V) -> V,
     {
-        for (key, value) in self.keys.iter().copied().zip(self.values.iter_mut()) {
-            *value = map(key, *value);
-        }
+        *self = self
+            .iter()
+            .map(|(key, value)| (key, map(key, value)))
+            .collect();
     }
+}
 
-    fn from_entries(entries: Vec<(K, V)>) -> Self {
-        let mut keys = Vec::with_capacity(entries.len());
-        let mut values = Vec::with_capacity(entries.len());
-        for (key, value) in entries {
-            keys.push(key);
-            values.push(value);
-        }
+impl<K, V> FromIterator<(K, V)> for FrozenValueMap<K, V>
+where
+    K: Ord,
+    V: Copy + Eq + Hash,
+{
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
+        let mut source_entries = iter.into_iter().collect::<Vec<_>>();
+        source_entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+        source_entries.dedup_by(|(left, _), (right, _)| left == right);
+
+        let (entries, values) = index_values(source_entries);
 
         Self {
-            keys: keys.into_boxed_slice(),
+            entries: FrozenMap(entries.into_boxed_slice()),
             values: values.into_boxed_slice(),
         }
     }
 }
 
-impl<K: Ord, V> FromIterator<(K, V)> for FrozenParallelMap<K, V> {
-    fn from_iter<T: IntoIterator<Item = (K, V)>>(iter: T) -> Self {
-        let mut entries = iter.into_iter().collect::<Vec<_>>();
-        entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        entries.dedup_by(|(left, _), (right, _)| left == right);
-        Self::from_entries(entries)
-    }
-}
-
-impl<K: Ord, V, S> From<std::collections::HashMap<K, V, S>> for FrozenParallelMap<K, V> {
+impl<K, V, S> From<std::collections::HashMap<K, V, S>> for FrozenValueMap<K, V>
+where
+    K: Ord,
+    V: Copy + Eq + Hash,
+{
     fn from(map: std::collections::HashMap<K, V, S>) -> Self {
-        let mut entries = map.into_iter().collect::<Vec<_>>();
+        let (mut entries, values) = index_values(map);
         entries.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
-        Self::from_entries(entries)
+
+        Self {
+            entries: FrozenMap(entries.into_boxed_slice()),
+            values: values.into_boxed_slice(),
+        }
     }
 }
 
-impl<K, V> Default for FrozenParallelMap<K, V> {
+impl<K, V> Default for FrozenValueMap<K, V> {
     fn default() -> Self {
         Self {
-            keys: Box::default(),
+            entries: FrozenMap::default(),
             values: Box::default(),
         }
     }
@@ -222,12 +271,13 @@ impl<K> Default for FrozenSet<K> {
 
 #[cfg(test)]
 mod tests {
-    use super::{FrozenMap, FrozenParallelMap};
+    use super::{FrozenMap, FrozenValueMap};
 
     #[test]
-    fn frozen_parallel_map_sorts_entries() {
-        let map = FrozenParallelMap::from_iter([(3, [1; 4]), (1, [2; 4]), (2, [1; 4])]);
+    fn frozen_value_map_deduplicates_values() {
+        let map = FrozenValueMap::from_iter([(3, [1; 4]), (1, [2; 4]), (2, [1; 4])]);
 
+        assert_eq!(map.values.len(), 2);
         assert_eq!(map.get(&1), Some(&[2; 4]));
         assert_eq!(map.get(&2), Some(&[1; 4]));
         assert_eq!(
@@ -237,12 +287,12 @@ mod tests {
     }
 
     #[test]
-    fn frozen_parallel_map_updates_values() {
-        let mut map = FrozenParallelMap::from_iter([(1, 10), (2, 20), (3, 30)]);
+    fn frozen_value_map_updates_and_rededuplicates_values() {
+        let mut map = FrozenValueMap::from_iter([(1, 10), (2, 20), (3, 30)]);
 
         map.map_values(|_, _| 42);
 
-        assert_eq!(map.values.as_ref(), &[42, 42, 42]);
+        assert_eq!(map.values.as_ref(), &[42]);
         assert_eq!(
             map.iter().collect::<Vec<_>>(),
             vec![(1, 42), (2, 42), (3, 42)]
@@ -250,16 +300,13 @@ mod tests {
     }
 
     #[test]
-    fn frozen_parallel_map_uses_less_heap_for_aligned_values() {
-        let entries = [
-            (1, [1_u64; 8]),
-            (2, [1_u64; 8]),
-            (3, [1_u64; 8]),
-            (4, [2_u64; 8]),
-        ];
+    fn frozen_value_map_uses_less_heap_for_repeated_large_values() {
+        let entries = [(1, [1; 8]), (2, [1; 8]), (3, [1; 8]), (4, [2; 8])];
         let direct = FrozenMap::from_iter(entries);
-        let parallel = FrozenParallelMap::from_iter(entries);
+        let deduplicated = FrozenValueMap::from_iter(entries);
 
-        assert!(ruff_memory_usage::heap_size(&parallel) < ruff_memory_usage::heap_size(&direct));
+        assert!(
+            ruff_memory_usage::heap_size(&deduplicated) < ruff_memory_usage::heap_size(&direct)
+        );
     }
 }

@@ -23,7 +23,7 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
-    ExpressionInferenceExtra, FrozenMap, FrozenParallelMap, FrozenSet, FunctionDecoratorInference,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FrozenValueMap, FunctionDecoratorInference,
     InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
@@ -10709,7 +10709,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenParallelMap::from(expressions),
+            expressions: FrozenValueMap::from(expressions),
             extra,
         }
     }
