@@ -6049,20 +6049,37 @@ def _(
 Extra items behave like non-required items for methods that mutate a specific literal key.
 
 ```py
+from typing import Literal
 from typing_extensions import TypedDict
 
 class Extra(TypedDict, extra_items=int):
     name: str
 
+class ListExtra(TypedDict, extra_items=list[int]):
+    name: str
+
 class ArbitraryPop(TypedDict, total=False, extra_items=int):
     label: str
 
-def _(extra: Extra, arbitrary: ArbitraryPop, key: str) -> None:
+def _(
+    extra: Extra,
+    list_extra: ListExtra,
+    arbitrary: ArbitraryPop,
+    literal_key: Literal["values"],
+    key: str,
+) -> None:
     reveal_type(extra.get("year"))  # revealed: int | None
     reveal_type(extra.get("year", "missing"))  # revealed: int | Literal["missing"]
     reveal_type(extra.pop("year"))  # revealed: int
     reveal_type(extra.pop("year", "missing"))  # revealed: int | Literal["missing"]
     reveal_type(extra.setdefault("year", 1982))  # revealed: int
+
+    reveal_type(list_extra.get(literal_key))  # revealed: list[int] | None
+    reveal_type(list_extra.get(literal_key, []))  # revealed: list[int]
+    reveal_type(list_extra.pop(literal_key))  # revealed: list[int]
+    reveal_type(list_extra.pop(literal_key, []))  # revealed: list[int]
+    reveal_type(list_extra.setdefault(literal_key, []))  # revealed: list[int]
+
     reveal_type(arbitrary.pop(key))  # revealed: str | int
     reveal_type(arbitrary.pop(key, 0))  # revealed: str | int
     reveal_type(arbitrary.pop(key, None))  # revealed: str | int | None

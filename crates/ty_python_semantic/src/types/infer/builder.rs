@@ -8195,12 +8195,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Validate the key argument for `TypedDict` methods
                 && let Some(first_arg) = arguments.args.first()
-                    && let ast::Expr::StringLiteral(ast::ExprStringLiteral {
+                && let Some(key) = (match first_arg {
+                    ast::Expr::StringLiteral(ast::ExprStringLiteral {
                         value: key_literal,
                         ..
-                    }) = first_arg
+                    }) => Some(key_literal.to_str()),
+                    _ => self
+                        .speculate()
+                        .get_or_infer_expression(first_arg, TypeContext::default())
+                        .as_string_literal()
+                        .map(|key_literal| key_literal.value(self.db())),
+                })
             {
-                let key = key_literal.to_str();
                 let items = typed_dict_ty.items(self.db());
                 let is_declared = items.contains_key(key);
 
@@ -8222,7 +8228,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && matches!(arguments.args.len(), 1 | 2)
                     {
                         let default_ty = if let Some(default) = arguments.args.get(1) {
-                            self.get_or_infer_expression(default, TypeContext::default())
+                            self.get_or_infer_expression(
+                                default,
+                                TypeContext::new(Some(field.declared_ty)),
+                            )
                         } else {
                             Type::none(self.db())
                         };
@@ -8249,7 +8258,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             field.declared_ty,
                                             self.get_or_infer_expression(
                                                 default,
-                                                TypeContext::default(),
+                                                TypeContext::new(Some(field.declared_ty)),
                                             ),
                                         )
                                     },
