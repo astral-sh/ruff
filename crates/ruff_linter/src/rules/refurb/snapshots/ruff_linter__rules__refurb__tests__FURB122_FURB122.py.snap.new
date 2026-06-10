@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+assertion_line: 66
 ---
 FURB122 [*] Use of `f.write` in a for loop
   --> FURB122.py:10:9

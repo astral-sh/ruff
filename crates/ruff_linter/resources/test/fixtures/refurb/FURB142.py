@@ -65,6 +65,10 @@ for x in (1, 2, 3):
 else:
     pass
 
+# x is used outside the loop. Don't flag.
+for x in (1, 2, 3):
+    s.add(x)
+print(x)
 
 async def f(y):
     async for x in y:
