@@ -144,6 +144,28 @@ pub enum TypedDictModule {
 }
 
 impl TypedDictModule {
+    /// Return the module for a `TypedDict` special form, including a union of the special forms
+    /// exported by `typing` and `typing_extensions`.
+    pub(crate) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        match ty {
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(module),
+            Type::Union(union) => {
+                let mut elements = union.elements(db).iter();
+                let Type::SpecialForm(SpecialFormType::TypedDict(module)) = elements.next()? else {
+                    return None;
+                };
+                elements.try_fold(*module, |module, element| {
+                    let Type::SpecialForm(SpecialFormType::TypedDict(element_module)) = element
+                    else {
+                        return None;
+                    };
+                    Some(module.union(*element_module))
+                })
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) const fn union(self, other: Self) -> Self {
         match (self, other) {
             (Self::Typing, Self::Typing) => Self::Typing,
@@ -154,13 +176,6 @@ impl TypedDictModule {
 }
 
 impl SpecialFormType {
-    pub(crate) const fn typed_dict_module(self) -> Option<TypedDictModule> {
-        match self {
-            Self::TypedDict(module) => Some(module),
-            _ => None,
-        }
-    }
-
     /// Return the [`KnownClass`] which this symbol is an instance of
     pub(crate) const fn class(self) -> KnownClass {
         match self {
