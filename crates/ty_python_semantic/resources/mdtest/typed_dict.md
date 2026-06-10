@@ -5452,11 +5452,12 @@ Iterating over the keys produces a `Literal` type; iterating the values produces
 value types.
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import Never, NotRequired, TypedDict
 
 class Closed(TypedDict, closed=True):
     name: str
     age: int
+    absent: NotRequired[Never]
 
 def _(closed: Closed) -> None:
     reveal_type(closed.keys())  # revealed: dict_keys[Literal["age", "name"], int | str]
@@ -5543,6 +5544,7 @@ static_assert(is_equivalent_to(AliasedExtra, Closed))
 ### Empty closed TypedDict truthiness
 
 An empty `closed=True` TypedDict cannot contain any keys, so it is always empty and always falsy.
+The same is true if all of its fields are `NotRequired[Never]`.
 
 ```py
 from typing_extensions import Never, NotRequired, TypedDict
@@ -5553,17 +5555,22 @@ class EmptyByNever(TypedDict, extra_items=Never): ...
 class OptionalClosed(TypedDict, closed=True):
     value: NotRequired[int]
 
+class ImpossibleOptionalClosed(TypedDict, closed=True):
+    value: NotRequired[Never]
+
 class EmptyOpen(TypedDict): ...
 
 def _(
     empty: Empty,
     empty_by_never: EmptyByNever,
     optional_closed: OptionalClosed,
+    impossible_optional_closed: ImpossibleOptionalClosed,
     empty_open: EmptyOpen,
 ) -> None:
     reveal_type(bool(empty))  # revealed: Literal[False]
     reveal_type(bool(empty_by_never))  # revealed: Literal[False]
     reveal_type(bool(optional_closed))  # revealed: bool
+    reveal_type(bool(impossible_optional_closed))  # revealed: Literal[False]
     reveal_type(bool(empty_open))  # revealed: bool
 ```
 

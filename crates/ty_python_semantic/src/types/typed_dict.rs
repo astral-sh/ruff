@@ -343,8 +343,9 @@ impl<'db> TypedDictType<'db> {
         }
 
         self.items(db)
-            .keys()
-            .fold(UnionBuilder::new(db), |builder, name| {
+            .iter()
+            .filter(|(_, field)| field.may_be_present(db))
+            .fold(UnionBuilder::new(db), |builder, (name, _)| {
                 builder.add(Type::string_literal(db, name))
             })
             .build()
@@ -3000,6 +3001,11 @@ impl<'db> TypedDictField<'db> {
 
     pub(crate) const fn is_read_only(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::READ_ONLY)
+    }
+
+    /// Returns `false` for optional fields whose declared type is uninhabited.
+    pub(crate) fn may_be_present(&self, db: &'db dyn Db) -> bool {
+        self.is_required() || !self.declared_ty.resolve_type_alias(db).is_never()
     }
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {
