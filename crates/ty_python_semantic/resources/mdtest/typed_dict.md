@@ -5477,6 +5477,7 @@ def _(closed: Closed) -> None:
         reveal_type(value)  # revealed: int | str
 
     for item in closed.items():
+        # TODO: should be `tuple[Literal["name"], str] | tuple[Literal["age"], int]`
         reveal_type(item)  # revealed: tuple[Literal["age", "name"], int | str]
 ```
 
