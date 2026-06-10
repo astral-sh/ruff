@@ -5706,6 +5706,12 @@ The functional syntax also supports `extra_items`:
 
 ```py
 MovieFunctional = TypedDict("MovieFunctional", {"name": str}, extra_items=bool)
+FunctionalIntDict = TypedDict(
+    "FunctionalIntDict",
+    {"count": int},
+    total=False,
+    extra_items=int,
+)
 NonIdentifierFunctional = TypedDict(
     "NonIdentifierFunctional",
     {"x-y": str},
@@ -5713,6 +5719,8 @@ NonIdentifierFunctional = TypedDict(
 )
 
 d: MovieFunctional = {"name": "Blade Runner", "novel_adaptation": True}
+functional_int_dict: FunctionalIntDict = {}
+reveal_type(functional_int_dict.copy())  # revealed: FunctionalIntDict
 NonIdentifierFunctional(**{"x-y": "ok", "other": 1})
 
 # error: [invalid-argument-type]
@@ -6435,6 +6443,7 @@ static_assert(not is_equivalent_to(dict[str, int], IntDict))
 
 def _(int_dict_with_num: IntDictWithNum, key: str) -> None:
     v: dict[str, int] = int_dict_with_num
+    reveal_type(int_dict_with_num.copy())  # revealed: IntDictWithNum
     int_dict_with_num.clear()
     reveal_type(int_dict_with_num.popitem())  # revealed: tuple[str, int]
     int_dict_with_num[key] = 42

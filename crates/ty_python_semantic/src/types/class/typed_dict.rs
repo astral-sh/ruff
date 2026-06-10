@@ -979,6 +979,19 @@ pub(super) fn typed_dict_class_member<'db>(
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
+    let fallback_member = KnownClass::TypedDictFallback
+        .to_class_literal(db)
+        .find_name_in_mro_with_policy(db, name, lookup_policy)
+        .expect("Will return Some() when called on class literal")
+        .map_type(|ty| {
+            let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
+            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+            ty.apply_type_mapping(db, &mapping, TypeContext::default())
+        });
+    if !fallback_member.is_undefined() {
+        return fallback_member;
+    }
+
     if let Some(value_ty) = typed_dict.dict_value_type(db)
         && let Some(dict_class) = KnownClass::Dict
             .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), value_ty])
@@ -989,13 +1002,5 @@ pub(super) fn typed_dict_class_member<'db>(
         }
     }
 
-    KnownClass::TypedDictFallback
-        .to_class_literal(db)
-        .find_name_in_mro_with_policy(db, name, lookup_policy)
-        .expect("Will return Some() when called on class literal")
-        .map_type(|ty| {
-            let new_upper_bound = determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
-            let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
-            ty.apply_type_mapping(db, &mapping, TypeContext::default())
-        })
+    fallback_member
 }
