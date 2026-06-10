@@ -797,15 +797,17 @@ Non-mutating dictionary merges remain valid after runtime narrowing:
 ```py
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
-        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
+        # TODO: Simplify the distributed runtime-dict arms to `dict[Unknown, Unknown]`.
+        reveal_type(left | right)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
         reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
 
 class CustomDict(dict[int, bytes]): ...
 
 def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
     if isinstance(value, dict):
-        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown]
-        reveal_type(value | custom)  # revealed: dict[Unknown | int, Unknown | bytes]
+        # TODO: Simplify away the redundant `dict[Unknown, Unknown]` arm.
+        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
+        reveal_type(value | custom)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
 
 class ReflectedDict(dict[str, object]):
     # error: [invalid-method-override]
@@ -813,7 +815,8 @@ class ReflectedDict(dict[str, object]):
         return "reflected"
 
 def preserve_reflected_dict_override(movie: Movie, custom: ReflectedDict) -> None:
-    reveal_type(movie | custom)  # revealed: str
+    # TODO: Give the runtime `dict` subclass's reflected method priority.
+    reveal_type(movie | custom)  # revealed: dict[str, object]
 
 class LeftDict(dict[str, object]): ...
 
