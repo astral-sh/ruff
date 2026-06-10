@@ -467,6 +467,29 @@ impl<'a> FieldBuilder<'a> {
                 ty: ty.map(|ty| ty.to_compact_string()),
                 description: body,
             },
+            FieldKind::ParameterType { lookup_name } => Field::ParameterType {
+                lookup_name: lookup_name.to_compact_string(),
+                ty: body,
+            },
+            FieldKind::Attribute { name, ty } => Field::Attribute {
+                name: name.to_compact_string(),
+                ty: ty.map(|ty| ty.to_compact_string()),
+                description: body,
+            },
+            FieldKind::AttributeType { name } => Field::AttributeType {
+                name: name.to_compact_string(),
+                ty: body,
+            },
+            FieldKind::Returns { name } => Field::Returns {
+                name: name.map(|name| name.to_compact_string()),
+                description: body,
+            },
+            FieldKind::ReturnType => Field::ReturnType { ty: body },
+            FieldKind::Raises { exception } => Field::Raises {
+                exception: exception.map(|exception| exception.to_compact_string()),
+                description: body,
+            },
+            FieldKind::Metadata => Field::Metadata,
             FieldKind::Unknown { name, argument } => Field::Unknown {
                 name: name.to_compact_string(),
                 argument: argument.to_compact_string(),
@@ -609,6 +632,24 @@ enum FieldKind<'a> {
         lookup_name: &'a str,
         ty: Option<&'a str>,
     },
+    ParameterType {
+        lookup_name: &'a str,
+    },
+    Attribute {
+        name: &'a str,
+        ty: Option<&'a str>,
+    },
+    AttributeType {
+        name: &'a str,
+    },
+    Returns {
+        name: Option<&'a str>,
+    },
+    ReturnType,
+    Raises {
+        exception: Option<&'a str>,
+    },
+    Metadata,
     Unknown {
         name: &'a str,
         argument: &'a str,
@@ -616,7 +657,7 @@ enum FieldKind<'a> {
 }
 
 impl<'a> FieldKind<'a> {
-    /// Categorizes a parsed field as a supported parameter field or an unknown field.
+    /// Categorizes a parsed field as a supported field or an unknown field.
     fn parse(name: &'a str, argument: &'a str) -> Self {
         match name {
             "param" | "parameter" | "arg" | "argument" | "key" | "keyword" | "kwarg"
@@ -627,6 +668,33 @@ impl<'a> FieldKind<'a> {
                     ty,
                 })
                 .unwrap_or(Self::Unknown { name, argument }),
+            "type" | "paramtype" => Self::parse_parameter_name(argument)
+                .map(|name| Self::ParameterType {
+                    lookup_name: name.lookup,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "var" | "ivar" | "cvar" => Self::parse_attribute_argument(argument)
+                .map(|(ty, attribute_name)| Self::Attribute {
+                    name: attribute_name,
+                    ty,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "vartype" => Self::parse_attribute_name(argument)
+                .map(|attribute_name| Self::AttributeType {
+                    name: attribute_name,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "return" | "returns" => Self::Returns {
+                name: Self::parse_parameter_name(argument).map(|name| name.lookup),
+            },
+            "rtype" => Self::ReturnType,
+            "raises" | "raise" | "except" | "exception" => {
+                let exception = argument.trim();
+                Self::Raises {
+                    exception: (!exception.is_empty()).then_some(exception),
+                }
+            }
+            "meta" => Self::Metadata,
             _ => Self::Unknown { name, argument },
         }
     }
@@ -639,12 +707,12 @@ impl<'a> FieldKind<'a> {
             return None;
         }
 
-        let (ty, name) = Self::split_parameter_type_and_name(argument);
+        let (ty, name) = Self::split_type_and_name(argument);
         Some((ty, Self::parse_parameter_name(name)?))
     }
 
-    /// Splits up a field argument into an optional parameter type and a parameter name.
-    fn split_parameter_type_and_name(argument: &'a str) -> (Option<&'a str>, &'a str) {
+    /// Splits up a field argument into an optional type and name.
+    fn split_type_and_name(argument: &'a str) -> (Option<&'a str>, &'a str) {
         for (index, char) in argument.char_indices().rev() {
             if char.is_whitespace() {
                 let ty = argument[..index].trim();
@@ -654,6 +722,21 @@ impl<'a> FieldKind<'a> {
         }
 
         (None, argument)
+    }
+
+    fn parse_attribute_argument(argument: &'a str) -> Option<(Option<&'a str>, &'a str)> {
+        let argument = argument.trim();
+        if argument.is_empty() {
+            return None;
+        }
+
+        let (ty, name) = Self::split_type_and_name(argument);
+        Some((ty, Self::parse_attribute_name(name)?))
+    }
+
+    fn parse_attribute_name(name: &'a str) -> Option<&'a str> {
+        let name = name.trim();
+        (!name.is_empty()).then_some(name)
     }
 
     /// Normalizes a parameter name into display and lookup identifiers.
@@ -673,6 +756,31 @@ enum Field {
         ty: Option<CompactString>,
         description: String,
     },
+    ParameterType {
+        lookup_name: CompactString,
+        ty: String,
+    },
+    Attribute {
+        name: CompactString,
+        ty: Option<CompactString>,
+        description: String,
+    },
+    AttributeType {
+        name: CompactString,
+        ty: String,
+    },
+    Returns {
+        name: Option<CompactString>,
+        description: String,
+    },
+    ReturnType {
+        ty: String,
+    },
+    Raises {
+        exception: Option<CompactString>,
+        description: String,
+    },
+    Metadata,
     Unknown {
         name: CompactString,
         argument: CompactString,
@@ -812,12 +920,18 @@ mod tests {
         let parsed = Docstring::parse(
             "\
 :param tuple[str, ...] *args: Extra positional arguments.
+:type args: tuple[str, ...]
+:var dict[str, int] cache: Cached values.
+:vartype cache: dict[str, int]
+:returns result: Return description.
+:rtype: str
+:raises ValueError: Error description.
 :meta private:
 :unknown with argument: Unknown description.",
         );
 
         assert_eq!(parsed.field_lists[0].start_line, 0);
-        assert_eq!(parsed.field_lists[0].end_line, 3);
+        assert_eq!(parsed.field_lists[0].end_line, 9);
         assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
         [
             Parameter {
@@ -828,11 +942,37 @@ mod tests {
                 ),
                 description: "Extra positional arguments.",
             },
-            Unknown {
-                name: "meta",
-                argument: "private",
-                body: "",
+            ParameterType {
+                lookup_name: "args",
+                ty: "tuple[str, ...]",
             },
+            Attribute {
+                name: "cache",
+                ty: Some(
+                    "dict[str, int]",
+                ),
+                description: "Cached values.",
+            },
+            AttributeType {
+                name: "cache",
+                ty: "dict[str, int]",
+            },
+            Returns {
+                name: Some(
+                    "result",
+                ),
+                description: "Return description.",
+            },
+            ReturnType {
+                ty: "str",
+            },
+            Raises {
+                exception: Some(
+                    "ValueError",
+                ),
+                description: "Error description.",
+            },
+            Metadata,
             Unknown {
                 name: "unknown",
                 argument: "with argument",
