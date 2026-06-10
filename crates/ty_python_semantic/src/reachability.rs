@@ -267,9 +267,14 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
+    let excluded_ty = definite_match_pattern_type(db, predicate.kind(db));
+    if excluded_ty == Type::Never {
+        return subject_ty;
+    }
+
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .add_negative(excluded_ty)
         .build()
 }
 
@@ -934,7 +939,13 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
-                UnionType::from_two_elements(self.db, true_ty, false_ty)
+                if true_ty == false_ty || false_ty == Type::Never {
+                    true_ty
+                } else if true_ty == Type::Never {
+                    false_ty
+                } else {
+                    UnionType::from_two_elements(self.db, true_ty, false_ty)
+                }
             }
         }
     }
@@ -1114,6 +1125,14 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
                 no_overloads_return_never &= !returns_never;
                 all_overloads_return_never &= returns_never;
                 any_overload_is_generic |= overload.return_ty.has_typevar(db);
+
+                // Once neither return-type shortcut can apply, the remaining overloads cannot
+                // change the fact that we need to infer the call expression.
+                let must_infer_call = !all_overloads_return_never
+                    && (is_await || !no_overloads_return_never || any_overload_is_generic);
+                if must_infer_call {
+                    break;
+                }
             }
 
             if no_overloads_return_never && !any_overload_is_generic && !is_await {
