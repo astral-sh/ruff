@@ -70,7 +70,7 @@ def _(x: A | B | C):
 
     # Only the if-branch (A) and elif-branch (B) flow through.
     # The else-branch returned, so its narrowing doesn't participate.
-    reveal_type(x)  # revealed: (B & ~A) | A
+    reveal_type(x)  # revealed: B | A
 ```
 
 ## Narrowing is preserved with multiple terminal branches
