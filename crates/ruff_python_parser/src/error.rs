@@ -203,9 +203,6 @@ pub enum ParseErrorType {
     TStringError(InterpolatedStringErrorType),
     /// Parser encountered an error during lexing.
     Lexical(LexicalErrorType),
-
-    /// Parser aborted because [`crate::ParseOptions::max_recursion_depth`] was exceeded.
-    RecursionLimitExceeded,
 }
 
 impl ParseErrorType {
@@ -336,7 +333,6 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedExpressionToken => {
                 write!(f, "Unexpected token at the end of an expression")
             }
-            ParseErrorType::RecursionLimitExceeded => f.write_str("Source is too deeply nested"),
         }
     }
 }

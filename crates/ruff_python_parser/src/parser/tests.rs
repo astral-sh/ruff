@@ -1,6 +1,4 @@
-use ruff_python_ast::Stmt;
-
-use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
+use crate::{Mode, ParseOptions, RECURSIVE_AST_TEST_DEPTH, parse, parse_expression, parse_module};
 
 #[test]
 fn test_modes() {
@@ -182,225 +180,115 @@ fn test_tstring_fstring_middle_fuzzer() {
     insta::assert_debug_snapshot!(error);
 }
 
-#[test]
-fn recursion_limit_nested_parens() {
-    let src = format!("{}1{}", "(".repeat(1_000), ")".repeat(1_000));
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
-}
+// `stacker` is a no-op on unsupported platforms, so only require stack
+// growth where its native support is well established.
+#[cfg(any(target_os = "linux", target_os = "macos", target_os = "windows"))]
+mod stack_growth {
+    use super::*;
 
-#[test]
-fn recursion_limit_normal_python_unaffected() {
-    // 50 levels is well above what real-world Python ever produces and well
-    // below the default cap — the point is to confirm the default doesn't
-    // reject ordinary input.
-    let src = format!("x = {}1{}", "(".repeat(50), ")".repeat(50));
-    parse_module(&src).unwrap();
-}
-
-#[test]
-fn recursion_limit_preserves_prior_statements() {
-    // Recursion-limit recovery is limited for now: we drain the rest of the file but keep the
-    // statements parsed before the overflowing statement.
-    // TODO: Recover at the next newline so the trailing statement is preserved too.
-    let src = format!(
-        "before = 1\n{}1{}\nafter = 2\n",
-        "(".repeat(1_000),
-        ")".repeat(1_000),
-    );
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let parsed = crate::parse_unchecked(&src, opts)
-        .try_into_module()
-        .unwrap();
-
-    assert!(matches!(
-        parsed.errors().first().map(|error| &error.error),
-        Some(ParseErrorType::RecursionLimitExceeded)
-    ));
-    assert!(matches!(parsed.suite().first(), Some(Stmt::Assign(_))));
-}
-
-#[test]
-fn recursion_limit_nested_def_blocks() {
-    // Nested function definitions exercise instrumentation on
-    // `parse_statement` rather than `parse_lhs_expression`. Each level
-    // needs one more leading tab to make indentation valid.
-    let depth = 400;
-    let mut src = String::new();
-    for i in 0..depth {
-        src.push_str(&"\t".repeat(i));
-        src.push_str("def f():\n");
+    #[test]
+    fn nested_parens() {
+        let source = format!(
+            "{}1{}",
+            "(".repeat(RECURSIVE_AST_TEST_DEPTH),
+            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
     }
-    src.push_str(&"\t".repeat(depth));
-    src.push_str("pass\n");
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
-}
 
-#[test]
-fn recursion_limit_nested_lists() {
-    let src = format!("{}1{}", "[".repeat(1_000), "]".repeat(1_000));
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
-}
-
-#[test]
-fn recursion_limit_nested_calls() {
-    let src = format!("x = {}1{}", "f(".repeat(1_000), ")".repeat(1_000));
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
-}
-
-#[test]
-fn recursion_limit_nested_subscripts() {
-    let src = format!("x = {}1{}", "a[".repeat(1_000), "]".repeat(1_000));
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
-}
-
-#[test]
-fn recursion_limit_nested_match_patterns() {
-    // Deeply parenthesised match patterns — exercises pattern-parsing
-    // instrumentation in addition to statement / expression paths.
-    let mut src = String::from("match x:\n case ");
-    for _ in 0..600 {
-        src.push('(');
+    #[test]
+    fn nested_lists() {
+        let source = format!(
+            "{}1{}",
+            "[".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
     }
-    src.push('y');
-    for _ in 0..600 {
-        src.push(')');
+
+    #[test]
+    fn nested_dictionaries() {
+        let source = format!(
+            "{}1{}",
+            "{'x':".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "}".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
     }
-    src.push_str(": pass\n");
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+
+    #[test]
+    fn unclosed_lists() {
+        // Invalid input does not return a deeply nested AST that must be dropped
+        // on the test thread, so this does not need the lower Windows limit.
+        let source = "[".repeat(5_000);
+        assert!(parse_module(&source).is_err());
+    }
+
+    #[test]
+    fn nested_calls() {
+        let source = format!(
+            "x = {}1{}",
+            "f(".repeat(RECURSIVE_AST_TEST_DEPTH),
+            ")".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn nested_subscripts() {
+        let source = format!(
+            "x = {}1{}",
+            "a[".repeat(RECURSIVE_AST_TEST_DEPTH),
+            "]".repeat(RECURSIVE_AST_TEST_DEPTH)
+        );
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn binary_paren_interplay() {
+        // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
+        // parenthesised sub-expression, exactly like the pattern described in
+        // the tracking issue.
+        let depth = RECURSIVE_AST_TEST_DEPTH;
+        let mut source = String::new();
+        for _ in 0..depth {
+            source.push_str("1+(");
+        }
+        source.push('1');
+        for _ in 0..depth {
+            source.push(')');
+        }
+        parse_module(&source).unwrap();
+    }
+
+    #[test]
+    fn ternary_else_chain() {
+        // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
+        // conditional layer (`parse_if_expression` -> `orelse`).
+        let depth = RECURSIVE_AST_TEST_DEPTH;
+        let mut source = String::with_capacity(depth * 12 + 1);
+        for _ in 0..depth {
+            source.push_str("1 if 1 else ");
+        }
+        source.push('1');
+        parse_module(&source).unwrap();
+    }
 }
 
 #[test]
-fn recursion_limit_binary_paren_interplay() {
-    // `1+(1+(1+(1+...)))` — each level alternates a binary operator and a
-    // parenthesised sub-expression, exactly like the pattern described in
-    // the tracking issue.
-    let depth = 2_000;
-    let mut src = String::new();
-    for _ in 0..depth {
-        src.push_str("1+(");
-    }
-    src.push('1');
-    for _ in 0..depth {
-        src.push(')');
-    }
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(matches!(err.error, ParseErrorType::RecursionLimitExceeded));
+fn invalid_async_chain_is_iterative() {
+    // Invalid repeated `async` prefixes are recovered iteratively.
+    let source = format!("{}x = 1\n", "async ".repeat(5_000));
+    let parsed = crate::parse_unchecked(&source, ParseOptions::from(Mode::Module));
+    assert!(!parsed.errors().is_empty());
 }
 
 #[test]
-fn recursion_limit_first_error_is_recursion_not_noise() {
-    // When the limit is hit the outer parser frames will emit secondary
-    // errors as they unwind. Callers read the first error via `into_result`
-    // / `Parsed::errors()`, so `RecursionLimitExceeded` must come first, and
-    // the drain-to-EOF after reporting the recursion limit should keep the total count
-    // small rather than producing one noisy error per unwound frame.
-    let src = format!("{}1{}", "(".repeat(2_000), ")".repeat(2_000));
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(50);
-    let parsed = crate::parse_unchecked(&src, opts);
-    let errors = parsed.errors();
-    let first = errors.first().expect("expected at least one error");
-    assert!(matches!(
-        first.error,
-        ParseErrorType::RecursionLimitExceeded
-    ));
-    // Exactly one `RecursionLimitExceeded` — guards against a regression
-    // where the unwind loops and re-triggers the limit check.
-    let recursion_errors = errors
-        .iter()
-        .filter(|e| matches!(e.error, ParseErrorType::RecursionLimitExceeded))
-        .count();
-    assert_eq!(recursion_errors, 1);
-    // Small, bounded tail of follow-up errors from the unwinding frames.
-    // Today this is 0; the generous cap is a regression gate, not a spec.
-    assert!(
-        errors.len() <= 8,
-        "expected a small number of errors, got {}: {errors:?}",
-        errors.len(),
-    );
-}
+fn nested_equal_precedence_unary_chains_are_iterative() {
+    // Consecutive unary operators sharing precedence do not require stack growth.
+    let source = format!("{}1\n", "-~+".repeat(RECURSIVE_AST_TEST_DEPTH));
+    parse_module(&source).unwrap();
 
-#[test]
-fn recursion_limit_default_set() {
-    let opts = ParseOptions::from(Mode::Module);
-    // Guards against someone accidentally unsetting the default. Real-world
-    // Python never approaches this depth, and the value must stay within the
-    // threading stack's capacity — see the const's docs in `options.rs`.
-    assert!(opts.max_recursion_depth() >= 200);
-    assert!(opts.max_recursion_depth() <= 2000);
-}
-
-#[test]
-fn recursion_limit_right_assoc_pow_chain() {
-    // `1**1**1**...**1` — `**` is right-associative, so the right operand
-    // is parsed by a recursive `parse_binary_expression_or_higher` call
-    // *without* any intervening parentheses or atom nesting. This exercises
-    // the binary-expression recursion path directly, unlike the
-    // `1+(1+(...))` interplay test which recurses through parenthesised
-    // atoms.
-    let depth = 2_000;
-    let mut src = String::with_capacity(depth * 3 + 1);
-    for _ in 0..depth {
-        src.push_str("1**");
-    }
-    src.push('1');
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(
-        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
-        "expected RecursionLimitExceeded, got {:?}",
-        err.error
-    );
-}
-
-#[test]
-fn recursion_limit_ternary_else_chain() {
-    // `1 if 1 else 1 if 1 else ...` — the `else` operand recurses at the
-    // conditional layer (`parse_if_expression` -> `orelse`), which is not
-    // covered by the `parse_lhs_expression` guard.
-    let depth = 2_000;
-    let mut src = String::with_capacity(depth * 12 + 1);
-    for _ in 0..depth {
-        src.push_str("1 if 1 else ");
-    }
-    src.push('1');
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(
-        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
-        "expected RecursionLimitExceeded, got {:?}",
-        err.error
-    );
-}
-
-#[test]
-fn recursion_limit_nested_lambda_chain() {
-    // `lambda: lambda: lambda: ...` — the lambda body recurses at the
-    // conditional layer (`parse_lambda_expr` -> body), bypassing the
-    // `parse_lhs_expression` guard entirely.
-    let depth = 2_000;
-    let mut src = String::from("x = ");
-    for _ in 0..depth {
-        src.push_str("lambda: ");
-    }
-    src.push('1');
-    let opts = ParseOptions::from(Mode::Module).with_max_recursion_depth(100);
-    let err = parse(&src, opts).unwrap_err();
-    assert!(
-        matches!(err.error, ParseErrorType::RecursionLimitExceeded),
-        "expected RecursionLimitExceeded, got {:?}",
-        err.error
-    );
+    let source = format!("{}True\n", "not ".repeat(RECURSIVE_AST_TEST_DEPTH));
+    parse_module(&source).unwrap();
 }
