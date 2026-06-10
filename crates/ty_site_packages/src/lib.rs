@@ -238,7 +238,8 @@ fn is_versioned_interpreter_path(file_name: &str) -> bool {
     !version.is_empty() && PythonVersion::from_str(version.trim_end_matches('t')).is_ok()
 }
 
-/// Extract the Python version from a path that looks like a versioned Python executable.
+/// Extract the Python version from a path that looks like a versioned Python executable,
+/// following symlinks if the filename itself isn't versioned.
 ///
 /// For example:
 /// - `/opt/bin/python3.14` -> `Some(PythonVersion(3, 14))`
@@ -247,21 +248,34 @@ fn is_versioned_interpreter_path(file_name: &str) -> bool {
 /// - `.venv/bin/python3.12` -> `Some(PythonVersion(3, 12))`
 /// - `/opt/bin/python3.13t` -> `Some(PythonVersion(3, 13))` (free-threaded)
 /// - `C:\Python3.14\python3.14.exe` -> `Some(PythonVersion(3, 14))` (Windows)
-fn python_version_from_executable_path(path: &SystemPath) -> Option<PythonVersion> {
-    let file_name = path.file_name()?;
-    // Strip the platform-specific executable suffix (e.g. `.exe` on Windows)
-    // so that `python3.14.exe` is parsed the same as `python3.14`.
-    let file_name = file_name
-        .strip_suffix(std::env::consts::EXE_SUFFIX)
-        .unwrap_or(file_name);
-    let version_str = file_name
-        .strip_prefix("python")
-        .or_else(|| file_name.strip_prefix("pypy"))?
-        .trim_end_matches('t');
-    if version_str.is_empty() {
-        return None;
+/// - `/usr/bin/python3` (symlink to `python3.14`) -> `Some(PythonVersion(3, 14))`
+fn python_version_from_executable_path(
+    path: &SystemPath,
+    system: &dyn System,
+) -> Option<PythonVersion> {
+    let extract = |file_name: &str| -> Option<PythonVersion> {
+        let file_name = file_name
+            .strip_suffix(std::env::consts::EXE_SUFFIX)
+            .unwrap_or(file_name);
+        let version_str = file_name
+            .strip_prefix("python")
+            .or_else(|| file_name.strip_prefix("pypy"))?
+            .trim_end_matches('t');
+        if version_str.is_empty() {
+            return None;
+        }
+        PythonVersion::from_str(version_str).ok()
+    };
+
+    // try extracting version from the path filename directly.
+    if let Some(version) = extract(path.file_name()?) {
+        return Some(version);
     }
-    PythonVersion::from_str(version_str).ok()
+
+    // if the filename isn't directly versioned, it might be a symlink
+    // then follow it and try again on the real target.
+    let canonical = system.canonicalize_path(path).ok()?;
+    extract(canonical.file_name()?)
 }
 
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
@@ -376,7 +390,7 @@ impl PythonEnvironment {
         // Extract the Python version from the executable path (e.g. `python3.14` → 3.14)
         // BEFORE it gets resolved to sys.prefix, so we can still identify the correct
         // site-packages directory even for system installations without pyvenv.cfg.
-        let python_version = python_version_from_executable_path(path.as_ref());
+        let python_version = python_version_from_executable_path(path.as_ref(), system);
         let path = SysPrefixPath::new(path.as_ref(), origin, system)?;
 
         // Attempt to inspect as a virtual environment first
