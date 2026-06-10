@@ -3504,14 +3504,31 @@ class TD2(TD1):
 def func(**kwargs: Unpack[TD2]) -> None:
     pass
 
+class ExtraTD(TypedDict, extra_items=int):
+    name: str
+
+def extra_typed_dict(**kwargs: Unpack[ExtraTD]) -> None:
+    pass
+
+def extra_explicit(*, name: str, **kwargs: int) -> None:
+    pass
+
 class ExplicitKwargs(Protocol):
     def __call__(self, *, v1: int, v3: str, v2: str = "") -> None: ...
 
 class TypedDictKwargs(Protocol):
     def __call__(self, **kwargs: Unpack[TD2]) -> None: ...
 
+class ExtraExplicitKwargs(Protocol):
+    def __call__(self, *, name: str, **kwargs: int) -> None: ...
+
+class ExtraTypedDictKwargs(Protocol):
+    def __call__(self, **kwargs: Unpack[ExtraTD]) -> None: ...
+
 explicit_ok: ExplicitKwargs = func
 typed_dict_ok: TypedDictKwargs = func
+extra_explicit_from_typed_dict: ExtraExplicitKwargs = extra_typed_dict
+extra_typed_dict_from_explicit: ExtraTypedDictKwargs = extra_explicit
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -3520,6 +3537,8 @@ def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
     return callback
 
 preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
+preserved_extra_explicit: ExtraExplicitKwargs = preserve_signature(extra_typed_dict)
+preserved_extra_typed_dict: ExtraTypedDictKwargs = preserve_signature(extra_explicit)
 
 def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
     typed_dict_2: TypedDictKwargs = explicit  # error: [invalid-assignment]
@@ -3564,6 +3583,8 @@ traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source  
 
 partial_typed_dict_target: TypedDictKwargs = partial(func)
 partial_explicit_target: TypedDictKwargs = partial(func7)  # error: [invalid-assignment]
+partial_extra_explicit: ExtraExplicitKwargs = partial(extra_typed_dict)
+partial_extra_typed_dict: ExtraTypedDictKwargs = partial(extra_explicit)
 ```
 
 ### Missing required keys remain incompatible
