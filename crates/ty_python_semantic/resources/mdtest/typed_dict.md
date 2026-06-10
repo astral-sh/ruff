@@ -3512,6 +3512,14 @@ class TypedDictKwargs(Protocol):
 explicit_ok: ExplicitKwargs = func
 typed_dict_ok: TypedDictKwargs = func
 
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
+    return callback
+
+preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
+
 def _(explicit: ExplicitKwargs, typed_dict: TypedDictKwargs) -> None:
     typed_dict_2: TypedDictKwargs = explicit  # error: [invalid-assignment]
     explicit_2: ExplicitKwargs = typed_dict
@@ -3552,14 +3560,6 @@ def traditional_kwargs_source(**kwargs: int) -> None:
     pass
 
 traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source  # error: [invalid-assignment]
-
-P = ParamSpec("P")
-R = TypeVar("R")
-
-def preserve_signature(callback: Callable[P, R]) -> Callable[P, R]:
-    return callback
-
-preserved_typed_dict_target: TypedDictKwargs = preserve_signature(func)
 
 partial_typed_dict_target: TypedDictKwargs = partial(func)
 partial_explicit_target: TypedDictKwargs = partial(func7)  # error: [invalid-assignment]
