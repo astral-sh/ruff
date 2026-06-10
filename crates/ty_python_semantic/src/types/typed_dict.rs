@@ -2642,7 +2642,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
                             ));
                         }
                     }
-                } else if !typed_dict.openness(db).is_open() {
+                } else {
                     valid = false;
                     if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
                         builder.into_diagnostic(format_args!(
@@ -2774,9 +2774,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         }
 
         return unpacked_valid;
-    } else if !typed_dict.openness(db).is_open()
-        && let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(db)
-    {
+    } else if let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(db) {
         if !key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
             if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
                 builder.into_diagnostic(format_args!(
@@ -2787,14 +2785,16 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             return false;
         }
 
-        return validate_extracted_typed_dict_openness(
-            context,
-            typed_dict,
-            &BTreeMap::new(),
-            TypedDictOpenness::extra(db, value_ty, true),
-            nodes,
-            shadowed_keys,
-        );
+        if !typed_dict.openness(db).is_open() {
+            return validate_extracted_typed_dict_openness(
+                context,
+                typed_dict,
+                &BTreeMap::new(),
+                TypedDictOpenness::extra(db, value_ty, true),
+                nodes,
+                shadowed_keys,
+            );
+        }
     }
 
     true

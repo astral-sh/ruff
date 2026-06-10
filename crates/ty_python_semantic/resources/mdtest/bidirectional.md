@@ -222,7 +222,9 @@ d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
 # error: [missing-typed-dict-key]
 # error: [invalid-key]
 d9_invalid_mapping_key: TypedDictOrMapping = {"y": 5.2}
-d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}  # error: [missing-typed-dict-key]
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}
 
 def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
     pass

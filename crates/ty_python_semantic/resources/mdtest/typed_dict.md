@@ -567,6 +567,7 @@ class SharedKwargsTD(TypedDict):
     x: int
 
 # error: [invalid-argument-type]
+# error: [invalid-key] "TypedDict `SharedKwargsTD` requires string keys, got key of type `Literal[1]`"
 SharedKwargsTD(**{"x": 1, 1: 2})
 
 # error: [invalid-argument-type]
@@ -5692,13 +5693,16 @@ c: ClosedMovie = {"name": "Blade Runner", "year": 1982}
 ClosedMovie(name="Blade Runner", year=1982)
 ```
 
-Closed and extra-items TypedDicts also reject non-string keys:
+TypedDicts reject non-string keys regardless of their openness:
 
 ```py
 from typing_extensions import TypedDict
 
 class ExtraOnly(TypedDict, extra_items=int): ...
 class ClosedEmpty(TypedDict, closed=True): ...
+
+class OpenSource(TypedDict):
+    name: str
 
 # error: [invalid-key] "TypedDict `ExtraOnly` requires string keys, got key of type `Literal[1]`"
 extra: ExtraOnly = {1: 1}
@@ -5711,6 +5715,16 @@ ExtraOnly({1: 1})
 
 # error: [invalid-key] "TypedDict `ClosedEmpty` requires string keys, got key of type `Literal[1]`"
 ClosedEmpty({1: 1})
+
+# error: [invalid-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
+open_source: OpenSource = {"name": "x", 1: 1}
+
+# error: [invalid-key] "TypedDict `OpenSource` requires string keys, got key of type `Literal[1]`"
+OpenSource({"name": "x", 1: 1})
+
+def _(int_keys: dict[int, int]) -> None:
+    merged: OpenSource = {"name": "x", **int_keys}  # error: [invalid-argument-type]
+    OpenSource({"name": "x", **int_keys})  # error: [invalid-argument-type]
 ```
 
 The functional syntax also supports `extra_items`:
