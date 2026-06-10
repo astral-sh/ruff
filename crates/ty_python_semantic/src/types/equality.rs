@@ -276,7 +276,7 @@ fn comparison_result<'db>(
 
         (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
         (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-            match comparison_semantics(db, other, operator) {
+            match KnownComparisonSemantics::of_type(db, other, operator) {
                 Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
                 Some(_) => operator.result_from_equality(false),
             }
@@ -421,7 +421,8 @@ fn enum_literal_constraint<'db>(
     let enum_class = right.enum_class(db);
 
     if !is_same_enum_domain(db, left, right)
-        || known_instance_semantics(db, right.enum_class_instance(db), operator).is_none()
+        || KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)
+            .is_none()
     {
         return None;
     }
@@ -674,12 +675,12 @@ fn finite_alternatives<'db>(
     operator: ComparisonOperator,
 ) -> Option<Vec<Type<'db>>> {
     match ty {
-        Type::EnumComplement(complement) => comparison_semantics(db, ty, operator)
+        Type::EnumComplement(complement) => KnownComparisonSemantics::of_type(db, ty, operator)
             .is_some()
             .then(|| complement.remaining_literal_types(db)),
         Type::Intersection(intersection) => {
             let complement = intersection.enum_complement(db)?;
-            comparison_semantics(db, ty, operator)
+            KnownComparisonSemantics::of_type(db, ty, operator)
                 .is_some()
                 .then(|| complement.remaining_literal_types(db))
         }
@@ -688,7 +689,7 @@ fn finite_alternatives<'db>(
         }
         Type::NominalInstance(instance)
             if enum_metadata(db, instance.class_literal(db)).is_some()
-                && comparison_semantics(db, ty, operator).is_some() =>
+                && KnownComparisonSemantics::of_type(db, ty, operator).is_some() =>
         {
             Some(
                 enum_member_literals(db, instance.class_literal(db), None)
@@ -731,7 +732,7 @@ fn narrow_literal_string_against_enum<'db>(
     enum_literal: EnumLiteralType<'db>,
     equality_is_positive: bool,
 ) -> ComparisonResult<'db> {
-    if comparison_semantics(
+    if KnownComparisonSemantics::of_type(
         db,
         Type::enum_literal(enum_literal),
         ComparisonOperator::Equality,
@@ -763,18 +764,19 @@ fn compare_literal_to_other<'db>(
     literal_is_target: bool,
 ) -> ComparisonResult<'db> {
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
-        return match comparison_semantics(db, other, operator) {
+        return match KnownComparisonSemantics::of_type(db, other, operator) {
             Some(KnownComparisonSemantics::Str) => ComparisonResult::Ambiguous,
             Some(_) => ComparisonResult::from_bool(operator == ComparisonOperator::Inequality),
             None => ComparisonResult::Ambiguous,
         };
     }
 
-    let Some(literal_semantics) = literal_semantics(db, literal, operator) else {
+    let Some(literal_semantics) = KnownComparisonSemantics::of_literal(db, literal, operator)
+    else {
         return ComparisonResult::Ambiguous;
     };
     let condition_expects_equality = operator.condition_expects_equality(is_positive);
-    match comparison_semantics(db, other, operator) {
+    match KnownComparisonSemantics::of_type(db, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
@@ -800,10 +802,10 @@ fn compare_nominal_instances<'db>(
 ) -> ComparisonResult<'db> {
     let left = Type::NominalInstance(left_instance);
     let right = Type::NominalInstance(right_instance);
-    let Some(left_semantics) = comparison_semantics(db, left, operator) else {
+    let Some(left_semantics) = KnownComparisonSemantics::of_type(db, left, operator) else {
         return ComparisonResult::Ambiguous;
     };
-    let Some(right_semantics) = comparison_semantics(db, right, operator) else {
+    let Some(right_semantics) = KnownComparisonSemantics::of_type(db, right, operator) else {
         return ComparisonResult::Ambiguous;
     };
 
@@ -865,6 +867,152 @@ enum KnownComparisonSemantics {
     Dict,
 }
 
+impl KnownComparisonSemantics {
+    /// Determine the builtin comparison implementation inherited by `ty`.
+    ///
+    /// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
+    fn of_type<'db>(db: &'db dyn Db, ty: Type<'db>, operator: ComparisonOperator) -> Option<Self> {
+        match ty {
+            Type::LiteralValue(literal) => Self::of_literal(db, literal.kind(), operator),
+            Type::TypedDict(_) => Some(Self::Dict),
+            Type::EnumComplement(complement) => Self::of_instance(
+                db,
+                complement.enum_class(db).to_non_generic_instance(db),
+                operator,
+            ),
+            Type::Intersection(intersection) => {
+                if let Some(complement) = intersection.enum_complement(db) {
+                    return Self::of_instance(
+                        db,
+                        complement.enum_class(db).to_non_generic_instance(db),
+                        operator,
+                    );
+                }
+                let mut semantics = intersection
+                    .positive(db)
+                    .iter()
+                    .filter_map(|element| Self::of_type(db, *element, operator));
+                let first = semantics.next()?;
+                semantics
+                    .all(|semantics| semantics == first)
+                    .then_some(first)
+            }
+            Type::NominalInstance(instance)
+                if instance.class(db).is_final(db)
+                    || instance.tuple_spec(db).is_some()
+                    || enum_metadata(db, instance.class_literal(db)).is_some() =>
+            {
+                Self::of_instance(db, ty, operator)
+            }
+            _ => None,
+        }
+    }
+
+    fn of_literal<'db>(
+        db: &'db dyn Db,
+        literal: LiteralValueTypeKind<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        match literal {
+            LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => Some(Self::Int),
+            LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
+                Some(Self::Str)
+            }
+            LiteralValueTypeKind::Bytes(_) => Some(Self::Bytes),
+            LiteralValueTypeKind::Enum(enum_literal) => {
+                Self::of_instance(db, enum_literal.enum_class_instance(db), operator)
+            }
+        }
+    }
+
+    fn of_instance<'db>(
+        db: &'db dyn Db,
+        instance: Type<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        if let Some(nominal) = instance.as_nominal_instance()
+            && enum_metadata(db, nominal.class_literal(db)).is_some()
+        {
+            return Self::of_enum(db, instance, operator);
+        }
+
+        let class = instance.to_meta_type(db);
+        let dunder = lookup_dunder(db, class, operator.dunder());
+
+        if dunder.place.is_undefined() {
+            if operator == ComparisonOperator::Inequality
+                && !lookup_dunder(db, class, "__eq__").place.is_undefined()
+            {
+                return None;
+            }
+            return Some(Self::Object);
+        }
+
+        for (known_class, semantics) in [
+            (KnownClass::Int, Self::Int),
+            (KnownClass::Str, Self::Str),
+            (KnownClass::Bytes, Self::Bytes),
+            (KnownClass::Tuple, Self::Tuple),
+            (KnownClass::Dict, Self::Dict),
+        ] {
+            if dunder == lookup_dunder(db, known_class.to_class_literal(db), operator.dunder()) {
+                return Some(semantics);
+            }
+        }
+        None
+    }
+
+    fn of_enum<'db>(
+        db: &'db dyn Db,
+        instance: Type<'db>,
+        operator: ComparisonOperator,
+    ) -> Option<Self> {
+        let base_semantics = if instance.is_subtype_of(db, KnownClass::Str.to_instance(db)) {
+            Self::Str
+        } else if instance.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
+            Self::Int
+        } else if instance.is_subtype_of(db, KnownClass::Bytes.to_instance(db)) {
+            Self::Bytes
+        } else {
+            Self::Object
+        };
+
+        let class = instance.to_meta_type(db);
+        let has_custom_dunder = |name| {
+            let dunder = class.member_lookup_with_policy(
+                db,
+                Name::new_static(name),
+                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
+                    | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
+            );
+            if dunder.place.is_undefined() {
+                return false;
+            }
+            if base_semantics == Self::Bytes
+                && dunder == lookup_dunder(db, KnownClass::Bytes.to_class_literal(db), name)
+            {
+                return false;
+            }
+            true
+        };
+
+        match operator {
+            ComparisonOperator::Equality => {
+                (!has_custom_dunder("__eq__")).then_some(base_semantics)
+            }
+            ComparisonOperator::Inequality => {
+                if has_custom_dunder("__ne__")
+                    || (base_semantics == Self::Object && has_custom_dunder("__eq__"))
+                {
+                    None
+                } else {
+                    Some(base_semantics)
+                }
+            }
+        }
+    }
+}
+
 /// Whether the non-target operand has a comparison domain that can safely constrain the target.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum ComparisonDomain {
@@ -909,7 +1057,8 @@ fn comparison_domain<'db>(
                     .class(db)
                     .known(db)
                     .is_some_and(|known| known == KnownClass::Bool || known.is_singleton())
-                || target.is_union() && comparison_semantics(db, ty, operator).is_some()
+                || target.is_union()
+                    && KnownComparisonSemantics::of_type(db, ty, operator).is_some()
             {
                 ComparisonDomain::Known
             } else {
@@ -918,50 +1067,6 @@ fn comparison_domain<'db>(
         }
         _ if ty.is_single_valued(db) => ComparisonDomain::Known,
         _ => ComparisonDomain::Unknown,
-    }
-}
-
-/// Determine the builtin comparison implementation inherited by `ty`.
-///
-/// Returns `None` when dunder lookup finds custom or conflicting comparison behavior.
-fn comparison_semantics<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    operator: ComparisonOperator,
-) -> Option<KnownComparisonSemantics> {
-    match ty {
-        Type::LiteralValue(literal) => literal_semantics(db, literal.kind(), operator),
-        Type::TypedDict(_) => Some(KnownComparisonSemantics::Dict),
-        Type::EnumComplement(complement) => known_instance_semantics(
-            db,
-            complement.enum_class(db).to_non_generic_instance(db),
-            operator,
-        ),
-        Type::Intersection(intersection) => {
-            if let Some(complement) = intersection.enum_complement(db) {
-                return known_instance_semantics(
-                    db,
-                    complement.enum_class(db).to_non_generic_instance(db),
-                    operator,
-                );
-            }
-            let mut semantics = intersection
-                .positive(db)
-                .iter()
-                .filter_map(|element| comparison_semantics(db, *element, operator));
-            let first = semantics.next()?;
-            semantics
-                .all(|semantics| semantics == first)
-                .then_some(first)
-        }
-        Type::NominalInstance(instance)
-            if instance.class(db).is_final(db)
-                || instance.tuple_spec(db).is_some()
-                || enum_metadata(db, instance.class_literal(db)).is_some() =>
-        {
-            known_instance_semantics(db, ty, operator)
-        }
-        _ => None,
     }
 }
 
@@ -974,117 +1079,13 @@ fn has_known_identity_comparison_semantics<'db>(
     match ty {
         Type::FunctionLiteral(_) | Type::ModuleLiteral(_) | Type::SpecialForm(_) => true,
         Type::ClassLiteral(class) => {
-            known_instance_semantics(db, class.metaclass_instance_type(db), operator)
+            KnownComparisonSemantics::of_instance(db, class.metaclass_instance_type(db), operator)
                 == Some(KnownComparisonSemantics::Object)
         }
         _ => {
             ty.is_singleton(db)
-                && comparison_semantics(db, ty, operator) == Some(KnownComparisonSemantics::Object)
-        }
-    }
-}
-
-fn literal_semantics<'db>(
-    db: &'db dyn Db,
-    literal: LiteralValueTypeKind<'db>,
-    operator: ComparisonOperator,
-) -> Option<KnownComparisonSemantics> {
-    match literal {
-        LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => {
-            Some(KnownComparisonSemantics::Int)
-        }
-        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
-            Some(KnownComparisonSemantics::Str)
-        }
-        LiteralValueTypeKind::Bytes(_) => Some(KnownComparisonSemantics::Bytes),
-        LiteralValueTypeKind::Enum(enum_literal) => {
-            known_instance_semantics(db, enum_literal.enum_class_instance(db), operator)
-        }
-    }
-}
-
-fn known_instance_semantics<'db>(
-    db: &'db dyn Db,
-    instance: Type<'db>,
-    operator: ComparisonOperator,
-) -> Option<KnownComparisonSemantics> {
-    if let Some(nominal) = instance.as_nominal_instance()
-        && enum_metadata(db, nominal.class_literal(db)).is_some()
-    {
-        return known_enum_semantics(db, instance, operator);
-    }
-
-    let class = instance.to_meta_type(db);
-    let dunder = lookup_dunder(db, class, operator.dunder());
-
-    if dunder.place.is_undefined() {
-        if operator == ComparisonOperator::Inequality
-            && !lookup_dunder(db, class, "__eq__").place.is_undefined()
-        {
-            return None;
-        }
-        return Some(KnownComparisonSemantics::Object);
-    }
-
-    for (known_class, semantics) in [
-        (KnownClass::Int, KnownComparisonSemantics::Int),
-        (KnownClass::Str, KnownComparisonSemantics::Str),
-        (KnownClass::Bytes, KnownComparisonSemantics::Bytes),
-        (KnownClass::Tuple, KnownComparisonSemantics::Tuple),
-        (KnownClass::Dict, KnownComparisonSemantics::Dict),
-    ] {
-        if dunder == lookup_dunder(db, known_class.to_class_literal(db), operator.dunder()) {
-            return Some(semantics);
-        }
-    }
-    None
-}
-
-fn known_enum_semantics<'db>(
-    db: &'db dyn Db,
-    instance: Type<'db>,
-    operator: ComparisonOperator,
-) -> Option<KnownComparisonSemantics> {
-    let base_semantics = if instance.is_subtype_of(db, KnownClass::Str.to_instance(db)) {
-        KnownComparisonSemantics::Str
-    } else if instance.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
-        KnownComparisonSemantics::Int
-    } else if instance.is_subtype_of(db, KnownClass::Bytes.to_instance(db)) {
-        KnownComparisonSemantics::Bytes
-    } else {
-        KnownComparisonSemantics::Object
-    };
-
-    let class = instance.to_meta_type(db);
-    let has_custom_dunder = |name| {
-        let dunder = class.member_lookup_with_policy(
-            db,
-            Name::new_static(name),
-            MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
-        );
-        if dunder.place.is_undefined() {
-            return false;
-        }
-        if base_semantics == KnownComparisonSemantics::Bytes
-            && dunder == lookup_dunder(db, KnownClass::Bytes.to_class_literal(db), name)
-        {
-            return false;
-        }
-        true
-    };
-
-    match operator {
-        ComparisonOperator::Equality => (!has_custom_dunder("__eq__")).then_some(base_semantics),
-        ComparisonOperator::Inequality => {
-            if has_custom_dunder("__ne__")
-                || (base_semantics == KnownComparisonSemantics::Object
-                    && has_custom_dunder("__eq__"))
-            {
-                None
-            } else {
-                Some(base_semantics)
-            }
+                && KnownComparisonSemantics::of_type(db, ty, operator)
+                    == Some(KnownComparisonSemantics::Object)
         }
     }
 }
@@ -1130,26 +1131,30 @@ fn known_literal_equality<'db>(
         }
         (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right)) => {
             let left_semantics =
-                known_instance_semantics(db, left.enum_class_instance(db), operator)?;
+                KnownComparisonSemantics::of_instance(db, left.enum_class_instance(db), operator)?;
             let right_semantics =
-                known_instance_semantics(db, right.enum_class_instance(db), operator)?;
+                KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)?;
             if left_semantics != right_semantics {
                 return Some(false);
             }
             if left_semantics == KnownComparisonSemantics::Object {
                 return Some(same_enum_member(db, left, right));
             }
-            known_type_value_equality(
+            known_literal_equality(
                 db,
-                enum_literal_value(db, left)?,
-                enum_literal_value(db, right)?,
+                enum_literal_value(db, left)?.as_literal_value_kind()?,
+                enum_literal_value(db, right)?.as_literal_value_kind()?,
+                ComparisonOperator::Equality,
             )
         }
         (LiteralValueTypeKind::Enum(enum_literal), other)
         | (other, LiteralValueTypeKind::Enum(enum_literal)) => {
-            let enum_semantics =
-                known_instance_semantics(db, enum_literal.enum_class_instance(db), operator)?;
-            if enum_semantics != literal_semantics(db, other, operator)? {
+            let enum_semantics = KnownComparisonSemantics::of_instance(
+                db,
+                enum_literal.enum_class_instance(db),
+                operator,
+            )?;
+            if enum_semantics != KnownComparisonSemantics::of_literal(db, other, operator)? {
                 return Some(false);
             }
             known_literal_equality(
@@ -1165,24 +1170,11 @@ fn known_literal_equality<'db>(
         )
         | (LiteralValueTypeKind::String(_), LiteralValueTypeKind::LiteralString) => None,
         (left, right) => {
-            let left_semantics = literal_semantics(db, left, operator)?;
-            let right_semantics = literal_semantics(db, right, operator)?;
+            let left_semantics = KnownComparisonSemantics::of_literal(db, left, operator)?;
+            let right_semantics = KnownComparisonSemantics::of_literal(db, right, operator)?;
             (left_semantics != right_semantics).then_some(false)
         }
     }
-}
-
-fn known_type_value_equality<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-) -> Option<bool> {
-    known_literal_equality(
-        db,
-        left.as_literal_value_kind()?,
-        right.as_literal_value_kind()?,
-        ComparisonOperator::Equality,
-    )
 }
 
 /// Return the statically known runtime value of an enum member.
