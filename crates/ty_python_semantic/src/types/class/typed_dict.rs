@@ -23,8 +23,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
-    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictType, UnionType,
-    determine_upper_bound,
+    MemberLookupPolicy, Type, TypeContext, TypeMapping, TypeVarVariance, TypedDictModule,
+    TypedDictType, UnionType, determine_upper_bound,
 };
 use crate::{Db, FxIndexMap};
 use ty_python_core::definition::Definition;
@@ -841,6 +841,8 @@ pub struct DynamicTypedDictLiteral<'db> {
     ///   eagerly computed spec is stored on the anchor.
     #[returns(ref)]
     pub(crate) anchor: DynamicTypedDictAnchor<'db>,
+
+    pub(crate) typed_dict_module: TypedDictModule,
 }
 
 impl get_size2::GetSize for DynamicTypedDictLiteral<'_> {}
@@ -857,6 +859,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
             self.name(db).clone(),
             self.anchor(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
+            self.typed_dict_module(db),
         ))
     }
 }
@@ -1017,16 +1020,22 @@ pub(super) fn typed_dict_class_member<'db>(
         return fallback_member;
     }
 
-    // `typing_extensions.TypedDict` backports these attributes to Python versions before 3.15,
-    // where the stdlib fallback intentionally omits them.
-    if matches!(name, "__closed__" | "__extra_items__")
+    if self_class.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
         && let Some(typing_extensions_fallback) =
             known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
                 .place
                 .ignore_possibly_undefined()
-                .and_then(Type::as_class_literal)
+                .filter(|ty| ty.as_class_literal().is_some())
     {
-        let member = typing_extensions_fallback.class_member(db, name, lookup_policy);
+        let member = typing_extensions_fallback
+            .find_name_in_mro_with_policy(db, name, lookup_policy)
+            .expect("Will return Some() when called on class literal")
+            .map_type(|ty| {
+                let new_upper_bound =
+                    determine_upper_bound(db, self_class, ClassBase::is_typed_dict);
+                let mapping = TypeMapping::ReplaceSelf { new_upper_bound };
+                ty.apply_type_mapping(db, &mapping, TypeContext::default())
+            });
         if !member.is_undefined() {
             return member;
         }

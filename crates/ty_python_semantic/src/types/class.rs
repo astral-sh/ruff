@@ -39,8 +39,8 @@ use crate::types::signatures::{
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
-    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable,
+    FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, TypedDictModule,
+    UnionBuilder, VarianceInferable,
 };
 use crate::{
     Db, FxIndexMap, FxOrderSet,
@@ -334,6 +334,31 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+fn typed_dict_module_from_bases<'db>(
+    db: &'db dyn Db,
+    bases: &[Type<'db>],
+) -> Option<TypedDictModule> {
+    let mut module = None;
+
+    for base in bases {
+        let base_module = match base {
+            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(*module),
+            Type::ClassLiteral(base) => base.typed_dict_module(db),
+            Type::GenericAlias(alias) => alias.origin(db).typed_dict_module(db),
+            _ => None,
+        };
+
+        if let Some(base_module) = base_module {
+            if module.is_some_and(|module| module != base_module) {
+                return None;
+            }
+            module = Some(base_module);
+        }
+    }
+
+    module
+}
+
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -380,6 +405,15 @@ impl<'db> ClassLiteral<'db> {
     /// Returns the known class, if any.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownClass> {
         self.as_static()?.known(db)
+    }
+
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        match self {
+            Self::Static(class) => class.typed_dict_module(db),
+            Self::Dynamic(class) => class.typed_dict_module(db),
+            Self::DynamicTypedDict(typed_dict) => Some(typed_dict.typed_dict_module(db)),
+            Self::DynamicNamedTuple(_) | Self::DynamicEnum(_) => None,
+        }
     }
 
     /// Returns whether this class has PEP 695 type parameters.

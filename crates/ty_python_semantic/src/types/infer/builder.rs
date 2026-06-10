@@ -3665,8 +3665,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
-                    } else if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-                        self.infer_typeddict_call_expression(call_expr, Some(definition))
+                    } else if let Type::SpecialForm(special_form) = callable_type
+                        && let Some(typed_dict_module) = special_form.typed_dict_module()
+                    {
+                        self.infer_typeddict_call_expression(
+                            call_expr,
+                            Some(definition),
+                            typed_dict_module,
+                        )
                     } else if let Some(function) = callable_type.as_function_literal()
                         && function.is_known(self.db(), KnownFunction::NewClass)
                     {
@@ -3972,7 +3978,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => {}
         }
-        if func_ty == Type::SpecialForm(SpecialFormType::TypedDict) {
+        if func_ty
+            .as_special_form()
+            .is_some_and(SpecialFormType::is_typed_dict)
+        {
             self.infer_functional_typeddict_deferred(arguments);
             return;
         }
@@ -8130,8 +8139,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return ty;
         }
 
-        if callable_type == Type::SpecialForm(SpecialFormType::TypedDict) {
-            return self.infer_typeddict_call_expression(call_expression, None);
+        if let Type::SpecialForm(special_form) = callable_type
+            && let Some(typed_dict_module) = special_form.typed_dict_module()
+        {
+            return self.infer_typeddict_call_expression(call_expression, None, typed_dict_module);
         }
 
         if callable_type == Type::SpecialForm(SpecialFormType::TypeForm) {

@@ -1,13 +1,14 @@
 use ruff_db::{diagnostic::Span, parsed::parsed_module};
 use ruff_python_ast::{self as ast, NodeIndex, name::Name};
 use ruff_text_size::{Ranged, TextRange};
+use ty_module_resolver::KnownModule;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{Place, PlaceAndQualifiers},
+    place::{Place, PlaceAndQualifiers, known_module_symbol},
     types::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        SubclassOfType, Type, TypedDictModule,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
@@ -225,6 +226,18 @@ impl<'db> DynamicClassLiteral<'db> {
         }
     }
 
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn typed_dict_module_inner<'db>(
+            db: &'db dyn Db,
+            class: DynamicClassLiteral<'db>,
+        ) -> Option<TypedDictModule> {
+            super::typed_dict_module_from_bases(db, class.explicit_bases(db))
+        }
+
+        typed_dict_module_inner(db, self)
+    }
+
     /// Returns a [`Span`] with the range of the `type()` call expression.
     ///
     /// See [`Self::header_range`] for more details.
@@ -423,10 +436,30 @@ impl<'db> DynamicClassLiteral<'db> {
             ClassMemberResult::Done(result) => result.finalize(db),
             ClassMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
-                KnownClass::TypedDictFallback
+                let fallback_member = KnownClass::TypedDictFallback
                     .to_class_literal(db)
                     .find_name_in_mro_with_policy(db, name, policy)
-                    .expect("Will return Some() when called on class literal")
+                    .expect("Will return Some() when called on class literal");
+                if !fallback_member.is_undefined() {
+                    return fallback_member;
+                }
+
+                if self.typed_dict_module(db) == Some(TypedDictModule::TypingExtensions)
+                    && let Some(typing_extensions_fallback) =
+                        known_module_symbol(db, KnownModule::TypingExtensions, "_TypedDict")
+                            .place
+                            .ignore_possibly_undefined()
+                            .filter(|ty| ty.as_class_literal().is_some())
+                {
+                    let member = typing_extensions_fallback
+                        .find_name_in_mro_with_policy(db, name, policy)
+                        .expect("Will return Some() when called on class literal");
+                    if !member.is_undefined() {
+                        return member;
+                    }
+                }
+
+                fallback_member
             }
         }
     }

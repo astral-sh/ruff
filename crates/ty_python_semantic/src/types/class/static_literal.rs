@@ -22,7 +22,7 @@ use crate::{
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
         Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        TypeMapping, TypeVarVariance, TypedDictModule, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -702,6 +702,21 @@ impl<'db> StaticClassLiteral<'db> {
             return false;
         }
         is_typed_dict_inner(db, self)
+    }
+
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn typed_dict_module_inner<'db>(
+            db: &'db dyn Db,
+            class: StaticClassLiteral<'db>,
+        ) -> Option<TypedDictModule> {
+            super::typed_dict_module_from_bases(db, class.explicit_bases(db))
+        }
+
+        if !self.has_explicit_bases(db) {
+            return None;
+        }
+        typed_dict_module_inner(db, self)
     }
 
     /// Return `true` if this class is, or inherits from, a `NamedTuple` (inherits from
