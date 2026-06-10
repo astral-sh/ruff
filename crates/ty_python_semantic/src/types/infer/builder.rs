@@ -10774,7 +10774,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra_field_count = usize::from(!string_annotations.is_empty())
+        let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
             + usize::from(!expected_types.is_empty())
             + usize::from(!collection_use_constraints.is_empty())
             + usize::from(!called_functions.is_empty())
@@ -10782,11 +10782,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             + usize::from(cycle_recovery.is_some())
             + usize::from(!deferred.is_empty())
             + usize::from(!diagnostics.is_empty())
-            + usize::from(undecorated_type.is_some())
             + usize::from(discards_dict_key_assignments)
             + usize::from(!qualifiers.is_empty());
 
-        let extra = match (extra_field_count, undecorated_type) {
+        let extra = match (non_undecorated_extra_field_count, undecorated_type) {
             (0, None) => None,
             (1, None) if !qualifiers.is_empty() => Some(Box::new(
                 DefinitionInferenceExtra::Qualifiers(FrozenMap::from(qualifiers)),
@@ -10814,10 +10813,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (1, None) if discards_dict_key_assignments => Some(Box::new(
                 DefinitionInferenceExtra::DiscardsDictKeyAssignments,
             )),
-            (1, Some(undecorated_type)) => Some(Box::new(DefinitionInferenceExtra::Undecorated(
+            (0, Some(undecorated_type)) => Some(Box::new(DefinitionInferenceExtra::Undecorated(
                 Box::new(undecorated_type),
             ))),
-            (2, Some(undecorated_type)) if !deferred.is_empty() => {
+            (1, Some(undecorated_type)) if !deferred.is_empty() => {
                 Some(Box::new(DefinitionInferenceExtra::DeferredAndUndecorated(
                     Box::new(DeferredAndUndecorated {
                         deferred: deferred.into_boxed_slice(),
