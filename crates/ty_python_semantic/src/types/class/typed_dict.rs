@@ -354,10 +354,10 @@ fn synthesize_typed_dict_get<'db>(
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
-    let fallback_value_ty = if typed_dict.explicit_extra_items(db).is_some() {
-        typed_dict.value_type(db)
-    } else {
+    let fallback_value_ty = if typed_dict.openness(db).is_open() {
         Type::unknown()
+    } else {
+        typed_dict.value_type(db)
     };
     let overloads = fields
         .iter()

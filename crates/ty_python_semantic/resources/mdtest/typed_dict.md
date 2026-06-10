@@ -6056,6 +6056,31 @@ def _(
     read_only.clear()  # error: [unresolved-attribute]
 ```
 
+### `get` accounts for closed TypedDicts
+
+An arbitrary string key can only refer to a declared item on a closed TypedDict:
+
+```py
+from typing_extensions import TypedDict
+
+class Closed(TypedDict, closed=True):
+    name: str
+    year: int
+
+FunctionalClosed = TypedDict(
+    "FunctionalClosed",
+    {"name": str, "year": int},
+    closed=True,
+)
+
+class EmptyClosed(TypedDict, closed=True): ...
+
+def _(closed: Closed, functional: FunctionalClosed, empty: EmptyClosed, key: str) -> None:
+    reveal_type(closed.get(key))  # revealed: str | int | None
+    reveal_type(functional.get(key))  # revealed: str | int | None
+    reveal_type(empty.get(key))  # revealed: None
+```
+
 ### `pop` and `setdefault` support literal extra-item keys
 
 Extra items behave like non-required items for methods that mutate a specific literal key.
