@@ -6405,6 +6405,34 @@ mod tests {
     }
 
     #[test]
+    fn lazy_subtyping_materializes_dynamic_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+
+        let upper_builder = ConstraintSetBuilder::new();
+        let upper =
+            Type::TypeVar(t).when_constraint_set_subtype_of(&db, Type::any(), &upper_builder);
+        assert_eq!(
+            upper
+                .node
+                .root_constraint(&upper_builder)
+                .map(|constraint| upper_builder.constraint_data(constraint).bounds),
+            Some(ConstraintBounds::new(None, Some(Type::Never)))
+        );
+
+        let lower_builder = ConstraintSetBuilder::new();
+        let lower =
+            Type::any().when_constraint_set_subtype_of(&db, Type::TypeVar(t), &lower_builder);
+        assert_eq!(
+            lower
+                .node
+                .root_constraint(&lower_builder)
+                .map(|constraint| lower_builder.constraint_data(constraint).bounds),
+            Some(ConstraintBounds::new(Some(Type::object()), None))
+        );
+    }
+
+    #[test]
     fn constraint_implications_are_cached() {
         let db = setup_db();
         let t = create_typevar(&db, "T");

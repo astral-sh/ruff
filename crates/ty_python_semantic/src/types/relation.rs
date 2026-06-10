@@ -1039,18 +1039,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = source {
+                let upper = if self.relation.is_subtyping() {
+                    target.bottom_materialization(db)
+                } else {
+                    target
+                };
                 return ConstraintSet::constrain_typevar_upper_bound(
                     db,
                     self.constraints,
                     bound_typevar,
-                    target,
+                    upper,
                 );
             } else if let Type::TypeVar(bound_typevar) = target {
+                let lower = if self.relation.is_subtyping() {
+                    source.top_materialization(db)
+                } else {
+                    source
+                };
                 return ConstraintSet::constrain_typevar_lower_bound(
                     db,
                     self.constraints,
                     bound_typevar,
-                    source,
+                    lower,
                 );
             }
         }
@@ -1833,10 +1843,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
-                let dict_value_type = if matches!(
-                    self.relation,
-                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability
-                ) {
+                let dict_value_type = if self.relation.is_assignability() {
                     typed_dict.assignable_dict_value_type(db)
                 } else {
                     typed_dict.dict_value_type(db)
