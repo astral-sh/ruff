@@ -68,7 +68,39 @@ pub(super) fn evaluate_type_equality<'db>(
 ) -> Option<Type<'db>> {
     enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
         .or_else(|| primitive_literal_constraint(db, left, right, is_positive))
-        .or_else(|| equality_result(db, left, right, is_positive).constraint(is_positive))
+        .or_else(|| {
+            if is_equality_narrowing_operand(db, left, right) {
+                equality_result(db, left, right, is_positive).constraint(is_positive)
+            } else {
+                None
+            }
+        })
+}
+
+/// Return whether `ty` can constrain `left` through equality.
+///
+/// The general evaluator distributes over unions, so avoid invoking it for ordinary nominal types
+/// whose comparison semantics are unknown.
+fn is_equality_narrowing_operand<'db>(db: &'db dyn Db, left: Type<'db>, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_equality_narrowing_operand(db, left, *element)),
+        Type::LiteralValue(_) | Type::EnumComplement(_) => true,
+        Type::Intersection(intersection) if intersection.enum_complement(db).is_some() => true,
+        Type::TypedDict(_) => true,
+        Type::NominalInstance(instance) => {
+            instance.tuple_spec(db).is_some()
+                || instance
+                    .class(db)
+                    .known(db)
+                    .is_some_and(|known| known == KnownClass::Bool || known.is_singleton())
+                || left.resolve_type_alias(db).is_union()
+                    && comparison_semantics(db, ty, ComparisonOperator::Equality).is_some()
+        }
+        ty => ty.is_single_valued(db),
+    }
 }
 
 pub(super) fn evaluate_type_inequality<'db>(
@@ -278,13 +310,8 @@ fn equality_result<'db>(
 /// false branch of `x == "C"` can freeze a loop before later iterations widen `x`. Constraining the
 /// target with `~Literal["C"]` instead describes the predicate itself and remains valid as the cycle
 /// reaches its fixed point.
-fn primitive_literal_constraint<'db>(
-    db: &'db dyn Db,
-    left: Type<'db>,
-    right: Type<'db>,
-    condition_expects_equality: bool,
-) -> Option<Type<'db>> {
-    let is_builtin_primitive = |ty: Type<'db>| match ty.resolve_type_alias(db) {
+fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
+    match ty.resolve_type_alias(db) {
         Type::LiteralValue(literal) => matches!(
             literal.kind(),
             LiteralValueTypeKind::Int(_)
@@ -294,11 +321,15 @@ fn primitive_literal_constraint<'db>(
         ),
         Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Bool),
         _ => false,
-    };
-    let left_is_builtin_primitive = match left.resolve_type_alias(db) {
-        Type::Union(union) => union.elements(db).iter().copied().all(is_builtin_primitive),
-        left => is_builtin_primitive(left),
-    };
+    }
+}
+
+fn primitive_literal_constraint<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    condition_expects_equality: bool,
+) -> Option<Type<'db>> {
     let Type::LiteralValue(right) = right.resolve_type_alias(db) else {
         return None;
     };
@@ -321,8 +352,57 @@ fn primitive_literal_constraint<'db>(
         LiteralValueTypeKind::LiteralString | LiteralValueTypeKind::Enum(_) => return None,
     };
 
-    (left_is_builtin_primitive || !condition_expects_equality)
-        .then(|| equal_to_right.negate_if(db, !condition_expects_equality))
+    if !condition_expects_equality {
+        return Some(equal_to_right.negate(db));
+    }
+
+    if matches!(
+        right.kind(),
+        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)
+    ) && let Type::Union(union) = left.resolve_type_alias(db)
+    {
+        let mut excluded = UnionBuilder::new(db);
+        let mut has_dynamic = false;
+
+        for element in union.elements(db) {
+            match element.resolve_type_alias(db) {
+                Type::LiteralValue(left) => {
+                    match known_literal_equality(
+                        db,
+                        left.kind(),
+                        right.kind(),
+                        ComparisonOperator::Equality,
+                    ) {
+                        Some(true) => {}
+                        Some(false) => excluded = excluded.add(*element),
+                        None => return None,
+                    }
+                }
+                Type::Dynamic(_) => has_dynamic = true,
+                Type::Intersection(intersection)
+                    if !intersection.positive(db).is_empty()
+                        && intersection.positive(db).iter().all(Type::is_dynamic) =>
+                {
+                    has_dynamic = true;
+                }
+                _ => return None,
+            }
+        }
+
+        if has_dynamic {
+            return excluded.try_build().map(|excluded| excluded.negate(db));
+        }
+    }
+
+    match left.resolve_type_alias(db) {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .all(|element| is_builtin_primitive(db, element)),
+        left => is_builtin_primitive(db, left),
+    }
+    .then_some(equal_to_right)
 }
 
 fn enum_literal_constraint<'db>(
