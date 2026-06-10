@@ -59,6 +59,25 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 ///     return var
 /// ```
 ///
+/// Type variables with constraints are converted to constrained type parameters:
+///
+/// ```python
+/// from typing import TypeVar
+///
+/// AnyStr = TypeVar("AnyStr", str, bytes)
+///
+///
+/// def concat(x: AnyStr, y: AnyStr) -> AnyStr:
+///     return x + y
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// def concat[AnyStr: (str, bytes)](x: AnyStr, y: AnyStr) -> AnyStr:
+///     return x + y
+/// ```
+///
 /// ## See also
 ///
 /// This rule replaces standalone type variables in function signatures but doesn't remove
