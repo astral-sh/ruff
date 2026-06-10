@@ -28,6 +28,8 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
     if sys.version_info >= (3, 13):
         __readonly_keys__: ClassVar[frozenset[str]]
         __mutable_keys__: ClassVar[frozenset[str]]
+    __closed__: ClassVar[bool | None]
+    __extra_items__: ClassVar[Any]
 
     def copy(self) -> typing_extensions.Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature

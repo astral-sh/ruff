@@ -2594,15 +2594,21 @@ def _(p: Person) -> None:
 `TypedDict` class definitions have some special properties that can be used for introspection:
 
 ```py
-from typing import TypedDict
+from typing_extensions import TypedDict
 
 class Person(TypedDict):
     name: str
     age: int | None
 
+FunctionalPerson = TypedDict("FunctionalPerson", {"name": str, "age": int | None})
+
 reveal_type(Person.__total__)  # revealed: bool
 reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
+reveal_type(Person.__closed__)  # revealed: bool | None
+reveal_type(Person.__extra_items__)  # revealed: Any
+reveal_type(FunctionalPerson.__closed__)  # revealed: bool | None
+reveal_type(FunctionalPerson.__extra_items__)  # revealed: Any
 ```
 
 These attributes cannot be accessed on inhabitants:
@@ -2612,6 +2618,8 @@ def _(person: Person) -> None:
     person.__total__  # error: [unresolved-attribute]
     person.__required_keys__  # error: [unresolved-attribute]
     person.__optional_keys__  # error: [unresolved-attribute]
+    person.__closed__  # error: [unresolved-attribute]
+    person.__extra_items__  # error: [unresolved-attribute]
 ```
 
 Also, they cannot be accessed on `type(person)`, as that would be `dict` at runtime:
@@ -2621,6 +2629,8 @@ def _(person: Person) -> None:
     type(person).__total__  # error: [unresolved-attribute]
     type(person).__required_keys__  # error: [unresolved-attribute]
     type(person).__optional_keys__  # error: [unresolved-attribute]
+    type(person).__closed__  # error: [unresolved-attribute]
+    type(person).__extra_items__  # error: [unresolved-attribute]
 ```
 
 But they _can_ be accessed on `type[Person]`, because this function would accept the class object
@@ -2631,6 +2641,8 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
     reveal_type(t_person.__total__)  # revealed: bool
     reveal_type(t_person.__required_keys__)  # revealed: frozenset[str]
     reveal_type(t_person.__optional_keys__)  # revealed: frozenset[str]
+    reveal_type(t_person.__closed__)  # revealed: bool | None
+    reveal_type(t_person.__extra_items__)  # revealed: Any
 
 accepts_typed_dict_class(Person)
 ```
