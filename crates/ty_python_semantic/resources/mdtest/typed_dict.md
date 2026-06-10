@@ -3551,7 +3551,6 @@ class TraditionalKwargsTarget(Protocol):
 def traditional_kwargs_source(**kwargs: int) -> None:
     pass
 
-# TODO: This should be accepted because the declared field is assignable to `int`.
 traditional_kwargs_target: TraditionalKwargsTarget = traditional_kwargs_source  # error: [invalid-assignment]
 
 P = ParamSpec("P")
