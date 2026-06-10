@@ -103,6 +103,10 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         self.diagnostics.get_mut().extend(other);
     }
 
+    pub(crate) fn has_diagnostics(&self) -> bool {
+        !self.diagnostics.borrow().is_empty()
+    }
+
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
         LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }

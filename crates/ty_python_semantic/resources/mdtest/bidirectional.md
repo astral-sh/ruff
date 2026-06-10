@@ -571,13 +571,23 @@ the other operand can provide type context for the literal:
 ```py
 from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, reveal_type
+from typing import Literal, TypedDict, reveal_type
 
 type Key = Literal["foo", "bar"]
+
+class Payload(TypedDict):
+    required: int
 
 def from_or(values: list[str] | None) -> None:
     for value in reveal_type(values or []):  # revealed: list[str]
         reveal_type(value)  # revealed: str
+
+def from_and(values: list[str]) -> None:
+    reveal_type(values and [])  # revealed: list[str]
+
+def chained_or(first: list[int], second: list[str]) -> None:
+    for value in first or second or []:
+        reveal_type(value)  # revealed: int | str
 
 def from_conditional(values: set[str], allowed: set[str] | None) -> None:
     filtered = reveal_type(
@@ -600,6 +610,11 @@ def widened_non_empty_fallback(values: list[int] | None) -> None:
 
 def incompatible_collection_kind(values: set[str] | None) -> None:
     reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
+
+def typed_dict_peer_is_only_a_hint(value: Payload | None, flag: bool) -> None:
+    value or {}
+    {} if flag else value
+    value or {"other": 1}
 
 def stored_literal_is_not_fresh(values: dict[Key, int] | None) -> None:
     fallback = {"foo": 0}

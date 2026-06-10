@@ -5695,6 +5695,52 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn infer_expression_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+    ) -> Type<'db> {
+        self.infer_with_collection_literal_peer_context(expression, tcx, peer_ty, |builder, tcx| {
+            builder.infer_expression(expression, tcx)
+        })
+    }
+
+    fn infer_maybe_standalone_expression_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+    ) -> Type<'db> {
+        self.infer_with_collection_literal_peer_context(expression, tcx, peer_ty, |builder, tcx| {
+            builder.infer_maybe_standalone_expression(expression, tcx)
+        })
+    }
+
+    fn infer_with_collection_literal_peer_context(
+        &mut self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+        peer_ty: Option<Type<'db>>,
+        mut infer_expression: impl FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        let Some(peer_tcx) = collection_literal_peer_context(expression, tcx, peer_ty) else {
+            return infer_expression(self, tcx);
+        };
+
+        let mut speculative_builder = self.speculate();
+        let ty = infer_expression(&mut speculative_builder, peer_tcx);
+
+        // Peer context is only an inference hint. If it introduces diagnostics, discard it and
+        // infer normally so that only diagnostics intrinsic to the expression are reported.
+        if speculative_builder.context.has_diagnostics() {
+            infer_expression(self, tcx)
+        } else {
+            self.extend(speculative_builder);
+            ty
+        }
+    }
+
     #[track_caller]
     fn infer_standalone_expression(
         &mut self,
@@ -7342,13 +7388,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if allows_collection_literal_peer_context(tcx) && is_collection_literal(body) {
                 // Infer the peer branch first so the body can use its type as context.
                 let orelse_ty = self.infer_expression(orelse, tcx);
-                let body_tcx = collection_literal_peer_context(body, tcx, Some(orelse_ty));
-                let body_ty = self.infer_expression(body, body_tcx);
+                let body_ty = self.infer_expression_with_collection_literal_peer_context(
+                    body,
+                    tcx,
+                    Some(orelse_ty),
+                );
                 (body_ty, orelse_ty)
             } else {
                 let body_ty = self.infer_expression(body, tcx);
-                let orelse_tcx = collection_literal_peer_context(orelse, tcx, Some(body_ty));
-                let orelse_ty = self.infer_expression(orelse, orelse_tcx);
+                let orelse_ty = self.infer_expression_with_collection_literal_peer_context(
+                    orelse,
+                    tcx,
+                    Some(body_ty),
+                );
                 (body_ty, orelse_ty)
             };
 
@@ -9697,17 +9749,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             op,
             values,
         } = bool_op;
-        let track_peer_types = allows_collection_literal_peer_context(tcx);
+        // The first operand has no peers. If no later operand is a collection literal,
+        // accumulating prior types cannot affect inference.
+        let track_peer_types = allows_collection_literal_peer_context(tcx)
+            && values.iter().skip(1).any(is_collection_literal);
         self.infer_chained_boolean_types(
             *op,
             track_peer_types,
             values.iter().enumerate(),
+            |(_, value)| is_collection_literal(value),
             |builder, (index, value), peer_ty| {
-                let value_tcx = collection_literal_peer_context(value, tcx, peer_ty);
                 let ty = if index == values.len() - 1 {
-                    builder.infer_expression(value, value_tcx)
+                    builder
+                        .infer_expression_with_collection_literal_peer_context(value, tcx, peer_ty)
                 } else {
-                    builder.infer_maybe_standalone_expression(value, value_tcx)
+                    builder.infer_maybe_standalone_expression_with_collection_literal_peer_context(
+                        value, tcx, peer_ty,
+                    )
                 };
 
                 (ty, value.range())
@@ -9722,17 +9780,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ///
     /// `infer_ty` receives the unguarded union of previous operand types that may contribute to the
     /// result. This can be used as a type context without losing generic specialization information
-    /// to the truthiness guards applied to the final result type.
-    fn infer_chained_boolean_types<Iterator, Item, F>(
+    /// to the truthiness guards applied to the final result type. `needs_peer_type` determines
+    /// whether that union is materialized for each operand.
+    fn infer_chained_boolean_types<Iterator, Item, NeedsPeerType, InferType>(
         &mut self,
         op: ast::BoolOp,
         track_peer_types: bool,
         operations: Iterator,
-        infer_ty: F,
+        needs_peer_type: NeedsPeerType,
+        infer_ty: InferType,
     ) -> Type<'db>
     where
         Iterator: IntoIterator<Item = Item>,
-        F: Fn(&mut Self, Item, Option<Type<'db>>) -> (Type<'db>, TextRange),
+        NeedsPeerType: Fn(&Item) -> bool,
+        InferType: Fn(&mut Self, Item, Option<Type<'db>>) -> (Type<'db>, TextRange),
     {
         let mut done = false;
         let mut peer_types: Option<UnionAccumulator<'db>> = None;
@@ -9742,7 +9803,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .into_iter()
             .with_position()
             .map(|(position, item)| {
-                let peer_ty = if done || !track_peer_types {
+                let peer_ty = if done || !track_peer_types || !needs_peer_type(&item) {
                     None
                 } else {
                     peer_types
@@ -9825,6 +9886,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .chain(comparators)
                 .tuple_windows::<(_, _)>()
                 .zip(ops),
+            |_| false,
             |builder, ((left, right), op), _peer_ty| {
                 let left_ty = builder.expression_type(left);
                 let right_ty = builder.infer_expression(right, TypeContext::default());
@@ -10345,7 +10407,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expression_cache: _,
             typevar_binding_context: _,
             deferred_state: _,
-            called_functions: _,
+            called_functions,
             index: _,
             region: _,
             return_types_and_ranges: _,
@@ -10372,6 +10434,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.expected_types.extend(expected_types.iter());
         self.type_expression_flags
             .extend(type_expression_flags.iter());
+        self.called_functions.extend(called_functions);
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
             self.bindings
@@ -10468,14 +10531,14 @@ fn collection_literal_peer_context<'db>(
     expression: &ast::Expr,
     tcx: TypeContext<'db>,
     peer_ty: Option<Type<'db>>,
-) -> TypeContext<'db> {
+) -> Option<TypeContext<'db>> {
     if allows_collection_literal_peer_context(tcx)
         && is_collection_literal(expression)
         && let Some(peer_ty) = peer_ty
     {
-        TypeContext::new(Some(peer_ty))
+        Some(TypeContext::new(Some(peer_ty)))
     } else {
-        tcx
+        None
     }
 }
 
