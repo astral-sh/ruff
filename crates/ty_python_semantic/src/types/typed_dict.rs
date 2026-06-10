@@ -241,13 +241,16 @@ impl<'db> TypedDictType<'db> {
             db: &'db dyn Db,
             class: ClassType<'db>,
         ) -> TypedDictOpenness<'db> {
-            let class_literal = class.class_literal(db);
-            if let ClassLiteral::DynamicTypedDict(dynamic) = class_literal {
-                return dynamic.openness(db);
-            }
-
-            let Some((static_class, specialization)) = class.static_class_literal(db) else {
-                return TypedDictOpenness::ImplicitlyOpen;
+            let (class_literal, specialization) = class.class_literal_and_specialization(db);
+            let static_class = match class_literal {
+                ClassLiteral::Static(static_class) => static_class,
+                ClassLiteral::DynamicTypedDict(dynamic) => return dynamic.openness(db),
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicEnum(_) => {
+                    // A `TypedDictType::Class` is only constructed from classes known to be TypedDicts.
+                    unreachable!("non-TypedDict dynamic class wrapped in `TypedDictType`")
+                }
             };
 
             let module = parsed_module(db, static_class.file(db)).load(db);
