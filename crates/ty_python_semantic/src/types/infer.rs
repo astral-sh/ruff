@@ -56,6 +56,9 @@ pub(super) use ty_python_core::frozen::{FrozenMap, FrozenSet};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
+use crate::types::recursive::{
+    ImplicitDefinitionCycleKind, ImplicitExpressionCycleKind, ImplicitRecursiveOrigin,
+};
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, TypeQualifiers,
@@ -97,8 +100,12 @@ struct TypeAndRange<'db> {
 /// Use when resolving a place use or public type of a place.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
+    cycle_initial=|db, _id, definition: Definition<'db>| {
+        let origin = ImplicitRecursiveOrigin::Definition {
+            kind: ImplicitDefinitionCycleKind::Definition,
+            definition,
+        };
+        DefinitionInference::cycle_initial(db, definition, origin.cycle_recovery_type(db))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -232,8 +239,12 @@ impl<'db> FunctionDecoratorInference<'db> {
 /// file, or in a file with `from __future__ import annotations`, or stringified annotations.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, definition: Definition<'db>| {
-        DefinitionInference::cycle_initial(db, definition, Type::implicit_recursive(db, id, Type::divergent(id)))
+    cycle_initial=|db, _id, definition: Definition<'db>| {
+        let origin = ImplicitRecursiveOrigin::Definition {
+            kind: ImplicitDefinitionCycleKind::Deferred,
+            definition,
+        };
+        DefinitionInference::cycle_initial(db, definition, origin.cycle_recovery_type(db))
     },
     cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -306,7 +317,14 @@ pub(crate) fn infer_scope_types<'db>(
     returns(ref),
     // Seed the scope cycle with the μα.α recursion marker (`Recursive`), matching the other
     // cycle-recovery seeds, so every cycle-recovery query starts in the same shape.
-    cycle_initial=|db, id, _| ScopeInference::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
+    cycle_initial=|db, _id, input: InferScope<'db>| {
+        let (scope, type_context) = input.into_inner(db);
+        let origin = ImplicitRecursiveOrigin::Scope {
+            scope,
+            type_context,
+        };
+        ScopeInference::cycle_initial(origin.cycle_recovery_type(db))
+    },
     cycle_fn=|db, cycle, previous: &ScopeInference<'db>, inference: ScopeInference<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
     },
@@ -378,11 +396,16 @@ pub(super) fn infer_expression_types_impl<'db>(
 
 fn expression_cycle_initial<'db>(
     db: &'db dyn Db,
-    id: salsa::Id,
+    _id: salsa::Id,
     input: InferExpression<'db>,
 ) -> ExpressionInference<'db> {
-    let (expression, _) = input.into_inner(db);
-    let cycle_recovery = Type::implicit_recursive(db, id, Type::divergent(id));
+    let (expression, type_context) = input.into_inner(db);
+    let origin = ImplicitRecursiveOrigin::Expression {
+        kind: ImplicitExpressionCycleKind::Inference,
+        expression,
+        type_context,
+    };
+    let cycle_recovery = origin.cycle_recovery_type(db);
     ExpressionInference::cycle_initial(expression.scope(db), cycle_recovery)
 }
 
@@ -416,7 +439,15 @@ pub(crate) fn infer_expression_type<'db>(
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _| Type::implicit_recursive(db, id, Type::divergent(id)),
+    cycle_initial=|db, _id, input: InferExpression<'db>| {
+        let (expression, type_context) = input.into_inner(db);
+        let origin = ImplicitRecursiveOrigin::Expression {
+            kind: ImplicitExpressionCycleKind::Type,
+            expression,
+            type_context,
+        };
+        origin.cycle_recovery_type(db)
+    },
     cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
         result.cycle_normalized(db, Some(*previous), cycle)
     },
@@ -454,8 +485,9 @@ pub(super) fn infer_statement_types<'db>(
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db: &'db dyn Db, id, statement: StatementInner<'db>| {
-        StatementInferenceInner::cycle_initial(statement.scope(db), Type::implicit_recursive(db, id, Type::divergent(id)))
+    cycle_initial=|db: &'db dyn Db, _id, statement: StatementInner<'db>| {
+        let origin = ImplicitRecursiveOrigin::Statement(statement);
+        StatementInferenceInner::cycle_initial(statement.scope(db), origin.cycle_recovery_type(db))
     },
     cycle_fn=|db, cycle, previous: &StatementInferenceInner<'db>, inference: StatementInferenceInner<'db>, _| {
         inference.cycle_normalized(db, previous, cycle)
@@ -564,7 +596,7 @@ impl<'db> InferScope<'db> {
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
-pub(crate) struct TypeContext<'db> {
+pub struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
 }
 
@@ -631,7 +663,9 @@ impl<'db> From<Type<'db>> for TypeContext<'db> {
 /// during this unpacking.
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|db, id, _| UnpackResult::cycle_initial(Type::implicit_recursive(db, id, Type::divergent(id))),
+    cycle_initial=|db, _id, unpack: Unpack<'db>| {
+        UnpackResult::cycle_initial(ImplicitRecursiveOrigin::Unpack(unpack).cycle_recovery_type(db))
+    },
     cycle_fn=|db, cycle, previous: &UnpackResult<'db>, result: UnpackResult<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },
