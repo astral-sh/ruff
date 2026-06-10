@@ -23,8 +23,8 @@ use crate::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            function_known_decorators, infer_statement_types, nearest_enclosing_function,
-            original_class_type,
+            function_known_decorators, infer_parameter_types_untracked, infer_statement_types,
+            nearest_enclosing_function, original_class_type,
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
@@ -133,7 +133,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // constituent nodes that are part of the function body. In order to get diagnostics
         // merged/emitted for them, we need to explicitly infer their definitions here.
         for parameter in &function.parameters {
-            self.infer_definition(parameter);
+            let definition = self.index.expect_single_definition(parameter);
+            let inference = infer_parameter_types_untracked(db, definition);
+            self.extend_definition(&inference);
         }
 
         validate_paramspec_components(&self.context, &function.parameters, |expr| {

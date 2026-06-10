@@ -30,7 +30,8 @@ pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_RE
 pub(crate) use self::infer::{
     InferredDeclaration, TypeContext, infer_complete_scope_types, infer_deferred_types,
     infer_definition_types, infer_expression_type, infer_expression_types,
-    infer_same_file_expression_type, infer_scope_types, is_discarded_dict_key_assignment,
+    infer_parameter_types_untracked, infer_same_file_expression_type, infer_scope_types,
+    is_discarded_dict_key_assignment,
 };
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
@@ -106,7 +107,7 @@ pub(crate) use literal::{
     BytesLiteralType, EnumLiteralType, LiteralValueType, LiteralValueTypeKind, StringLiteralType,
 };
 pub use special_form::SpecialFormType;
-use ty_python_core::definition::Definition;
+use ty_python_core::definition::{Definition, DefinitionKind};
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{Truthiness, place_table, semantic_index};
@@ -209,6 +210,10 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
 /// Infer the type of a binding.
 pub(crate) fn binding_type<'db>(db: &'db dyn Db, definition: Definition<'db>) -> Type<'db> {
+    if matches!(definition.kind(db), DefinitionKind::Parameter(_)) {
+        return infer_parameter_types_untracked(db, definition).binding_type(definition);
+    }
+
     let inference = infer_definition_types(db, definition);
     inference.binding_type(definition)
 }
@@ -218,6 +223,10 @@ pub(crate) fn inferred_declaration<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> InferredDeclaration<'db> {
+    if matches!(definition.kind(db), DefinitionKind::Parameter(_)) {
+        return infer_parameter_types_untracked(db, definition).inferred_declaration(definition);
+    }
+
     let inference = infer_definition_types(db, definition);
     inference.inferred_declaration(definition)
 }

@@ -124,6 +124,24 @@ pub(crate) fn infer_definition_types<'db>(
         .finish_definition(definition)
 }
 
+/// Infer a parameter without retaining a separate Salsa memo for its definition.
+///
+/// Parameter inference is small and is already repeated when function-body inference merges the
+/// parameter diagnostics, so retaining every result costs more than recomputing it.
+pub(crate) fn infer_parameter_types_untracked<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> DefinitionInference<'db> {
+    debug_assert!(matches!(definition.kind(db), DefinitionKind::Parameter(_)));
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
+        .finish_definition()
+}
+
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
 ///
 /// For example, inference synthesizes an `x["a"] = "bad"` binding for:

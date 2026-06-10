@@ -2,7 +2,7 @@ use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
 use crate::place::{ConsideredDefinitions, Place, global_symbol};
-use crate::types::{KnownClass, KnownInstanceType, check_types};
+use crate::types::{KnownClass, KnownInstanceType, binding_type, check_types};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
@@ -94,6 +94,48 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
     );
+
+    Ok(())
+}
+
+#[test]
+fn parameter_inference_is_not_memoized_per_definition() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+        def f(
+            positional: int,
+            *args: str,
+            keyword_only: bool,
+            **kwargs: bytes,
+        ) -> None:
+            pass
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    for (parameter_index, expected) in ["int", "tuple[str, ...]", "bool", "dict[str, bytes]"]
+        .into_iter()
+        .enumerate()
+    {
+        db.clear_salsa_events();
+        let actual = {
+            let module = parsed_module(&db, file).load(&db);
+            let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+            let parameter = function.parameters.iter().nth(parameter_index).unwrap();
+            let definition = semantic_index(&db, file).expect_single_definition(parameter);
+            binding_type(&db, definition).display(&db).to_string()
+        };
+        assert_eq!(actual, expected);
+        let events = db.take_salsa_events();
+
+        let module = parsed_module(&db, file).load(&db);
+        let function = module.syntax().body[0].as_function_def_stmt().unwrap();
+        let parameter = function.parameters.iter().nth(parameter_index).unwrap();
+        let definition = semantic_index(&db, file).expect_single_definition(parameter);
+        assert_function_query_was_not_run(&db, infer_definition_types, definition, &events);
+    }
 
     Ok(())
 }
