@@ -1,5 +1,9 @@
 use std::borrow::Cow;
+use std::ops::Range;
 
+use ruff_text_size::TextSize;
+
+use super::rest;
 use super::sections::{DocstringItem, DocstringSectionKind, DocstringSections};
 
 /// A tolerant, display-oriented parse of a normalized docstring.
@@ -10,10 +14,10 @@ pub(super) struct ParsedDocstring<'a> {
 
 impl<'a> ParsedDocstring<'a> {
     pub(super) fn parse(raw: &'a str) -> Self {
-        Self {
-            raw,
-            blocks: vec![],
-        }
+        let rest = rest::Docstring::parse(raw);
+        let blocks = parse_rest_blocks(raw, rest.field_lists());
+
+        Self { raw, blocks }
     }
 
     pub(super) fn render_markdown_source(&self) -> Cow<'a, str> {
@@ -48,6 +52,155 @@ impl<'a> ParsedDocstring<'a> {
             .filter_map(Block::as_section)
             .flat_map(SectionBlock::parameter_documentation)
             .collect()
+    }
+}
+
+fn parse_rest_blocks<'a>(raw: &'a str, field_lists: &[rest::FieldList]) -> Vec<Block<'a>> {
+    let mut blocks = Vec::new();
+    let mut rendered_through = 0;
+
+    for field_list in field_lists {
+        if field_list.indent() != TextSize::default() {
+            continue;
+        }
+
+        let range = field_list.range();
+        let start = range.start().to_usize();
+        let end = range.end().to_usize();
+        if start < rendered_through {
+            continue;
+        }
+
+        let Some(section) = basic_rest_section_block(field_list) else {
+            continue;
+        };
+
+        if !push_raw_block(&mut blocks, raw, rendered_through..start) {
+            return Vec::new();
+        }
+        blocks.push(Block::Section(section));
+        rendered_through = end;
+    }
+
+    if !blocks.is_empty() && !push_raw_block(&mut blocks, raw, rendered_through..raw.len()) {
+        return Vec::new();
+    }
+
+    blocks
+}
+
+fn push_raw_block<'a>(blocks: &mut Vec<Block<'a>>, raw: &'a str, range: Range<usize>) -> bool {
+    if range.is_empty() {
+        return true;
+    }
+
+    let Some(raw) = raw.get(range) else {
+        return false;
+    };
+    blocks.push(Block::Raw(raw));
+    true
+}
+
+fn basic_rest_section_block(field_list: &rest::FieldList) -> Option<SectionBlock> {
+    let plan = BasicRestFieldRenderPlan::from_fields(field_list.fields())?;
+    let items = plan.items(field_list.fields());
+    items
+        .iter()
+        .all(|item| !item.is_empty())
+        .then(|| SectionBlock::new(items))
+}
+
+/// Validates a basic reST field list and stores cross-field metadata needed while rendering.
+struct BasicRestFieldRenderPlan<'a> {
+    return_type: Option<&'a str>,
+    has_returns: bool,
+}
+
+impl<'a> BasicRestFieldRenderPlan<'a> {
+    fn from_fields(fields: &'a [rest::Field]) -> Option<Self> {
+        let mut has_rendered_field = false;
+        let mut has_returns = false;
+        let mut has_return_type = false;
+        let mut return_type = None;
+
+        for field in fields {
+            match field {
+                rest::Field::Parameter { .. } => {
+                    has_rendered_field = true;
+                }
+                rest::Field::Returns { .. } => {
+                    has_rendered_field = true;
+                    has_returns = true;
+                }
+                rest::Field::ReturnType { ty } => {
+                    if has_return_type {
+                        return None;
+                    }
+                    has_return_type = true;
+                    return_type = (!ty.is_empty()).then_some(ty.as_str());
+                    has_rendered_field |= return_type.is_some();
+                }
+                rest::Field::ParameterType { .. }
+                | rest::Field::Attribute { .. }
+                | rest::Field::AttributeType { .. }
+                | rest::Field::Raises { .. }
+                | rest::Field::Metadata
+                | rest::Field::Unknown { .. } => return None,
+            }
+        }
+
+        has_rendered_field.then_some(Self {
+            return_type,
+            has_returns,
+        })
+    }
+
+    fn items(&self, fields: &'a [rest::Field]) -> Vec<SectionItem> {
+        let mut items = Vec::new();
+
+        for field in fields {
+            match field {
+                rest::Field::Parameter {
+                    display_name,
+                    lookup_name,
+                    ty,
+                    description,
+                } => items.push(SectionItem::new(
+                    DocstringSectionKind::Parameters,
+                    Some(display_name.to_string()),
+                    Some(lookup_name.to_string()),
+                    ty.as_deref().map(str::to_string),
+                    description.clone(),
+                )),
+                rest::Field::Returns { name, description } => items.push(SectionItem::new(
+                    DocstringSectionKind::Returns,
+                    name.as_ref().map(ToString::to_string),
+                    None,
+                    self.return_type.map(str::to_string),
+                    description.clone(),
+                )),
+                rest::Field::ReturnType { .. } if !self.has_returns => {
+                    if let Some(return_type) = self.return_type {
+                        items.push(SectionItem::new(
+                            DocstringSectionKind::Returns,
+                            None,
+                            None,
+                            Some(return_type.to_string()),
+                            String::new(),
+                        ));
+                    }
+                }
+                rest::Field::ParameterType { .. }
+                | rest::Field::Attribute { .. }
+                | rest::Field::AttributeType { .. }
+                | rest::Field::Raises { .. }
+                | rest::Field::ReturnType { .. }
+                | rest::Field::Metadata
+                | rest::Field::Unknown { .. } => {}
+            }
+        }
+
+        items
     }
 }
 
@@ -174,6 +327,12 @@ impl SectionItem {
         }
         names
     }
+
+    fn is_empty(&self) -> bool {
+        self.display_name.is_none()
+            && self.ty.as_deref().is_none_or(str::is_empty)
+            && self.description.is_empty()
+    }
 }
 
 fn comma_separated_lookup_names(display_name: &str) -> Vec<String> {
@@ -213,6 +372,77 @@ mod tests {
         };
 
         assert_eq!(parsed.render_markdown_source(), "Summary.");
+    }
+
+    #[test]
+    fn basic_rest_field_lists_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+:param str value: The value.
+:param other: Another value.
+:returns: Whether validation passed.
+:rtype: bool
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value` (`str`): The value.
+        `other`: Another value.
+
+        ## Returns
+        `bool`: Whether validation passed.
+        ");
+
+        let docstring = "\
+Summary.
+
+:rtype: str
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Returns
+        `str`
+        ");
+    }
+
+    #[test]
+    fn unsupported_rest_field_lists_stay_raw() {
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:type value: int
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:raises ValueError: Invalid value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:unknown field: Preserve this field list.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
     }
 
     #[test]

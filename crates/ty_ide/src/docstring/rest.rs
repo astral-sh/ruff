@@ -47,6 +47,10 @@ impl Docstring {
 
         parameters
     }
+
+    pub(super) fn field_lists(&self) -> &[FieldList] {
+        &self.field_lists
+    }
 }
 
 /// Cursor over docstring lines and their line numbers.
@@ -100,7 +104,7 @@ impl<'a> DocstringLine<'a> {
 ///
 /// <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#field-lists>
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FieldList {
+pub(super) struct FieldList {
     start_line: usize,
     end_line: usize,
     range: TextRange,
@@ -109,6 +113,18 @@ struct FieldList {
 }
 
 impl FieldList {
+    pub(super) fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub(super) fn indent(&self) -> TextSize {
+        self.indent
+    }
+
+    pub(super) fn fields(&self) -> &[Field] {
+        &self.fields
+    }
+
     /// Parse all the field lists in the given lines of a docstring.
     fn parse_all(raw: &str) -> Vec<Self> {
         let mut field_lists = Vec::new();
@@ -558,7 +574,7 @@ impl<'a> FieldKind<'a> {
 
 /// Represents the reST fields captured by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Field {
+pub(super) enum Field {
     Parameter {
         display_name: CompactString,
         lookup_name: CompactString,
