@@ -1263,7 +1263,6 @@ impl<'db> Type<'db> {
                 other => contains_marker(other),
             };
 
-            // Function recursion is represented by explicit `RecursiveOrigin::Function` wrappers.
             // Implicit callable cycles stay in `Divergent` form for signature recovery.
             if has_structural_marker
                 && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
@@ -6689,15 +6688,23 @@ impl<'db> Type<'db> {
                 _ => self,
             },
             Type::Recursive(recursive) => match type_mapping {
-                TypeMapping::Materialize(_) => visitor.visit(db, self, type_mapping, || {
-                    let body = *recursive.body(db);
-                    let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                    if mapped == body {
-                        self
-                    } else {
-                        Type::recursive(db, recursive.binder_id(db), recursive.origin(db), mapped)
-                    }
-                }),
+                TypeMapping::Materialize(_)
+                | TypeMapping::ApplySpecializationWithMaterialization { .. } => {
+                    visitor.visit(db, self, type_mapping, || {
+                        let body = *recursive.body(db);
+                        let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                        if mapped == body {
+                            self
+                        } else {
+                            Type::recursive(
+                                db,
+                                recursive.binder_id(db),
+                                recursive.origin(db),
+                                mapped,
+                            )
+                        }
+                    })
+                }
                 _ => self,
             },
 

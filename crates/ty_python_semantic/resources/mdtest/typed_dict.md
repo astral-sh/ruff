@@ -1971,8 +1971,8 @@ static_assert(is_equivalent_to(Person1, Person2))
 
 # Mutually-recursive `TypedDict`s. Regression test for a stack overflow: the
 # `(TypedDict, TypedDict)` subtyping and disjointness arms had lost their
-# `with_recursion_guard`, and only *self*-recursion is folded into `Type::Recursive`,
-# so the mutual cycle (`Ping.other: Pong`, `Pong.other: Ping`) recursed forever.
+# `with_recursion_guard`, so the mutual cycle (`Ping.other: Pong`,
+# `Pong.other: Ping`) recursed forever.
 class Ping(TypedDict):
     other: "Pong"
 

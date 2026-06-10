@@ -1169,9 +1169,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
-            // but this is not true for divergent types (and moving this case any lower down appears to cause
-            // "too many cycle iterations" panics).
+            // Handle provisional cycle markers before the normal structural cases. If a matching
+            // `Type::Recursive` is already active, `check_divergent_type_pair` restores it;
+            // otherwise `Divergent` keeps its relation-specific gradual fallback.
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, source, target)
             }
