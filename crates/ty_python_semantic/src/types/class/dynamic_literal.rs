@@ -423,7 +423,6 @@ impl<'db> DynamicClassLiteral<'db> {
         match result {
             ClassMemberResult::Done(result) => result.finalize(db),
             ClassMemberResult::TypedDict(module) => {
-                // Simplified `TypedDict` handling without type mapping.
                 typed_dict_fallback_class_member(db, module, policy, name)
             }
         }

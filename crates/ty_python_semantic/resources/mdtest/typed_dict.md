@@ -2636,10 +2636,8 @@ python-version = "3.12"
 `TypedDict` class definitions have some special properties that can be used for introspection:
 
 ```py
-from typing import Generic, TypeVar, TypedDict as TypingTypedDict
+from typing import TypedDict as TypingTypedDict
 from typing_extensions import TypedDict
-
-T = TypeVar("T")
 
 class StdlibPerson(TypingTypedDict):
     name: str
@@ -2657,11 +2655,8 @@ DynamicPerson = type("DynamicPerson", (Person,), {})
 class Employee(Person):
     employee_id: int
 
-class GenericPerson(TypedDict, Generic[T]):
+class GenericPerson[T](TypedDict):
     value: T
-
-class SpecializedPerson(GenericPerson[int]):
-    pass
 
 StdlibPerson.__closed__  # error: [unresolved-attribute]
 StdlibPerson.__readonly_keys__  # error: [unresolved-attribute]
@@ -2678,7 +2673,7 @@ reveal_type(FunctionalPerson.__closed__)  # revealed: bool | None
 reveal_type(FunctionalPerson.__extra_items__)  # revealed: Any
 reveal_type(Employee.__closed__)  # revealed: bool | None
 reveal_type(DynamicPerson.__closed__)  # revealed: bool | None
-reveal_type(SpecializedPerson.__readonly_keys__)  # revealed: frozenset[str]
+reveal_type(GenericPerson[int].__readonly_keys__)  # revealed: frozenset[str]
 ```
 
 These attributes cannot be accessed on inhabitants:
