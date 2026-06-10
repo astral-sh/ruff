@@ -48,6 +48,7 @@ use smallvec::{SmallVec, smallvec};
 
 use crate::ReachabilityConstraintsBuilder;
 use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
+use crate::predicate::ScopedPredicateId;
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
@@ -426,6 +427,7 @@ impl Bindings {
         b: Self,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        preceding_branch_predicates: &[ScopedPredicateId],
     ) {
         let a = std::mem::take(self);
 
@@ -433,7 +435,12 @@ impl Bindings {
             .unbound_narrowing_constraint
             .zip(b.unbound_narrowing_constraint)
         {
-            self.unbound_narrowing_constraint = Some(narrowing_constraints.add_or_constraint(a, b));
+            self.unbound_narrowing_constraint = Some(merge_narrowing_constraints(
+                narrowing_constraints,
+                a,
+                b,
+                preceding_branch_predicates,
+            ));
         }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
@@ -447,8 +454,12 @@ impl Bindings {
                 EitherOrBoth::Both(a, b) => {
                     // If the same definition is visible through both paths, we OR the narrowing
                     // constraints: the type should be narrowed by whichever path was taken.
-                    let narrowing_constraint = narrowing_constraints
-                        .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
+                    let narrowing_constraint = merge_narrowing_constraints(
+                        narrowing_constraints,
+                        a.narrowing_constraint,
+                        b.narrowing_constraint,
+                        preceding_branch_predicates,
+                    );
 
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
@@ -548,9 +559,14 @@ impl PlaceState {
         b: PlaceState,
         narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        preceding_branch_predicates: &[ScopedPredicateId],
     ) {
-        self.bindings
-            .merge(b.bindings, narrowing_constraints, reachability_constraints);
+        self.bindings.merge(
+            b.bindings,
+            narrowing_constraints,
+            reachability_constraints,
+            preceding_branch_predicates,
+        );
         self.declarations
             .merge(b.declarations, reachability_constraints);
     }
@@ -565,6 +581,44 @@ impl PlaceState {
 
     pub(super) fn into_parts(self) -> (Bindings, Declarations) {
         (self.bindings, self.declarations)
+    }
+}
+
+/// Combines the narrowing from two branches that meet after an `if`/`elif` chain.
+///
+/// A later branch includes the failed checks from every earlier branch. For example, the two
+/// branches in `if A: ... elif B: ...` contribute `A` and `not A and B`. If both branches reach
+/// the next statement, `not A` is redundant and the merged condition can be stored as `A or B`.
+///
+/// We only remove an earlier predicate when the complete merged condition remains the same. This
+/// preserves `not A` when the `A` branch returns and only the `B` branch reaches the merge.
+fn merge_narrowing_constraints(
+    constraints: &mut NarrowingConstraintsBuilder,
+    accumulated: ScopedNarrowingConstraint,
+    branch: ScopedNarrowingConstraint,
+    preceding_branch_predicates: &[ScopedPredicateId],
+) -> ScopedNarrowingConstraint {
+    if accumulated == branch {
+        return accumulated;
+    }
+
+    if preceding_branch_predicates.is_empty() {
+        return constraints.add_bdd_or_constraint(accumulated, branch);
+    }
+
+    let merged = constraints.add_or_constraint(accumulated, branch);
+    if merged == ScopedNarrowingConstraint::ALWAYS_TRUE {
+        return merged;
+    }
+
+    let branch_without_preceding_predicates =
+        constraints.remove_predicates(branch, preceding_branch_predicates);
+    let merged_without_preceding_predicates =
+        constraints.add_or_constraint(accumulated, branch_without_preceding_predicates);
+    if constraints.are_equivalent(merged, merged_without_preceding_predicates) {
+        merged_without_preceding_predicates
+    } else {
+        merged
     }
 }
 
@@ -730,6 +784,7 @@ mod tests {
             sym1b,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
         let mut sym1 = sym1a;
         // Same constraint on both sides → OR(atom0, atom0) = atom0
@@ -764,6 +819,7 @@ mod tests {
             sym1b,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
         let sym2 = sym2a;
         // Different constraints: OR(atom1, atom2) produces a new TDD node (not a terminal)
@@ -792,6 +848,7 @@ mod tests {
             sym2b,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
         let sym3 = sym3a;
         let bindings: Vec<_> = sym3
@@ -809,6 +866,7 @@ mod tests {
             sym3,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
         let sym = sym1;
         let bindings: Vec<_> = sym
@@ -877,6 +935,7 @@ mod tests {
             sym2,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
 
         assert_declarations(&sym, &["1", "2"]);
@@ -898,6 +957,7 @@ mod tests {
             sym2,
             &mut narrowing_constraints,
             &mut reachability_constraints,
+            &[],
         );
 
         assert_declarations(&sym, &["undeclared", "1"]);

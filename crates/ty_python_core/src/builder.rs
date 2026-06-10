@@ -1209,6 +1209,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().merge(state);
     }
 
+    fn flow_merge_after_branches(
+        &mut self,
+        state: FlowSnapshot,
+        preceding_branch_predicates: &[ScopedPredicateId],
+    ) {
+        self.current_use_def_map_mut()
+            .merge_after_branches(state, preceding_branch_predicates);
+    }
+
     /// Add a symbol to the place table and the use-def map.
     /// Return the [`ScopedPlaceId`] that uniquely identifies the symbol in both.
     fn add_symbol(&mut self, name: Name) -> ScopedSymbolId {
@@ -3117,7 +3126,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_body(&node.body);
 
-                let mut post_clauses: Vec<FlowSnapshot> = vec![];
+                let mut post_clauses: Vec<(FlowSnapshot, ScopedPredicateId)> = vec![];
                 let elif_else_clauses = node
                     .elif_else_clauses
                     .iter()
@@ -3137,7 +3146,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 for (clause_test, clause_body) in elif_else_clauses {
                     // snapshot after every block except the last; the last one will just become
                     // the state that we merge the other snapshots into
-                    post_clauses.push(self.flow_snapshot());
+                    post_clauses.push((self.flow_snapshot(), last_narrowing_id));
                     // we can only take an elif/else branch if none of the previous ones were
                     // taken
                     self.flow_restore(condition_flow_snapshot.falsy());
@@ -3183,8 +3192,41 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     self.visit_body(clause_body);
                 }
 
-                for post_clause_state in post_clauses {
+                // An ordinary `if` only has one saved branch. Keep the final branch in place so
+                // that we avoid cloning the entire flow state just to merge the two branches.
+                if post_clauses.len() == 1
+                    && let Some((post_clause_state, _)) = post_clauses.pop()
+                {
                     self.flow_merge(post_clause_state);
+                } else {
+                    let final_clause = self.flow_snapshot();
+                    let mut preceding_predicates = Vec::with_capacity(post_clauses.len());
+                    let mut merged_reachable_clause = false;
+
+                    for (post_clause_state, predicate) in post_clauses {
+                        if !post_clause_state.is_always_unreachable() {
+                            if merged_reachable_clause {
+                                self.flow_merge_after_branches(
+                                    post_clause_state,
+                                    &preceding_predicates,
+                                );
+                            } else {
+                                self.flow_restore(post_clause_state);
+                                merged_reachable_clause = true;
+                            }
+                        }
+                        preceding_predicates.push(predicate);
+                    }
+
+                    if !final_clause.is_always_unreachable() {
+                        if merged_reachable_clause {
+                            self.flow_merge_after_branches(final_clause, &preceding_predicates);
+                        } else {
+                            self.flow_restore(final_clause);
+                        }
+                    } else if !merged_reachable_clause {
+                        self.flow_restore(final_clause);
+                    }
                 }
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
@@ -3865,22 +3907,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                         if self.in_function_scope() {
                             self.record_reachability_constraint_id(predicate_id);
-
-                            // Also gate narrowing by this constraint: if the call returns
-                            // `Never`, any narrowing in the current branch should be
-                            // invalidated (since this path is unreachable). This enables
-                            // narrowing to be preserved after if-statements where one branch
-                            // calls a `NoReturn` function like `sys.exit()`.
-                            self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
-                        } else {
-                            // In non-function scopes, we only record a narrowing constraint
-                            // (not a reachability constraint). Recording reachability for
-                            // calls in module scope is simply too expensive, and it's not
-                            // too important of a use case.
-                            self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         }
+
+                        // Gate narrowing by this constraint: if the call returns `Never`, any
+                        // narrowing in the current branch should be invalidated. In non-function
+                        // scopes, only record narrowing because call reachability is too expensive.
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_all_places(narrowing_constraint);
                     }
                 }
             }

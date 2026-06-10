@@ -70,7 +70,106 @@ def _(x: A | B | C):
 
     # Only the if-branch (A) and elif-branch (B) flow through.
     # The else-branch returned, so its narrowing doesn't participate.
-    reveal_type(x)  # revealed: (B & ~A) | A
+    reveal_type(x)  # revealed: B | A
+```
+
+## Earlier branch checks can be dropped after the paths merge
+
+When two branches both reach the next statement, the later branch no longer needs to remember the
+failed check that sent execution past the earlier branch.
+
+```py
+from typing import Any, NoReturn
+from typing_extensions import TypeGuard, TypeIs
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def is_a(x: object) -> TypeIs[A]:
+    return isinstance(x, A)
+
+def is_b(x: object) -> TypeIs[B]:
+    return isinstance(x, B)
+
+def is_c(x: object) -> TypeIs[C]:
+    return isinstance(x, C)
+
+def guard_a(x: object) -> TypeGuard[A]:
+    return isinstance(x, A)
+
+def exact_narrowing(x: A | B | C | D):
+    if is_a(x):
+        pass
+    elif is_b(x):
+        pass
+    elif is_c(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
+def noop() -> None:
+    pass
+
+def stop() -> NoReturn:
+    raise RuntimeError
+
+def calls_in_branches(x: A | B | C | D):
+    if is_a(x):
+        noop()
+    elif is_b(x):
+        noop()
+    elif is_c(x):
+        noop()
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
+def mixed_call_branches(x: A | B | C | D):
+    if is_a(x):
+        noop()
+    elif is_b(x):
+        pass
+    elif is_c(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: C | B | A
+
+def noreturn_call_removes_branch(x: A | B | C):
+    if is_a(x):
+        stop()
+    elif is_b(x):
+        noop()
+    else:
+        return
+
+    reveal_type(x)  # revealed: B & ~A
+
+def one_sided_narrowing(x: A | B | C):
+    if guard_a(x):
+        pass
+    elif is_b(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: B | A
+
+def gradual_narrowing(x: Any):
+    if is_a(x):
+        pass
+    elif is_b(x):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: (Any & B) | (Any & A)
 ```
 
 ## Narrowing is preserved with multiple terminal branches

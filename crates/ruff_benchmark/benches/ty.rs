@@ -1000,6 +1000,128 @@ fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Regression benchmark for dropping failed earlier `isinstance` checks after branches that
+/// contain ordinary calls merge.
+///
+/// Every matching branch reaches the statements after the chain, so the merged type should be
+/// `C0 | C1 | ...` without retaining the failed checks from the preceding branches.
+///
+/// Sample code structure:
+/// ```python
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         noop()
+///     elif isinstance(obj, C1):
+///         noop()
+///     ...
+///     else:
+///         return
+///
+///     obj
+///     obj
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing_across_calls(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+    const NUM_USES: usize = 10;
+
+    setup_rayon();
+
+    let mut code = "class Base: ...\n".to_string();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    code.push_str("\ndef noop() -> None: ...\n\n");
+
+    code.push_str("def f(obj: Base) -> None:\n");
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        code.push_str("        noop()\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..NUM_USES {
+        code.push_str("    obj\n");
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_across_calls]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for dropping failed earlier `isinstance` checks when branches with and
+/// without ordinary calls merge.
+///
+/// Every matching branch reaches the statements after the chain, but only the first branch
+/// contains a call. The merged type should still be `C0 | C1 | ...` without retaining the failed
+/// checks from the preceding branches.
+///
+/// Sample code structure:
+/// ```python
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         noop()
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+///     else:
+///         return
+///
+///     obj
+///     obj
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing_mixed_calls(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+    const NUM_USES: usize = 10;
+
+    setup_rayon();
+
+    let mut code = "class Base: ...\n".to_string();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    code.push_str("\ndef noop() -> None: ...\n\n");
+
+    code.push_str("def f(obj: Base) -> None:\n");
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+            code.push_str("        noop()\n");
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+            code.push_str("        pass\n");
+        }
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..NUM_USES {
+        code.push_str("    obj\n");
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing_mixed_calls]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 const NUM_LITERAL_FALLTHROUGH_ARMS: usize = 40;
 
 fn is_literal_fallthrough_arm(index: usize) -> bool {
@@ -1205,6 +1327,68 @@ fn benchmark_typeis_narrowing(criterion: &mut Criterion) {
     criterion.bench_function("ty_micro[typeis_narrowing]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(include_str!("../resources/typeis_narrowing.py")),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Regression benchmark for repeatedly using a value after a long `TypeIs` `elif` chain.
+///
+/// Every matching branch reaches the calls after the chain, while the `else` branch returns. The
+/// merged type should be `C0 | C1 | ...` instead of keeping `not C0`, `not C1`, and so on in each
+/// later branch.
+fn benchmark_typeis_elif_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 40;
+    const LOADS_AFTER_CHAIN: usize = 10;
+
+    setup_rayon();
+
+    let mut code = r#"
+from typing import TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T")
+
+class Source: ...
+"#
+    .to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Source): ...").ok();
+    }
+
+    code.push_str(
+        r#"
+def istype(value: object, cls: type[T]) -> TypeIs[T]:
+    raise NotImplementedError
+
+def consume(value: object) -> None: ...
+
+def check(source: Source) -> None:
+"#,
+    );
+
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if istype(source, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif istype(source, C{i}):").ok();
+        }
+        code.push_str("        pass\n");
+    }
+    code.push_str("    else:\n        return\n\n");
+    for _ in 0..LOADS_AFTER_CHAIN {
+        code.push_str("    consume(source)\n");
+    }
+
+    criterion.bench_function("ty_micro[typeis_elif_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
             |case| {
                 let Case { db, .. } = case;
                 let result = db.check();
@@ -1520,10 +1704,13 @@ criterion_group!(
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
     benchmark_large_isinstance_narrowing,
+    benchmark_large_isinstance_narrowing_across_calls,
+    benchmark_large_isinstance_narrowing_mixed_calls,
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
     benchmark_typeis_narrowing,
+    benchmark_typeis_elif_narrowing,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
     benchmark_pydantic_core_schema_dict,

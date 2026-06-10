@@ -559,6 +559,11 @@ pub(crate) fn narrow_type_by_constraint<'db>(
 ) -> Type<'db> {
     let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
     let projected_root = projector.project(id);
+    let projected_root = if projector.resolved_nonterminal_call {
+        projector.graph.reduce(projected_root)
+    } else {
+        projected_root
+    };
     let mut context = ProjectedNarrowingContext {
         db,
         base_ty,
@@ -613,6 +618,7 @@ struct ProjectedNarrowingGraph<'db> {
     node_cache: FxHashMap<ProjectedNarrowingNode, ProjectedNarrowingNodeId>,
     or_cache:
         FxHashMap<(ProjectedNarrowingNodeId, ProjectedNarrowingNodeId), ProjectedNarrowingNodeId>,
+    reduction_cache: FxHashMap<ProjectedNarrowingNodeId, ProjectedNarrowingNodeId>,
     predicate_constraints_cache: FxHashMap<
         ScopedPredicateId,
         (
@@ -645,6 +651,58 @@ impl ProjectedNarrowingGraph<'_> {
         self.nodes.push(node);
         self.node_cache.insert(node, id);
         id
+    }
+
+    /// Removes conditions made redundant by another path through the graph.
+    ///
+    /// Resolving a call predicate can expose a formula such as `A or (not A and B)`. The earlier
+    /// `A` path means that `not A` no longer narrows the `B` path, so this reduces the formula to
+    /// `A or B`.
+    fn reduce(&mut self, id: ProjectedNarrowingNodeId) -> ProjectedNarrowingNodeId {
+        if id.is_terminal() {
+            return id;
+        }
+        if let Some(cached) = self.reduction_cache.get(&id) {
+            return *cached;
+        }
+
+        let node = self.node(id);
+        let if_true = self.reduce(node.if_true);
+        let if_uncertain = self.reduce(node.if_uncertain);
+        let if_false = self.reduce(node.if_false);
+
+        let when_true = self.or(if_true, if_uncertain);
+        let when_true = self.reduce(when_true);
+        let when_false = self.or(if_false, if_uncertain);
+        let when_false = self.reduce(when_false);
+
+        let reduced = if when_true == when_false {
+            when_true
+        } else if when_true == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+                if_uncertain: when_false,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            })
+        } else if when_false == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+                if_uncertain: when_true,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            })
+        } else {
+            self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true,
+                if_uncertain,
+                if_false,
+            })
+        };
+
+        self.reduction_cache.insert(id, reduced);
+        reduced
     }
 
     /// Returns the projected nodes that join multiple incoming paths.
@@ -751,6 +809,7 @@ struct NarrowingProjector<'a, 'db> {
     place: ScopedPlaceId,
     project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
+    resolved_nonterminal_call: bool,
 }
 
 impl<'a, 'db> NarrowingProjector<'a, 'db> {
@@ -768,6 +827,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             place,
             project_cache: FxHashMap::default(),
             graph: ProjectedNarrowingGraph::default(),
+            resolved_nonterminal_call: false,
         }
     }
 
@@ -807,6 +867,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                 let predicate = self.predicates[node.atom()];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    self.resolved_nonterminal_call = true;
                     let if_uncertain = self.project(node.if_uncertain());
                     match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => {
@@ -907,10 +968,42 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
 
+            if node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                    return self.narrow(node.if_false, false_accumulated);
+                }
+                if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                    return self.narrow(node.if_true, true_accumulated);
+                }
+
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_ty = self.narrow(node.if_true, true_accumulated);
+
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
+
+                return UnionType::from_two_elements(self.db, true_ty, false_ty);
+            }
+
+            let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                    return uncertain_ty;
+                }
+
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
+                return UnionType::from_two_elements(self.db, uncertain_ty, false_ty);
+            }
+
             let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
             let true_ty = self.narrow(node.if_true, true_accumulated);
 
-            let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+            if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+                return UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
+            }
 
             let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
             let false_ty = self.narrow(node.if_false, false_accumulated);

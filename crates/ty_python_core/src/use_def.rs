@@ -1503,6 +1503,7 @@ impl<'db> UseDefMapBuilder<'db> {
             post_definition_state,
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
+            &[],
         );
 
         // And similarly for all associated members:
@@ -1530,6 +1531,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 post_definition_state,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
+                &[],
             );
         }
     }
@@ -1794,6 +1796,7 @@ impl<'db> UseDefMapBuilder<'db> {
                     new_symbol_state.bindings().clone(),
                     &mut self.narrowing_constraints,
                     &mut self.reachability_constraints,
+                    &[],
                 );
             }
             Some(EnclosingSnapshot::Constraint(constraint)) => {
@@ -1877,6 +1880,22 @@ impl<'db> UseDefMapBuilder<'db> {
     /// path to get here. The new state for each place should include definitions from both the
     /// prior state and the snapshot.
     pub(super) fn merge(&mut self, snapshot: FlowSnapshot) {
+        self.merge_inner(snapshot, &[]);
+    }
+
+    pub(super) fn merge_after_branches(
+        &mut self,
+        snapshot: FlowSnapshot,
+        preceding_branch_predicates: &[ScopedPredicateId],
+    ) {
+        self.merge_inner(snapshot, preceding_branch_predicates);
+    }
+
+    fn merge_inner(
+        &mut self,
+        snapshot: FlowSnapshot,
+        preceding_branch_predicates: &[ScopedPredicateId],
+    ) {
         // As an optimization, if we know statically that either of the snapshots is always
         // unreachable, we can leave it out of the merged result entirely. Note that we cannot
         // perform any type inference at this point, so this is largely limited to unreachability
@@ -1908,6 +1927,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 branch,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
+                preceding_branch_predicates,
             );
         }
 
@@ -1921,6 +1941,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 branch,
                 &mut self.narrowing_constraints,
                 &mut self.reachability_constraints,
+                preceding_branch_predicates,
             );
         }
 

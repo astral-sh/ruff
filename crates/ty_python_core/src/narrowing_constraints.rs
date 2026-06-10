@@ -135,6 +135,13 @@ pub struct NarrowingConstraintsBuilder {
         (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
         ScopedNarrowingConstraint,
     >,
+    remove_predicate_cache:
+        FxHashMap<(ScopedNarrowingConstraint, ScopedPredicateId), ScopedNarrowingConstraint>,
+    bdd_or_cache: FxHashMap<
+        (ScopedNarrowingConstraint, ScopedNarrowingConstraint),
+        ScopedNarrowingConstraint,
+    >,
+    bdd_projection_cache: FxHashMap<ScopedNarrowingConstraint, ScopedNarrowingConstraint>,
 }
 
 impl NarrowingConstraintsBuilder {
@@ -291,6 +298,21 @@ impl NarrowingConstraintsBuilder {
         result
     }
 
+    /// Combines two formulas as an ordinary BDD, without creating `if_uncertain` edges.
+    ///
+    /// Other control-flow merges use this operation so they keep producing narrowed types in the
+    /// same order as before. The `if`/`elif` continuation merge uses
+    /// [`Self::add_or_constraint`] to avoid copying every earlier branch into every later one.
+    pub(crate) fn add_bdd_or_constraint(
+        &mut self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        let a = self.project_to_bdd(a);
+        let b = self.project_to_bdd(b);
+        self.add_bdd_or(a, b)
+    }
+
     pub(crate) fn add_and_constraint(
         &mut self,
         a: ScopedNarrowingConstraint,
@@ -369,6 +391,159 @@ impl NarrowingConstraintsBuilder {
         self.and_cache.insert((a, b), result);
         result
     }
+
+    /// Removes the listed predicates from a formula.
+    ///
+    /// The result is true whenever the original formula is true for either value of each removed
+    /// predicate.
+    pub(crate) fn remove_predicates(
+        &mut self,
+        mut constraint: ScopedNarrowingConstraint,
+        predicates: &[ScopedPredicateId],
+    ) -> ScopedNarrowingConstraint {
+        for &predicate in predicates {
+            constraint = self.remove_predicate(constraint, predicate);
+        }
+        constraint
+    }
+
+    fn remove_predicate(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        predicate: ScopedPredicateId,
+    ) -> ScopedNarrowingConstraint {
+        if constraint.is_terminal() {
+            return constraint;
+        }
+        if let Some(cached) = self.remove_predicate_cache.get(&(constraint, predicate)) {
+            return *cached;
+        }
+
+        let node = self.interiors[constraint];
+        let if_true = self.remove_predicate(node.if_true, predicate);
+        let if_uncertain = self.remove_predicate(node.if_uncertain, predicate);
+        let if_false = self.remove_predicate(node.if_false, predicate);
+        let result = if node.atom == predicate {
+            let either_branch = self.add_or_constraint(if_true, if_false);
+            self.add_or_constraint(either_branch, if_uncertain)
+        } else {
+            self.add_interior(InteriorNode {
+                atom: node.atom,
+                if_true,
+                if_uncertain,
+                if_false,
+            })
+        };
+        self.remove_predicate_cache
+            .insert((constraint, predicate), result);
+        result
+    }
+
+    pub(crate) fn are_equivalent(
+        &mut self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> bool {
+        self.project_to_bdd(a) == self.project_to_bdd(b)
+    }
+
+    /// Expands the `if_uncertain` edge into both other edges, producing a canonical BDD.
+    fn project_to_bdd(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        match constraint {
+            ALWAYS_TRUE | ALWAYS_FALSE => constraint,
+            _ => {
+                if let Some(cached) = self.bdd_projection_cache.get(&constraint) {
+                    return *cached;
+                }
+                if self.interiors.len() >= MAX_INTERIOR_NODES {
+                    return ALWAYS_TRUE;
+                }
+
+                let node = self.interiors[constraint];
+                let if_true = self.project_to_bdd(node.if_true);
+                let if_uncertain = self.project_to_bdd(node.if_uncertain);
+                let if_false = self.project_to_bdd(node.if_false);
+                let if_true = self.add_bdd_or(if_true, if_uncertain);
+                let if_false = self.add_bdd_or(if_false, if_uncertain);
+                let result = self.add_interior(InteriorNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain: ALWAYS_FALSE,
+                    if_false,
+                });
+                self.bdd_projection_cache.insert(constraint, result);
+                result
+            }
+        }
+    }
+
+    /// Computes OR for formulas that have already been converted to ordinary BDDs.
+    fn add_bdd_or(
+        &mut self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> ScopedNarrowingConstraint {
+        match (a, b) {
+            (ALWAYS_TRUE, _) | (_, ALWAYS_TRUE) => return ALWAYS_TRUE,
+            (ALWAYS_FALSE, other) | (other, ALWAYS_FALSE) => return other,
+            _ if a == b => return a,
+            _ => {}
+        }
+
+        let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
+        if let Some(cached) = self.bdd_or_cache.get(&(a, b)) {
+            return *cached;
+        }
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return ALWAYS_TRUE;
+        }
+
+        let result = match self.cmp_atoms(a, b) {
+            Ordering::Equal => {
+                let a_node = self.interiors[a];
+                let b_node = self.interiors[b];
+                debug_assert_eq!(a_node.if_uncertain, ALWAYS_FALSE);
+                debug_assert_eq!(b_node.if_uncertain, ALWAYS_FALSE);
+                let if_true = self.add_bdd_or(a_node.if_true, b_node.if_true);
+                let if_false = self.add_bdd_or(a_node.if_false, b_node.if_false);
+                self.add_interior(InteriorNode {
+                    atom: a_node.atom,
+                    if_true,
+                    if_uncertain: ALWAYS_FALSE,
+                    if_false,
+                })
+            }
+            Ordering::Less => {
+                let node = self.interiors[a];
+                debug_assert_eq!(node.if_uncertain, ALWAYS_FALSE);
+                let if_true = self.add_bdd_or(node.if_true, b);
+                let if_false = self.add_bdd_or(node.if_false, b);
+                self.add_interior(InteriorNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain: ALWAYS_FALSE,
+                    if_false,
+                })
+            }
+            Ordering::Greater => {
+                let node = self.interiors[b];
+                debug_assert_eq!(node.if_uncertain, ALWAYS_FALSE);
+                let if_true = self.add_bdd_or(a, node.if_true);
+                let if_false = self.add_bdd_or(a, node.if_false);
+                self.add_interior(InteriorNode {
+                    atom: node.atom,
+                    if_true,
+                    if_uncertain: ALWAYS_FALSE,
+                    if_false,
+                })
+            }
+        };
+        self.bdd_or_cache.insert((a, b), result);
+        result
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -438,5 +613,33 @@ mod tests {
         assert_eq!(root.if_true, ALWAYS_TRUE);
         assert_eq!(root.if_uncertain, a);
         assert_eq!(root.if_false, ALWAYS_FALSE);
+    }
+
+    #[test]
+    fn removing_a_predicate_accepts_either_value() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let b = constraints.add_atom(predicate(1));
+        let not_a = constraints.add_negated_atom(predicate(0));
+        let branch = constraints.add_and_constraint(not_a, b);
+
+        let without_a = constraints.remove_predicates(branch, &[predicate(0)]);
+
+        assert!(constraints.are_equivalent(without_a, b));
+    }
+
+    #[test]
+    fn removing_a_predicate_is_only_safe_after_a_preceding_branch_reaches_the_merge() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let a = constraints.add_atom(predicate(0));
+        let b = constraints.add_atom(predicate(1));
+        let not_a = constraints.add_negated_atom(predicate(0));
+        let later_branch = constraints.add_and_constraint(not_a, b);
+        let without_a = constraints.remove_predicates(later_branch, &[predicate(0)]);
+
+        let merged = constraints.add_or_constraint(a, later_branch);
+        let merged_without_a = constraints.add_or_constraint(a, without_a);
+        assert!(constraints.are_equivalent(merged, merged_without_a));
+
+        assert!(!constraints.are_equivalent(later_branch, without_a));
     }
 }
