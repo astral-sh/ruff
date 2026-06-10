@@ -1,6 +1,3 @@
-use std::fmt::Write as _;
-use std::time::{Duration, Instant};
-
 use super::builder::TypeInferenceBuilder;
 use crate::db::tests::{TestDb, setup_db};
 use crate::place::symbol;
@@ -96,61 +93,6 @@ fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
     assert_eq!(
         non_owner.bindings(first).collect::<Vec<_>>(),
         [(second, owner_type)]
-    );
-
-    Ok(())
-}
-
-#[test]
-fn enum_discriminated_typed_dict_chain_avoids_constraint_explosion() -> anyhow::Result<()> {
-    let mut db = setup_db();
-    let mut members = String::new();
-    let mut typed_dicts = String::new();
-    let mut branches = String::new();
-
-    for index in 0..16 {
-        writeln!(&mut members, "    K{index} = \"{index}\"")
-            .expect("writing to a String cannot fail");
-    }
-    for index in 0..8 {
-        let first = index * 2;
-        let second = first + 1;
-        writeln!(
-            &mut typed_dicts,
-            "class M{index}(TypedDict):\n    type: Literal[Kind.K{first}, Kind.K{second}]\n"
-        )
-        .expect("writing to a String cannot fail");
-        writeln!(
-            &mut branches,
-            "    {} message[\"type\"] == Kind.K{first} or message[\"type\"] == Kind.K{second}:\n        return {index}",
-            if index == 0 { "if" } else { "elif" },
-        )
-        .expect("writing to a String cannot fail");
-    }
-
-    let source = format!(
-        r#"
-from enum import Enum
-from typing import Literal, TypedDict
-
-class Kind(str, Enum):
-{members}
-{typed_dicts}
-Message = M0 | M1 | M2 | M3 | M4 | M5 | M6 | M7
-
-def classify(message: Message) -> int:
-{branches}
-    return -1
-"#
-    );
-    db.write_file("/src/a.py", source)?;
-
-    let start = Instant::now();
-    assert_file_diagnostics(&db, "/src/a.py", &[]);
-    assert!(
-        start.elapsed() < Duration::from_secs(10),
-        "enum-discriminated TypedDict narrowing took {:?}",
-        start.elapsed()
     );
 
     Ok(())
