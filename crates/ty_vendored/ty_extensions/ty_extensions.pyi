@@ -319,11 +319,6 @@ class NamedTupleLike(Protocol):
     if sys.version_info >= (3, 13):
         def __replace__(self, *args, **kwargs) -> Self: ...
 
-class ExactlySized[Length: int](Protocol):
-    """A protocol for objects whose length is statically known."""
-
-    def __len__(self) -> Length: ...
-
 # Special variants of the corresponding protocols in `typing`, but without the
 # `__iter__`/`__aiter__` on Iterator/AsyncIterator, which is often omitted in
 # practice. These protocols are used for generating better `non-iterable` error
