@@ -5856,6 +5856,21 @@ impl<'db> Type<'db> {
                 | Type::AlwaysFalsy
                 | Type::LiteralValue(_)
                 | Type::BoundSuper(_)
+                | Type::KnownInstance(
+                    KnownInstanceType::SubscriptedProtocol(_)
+                        | KnownInstanceType::SubscriptedGeneric(_)
+                        | KnownInstanceType::TypeAliasType(_)
+                        | KnownInstanceType::Deprecated(_)
+                        | KnownInstanceType::Field(_)
+                        | KnownInstanceType::ConstraintSet(_)
+                        | KnownInstanceType::GenericContext(_)
+                        | KnownInstanceType::Specialization(_)
+                        | KnownInstanceType::Literal(_)
+                        | KnownInstanceType::LiteralStringAlias(_)
+                        | KnownInstanceType::NewType(_)
+                        | KnownInstanceType::Sentinel(_)
+                        | KnownInstanceType::NamedTupleSpec(_),
+                )
                 | Type::KnownBoundMethod(
                     KnownBoundMethodType::StrStartswith(_)
                         | KnownBoundMethodType::ConstraintSetRange
