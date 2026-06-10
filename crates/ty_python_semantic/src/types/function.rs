@@ -52,6 +52,7 @@
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use itertools::Either;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -720,9 +721,18 @@ impl<'db> OverloadLiteral<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
+    has_no_overloads: bool,
 }
 
 impl<'db> FunctionLiteral<'db> {
+    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
+        Self {
+            last_definition,
+            has_no_overloads: !last_definition.is_overload(db)
+                && last_definition.previous_overload(db).is_none(),
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition.name(db)
@@ -794,9 +804,13 @@ impl<'db> FunctionLiteral<'db> {
             (overloads.into_boxed_slice(), implementation)
         }
 
-        let (overloads, implementation) =
-            overloads_and_implementation_inner(db, self.last_definition);
-        (overloads.as_ref(), *implementation)
+        if self.has_no_overloads {
+            (&[], Some(self.last_definition))
+        } else {
+            let (overloads, implementation) =
+                overloads_and_implementation_inner(db, self.last_definition);
+            (overloads.as_ref(), *implementation)
+        }
     }
 
     fn has_separate_implementation(self, db: &'db dyn Db) -> bool {
@@ -808,8 +822,12 @@ impl<'db> FunctionLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> impl DoubleEndedIterator<Item = OverloadLiteral<'db>> + 'db {
-        let (overloads, implementation) = self.overloads_and_implementation(db);
-        overloads.iter().copied().chain(implementation)
+        if self.has_no_overloads {
+            Either::Left(std::iter::once(self.last_definition))
+        } else {
+            let (overloads, implementation) = self.overloads_and_implementation(db);
+            Either::Right(overloads.iter().copied().chain(implementation))
+        }
     }
 
     /// Typed externally-visible signature for this function.
@@ -824,6 +842,10 @@ impl<'db> FunctionLiteral<'db> {
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
     fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+        if self.has_no_overloads {
+            return CallableSignature::single(self.last_definition.signature(db));
+        }
+
         // We only include an implementation (i.e. a definition not decorated with `@overload`) if
         // it's the only definition.
         let (overloads, implementation) = self.overloads_and_implementation(db);
@@ -1127,7 +1149,10 @@ impl<'db> FunctionType<'db> {
         let last_definition = literal
             .last_definition
             .with_dataclass_transformer_params(db, params);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition,
+            has_no_overloads: literal.has_no_overloads,
+        };
         Self::new(db, literal, None)
     }
 
@@ -1140,7 +1165,10 @@ impl<'db> FunctionType<'db> {
         // previous overloads.
         let literal = self.literal(db);
         let last_definition = literal.last_definition.with_deprecated(db, deprecated);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition,
+            has_no_overloads: literal.has_no_overloads,
+        };
         Self::new(db, literal, self.updated_signatures(db).cloned())
     }
 
