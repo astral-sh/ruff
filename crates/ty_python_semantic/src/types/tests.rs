@@ -3,7 +3,7 @@ use crate::FxOrderSet;
 use crate::db::tests::{TestDb, TestDbBuilder, setup_db};
 use crate::place::{global_symbol, typing_extensions_symbol, typing_symbol};
 use crate::types::type_alias::PEP695TypeAliasType;
-use crate::types::typevar::{TypeVarIdentity, TypeVarInstance};
+use crate::types::typevar::{TypeVarIdentity, TypeVarInstance, TypeVarNonce};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
@@ -475,6 +475,7 @@ fn recursive_alias_legacy_typevars() {
         ),
         BindingContext::Synthetic,
         None,
+        TypeVarNonce::NONE,
     );
     let binder_id = salsa::plumbing::Id::from_bits(1);
     let recursive = Type::implicit_recursive(
