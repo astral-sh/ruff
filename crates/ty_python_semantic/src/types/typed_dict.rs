@@ -350,19 +350,22 @@ impl<'db> TypedDictType<'db> {
         })
     }
 
-    /// Returns the value type that is safe to read through an arbitrary string key.
+    /// Returns the type that a value must be assignable to when initializing an arbitrary string
+    /// key.
     ///
     /// The runtime key may name either an extra item or any declared item, so the result is the
-    /// intersection of all of those value types. Returns `None` unless extra items are explicit.
-    pub(crate) fn arbitrary_key_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.arbitrary_key_value_type_excluding(db, &OrderSet::new())
+    /// intersection of all possible destination item types. Returns `None` unless extra items are
+    /// explicit.
+    pub(crate) fn arbitrary_key_initialization_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.arbitrary_key_initialization_type_excluding(db, &OrderSet::new())
     }
 
-    /// Returns the arbitrary-key read type after excluding keys that are known to be shadowed.
+    /// Returns the arbitrary-key initialization type after excluding keys that are known to be
+    /// shadowed.
     ///
     /// This is used while validating merged dictionary literals, where later entries determine the
     /// final value for a known key.
-    fn arbitrary_key_value_type_excluding(
+    fn arbitrary_key_initialization_type_excluding(
         self,
         db: &'db dyn Db,
         excluded_keys: &OrderSet<Name>,
@@ -380,11 +383,11 @@ impl<'db> TypedDictType<'db> {
         ))
     }
 
-    /// Returns the value type that is safe to write through an arbitrary string key.
+    /// Returns the type that a value must be assignable to when mutating an arbitrary string key.
     ///
-    /// A write may target any declared or extra item, so no such write is allowed if any possible
-    /// destination is read-only.
-    pub(crate) fn arbitrary_key_write_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    /// A mutation may target any declared or extra item, so no such mutation is allowed if any
+    /// possible destination is read-only.
+    pub(crate) fn arbitrary_key_mutation_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self
             .explicit_extra_items(db)
             .is_some_and(TypedDictExtraItems::is_read_only)
@@ -393,7 +396,7 @@ impl<'db> TypedDictType<'db> {
             return None;
         }
 
-        self.arbitrary_key_value_type(db)
+        self.arbitrary_key_initialization_type(db)
     }
 
     /// Returns whether operations that delete an arbitrary key are safe.
@@ -2625,7 +2628,7 @@ fn validate_merged_dict_literal<'db, 'ast>(
             let Some(key_literal) = key_ty.as_string_literal() else {
                 if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
                     if let Some(expected_ty) =
-                        typed_dict.arbitrary_key_value_type_excluding(db, shadowed_keys)
+                        typed_dict.arbitrary_key_initialization_type_excluding(db, shadowed_keys)
                     {
                         let value_ty =
                             expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));

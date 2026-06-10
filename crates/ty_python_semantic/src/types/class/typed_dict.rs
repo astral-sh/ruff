@@ -246,9 +246,9 @@ fn synthesize_typed_dict_setitem<'db>(
         .iter()
         .filter(|(_, field)| !field.is_read_only())
         .peekable();
-    let arbitrary_key_write_type = typed_dict.arbitrary_key_write_type(db);
+    let arbitrary_key_mutation_type = typed_dict.arbitrary_key_mutation_type(db);
 
-    if writable_fields.peek().is_none() && arbitrary_key_write_type.is_none() {
+    if writable_fields.peek().is_none() && arbitrary_key_mutation_type.is_none() {
         let parameters = [
             Parameter::positional_only(Some(Name::new_static("self")))
                 .with_annotated_type(instance_ty),
@@ -274,7 +274,7 @@ fn synthesize_typed_dict_setitem<'db>(
             ];
             Signature::new(Parameters::new(db, parameters), Type::none(db))
         })
-        .chain(arbitrary_key_write_type.map(|value_ty| {
+        .chain(arbitrary_key_mutation_type.map(|value_ty| {
             let parameters = [
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
@@ -509,7 +509,7 @@ fn synthesize_typed_dict_update<'db>(
         KnownClass::Mapping
             .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), value_ty])
     });
-    let iterable_ty = typed_dict.arbitrary_key_write_type(db).map(|value_ty| {
+    let iterable_ty = typed_dict.arbitrary_key_mutation_type(db).map(|value_ty| {
         let item_ty = Type::heterogeneous_tuple(db, [KnownClass::Str.to_instance(db), value_ty]);
         KnownClass::Iterable.to_specialized_instance(db, &[item_ty])
     });
@@ -625,17 +625,21 @@ fn synthesize_typed_dict_setdefault<'db>(
 
             Signature::new(Parameters::new(db, parameters), field.declared_ty)
         })
-        .chain(typed_dict.arbitrary_key_write_type(db).map(|default_ty| {
-            let parameters = [
-                Parameter::positional_only(Some(Name::new_static("self")))
-                    .with_annotated_type(instance_ty),
-                Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db)),
-                Parameter::positional_only(Some(Name::new_static("default")))
-                    .with_annotated_type(default_ty),
-            ];
-            Signature::new(Parameters::new(db, parameters), typed_dict.value_type(db))
-        }));
+        .chain(
+            typed_dict
+                .arbitrary_key_mutation_type(db)
+                .map(|default_ty| {
+                    let parameters = [
+                        Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty),
+                        Parameter::positional_only(Some(Name::new_static("key")))
+                            .with_annotated_type(KnownClass::Str.to_instance(db)),
+                        Parameter::positional_only(Some(Name::new_static("default")))
+                            .with_annotated_type(default_ty),
+                    ];
+                    Signature::new(Parameters::new(db, parameters), typed_dict.value_type(db))
+                }),
+        );
 
     Type::Callable(CallableType::new(
         db,

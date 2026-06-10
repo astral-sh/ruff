@@ -346,7 +346,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
             } else if key_ty.is_some_and(|key_ty| {
                 key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
-            }) && let Some(value_ty) = typed_dict.arbitrary_key_value_type(self.db())
+            }) && let Some(value_ty) =
+                typed_dict.arbitrary_key_initialization_type(self.db())
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(value_ty)))
             } else {
@@ -485,7 +486,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             } else if key_ty.is_some_and(|key_ty| {
                 key_ty.is_assignable_to(self.db(), KnownClass::Str.to_instance(self.db()))
             }) {
-                TypeContext::new(typed_dict.arbitrary_key_value_type(self.db()))
+                TypeContext::new(typed_dict.arbitrary_key_initialization_type(self.db()))
             } else {
                 TypeContext::default()
             };

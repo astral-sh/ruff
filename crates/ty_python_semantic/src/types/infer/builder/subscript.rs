@@ -1448,7 +1448,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
 
                     if slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
-                        && let Some(expected_ty) = typed_dict.arbitrary_key_write_type(db)
+                        && let Some(expected_ty) = typed_dict.arbitrary_key_mutation_type(db)
                     {
                         let rhs_value_ty =
                             infer_rhs_value(self, TypeContext::new(Some(expected_ty)));
