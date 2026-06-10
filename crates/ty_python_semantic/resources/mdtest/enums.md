@@ -749,6 +749,9 @@ def get(value: Enum) -> str:
     return value.name
 
 descriptor = enum_property(get)
+reveal_type(descriptor)  # revealed: enum.property
+# revealed: <method-wrapper '__get__' of enum.property 'get'>
+reveal_type(descriptor.__get__)
 retained: enum_property = descriptor
 retained_as_property: property = descriptor
 not_enum_property: enum_property = property(get)  # error: [invalid-assignment]
