@@ -54,7 +54,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(base, TypeContext::default())
                 };
                 is_typed_dict |= match ty {
-                    Type::SpecialForm(SpecialFormType::TypedDict) => true,
+                    Type::SpecialForm(special_form) if special_form.is_typed_dict() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
                     Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
                     _ => false,

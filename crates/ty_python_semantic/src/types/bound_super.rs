@@ -541,7 +541,7 @@ impl<'db> BoundSuperType<'db> {
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::SpecialForm(SpecialFormType::TypedDict(_)) => ClassBase::TypedDict,
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             Type::Divergent(divergent) => ClassBase::Divergent(divergent),
             _ => {
