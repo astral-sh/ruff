@@ -4471,6 +4471,11 @@ reveal_type(user_partial["age"])  # revealed: int
 Compatibility imports that fall back to `typing_extensions.TypedDict` should also preserve
 `TypedDict` semantics:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 try:
     from typing import TypedDict as CompatTypedDict
@@ -4482,6 +4487,9 @@ class FormattedError(CompatTypedDict, total=False):
 
 class ErrorMessage(CompatTypedDict):
     payload: FormattedError
+
+# `__closed__` is only available on the `typing_extensions` branch for Python 3.12.
+FormattedError.__closed__  # error: [unresolved-attribute]
 
 error = ErrorMessage(payload={"message": "Subscription limit reached"})
 reveal_type(error["payload"])  # revealed: FormattedError
