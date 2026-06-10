@@ -18,12 +18,12 @@ fn default_inlay_hints() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
     let foo_content = "\
-x = 1
+class Thing: ...
 
-def foo(a: int) -> int:
-    return a + 1
+def foo(a: Thing) -> Thing:
+    return a
 
-y = foo(1)
+y = foo(Thing())
 ";
 
     let mut server = TestServerBuilder::new()?
@@ -52,17 +52,17 @@ y = foo(1)
             "value": ": "
           },
           {
-            "value": "int",
+            "value": "Thing",
             "location": {
-              "uri": "file://<typeshed>/stdlib/builtins.pyi",
+              "uri": "file://<temp_dir>/src/foo.py",
               "range": {
                 "start": {
-                  "line": 348,
+                  "line": 0,
                   "character": 6
                 },
                 "end": {
-                  "line": 348,
-                  "character": 9
+                  "line": 0,
+                  "character": 11
                 }
               }
             }
@@ -81,7 +81,7 @@ y = foo(1)
                 "character": 1
               }
             },
-            "newText": ": int"
+            "newText": ": Thing"
           }
         ]
       },
