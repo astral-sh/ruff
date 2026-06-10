@@ -6112,7 +6112,7 @@ Extra items behave like non-required items for methods that mutate a specific li
 
 ```py
 from typing import Literal
-from typing_extensions import TypedDict
+from typing_extensions import ReadOnly, TypedDict
 
 class Extra(TypedDict, extra_items=int):
     name: str
@@ -6123,10 +6123,14 @@ class ListExtra(TypedDict, extra_items=list[int]):
 class ArbitraryPop(TypedDict, total=False, extra_items=int):
     label: str
 
+class ReadOnlyExtra(TypedDict, extra_items=ReadOnly[int]):
+    name: str
+
 def _(
     extra: Extra,
     list_extra: ListExtra,
     arbitrary: ArbitraryPop,
+    read_only: ReadOnlyExtra,
     literal_key: Literal["values"],
     key: str,
 ) -> None:
@@ -6145,6 +6149,18 @@ def _(
     reveal_type(arbitrary.pop(key))  # revealed: str | int
     reveal_type(arbitrary.pop(key, 0))  # revealed: str | int
     reveal_type(arbitrary.pop(key, None))  # revealed: str | int | None
+
+    reveal_type(read_only.get("other"))  # revealed: int | None
+    reveal_type(read_only.get("other", "missing"))  # revealed: int | Literal["missing"]
+
+    # error: [invalid-argument-type] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    read_only.pop("other")
+    # error: [invalid-argument-type] "Cannot pop read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    read_only.pop("other", 0)
+    # error: [invalid-argument-type] "Cannot set default for read-only extra item "other" on TypedDict `ReadOnlyExtra`"
+    read_only.setdefault("other", 0)
+    # error: [invalid-argument-type] "Cannot delete read-only extra item "other" from TypedDict `ReadOnlyExtra`"
+    del read_only["other"]
 
     # error: [invalid-argument-type]
     extra.setdefault("year", "not an int")

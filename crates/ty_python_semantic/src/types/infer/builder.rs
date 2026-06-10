@@ -8242,6 +8242,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
 
+                    if !is_declared && field.is_read_only() {
+                        let mutation = match method_name {
+                            "pop"
+                                if arguments.keywords.is_empty()
+                                    && matches!(arguments.args.len(), 1 | 2) =>
+                            {
+                                Some(("pop", "from"))
+                            }
+                            "setdefault"
+                                if arguments.keywords.is_empty() && arguments.args.len() == 2 =>
+                            {
+                                Some(("set default for", "on"))
+                            }
+                            _ => None,
+                        };
+                        if let Some((action, preposition)) = mutation {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_ARGUMENT_TYPE, first_arg)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot {action} read-only extra item \"{key}\" {preposition} TypedDict `{}`",
+                                    Type::TypedDict(typed_dict_ty).display(self.db()),
+                                ));
+                            }
+                            return Type::unknown();
+                        }
+                    }
+
                     // Unknown literal keys are concrete extra items, so mutating operations can
                     // use their extra-items type even when arbitrary `str` keys are unsafe.
                     if !is_declared && !field.is_read_only() {

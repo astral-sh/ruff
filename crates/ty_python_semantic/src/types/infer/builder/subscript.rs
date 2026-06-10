@@ -1880,6 +1880,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                     Some(field),
                                                     TypedDictDeleteErrorKind::RequiredKey,
                                                 );
+                                            } else if typed_dict
+                                                .explicit_extra_items(db)
+                                                .is_some_and(|extra_items| {
+                                                    extra_items.is_read_only()
+                                                })
+                                            {
+                                                report_cannot_delete_typed_dict_key(
+                                                    &self.context,
+                                                    (&*target.slice).into(),
+                                                    typed_dict,
+                                                    key,
+                                                    None,
+                                                    TypedDictDeleteErrorKind::ReadOnlyExtraItem,
+                                                );
                                             } else {
                                                 // Key doesn't exist.
                                                 report_cannot_delete_typed_dict_key(
