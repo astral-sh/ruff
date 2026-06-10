@@ -7,6 +7,7 @@ use crate::types::typevar::{TypeVarIdentity, TypeVarInstance, TypeVarNonce};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
+use salsa::plumbing::Id;
 use test_case::test_case;
 
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
@@ -145,7 +146,7 @@ fn todo_types() {
 #[test]
 fn divergent_type() {
     let db = setup_db();
-    let div = Type::divergent(salsa::plumbing::Id::from_bits(1));
+    let div = Type::divergent(Id::from_bits(1));
     assert!(div.is_dynamic());
     assert!(div.has_dynamic(&db));
     // `Divergent` is the α-binder variable of a μ-type: materialization leaves the bound
@@ -306,6 +307,40 @@ fn divergent_type() {
 
     let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
     assert_eq!(intersection.display(&db).to_string(), "Never");
+}
+
+#[test]
+fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
+    let int = KnownClass::Int.to_instance(&db);
+
+    let union = UnionType::from_elements(&db, [int, non_contractive]).expect_union();
+
+    assert_eq!(
+        union.recursive_type_normalized_impl(&db, marker, false),
+        Some(int)
+    );
+}
+
+#[test]
+fn nested_union_cycle_normalization_preserves_non_contractive_recursive_marker() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
+    let int = KnownClass::Int.to_instance(&db);
+    let list_recursive = KnownClass::List.to_specialized_instance(&db, &[non_contractive]);
+    let list_marker = KnownClass::List.to_specialized_instance(&db, &[marker]);
+
+    let union = UnionType::from_elements(&db, [int, list_recursive]).expect_union();
+
+    assert_eq!(
+        union.recursive_type_normalized_impl(&db, marker, false),
+        Some(UnionType::from_elements(&db, [int, list_marker]))
+    );
 }
 
 #[test]
@@ -477,7 +512,7 @@ fn recursive_alias_legacy_typevars() {
         None,
         TypeVarNonce::NONE,
     );
-    let binder_id = salsa::plumbing::Id::from_bits(1);
+    let binder_id = Id::from_bits(1);
     let recursive = Type::implicit_recursive(
         &db,
         binder_id,
@@ -528,7 +563,7 @@ type RecursiveAlias = list[int | RecursiveAlias]
 #[test]
 fn recursive_materialization_maps_body() {
     let db = setup_db();
-    let binder_id = salsa::plumbing::Id::from_bits(1);
+    let binder_id = Id::from_bits(1);
     let recursive = Type::implicit_recursive(
         &db,
         binder_id,

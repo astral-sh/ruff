@@ -389,6 +389,15 @@ impl<'db> UnionType<'db> {
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
         let mut empty = true;
+        let is_top_level_cycle_marker = |ty: Type<'db>| {
+            ty.same_divergent_marker(div)
+                || matches!(
+                    ty,
+                    Type::Recursive(recursive)
+                        if recursive.is_non_contractive(db)
+                            && Type::divergent(recursive.binder_id(db)).same_divergent_marker(div)
+                )
+        };
         for ty in self.elements(db) {
             if nested {
                 // list[T | Divergent] => list[Divergent]
@@ -399,9 +408,9 @@ impl<'db> UnionType<'db> {
                 builder = builder.add(ty);
                 empty = false;
             } else {
-                // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
-                // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if ty.same_divergent_marker(div) {
+                // Top-level cycle markers in a union do not mean true divergence, so we skip
+                // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
+                if is_top_level_cycle_marker(*ty) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
