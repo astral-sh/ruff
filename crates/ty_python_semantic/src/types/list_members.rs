@@ -169,7 +169,6 @@ impl<'db> AllMembers<'db> {
                     // `Type` guarantees that unions/intersections
                     // are kept in DNF (i.e., they are flattened).
                     ty.is_dynamic()
-                        || matches!(ty, Type::Recursive(rec) if rec.contains_non_contractive(db))
                         || match ty {
                             Type::Intersection(intersection) => {
                                 intersection.positive(db).iter().any(Type::is_dynamic)
