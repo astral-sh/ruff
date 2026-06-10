@@ -583,7 +583,7 @@ impl<'db> ProtocolMemberKind<'db> {
                     previous,
                     Self::Other(ty)
                         if ty.is_divergent()
-                            || matches!(ty, Type::Recursive(recursive) if recursive.is_implicit(db))
+                            || matches!(ty, Type::Recursive(recursive) if recursive.is_non_contractive(db))
                 ));
                 *self
             }

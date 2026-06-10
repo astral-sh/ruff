@@ -5751,9 +5751,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
-            Type::Recursive(rec) if rec.is_non_contractive(db) => {
-                Ok(*self)
-            }
+            Type::Recursive(rec) if rec.is_non_contractive(db) => Ok(*self),
             Type::Recursive(rec) => rec
                 .unfold(db)
                 .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
