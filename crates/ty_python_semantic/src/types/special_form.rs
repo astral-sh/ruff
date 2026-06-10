@@ -132,13 +132,25 @@ pub enum SpecialFormType {
     NamedTuple,
 }
 
-/// The module from which `TypedDict` was imported.
+/// The module or modules from which `TypedDict` may have been imported.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum TypedDictModule {
     /// `typing.TypedDict`.
     Typing,
     /// `typing_extensions.TypedDict`.
     TypingExtensions,
+    /// `TypedDict` may resolve to the symbol from either module.
+    Either,
+}
+
+impl TypedDictModule {
+    pub(crate) const fn union(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Typing, Self::Typing) => Self::Typing,
+            (Self::TypingExtensions, Self::TypingExtensions) => Self::TypingExtensions,
+            _ => Self::Either,
+        }
+    }
 }
 
 impl SpecialFormType {
@@ -147,10 +159,6 @@ impl SpecialFormType {
             Self::TypedDict(module) => Some(module),
             _ => None,
         }
-    }
-
-    pub(crate) const fn is_typed_dict(self) -> bool {
-        self.typed_dict_module().is_some()
     }
 
     /// Return the [`KnownClass`] which this symbol is an instance of

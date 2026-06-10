@@ -4486,6 +4486,28 @@ reveal_type(user_empty["name"])  # revealed: str
 reveal_type(user_partial["age"])  # revealed: int
 ```
 
+Compatibility imports that fall back to `typing_extensions.TypedDict` should also preserve
+`TypedDict` semantics:
+
+```py
+try:
+    from typing import TypedDict as CompatTypedDict
+except ImportError:
+    from typing_extensions import TypedDict as CompatTypedDict
+
+class FormattedError(CompatTypedDict, total=False):
+    message: str
+
+class ErrorMessage(CompatTypedDict):
+    payload: FormattedError
+
+error = ErrorMessage(payload={"message": "Subscription limit reached"})
+reveal_type(error["payload"])  # revealed: FormattedError
+
+FunctionalError = CompatTypedDict("FunctionalError", {"message": str}, total=False)
+functional_error: FunctionalError = {"message": "Subscription limit reached"}
+```
+
 ## Shadowing behavior
 
 When a local class shadows the `TypedDict` import, only the actual `TypedDict` import should be
