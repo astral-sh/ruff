@@ -540,7 +540,7 @@ impl<'db> TypedDictType<'db> {
         Self::Synthesized(SynthesizedTypedDictType::schema(db, items, openness))
     }
 
-    fn from_patch_items(
+    fn from_patch_items_with_openness(
         db: &'db dyn Db,
         items: TypedDictSchema<'db>,
         openness: TypedDictOpenness<'db>,
@@ -559,7 +559,7 @@ impl<'db> TypedDictType<'db> {
             .map(|(name, field)| (name.clone(), field.clone().with_required(false)))
             .collect();
 
-        Self::from_patch_items(db, items, self.openness(db))
+        Self::from_patch_items_with_openness(db, items, self.openness(db))
     }
 
     /// Returns a patch version of this `TypedDict` for `TypedDict.update()`.
@@ -588,7 +588,7 @@ impl<'db> TypedDictType<'db> {
             TypedDictOpenness::Closed | TypedDictOpenness::Extra(_) => TypedDictOpenness::Closed,
         };
 
-        Self::from_patch_items(db, items, openness)
+        Self::from_patch_items_with_openness(db, items, openness)
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
