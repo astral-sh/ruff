@@ -39,7 +39,8 @@ impl<'a> FullRenderer<'a> {
         } else {
             AnnotateRenderer::plain()
         }
-        .cut_indicator("…");
+        .cut_indicator("…")
+        .anonymized_line_numbers(self.config.anonymized_line_numbers);
 
         renderer = renderer
             .error(stylesheet.error)

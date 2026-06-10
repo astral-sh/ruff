@@ -1386,6 +1386,10 @@ pub struct DisplayDiagnosticConfig {
     ///
     /// Disabled by default.
     color: bool,
+    /// Whether to anonymize line numbers in full diagnostic output.
+    ///
+    /// Disabled by default.
+    anonymized_line_numbers: bool,
     /// The number of non-empty lines to show around each snippet.
     ///
     /// NOTE: It seems like making this a property of rendering *could*
@@ -1429,6 +1433,7 @@ impl DisplayDiagnosticConfig {
             program,
             format: DiagnosticFormat::default(),
             color: false,
+            anonymized_line_numbers: false,
             context: 2,
             merge_window: 2,
             preview: false,
@@ -1448,6 +1453,14 @@ impl DisplayDiagnosticConfig {
     /// Whether to enable colors or not.
     pub fn color(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { color: yes, ..self }
+    }
+
+    /// Whether to anonymize line numbers in full diagnostic output.
+    pub fn anonymized_line_numbers(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            anonymized_line_numbers: yes,
+            ..self
+        }
     }
 
     /// Set the number of contextual lines to show around each snippet.
