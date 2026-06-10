@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 
 use ruff_text_size::TextSize;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use super::rest;
 use super::sections::{DocstringItem, DocstringSectionKind, DocstringSections};
@@ -47,11 +48,51 @@ impl<'a> ParsedDocstring<'a> {
     }
 
     pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
-        self.blocks
+        let mut parameters: Vec<ParameterDocumentation> = Vec::new();
+        let mut names = FxHashSet::default();
+        let mut rest_parameter_indices: FxHashMap<String, usize> = FxHashMap::default();
+
+        for field_list in rest::Docstring::parse(self.raw).field_lists() {
+            for field in field_list.fields() {
+                let rest::Field::Parameter {
+                    lookup_name,
+                    description,
+                    ..
+                } = field
+                else {
+                    continue;
+                };
+
+                if description.is_empty() {
+                    continue;
+                }
+
+                let name = lookup_name.to_string();
+                if let Some(index) = rest_parameter_indices.get(&name).copied() {
+                    parameters[index].description.clone_from(description);
+                } else {
+                    rest_parameter_indices.insert(name.clone(), parameters.len());
+                    names.insert(name.clone());
+                    parameters.push(ParameterDocumentation {
+                        name,
+                        description: description.clone(),
+                    });
+                }
+            }
+        }
+
+        for parameter in self
+            .blocks
             .iter()
             .filter_map(Block::as_section)
             .flat_map(SectionBlock::parameter_documentation)
-            .collect()
+        {
+            if names.insert(parameter.name.clone()) {
+                parameters.push(parameter);
+            }
+        }
+
+        parameters
     }
 }
 
@@ -71,7 +112,7 @@ fn parse_rest_blocks<'a>(raw: &'a str, field_lists: &[rest::FieldList]) -> Vec<B
             continue;
         }
 
-        let Some(section) = basic_rest_section_block(field_list) else {
+        let Some(section) = rest_section_block(field_list) else {
             continue;
         };
 
@@ -101,8 +142,8 @@ fn push_raw_block<'a>(blocks: &mut Vec<Block<'a>>, raw: &'a str, range: Range<us
     true
 }
 
-fn basic_rest_section_block(field_list: &rest::FieldList) -> Option<SectionBlock> {
-    let plan = BasicRestFieldRenderPlan::from_fields(field_list.fields())?;
+fn rest_section_block(field_list: &rest::FieldList) -> Option<SectionBlock> {
+    let plan = RestFieldRenderPlan::from_fields(field_list.fields())?;
     let items = plan.items(field_list.fields());
     items
         .iter()
@@ -110,27 +151,62 @@ fn basic_rest_section_block(field_list: &rest::FieldList) -> Option<SectionBlock
         .then(|| SectionBlock::new(items))
 }
 
-/// Validates a basic reST field list and stores cross-field metadata needed while rendering.
-struct BasicRestFieldRenderPlan<'a> {
+/// Validates a reST field list and stores cross-field metadata needed while rendering.
+struct RestFieldRenderPlan<'a> {
+    parameter_types: FxHashMap<&'a str, &'a str>,
+    attribute_types: FxHashMap<&'a str, &'a str>,
     return_type: Option<&'a str>,
     has_returns: bool,
 }
 
-impl<'a> BasicRestFieldRenderPlan<'a> {
+impl<'a> RestFieldRenderPlan<'a> {
     fn from_fields(fields: &'a [rest::Field]) -> Option<Self> {
         let mut has_rendered_field = false;
         let mut has_returns = false;
         let mut has_return_type = false;
+        let mut parameters: FxHashMap<&'a str, TypedFieldRenderState> = FxHashMap::default();
+        let mut attributes: FxHashMap<&'a str, TypedFieldRenderState> = FxHashMap::default();
+        let mut parameter_types: FxHashMap<&'a str, &'a str> = FxHashMap::default();
+        let mut attribute_types: FxHashMap<&'a str, &'a str> = FxHashMap::default();
         let mut return_type = None;
 
         for field in fields {
             match field {
-                rest::Field::Parameter { .. } => {
+                rest::Field::Parameter {
+                    lookup_name, ty, ..
+                } => {
                     has_rendered_field = true;
+                    parameters
+                        .entry(lookup_name.as_str())
+                        .or_default()
+                        .record_field(ty.is_some());
+                }
+                rest::Field::Attribute { name, ty, .. } => {
+                    has_rendered_field = true;
+                    attributes
+                        .entry(name.as_str())
+                        .or_default()
+                        .record_field(ty.is_some());
                 }
                 rest::Field::Returns { .. } => {
                     has_rendered_field = true;
                     has_returns = true;
+                }
+                rest::Field::Raises { .. } => {
+                    has_rendered_field = true;
+                }
+                rest::Field::ParameterType { lookup_name, ty } => {
+                    if parameter_types
+                        .insert(lookup_name.as_str(), ty.as_str())
+                        .is_some()
+                    {
+                        return None;
+                    }
+                }
+                rest::Field::AttributeType { name, ty } => {
+                    if attribute_types.insert(name.as_str(), ty.as_str()).is_some() {
+                        return None;
+                    }
                 }
                 rest::Field::ReturnType { ty } => {
                     if has_return_type {
@@ -140,16 +216,36 @@ impl<'a> BasicRestFieldRenderPlan<'a> {
                     return_type = (!ty.is_empty()).then_some(ty.as_str());
                     has_rendered_field |= return_type.is_some();
                 }
-                rest::Field::ParameterType { .. }
-                | rest::Field::Attribute { .. }
-                | rest::Field::AttributeType { .. }
-                | rest::Field::Raises { .. }
-                | rest::Field::Metadata
-                | rest::Field::Unknown { .. } => return None,
+                rest::Field::Metadata => {}
+                rest::Field::Unknown { .. } => return None,
             }
         }
 
-        has_rendered_field.then_some(Self {
+        for lookup_name in parameter_types.keys() {
+            if !parameters
+                .get(*lookup_name)
+                .is_some_and(TypedFieldRenderState::accepts_separate_type)
+            {
+                return None;
+            }
+        }
+
+        for name in attribute_types.keys() {
+            if !attributes
+                .get(*name)
+                .is_some_and(TypedFieldRenderState::accepts_separate_type)
+            {
+                return None;
+            }
+        }
+
+        if !has_rendered_field {
+            return None;
+        }
+
+        Some(Self {
+            parameter_types,
+            attribute_types,
             return_type,
             has_returns,
         })
@@ -169,7 +265,32 @@ impl<'a> BasicRestFieldRenderPlan<'a> {
                     DocstringSectionKind::Parameters,
                     Some(display_name.to_string()),
                     Some(lookup_name.to_string()),
-                    ty.as_deref().map(str::to_string),
+                    ty.as_deref()
+                        .or_else(|| {
+                            self.parameter_types
+                                .get(lookup_name.as_str())
+                                .copied()
+                                .filter(|ty| !ty.is_empty())
+                        })
+                        .map(str::to_string),
+                    description.clone(),
+                )),
+                rest::Field::Attribute {
+                    name,
+                    ty,
+                    description,
+                } => items.push(SectionItem::new(
+                    DocstringSectionKind::Attributes,
+                    Some(name.to_string()),
+                    None,
+                    ty.as_deref()
+                        .or_else(|| {
+                            self.attribute_types
+                                .get(name.as_str())
+                                .copied()
+                                .filter(|ty| !ty.is_empty())
+                        })
+                        .map(str::to_string),
                     description.clone(),
                 )),
                 rest::Field::Returns { name, description } => items.push(SectionItem::new(
@@ -177,6 +298,16 @@ impl<'a> BasicRestFieldRenderPlan<'a> {
                     name.as_ref().map(ToString::to_string),
                     None,
                     self.return_type.map(str::to_string),
+                    description.clone(),
+                )),
+                rest::Field::Raises {
+                    exception,
+                    description,
+                } => items.push(SectionItem::new(
+                    DocstringSectionKind::Raises,
+                    exception.as_ref().map(ToString::to_string),
+                    None,
+                    None,
                     description.clone(),
                 )),
                 rest::Field::ReturnType { .. } if !self.has_returns => {
@@ -191,9 +322,7 @@ impl<'a> BasicRestFieldRenderPlan<'a> {
                     }
                 }
                 rest::Field::ParameterType { .. }
-                | rest::Field::Attribute { .. }
                 | rest::Field::AttributeType { .. }
-                | rest::Field::Raises { .. }
                 | rest::Field::ReturnType { .. }
                 | rest::Field::Metadata
                 | rest::Field::Unknown { .. } => {}
@@ -201,6 +330,26 @@ impl<'a> BasicRestFieldRenderPlan<'a> {
         }
 
         items
+    }
+}
+
+#[derive(Default)]
+struct TypedFieldRenderState {
+    has_untyped_field: bool,
+    has_inline_typed_field: bool,
+}
+
+impl TypedFieldRenderState {
+    fn record_field(&mut self, has_inline_type: bool) {
+        if has_inline_type {
+            self.has_inline_typed_field = true;
+        } else {
+            self.has_untyped_field = true;
+        }
+    }
+
+    fn accepts_separate_type(&self) -> bool {
+        self.has_untyped_field && !self.has_inline_typed_field
     }
 }
 
@@ -375,12 +524,13 @@ mod tests {
     }
 
     #[test]
-    fn basic_rest_field_lists_render_markdown_sections() {
+    fn rest_field_lists_render_markdown_sections() {
         let docstring = "\
 Summary.
 
 :param str value: The value.
 :param other: Another value.
+:type other: int
 :returns: Whether validation passed.
 :rtype: bool
 ";
@@ -391,10 +541,46 @@ Summary.
 
         ## Parameters
         `value` (`str`): The value.
-        `other`: Another value.
+        `other` (`int`): Another value.
 
         ## Returns
         `bool`: Whether validation passed.
+        ");
+
+        let parameters = parsed.parameter_documentation();
+        assert_eq!(parameters.len(), 2);
+        assert_eq!(parameters[0].name, "value");
+        assert_eq!(parameters[0].description, "The value.");
+        assert_eq!(parameters[1].name, "other");
+        assert_eq!(parameters[1].description, "Another value.");
+
+        let docstring = "\
+:param value: Stale description.
+:param value: Corrected description.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+        let parameters = parsed.parameter_documentation();
+
+        assert_eq!(parameters.len(), 1);
+        assert_eq!(parameters[0].name, "value");
+        assert_eq!(parameters[0].description, "Corrected description.");
+
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:rtype: str
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value`: The value.
+
+        ## Returns
+        `str`
         ");
 
         let docstring = "\
@@ -413,32 +599,166 @@ Summary.
     }
 
     #[test]
+    fn rest_field_lists_render_edge_cases() {
+        let docstring = "\
+This is a function description.
+:class:`Foo` instances can be passed here.
+
+:param str param1: The first parameter description
+:meta private:
+:param param2: The second parameter description
+:type param2: int
+:kwparam retries: Retry attempts.
+:paramtype retries: int
+:param *args: Extra positional arguments.
+:type args: tuple[str, ...]
+:param **kwargs: Extra keyword arguments.
+:type **kwargs: dict[str, object]
+:var cache: Cached data.
+:vartype cache: dict[str,
+    object]
+:ivar state: Instance state.
+:var str title: Display title.
+:cvar VERSION: Package version.
+:vartype VERSION: str
+:returns baz: The return value description
+:rtype: dict[str,
+    int]
+:raises ValueError: If the value is invalid.
+:meta hide-value:
+:exception RuntimeError: If the system is unavailable.";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        This is a function description.
+        :class:`Foo` instances can be passed here.
+
+        ## Parameters
+        `param1` (`str`): The first parameter description
+        `param2` (`int`): The second parameter description
+        `retries` (`int`): Retry attempts.
+        `*args` (`tuple[str, ...]`): Extra positional arguments.
+        `**kwargs` (`dict[str, object]`): Extra keyword arguments.
+
+        ## Attributes
+        `cache` (`dict[str, object]`): Cached data.
+        `state`: Instance state.
+        `title` (`str`): Display title.
+        `VERSION` (`str`): Package version.
+
+        ## Returns
+        `baz` (`dict[str, int]`): The return value description
+
+        ## Raises
+        `ValueError`: If the value is invalid.
+        `RuntimeError`: If the system is unavailable.
+        ");
+    }
+
+    #[test]
+    fn rest_field_lists_preserve_unrenderable_and_preformatted_lists() {
+        let docstring = "\
+:param first: First parameter.
+:type orphan: str
+
+Some prose between field lists.
+
+:meta private:
+
+Markdown input:
+
+```text
+:param sample: This is sample input
+```
+
+Doctest output:
+
+>>> print(\"field list\")
+:param sample: This is sample output
+
+Literal block::
+
+    :param sample: This is sample input
+
+:param second:
+    - First option.
+    - Second option.
+:param third:
+    1. Validate the input.
+    2. Return the result.
+:param done: Whether work is done.";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        :param first: First parameter.
+        :type orphan: str
+
+        Some prose between field lists.
+
+        :meta private:
+
+        Markdown input:
+
+        ```text
+        :param sample: This is sample input
+        ```
+
+        Doctest output:
+
+        >>> print(\"field list\")
+        :param sample: This is sample output
+
+        Literal block::
+
+            :param sample: This is sample input
+
+        ## Parameters
+        `second`:
+        - First option.
+        - Second option.
+
+        `third`:
+        1. Validate the input.
+        2. Return the result.
+
+        `done`: Whether work is done.
+        ");
+
+        let parameters = parsed.parameter_documentation();
+        assert_eq!(parameters.len(), 4);
+        assert_eq!(parameters[0].name, "first");
+        assert_eq!(parameters[1].name, "second");
+        assert_eq!(parameters[2].name, "third");
+        assert_eq!(parameters[3].name, "done");
+    }
+
+    #[test]
     fn unsupported_rest_field_lists_stay_raw() {
         let docstring = "\
 Summary.
 
 :param value: The value.
-:type value: int
-";
-        let parsed = ParsedDocstring::parse(docstring);
-
-        assert_eq!(parsed.render_markdown_source(), docstring);
-
-        let docstring = "\
-Summary.
-
-:param value: The value.
-:raises ValueError: Invalid value.
-";
-        let parsed = ParsedDocstring::parse(docstring);
-
-        assert_eq!(parsed.render_markdown_source(), docstring);
-
-        let docstring = "\
-Summary.
-
-:param value: The value.
 :unknown field: Preserve this field list.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+:returns:
+:raises:
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:returns:
 ";
         let parsed = ParsedDocstring::parse(docstring);
 
