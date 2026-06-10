@@ -1118,7 +1118,12 @@ impl<'db> FunctionType<'db> {
             )
         };
 
-        if updated_signature.is_none() && updated_implementation_signature.is_none() {
+        // Preserve whether the function has been mapped: some recursion-avoiding mappings only
+        // traverse signatures that are stored as updated.
+        if updated_signature.as_ref() == self.updated_signature(db)
+            && updated_implementation_signature.as_ref()
+                == self.updated_implementation_signature(db)
+        {
             self
         } else {
             Self::new(
@@ -2625,11 +2630,57 @@ pub(super) fn report_revealed_type<'db>(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::DbWithWritableSystem as _;
     use strum::IntoEnumIterator;
 
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::place::known_module_symbol;
+    use crate::place::{global_symbol, known_module_symbol};
+    use crate::types::MaterializationKind;
+
+    #[test]
+    fn no_op_type_mapping_preserves_updated_function_identity() -> anyhow::Result<()> {
+        let mut db = setup_db();
+        db.write_file(
+            "/src/module.py",
+            r#"
+from typing import overload
+
+@overload
+def f(value: int) -> int: ...
+@overload
+def f(value: str) -> str: ...
+def f(value: int | str) -> int | str:
+    return value
+"#,
+        )?;
+
+        let file = system_path_to_file(&db, "/src/module.py")?;
+        let function = global_symbol(&db, file, "f")
+            .place
+            .expect_type()
+            .expect_function_literal();
+        let type_mapping = TypeMapping::Materialize(MaterializationKind::Top);
+        let mapped = function.apply_type_mapping_impl(
+            &db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+        let remapped = mapped.apply_type_mapping_impl(
+            &db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        );
+
+        // The first mapping must record the signature even though its value is unchanged.
+        assert_ne!(mapped, function);
+        assert_eq!(remapped, mapped);
+
+        Ok(())
+    }
 
     #[test]
     fn known_function_roundtrip_from_str() {
