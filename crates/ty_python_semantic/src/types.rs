@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::{OnceCell, RefCell};
+use std::cell::OnceCell;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -82,7 +82,7 @@ use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::recursive::RecursiveOrigin;
-use crate::types::recursive::{ImplicitRecursiveOrigin, RecursiveType};
+use crate::types::recursive::RecursiveType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
@@ -998,12 +998,7 @@ impl<'db> Type<'db> {
         binder_id: salsa::Id,
         body: Type<'db>,
     ) -> Self {
-        Self::recursive(
-            db,
-            binder_id,
-            RecursiveOrigin::Implicit(ImplicitRecursiveOrigin::query_cycle(binder_id)),
-            body,
-        )
+        Self::recursive(db, binder_id, RecursiveOrigin::Implicit, body)
     }
 
     /// One-step unwrapping of a recursive type.
@@ -1106,37 +1101,9 @@ impl<'db> Type<'db> {
         previous: Option<Self>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        let binder_ids = RefCell::new(Vec::new());
-        for id in cycle.head_ids() {
-            let mut binder_ids = binder_ids.borrow_mut();
-            if !binder_ids.contains(&id) {
-                binder_ids.push(id);
-            }
-        }
-        {
-            let collect_implicit_binder = |ty| {
-                any_over_type(db, ty, false, |inner| {
-                    if let Type::Recursive(rec) = inner
-                        && rec.is_implicit(db)
-                    {
-                        let id = rec.binder_id(db);
-                        let mut binder_ids = binder_ids.borrow_mut();
-                        if !binder_ids.contains(&id) {
-                            binder_ids.push(id);
-                        }
-                    }
-                    false
-                });
-            };
-            if let Some(previous) = previous {
-                collect_implicit_binder(previous);
-            }
-        }
-        let binder_ids = binder_ids.into_inner();
-
         let cycle_head_body = |ty: Self| match ty {
             Type::Recursive(rec)
-                if rec.is_implicit(db) && binder_ids.contains(&rec.binder_id(db)) =>
+                if rec.is_implicit(db) && cycle.head_ids().any(|id| id == rec.binder_id(db)) =>
             {
                 *rec.body(db)
             }
@@ -1175,52 +1142,49 @@ impl<'db> Type<'db> {
             self
         };
 
-        binder_ids
-            .iter()
-            .copied()
-            .fold(cycle_head_body(recovered), |ty, id| {
-                let marker = Type::divergent(id);
-                let normalized = ty
-                    .recursive_type_normalized_impl(db, marker, false)
-                    .unwrap_or(marker);
+        cycle.head_ids().fold(cycle_head_body(recovered), |ty, id| {
+            let marker = Type::divergent(id);
+            let normalized = ty
+                .recursive_type_normalized_impl(db, marker, false)
+                .unwrap_or(marker);
 
-                let contains_marker = |ty| {
-                    any_over_type(
+            let contains_marker = |ty| {
+                any_over_type(
+                    db,
+                    ty,
+                    false,
+                    |inner| matches!(inner, Type::Divergent(d) if d.id() == id),
+                )
+            };
+            let has_structural_marker = match normalized {
+                Type::Divergent(_) => false,
+                Type::Union(union) => union.elements(db).iter().any(|element| {
+                    !matches!(element, Type::Divergent(d) if d.id() == id)
+                        && contains_marker(*element)
+                }),
+                other => contains_marker(other),
+            };
+
+            // Function recursion is represented by explicit `RecursiveOrigin::Function` wrappers.
+            // Implicit callable cycles stay in `Divergent` form for signature recovery.
+            if has_structural_marker
+                && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
+                && normalized.is_recursion_value_like(db)
+            {
+                let body = match normalized {
+                    Type::Union(union) => UnionType::from_elements_cycle_recovery(
                         db,
-                        ty,
-                        false,
-                        |inner| matches!(inner, Type::Divergent(d) if d.id() == id),
-                    )
-                };
-                let has_structural_marker = match normalized {
-                    Type::Divergent(_) => false,
-                    Type::Union(union) => union.elements(db).iter().any(|element| {
-                        !matches!(element, Type::Divergent(d) if d.id() == id)
-                            && contains_marker(*element)
-                    }),
-                    other => contains_marker(other),
-                };
-
-                // Function recursion is represented by explicit `RecursiveOrigin::Function` wrappers.
-                // Implicit callable cycles stay in `Divergent` form for signature recovery.
-                if has_structural_marker
-                    && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
-                    && normalized.is_recursion_value_like(db)
-                {
-                    let body = match normalized {
-                        Type::Union(union) => UnionType::from_elements_cycle_recovery(
-                            db,
-                            union.elements(db).iter().copied().filter(
-                                |element| !matches!(element, Type::Divergent(d) if d.id() == id),
-                            ),
+                        union.elements(db).iter().copied().filter(
+                            |element| !matches!(element, Type::Divergent(d) if d.id() == id),
                         ),
-                        _ => normalized,
-                    };
-                    Type::implicit_recursive(db, id, body)
-                } else {
-                    normalized
-                }
-            })
+                    ),
+                    _ => normalized,
+                };
+                Type::implicit_recursive(db, id, body)
+            } else {
+                normalized
+            }
+        })
     }
 
     pub fn is_none(&self, db: &'db dyn Db) -> bool {
