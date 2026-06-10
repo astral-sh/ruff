@@ -232,11 +232,67 @@ select = ["F401", "RUF102"]
 With preview disabled, this should continue to emit `F401`, as well as `RUF102`:
 
 ```py
-# error: [invalid-rule-code]
+# snapshot: invalid-rule-code
 # ruff:disable[unused-import]
 # error: [unused-import]
 import math
 # ruff:enable[unused-import]
+```
+
+```snapshot
+error[RUF102]: Invalid rule code in suppression: unused-import
+ --> src/mdtest_snippet.py:2:16
+  |
+2 | # ruff:disable[unused-import]
+  |                ^^^^^^^^^^^^^
+3 | # error: [unused-import]
+4 | import math
+5 | # ruff:enable[unused-import]
+  |               -------------
+  |
+help: Enable `lint.preview` to use rule names
+help: Remove the suppression comment
+1 | # snapshot: invalid-rule-code
+  - # ruff:disable[unused-import]
+2 | # error: [unused-import]
+3 | import math
+  - # ruff:enable[unused-import]
+4 | # snapshot: invalid-rule-code
+5 | # ruff:disable[unused-import, unknown-rule]
+6 | # error: [unused-import]
+```
+
+Emit both (non-fix-title) help messages when rule names and unknown codes are present:
+
+```py
+# snapshot: invalid-rule-code
+# ruff:disable[unused-import, unknown-rule]
+# error: [unused-import]
+import sys
+# ruff:enable[unused-import, unknown-rule]
+```
+
+```snapshot
+error[RUF102]: Invalid rule code in suppression: unknown-rule, unused-import
+  --> src/mdtest_snippet.py:7:1
+   |
+ 7 | # ruff:disable[unused-import, unknown-rule]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+ 8 | # error: [unused-import]
+ 9 | import sys
+10 | # ruff:enable[unused-import, unknown-rule]
+   | ------------------------------------------
+   |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
+help: Enable `lint.preview` to use rule names
+help: Remove the suppression comment
+4 | import math
+5 | # ruff:enable[unused-import]
+6 | # snapshot: invalid-rule-code
+  - # ruff:disable[unused-import, unknown-rule]
+7 | # error: [unused-import]
+8 | import sys
+  - # ruff:enable[unused-import, unknown-rule]
 ```
 
 ## Allow human-readable names in preview

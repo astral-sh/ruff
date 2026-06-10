@@ -197,6 +197,12 @@ struct SuppressionDiagnostic<'a> {
     duplicated_codes: Vec<&'a str>,
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
+
+    /// Whether one of the invalid codes was totally unknown and may be external.
+    has_unknown_code: bool,
+
+    /// Whether one of the invalid codes was a rule name with preview disabled.
+    has_stable_rule_name: bool,
 }
 
 impl<'a> SuppressionDiagnostic<'a> {
@@ -207,6 +213,8 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
+            has_unknown_code: false,
+            has_stable_rule_name: false,
         }
     }
 
@@ -340,9 +348,14 @@ impl Suppressions {
                                 == group.invalid_codes.len(),
                         },
                     ) {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
+                        if group.has_unknown_code {
+                            diagnostic.help(
+                                "Add non-Ruff rule codes to the `lint.external` configuration option",
+                            );
+                        }
+                        if group.has_stable_rule_name {
+                            diagnostic.help("Enable `lint.preview` to use rule names");
+                        }
                     }
                 }
                 if group.any_unused() {
@@ -397,14 +410,16 @@ impl Suppressions {
             let code_str = suppression.code.as_str();
 
             let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
-            let name_is_valid = is_human_readable_names_enabled(self.preview)
-                && Rule::from_name(&suppression.code).is_ok();
+            let name_is_known = Rule::from_name(&suppression.code).is_ok();
+            let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
 
             if !code_is_valid && !name_is_valid {
                 // InvalidRuleCode
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
+                group.has_unknown_code |= !name_is_known;
+                group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
                 // UnusedNOQA
                 let Some(rule) = suppression.rule(self.preview) else {
