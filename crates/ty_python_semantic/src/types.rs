@@ -1,5 +1,4 @@
 use compact_str::ToCompactString;
-use itertools::Itertools;
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
@@ -2612,25 +2611,54 @@ impl<'db> Type<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 
-    #[salsa::tracked(
-        cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
-        cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
-            member.cycle_normalized(db, *previous, cycle)
-        },
-        heap_size=ruff_memory_usage::heap_size
-    )]
     fn class_member_with_policy(
         self,
         db: &'db dyn Db,
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        tracing::trace!("class_member: {}.{}", self.display(db), name);
-        if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.class_member_with_policy(db, name, policy);
+        if let Type::LiteralValue(literal) = self
+            && !literal.is_enum()
+            && matches!(name.as_str(), "__get__" | "__set__" | "__delete__")
+        {
+            return Place::Undefined.into();
         }
 
-        match self {
+        if let Type::NominalInstance(instance) = self {
+            return SubclassOfType::from(db, instance.class(db))
+                .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                .expect(
+                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                );
+        }
+
+        if let Type::TypeVar(bound_typevar) = self {
+            return SubclassOfType::from(db, SubclassOfInner::TypeVar(bound_typevar))
+                .find_name_in_mro_with_policy(db, name.as_str(), policy)
+                .expect(
+                    "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
+                );
+        }
+
+        #[salsa::tracked(
+            cycle_initial=|_, id, _, _, _| Place::bound(Type::divergent(id)).into(),
+            cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _| {
+                member.cycle_normalized(db, *previous, cycle)
+            },
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn class_member_with_policy_inner<'db>(
+            db: &'db dyn Db,
+            this: Type<'db>,
+            name: Name,
+            policy: MemberLookupPolicy,
+        ) -> PlaceAndQualifiers<'db> {
+            tracing::trace!("class_member: {}.{}", this.display(db), name);
+            if let Some(fallback) = this.materialized_divergent_fallback() {
+                return fallback.class_member_with_policy(db, name, policy);
+            }
+
+            match this {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
             }),
@@ -2641,7 +2669,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(ProtocolInstanceType {
                 inner: Protocol::Synthesized(_),
                 ..
-            }) => self.instance_member(db, &name),
+            }) => this.instance_member(db, &name),
 
             Type::LiteralValue(literal) if name == "__len__" => {
                 if let Some(length) = match literal.kind() {
@@ -2653,7 +2681,7 @@ impl<'db> Type<'db> {
                     let parameters = Parameters::new(
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(self)],
+                            .with_annotated_type(this)],
                     );
                     Place::bound(Type::function_like_callable(
                         db,
@@ -2661,7 +2689,7 @@ impl<'db> Type<'db> {
                     ))
                     .into()
                 } else {
-                    self.to_meta_type(db)
+                    this.to_meta_type(db)
                         .find_name_in_mro_with_policy(db, name.as_str(), policy)
                         .expect(
                             "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
@@ -2681,7 +2709,7 @@ impl<'db> Type<'db> {
                 if !type_result.place.is_undefined() {
                     type_result
                 } else {
-                    self.to_meta_type(db)
+                    this.to_meta_type(db)
                         .find_name_in_mro_with_policy(db, name.as_str(), policy)
                         .expect(
                             "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
@@ -2689,17 +2717,20 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
+            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => this
                 .to_meta_type(db)
                 .class_object_member(db, name.as_str(), policy),
 
-            _ => self
+            _ => this
                 .to_meta_type(db)
                 .find_name_in_mro_with_policy(db, name.as_str(), policy)
                 .expect(
                     "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                 ),
+            }
         }
+
+        class_member_with_policy_inner(db, self, name, policy)
     }
 
     /// Look up attributes stored in the namespace of a class object.
@@ -3007,6 +3038,34 @@ impl<'db> Type<'db> {
             };
 
             return Some((descriptor_result, AttributeKind::NormalOrNonDataDescriptor));
+        }
+
+        if let Type::Callable(callable) = self {
+            if callable.is_staticmethod_like(db) {
+                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            }
+
+            if callable.is_function_like(db) || callable.is_classmethod_like(db) {
+                if instance.is_none() && callable.is_function_like(db) {
+                    return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+                }
+
+                let self_type = instance.unwrap_or_else(|| {
+                    // For classmethod-like callables, bind to the owner class.
+                    owner.to_instance(db).unwrap_or(owner)
+                });
+
+                return Some((
+                    Type::Callable(callable.bind_self(db, Some(self_type))),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
+            }
+        }
+
+        if let Type::LiteralValue(literal) = self
+            && !literal.is_enum()
+        {
+            return None;
         }
 
         try_call_dunder_get_inner(db, self, instance, owner)
@@ -3915,6 +3974,10 @@ impl<'db> Type<'db> {
             if matches!(self, Type::Dynamic(_) | Type::Divergent(_) | Type::Never) {
                 return Place::bound(self).into();
             }
+        }
+
+        if let Type::ModuleLiteral(module) = self {
+            return module.static_member(db, name.as_str());
         }
 
         member_lookup_with_policy_inner(db, self, name, policy, receiver)
@@ -8012,6 +8075,25 @@ impl<'db> ModuleLiteralType<'db> {
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }
 
+    fn resolve_available_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let importing_file = self.importing_file(db)?;
+        let Some(relative_submodule_name) = ModuleName::new(name) else {
+            return None;
+        };
+        let mut absolute_submodule_name = self.module(db).name(db).clone();
+        absolute_submodule_name.extend(&relative_submodule_name);
+
+        if !semantic_index(db, importing_file)
+            .imported_modules()
+            .any(|module| module == &absolute_submodule_name)
+        {
+            return None;
+        }
+
+        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
+        Some(Type::module_literal(db, importing_file, submodule))
+    }
+
     fn resolve_submodule(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let importing_file = self.importing_file(db)?;
         let relative_submodule_name = ModuleName::new(name)?;
@@ -8065,15 +8147,15 @@ impl<'db> ModuleLiteralType<'db> {
         // the parent module's `__init__.py` file being evaluated. That said, we have
         // chosen to always have the submodule take priority. (This matches pyright's
         // current behavior, but is the opposite of mypy's current behavior.)
-        if self.available_submodule_attributes(db).contains(name)
-            && let Some(submodule) = self.resolve_submodule(db, name)
+        if self.module(db).kind(db).is_package()
+            && let Some(submodule) = self.resolve_available_submodule(db, name)
         {
             return Place::bound(submodule).into();
         }
 
         let place_and_qualifiers = imported_symbol(db, self.module(db).file(db), name, None);
 
-        // If the normal lookup failed, try to call the module's `__getattr__` function
+        // If the normal lookup failed, try to call the module's `__getattr__` function.
         if place_and_qualifiers.place.is_undefined() {
             return self.try_module_getattr(db, name);
         }

@@ -335,11 +335,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let module_literal = ModuleLiteralType::new(
-            db,
-            module,
-            module.kind(db).is_package().then_some(self.file()),
-        );
+        let module_is_package = module.kind(db).is_package();
+        let module_literal =
+            ModuleLiteralType::new(db, module, module_is_package.then_some(self.file()));
         let module_ty = Type::ModuleLiteral(module_literal);
 
         let name = if let Some(star_import) = definition.kind(db).as_star_import() {
@@ -433,8 +431,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // Regardless, for now, we sidestep all of that by repeating the submodule-or-attribute
         // check here when inferring types for a `from...import` statement.
-        if let Some(submodule_type) = full_submodule_name
-            .as_ref()
+        if let Some(submodule_type) = module_is_package
+            .then_some(full_submodule_name.as_ref())
+            .flatten()
             .and_then(|submodule_name| self.module_type_from_name(submodule_name))
         {
             self.add_declaration_with_binding(
