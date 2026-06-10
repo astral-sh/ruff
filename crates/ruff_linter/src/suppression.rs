@@ -169,6 +169,11 @@ impl SuppressionComments {
             SuppressionComments::DisableEnable(_, comment) => Some(comment),
         }
     }
+
+    /// Return an iterator over all of the [`SuppressionComment`]s in `self`.
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &SuppressionComment> {
+        std::iter::once(self.first()).chain(self.second())
+    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -341,67 +346,6 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        fn process_pending_diagnostics(
-            key: Option<TextRange>,
-            grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
-            context: &LintContext,
-            locator: &Locator,
-        ) -> bool {
-            let Some((group_key, group)) = grouped_diagnostic else {
-                return false;
-            };
-
-            if key.is_some_and(|key| key == *group_key) {
-                return false;
-            }
-
-            if group.any_invalid() {
-                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                    context,
-                    locator,
-                    group.suppression,
-                    &group.invalid_codes,
-                    true,
-                    InvalidRuleCode {
-                        rule_code: group.invalid_codes.iter().join(", "),
-                        kind: InvalidRuleCodeKind::Suppression,
-                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
-                    },
-                ) {
-                    if group.has_unknown_code {
-                        diagnostic.help(
-                            "Add non-Ruff rule codes to the `lint.external` configuration option",
-                        );
-                    }
-                    if group.has_stable_rule_name {
-                        diagnostic.help("Enable `lint.preview` to use rule names");
-                    }
-                }
-            }
-
-            if group.any_unused() {
-                let mut codes = group.disabled_codes.clone();
-                codes.extend(group.unused_codes.clone());
-                Suppressions::report_suppression_codes(
-                    context,
-                    locator,
-                    group.suppression,
-                    &codes,
-                    false,
-                    UnusedNOQA {
-                        codes: Some(UnusedCodes {
-                            disabled: &group.disabled_codes,
-                            duplicated: &group.duplicated_codes,
-                            unmatched: &group.unused_codes,
-                        }),
-                        kind: UnusedNOQAKind::Suppression,
-                    },
-                );
-            }
-
-            true
-        }
-
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
 
@@ -409,8 +353,12 @@ impl Suppressions {
             let first_comment = suppression.comments.first();
             let key = first_comment.range;
 
-            if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
-            {
+            if self.process_pending_diagnostics(
+                Some(key),
+                grouped_diagnostic.as_ref(),
+                context,
+                locator,
+            ) {
                 grouped_diagnostic = None;
             }
 
@@ -463,39 +411,103 @@ impl Suppressions {
             }
         }
 
-        process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
+        self.process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
-                context
-                    .report_diagnostic(
-                        InvalidSuppressionComment {
-                            kind: InvalidSuppressionCommentKind::Error(error.kind),
-                        },
-                        error.range,
-                    )
-                    .set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
+                let mut diagnostic = context.report_diagnostic(
+                    InvalidSuppressionComment {
+                        kind: InvalidSuppressionCommentKind::Error(error.kind),
+                    },
+                    error.range,
+                );
+                if !self.has_later_suppression(error.range) {
+                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
+                }
             }
         }
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for invalid in &self.invalid {
-                context
-                    .report_diagnostic(
-                        InvalidSuppressionComment {
-                            kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
-                        },
-                        invalid.comment.range,
-                    )
-                    .set_fix(Fix::unsafe_edit(delete_comment(
+                let mut diagnostic = context.report_diagnostic(
+                    InvalidSuppressionComment {
+                        kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
+                    },
+                    invalid.comment.range,
+                );
+                if !self.has_later_suppression(invalid.comment.range) {
+                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(
                         invalid.comment.range,
                         locator,
                     )));
+                }
             }
         }
     }
 
+    fn process_pending_diagnostics(
+        &self,
+        key: Option<TextRange>,
+        grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
+        context: &LintContext,
+        locator: &Locator,
+    ) -> bool {
+        let Some((group_key, group)) = grouped_diagnostic else {
+            return false;
+        };
+
+        if key.is_some_and(|key| key == *group_key) {
+            return false;
+        }
+
+        if group.any_invalid()
+            && let Some(mut diagnostic) = self.report_suppression_codes(
+                context,
+                locator,
+                group.suppression,
+                &group.invalid_codes,
+                true,
+                InvalidRuleCode {
+                    rule_code: group.invalid_codes.iter().join(", "),
+                    kind: InvalidRuleCodeKind::Suppression,
+                    whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                },
+            )
+        {
+            if group.has_unknown_code {
+                diagnostic
+                    .help("Add non-Ruff rule codes to the `lint.external` configuration option");
+            }
+            if group.has_stable_rule_name {
+                diagnostic.help("Enable `lint.preview` to use rule names");
+            }
+        }
+
+        if group.any_unused() {
+            let mut codes = group.disabled_codes.clone();
+            codes.extend(group.unused_codes.clone());
+            self.report_suppression_codes(
+                context,
+                locator,
+                group.suppression,
+                &codes,
+                false,
+                UnusedNOQA {
+                    codes: Some(UnusedCodes {
+                        disabled: &group.disabled_codes,
+                        duplicated: &group.duplicated_codes,
+                        unmatched: &group.unused_codes,
+                    }),
+                    kind: UnusedNOQAKind::Suppression,
+                },
+            );
+        }
+
+        true
+    }
+
     fn report_suppression_codes<'a, 'b, T: Violation>(
+        &self,
         context: &'a LintContext<'b>,
         locator: &Locator,
         suppression: &Suppression,
@@ -504,36 +516,39 @@ impl Suppressions {
         kind: T,
     ) -> Option<DiagnosticGuard<'a, 'b>> {
         let first_comment = suppression.comments.first();
-        let (range, edit) = Suppressions::delete_codes_or_comment(
+        let (range, edit) = self.edit_suppression_comment(
             locator,
             first_comment,
             remove_codes,
             highlight_only_code,
         );
         if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
-            if let Some(second_comment) = suppression.comments.second() {
-                let (second_range, second_range_edit) = Suppressions::delete_codes_or_comment(
+            let fix = if let Some(second_comment) = suppression.comments.second() {
+                let (second_range, second_edit) = self.edit_suppression_comment(
                     locator,
                     second_comment,
                     remove_codes,
                     highlight_only_code,
                 );
                 diagnostic.secondary_annotation("", second_range);
-                diagnostic.set_fix(Fix::safe_edits(edit, [second_range_edit]));
+                edit.zip(second_edit)
+                    .map(|(edit, second_edit)| Fix::safe_edits(edit, [second_edit]))
             } else {
-                diagnostic.set_fix(Fix::safe_edit(edit));
-            }
+                edit.map(Fix::safe_edit)
+            };
+            diagnostic.set_optional_fix(fix);
             return Some(diagnostic);
         }
         None
     }
 
-    fn delete_codes_or_comment(
+    fn edit_suppression_comment(
+        &self,
         locator: &Locator<'_>,
         comment: &SuppressionComment,
         remove_codes: &[&str],
         highlight_only_code: bool,
-    ) -> (TextRange, Edit) {
+    ) -> (TextRange, Option<Edit>) {
         let mut range = comment.range;
         let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
@@ -578,7 +593,31 @@ impl Suppressions {
                 Edit::range_replacement(remaining, code_range)
             }
         };
+
+        // Suppress the fix for cases where deleting one suppression comment could activate a later
+        // one within the same comment token.
+        let edit = if edit.is_deletion()
+            && edit.range().contains_range(comment.range)
+            && self.has_later_suppression(comment.range)
+        {
+            None
+        } else {
+            Some(edit)
+        };
+
         (range, edit)
+    }
+
+    /// Check whether another suppression occurs later in the same comment token.
+    fn has_later_suppression(&self, current_range: TextRange) -> bool {
+        self.valid
+            .iter()
+            .flat_map(|suppression| suppression.comments.iter())
+            .chain(self.invalid.iter().map(|invalid| &invalid.comment))
+            .any(|suppression| {
+                suppression.token_range.contains_range(current_range)
+                    && suppression.range.start() > current_range.start()
+            })
     }
 }
 
@@ -750,15 +789,15 @@ impl<'a> SuppressionsBuilder<'a> {
         match suppression.action {
             SuppressionAction::Ignore => {
                 if is_ruff_ignore_enabled(self.settings) {
-                    let token_range = suppression.token_range;
-                    let (before, after) = tokens.split_at(token_range.start());
-                    let range = if indentation_at_offset(token_range.start(), self.source).is_some()
+                    let (before, after) = tokens.split_at(suppression.token_range.start());
+                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                        .is_some()
                     {
                         // own-line ignore
-                        Self::standalone_comment_range(token_range, before, after)
+                        Self::standalone_comment_range(suppression.range, before, after)
                     } else {
                         // trailing ignore
-                        self.trailing_comment_range(token_range, before)
+                        self.trailing_comment_range(suppression.token_range, before)
                     };
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {
