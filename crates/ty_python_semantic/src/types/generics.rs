@@ -1112,7 +1112,8 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
-    /// Maps the specialization's types without allocating if every type is unchanged.
+    /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
+    /// type is unchanged and [`Cow::Owned`] otherwise.
     fn map_types(
         self,
         db: &'db dyn Db,
@@ -1260,16 +1261,15 @@ impl<'db> Specialization<'db> {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
-        if matches!(types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner {
-            self
-        } else {
-            Specialization::new(
+        match types {
+            Cow::Borrowed(_) if tuple_inner == original_tuple_inner => self,
+            types => Specialization::new(
                 db,
                 self.generic_context(db),
                 types,
                 self.materialization_kind(db),
                 tuple_inner,
-            )
+            ),
         }
     }
 
@@ -1397,19 +1397,17 @@ impl<'db> Specialization<'db> {
         } else {
             None
         };
-        if matches!(types, Cow::Borrowed(_))
-            && tuple_inner == original_tuple_inner
-            && new_materialization_kind == self.materialization_kind(db)
-        {
-            self
-        } else {
-            Specialization::new(
+        let metadata_unchanged = tuple_inner == original_tuple_inner
+            && new_materialization_kind == self.materialization_kind(db);
+        match types {
+            Cow::Borrowed(_) if metadata_unchanged => self,
+            types => Specialization::new(
                 db,
                 self.generic_context(db),
                 types,
                 new_materialization_kind,
                 tuple_inner,
-            )
+            ),
         }
     }
 
