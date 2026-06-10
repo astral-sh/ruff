@@ -100,8 +100,8 @@ struct TypeAndRange<'db> {
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
-    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
-        inference.cycle_normalized(db, previous, cycle)
+    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
+        inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -121,7 +121,7 @@ pub(crate) fn infer_definition_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_definition()
+        .finish_definition(definition)
 }
 
 /// Returns `true` if the definition refers to a dictionary-key binding that should be discarded.
@@ -235,8 +235,8 @@ impl<'db> FunctionDecoratorInference<'db> {
     cycle_initial=|db, id, definition: Definition<'db>| {
         DefinitionInference::cycle_initial(db, definition, Type::divergent(id))
     },
-    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, _| {
-        inference.cycle_normalized(db, previous, cycle)
+    cycle_fn=|db, cycle, previous: &DefinitionInference<'db>, inference: DefinitionInference<'db>, definition| {
+        inference.cycle_normalized(db, previous, cycle, definition)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -257,7 +257,7 @@ pub(crate) fn infer_deferred_types<'db>(
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
-        .finish_definition()
+        .finish_definition(definition)
 }
 
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
@@ -442,7 +442,7 @@ pub(super) fn infer_statement_types<'db>(
             infer_expression_types(db, expression, TypeContext::default()),
         ),
         Statement::Definition(definition) => {
-            StatementInference::Definition(infer_definition_types(db, definition))
+            StatementInference::Definition(definition, infer_definition_types(db, definition))
         }
         Statement::Other(statement) => {
             StatementInference::Other(infer_statement_types_impl(db, statement))
@@ -913,9 +913,9 @@ pub(crate) struct DefinitionInference<'db> {
 enum DefinitionTypes<'db> {
     #[default]
     Empty,
-    Binding(DefinitionBinding<'db>),
-    Declaration(DefinitionDeclaration<'db>),
-    BindingAndDeclaration(DefinitionDeclaration<'db>),
+    Binding(Type<'db>),
+    Declaration(TypeAndQualifiers<'db>),
+    BindingAndDeclaration(TypeAndQualifiers<'db>),
     Other(Box<OtherDefinitionTypes<'db>>),
 }
 
@@ -930,17 +930,20 @@ struct OtherDefinitionTypes<'db> {
 
 impl<'db> DefinitionTypes<'db> {
     fn from_parts(
+        owner: Definition<'db>,
         bindings: Vec<DefinitionBinding<'db>>,
         declarations: Vec<DefinitionDeclaration<'db>>,
     ) -> Self {
         match (&*bindings, &*declarations) {
             ([], []) => Self::Empty,
-            ([binding], []) => Self::Binding(*binding),
-            ([], [declaration]) => Self::Declaration(*declaration),
+            ([(definition, ty)], []) if *definition == owner => Self::Binding(*ty),
+            ([], [(definition, ty)]) if *definition == owner => Self::Declaration(*ty),
             ([(binding, binding_ty)], [(declaration, declaration_ty)])
-                if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
+                if *binding == owner
+                    && binding == declaration
+                    && *binding_ty == declaration_ty.inner_type() =>
             {
-                Self::BindingAndDeclaration((*declaration, *declaration_ty))
+                Self::BindingAndDeclaration(*declaration_ty)
             }
             _ => Self::Other(Box::new(OtherDefinitionTypes {
                 bindings: bindings.into_boxed_slice(),
@@ -949,13 +952,21 @@ impl<'db> DefinitionTypes<'db> {
         }
     }
 
-    fn binding_type(&self, definition: Definition<'db>) -> Option<Type<'db>> {
-        self.bindings()
+    fn binding_type(
+        &self,
+        owner: Definition<'db>,
+        definition: Definition<'db>,
+    ) -> Option<Type<'db>> {
+        self.bindings(owner)
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
     }
 
-    fn declaration_type(&self, definition: Definition<'db>) -> Option<TypeAndQualifiers<'db>> {
-        self.declarations()
+    fn declaration_type(
+        &self,
+        owner: Definition<'db>,
+        definition: Definition<'db>,
+    ) -> Option<TypeAndQualifiers<'db>> {
+        self.declarations(owner)
             .find_map(|(candidate, ty)| (candidate == definition).then_some(ty))
     }
 
@@ -963,10 +974,11 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        owner: Definition<'db>,
         definition: Definition<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        if let Some(previous_ty) = previous.binding_type(definition) {
+        if let Some(previous_ty) = previous.binding_type(owner, definition) {
             ty.cycle_normalized(db, previous_ty, cycle)
         } else {
             ty.recursive_type_normalized(db, cycle)
@@ -977,10 +989,11 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        owner: Definition<'db>,
         definition: Definition<'db>,
         ty: TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        if let Some(previous_ty) = previous.declaration_type(definition) {
+        if let Some(previous_ty) = previous.declaration_type(owner, definition) {
             ty.map_type(|inner| inner.cycle_normalized(db, previous_ty.inner_type(), cycle))
         } else {
             ty.map_type(|inner| inner.recursive_type_normalized(db, cycle))
@@ -992,54 +1005,52 @@ impl<'db> DefinitionTypes<'db> {
         db: &'db dyn Db,
         previous: &DefinitionTypes<'db>,
         cycle: &salsa::Cycle,
+        owner: Definition<'db>,
     ) -> Self {
         match self {
             Self::Empty => Self::Empty,
-            Self::Binding(mut binding) => {
-                let (definition, ty) = &mut binding;
-                *ty = Self::normalize_binding(db, previous, cycle, *definition, *ty);
-                Self::Binding(binding)
-            }
-            Self::Declaration(mut declaration) => {
-                let (definition, ty) = &mut declaration;
-                *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
-                Self::Declaration(declaration)
-            }
-            Self::BindingAndDeclaration(mut declaration) => {
-                let (definition, declaration_ty) = declaration;
+            Self::Binding(ty) => Self::Binding(Self::normalize_binding(
+                db, previous, cycle, owner, owner, ty,
+            )),
+            Self::Declaration(ty) => Self::Declaration(Self::normalize_declaration(
+                db, previous, cycle, owner, owner, ty,
+            )),
+            Self::BindingAndDeclaration(declaration_ty) => {
                 let binding_ty = Self::normalize_binding(
                     db,
                     previous,
                     cycle,
-                    definition,
+                    owner,
+                    owner,
                     declaration_ty.inner_type(),
                 );
                 let declaration_ty =
-                    Self::normalize_declaration(db, previous, cycle, definition, declaration_ty);
+                    Self::normalize_declaration(db, previous, cycle, owner, owner, declaration_ty);
 
                 if binding_ty == declaration_ty.inner_type() {
-                    declaration.1 = declaration_ty;
-                    Self::BindingAndDeclaration(declaration)
+                    Self::BindingAndDeclaration(declaration_ty)
                 } else {
                     Self::Other(Box::new(OtherDefinitionTypes {
-                        bindings: Box::new([(definition, binding_ty)]),
-                        declarations: Box::new([(definition, declaration_ty)]),
+                        bindings: Box::new([(owner, binding_ty)]),
+                        declarations: Box::new([(owner, declaration_ty)]),
                     }))
                 }
             }
             Self::Other(mut other) => {
                 for (definition, ty) in &mut other.bindings {
-                    *ty = Self::normalize_binding(db, previous, cycle, *definition, *ty);
+                    *ty = Self::normalize_binding(db, previous, cycle, owner, *definition, *ty);
                 }
                 for (definition, ty) in &mut other.declarations {
-                    *ty = Self::normalize_declaration(db, previous, cycle, *definition, *ty);
+                    *ty = Self::normalize_declaration(db, previous, cycle, owner, *definition, *ty);
                 }
 
                 match (&*other.bindings, &*other.declarations) {
                     ([(binding, binding_ty)], [(declaration, declaration_ty)])
-                        if binding == declaration && *binding_ty == declaration_ty.inner_type() =>
+                        if *binding == owner
+                            && binding == declaration
+                            && *binding_ty == declaration_ty.inner_type() =>
                     {
-                        Self::BindingAndDeclaration((*declaration, *declaration_ty))
+                        Self::BindingAndDeclaration(*declaration_ty)
                     }
                     _ => Self::Other(other),
                 }
@@ -1047,11 +1058,14 @@ impl<'db> DefinitionTypes<'db> {
         }
     }
 
-    fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
+    fn bindings(
+        &self,
+        owner: Definition<'db>,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
         match self {
-            Self::Binding(binding) => Either::Left(std::iter::once(*binding)),
+            Self::Binding(ty) => Either::Left(std::iter::once((owner, *ty))),
             Self::BindingAndDeclaration(declaration) => {
-                Either::Left(std::iter::once((declaration.0, declaration.1.inner_type())))
+                Either::Left(std::iter::once((owner, declaration.inner_type())))
             }
             Self::Other(other) => Either::Right(other.bindings.iter().copied()),
             Self::Empty | Self::Declaration(..) => Either::Right([].iter().copied()),
@@ -1060,13 +1074,26 @@ impl<'db> DefinitionTypes<'db> {
 
     fn declarations(
         &self,
+        owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
         match self {
             Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
-                Either::Left(std::iter::once(*declaration))
+                Either::Left(std::iter::once((owner, *declaration)))
             }
             Self::Other(other) => Either::Right(other.declarations.iter().copied()),
             Self::Empty | Self::Binding(..) => Either::Right([].iter().copied()),
+        }
+    }
+
+    fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> + '_ {
+        match self {
+            Self::Declaration(declaration) | Self::BindingAndDeclaration(declaration) => {
+                Either::Left(Either::Left(std::iter::once(*declaration)))
+            }
+            Self::Other(other) => {
+                Either::Left(Either::Right(other.declarations.iter().map(|(_, ty)| *ty)))
+            }
+            Self::Empty | Self::Binding(..) => Either::Right(std::iter::empty()),
         }
     }
 }
@@ -1136,10 +1163,7 @@ impl<'db> DefinitionInference<'db> {
                         generic_context.repeat_specialization(db, cycle_recovery)
                     });
 
-                types = DefinitionTypes::Binding((
-                    definition,
-                    Type::instance(db, divergent_collection),
-                ));
+                types = DefinitionTypes::Binding(Type::instance(db, divergent_collection));
             }
         }
 
@@ -1160,13 +1184,18 @@ impl<'db> DefinitionInference<'db> {
         db: &'db dyn Db,
         previous_inference: &DefinitionInference<'db>,
         cycle: &salsa::Cycle,
+        definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
-        self.types =
-            std::mem::take(&mut self.types).cycle_normalized(db, &previous_inference.types, cycle);
+        self.types = std::mem::take(&mut self.types).cycle_normalized(
+            db,
+            &previous_inference.types,
+            cycle,
+            definition,
+        );
 
         self
     }
@@ -1218,7 +1247,7 @@ impl<'db> DefinitionInference<'db> {
     #[track_caller]
     pub(crate) fn binding_type(&self, definition: Definition<'db>) -> Type<'db> {
         self.types
-            .bindings()
+            .bindings(definition)
             .find_map(|(def, ty)| if def == definition { Some(ty) } else { None })
             .or_else(|| self.fallback_type())
             .expect(
@@ -1227,8 +1256,11 @@ impl<'db> DefinitionInference<'db> {
             )
     }
 
-    fn bindings(&self) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
-        self.types.bindings()
+    fn bindings(
+        &self,
+        owner: Definition<'db>,
+    ) -> impl ExactSizeIterator<Item = (Definition<'db>, Type<'db>)> {
+        self.types.bindings(owner)
     }
 
     pub(crate) fn inferred_declaration(
@@ -1236,7 +1268,7 @@ impl<'db> DefinitionInference<'db> {
         definition: Definition<'db>,
     ) -> InferredDeclaration<'db> {
         self.types
-            .declarations()
+            .declarations(definition)
             .find_map(|(def, declaration)| {
                 if def == definition {
                     Some(InferredDeclaration::Declared(declaration))
@@ -1254,12 +1286,13 @@ impl<'db> DefinitionInference<'db> {
 
     fn declarations(
         &self,
+        owner: Definition<'db>,
     ) -> impl ExactSizeIterator<Item = (Definition<'db>, TypeAndQualifiers<'db>)> {
-        self.types.declarations()
+        self.types.declarations(owner)
     }
 
     fn declaration_types(&self) -> impl ExactSizeIterator<Item = TypeAndQualifiers<'db>> {
-        self.declarations().map(|(_, qualifiers)| qualifiers)
+        self.types.declaration_types()
     }
 
     pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
@@ -1409,7 +1442,7 @@ impl<'db> ExpressionInference<'db> {
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
 pub(crate) enum StatementInference<'db> {
     Expression(&'db ExpressionInference<'db>),
-    Definition(&'db DefinitionInference<'db>),
+    Definition(Definition<'db>, &'db DefinitionInference<'db>),
     Other(&'db StatementInferenceInner<'db>),
 }
 
@@ -1417,7 +1450,7 @@ impl<'db> StatementInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         match self {
             StatementInference::Expression(inference) => inference.expression_type(expression),
-            StatementInference::Definition(inference) => inference.expression_type(expression),
+            StatementInference::Definition(_, inference) => inference.expression_type(expression),
             StatementInference::Other(inference) => inference.expression_type(expression),
         }
     }
@@ -1430,7 +1463,7 @@ impl<'db> StatementInference<'db> {
             StatementInference::Expression(inference) => {
                 inference.collection_use_constraints(collection_def)
             }
-            StatementInference::Definition(inference) => {
+            StatementInference::Definition(_, inference) => {
                 inference.collection_use_constraints(collection_def)
             }
             StatementInference::Other(inference) => {
