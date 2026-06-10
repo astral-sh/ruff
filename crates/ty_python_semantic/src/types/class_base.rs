@@ -128,6 +128,10 @@ impl<'db> ClassBase<'db> {
                 }
             }
             Type::Union(union) => {
+                if let Some(module) = ty.typed_dict_module(db) {
+                    return Some(ClassBase::TypedDict(module));
+                }
+
                 // We do not support full unions of MROs (yet). Until we do,
                 // support the cases where one of the types in the union is
                 // a dynamic type such as `Any` or `Unknown`, and all other

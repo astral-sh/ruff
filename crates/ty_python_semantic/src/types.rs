@@ -1603,6 +1603,26 @@ impl<'db> Type<'db> {
         matches!(self, Type::TypedDict(..))
     }
 
+    /// Return the module for a `TypedDict` special form, including a union of the special forms
+    /// exported by `typing` and `typing_extensions`.
+    pub(crate) fn typed_dict_module(self, db: &'db dyn Db) -> Option<TypedDictModule> {
+        match self {
+            Type::SpecialForm(special_form) => special_form.typed_dict_module(),
+            Type::Union(union) => {
+                let mut module: Option<TypedDictModule> = None;
+                for element in union.elements(db) {
+                    let element_module = element.typed_dict_module(db)?;
+                    module = Some(match module {
+                        None => element_module,
+                        Some(module) => module.union(element_module),
+                    });
+                }
+                module
+            }
+            _ => None,
+        }
+    }
+
     pub(crate) const fn as_typed_dict(self) -> Option<TypedDictType<'db>> {
         match self {
             Type::TypedDict(typed_dict) => Some(typed_dict),
