@@ -672,46 +672,44 @@ impl<'a> SuppressionsBuilder<'a> {
                         }
                     }
                     TokenKind::Comment => {
-                        let Some(suppression) = suppressions
+                        while let Some(suppression) = suppressions
                             .next_if(|suppression| suppression.token_range == token.range())
-                        else {
-                            continue;
-                        };
-
-                        if self.register_standalone_suppression(&suppression, tokens) {
-                            continue;
-                        }
-
-                        let Some(indent) =
-                            indentation_at_offset(suppression.range.start(), self.source)
-                        else {
-                            // trailing suppressions are not supported
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression,
-                            });
-                            continue;
-                        };
-
-                        // comment matches current block's indentation, or precedes an indent/dedent token
-                        if indent == current_indent
-                            || after[token_index..]
-                                .iter()
-                                .find(|t| !t.kind().is_trivia())
-                                .is_some_and(|t| {
-                                    matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
-                                })
                         {
-                            self.pending.push(PendingSuppressionComment {
-                                indent,
-                                comment: suppression,
-                            });
-                        } else {
-                            // weirdly indented? ¯\_(ツ)_/¯
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Indentation,
-                                comment: suppression,
-                            });
+                            if self.register_standalone_suppression(&suppression, tokens) {
+                                continue;
+                            }
+
+                            let Some(indent) =
+                                indentation_at_offset(suppression.range.start(), self.source)
+                            else {
+                                // trailing suppressions are not supported
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Trailing,
+                                    comment: suppression,
+                                });
+                                continue;
+                            };
+
+                            // comment matches current block's indentation, or precedes an indent/dedent token
+                            if indent == current_indent
+                                || after[token_index..]
+                                    .iter()
+                                    .find(|t| !t.kind().is_trivia())
+                                    .is_some_and(|t| {
+                                        matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
+                                    })
+                            {
+                                self.pending.push(PendingSuppressionComment {
+                                    indent,
+                                    comment: suppression,
+                                });
+                            } else {
+                                // weirdly indented? ¯\_(ツ)_/¯
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Indentation,
+                                    comment: suppression,
+                                });
+                            }
                         }
                     }
                     _ => {}

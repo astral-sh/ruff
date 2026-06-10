@@ -290,6 +290,16 @@ message = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # ruff:enable[E501]
 ```
 
+This should also work for `ruff:ignore` comments on the same line as the `disable` comment:
+
+```py
+def f():
+    # error: [unused-noqa] "FIX002"
+    # ruff:disable[F401] # ruff:ignore[FIX002]
+    import os
+    # ruff:enable[F401]
+```
+
 ## `file-ignore` comments within a `disable`/`enable` pair
 
 ```toml
