@@ -5,7 +5,7 @@ use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use zip::result::ZipResult;
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
@@ -232,7 +232,7 @@ impl Default for VendoredFileSystem {
         let mut cursor = io::Cursor::new(&mut bytes);
 
         {
-            let mut writer = ZipWriter::new(&mut cursor);
+            let writer = ZipWriter::new(&mut cursor);
             writer.finish().unwrap();
         }
 
@@ -256,8 +256,8 @@ struct ZipFileDebugInfo {
     kind: FileType,
 }
 
-impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
-    fn from(value: ZipFile<'a>) -> Self {
+impl<'a, R: Read> From<ZipFile<'a, R>> for ZipFileDebugInfo {
+    fn from(value: ZipFile<'a, R>) -> Self {
         Self {
             crc32_hash: value.crc32(),
             compressed_size: value.compressed_size(),
@@ -305,7 +305,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    fn from_zip_file(zip_file: ZipFile) -> Self {
+    fn from_zip_file<R: Read>(zip_file: ZipFile<'_, R>) -> Self {
         let kind = if zip_file.is_dir() {
             FileType::Directory
         } else {
@@ -360,7 +360,10 @@ impl VendoredZipArchive {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile<'_>> {
+    fn lookup_path(
+        &mut self,
+        path: &NormalizedVendoredPath,
+    ) -> Result<ZipFile<'_, io::Cursor<Cow<'static, [u8]>>>> {
         Ok(self.0.by_name(path.as_str())?)
     }
 
@@ -477,14 +480,14 @@ impl VendoredFileSystemBuilder {
             .add_directory(path.as_ref().as_str(), self.options())
     }
 
-    pub fn finish(mut self) -> Result<VendoredFileSystem> {
+    pub fn finish(self) -> Result<VendoredFileSystem> {
         let buffer = self.writer.finish()?;
 
         VendoredFileSystem::new(buffer.into_inner())
     }
 
-    fn options(&self) -> FileOptions {
-        FileOptions::default()
+    fn options(&self) -> SimpleFileOptions {
+        SimpleFileOptions::default()
             .compression_method(self.compression_method)
             .unix_permissions(0o644)
     }
