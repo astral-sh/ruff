@@ -1189,9 +1189,7 @@ impl<'db> Type<'db> {
         cycle: &salsa::Cycle,
     ) -> Self {
         let cycle_head_body = |ty: Self| match ty {
-            Type::Recursive(rec)
-                if rec.is_implicit(db) && cycle.head_ids().any(|id| id == rec.binder_id(db)) =>
-            {
+            Type::Recursive(rec) if cycle.head_ids().any(|id| id == rec.binder_id(db)) => {
                 *rec.body(db)
             }
             _ => ty,
@@ -2363,19 +2361,15 @@ impl<'db> Type<'db> {
         if nested && self.same_divergent_marker(div) {
             return None;
         }
-        // A top-level implicit recursive type for the marker currently being normalized is folded
-        // back to its own `Divergent` marker. Implicit recursive types for other cycle heads are
-        // already canonical markers for those heads and must be preserved.
-        if let Type::Recursive(rec) = self
-            && rec.is_implicit(db)
-        {
-            let marker = Type::divergent(rec.binder_id(db));
-            if marker.same_divergent_marker(div) {
-                return Some(marker);
-            }
-            return Some(self);
-        }
         match self {
+            Type::Recursive(rec) => {
+                let marker = Type::divergent(rec.binder_id(db));
+                if marker.same_divergent_marker(div) {
+                    Some(marker)
+                } else {
+                    Some(self)
+                }
+            },
             Type::Union(union) => union.recursive_type_normalized_impl(db, div, nested),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, div, nested)
@@ -2431,7 +2425,6 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
-            Type::Recursive(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
