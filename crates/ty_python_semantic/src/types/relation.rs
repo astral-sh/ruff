@@ -872,7 +872,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let Type::Recursive(recursive) = ty else {
                     return false;
                 };
-                if recursive.has_explicit_origin(db) && recursive.binder_id(db) == divergent.id() {
+                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id() {
                     wrapping.set(Some(recursive));
                     true
                 } else {
@@ -2383,7 +2383,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 let Type::Recursive(recursive) = ty else {
                     return false;
                 };
-                if recursive.has_explicit_origin(db) && recursive.binder_id(db) == divergent.id() {
+                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id() {
                     wrapping.set(Some(recursive));
                     true
                 } else {
