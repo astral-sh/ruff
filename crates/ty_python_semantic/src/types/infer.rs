@@ -761,6 +761,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
+    /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
+    qualifiers: FrozenMap<ExpressionNodeKey, TypeQualifiers>,
+
     /// Expected types for expression nodes tracked for IDE completion.
     expected_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
 
@@ -819,6 +822,14 @@ impl<'db> ScopeInference<'db> {
             .get(&expression.into())
             .copied()
             .or_else(|| self.fallback_type())
+    }
+
+    /// Get qualifiers for an annotation expression.
+    pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.qualifiers.get(&expression.into()).copied())
+            .unwrap_or_default()
     }
 
     pub(crate) fn try_expected_type(

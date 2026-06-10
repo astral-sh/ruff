@@ -220,8 +220,7 @@ impl<'db> Type<'db> {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
                 } else {
-                    // We can potentially infer empty typeddicts as always falsy if they're `closed=True`,
-                    // but as of 22-01-26 we don't yet support PEP 728.
+                    // TODO: Empty closed TypedDicts can be inferred as always falsy.
                     Truthiness::Ambiguous
                 }
             }

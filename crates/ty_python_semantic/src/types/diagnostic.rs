@@ -5621,6 +5621,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key refers to a read-only extra item.
+    ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
     UnknownKey,
 }
@@ -5643,6 +5645,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only extra item \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
