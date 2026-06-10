@@ -12,6 +12,11 @@ use crate::Db;
 use crate::types::visitor;
 use crate::types::{ApplyTypeMappingVisitor, Type, TypeAliasType, TypeContext, TypeMapping};
 use salsa::plumbing::AsId;
+use ty_python_core::definition::Definition;
+use ty_python_core::expression::Expression;
+use ty_python_core::scope::ScopeId;
+use ty_python_core::statement::StatementInner;
+use ty_python_core::unpack::Unpack;
 
 /// Wrapper around `salsa::Id` that implements `GetSize` so it can be used as a
 /// field of a `#[salsa::interned]` struct that uses `heap_size`.
@@ -29,11 +34,90 @@ impl BinderId {
     }
 }
 
+/// Which definition-inference query produced an implicit recursive marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum ImplicitDefinitionCycleKind {
+    Definition,
+    Deferred,
+}
+
+/// Which expression-inference query produced an implicit recursive marker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum ImplicitExpressionCycleKind {
+    Inference,
+    Type,
+}
+
+/// A stable source anchor for an inferred recursion cycle.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub enum ImplicitRecursiveOrigin<'db> {
+    /// Compatibility path for cycle-recovery sites that still use the Salsa
+    /// query cycle id as their binder.
+    QueryCycle(BinderId),
+    Definition {
+        kind: ImplicitDefinitionCycleKind,
+        definition: Definition<'db>,
+    },
+    Scope {
+        scope: ScopeId<'db>,
+        type_context: TypeContext<'db>,
+    },
+    Expression {
+        kind: ImplicitExpressionCycleKind,
+        expression: Expression<'db>,
+        type_context: TypeContext<'db>,
+    },
+    Statement(StatementInner<'db>),
+    Unpack(Unpack<'db>),
+}
+
+impl<'db> ImplicitRecursiveOrigin<'db> {
+    pub(crate) fn query_cycle(id: salsa::Id) -> Self {
+        Self::QueryCycle(BinderId::new(id))
+    }
+
+    pub(crate) fn binder_id(self, db: &'db dyn Db) -> salsa::Id {
+        match self {
+            Self::QueryCycle(id) => id.into_id(),
+            Self::Definition { definition, .. } => definition.as_id(),
+            Self::Scope {
+                scope,
+                type_context,
+            } if type_context.annotation.is_none() => scope.as_id(),
+            Self::Expression {
+                kind: ImplicitExpressionCycleKind::Inference,
+                expression,
+                type_context,
+            } if type_context.annotation.is_none() => expression.as_id(),
+            Self::Statement(statement) => statement.as_id(),
+            Self::Unpack(unpack) => unpack.as_id(),
+            _ => ImplicitRecursiveBinder::new(db, self).as_id(),
+        }
+    }
+
+    pub(crate) fn cycle_recovery_type(self, db: &'db dyn Db) -> Type<'db> {
+        let binder_id = self.binder_id(db);
+        Type::recursive(
+            db,
+            binder_id,
+            RecursiveOrigin::Implicit(Self::query_cycle(binder_id)),
+            Type::divergent(binder_id),
+        )
+    }
+}
+
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+struct ImplicitRecursiveBinder<'db> {
+    origin: ImplicitRecursiveOrigin<'db>,
+}
+
+impl get_size2::GetSize for ImplicitRecursiveBinder<'_> {}
+
 /// The source whose recursion is represented by a [`RecursiveType`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum RecursiveOrigin<'db> {
-    /// An inferred recursion cycle with no stable source name.
-    Implicit,
+    /// An inferred recursion cycle.
+    Implicit(ImplicitRecursiveOrigin<'db>),
     /// A recursive PEP 695 type alias.
     TypeAlias(TypeAliasType<'db>),
 }
@@ -41,7 +125,7 @@ pub enum RecursiveOrigin<'db> {
 impl<'db> RecursiveOrigin<'db> {
     pub(crate) fn source_type(self) -> Option<Type<'db>> {
         match self {
-            Self::Implicit => None,
+            Self::Implicit(_) => None,
             Self::TypeAlias(alias) => Some(Type::TypeAlias(alias)),
         }
     }
@@ -53,7 +137,7 @@ impl<'db> RecursiveOrigin<'db> {
     /// protocol interface computation here.
     pub(crate) fn matches_type(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         match (self, ty) {
-            (Self::Implicit, _) => false,
+            (Self::Implicit(_), _) => false,
             (Self::TypeAlias(alias), Type::TypeAlias(other)) => {
                 alias.definition(db) == other.definition(db)
             }
@@ -65,11 +149,11 @@ impl<'db> RecursiveOrigin<'db> {
         visitor::any_over_type(db, ty, false, |inner| self.matches_type(db, inner))
     }
 
-    pub(crate) fn binder_id(self, db: &'db dyn Db) -> Option<salsa::Id> {
+    pub(crate) fn binder_id(self, db: &'db dyn Db) -> salsa::Id {
         match self {
-            Self::Implicit => None,
-            Self::TypeAlias(TypeAliasType::PEP695(alias)) => Some(alias.as_id()),
-            Self::TypeAlias(alias) => Some(alias.definition(db).as_id()),
+            Self::Implicit(origin) => origin.binder_id(db),
+            Self::TypeAlias(TypeAliasType::PEP695(alias)) => alias.as_id(),
+            Self::TypeAlias(alias) => alias.definition(db).as_id(),
         }
     }
 
@@ -81,11 +165,11 @@ impl<'db> RecursiveOrigin<'db> {
             TypeMapping<'a, 'db>,
             &ApplyTypeMappingVisitor<'db>,
         ) -> (Type<'db>, Type<'db>),
-    ) -> Option<Type<'db>>
+    ) -> Type<'db>
     where
         'db: 'a,
     {
-        let binder_id = self.binder_id(db)?;
+        let binder_id = self.binder_id(db);
         let type_mapping = TypeMapping::ReplaceRecursiveOrigin {
             origin: self,
             binder_id: BinderId::new(binder_id),
@@ -98,9 +182,9 @@ impl<'db> RecursiveOrigin<'db> {
             false,
             |ty| matches!(ty, Type::Divergent(divergent) if divergent.id() == binder_id),
         ) {
-            Some(Type::recursive(db, binder_id, self, body))
+            Type::recursive(db, binder_id, self, body)
         } else {
-            Some(fallback)
+            fallback
         }
     }
 }
@@ -147,7 +231,7 @@ impl<'db> RecursiveType<'db> {
     }
 
     pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
-        matches!(self.origin(db), RecursiveOrigin::Implicit)
+        matches!(self.origin(db), RecursiveOrigin::Implicit(_))
     }
 
     pub(crate) fn has_explicit_origin(self, db: &'db dyn Db) -> bool {
