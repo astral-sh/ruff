@@ -1590,8 +1590,11 @@ def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]
     reveal_type(project(dst))  # revealed: tuple[str, object]
     reveal_type(iter(dst))  # revealed: Iterator[str]
     reveal_type(dst | src)  # revealed: EmptyTypedDict
-    reveal_type(dst | other)  # revealed: dict[str | int, object]
-    reveal_type(other | dst)  # revealed: dict[int | str, object]
+    # TODO: Support dictionary merges between `TypedDict` and ordinary `dict` instances.
+    # error: [unsupported-operator]
+    reveal_type(dst | other)  # revealed: Unknown
+    # error: [unsupported-operator]
+    reveal_type(other | dst)  # revealed: Unknown
     dst.update(src)
     dst |= src
 
