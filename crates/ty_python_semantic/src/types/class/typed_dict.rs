@@ -354,7 +354,7 @@ fn synthesize_typed_dict_get<'db>(
     fields: TypedDictFields<'db>,
 ) -> Type<'db> {
     let instance_ty = Type::TypedDict(typed_dict);
-    let fallback_value_ty = if typed_dict.openness(db).is_open() {
+    let fallback_value_ty = if typed_dict.openness(db).is_implicitly_open() {
         Type::unknown()
     } else {
         typed_dict.value_type(db)

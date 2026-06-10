@@ -4737,7 +4737,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
         openness: TypedDictOpenness<'db>,
     ) {
         let (extra_items_ty, has_explicit_extra_items) = match openness {
-            TypedDictOpenness::Open => (Type::object(), false),
+            TypedDictOpenness::ImplicitlyOpen => (Type::object(), false),
             TypedDictOpenness::Closed => return,
             TypedDictOpenness::Extra(extra_items) => (extra_items.declared_ty, true),
         };
@@ -4763,7 +4763,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 argument_index,
                 Argument::Keywords,
                 Some(extra_items_ty),
-                if openness.is_open() {
+                if openness.is_implicitly_open() {
                     InvalidArgumentTypeProvenance::OpenTypedDictExtraItems
                 } else {
                     InvalidArgumentTypeProvenance::Argument

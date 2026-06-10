@@ -308,7 +308,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     openness: extra_items.unwrap_or(if closed {
                         TypedDictOpenness::Closed
                     } else {
-                        TypedDictOpenness::Open
+                        TypedDictOpenness::ImplicitlyOpen
                     }),
                 }
             }

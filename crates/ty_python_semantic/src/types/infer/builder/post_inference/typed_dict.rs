@@ -172,7 +172,7 @@ fn validate_typed_dict_openness<'db>(
         let base_items = base_typed_dict.items(db);
 
         match base_openness {
-            TypedDictOpenness::Open => {}
+            TypedDictOpenness::ImplicitlyOpen => {}
             TypedDictOpenness::Closed => {
                 if !child_openness.is_closed() {
                     report_invalid_typed_dict_openness(
@@ -203,7 +203,7 @@ fn validate_typed_dict_openness<'db>(
             }
             TypedDictOpenness::Extra(base_extra_items) if base_extra_items.is_read_only() => {
                 match child_openness {
-                    TypedDictOpenness::Open => {
+                    TypedDictOpenness::ImplicitlyOpen => {
                         report_invalid_typed_dict_openness(
                             context,
                             class,

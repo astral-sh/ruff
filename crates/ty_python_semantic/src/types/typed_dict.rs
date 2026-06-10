@@ -48,16 +48,17 @@ impl Default for TypedDictParams {
     }
 }
 
-/// The openness of a `TypedDict`.
+/// The undeclared-item policy of a `TypedDict`.
 ///
-/// Open `TypedDict`s may contain hidden items, but those items are not directly accessible through
-/// most operations. `TypedDict`s with explicit extra items expose those items with a known type.
+/// An implicitly open `TypedDict` may contain hidden items, but those items are not directly
+/// accessible through most operations. A `TypedDict` with explicit extra items exposes those items
+/// with a known type.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub enum TypedDictOpenness<'db> {
     /// Undeclared items may exist at runtime, but are not directly accessible through most
     /// `TypedDict` operations.
     #[default]
-    Open,
+    ImplicitlyOpen,
     /// Undeclared items cannot exist.
     Closed,
     /// Undeclared items are explicitly exposed with the given value type and mutability.
@@ -86,23 +87,23 @@ impl<'db> TypedDictOpenness<'db> {
 
     /// Returns extra items only when they were explicitly declared.
     ///
-    /// An ordinary open `TypedDict` returns `None` here because its hidden items are not directly
+    /// An implicitly open `TypedDict` returns `None` here because its hidden items are not directly
     /// accessible. Use [`Self::effective_extra_items`] for structural relations that must account
     /// for those hidden items.
     pub(crate) const fn explicit_extra_items(self) -> Option<TypedDictExtraItems<'db>> {
         match self {
             Self::Extra(extra_items) => Some(extra_items),
-            Self::Open | Self::Closed => None,
+            Self::ImplicitlyOpen | Self::Closed => None,
         }
     }
 
     /// Returns the effective extra-items policy.
     ///
-    /// An open `TypedDict` behaves like it has read-only extra items of type `object` for these
-    /// purposes, while a closed `TypedDict` has no extra items.
+    /// An implicitly open `TypedDict` behaves like it has read-only extra items of type `object`
+    /// for these purposes, while a closed `TypedDict` has no extra items.
     pub(crate) fn effective_extra_items(self) -> Option<TypedDictExtraItems<'db>> {
         match self {
-            Self::Open => Some(TypedDictExtraItems {
+            Self::ImplicitlyOpen => Some(TypedDictExtraItems {
                 declared_ty: Type::object(),
                 is_read_only: true,
             }),
@@ -111,8 +112,8 @@ impl<'db> TypedDictOpenness<'db> {
         }
     }
 
-    pub(crate) const fn is_open(self) -> bool {
-        matches!(self, Self::Open)
+    pub(crate) const fn is_implicitly_open(self) -> bool {
+        matches!(self, Self::ImplicitlyOpen)
     }
 
     pub(crate) const fn is_closed(self) -> bool {
@@ -127,7 +128,7 @@ impl<'db> TypedDictOpenness<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
-            Self::Open | Self::Closed => self,
+            Self::ImplicitlyOpen | Self::Closed => self,
             Self::Extra(extra_items) => Self::extra(
                 db,
                 extra_items
@@ -145,7 +146,7 @@ impl<'db> TypedDictOpenness<'db> {
         nested: bool,
     ) -> Option<Self> {
         match self {
-            Self::Open | Self::Closed => Some(self),
+            Self::ImplicitlyOpen | Self::Closed => Some(self),
             Self::Extra(extra_items) => {
                 let declared_ty = extra_items
                     .declared_ty
@@ -164,7 +165,8 @@ impl<'db> TypedDictOpenness<'db> {
 /// The value type and mutability of a `TypedDict`'s extra items.
 ///
 /// This represents either an explicit `extra_items` declaration or the synthetic read-only
-/// `object` policy returned for an open `TypedDict` by [`TypedDictOpenness::effective_extra_items`].
+/// `object` policy returned for an implicitly open `TypedDict` by
+/// [`TypedDictOpenness::effective_extra_items`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub struct TypedDictExtraItems<'db> {
     pub(crate) declared_ty: Type<'db>,
@@ -226,13 +228,13 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    /// Returns whether this `TypedDict` is open, closed, or has explicitly typed extra items.
+    /// Returns whether this `TypedDict` is implicitly open, closed, or has explicit extra items.
     ///
-    /// A class-based `TypedDict` inherits the first non-open policy from its bases unless it
+    /// A class-based `TypedDict` inherits the first explicit policy from its bases unless it
     /// declares its own `closed` or `extra_items` argument.
     pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
         #[salsa::tracked(
-            cycle_initial=|_, _, _| TypedDictOpenness::Open,
+            cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
             heap_size=ruff_memory_usage::heap_size
         )]
         fn class_based_openness<'db>(
@@ -245,7 +247,7 @@ impl<'db> TypedDictType<'db> {
             }
 
             let Some((static_class, specialization)) = class.static_class_literal(db) else {
-                return TypedDictOpenness::Open;
+                return TypedDictOpenness::ImplicitlyOpen;
             };
 
             let module = parsed_module(db, static_class.file(db)).load(db);
@@ -275,7 +277,7 @@ impl<'db> TypedDictType<'db> {
                     return if closed_ty.bool(db).is_always_true() {
                         TypedDictOpenness::Closed
                     } else {
-                        TypedDictOpenness::Open
+                        TypedDictOpenness::ImplicitlyOpen
                     };
                 }
             }
@@ -290,13 +292,13 @@ impl<'db> TypedDictType<'db> {
 
                 if base_class.class_literal(db).is_typed_dict(db) {
                     let openness = TypedDictType::new(base_class).openness(db);
-                    if !openness.is_open() {
+                    if !openness.is_implicitly_open() {
                         return openness;
                     }
                 }
             }
 
-            TypedDictOpenness::Open
+            TypedDictOpenness::ImplicitlyOpen
         }
 
         match self {
@@ -312,11 +314,11 @@ impl<'db> TypedDictType<'db> {
 
     /// Returns a type that contains every value that may be stored in this `TypedDict`.
     ///
-    /// An ordinary open `TypedDict` immediately returns `object` because hidden items may have any
-    /// value type. This also avoids unnecessarily materializing its declared items.
+    /// An implicitly open `TypedDict` immediately returns `object` because hidden items may have
+    /// any value type. This also avoids unnecessarily materializing its declared items.
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         let openness = self.openness(db);
-        if openness.is_open() {
+        if openness.is_implicitly_open() {
             return Type::object();
         }
 
@@ -333,7 +335,7 @@ impl<'db> TypedDictType<'db> {
     /// Returns the field exposed by a literal key.
     ///
     /// Undeclared keys synthesize a field only for explicit extra items. Hidden items on an
-    /// ordinary open `TypedDict` are intentionally not directly accessible.
+    /// implicitly open `TypedDict` are intentionally not directly accessible.
     pub(crate) fn item(self, db: &'db dyn Db, key: &str) -> Option<TypedDictField<'db>> {
         self.items(db).get(key).cloned().or_else(|| {
             let extra_items = self.explicit_extra_items(db)?;
@@ -397,7 +399,7 @@ impl<'db> TypedDictType<'db> {
     /// extra items, and cannot be exposed when any declared item is required or read-only.
     pub(crate) fn supports_arbitrary_key_deletion(self, db: &'db dyn Db) -> bool {
         let openness_supports_deletion = match self.openness(db) {
-            TypedDictOpenness::Open => false,
+            TypedDictOpenness::ImplicitlyOpen => false,
             TypedDictOpenness::Closed => true,
             TypedDictOpenness::Extra(extra_items) => !extra_items.is_read_only(),
         };
@@ -520,7 +522,7 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn from_schema_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::from_schema_items_with_openness(db, items, TypedDictOpenness::Open)
+        Self::from_schema_items_with_openness(db, items, TypedDictOpenness::ImplicitlyOpen)
     }
 
     /// Creates a synthesized schema while preserving its undeclared-item policy.
@@ -573,7 +575,7 @@ impl<'db> TypedDictType<'db> {
             .collect();
 
         let openness = match self.openness(db) {
-            TypedDictOpenness::Open => TypedDictOpenness::Open,
+            TypedDictOpenness::ImplicitlyOpen => TypedDictOpenness::ImplicitlyOpen,
             TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
                 TypedDictOpenness::Extra(extra_items)
             }
@@ -621,7 +623,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     target_item_field.declared_ty
                 } else {
                     match target_openness {
-                        TypedDictOpenness::Open => continue,
+                        TypedDictOpenness::ImplicitlyOpen => continue,
                         TypedDictOpenness::Closed => return self.never(),
                         TypedDictOpenness::Extra(extra_items) => extra_items.declared_ty,
                     }
@@ -638,7 +640,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
             }
 
-            let source_extra_items = if target_openness.is_open() {
+            let source_extra_items = if target_openness.is_implicitly_open() {
                 source.explicit_extra_items(db)
             } else {
                 source.openness(db).effective_extra_items()
@@ -663,7 +665,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 }
 
                 match target_openness {
-                    TypedDictOpenness::Open => {}
+                    TypedDictOpenness::ImplicitlyOpen => {}
                     TypedDictOpenness::Closed => return self.never(),
                     TypedDictOpenness::Extra(target_extra_items) => {
                         result.intersect(
@@ -913,7 +915,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                 }
             }
-            TypedDictOpenness::Open | TypedDictOpenness::Extra(_) => {
+            TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Extra(_) => {
                 // An open target shares the read-only extra-items path, using `object` as its
                 // effective extra-items type.
                 let target_extra_items = target_openness.effective_extra_items().expect(
@@ -1090,7 +1092,9 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
                             self.always()
                         }
-                        TypedDictOpenness::Open => check_read_only_extra_items(Type::object()),
+                        TypedDictOpenness::ImplicitlyOpen => {
+                            check_read_only_extra_items(Type::object())
+                        }
                         TypedDictOpenness::Extra(extra_items) => {
                             check_read_only_extra_items(extra_items.declared_ty)
                         }
@@ -1118,7 +1122,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                         {
                             Some((field, Some(extra_items)))
                         }
-                        TypedDictOpenness::Open
+                        TypedDictOpenness::ImplicitlyOpen
                         | TypedDictOpenness::Closed
                         | TypedDictOpenness::Extra(_) => None,
                     }
@@ -1283,7 +1287,7 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
 /// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
 /// ```
 #[salsa::tracked(
-    cycle_initial = |_, _, _| TypedDictOpenness::Open,
+    cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
     heap_size = ruff_memory_usage::heap_size
 )]
 pub(super) fn deferred_functional_typed_dict_openness<'db>(
@@ -1316,7 +1320,7 @@ pub(super) fn deferred_functional_typed_dict_openness<'db>(
         }
     }
 
-    TypedDictOpenness::Open
+    TypedDictOpenness::ImplicitlyOpen
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
@@ -1581,9 +1585,10 @@ pub(crate) struct UnpackedTypedDict<'db> {
 
 /// Combines the openness policies of intersected `TypedDict`-shaped values.
 ///
-/// An intersection must satisfy every constituent, so `Closed` dominates, `Open` adds no
+/// An intersection must satisfy every constituent, so `Closed` dominates, `ImplicitlyOpen` adds no
 /// constraint, and explicit extra-item value types are intersected. Conceptually,
-/// `Open & Extra[int]` becomes a read-only `Extra[int]`, while `Closed & Extra[int]` is `Closed`.
+/// `ImplicitlyOpen & Extra[int]` becomes a read-only `Extra[int]`, while
+/// `Closed & Extra[int]` is `Closed`.
 ///
 /// The combined explicit policy can be read-only because unpacking observes extra items but never
 /// writes through the synthesized policy.
@@ -1596,7 +1601,7 @@ fn intersect_unpacked_typed_dict_openness<'db>(
     for openness in openness {
         match openness {
             TypedDictOpenness::Closed => return TypedDictOpenness::Closed,
-            TypedDictOpenness::Open => {}
+            TypedDictOpenness::ImplicitlyOpen => {}
             TypedDictOpenness::Extra(extra_items) => {
                 explicit_value_types.push(extra_items.declared_ty);
             }
@@ -1604,7 +1609,7 @@ fn intersect_unpacked_typed_dict_openness<'db>(
     }
 
     if explicit_value_types.is_empty() {
-        TypedDictOpenness::Open
+        TypedDictOpenness::ImplicitlyOpen
     } else {
         TypedDictOpenness::extra(
             db,
@@ -1617,10 +1622,11 @@ fn intersect_unpacked_typed_dict_openness<'db>(
 /// Combines the openness policies of unioned `TypedDict`-shaped values.
 ///
 /// A union may contain extra items from any constituent, so `Closed` contributes no values and
-/// explicit extra-item value types are unioned. An `Open` constituent widens explicit extra items
-/// to `object` while preserving explicit-extra-item behavior: conceptually,
-/// `Open | Extra[int]` becomes a read-only `Extra[object]`. With no explicit extra items, any open
-/// constituent makes the result `Open`; otherwise the result is `Closed`.
+/// explicit extra-item value types are unioned. An `ImplicitlyOpen` constituent widens explicit
+/// extra items to `object` while preserving explicit-extra-item behavior: conceptually,
+/// `ImplicitlyOpen | Extra[int]` becomes a read-only `Extra[object]`. With no explicit extra items,
+/// any implicitly open constituent makes the result `ImplicitlyOpen`; otherwise the result is
+/// `Closed`.
 ///
 /// As with intersections, a synthesized explicit policy is read-only because unpacking only
 /// observes its values.
@@ -1629,13 +1635,13 @@ fn union_unpacked_typed_dict_openness<'db>(
     openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
 ) -> TypedDictOpenness<'db> {
     let mut value_types = UnionBuilder::new(db);
-    let mut has_open = false;
+    let mut has_implicitly_open = false;
     let mut has_explicit_extra_items = false;
 
     for openness in openness {
         match openness {
             TypedDictOpenness::Closed => {}
-            TypedDictOpenness::Open => has_open = true,
+            TypedDictOpenness::ImplicitlyOpen => has_implicitly_open = true,
             TypedDictOpenness::Extra(extra_items) => {
                 value_types = value_types.add(extra_items.declared_ty);
                 has_explicit_extra_items = true;
@@ -1643,10 +1649,10 @@ fn union_unpacked_typed_dict_openness<'db>(
         }
     }
 
-    if has_open && has_explicit_extra_items {
+    if has_implicitly_open && has_explicit_extra_items {
         TypedDictOpenness::extra(db, Type::object(), true)
-    } else if has_open {
-        TypedDictOpenness::Open
+    } else if has_implicitly_open {
+        TypedDictOpenness::ImplicitlyOpen
     } else if has_explicit_extra_items {
         TypedDictOpenness::extra(db, value_types.build(), true)
     } else {
@@ -2142,8 +2148,8 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
 /// Validates the arbitrary keys of a `TypedDict`-shaped constructor argument.
 ///
 /// The source's effective extra items must be valid for every target field they could provide and
-/// for the target's explicit extra-items type. Open sources retain ty's existing leniency when
-/// constructing another open `TypedDict`.
+/// for the target's explicit extra-items type. Implicitly open sources retain ty's existing
+/// leniency when constructing another implicitly open `TypedDict`.
 fn validate_extracted_typed_dict_openness<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,
@@ -2159,7 +2165,7 @@ fn validate_extracted_typed_dict_openness<'db, 'ast>(
     let extra_items_ty = extra_items.declared_ty;
     let target_openness = typed_dict.openness(db);
 
-    if target_openness.is_open() && source_openness.is_open() {
+    if target_openness.is_implicitly_open() && source_openness.is_implicitly_open() {
         return true;
     }
 
@@ -2242,7 +2248,7 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
     let typed_dict_items = typed_dict.items(db);
     let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
     let source_openness = unpacked.openness;
-    let validate_extra_keys = !typed_dict.openness(db).is_open();
+    let validate_extra_keys = !typed_dict.openness(db).is_implicitly_open();
     let unpacked_keys = unpacked
         .keys
         .into_iter()
@@ -2387,8 +2393,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target =
                 typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
-            let positional_target_is_unconstrained =
-                positional_target.items(db).is_empty() && positional_target.openness(db).is_open();
+            let positional_target_is_unconstrained = positional_target.items(db).is_empty()
+                && positional_target.openness(db).is_implicitly_open();
             let positional_target_ty = Type::TypedDict(positional_target);
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty =
@@ -2785,7 +2791,7 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             return false;
         }
 
-        if !typed_dict.openness(db).is_open() {
+        if !typed_dict.openness(db).is_implicitly_open() {
             return validate_extracted_typed_dict_openness(
                 context,
                 typed_dict,
