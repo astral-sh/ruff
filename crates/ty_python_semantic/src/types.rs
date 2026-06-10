@@ -3557,7 +3557,9 @@ impl<'db> Type<'db> {
                             )
                             .or_fall_back_to(db, || {
                                 // If an attribute is not available on the bound method object,
-                                // it will be looked up on the underlying function object:
+                                // it will be looked up on the underlying function object. This
+                                // changes the lookup object, so do not forward the bound-method
+                                // receiver.
                                 Type::FunctionLiteral(bound_method.function(db))
                                     .member_lookup_with_policy(db, name, policy)
                             })
@@ -3748,7 +3750,7 @@ impl<'db> Type<'db> {
                     let nominal_lookup = partial
                         .partial(db)
                         .into_functools_partial_instance(db)
-                        .member_lookup_with_policy(db, name.clone(), policy);
+                        .member_lookup_with_policy_and_receiver(db, name.clone(), policy, receiver);
                     if name_str == "func" {
                         match nominal_lookup.place {
                             Place::Defined(DefinedPlace {
