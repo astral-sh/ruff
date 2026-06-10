@@ -1,4 +1,4 @@
-use super::{ArgumentForms, Binding, Bindings, CallableBinding, CallableItem};
+use super::{Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
@@ -65,13 +65,8 @@ impl<'db> ConstructorBinding<'db> {
     }
 
     /// Match parameters for this constructor method and downstream constructors.
-    pub(super) fn match_parameters(
-        &mut self,
-        db: &'db dyn Db,
-        arguments: &CallArguments<'_, 'db>,
-        argument_forms: &mut ArgumentForms,
-    ) {
-        self.entry.match_parameters(db, arguments, argument_forms);
+    pub(super) fn match_parameters(&mut self, db: &'db dyn Db, arguments: &CallArguments<'_, 'db>) {
+        self.entry.match_parameters(db, arguments);
 
         // We don't know at this point whether we'll need to check downstream constructors or not
         // (since we can't resolve return types yet), so we match parameters for all downstream
@@ -89,7 +84,7 @@ impl<'db> ConstructorBinding<'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
-    ) -> Option<ArgumentForms> {
+    ) {
         /// For constructors which may have downstreams (that is, metaclass `__call__` or `__new__`),
         /// analyze their overloads to determine whether to check downstream constructors.
         ///
@@ -125,8 +120,7 @@ impl<'db> ConstructorBinding<'db> {
             })
         }
 
-        let forms = self
-            .entry
+        self.entry
             .check_types(db, constraints, argument_types, call_expression_tcx);
 
         // Now that we've fully checked our own callable, we can determine whether downstream
@@ -135,8 +129,6 @@ impl<'db> ConstructorBinding<'db> {
             // If not, we can discard the downstream constructor bindings entirely.
             self.downstream_constructor = None;
         }
-
-        forms
     }
 
     /// Check types for downstream constructors, if any.

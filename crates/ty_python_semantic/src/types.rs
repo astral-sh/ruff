@@ -81,11 +81,12 @@ pub use crate::types::method::{BoundMethodType, KnownBoundMethodType, WrapperDes
 use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
+use crate::types::signatures::walk_signature;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
-use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::TupleSpec;
 pub use crate::types::type_alias::TypeAliasType;
+pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
 use crate::types::typevar::TypeVarInstance;
 pub use crate::types::typevar::{
@@ -150,6 +151,7 @@ mod subclass_of;
 pub(crate) mod tests;
 mod tuple;
 mod type_alias;
+mod type_form;
 mod typed_dict;
 mod typevar;
 mod unpacker;
@@ -976,6 +978,10 @@ struct GeneratorTypes<'db> {
     yield_ty: Option<Type<'db>>,
     send_ty: Option<Type<'db>>,
     return_ty: Option<Type<'db>>,
+}
+
+fn object_type_form(db: &dyn Db) -> Type<'_> {
+    TypeFormType::from_type_expression(db, Type::object())
 }
 
 #[salsa::tracked]
@@ -4148,8 +4154,7 @@ impl<'db> Type<'db> {
                                     Parameter::positional_only(Some(Name::new_static("value")))
                                         .with_annotated_type(Type::TypeVar(val_ty)),
                                     Parameter::positional_only(Some(Name::new_static("type")))
-                                        .type_form()
-                                        .with_annotated_type(Type::any()),
+                                        .with_annotated_type(object_type_form(db)),
                                 ],
                             ),
                             Type::TypeVar(val_ty),
@@ -4184,8 +4189,7 @@ impl<'db> Type<'db> {
                             db,
                             [
                                 Parameter::positional_or_keyword(Name::new_static("typ"))
-                                    .type_form()
-                                    .with_annotated_type(Type::any()),
+                                    .with_annotated_type(object_type_form(db)),
                                 Parameter::positional_or_keyword(Name::new_static("val"))
                                     .with_annotated_type(Type::any()),
                             ],
@@ -4590,8 +4594,7 @@ impl<'db> Type<'db> {
                                     Parameter::positional_or_keyword(Name::new_static("name"))
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                     Parameter::positional_or_keyword(Name::new_static("value"))
-                                        .with_annotated_type(Type::any())
-                                        .type_form(),
+                                        .with_annotated_type(object_type_form(db)),
                                     Parameter::keyword_only(Name::new_static("type_params"))
                                         .with_annotated_type(Type::homogeneous_tuple(
                                             db,
@@ -8312,35 +8315,6 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     // section of mdtest/generics/pep695/variance.md for details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
-    }
-}
-
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-pub struct TypeFormType<'db> {
-    type_argument: Type<'db>,
-}
-
-fn walk_typeform_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
-    db: &'db dyn Db,
-    typeform_type: TypeFormType<'db>,
-    visitor: &V,
-) {
-    visitor.visit_type(db, typeform_type.type_argument(db));
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for TypeFormType<'_> {}
-
-impl<'db> TypeFormType<'db> {
-    pub(crate) fn from_type_expression(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-        Type::TypeForm(Self::new(db, ty))
-    }
-}
-
-impl<'db> VarianceInferable<'db> for TypeFormType<'db> {
-    // `TypeForm` is covariant in its type argument.
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        self.type_argument(db).variance_of(db, typevar)
     }
 }
 

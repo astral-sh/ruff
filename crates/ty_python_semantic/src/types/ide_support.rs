@@ -6,10 +6,10 @@ use crate::reachability::is_range_reachable;
 use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::class::{DynamicClassAnchor, DynamicEnumAnchor, DynamicNamedTupleAnchor};
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::signatures::{ParameterForm, ParametersKind, Signature};
+use crate::types::signatures::{ParametersKind, Signature};
 use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownClass, KnownUnion,
-    Type, TypeContext, UnionType,
+    CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, CycleDetector, KnownClass,
+    KnownUnion, Type, TypeContext, UnionType,
 };
 use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
@@ -866,19 +866,80 @@ fn full_type_bindings_for_call<'db>(
         .unwrap_or_else(|CallError(_, bindings)| *bindings)
 }
 
-/// Returns the form for a single argument from a successful binding.
-fn argument_form_from_successful_binding(
-    binding: &crate::types::call::Binding<'_>,
+fn annotation_form<'db>(db: &'db dyn Db, annotation: Type<'db>) -> CallArgumentForm {
+    struct AnnotationForm;
+    type AnnotationFormVisitor<'db> = CycleDetector<AnnotationForm, Type<'db>, CallArgumentForm>;
+
+    fn classify<'db>(
+        db: &'db dyn Db,
+        annotation: Type<'db>,
+        visitor: &AnnotationFormVisitor<'db>,
+    ) -> CallArgumentForm {
+        match annotation {
+            Type::TypeForm(_) => CallArgumentForm::Type,
+            Type::TypeAlias(alias) => {
+                visitor.visit(annotation, || classify(db, alias.value_type(db), visitor))
+            }
+            Type::Union(union) => {
+                let mut forms = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| classify(db, *element, visitor));
+                let Some(first) = forms.next() else {
+                    return CallArgumentForm::Unknown;
+                };
+                if forms.all(|form| form == first) {
+                    first
+                } else {
+                    CallArgumentForm::Unknown
+                }
+            }
+            Type::Intersection(intersection) => {
+                let mut form = CallArgumentForm::Value;
+                for element in intersection.iter_positive(db) {
+                    match classify(db, element, visitor) {
+                        CallArgumentForm::Type => return CallArgumentForm::Type,
+                        CallArgumentForm::Unknown => form = CallArgumentForm::Unknown,
+                        CallArgumentForm::Value => {}
+                    }
+                }
+                form
+            }
+            Type::TypeVar(typevar) => visitor.visit(annotation, || {
+                typevar
+                    .typevar(db)
+                    .bound_or_constraints(db)
+                    .map_or(CallArgumentForm::Value, |bound_or_constraints| {
+                        classify(db, bound_or_constraints.as_type(db), visitor)
+                    })
+            }),
+            _ => CallArgumentForm::Value,
+        }
+    }
+
+    classify(
+        db,
+        annotation,
+        &AnnotationFormVisitor::new(CallArgumentForm::Unknown),
+    )
+}
+
+/// Returns the form for a single argument from a binding.
+fn argument_form_from_binding<'db>(
+    db: &'db dyn Db,
+    callable_binding: &crate::types::call::CallableBinding<'db>,
+    binding: &crate::types::call::Binding<'db>,
     argument_index: usize,
 ) -> CallArgumentForm {
-    if let Some(argument_match) = binding.argument_matches().get(argument_index)
+    if let Some(argument_match) =
+        binding.matched_argument_for_call_argument(callable_binding, argument_index)
         && argument_match.matched
         && let [parameter] = argument_match.parameters.as_slice()
     {
-        return match binding.signature.parameters()[parameter.index].form {
-            ParameterForm::Value => CallArgumentForm::Value,
-            ParameterForm::Type => CallArgumentForm::Type,
-        };
+        return annotation_form(
+            db,
+            binding.signature.parameters()[parameter.index].annotated_type(),
+        );
     }
 
     CallArgumentForm::Unknown
@@ -897,15 +958,18 @@ pub fn call_argument_forms(
     };
 
     let argument_count = call_expr.arguments.len();
+    let db = model.db();
 
     // If the function doesn't contain any type forms, for any overloads, short-circuit.
-    if !func_type.bindings(model.db()).iter_flat().any(|binding| {
+    if !func_type.bindings(db).iter_flat().any(|binding| {
         binding.overloads().iter().any(|overload| {
             overload
                 .signature
                 .parameters()
                 .into_iter()
-                .any(|parameter| parameter.form == ParameterForm::Type)
+                .any(|parameter| {
+                    annotation_form(db, parameter.annotated_type()) != CallArgumentForm::Value
+                })
         })
     }) {
         return vec![CallArgumentForm::Value; argument_count];
@@ -915,38 +979,42 @@ pub fn call_argument_forms(
 
     let mut argument_forms = vec![CallArgumentForm::Unknown; argument_count];
 
-    // If any bindings are successful, limit analysis to those bindings.
-    let successful_bindings: Vec<_> = bindings
+    let mut candidate_bindings: Vec<_> = bindings
         .iter_flat()
-        .flatten()
-        .filter(|binding| binding.errors().is_empty())
+        .flat_map(|callable_binding| {
+            callable_binding
+                .into_iter()
+                .map(move |binding| (callable_binding, binding))
+        })
         .collect();
 
-    let Some((first_binding, remaining_bindings)) = successful_bindings.split_first() else {
-        // If no binding succeeds, fall back to the merged non-conflicting forms from the full
-        // binding result so callers still get the best conservative answer available.
-        for (arg_index, form) in bindings.non_conflicting_argument_forms().enumerate() {
-            let Some(argument_form) = argument_forms.get_mut(arg_index) else {
-                break;
-            };
-            *argument_form = form.map_or(CallArgumentForm::Unknown, |form| match form {
-                ParameterForm::Value => CallArgumentForm::Value,
-                ParameterForm::Type => CallArgumentForm::Type,
-            });
-        }
+    // If any bindings are successful, limit analysis to those bindings.
+    if candidate_bindings
+        .iter()
+        .any(|(_, binding)| binding.errors().is_empty())
+    {
+        candidate_bindings.retain(|(_, binding)| binding.errors().is_empty());
+    }
+
+    let Some((first_binding, remaining_bindings)) = candidate_bindings.split_first() else {
         return argument_forms;
     };
 
-    // If all successful bindings agree on the argument form, use the agreed-upon form; otherwise,
+    // If all candidate bindings agree on the argument form, use the agreed-upon form; otherwise,
     // fall back to `CallArgumentForm::Unknown`.
     for (arg_index, resolved_argument_form) in argument_forms.iter_mut().enumerate() {
-        let argument_form = argument_form_from_successful_binding(first_binding, arg_index);
+        let argument_form =
+            argument_form_from_binding(db, first_binding.0, first_binding.1, arg_index);
         if argument_form == CallArgumentForm::Unknown {
             continue;
         }
-        if remaining_bindings.iter().all(|binding| {
-            argument_form_from_successful_binding(binding, arg_index) == argument_form
-        }) {
+        if remaining_bindings
+            .iter()
+            .all(|(callable_binding, binding)| {
+                argument_form_from_binding(db, callable_binding, binding, arg_index)
+                    == argument_form
+            })
+        {
             *resolved_argument_form = argument_form;
         }
     }
@@ -2311,8 +2379,8 @@ f(val="", typ=int)
     }
 
     #[test]
-    fn conditional_special_forms_degrade_to_unknown_for_positional_arguments() -> anyhow::Result<()>
-    {
+    fn conditional_special_forms_use_successful_binding_for_positional_arguments()
+    -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
@@ -2341,7 +2409,7 @@ f("", int)
 
         assert_eq!(
             call_argument_forms(&model, call),
-            [CallArgumentForm::Unknown, CallArgumentForm::Unknown]
+            [CallArgumentForm::Value, CallArgumentForm::Type]
         );
 
         Ok(())
@@ -2388,18 +2456,29 @@ f(int, x)
     }
 
     #[test]
-    fn call_argument_forms_fast_path_value_only_signatures() -> anyhow::Result<()> {
+    fn call_argument_forms_distinguish_parameter_annotations() -> anyhow::Result<()> {
         let db = TestDbBuilder::new()
             .with_file(
                 "/src/foo.py",
                 r#"
 from typing import cast
+from typing_extensions import TypeForm
 
 def f(x: type[int], y: int) -> None:
     pass
 
+def g(form: TypeForm[int], value: int) -> None:
+    pass
+
+type RecursiveForm = RecursiveForm | TypeForm[int]
+
+def h(form: RecursiveForm) -> None:
+    pass
+
 cast(int, 1)
 f(int, 1)
+g(int, 1)
+h(int)
 "#,
             )
             .build()?;
@@ -2413,7 +2492,7 @@ f(int, 1)
             .collect();
         let model = SemanticModel::new(&db, file);
 
-        assert_eq!(calls.len(), 2);
+        assert_eq!(calls.len(), 4);
         assert_eq!(
             call_argument_forms(&model, calls[0]),
             [CallArgumentForm::Type, CallArgumentForm::Value]
@@ -2421,6 +2500,14 @@ f(int, 1)
         assert_eq!(
             call_argument_forms(&model, calls[1]),
             [CallArgumentForm::Value, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[2]),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+        assert_eq!(
+            call_argument_forms(&model, calls[3]),
+            [CallArgumentForm::Unknown]
         );
 
         Ok(())
@@ -2458,6 +2545,83 @@ cast(*args)
             call_argument_forms(&model, call),
             [CallArgumentForm::Unknown]
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn bound_method_call_argument_forms_exclude_synthetic_receiver() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing_extensions import TypeForm
+
+class C:
+    def method(self, form: TypeForm[int], value: int) -> None:
+        pass
+
+C().method(int, 1)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(
+            call_argument_forms(&model, call),
+            [CallArgumentForm::Type, CallArgumentForm::Value]
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn intersection_call_argument_forms_use_type_form_facet() -> anyhow::Result<()> {
+        let db = TestDbBuilder::new()
+            .with_file(
+                "/src/foo.py",
+                r#"
+from typing import Protocol
+from typing_extensions import TypeForm
+from ty_extensions import Intersection
+
+class HasX(Protocol):
+    x: int
+
+def f(form: Intersection[TypeForm[int], HasX]) -> None:
+    pass
+
+f(int)
+"#,
+            )
+            .build()?;
+
+        let file = system_path_to_file(&db, "/src/foo.py").unwrap();
+        let parsed = parsed_module(&db, file).load(&db);
+        let call = parsed
+            .suite()
+            .last()
+            .unwrap()
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_call_expr()
+            .unwrap();
+        let model = SemanticModel::new(&db, file);
+
+        assert_eq!(call_argument_forms(&model, call), [CallArgumentForm::Type]);
 
         Ok(())
     }

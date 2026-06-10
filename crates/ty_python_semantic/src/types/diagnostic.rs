@@ -62,7 +62,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
-    registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -243,32 +242,6 @@ declare_lint! {
         summary: "detects implicit calls to possibly missing methods",
         status: LintStatus::stable("0.0.1-alpha.22"),
         default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks whether an argument is used as both a value and a type form in a call.
-    ///
-    /// ## Why is this bad?
-    /// Such calls have confusing semantics and often indicate a logic error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import reveal_type
-    /// from ty_extensions import is_singleton
-    ///
-    /// if flag:
-    ///     f = repr  # Expects a value
-    /// else:
-    ///     f = is_singleton  # Expects a type form
-    ///
-    /// f(int)  # error
-    /// ```
-    pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
-        summary: "detects when an argument is used as both a value and a type form in a call",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
     }
 }
 

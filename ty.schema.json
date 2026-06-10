@@ -390,16 +390,6 @@
             }
           ]
         },
-        "conflicting-argument-forms": {
-          "title": "detects when an argument is used as both a value and a type form in a call",
-          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "conflicting-declarations": {
           "title": "detects conflicting declarations",
           "description": "## What it does\nChecks whether a variable has been declared as two conflicting types.\n\n## Why is this bad\nA variable with two conflicting declarations likely indicates a mistake.\nMoreover, it could lead to incorrect or ill-defined type inference for\nother code that relies on these variables.\n\n## Examples\n```python\nif b:\n    a: int\nelse:\n    a: str\n\na = 1\n```",
