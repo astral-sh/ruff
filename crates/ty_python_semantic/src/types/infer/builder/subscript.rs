@@ -37,6 +37,29 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
+/// Given a string literal or a union of string literals, return an iterator over the contained
+/// strings, or `None` if the type is neither.
+fn string_literal_values<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<impl Iterator<Item = &'db str> + 'db> {
+    if let Some(literal) = ty.as_string_literal() {
+        Some(Either::Left(std::iter::once(literal.value(db))))
+    } else {
+        let elements = ty.as_union()?.elements(db);
+        elements
+            .iter()
+            .all(|ty| ty.as_string_literal().is_some())
+            .then(|| {
+                Either::Right(
+                    elements
+                        .iter()
+                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                )
+            })
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
@@ -1318,26 +1341,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostic: bool,
     ) -> bool {
-        /// Given a string literal or a union of string literals, return an iterator over the contained
-        /// strings, or `None`, if the type is neither.
-        fn key_literals<'db>(
-            db: &'db dyn Db,
-            slice_ty: Type<'db>,
-        ) -> Option<impl Iterator<Item = &'db str> + 'db> {
-            if let Some(literal) = slice_ty.as_string_literal() {
-                Some(Either::Left(std::iter::once(literal.value(db))))
-            } else {
-                slice_ty.as_union().map(|union| {
-                    Either::Right(
-                        union
-                            .elements(db)
-                            .iter()
-                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
-                    )
-                })
-            }
-        }
-
         let db = self.db();
 
         let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
@@ -1433,7 +1436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut valid = true;
                 let slice_ty = infer_slice_ty(self, TypeContext::default());
-                let Some(keys) = key_literals(db, slice_ty) else {
+                let Some(keys) = string_literal_values(db, slice_ty) else {
                     // Check if the key has a valid type. We only allow string literals, a union of string literals,
                     // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
                     // but we need to exclude `LiteralString` itself. This check would technically allow weird key
@@ -1806,21 +1809,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             _ => {
                 if let Type::TypedDict(typed_dict) = object_ty {
-                    // A known undeclared key can only refer to an explicit extra item, so it can
-                    // be deleted whenever those items are mutable. An arbitrary string key could
+                    // Known undeclared keys can only refer to explicit extra items, so they can be
+                    // deleted whenever those items are mutable. An arbitrary string key could
                     // instead refer to any declared field, so deletion is only safe when all
                     // possible fields are optional and mutable.
-                    let can_delete_extra_literal =
-                        slice_ty.as_string_literal().is_some_and(|literal| {
-                            !typed_dict.items(db).contains_key(literal.value(db))
-                                && typed_dict
-                                    .explicit_extra_items(db)
-                                    .is_some_and(|extra_items| !extra_items.is_read_only())
+                    let can_delete_extra_literals = typed_dict
+                        .explicit_extra_items(db)
+                        .is_some_and(|extra_items| !extra_items.is_read_only())
+                        && string_literal_values(db, slice_ty).is_some_and(|mut literals| {
+                            literals.all(|literal| !typed_dict.items(db).contains_key(literal))
                         });
                     let can_delete_arbitrary_key = slice_ty
                         .is_assignable_to(db, KnownClass::Str.to_instance(db))
                         && typed_dict.supports_arbitrary_key_deletion(db);
-                    if can_delete_extra_literal || can_delete_arbitrary_key {
+                    if can_delete_extra_literals || can_delete_arbitrary_key {
                         return;
                     }
                 }

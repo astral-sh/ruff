@@ -5994,13 +5994,25 @@ Extra items are implicitly non-required, so deletion is allowed for unknown keys
 literal types. Deletion of declared required keys and keys of type `str` is still an error.
 
 ```py
+from typing import Literal
+
 from typing_extensions import TypedDict
 
 class Extra(TypedDict, extra_items=int):
     name: str
 
-def _(extra: Extra, key: str) -> None:
+def _(
+    extra: Extra,
+    key: str,
+    extra_keys: Literal["year", "rating"],
+    declared_key_union: Literal["year", "name"],
+    mixed_type_key: Literal["year"] | int,
+) -> None:
     del extra["year"]
+    del extra[extra_keys]
+
+    del extra[declared_key_union]  # error: [invalid-argument-type]
+    del extra[mixed_type_key]  # error: [invalid-argument-type]
 
     # error: [invalid-argument-type] "Cannot delete required key "name" from TypedDict `Extra`"
     del extra["name"]
