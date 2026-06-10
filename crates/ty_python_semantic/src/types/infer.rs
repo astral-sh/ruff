@@ -1098,8 +1098,39 @@ impl<'db> DefinitionTypes<'db> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+enum DefinitionInferenceExtra<'db> {
+    /// Type qualifiers are the only extra data for most annotated definitions.
+    Qualifiers(FrozenMap<ExpressionNodeKey, TypeQualifiers>),
+
+    /// Deferred definitions are the only extra data for most definitions with annotations.
+    Deferred(Box<[Definition<'db>]>),
+
+    Diagnostics(Box<TypeCheckDiagnostics>),
+
+    Undecorated(Box<Type<'db>>),
+
+    DeferredAndUndecorated(Box<DeferredAndUndecorated<'db>>),
+
+    CalledFunctions(Box<[FunctionType<'db>]>),
+
+    ExpectedTypes(FrozenMap<ExpressionNodeKey, Type<'db>>),
+
+    StringAnnotations(FrozenSet<ExpressionNodeKey>),
+
+    DiscardsDictKeyAssignments,
+
+    Other(Box<OtherDefinitionInferenceExtra<'db>>),
+}
+
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+struct DeferredAndUndecorated<'db> {
+    deferred: Box<[Definition<'db>]>,
+    undecorated_type: Type<'db>,
+}
+
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
-struct DefinitionInferenceExtra<'db> {
+struct OtherDefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FrozenSet<ExpressionNodeKey>,
 
@@ -1172,10 +1203,12 @@ impl<'db> DefinitionInference<'db> {
             types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
-            extra: Some(Box::new(DefinitionInferenceExtra {
-                cycle_recovery: Some(cycle_recovery),
-                ..DefinitionInferenceExtra::default()
-            })),
+            extra: Some(Box::new(DefinitionInferenceExtra::Other(Box::new(
+                OtherDefinitionInferenceExtra {
+                    cycle_recovery: Some(cycle_recovery),
+                    ..OtherDefinitionInferenceExtra::default()
+                },
+            )))),
         }
     }
 
@@ -1219,18 +1252,28 @@ impl<'db> DefinitionInference<'db> {
         &self,
         collection_def: Definition<'db>,
     ) -> Option<&FxIndexSet<Type<'db>>> {
-        self.extra
-            .as_ref()?
-            .collection_use_constraints
-            .get(&collection_def)
+        match self.extra.as_deref()? {
+            DefinitionInferenceExtra::Other(extra) => {
+                extra.collection_use_constraints.get(&collection_def)
+            }
+            _ => None,
+        }
     }
 
     /// Get qualifiers for an annotation expression
     pub(crate) fn qualifiers(&self, expression: impl Into<ExpressionNodeKey>) -> TypeQualifiers {
-        self.extra
-            .as_ref()
-            .and_then(|extra| extra.qualifiers.get(&expression.into()).copied())
-            .unwrap_or_default()
+        let expression = expression.into();
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Qualifiers(qualifiers)) => {
+                qualifiers.get(&expression).copied().unwrap_or_default()
+            }
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .qualifiers
+                .get(&expression)
+                .copied()
+                .unwrap_or_default(),
+            Some(_) | None => TypeQualifiers::default(),
+        }
     }
 
     /// Get metadata for a type expression.
@@ -1238,10 +1281,14 @@ impl<'db> DefinitionInference<'db> {
         &self,
         expression: impl Into<ExpressionNodeKey>,
     ) -> TypeExpressionFlags {
-        self.extra
-            .as_ref()
-            .and_then(|extra| extra.type_expression_flags.get(&expression.into()).copied())
-            .unwrap_or_default()
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra
+                .type_expression_flags
+                .get(&expression.into())
+                .copied()
+                .unwrap_or_default(),
+            Some(_) | None => TypeExpressionFlags::default(),
+        }
     }
 
     #[track_caller]
@@ -1296,17 +1343,31 @@ impl<'db> DefinitionInference<'db> {
     }
 
     pub(crate) fn fallback_type(&self) -> Option<Type<'db>> {
-        self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.cycle_recovery,
+            Some(_) | None => None,
+        }
     }
 
     pub(crate) fn discards_dict_key_assignments(&self) -> bool {
-        self.extra
-            .as_deref()
-            .is_some_and(|extra| extra.discards_dict_key_assignments)
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::DiscardsDictKeyAssignments) => true,
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.discards_dict_key_assignments,
+            Some(_) | None => false,
+        }
     }
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
-        self.extra.as_ref().and_then(|extra| extra.undecorated_type)
+        match self.extra.as_deref() {
+            Some(DefinitionInferenceExtra::Undecorated(undecorated_type)) => {
+                Some(**undecorated_type)
+            }
+            Some(DefinitionInferenceExtra::DeferredAndUndecorated(extra)) => {
+                Some(extra.undecorated_type)
+            }
+            Some(DefinitionInferenceExtra::Other(extra)) => extra.undecorated_type,
+            Some(_) | None => None,
+        }
     }
 
     pub(crate) fn function_type(&self, definition: Definition<'db>) -> Option<FunctionType<'db>> {
