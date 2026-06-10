@@ -15,7 +15,7 @@ use std::num::NonZeroUsize;
 use std::panic::{PanicHookInfo, RefUnwindSafe};
 use std::sync::Arc;
 
-mod api;
+pub mod api;
 mod lazy_work_done_progress;
 mod main_loop;
 mod schedule;
@@ -27,6 +27,7 @@ pub(crate) use main_loop::{
     Action, ConnectionSender, Event, MainLoopReceiver, MainLoopSender, SendRequest,
 };
 pub(crate) type Result<T> = std::result::Result<T, api::Error>;
+pub use api::{ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse};
 
 pub struct Server {
     connection: Connection,

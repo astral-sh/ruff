@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
-mod requests;
+pub mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
@@ -19,6 +19,7 @@ use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
 use crate::session::client::Client;
 pub(crate) use diagnostics::publish_settings_diagnostics;
+pub use requests::{ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse};
 use ruff_db::panic::PanicError;
 
 /// Processes a request from the client to the server.
@@ -141,6 +142,9 @@ pub(super) fn request(req: server::Request) -> Task {
                 BackgroundSchedule::Worker,
             )
         }
+        requests::ProvideTypeRequest::METHOD => background_document_request_task::<
+            requests::ProvideTypeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
