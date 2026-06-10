@@ -518,7 +518,7 @@ match x:
     case "foo" if (x := "bar") and reveal_type(x):  #  revealed: Literal["bar"]
         pass
 
-reveal_type(x)  # revealed: object
+reveal_type(x)  # revealed: int | str | (~str & ~float & ~Literal[False]) | float
 ```
 
 ## Narrowing on `Self` in `match` statements
@@ -613,7 +613,7 @@ def _(x: A | B | C):
         case _:
             raise ValueError()
 
-    reveal_type(x)  # revealed: B | (A & ~B)
+    reveal_type(x)  # revealed: (B & ~A) | A
 ```
 
 Reassignment in non-terminal branches is also preserved when the default branch is terminal:

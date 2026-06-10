@@ -228,8 +228,8 @@ def f(x: Literal[0, 1], y: Literal["", "hello"]):
         reveal_type(y)  # revealed: Never
     else:
         # ~(x or not x) or ~(y and not y)
-        reveal_type(x)  # revealed: Literal[0, 1]
-        reveal_type(y)  # revealed: Literal["", "hello"]
+        reveal_type(x)  # revealed: Literal[1, 0]
+        reveal_type(y)  # revealed: Literal["hello", ""]
 ```
 
 ## Control Flow Merging
