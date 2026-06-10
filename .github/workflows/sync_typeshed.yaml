@@ -63,12 +63,12 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           path: ruff
           persist-credentials: true
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout typeshed
         with:
           repository: python/typeshed
@@ -129,7 +129,7 @@ jobs:
     permissions:
       contents: write # to push back to the repository
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           persist-credentials: true
@@ -170,7 +170,7 @@ jobs:
       contents: write # to push back to the repository
       pull-requests: write # to create a PR
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
         with:
           persist-credentials: true
