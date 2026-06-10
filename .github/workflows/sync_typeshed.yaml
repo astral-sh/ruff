@@ -17,8 +17,9 @@ name: Sync typeshed
 #    a. Checks out the branch created by the Linux worker
 #    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
 #    c. Formats the code again
-#    d. Commits the changes and pushes them to the same upstream branch
-#    e. Creates a PR against the `main` branch using the branch all three workers have pushed to
+#    d. Commits and pushes the completed sync to the same upstream branch
+#    e. Applies the typeshed patches in a standalone commit
+#    f. Pushes the patch commit and creates a PR against the `main` branch
 # 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
 
 on:
@@ -210,6 +211,15 @@ jobs:
         run: |
           rm "${VENDORED_TYPESHED}/pyproject.toml"
           git commit -am "Remove pyproject.toml file"
+      - name: Push synced changes upstream
+        if: ${{ success() }}
+        run: git push
+      - name: Apply typeshed patches
+        if: ${{ success() }}
+        run: |
+          git apply --directory="${VENDORED_TYPESHED}" crates/ty_vendored/typeshed_patches/*.patch
+          git add "${VENDORED_TYPESHED}"
+          git commit -m "Apply typeshed patches"
       - name: Push changes upstream and create a PR
         if: ${{ success() }}
         run: |
