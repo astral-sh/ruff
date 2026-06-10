@@ -29,7 +29,7 @@ pub enum ClassBase<'db> {
     /// but nonetheless appears in the MRO of classes that inherit from `Generic[T]`,
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
-    TypedDict,
+    TypedDict(TypedDictModule),
 }
 
 impl<'db> ClassBase<'db> {
@@ -49,7 +49,7 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
+            Self::Protocol | Self::Generic | Self::TypedDict(_) => Some(self),
         }
     }
 
@@ -73,7 +73,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Divergent(_) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
-            ClassBase::TypedDict => "TypedDict",
+            ClassBase::TypedDict(_) => "TypedDict",
         }
     }
 
@@ -83,7 +83,14 @@ impl<'db> ClassBase<'db> {
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
-        matches!(self, ClassBase::TypedDict)
+        self.typed_dict_module().is_some()
+    }
+
+    pub(super) const fn typed_dict_module(self) -> Option<TypedDictModule> {
+        match self {
+            ClassBase::TypedDict(module) => Some(module),
+            _ => None,
+        }
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -246,7 +253,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Unknown => Some(Self::unknown()),
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
-                SpecialFormType::TypedDict(_) => Some(Self::TypedDict),
+                SpecialFormType::TypedDict(module) => Some(Self::TypedDict(module)),
 
                 SpecialFormType::NamedTuple => {
                     let class = subclass?.as_static()?;
@@ -294,7 +301,7 @@ impl<'db> ClassBase<'db> {
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
-            | Self::TypedDict => None,
+            | Self::TypedDict(_) => None,
         }
     }
 
@@ -305,7 +312,7 @@ impl<'db> ClassBase<'db> {
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Divergent(divergent) => Type::Divergent(divergent),
             // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
-            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+            Self::Protocol | Self::Generic | Self::TypedDict(_) => KnownClass::Type.to_instance(db),
         }
     }
 
@@ -324,7 +331,7 @@ impl<'db> ClassBase<'db> {
             | Self::Divergent(_)
             | Self::Generic
             | Self::Protocol
-            | Self::TypedDict => self,
+            | Self::TypedDict(_) => self,
         }
     }
 
@@ -378,7 +385,7 @@ impl<'db> ClassBase<'db> {
             | ClassBase::Divergent(_)
             | ClassBase::Generic
             | ClassBase::Protocol
-            | ClassBase::TypedDict => false,
+            | ClassBase::TypedDict(_) => false,
         }
     }
 
@@ -393,7 +400,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(_)
             | ClassBase::Divergent(_)
             | ClassBase::Generic
-            | ClassBase::TypedDict => ClassBaseMroIterator::length_2(db, self),
+            | ClassBase::TypedDict(_) => ClassBaseMroIterator::length_2(db, self),
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
@@ -425,7 +432,7 @@ impl<'db> ClassBase<'db> {
                         .fmt(f),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
-                    ClassBase::TypedDict => f.write_str("typing.TypedDict"),
+                    ClassBase::TypedDict(_) => f.write_str("typing.TypedDict"),
                 }
             }
         }
@@ -452,9 +459,7 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
             ClassBase::Class(class) => class.into(),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
-            ClassBase::TypedDict => {
-                Type::SpecialForm(SpecialFormType::TypedDict(TypedDictModule::Typing))
-            }
+            ClassBase::TypedDict(module) => Type::SpecialForm(SpecialFormType::TypedDict(module)),
         }
     }
 }

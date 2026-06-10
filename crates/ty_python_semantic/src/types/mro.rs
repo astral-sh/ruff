@@ -285,7 +285,7 @@ impl<'db> Mro<'db> {
                             ClassBase::Class(_)
                             | ClassBase::Generic
                             | ClassBase::Protocol
-                            | ClassBase::TypedDict => {
+                            | ClassBase::TypedDict(_) => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
                                     first_index: *first_index,

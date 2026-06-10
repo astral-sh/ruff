@@ -951,7 +951,7 @@ impl<'db> DynamicTypedDictLiteral<'db> {
         let object_class = ClassType::object(db);
         Mro::from([
             self_base,
-            ClassBase::TypedDict,
+            ClassBase::TypedDict(self.typed_dict_module(db)),
             ClassBase::Class(object_class),
         ])
     }

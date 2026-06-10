@@ -691,7 +691,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         #[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
         fn is_typed_dict_inner<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-            class.iter_mro(db, None).contains(&ClassBase::TypedDict)
+            class.iter_mro(db, None).any(ClassBase::is_typed_dict)
         }
 
         if let Some(known) = self.known(db) {

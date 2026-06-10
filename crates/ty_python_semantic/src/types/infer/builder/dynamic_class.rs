@@ -106,7 +106,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
 
             match class_base {
-                ClassBase::Generic | ClassBase::TypedDict => {
+                ClassBase::Generic | ClassBase::TypedDict(_) => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)
                     {
                         let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -123,7 +123,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     "Consider using `class {name}(Generic[...]): ...` instead"
                                 ));
                             }
-                            ClassBase::TypedDict => {
+                            ClassBase::TypedDict(_) => {
                                 diagnostic.info(format_args!(
                                     "Classes created via `{fn_name}` cannot be TypedDicts"
                                 ));

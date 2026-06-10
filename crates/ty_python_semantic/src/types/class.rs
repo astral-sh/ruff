@@ -336,33 +336,6 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
-fn typed_dict_module_from_bases<'db>(
-    db: &'db dyn Db,
-    bases: &[Type<'db>],
-) -> Option<TypedDictModule> {
-    let mut module = None;
-
-    for base in bases {
-        let base_module = match base {
-            Type::SpecialForm(SpecialFormType::TypedDict(module)) => Some(*module),
-            Type::ClassLiteral(base) => base.typed_dict_module(db),
-            Type::GenericAlias(alias) => {
-                ClassLiteral::Static(alias.origin(db)).typed_dict_module(db)
-            }
-            _ => None,
-        };
-
-        if let Some(base_module) = base_module {
-            if module.is_some_and(|module| module != base_module) {
-                return None;
-            }
-            module = Some(base_module);
-        }
-    }
-
-    module
-}
-
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -417,18 +390,7 @@ impl<'db> ClassLiteral<'db> {
             db: &'db dyn Db,
             class: ClassLiteral<'db>,
         ) -> Option<TypedDictModule> {
-            match class {
-                ClassLiteral::Static(class) => {
-                    typed_dict_module_from_bases(db, class.explicit_bases(db))
-                }
-                ClassLiteral::Dynamic(class) => {
-                    typed_dict_module_from_bases(db, class.explicit_bases(db))
-                }
-                ClassLiteral::DynamicTypedDict(typed_dict) => {
-                    Some(typed_dict.typed_dict_module(db))
-                }
-                ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicEnum(_) => None,
-            }
+            class.iter_mro(db).find_map(ClassBase::typed_dict_module)
         }
 
         typed_dict_module_inner(db, self)
@@ -2233,7 +2195,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => self.never(),
+                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict(_) => self.never(),
 
                 ClassBase::Class(source) => match (source, target) {
                     // Two non-generic classes match if they have the same class literal.
@@ -2479,7 +2441,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         )
                     });
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     return ClassMemberResult::TypedDict;
                 }
             }
@@ -2555,7 +2517,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         union_qualifiers |= qualifiers;
                     }
                 }
-                ClassBase::TypedDict => {
+                ClassBase::TypedDict(_) => {
                     return InstanceMemberResult::TypedDict;
                 }
             }
