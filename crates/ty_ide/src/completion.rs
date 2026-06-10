@@ -16,6 +16,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
+use ty_python_semantic::types::ide_support::is_enum_class;
 use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -472,17 +473,18 @@ impl<'db> CompletionBuilder<'db> {
             .or_else(|| self.ty.and_then(|ty| completion_kind_from_type(db, ty)));
         let relevance = Relevance::new(ctx, query, &self);
         let label = self.insert.as_ref().unwrap_or(&self.name).clone();
-        let (insert, insert_text_format) = if ctx.should_complete_callable_parentheses(kind) {
-            if ctx.capabilities.snippets {
-                let insert = Name::new(format!("{label}($0)"));
-                (Some(insert), CompletionInsertTextFormat::Snippet)
+        let (insert, insert_text_format) =
+            if ctx.should_complete_callable_parentheses(db, kind, self.ty) {
+                if ctx.capabilities.snippets {
+                    let insert = Name::new(format!("{label}($0)"));
+                    (Some(insert), CompletionInsertTextFormat::Snippet)
+                } else {
+                    let insert = Name::new(format!("{label}()"));
+                    (Some(insert), CompletionInsertTextFormat::PlainText)
+                }
             } else {
-                let insert = Name::new(format!("{label}()"));
-                (Some(insert), CompletionInsertTextFormat::PlainText)
-            }
-        } else {
-            (self.insert, CompletionInsertTextFormat::PlainText)
-        };
+                (self.insert, CompletionInsertTextFormat::PlainText)
+            };
         Completion {
             name: self.name,
             label,
@@ -1322,12 +1324,19 @@ impl<'db> CollectionContext<'db> {
         false
     }
 
-    fn should_complete_callable_parentheses(&self, kind: Option<CompletionKind>) -> bool {
+    fn should_complete_callable_parentheses(
+        &self,
+        db: &'db dyn Db,
+        kind: Option<CompletionKind>,
+        ty: Option<Type<'db>>,
+    ) -> bool {
         match kind {
             Some(CompletionKind::Function | CompletionKind::Method) => {
                 self.complete_function_and_method_parentheses
             }
-            Some(CompletionKind::Class) => self.complete_class_parentheses,
+            Some(CompletionKind::Class) => {
+                self.complete_class_parentheses && !ty.is_some_and(|ty| is_enum_class(db, ty))
+            }
             _ => false,
         }
     }
@@ -9482,6 +9491,29 @@ value = Call<CURSOR>
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
             @"CallableType",
+        );
+    }
+
+    #[test]
+    fn complete_class_parentheses_enum() {
+        let builder = completion_test_builder(
+            "\
+from enum import Enum
+
+class Foo(Enum):
+    A = \"A\"
+
+value = Fo<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder
+                .skip_auto_import()
+                .complete_function_parentheses()
+                .filter(|completion| completion.name == "Foo")
+                .build()
+                .snapshot(),
+            @"Foo",
         );
     }
 
