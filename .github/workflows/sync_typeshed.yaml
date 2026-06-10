@@ -94,6 +94,32 @@ jobs:
 
           cp -r typeshed/stdlib "ruff/${VENDORED_TYPESHED}/stdlib"
           rm -rf "ruff/${VENDORED_TYPESHED}/stdlib/@tests"
+
+          # These methods are not restricted to the dictionary's specialized key or item types.
+          # Patch their annotations until typeshed reflects that, and verify the expected overloads.
+          sed -i.bak \
+            '/^class dict(/,/^if sys.version_info/ s/def get(self, key: _KT,/def get(self, key: object,/' \
+            "ruff/${VENDORED_TYPESHED}/stdlib/builtins.pyi"
+          test "$(sed -n '/^class dict(/,/^if sys.version_info/ p' \
+            "ruff/${VENDORED_TYPESHED}/stdlib/builtins.pyi" \
+            | grep -c 'def get(self, key: object,')" -eq 3
+
+          sed -i.bak \
+            '/^class Mapping(/,/^class MutableMapping/ s/def get(self, key: _KT,/def get(self, key: object,/' \
+            "ruff/${VENDORED_TYPESHED}/stdlib/typing.pyi"
+          test "$(sed -n '/^class Mapping(/,/^class MutableMapping/ p' \
+            "ruff/${VENDORED_TYPESHED}/stdlib/typing.pyi" \
+            | grep -c 'def get(self, key: object,')" -eq 3
+
+          sed -i.bak \
+            -e 's/def isdisjoint(self, other: Iterable\[_KT_co\],/def isdisjoint(self, other: object,/' \
+            -e 's/def isdisjoint(self, other: Iterable\[tuple\[_KT_co, _VT_co\]\],/def isdisjoint(self, other: object,/' \
+            "ruff/${VENDORED_TYPESHED}/stdlib/_collections_abc.pyi"
+          test "$(grep -c 'def isdisjoint(self, other: object,' "ruff/${VENDORED_TYPESHED}/stdlib/_collections_abc.pyi")" -eq 2
+          rm "ruff/${VENDORED_TYPESHED}/stdlib/builtins.pyi.bak" \
+            "ruff/${VENDORED_TYPESHED}/stdlib/typing.pyi.bak" \
+            "ruff/${VENDORED_TYPESHED}/stdlib/_collections_abc.pyi.bak"
+
           git -C typeshed rev-parse HEAD > "ruff/${VENDORED_TYPESHED}/source_commit.txt"
           cd ruff
           git checkout -b "${UPSTREAM_BRANCH}"
