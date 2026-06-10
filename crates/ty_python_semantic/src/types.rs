@@ -987,9 +987,7 @@ impl<'db> Type<'db> {
         self.same_divergent_marker(div)
             || matches!(
                 self,
-                Type::Recursive(recursive)
-                    if recursive.is_non_contractive(db)
-                        && Type::divergent(recursive.binder_id(db)).same_divergent_marker(div)
+                Type::Recursive(recursive) if recursive.is_non_contractive(db)
             )
     }
 

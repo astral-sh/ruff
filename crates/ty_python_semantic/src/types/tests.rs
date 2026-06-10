@@ -263,6 +263,21 @@ fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() 
 }
 
 #[test]
+fn top_level_union_cycle_normalization_drops_other_cycle_markers() {
+    let db = setup_db();
+    let marker = Type::divergent(Id::from_bits(1));
+    let other_non_contractive =
+        Type::implicit_recursive(&db, Id::from_bits(3), Type::divergent(Id::from_bits(3)));
+    let int = KnownClass::Int.to_instance(&db);
+
+    let union =
+        UnionType::from_elements(&db, [int, other_non_contractive]).expect_union();
+    let normalized = union.recursive_type_normalized_impl(&db, marker, false);
+
+    assert_eq!(normalized, Some(int));
+}
+
+#[test]
 fn nested_union_cycle_normalization_preserves_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
