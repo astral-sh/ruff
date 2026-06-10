@@ -173,10 +173,6 @@ impl<'db> RecursiveType<'db> {
         self.binder(db).into_id()
     }
 
-    pub(crate) fn is_implicit(self, db: &'db dyn Db) -> bool {
-        matches!(self.origin(db), RecursiveOrigin::Implicit)
-    }
-
     /// Returns the body with its `Type::Divergent` α-binder markers substituted
     /// back to the source type when this μ-binder has an explicit origin.
     /// Use this when you do not need to perform type operations arbitrarily and would rather treat it as a finite type.

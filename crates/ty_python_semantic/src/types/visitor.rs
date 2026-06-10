@@ -355,11 +355,7 @@ where
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            // Implicit cycle markers do not have a finite source body to inspect here.
-            if recursive.is_implicit(db) {
-                return;
-            }
-            self.visit_type(db, *recursive.body(db));
+            self.visit_type(db, recursive.unfold(db));
         }
     }
 
