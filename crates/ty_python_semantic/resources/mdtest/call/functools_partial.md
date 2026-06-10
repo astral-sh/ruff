@@ -1573,9 +1573,9 @@ reveal_type(p.__call__("hello"))  # revealed: bool
 
 ### Attribute access on partial results
 
-Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. Runtime
-protocol narrowing can add a refinement to the concrete `partial` object, but attributes provided by
-`partial` must remain precise when looked up through that intersection.
+Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible. As with
+other intersection types, runtime protocol narrowing preserves the full receiver while looking up
+attributes provided by `partial`.
 
 ```py
 from functools import partial
@@ -1595,6 +1595,9 @@ class PartialMarker(Protocol):
     def __call__(self, value: str) -> bool: ...
 
 if isinstance(p, PartialMarker):
+    reveal_type(p)  # revealed: partial[(b: str) -> bool] & PartialMarker
+    # revealed: bound method (partial[(b: str) -> bool] & PartialMarker).__str__() -> str
+    reveal_type(p.__str__)
     reveal_type(p.args)  # revealed: tuple[Any, ...]
     reveal_type(p.keywords)  # revealed: dict[str, Any]
 ```
