@@ -192,6 +192,35 @@ impl NarrowingConstraintsBuilder {
             return self.add_or_constraint(node.if_true, node.if_uncertain);
         }
 
+        // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
+        // then the remaining cofactor can be lifted into `if_uncertain`, avoiding shapes like
+        // `A or (not A and B)`.
+        let when_true = self.add_or_constraint(node.if_true, node.if_uncertain);
+        let when_false = self.add_or_constraint(node.if_false, node.if_uncertain);
+        if when_true == when_false {
+            return when_true;
+        }
+        if when_true == ALWAYS_TRUE
+            && !(node.if_true == ALWAYS_TRUE && node.if_false == ALWAYS_FALSE)
+        {
+            return self.add_interior(InteriorNode {
+                atom: node.atom,
+                if_true: ALWAYS_TRUE,
+                if_uncertain: when_false,
+                if_false: ALWAYS_FALSE,
+            });
+        }
+        if when_false == ALWAYS_TRUE
+            && !(node.if_true == ALWAYS_FALSE && node.if_false == ALWAYS_TRUE)
+        {
+            return self.add_interior(InteriorNode {
+                atom: node.atom,
+                if_true: ALWAYS_FALSE,
+                if_uncertain: when_true,
+                if_false: ALWAYS_TRUE,
+            });
+        }
+
         *self.interior_cache.entry(node).or_insert_with(|| {
             self.interior_used.push(false);
             self.interiors.push(node)
@@ -438,5 +467,52 @@ mod tests {
         assert_eq!(root.if_true, ALWAYS_TRUE);
         assert_eq!(root.if_uncertain, a);
         assert_eq!(root.if_false, ALWAYS_FALSE);
+    }
+
+    #[test]
+    fn absorption_drops_failed_check_when_preceding_branch_reaches_merge() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let a = constraints.add_atom(predicate(0));
+        let b = constraints.add_atom(predicate(1));
+        let not_a = constraints.add_negated_atom(predicate(0));
+        let later_branch = constraints.add_and_constraint(not_a, b);
+
+        let merged = constraints.add_or_constraint(a, later_branch);
+        let root = constraints.interiors[merged];
+
+        assert_eq!(root.atom, predicate(1));
+        assert_eq!(root.if_true, ALWAYS_TRUE);
+        assert_eq!(root.if_uncertain, a);
+        assert_eq!(root.if_false, ALWAYS_FALSE);
+
+        for mask in 0_u8..4 {
+            let values = [mask & 0b01 != 0, mask & 0b10 != 0];
+            assert_eq!(
+                evaluate(&constraints, merged, &values),
+                values[0] || values[1]
+            );
+        }
+    }
+
+    #[test]
+    fn absorption_keeps_common_failed_check_from_terminal_branch() {
+        let mut constraints = NarrowingConstraintsBuilder::default();
+        let not_a = constraints.add_negated_atom(predicate(0));
+        let b = constraints.add_atom(predicate(1));
+        let not_b = constraints.add_negated_atom(predicate(1));
+        let c = constraints.add_atom(predicate(2));
+
+        let b_branch = constraints.add_and_constraint(not_a, b);
+        let c_branch = constraints.add_and_constraint(not_a, not_b);
+        let c_branch = constraints.add_and_constraint(c_branch, c);
+        let merged = constraints.add_or_constraint(b_branch, c_branch);
+
+        for mask in 0_u8..8 {
+            let values = [mask & 0b001 != 0, mask & 0b010 != 0, mask & 0b100 != 0];
+            assert_eq!(
+                evaluate(&constraints, merged, &values),
+                !values[0] && (values[1] || values[2]),
+            );
+        }
     }
 }

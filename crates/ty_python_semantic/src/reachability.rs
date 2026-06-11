@@ -637,6 +637,37 @@ impl ProjectedNarrowingGraph<'_> {
             return self.or(node.if_true, node.if_uncertain);
         }
 
+        // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
+        // then the remaining cofactor can be lifted into `if_uncertain`, avoiding shapes like
+        // `A or (not A and B)`.
+        let when_true = self.or(node.if_true, node.if_uncertain);
+        let when_false = self.or(node.if_false, node.if_uncertain);
+        if when_true == when_false {
+            return when_true;
+        }
+        if when_true == ProjectedNarrowingNodeId::ALWAYS_TRUE
+            && !(node.if_true == ProjectedNarrowingNodeId::ALWAYS_TRUE
+                && node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE)
+        {
+            return self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+                if_uncertain: when_false,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            });
+        }
+        if when_false == ProjectedNarrowingNodeId::ALWAYS_TRUE
+            && !(node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_false == ProjectedNarrowingNodeId::ALWAYS_TRUE)
+        {
+            return self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+                if_uncertain: when_true,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            });
+        }
+
         if let Some(cached) = self.node_cache.get(&node) {
             return *cached;
         }
