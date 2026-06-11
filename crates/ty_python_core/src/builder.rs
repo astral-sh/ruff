@@ -1623,7 +1623,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .reachability_constraints
                     .mark_used(live_binding.reachability_constraint());
                 use_def
-                    .reachability_constraints
+                    .narrowing_constraints
                     .mark_used(live_binding.narrowing_constraint());
             }
         }
@@ -1773,7 +1773,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
     ///
     /// Returns the `ScopedPredicateId` for the positive predicate, which can later be passed to
-    /// `record_negated_narrowing_constraint` for TDD-level negation.
+    /// `record_negated_narrowing_constraint` to record the opposite result of the same check.
     fn record_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
@@ -1824,9 +1824,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// Negates the given predicate and then adds it as a narrowing constraint to the places
     /// that could possibly be narrowed.
     ///
-    /// Takes the `ScopedPredicateId` from the positive recording so that TDD-level negation
-    /// (`add_not_constraint`) uses the same atom. This ensures `atom(P) OR NOT(atom(P))`
-    /// simplifies to `ALWAYS_TRUE`, correctly cancelling narrowing after complete if/else blocks.
+    /// Takes the `ScopedPredicateId` from the positive recording so that both constraints refer to
+    /// the same check. This lets the positive and negative cases cancel after a complete
+    /// `if`/`else`.
     fn record_negated_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
@@ -3422,8 +3422,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         });
-                        // Add the predicate once, then use TDD-level negation for the failure
-                        // path. This ensures the positive and negative atoms share the same ID.
+                        // Use the same predicate ID for the successful and failed checks.
                         let guard_predicate_id = self.add_predicate(predicate);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         self.flow_restore(condition_flow_snapshot.falsy());
@@ -3857,10 +3856,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             is_positive: true,
                         };
 
+                        let predicate_id =
+                            self.add_predicate(PredicateOrLiteral::Predicate(predicate));
+                        let narrowing_constraint = self
+                            .current_use_def_map_mut()
+                            .narrowing_constraints
+                            .add_atom(predicate_id);
+
                         if self.in_function_scope() {
-                            let constraint = self.record_reachability_constraint(
-                                PredicateOrLiteral::Predicate(predicate),
-                            );
+                            self.record_reachability_constraint_id(predicate_id);
 
                             // Also gate narrowing by this constraint: if the call returns
                             // `Never`, any narrowing in the current branch should be
@@ -3868,19 +3872,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             // narrowing to be preserved after if-statements where one branch
                             // calls a `NoReturn` function like `sys.exit()`.
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(constraint);
+                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         } else {
                             // In non-function scopes, we only record a narrowing constraint
                             // (not a reachability constraint). Recording reachability for
                             // calls in module scope is simply too expensive, and it's not
                             // too important of a use case.
-                            let predicate_id =
-                                self.add_predicate(PredicateOrLiteral::Predicate(predicate));
-                            let constraint = self
-                                .current_reachability_constraints_mut()
-                                .add_atom(predicate_id);
                             self.current_use_def_map_mut()
-                                .record_narrowing_constraint_for_all_places(constraint);
+                                .record_narrowing_constraint_for_all_places(narrowing_constraint);
                         }
                     }
                 }
