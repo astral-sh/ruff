@@ -1846,6 +1846,9 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+    // Whether `pending` only contains direct covariant mappings from unbounded ordinary typevars
+    // to types that contain no typevars.
+    simple_covariant_mappings_only: bool,
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
@@ -1861,6 +1864,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
+            simple_covariant_mappings_only: true,
         }
     }
 
@@ -1905,12 +1909,16 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        if self.can_solve_simple_covariant_mappings(generic_context) {
+            return self.solve_hash_map_with(generic_context, choose, true);
+        }
+
         if generic_context
             .variables_inner(self.db)
             .values()
             .any(|typevar| typevar.is_paramspec(self.db))
         {
-            return self.solve_hash_map_with(generic_context, choose);
+            return self.solve_hash_map_with(generic_context, choose, false);
         }
 
         // TODO: This projection / solve can be expensive for large-union collection-literal type
@@ -1937,7 +1945,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
             }) {
                 Solutions::Unsatisfiable | Solutions::Unconstrained => {
-                    return self.solve_hash_map_with(generic_context, choose);
+                    return self.solve_hash_map_with(generic_context, choose, false);
                 }
                 Solutions::Constrained(solutions) => solutions,
             };
@@ -1981,10 +1989,31 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         {
             // Recursive specialization cannot reach a fixed point when a cycle grows through an
             // embedded generic type, such as `SupportsAdd[T, S]`.
-            self.solve_hash_map_with(generic_context, choose)
+            self.solve_hash_map_with(generic_context, choose, false)
         } else {
             types
         }
+    }
+
+    fn can_solve_simple_covariant_mappings(&self, generic_context: GenericContext<'db>) -> bool {
+        !self.types.is_empty()
+            && self.simple_covariant_mappings_only
+            && self
+                .types
+                .keys()
+                .all(|identity| generic_context.contains(self.db, *identity))
+            && generic_context
+                .variables_inner(self.db)
+                .values()
+                .all(|typevar| {
+                    matches!(
+                        typevar.kind(self.db),
+                        TypeVarKind::Legacy | TypeVarKind::Pep695
+                    ) && typevar
+                        .typevar(self.db)
+                        .bound_or_constraints(self.db)
+                        .is_none()
+                })
     }
 
     fn has_expanding_cycle(
@@ -2145,6 +2174,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             BoundTypeVarInstance<'db>,
             Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
+        covariant_only: bool,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
         generic_context
             .variables_inner(self.db)
@@ -2155,8 +2185,14 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .get_mut(identity)
                     .map(|accumulator| accumulator.get_or_build(self.db));
                 let chosen = match mapped_ty {
-                    Some(mapped_ty) => choose(*variable, Some(ConstraintBounds::exact(mapped_ty)))
-                        .unwrap_or(mapped_ty),
+                    Some(mapped_ty) => {
+                        let bounds = if covariant_only {
+                            ConstraintBounds::new(Some(mapped_ty), None)
+                        } else {
+                            ConstraintBounds::exact(mapped_ty)
+                        };
+                        choose(*variable, Some(bounds)).unwrap_or(mapped_ty)
+                    }
                     None => choose(*variable, None)?,
                 };
                 Some((*identity, chosen))
@@ -2233,6 +2269,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         ty: Type<'db>,
         variance: TypeVarVariance,
     ) {
+        self.simple_covariant_mappings_only = false;
         self.insert_hash_map_type_mapping(bound_typevar, ty);
 
         let bounds = match variance {
@@ -2243,6 +2280,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         };
 
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
+    }
+
+    fn add_simple_covariant_type_mapping(
+        &mut self,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    ) {
+        self.insert_hash_map_type_mapping(bound_typevar, ty);
+        self.intersect_pending_typevar_constraint(
+            bound_typevar,
+            ConstraintBounds::new(Some(ty), None),
+        );
     }
 
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
@@ -2257,6 +2306,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
+        self.simple_covariant_mappings_only = false;
         let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
         let solutions = match set.solutions(self.db, self.constraints) {
             Solutions::Unsatisfiable => return Err(()),
@@ -2398,6 +2448,28 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if let Type::TypeVar(bound_typevar) = formal
+            && bound_typevar.is_inferable(self.db, self.inferable)
+            && matches!(
+                bound_typevar.kind(self.db),
+                TypeVarKind::Legacy | TypeVarKind::Pep695
+            )
+            && bound_typevar
+                .typevar(self.db)
+                .bound_or_constraints(self.db)
+                .is_none()
+            && !actual.has_typevar(self.db)
+            && !actual.has_unspecialized_type_var(self.db)
+        {
+            let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+            self.add_simple_covariant_type_mapping(bound_typevar, actual);
+            return Ok(());
+        }
+
+        if actual.has_typevar(self.db) {
+            self.simple_covariant_mappings_only = false;
+        }
+
         self.infer_map_impl(
             formal,
             actual,
