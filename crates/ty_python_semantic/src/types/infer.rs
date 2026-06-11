@@ -750,10 +750,428 @@ impl<'db> InferenceRegion<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: ScopeExpressionTypes<'db>,
 
     /// The extra data that is only present for few inference regions.
     extra: Option<Box<ScopeInferenceExtra<'db>>>,
+}
+
+// A segmented scope entry uses one bit for local types, three for the source kind, five for the
+// source-entry width, and the remaining 23 for the packed source and source-entry indices.
+const LOCAL_SCOPE_EXPRESSION: u32 = 1 << 31;
+const SCOPE_EXPRESSION_SOURCE_KIND_SHIFT: u32 = 28;
+const SCOPE_EXPRESSION_SOURCE_KIND_MASK: u32 = 0b111 << SCOPE_EXPRESSION_SOURCE_KIND_SHIFT;
+const SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT: u32 = 23;
+const SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_MASK: u32 =
+    0b1_1111 << SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT;
+const SCOPE_EXPRESSION_SOURCE_LOCATION_MASK: u32 =
+    (1 << SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT) - 1;
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+enum ScopeExpressionTypes<'db> {
+    Flat(FrozenMap<ExpressionNodeKey, Type<'db>>),
+    Segmented(Box<SegmentedScopeExpressionTypes<'db>>),
+}
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct SegmentedScopeExpressionTypes<'db> {
+    // Entries are sorted by key. Source-entry indices address the corresponding child inference
+    // result in the same key order, and each raw Salsa ID must be reconstructed using its packed
+    // concrete kind. Resolving a source intentionally invokes its query so Salsa records the
+    // dependency of the caller that reads the type.
+    entries: Box<[ScopeExpressionEntry]>,
+    local_types: Box<[Type<'db>]>,
+    sources: Box<[ScopeExpressionSourceId]>,
+}
+
+impl<'db> SegmentedScopeExpressionTypes<'db> {
+    fn source_location(entry: ScopeExpressionEntry) -> (usize, usize, ScopeExpressionSourceKind) {
+        let source_entry_bits = ((entry.location & SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_MASK)
+            >> SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT) as u8;
+        let entry_mask = if source_entry_bits == 0 {
+            0
+        } else {
+            (1 << source_entry_bits) - 1
+        };
+        let source_location = entry.location & SCOPE_EXPRESSION_SOURCE_LOCATION_MASK;
+        let source = source_location >> source_entry_bits;
+        let source_entry = source_location & entry_mask;
+        let source_kind = ScopeExpressionSourceKind::from_location(entry.location)
+            .expect("segmented scope entry has a valid source kind");
+        (source as usize, source_entry as usize, source_kind)
+    }
+
+    fn source_entry_type(
+        db: &'db dyn Db,
+        entry: ScopeExpressionEntry,
+        source_entry: usize,
+        source: ScopeExpressionSourceInference<'db>,
+    ) -> Type<'db> {
+        let (source_key, ty) = source
+            .get_index(db, source_entry)
+            .expect("segmented scope entry references a valid source entry");
+        assert_eq!(
+            source_key, entry.key,
+            "segmented scope entry references the matching source expression"
+        );
+        ty
+    }
+
+    fn entry_type(&self, db: &'db dyn Db, entry: ScopeExpressionEntry) -> Type<'db> {
+        if entry.location & LOCAL_SCOPE_EXPRESSION != 0 {
+            self.local_types
+                .get((entry.location & !LOCAL_SCOPE_EXPRESSION) as usize)
+                .copied()
+                .expect("segmented scope entry references a valid local type")
+        } else {
+            let (source, source_entry, source_kind) = Self::source_location(entry);
+            let source = self
+                .sources
+                .get(source)
+                .expect("segmented scope entry references a valid source")
+                .resolve(db, source_kind);
+            Self::source_entry_type(db, entry, source_entry, source)
+        }
+    }
+
+    fn entry_type_cached(
+        &self,
+        db: &'db dyn Db,
+        entry: ScopeExpressionEntry,
+        sources: &mut [Option<ScopeExpressionSourceInference<'db>>],
+    ) -> Type<'db> {
+        if entry.location & LOCAL_SCOPE_EXPRESSION != 0 {
+            self.local_types
+                .get((entry.location & !LOCAL_SCOPE_EXPRESSION) as usize)
+                .copied()
+                .expect("segmented scope entry references a valid local type")
+        } else {
+            let (source, source_entry, source_kind) = Self::source_location(entry);
+            let cached = sources
+                .get_mut(source)
+                .expect("segmented scope entry references a valid source");
+            let source = if let Some(source) = *cached {
+                source
+            } else {
+                let source = self
+                    .sources
+                    .get(source)
+                    .expect("segmented scope entry references a valid source")
+                    .resolve(db, source_kind);
+                *cached = Some(source);
+                source
+            };
+            Self::source_entry_type(db, entry, source_entry, source)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct ScopeExpressionEntry {
+    key: ExpressionNodeKey,
+    location: u32,
+}
+
+enum ScopeExpressionSource<'db> {
+    Definition(Definition<'db>),
+    Expression(InferExpression<'db>),
+    Statement(StatementInner<'db>),
+    Scope(InferScope<'db>),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[repr(u8)]
+enum ScopeExpressionSourceKind {
+    Definition,
+    Expression,
+    ExpressionWithContext,
+    Statement,
+    Scope,
+    ScopeWithContext,
+}
+
+impl ScopeExpressionSourceKind {
+    fn from_location(location: u32) -> Option<Self> {
+        match (location & SCOPE_EXPRESSION_SOURCE_KIND_MASK) >> SCOPE_EXPRESSION_SOURCE_KIND_SHIFT {
+            0 => Some(Self::Definition),
+            1 => Some(Self::Expression),
+            2 => Some(Self::ExpressionWithContext),
+            3 => Some(Self::Statement),
+            4 => Some(Self::Scope),
+            5 => Some(Self::ScopeWithContext),
+            _ => None,
+        }
+    }
+
+    fn location_bits(self) -> u32 {
+        (self as u32) << SCOPE_EXPRESSION_SOURCE_KIND_SHIFT
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, salsa::Update)]
+struct ScopeExpressionSourceId(salsa::Id);
+
+impl get_size2::GetSize for ScopeExpressionSourceId {}
+
+impl ScopeExpressionSourceId {
+    // The kind is stored separately because Salsa IDs are only meaningful together with their
+    // concrete tracked type. Reconstructing a supertype from an untagged ID can select the wrong
+    // query when two variants use the same underlying ID representation.
+    fn new(source: &ScopeExpressionSource<'_>) -> (Self, ScopeExpressionSourceKind) {
+        let (id, kind) = match source {
+            ScopeExpressionSource::Definition(definition) => {
+                (definition.as_id(), ScopeExpressionSourceKind::Definition)
+            }
+            ScopeExpressionSource::Expression(InferExpression::Bare(expression)) => {
+                (expression.as_id(), ScopeExpressionSourceKind::Expression)
+            }
+            ScopeExpressionSource::Expression(InferExpression::WithContext(expression)) => (
+                expression.as_id(),
+                ScopeExpressionSourceKind::ExpressionWithContext,
+            ),
+            ScopeExpressionSource::Statement(statement) => {
+                (statement.as_id(), ScopeExpressionSourceKind::Statement)
+            }
+            ScopeExpressionSource::Scope(InferScope::Bare(scope)) => {
+                (scope.as_id(), ScopeExpressionSourceKind::Scope)
+            }
+            ScopeExpressionSource::Scope(InferScope::WithContext(scope)) => {
+                (scope.as_id(), ScopeExpressionSourceKind::ScopeWithContext)
+            }
+        };
+        (Self(id), kind)
+    }
+
+    fn resolve<'db>(
+        self,
+        db: &'db dyn Db,
+        kind: ScopeExpressionSourceKind,
+    ) -> ScopeExpressionSourceInference<'db> {
+        match kind {
+            ScopeExpressionSourceKind::Definition => {
+                ScopeExpressionSourceInference::Definition(infer_definition_types(
+                    db,
+                    <Definition<'db> as salsa::plumbing::FromId>::from_id(self.0),
+                ))
+            }
+            ScopeExpressionSourceKind::Expression => {
+                ScopeExpressionSourceInference::Expression(infer_expression_types_impl(
+                    db,
+                    InferExpression::Bare(<Expression<'db> as salsa::plumbing::FromId>::from_id(
+                        self.0,
+                    )),
+                ))
+            }
+            ScopeExpressionSourceKind::ExpressionWithContext => {
+                ScopeExpressionSourceInference::Expression(infer_expression_types_impl(
+                    db,
+                    InferExpression::WithContext(
+                        <ExpressionWithContext<'db> as salsa::plumbing::FromId>::from_id(self.0),
+                    ),
+                ))
+            }
+            ScopeExpressionSourceKind::Statement => {
+                ScopeExpressionSourceInference::Statement(infer_statement_types_impl(
+                    db,
+                    <StatementInner<'db> as salsa::plumbing::FromId>::from_id(self.0),
+                ))
+            }
+            ScopeExpressionSourceKind::Scope => {
+                ScopeExpressionSourceInference::Scope(infer_scope_types_impl(
+                    db,
+                    InferScope::Bare(<ScopeId<'db> as salsa::plumbing::FromId>::from_id(self.0)),
+                ))
+            }
+            ScopeExpressionSourceKind::ScopeWithContext => {
+                ScopeExpressionSourceInference::Scope(infer_scope_types_impl(
+                    db,
+                    InferScope::WithContext(
+                        <ScopeWithContext<'db> as salsa::plumbing::FromId>::from_id(self.0),
+                    ),
+                ))
+            }
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ScopeExpressionSourceInference<'db> {
+    Definition(&'db DefinitionInference<'db>),
+    Expression(&'db ExpressionInference<'db>),
+    Statement(&'db StatementInferenceInner<'db>),
+    Scope(&'db ScopeInference<'db>),
+}
+
+impl<'db> ScopeExpressionSourceInference<'db> {
+    fn get_index(self, db: &'db dyn Db, index: usize) -> Option<(ExpressionNodeKey, Type<'db>)> {
+        match self {
+            Self::Definition(inference) => inference.expressions.get_index(index).copied(),
+            Self::Expression(inference) => inference.expressions.get_index(index).copied(),
+            Self::Statement(inference) => inference.expressions.get_index(index).copied(),
+            Self::Scope(inference) => inference.expressions.get_index(db, index),
+        }
+    }
+}
+
+impl<'db> ScopeExpressionTypes<'db> {
+    fn flat(expressions: FrozenMap<ExpressionNodeKey, Type<'db>>) -> Self {
+        Self::Flat(expressions)
+    }
+
+    fn try_expression_type(&self, db: &'db dyn Db, key: ExpressionNodeKey) -> Option<Type<'db>> {
+        match self {
+            Self::Flat(expressions) => expressions.get(&key).copied(),
+            Self::Segmented(expressions) => {
+                let entry = expressions
+                    .entries
+                    .binary_search_by_key(&key, |entry| entry.key)
+                    .ok()
+                    .map(|index| expressions.entries[index])?;
+                Some(expressions.entry_type(db, entry))
+            }
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Flat(expressions) => expressions.iter().len(),
+            Self::Segmented(expressions) => expressions.entries.len(),
+        }
+    }
+
+    fn get_index(&self, db: &'db dyn Db, index: usize) -> Option<(ExpressionNodeKey, Type<'db>)> {
+        match self {
+            Self::Flat(expressions) => expressions.get_index(index).copied(),
+            Self::Segmented(expressions) => {
+                let entry = *expressions.entries.get(index)?;
+                Some((entry.key, expressions.entry_type(db, entry)))
+            }
+        }
+    }
+
+    fn for_each(
+        &self,
+        db: &'db dyn Db,
+        mut visit: impl FnMut(usize, ExpressionNodeKey, Type<'db>),
+    ) {
+        match self {
+            Self::Flat(expressions) => {
+                for (index, &(key, ty)) in expressions.iter().enumerate() {
+                    visit(index, key, ty);
+                }
+            }
+            Self::Segmented(expressions) => {
+                let mut sources = vec![None; expressions.sources.len()];
+                for (index, &entry) in expressions.entries.iter().enumerate() {
+                    let ty = expressions.entry_type_cached(db, entry, &mut sources);
+                    visit(index, entry.key, ty);
+                }
+            }
+        }
+    }
+
+    fn materialize(&self, db: &'db dyn Db) -> FrozenMap<ExpressionNodeKey, Type<'db>> {
+        let mut entries = Vec::with_capacity(self.len());
+        self.for_each(db, |_, key, ty| entries.push((key, ty)));
+        entries.into_iter().collect()
+    }
+
+    fn from_scope_builder(
+        expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
+        origins: &FxHashMap<ExpressionNodeKey, (u32, u32)>,
+        sources: Vec<ScopeExpressionSource<'db>>,
+    ) -> Self {
+        let flat_bytes = expressions.len() * std::mem::size_of::<(ExpressionNodeKey, Type<'db>)>();
+        let minimum_segmented_bytes = expressions.len()
+            * std::mem::size_of::<ScopeExpressionEntry>()
+            + expressions.len().saturating_sub(origins.len()) * std::mem::size_of::<Type<'db>>()
+            + std::mem::size_of::<SegmentedScopeExpressionTypes<'db>>();
+        if minimum_segmented_bytes >= flat_bytes {
+            return Self::flat(FrozenMap::from(expressions));
+        }
+
+        debug_assert!(
+            origins
+                .keys()
+                .all(|expression| expressions.contains_key(expression)),
+            "scope expression origins only contain retained expressions"
+        );
+        let local_count = expressions
+            .len()
+            .checked_sub(origins.len())
+            .expect("scope expression origins only contain retained expressions");
+        let mut used_sources = vec![false; sources.len()];
+        let mut max_source_entry = 0;
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "source use and maximum entry are independent of iteration order"
+        )]
+        for &(source, source_entry) in origins.values() {
+            *used_sources
+                .get_mut(source as usize)
+                .expect("scope expression origin references a known source") = true;
+            max_source_entry = max_source_entry.max(source_entry);
+        }
+
+        let retained_source_count = used_sources.iter().filter(|&&used| used).count();
+        let source_entry_bits = u8::try_from(u32::BITS - max_source_entry.leading_zeros())
+            .expect("u32 bit width fits u8");
+        let source_bits = retained_source_count
+            .checked_sub(1)
+            .and_then(|max_source| u32::try_from(max_source).ok())
+            .map_or(0, |max_source| u32::BITS - max_source.leading_zeros());
+        let segmented_bytes = expressions.len() * std::mem::size_of::<ScopeExpressionEntry>()
+            + local_count * std::mem::size_of::<Type<'db>>()
+            + retained_source_count * std::mem::size_of::<ScopeExpressionSourceId>()
+            + std::mem::size_of::<SegmentedScopeExpressionTypes<'db>>();
+
+        if local_count > LOCAL_SCOPE_EXPRESSION as usize
+            || u32::from(source_entry_bits) + source_bits > SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT
+            || segmented_bytes >= flat_bytes
+        {
+            return Self::flat(FrozenMap::from(expressions));
+        }
+
+        let mut source_remap = vec![None; sources.len()];
+        let mut retained_sources = Vec::with_capacity(retained_source_count);
+        for (old_source, (source, used)) in sources.into_iter().zip(used_sources).enumerate() {
+            if used {
+                let new_source = u32::try_from(retained_sources.len())
+                    .expect("scope expression source count fits u32");
+                let (source, kind) = ScopeExpressionSourceId::new(&source);
+                source_remap[old_source] = Some((new_source, kind));
+                retained_sources.push(source);
+            }
+        }
+
+        let mut entries = expressions.into_iter().collect::<Vec<_>>();
+        entries.sort_unstable_by_key(|(key, _)| *key);
+        let mut segmented_entries = Vec::with_capacity(entries.len());
+        let mut local_types = Vec::with_capacity(local_count);
+        for (key, ty) in entries {
+            let location = if let Some(&(source, source_entry)) = origins.get(&key) {
+                let (source, kind) =
+                    source_remap[source as usize].expect("used source is retained");
+                (source << source_entry_bits)
+                    | source_entry
+                    | kind.location_bits()
+                    | (u32::from(source_entry_bits) << SCOPE_EXPRESSION_SOURCE_ENTRY_BITS_SHIFT)
+            } else {
+                let local =
+                    u32::try_from(local_types.len()).expect("scope expression count fits u32");
+                debug_assert!(local < LOCAL_SCOPE_EXPRESSION);
+                local_types.push(ty);
+                LOCAL_SCOPE_EXPRESSION | local
+            };
+            segmented_entries.push(ScopeExpressionEntry { key, location });
+        }
+
+        Self::Segmented(Box::new(SegmentedScopeExpressionTypes {
+            entries: segmented_entries.into_boxed_slice(),
+            local_types: local_types.into_boxed_slice(),
+            sources: retained_sources.into_boxed_slice(),
+        }))
+    }
 }
 
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update, Default)]
@@ -787,7 +1205,7 @@ impl<'db> ScopeInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ScopeInferenceExtra::default()
             })),
-            expressions: FrozenMap::default(),
+            expressions: ScopeExpressionTypes::flat(FrozenMap::default()),
         }
     }
 
@@ -797,10 +1215,20 @@ impl<'db> ScopeInference<'db> {
         previous_inference: &ScopeInference<'db>,
         cycle: &salsa::Cycle,
     ) -> ScopeInference<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
+        if let ScopeExpressionTypes::Flat(expressions) = &mut self.expressions {
+            for (expr, ty) in expressions {
+                let previous_ty = previous_inference.expression_type(db, *expr);
+                *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            }
+            return self;
+        }
+
+        let mut expressions = self.expressions.materialize(db);
+        for (expr, ty) in &mut expressions {
+            let previous_ty = previous_inference.expression_type(db, *expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
+        self.expressions = ScopeExpressionTypes::flat(expressions);
 
         self
     }
@@ -809,18 +1237,22 @@ impl<'db> ScopeInference<'db> {
         self.extra.as_deref().map(|extra| &extra.diagnostics)
     }
 
-    pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
-        self.try_expression_type(expression)
+    pub(crate) fn expression_type(
+        &self,
+        db: &'db dyn Db,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Type<'db> {
+        self.try_expression_type(db, expression)
             .unwrap_or_else(Type::unknown)
     }
 
     pub(crate) fn try_expression_type(
         &self,
+        db: &'db dyn Db,
         expression: impl Into<ExpressionNodeKey>,
     ) -> Option<Type<'db>> {
         self.expressions
-            .get(&expression.into())
-            .copied()
+            .try_expression_type(db, expression.into())
             .or_else(|| self.fallback_type())
     }
 

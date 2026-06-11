@@ -244,7 +244,7 @@ fn definition_expression_type<'db>(
         }
     } else {
         // expression is in a type-params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
@@ -271,7 +271,7 @@ fn definition_expression_annotation<'db>(
     } else {
         let inference = infer_complete_scope_types(db, scope);
         TypeAndQualifiers::new(
-            inference.expression_type(expression),
+            inference.expression_type(db, expression),
             TypeOrigin::Declared,
             inference.qualifiers(expression),
         )

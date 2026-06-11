@@ -294,6 +294,128 @@ fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definit
         .expect("no binding found")
 }
 
+#[salsa::tracked]
+fn tracked_scope_expression_type<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expression: ExpressionNodeKey,
+) -> Type<'db> {
+    infer_complete_scope_types(db, scope).expression_type(db, expression)
+}
+
+#[test]
+fn segmented_scope_expression_dependency() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/a.py",
+        "x = y = (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)\n",
+    )?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    let (expression, scope_id, location, sources) = {
+        let module = parsed_module(&db, file).load(&db);
+        let assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+        let tuple = assignment.value.as_tuple_expr().unwrap();
+        let expression = ExpressionNodeKey::from(&tuple.elts[0]);
+        let scope = global_scope(&db, file);
+
+        let inference = infer_complete_scope_types(&db, scope);
+        let ScopeExpressionTypes::Segmented(expressions) = &inference.expressions else {
+            panic!("expected segmented scope expression storage");
+        };
+        let entry = expressions
+            .entries
+            .binary_search_by_key(&expression, |entry| entry.key)
+            .map(|index| expressions.entries[index])
+            .expect("expression is present in scope inference");
+        assert_eq!(
+            entry.location & LOCAL_SCOPE_EXPRESSION,
+            0,
+            "expression should refer to its source inference"
+        );
+        assert_eq!(
+            tracked_scope_expression_type(&db, scope, expression)
+                .display(&db)
+                .to_string(),
+            "Literal[1]"
+        );
+        (
+            expression,
+            scope.as_id(),
+            entry.location,
+            expressions.sources.to_vec(),
+        )
+    };
+
+    db.write_file(
+        "/src/a.py",
+        r#"x = y = ("x", "x", "x", "x", "x", "x", "x", "x", "x", "x", "x", "x")
+"#,
+    )?;
+
+    let scope = global_scope(&db, file);
+    assert_eq!(scope.as_id(), scope_id);
+    let inference = infer_complete_scope_types(&db, scope);
+    let ScopeExpressionTypes::Segmented(expressions) = &inference.expressions else {
+        panic!("expected segmented scope expression storage");
+    };
+    let entry = expressions
+        .entries
+        .binary_search_by_key(&expression, |entry| entry.key)
+        .map(|index| expressions.entries[index])
+        .expect("expression is present in scope inference");
+    assert_eq!(entry.location, location);
+    assert_eq!(&*expressions.sources, &*sources);
+    assert_eq!(
+        tracked_scope_expression_type(&db, scope, expression)
+            .display(&db)
+            .to_string(),
+        r#"Literal["x"]"#
+    );
+
+    Ok(())
+}
+
+#[test]
+fn segmented_scope_copies_deferred_expressions_locally() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_file(
+        "/src/a.py",
+        "from __future__ import annotations\n\
+         a = b = (1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1)\n\
+         def f(x: int) -> str: ...\n",
+    )?;
+
+    let file = system_path_to_file(&db, "/src/a.py").unwrap();
+    let module = parsed_module(&db, file).load(&db);
+    let function = module.syntax().body[2].as_function_def_stmt().unwrap();
+    let annotation = function.returns.as_deref().unwrap();
+    let expression = ExpressionNodeKey::from(annotation);
+    let scope = global_scope(&db, file);
+    let inference = infer_complete_scope_types(&db, scope);
+    let ScopeExpressionTypes::Segmented(expressions) = &inference.expressions else {
+        panic!("expected segmented scope expression storage");
+    };
+    let entry = expressions
+        .entries
+        .binary_search_by_key(&expression, |entry| entry.key)
+        .map(|index| expressions.entries[index])
+        .expect("annotation is present in scope inference");
+    assert_ne!(
+        entry.location & LOCAL_SCOPE_EXPRESSION,
+        0,
+        "deferred expression should retain its type locally"
+    );
+
+    let definition = semantic_index(&db, file).expect_single_definition(function);
+    assert_eq!(
+        inference.expression_type(&db, annotation),
+        infer_deferred_types(&db, definition).expression_type(annotation)
+    );
+
+    Ok(())
+}
+
 #[test]
 fn dependency_public_symbol_type_change() -> anyhow::Result<()> {
     let mut db = setup_db();

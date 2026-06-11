@@ -21,6 +21,11 @@ impl<K, V> FrozenMap<K, V> {
     pub fn values(&self) -> impl DoubleEndedIterator<Item = &V> + ExactSizeIterator {
         self.0.iter().map(|(_, value)| value)
     }
+
+    /// Returns the entry at `index` in key order.
+    pub fn get_index(&self, index: usize) -> Option<&(K, V)> {
+        self.0.get(index)
+    }
 }
 
 impl<K: Ord, V> FromIterator<(K, V)> for FrozenMap<K, V> {

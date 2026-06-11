@@ -554,7 +554,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .as_deref()
                         .map(|annotation| {
                             TypeContext::new(Some(
-                                type_params_inference.expression_type(annotation),
+                                type_params_inference.expression_type(db, annotation),
                             ))
                         })
                         .unwrap_or_else(TypeContext::default);

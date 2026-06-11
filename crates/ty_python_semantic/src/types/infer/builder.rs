@@ -23,9 +23,10 @@ use ty_python_core::statement::StatementInner;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
-    ExpressionInferenceExtra, FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
-    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
-    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
+    ExpressionInferenceExtra, FrozenMap, FrozenSet, FunctionDecoratorInference, InferExpression,
+    InferScope, InferenceRegion, ScopeExpressionSource, ScopeExpressionTypes, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types_impl,
+    infer_same_file_expression_type, infer_scope_types_impl, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -101,7 +102,7 @@ use crate::types::{
     Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    infer_complete_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -236,6 +237,11 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The types of every expression in this region.
     expressions: FxHashMap<ExpressionNodeKey, Type<'db>>,
 
+    /// Child-query expression entries merged into a scope, used to retain source references
+    /// instead of copying their types into the finished scope result.
+    scope_expression_sources: Vec<ScopeExpressionSource<'db>>,
+    scope_expression_origins: FxHashMap<ExpressionNodeKey, (u32, u32)>,
+
     /// An expression cache shared across builders during multi-inference.
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
@@ -368,6 +374,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: FxIndexSet::default(),
             deferred_state: DeferredExpressionState::None,
             expressions: FxHashMap::default(),
+            scope_expression_sources: Vec::new(),
+            scope_expression_origins: FxHashMap::default(),
             expression_cache: None,
             qualifiers: FxHashMap::default(),
             type_expression_flags: FxHashMap::default(),
@@ -421,12 +429,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
+    fn extend_definition(
+        &mut self,
+        source: Option<Definition<'db>>,
+        inference: &DefinitionInference<'db>,
+    ) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+        if let Some(source) = source {
+            self.extend_expression_source(
+                ScopeExpressionSource::Definition(source),
+                inference.expressions.iter().copied(),
+            );
+        } else {
+            for (key, ty) in inference.expressions.iter().copied() {
+                self.insert_expression_type(key, ty);
+            }
+        }
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -460,18 +480,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_statement(&mut self, inference: &StatementInference<'db>) {
-        let inference = match inference {
-            StatementInference::Other(inference) => inference,
-            StatementInference::Expression(inference) => return self.extend_expression(inference),
-            StatementInference::Definition(inference) => return self.extend_definition(inference),
+    fn extend_statement(&mut self, statement: Statement<'db>, inference: &StatementInference<'db>) {
+        let (statement, inference) = match (statement, inference) {
+            (Statement::Other(statement), StatementInference::Other(inference)) => {
+                (statement, inference)
+            }
+            (Statement::Expression(expression), StatementInference::Expression(inference)) => {
+                return self.extend_expression(
+                    InferExpression::new(self.db(), expression, TypeContext::default()),
+                    inference,
+                );
+            }
+            (Statement::Definition(definition), StatementInference::Definition(inference)) => {
+                return self.extend_definition(Some(definition), inference);
+            }
+            _ => unreachable!("statement inference kind matches its input"),
         };
 
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+        self.extend_expression_source(
+            ScopeExpressionSource::Statement(statement),
+            inference.expressions.iter().copied(),
+        );
         self.declarations.extend(inference.declarations());
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
@@ -496,16 +528,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_expression(&mut self, inference: &ExpressionInference<'db>) {
+    fn extend_expression(
+        &mut self,
+        input: InferExpression<'db>,
+        inference: &ExpressionInference<'db>,
+    ) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
-        self.extend_expression_unchecked(inference);
+        self.extend_expression_unchecked(input, inference);
     }
 
-    fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+    fn extend_expression_unchecked(
+        &mut self,
+        input: InferExpression<'db>,
+        inference: &ExpressionInference<'db>,
+    ) {
+        self.extend_expression_source(
+            ScopeExpressionSource::Expression(input),
+            inference.expressions.iter().copied(),
+        );
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -534,9 +576,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_scope(&mut self, inference: &ScopeInference<'db>) {
-        self.expressions
-            .extend(inference.expressions.iter().copied());
+    fn extend_scope(&mut self, input: InferScope<'db>, inference: &ScopeInference<'db>) {
+        let db = self.db();
+        if matches!(self.region, InferenceRegion::Scope(..)) {
+            let expression_count = inference.expressions.len();
+            if expression_count > 0 {
+                self.expressions.reserve(expression_count);
+                self.scope_expression_origins.reserve(expression_count);
+                let source_id = u32::try_from(self.scope_expression_sources.len())
+                    .expect("scope expression source count fits u32");
+                self.scope_expression_sources
+                    .push(ScopeExpressionSource::Scope(input));
+                inference.expressions.for_each(db, |source_entry, key, ty| {
+                    self.expressions.insert(key, ty);
+                    self.scope_expression_origins.insert(
+                        key,
+                        (
+                            source_id,
+                            u32::try_from(source_entry).expect("source expression count fits u32"),
+                        ),
+                    );
+                });
+            }
+        } else {
+            inference.expressions.for_each(db, |_, key, ty| {
+                self.insert_expression_type(key, ty);
+            });
+        }
 
         if let Some(extra) = &inference.extra {
             self.context.extend(&extra.diagnostics);
@@ -559,6 +625,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .or_insert(constraints.clone());
             }
         }
+    }
+
+    fn extend_expression_source(
+        &mut self,
+        source: ScopeExpressionSource<'db>,
+        expressions: impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)>,
+    ) {
+        if matches!(self.region, InferenceRegion::Scope(..)) {
+            let expression_count = expressions.len();
+            if expression_count == 0 {
+                return;
+            }
+            self.expressions.reserve(expression_count);
+            self.scope_expression_origins.reserve(expression_count);
+            let source_id = u32::try_from(self.scope_expression_sources.len())
+                .expect("scope expression source count fits u32");
+            self.scope_expression_sources.push(source);
+            for (source_entry, (key, ty)) in expressions.enumerate() {
+                self.expressions.insert(key, ty);
+                self.scope_expression_origins.insert(
+                    key,
+                    (
+                        source_id,
+                        u32::try_from(source_entry).expect("source expression count fits u32"),
+                    ),
+                );
+            }
+        } else {
+            for (key, ty) in expressions {
+                self.insert_expression_type(key, ty);
+            }
+        }
+    }
+
+    fn insert_expression_type(
+        &mut self,
+        key: ExpressionNodeKey,
+        ty: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if matches!(self.region, InferenceRegion::Scope(..)) {
+            self.scope_expression_origins.remove(&key);
+        }
+        self.expressions.insert(key, ty)
     }
 
     fn file(&self) -> File {
@@ -754,7 +863,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Get the type of an expression from any scope in the same file.
     ///
     /// If the expression is in the current scope, and we are inferring the entire scope, just look
-    /// up the expression in our own results, otherwise call [`infer_scope_types()`] for the scope
+    /// up the expression in our own results, otherwise call [`super::infer_scope_types()`] for the
+    /// scope
     /// of the expression.
     ///
     /// ## Panics
@@ -770,7 +880,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             InferenceRegion::Scope(scope, _) if scope == expr_scope => {
                 self.expression_type(expression)
             }
-            _ => infer_complete_scope_types(self.db(), expr_scope).expression_type(expression),
+            _ => infer_complete_scope_types(self.db(), expr_scope)
+                .expression_type(self.db(), expression),
         }
     }
 
@@ -855,7 +966,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer deferred types for all definitions.
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
-            self.extend_definition(infer_deferred_types(self.db(), *definition));
+            self.extend_definition(None, infer_deferred_types(self.db(), *definition));
         }
 
         assert!(
@@ -1573,8 +1684,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
             // Replace with `Divergent`.
-            self.expressions
-                .insert(type_alias.value.as_ref().into(), expanded);
+            self.insert_expression_type(type_alias.value.as_ref().into(), expanded);
         }
     }
 
@@ -1730,7 +1840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
-        self.extend_definition(result);
+        self.extend_definition(Some(definition), result);
     }
 
     fn infer_type_alias_definition(
@@ -4392,7 +4502,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 annotated.inner_type()
             };
-            self.expressions.insert((&**target).into(), target_ty);
+            self.insert_expression_type((&**target).into(), target_ty);
         }
     }
 
@@ -4667,7 +4777,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // retained as the alias binding.
                 match inferred_ty {
                     Type::SpecialForm(SpecialFormType::TypingSelf) => {
-                        self.expressions.insert(value.into(), Type::unknown());
+                        self.insert_expression_type(value.into(), Type::unknown());
                         Type::unknown()
                     }
                     Type::KnownInstance(KnownInstanceType::LiteralStringAlias(ty))
@@ -5814,7 +5924,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     fn infer_standalone_statement_impl(&mut self, standalone_statement: Statement<'db>) {
         let types = infer_statement_types(self.db(), standalone_statement);
-        self.extend_statement(&types);
+        self.extend_statement(standalone_statement, &types);
     }
 
     fn infer_optional_expression(
@@ -5875,8 +5985,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         standalone_expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        let types = infer_expression_types(self.db(), standalone_expression, tcx);
-        self.extend_expression(types);
+        let input = InferExpression::new(self.db(), standalone_expression, tcx);
+        let types = infer_expression_types_impl(self.db(), input);
+        self.extend_expression(input, types);
 
         // Instead of calling `self.expression_type(expr)` after extending here, we get
         // the result from `types` directly because we might be in cycle recovery where
@@ -6162,7 +6273,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        let previous = self.expressions.insert(expression.into(), ty);
+        let previous = self.insert_expression_type(expression.into(), ty);
         assert_eq!(previous, None);
     }
 
@@ -7281,8 +7392,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, yield_tcx);
-        self.extend_scope(inference);
+        let input = InferScope::new(self.db(), scope, yield_tcx);
+        let inference = infer_scope_types_impl(self.db(), input);
+        self.extend_scope(input, inference);
         let yield_type = self.comprehension_element_type(elt, inference);
 
         if evaluation_mode.is_async() {
@@ -7301,7 +7413,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         element: &ast::Expr,
         inference: &ScopeInference<'db>,
     ) -> Type<'db> {
-        let element_type = inference.expression_type(element);
+        let element_type = inference.expression_type(self.db(), element);
         if element.is_starred_expr() {
             element_type
                 .iterate(self.db())
@@ -7322,7 +7434,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         tcx: TypeContext<'db>,
     ) -> Option<Type<'db>> {
         let mut infer_element_ty =
-            |_builder: &mut Self, (_, elt, _)| inference.expression_type(elt);
+            |builder: &mut Self, (_, elt, _)| inference.expression_type(builder.db(), elt);
 
         self.infer_collection_literal(
             collection_class,
@@ -7354,8 +7466,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let input = InferScope::new(self.db(), scope, tcx);
+        let inference = infer_scope_types_impl(self.db(), input);
+        self.extend_scope(input, inference);
 
         self.infer_comprehension_specialization(
             KnownClass::List,
@@ -7388,8 +7501,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let input = InferScope::new(self.db(), scope, tcx);
+        let inference = infer_scope_types_impl(self.db(), input);
+        self.extend_scope(input, inference);
 
         self.infer_comprehension_specialization(
             KnownClass::Set,
@@ -7423,8 +7537,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::unknown();
         };
         let scope = scope_id.to_scope_id(self.db(), self.file());
-        let inference = infer_scope_types(self.db(), scope, tcx);
-        self.extend_scope(inference);
+        let input = InferScope::new(self.db(), scope, tcx);
+        let inference = infer_scope_types_impl(self.db(), input);
+        self.extend_scope(input, inference);
 
         self.infer_comprehension_specialization(
             KnownClass::Dict,
@@ -7601,7 +7716,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            let result = infer_expression_types(self.db(), expression, TypeContext::default());
+            let input = InferExpression::new(self.db(), expression, TypeContext::default());
+            let result = infer_expression_types_impl(self.db(), input);
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
@@ -7612,7 +7728,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if comprehension.is_first() && target.is_name_expr() {
                 result.expression_type(iterable)
             } else {
-                self.extend_expression_unchecked(result);
+                self.extend_expression_unchecked(input, result);
                 result.expression_type(iterable)
             }
         };
@@ -7642,7 +7758,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.expressions.insert(target.into(), target_type);
+        self.insert_expression_type(target.into(), target_type);
         self.add_binding(target.into(), definition)
             .insert(self, target_type);
     }
@@ -7652,7 +7768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
+            self.extend_definition(Some(definition), result);
             result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -7846,10 +7962,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeContext::new(None)
         };
 
-        let inference = infer_scope_types(self.db(), scope, return_tcx);
-        self.extend_scope(inference);
+        let input = InferScope::new(self.db(), scope, return_tcx);
+        let inference = infer_scope_types_impl(self.db(), input);
+        self.extend_scope(input, inference);
 
-        let return_ty = inference.expression_type(lambda_expression.body.as_ref());
+        let return_ty = inference.expression_type(self.db(), lambda_expression.body.as_ref());
         Type::Callable(CallableType::new(
             self.db(),
             CallableSignature::single(Signature::new(parameters, return_ty)),
@@ -10355,6 +10472,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
@@ -10436,6 +10555,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10530,6 +10651,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             bindings,
             called_functions,
             expression_cache: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             declarations: _,
             deferred: _,
             scope: _,
@@ -10584,6 +10707,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             dataclass_field_specifiers: _,
             typevar_binding_context: _,
             deferred_state: _,
@@ -10661,6 +10786,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             type_expression_flags,
             mut collection_use_constraints,
             expressions,
+            scope_expression_sources,
+            scope_expression_origins,
             scope,
             cycle_recovery,
             qualifiers,
@@ -10709,7 +10836,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         ScopeInference {
-            expressions: FrozenMap::from(expressions),
+            expressions: ScopeExpressionTypes::from_scope_builder(
+                expressions,
+                &scope_expression_origins,
+                scope_expression_sources,
+            ),
             extra,
         }
     }
@@ -10739,6 +10870,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             context: _,
             collection_use_constraints: _,
             expressions: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             string_annotations: _,
             expected_types: _,
             scope: _,
@@ -10795,6 +10928,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // builder only state
             expression_cache: _,
+            scope_expression_sources: _,
+            scope_expression_origins: _,
             typevar_binding_context: _,
             deferred_state: _,
             called_functions: _,
@@ -10816,7 +10951,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             "speculative `TypeInferenceBuilder` should only be used for expression inference"
         );
 
-        self.expressions.extend(expressions.iter());
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "speculative expression results are independent entries"
+        )]
+        for (key, ty) in expressions {
+            self.insert_expression_type(key, ty);
+        }
         self.context.extend(&diagnostics);
         self.extend_cycle_recovery(cycle_recovery);
         self.string_annotations

@@ -74,7 +74,7 @@ fn function_signature_expression_type<'db>(
         infer_deferred_types(db, definition).expression_type(expression)
     } else {
         // expression is in the PEP-695 type params sub-scope
-        infer_complete_scope_types(db, scope).expression_type(expression)
+        infer_complete_scope_types(db, scope).expression_type(db, expression)
     }
 }
 
