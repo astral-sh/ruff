@@ -2456,6 +2456,17 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
+    /// Concatenates an unpacked `TypeVarTuple` as the variable-length portion of this tuple.
+    pub(crate) fn concat_variadic_typevar(
+        self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        debug_assert!(typevar.is_typevartuple(db));
+        let other = VariableLengthTuple::mixed([], Type::TypeVar(typevar), []);
+        self.concat(db, &other)
+    }
+
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {

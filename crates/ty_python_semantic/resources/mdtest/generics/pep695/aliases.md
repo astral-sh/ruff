@@ -26,15 +26,13 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: ty_extensions._internal.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `TypeVarTuple` properly
-# (these should include the `TypeVarTuple`s in their generic contexts)
 # revealed: ty_extensions._internal.GenericContext[P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
 # revealed: ty_extensions._internal.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions._internal.GenericContext[]
+# revealed: ty_extensions._internal.GenericContext[Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions._internal.GenericContext[T@TypeVarAndTypeVarTuple, Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
@@ -721,18 +719,20 @@ info: See https://typing.python.org/en/latest/spec/generics.html#defaults-follow
 
 ```py
 # snapshot: invalid-type-variable-default
+# error: [invalid-type-form] "TypeVarTuple `Ts` cannot appear after TypeVarTuple `Us`"
+# error: [invalid-type-form] "Multiple unpacked variadic tuples are not allowed in a `tuple` specialization"
 type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
 ```
 
 ```snapshot
 error[invalid-type-variable-default]: Type parameters with defaults cannot follow a TypeVarTuple parameter
- --> src/mdtest_snippet.py:8:13
-  |
-8 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
-  |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
-  |             |
-  |             `Us` is a TypeVarTuple
-  |
+  --> src/mdtest_snippet.py:10:13
+   |
+10 | type Alias4[*Us, *Ts = *tuple[int, str]] = tuple[*Us, *Ts]
+   |             ---  ^^^^^^^^^^^^^^^^^^^^^^ `Ts` has a default
+   |             |
+   |             `Us` is a TypeVarTuple
+   |
 info: See https://typing.python.org/en/latest/spec/generics.html#defaults-following-typevartuple
 ```
 

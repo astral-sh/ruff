@@ -1,5 +1,6 @@
 use itertools::Either;
 use ruff_python_ast::helpers::is_dotted_name;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
@@ -199,7 +200,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let value_ty = self.infer_expression(value, TypeContext::default());
 
                 if is_dotted_name(value) {
-                    self.infer_subscript_type_expression_no_store(subscript, slice, value_ty)
+                    // Preserve the flag for another `Unpack` so that nested unpacking emits a
+                    // diagnostic. Other subscripts are no longer the direct unpack operand.
+                    let previously_in_unpack_type_argument =
+                        if value_ty == Type::SpecialForm(SpecialFormType::Unpack) {
+                            None
+                        } else {
+                            Some(
+                                self.context
+                                    .inference_flags
+                                    .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, false),
+                            )
+                        };
+                    let ty =
+                        self.infer_subscript_type_expression_no_store(subscript, slice, value_ty);
+                    if let Some(previously_in_unpack_type_argument) =
+                        previously_in_unpack_type_argument
+                    {
+                        self.context.inference_flags.set(
+                            InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+                            previously_in_unpack_type_argument,
+                        );
+                    }
+                    ty
                 } else {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());
@@ -931,11 +954,38 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ctx: _,
         } = starred;
 
+        self.store_type_expression_flags(ast::ExprRef::from(starred), TypeExpressionFlags::UNPACK);
+
+        let previously_in_unpack_type_argument = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT, true);
         let starred_type = self.infer_type_expression(value);
-        if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
+        self.context.inference_flags.set(
+            InferenceFlags::IN_UNPACK_TYPE_ARGUMENT,
+            previously_in_unpack_type_argument,
+        );
+
+        if starred_type.exact_tuple_instance_spec(self.db()).is_some()
+            || matches!(
+                starred_type,
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+            )
+        {
             starred_type
         } else {
-            Type::Dynamic(DynamicType::TodoStarredExpression)
+            self.store_type_expression_flags(
+                ast::ExprRef::from(starred),
+                TypeExpressionFlags::INVALID_UNPACK,
+            );
+            if !starred_type.is_unknown()
+                && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, starred)
+            {
+                diagnostic::add_type_expression_reference_link(
+                    builder.into_diagnostic("`*` can only unpack a tuple type or `TypeVarTuple`"),
+                );
+            }
+            Type::homogeneous_tuple(self.db(), Type::unknown())
         }
     }
 
@@ -1012,36 +1062,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         tuple: &ast::ExprSubscript,
     ) -> Option<TupleType<'db>> {
-        /// In most cases, if a subelement of the tuple is inferred as `Todo`,
-        /// we should only infer `Todo` for that specific subelement.
-        /// Certain specific AST nodes can however change the meaning of the entire tuple,
-        /// however: for example, `tuple[int, ...]` or `tuple[int, *tuple[str, ...]]` are a
-        /// homogeneous tuple and a partly homogeneous tuple (respectively) due to the `...`
-        /// and the starred expression (respectively), Neither is supported by us right now,
-        /// so we should infer `Todo` for the *entire* tuple if we encounter one of those elements.
-        fn element_could_alter_type_of_whole_tuple(
-            element: &ast::Expr,
-            element_ty: Type,
-            builder: &mut TypeInferenceBuilder,
-        ) -> bool {
-            if !element_ty.is_todo() {
-                return false;
-            }
-
-            match element {
-                ast::Expr::Starred(_) => {
-                    element_ty.exact_tuple_instance_spec(builder.db()).is_none()
-                }
-                ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    let value_ty = builder.expression_type(value);
-
-                    value_ty == Type::SpecialForm(SpecialFormType::Unpack)
-                }
-                _ => false,
-            }
-        }
-
-        // TODO: TypeVarTuple
         match &*tuple.slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
@@ -1070,10 +1090,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 let mut element_types = TupleSpecBuilder::with_capacity(elements.len());
 
-                // Whether to infer `Todo` for the whole tuple
-                // (see docstring for `element_could_alter_type_of_whole_tuple`)
-                let mut return_todo = false;
-
                 let mut first_unpacked_variadic_tuple = None;
 
                 for element in elements {
@@ -1099,25 +1115,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                         previously_in_valid_unpack_context,
                     );
-                    return_todo |=
-                        element_could_alter_type_of_whole_tuple(element, element_ty, self);
-
                     // Determine if this element unpacks a tuple: either `*expr` or `Unpack[expr]`
-                    let unpack_inner = if let ast::Expr::Starred(ast::ExprStarred {
-                        value, ..
-                    }) = element
-                    {
-                        Some(&**value)
-                    } else if let ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) =
-                        element
-                        && self.expression_type(value) == Type::SpecialForm(SpecialFormType::Unpack)
-                    {
-                        Some(&**slice)
-                    } else {
-                        None
-                    };
+                    let is_unpack = matches!(element, ast::Expr::Starred(_))
+                        || matches!(
+                            element,
+                            ast::Expr::Subscript(ast::ExprSubscript { value, .. })
+                                if self.expression_type(value)
+                                    == Type::SpecialForm(SpecialFormType::Unpack)
+                        );
 
-                    if let Some(unpack_inner) = unpack_inner {
+                    if is_unpack {
                         let mut report_too_many_unpacked_tuples = || {
                             if let Some(first_unpacked_variadic_tuple) =
                                 first_unpacked_variadic_tuple
@@ -1151,10 +1158,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(unpack_inner)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                        } else if let Type::TypeVar(typevar) = element_ty
+                            && typevar.is_typevartuple(self.db())
                         {
                             report_too_many_unpacked_tuples();
+                            element_types =
+                                element_types.concat_variadic_typevar(self.db(), typevar);
                         } else {
                             // TODO: emit a diagnostic
                         }
@@ -1163,14 +1172,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
 
-                let ty = if return_todo {
-                    Some(TupleType::homogeneous(
-                        self.db(),
-                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
-                    ))
-                } else {
-                    TupleType::new(self.db(), &element_types.build())
-                };
+                let ty = TupleType::new(self.db(), &element_types.build());
 
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
@@ -1201,15 +1203,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                     previously_in_valid_unpack_context,
                 );
-                if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
-                {
-                    Some(TupleType::homogeneous(
-                        self.db(),
-                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
-                    ))
-                } else {
-                    TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
+                let single_element_is_unpack = matches!(single_element, ast::Expr::Starred(_))
+                    || matches!(
+                        single_element,
+                        ast::Expr::Subscript(ast::ExprSubscript { value, .. })
+                            if self.expression_type(value)
+                                == Type::SpecialForm(SpecialFormType::Unpack)
+                    );
+                if single_element_is_unpack {
+                    if let Some(inner_tuple) =
+                        single_element_ty.exact_tuple_instance_spec(self.db())
+                    {
+                        return TupleType::new(self.db(), &inner_tuple);
+                    } else if let Type::TypeVar(typevar) = single_element_ty
+                        && typevar.is_typevartuple(self.db())
+                    {
+                        return TupleType::new(
+                            self.db(),
+                            &TupleSpecBuilder::with_capacity(0)
+                                .concat_variadic_typevar(self.db(), typevar)
+                                .build(),
+                        );
+                    }
                 }
+                TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
             }
         }
     }
@@ -2388,10 +2405,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 if self
                     .inference_flags()
-                    .contains(InferenceFlags::IN_KWARG_ANNOTATION)
-                    && self
-                        .inference_flags()
-                        .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                    .contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
                 {
                     if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                         diagnostic::add_type_expression_reference_link(
@@ -2449,20 +2463,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return inner_ty;
                 }
 
-                // When the argument is a tuple type, return it directly so that
-                // `Unpack[tuple[int, ...]]` behaves identically to `*tuple[int, ...]`.
-                //
-                // However, we still need a Todo type for things like
-                // `def f(*args: Unpack[tuple[int, Unpack[tuple[str, ...]]]]): ...`,
-                // which we don't yet support.
-                if self
-                    .inference_flags()
-                    .contains(InferenceFlags::IN_VARARG_ANNOTATION)
-                    || inner_ty.exact_tuple_instance_spec(self.db()).is_none()
+                // Preserve valid unpack targets so that `Unpack[...]` follows the same
+                // argument-binding path as an equivalent starred annotation.
+                if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
+                    || matches!(
+                        inner_ty,
+                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
+                    )
                 {
-                    todo_type!("`Unpack[]` special form")
-                } else {
                     inner_ty
+                } else {
+                    self.store_type_expression_flags(
+                        ast::ExprRef::from(subscript),
+                        TypeExpressionFlags::INVALID_UNPACK,
+                    );
+                    if !inner_ty.is_unknown()
+                        && let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                    {
+                        diagnostic::add_type_expression_reference_link(builder.into_diagnostic(
+                            "`Unpack` can only unpack a tuple type or `TypeVarTuple`",
+                        ));
+                    }
+                    Type::homogeneous_tuple(self.db(), Type::unknown())
                 }
             }
             SpecialFormType::NoReturn
@@ -2702,10 +2725,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     return None;
                 }
 
-                let mut parameter_types = Vec::with_capacity(params.len());
-
-                // Whether to infer `Todo` for the parameters
-                let mut return_todo = false;
+                let mut parameters = Vec::with_capacity(params.len());
 
                 let previously_in_valid_unpack_context = self
                     .context
@@ -2713,30 +2733,41 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .replace(InferenceFlags::IN_VALID_UNPACK_CONTEXT, true);
                 for param in params {
                     let param_type = self.infer_type_expression(param);
-                    // This is similar to what we currently do for inferring tuple type expression.
-                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
-                    // when trying to check for assignability or any other relation. For example,
-                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
-                    parameter_types.push(param_type);
+                    let is_unpack = self
+                        .type_expression_flags(param)
+                        .contains(TypeExpressionFlags::UNPACK);
+
+                    if is_unpack {
+                        if let Type::TypeVar(typevar) = param_type
+                            && typevar.is_typevartuple(self.db())
+                        {
+                            parameters.push(
+                                Parameter::variadic(Name::new_static("args"))
+                                    .with_annotated_type(Type::TypeVar(typevar))
+                                    .with_starred_annotation(),
+                            );
+                            continue;
+                        }
+
+                        if param_type.exact_tuple_instance_spec(self.db()).is_some() {
+                            parameters.push(
+                                Parameter::variadic(Name::new_static("args"))
+                                    .with_annotated_type(param_type)
+                                    .with_starred_annotation(),
+                            );
+                            continue;
+                        }
+                    }
+
+                    parameters
+                        .push(Parameter::positional_only(None).with_annotated_type(param_type));
                 }
                 self.context.inference_flags.set(
                     InferenceFlags::IN_VALID_UNPACK_CONTEXT,
                     previously_in_valid_unpack_context,
                 );
 
-                return Some(if return_todo {
-                    // TODO: `Unpack`
-                    Parameters::todo()
-                } else {
-                    Parameters::from_annotation(
-                        self.db(),
-                        parameter_types.iter().map(|param_type| {
-                            Parameter::positional_only(None).with_annotated_type(*param_type)
-                        }),
-                    )
-                });
+                return Some(Parameters::from_annotation(self.db(), parameters));
             }
             ast::Expr::Subscript(subscript) => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());

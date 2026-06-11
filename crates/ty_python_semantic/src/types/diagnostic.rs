@@ -3684,6 +3684,7 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         | TypeVarKind::TypingSelf
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
+        TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => "TypeVarTuple",
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",

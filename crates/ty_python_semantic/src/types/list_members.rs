@@ -409,6 +409,7 @@ impl<'db> AllMembers<'db> {
                                     Some(
                                         KnownClass::TypeVar
                                             | KnownClass::TypeVarTuple
+                                            | KnownClass::ExtensionsTypeVarTuple
                                             | KnownClass::ParamSpec
                                             | KnownClass::UnionType
                                     )

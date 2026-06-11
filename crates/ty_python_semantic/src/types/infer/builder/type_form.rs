@@ -2,7 +2,7 @@ use ruff_python_ast::{self as ast};
 
 use super::TypeInferenceBuilder;
 use crate::types::diagnostic::INVALID_TYPE_FORM;
-use crate::types::{CycleDetector, DynamicType, KnownClass, Type, TypeContext, TypeFormType};
+use crate::types::{CycleDetector, KnownClass, Type, TypeContext, TypeFormType};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     /// In a `TypeForm` context, keep the ordinary value interpretation if it is
@@ -56,11 +56,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             let contextual_ty = self
                 .speculate_without_diagnostics()
                 .infer_value_expression_impl(expression, TypeContext::new(Some(target)));
-            // TODO: Remove this exception once `Unpack` produces a precise type instead of a
-            // dynamic placeholder in ordinary expression inference.
-            if contextual_ty.is_assignable_to(self.db(), target)
-                && contextual_ty != Type::Dynamic(DynamicType::TodoUnpack)
-            {
+            if contextual_ty.is_assignable_to(self.db(), target) {
                 return None;
             }
         }

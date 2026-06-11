@@ -28,7 +28,7 @@ use crate::{
         },
         infer_definition_types, infer_scope_types,
         signatures::ReturnCallableTypeVarScope,
-        todo_type,
+        tuple::{TupleSpecBuilder, TupleType},
         typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation,
     },
 };
@@ -894,13 +894,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         if let Some(annotation) = parameter.annotation() {
-            let ty = if annotation.is_starred_expr() {
-                todo_type!("PEP 646")
-            } else {
-                let annotated_type = self.file_expression_type(annotation);
-                if let Type::TypeVar(typevar) = annotated_type
-                    && typevar.is_paramspec(db)
+            let annotated_type = self.file_expression_type(annotation);
+            let has_unpacked_annotation = self
+                .file_type_expression_flags(annotation)
+                .contains(TypeExpressionFlags::UNPACK);
+            let ty = match annotated_type {
+                Type::TypeVar(typevar)
+                    if has_unpacked_annotation && typevar.is_typevartuple(db) =>
                 {
+                    Type::tuple(TupleType::new(
+                        db,
+                        &TupleSpecBuilder::with_capacity(0)
+                            .concat_variadic_typevar(db, typevar)
+                            .build(),
+                    ))
+                }
+                _ if has_unpacked_annotation => annotated_type,
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     match typevar.paramspec_attr(db) {
                         // `*args: P.args`
                         Some(ParamSpecAttrKind::Args) => annotated_type,
@@ -930,9 +940,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::homogeneous_tuple(db, Type::unknown())
                         }
                     }
-                } else {
-                    Type::homogeneous_tuple(db, annotated_type)
                 }
+                _ => Type::homogeneous_tuple(db, annotated_type),
             };
 
             self.add_declaration_with_binding(

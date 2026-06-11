@@ -13,12 +13,12 @@ from typing_extensions import TypeVarTuple
 Ts = TypeVarTuple("Ts")
 
 def append_int(*args: *Ts) -> tuple[*Ts, int]:
-    reveal_type(args)  # revealed: @Todo(PEP 646)
+    reveal_type(args)  # revealed: tuple[*Ts@append_int]
 
     return (*args, 1)
 
-# TODO should be tuple[Literal[True], Literal["a"], int]
-reveal_type(append_int(True, "a"))  # revealed: tuple[@Todo(TypeVarTuple), ...]
+# TODO: revealed: tuple[Literal[True], Literal["a"], int]
+reveal_type(append_int(True, "a"))  # revealed: tuple[*tuple[Literal[True, "a"], ...], int]
 
 def first_arg_int(*args: *tuple[int, *tuple[str, ...]]): ...
 

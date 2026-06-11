@@ -570,8 +570,16 @@ impl<'db> GenericContext<'db> {
                 };
                 Some(typevar.with_binding_context(db, binding_context))
             }
-            // TODO: Support this!
-            ast::TypeParam::TypeVarTuple(_) => None,
+            ast::TypeParam::TypeVarTuple(node) => {
+                let definition = index.expect_single_definition(node);
+                let declared = inferred_declaration(db, definition).declared()?;
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declared.inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.with_binding_context(db, binding_context))
+            }
         }
     }
 
@@ -883,12 +891,20 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self.len(db) {
-            0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
-        }
+        self.specialize(
+            db,
+            self.variables(db)
+                .map(|typevar| match typevar.kind(db) {
+                    TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                        Type::homogeneous_tuple(db, Type::unknown())
+                    }
+                    TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    }
+                    _ => Type::unknown(),
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
@@ -1026,11 +1042,15 @@ impl<'db> GenericContext<'db> {
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
         let mut expanded = Vec::with_capacity(types.len());
         for typevar in variables.clone() {
-            if typevar.is_paramspec(db) {
-                expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
-            } else {
-                expanded.push(Type::unknown());
-            }
+            expanded.push(match typevar.kind(db) {
+                TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    Type::homogeneous_tuple(db, Type::unknown())
+                }
+                TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => {
+                    Type::paramspec_value_callable(db, Parameters::unknown())
+                }
+                _ => Type::unknown(),
+            });
         }
 
         for (idx, (ty, typevar)) in types.zip(variables).enumerate() {

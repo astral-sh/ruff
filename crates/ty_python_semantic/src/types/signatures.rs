@@ -4334,6 +4334,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn with_starred_annotation(mut self) -> Self {
+        self.annotation_kind = ParameterAnnotationKind::Starred;
+        self
+    }
+
     pub(crate) fn with_default_type(mut self, default: Type<'db>) -> Self {
         match &mut self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
@@ -4483,28 +4488,29 @@ impl<'db> Parameter<'db> {
         let index = semantic_index(db, function_definition.file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
-        let (annotated_type, inferred_annotation, has_starred_annotation) =
+        let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
                     function_signature_expression_type(db, function_definition, annotation),
                     false,
+                    function_signature_type_expression_flags(db, function_definition, annotation),
                     annotation.is_starred_expr(),
                 )
             } else {
-                (Type::unknown(), true, false)
+                (Type::unknown(), true, TypeExpressionFlags::empty(), false)
             };
+        let has_unpacked_variadic_annotation = matches!(&kind, ParameterKind::Variadic { .. })
+            && annotation_flags.contains(TypeExpressionFlags::UNPACK);
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
-            && parameter.annotation().is_some_and(|annotation| {
-                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                    db,
-                    annotated_type,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
-                )
-                .is_some()
-            });
+            && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                db,
+                annotated_type,
+                annotation_flags,
+            )
+            .is_some();
         let annotation_kind = if is_unpacked_typed_dict_kwargs {
             ParameterAnnotationKind::UnpackedTypedDictKwargs
-        } else if has_starred_annotation {
+        } else if has_starred_annotation || has_unpacked_variadic_annotation {
             ParameterAnnotationKind::Starred
         } else {
             ParameterAnnotationKind::Normal
@@ -4588,8 +4594,9 @@ impl<'db> Parameter<'db> {
         self.definition
     }
 
-    /// Return `true` if this parameter has a starred annotation,
-    /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
+    /// Return `true` if this parameter has an unpacked variadic annotation,
+    /// e.g. `*args: *Ts`, `*args: Unpack[Ts]`, or
+    /// `*args: *tuple[int, *tuple[str, ...], bytes]`.
     pub(crate) fn has_starred_annotation(&self) -> bool {
         matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }
