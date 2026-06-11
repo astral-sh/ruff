@@ -7,6 +7,7 @@
 //! logic needs to be tolerant of variations.
 
 mod markdown;
+mod preformatted;
 mod rest;
 
 use indexmap::IndexMap;
