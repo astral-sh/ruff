@@ -31,9 +31,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::enums::{enum_member_literals, enum_metadata};
-use super::equality::{
-    evaluate_type_equality, evaluate_type_inequality, has_known_identity_equality_semantics,
-};
+use super::equality::{evaluate_type_equality, evaluate_type_inequality};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -2462,7 +2460,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         let key_literal = subscript_key_type.as_string_literal()?;
-        if !is_supported_tag_literal(self.db, rhs_type) {
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
@@ -2561,7 +2559,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let index = i32::try_from(index).ok()?;
 
         // The comparison value must be a supported literal type.
-        if !is_supported_tag_literal(self.db, rhs_type) {
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
@@ -2615,14 +2613,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
             return None;
         };
-        if !is_supported_tag_literal(self.db, rhs_type) {
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
         let narrowed = union.filter(self.db, |element| {
             nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
                 if is_equality {
-                    !is_supported_tag_literal(self.db, attribute_type)
+                    !is_supported_tag_literal(attribute_type)
                         || !attribute_type.is_disjoint_from(self.db, rhs_type)
                 } else {
                     !attribute_type.is_subtype_of(self.db, rhs_type)
@@ -2767,16 +2765,16 @@ fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db
     )
 }
 
-fn is_supported_tag_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.as_literal_value_kind() {
+fn is_supported_tag_literal(ty: Type) -> bool {
+    matches!(
+        ty.as_literal_value_kind(),
         Some(
             LiteralValueTypeKind::String(_)
-            | LiteralValueTypeKind::Bytes(_)
-            | LiteralValueTypeKind::Int(_),
-        ) => true,
-        Some(LiteralValueTypeKind::Enum(_)) => has_known_identity_equality_semantics(db, ty),
-        _ => false,
-    }
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Enum(_)
+        )
+    )
 }
 
 fn nominal_attribute_type<'db>(
@@ -2809,7 +2807,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal(db, field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };
 
     match ty {
@@ -2909,7 +2907,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
         elem.as_nominal_instance()
             .and_then(|inst| inst.tuple_spec(db))
             .and_then(|spec| spec.py_index(db, index).ok())
-            .is_none_or(|ty| is_supported_tag_literal(db, ty))
+            .is_none_or(is_supported_tag_literal)
     })
 }
 

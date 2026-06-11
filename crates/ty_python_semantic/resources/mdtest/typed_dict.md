@@ -4745,7 +4745,7 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
-Enum literals are also supported as tags when their equality behavior is known:
+Enum literals are also supported as tags:
 
 ```py
 from enum import Enum
@@ -4773,136 +4773,30 @@ def _(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
         reveal_type(u)  # revealed: WithEnumTagC
 ```
 
-Enums with custom equality behavior cannot be used to narrow tagged unions:
+Explicit enum aliases resolve to their canonical member:
 
 ```py
-class WackyTag(Enum):
-    X = 1
-    Y = 2
+class AliasTag(Enum):
+    A = 1
+    ALSO_A = A
+    B = 2
 
-    def __eq__(self, other: object) -> bool:
-        return True
+class WithAliasTagA(TypedDict):
+    tag: Literal[AliasTag.A]
+    a: int
 
-class WithWackyTagX(TypedDict):
-    tag: Literal[WackyTag.X]
+class WithAliasTagAlsoA(TypedDict):
+    tag: Literal[AliasTag.ALSO_A]
+    also_a: int
 
-class WithWackyTagY(TypedDict):
-    tag: Literal[WackyTag.Y]
+class WithAliasTagB(TypedDict):
+    tag: Literal[AliasTag.B]
 
-def _(u: WithWackyTagX | WithWackyTagY):
-    if u["tag"] == WackyTag.X:
-        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+def _(u: WithAliasTagA | WithAliasTagAlsoA | WithAliasTagB):
+    if u["tag"] == AliasTag.A:
+        reveal_type(u)  # revealed: WithAliasTagA | WithAliasTagAlsoA
     else:
-        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
-```
-
-We also avoid narrowing when we cannot determine enum member aliases statically:
-
-```py
-class UnhashableTag(Enum):
-    X = []
-    Y = []
-
-class WithUnhashableTagX(TypedDict):
-    tag: Literal[UnhashableTag.X]
-
-class WithUnhashableTagY(TypedDict):
-    tag: Literal[UnhashableTag.Y]
-
-def _(u: WithUnhashableTagX | WithUnhashableTagY):
-    if u["tag"] == UnhashableTag.X:
-        reveal_type(u)  # revealed: WithUnhashableTagX | WithUnhashableTagY
-    else:
-        reveal_type(u)  # revealed: WithUnhashableTagX | WithUnhashableTagY
-
-class CrossTypeAliasTag(Enum):
-    X = 1
-    Y = True
-
-class WithCrossTypeAliasTagX(TypedDict):
-    tag: Literal[CrossTypeAliasTag.X]
-
-class WithCrossTypeAliasTagY(TypedDict):
-    tag: Literal[CrossTypeAliasTag.Y]
-
-def _(u: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY):
-    if u["tag"] == CrossTypeAliasTag.X:
-        reveal_type(u)  # revealed: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY
-    else:
-        reveal_type(u)  # revealed: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY
-
-class ConstructedTag(Enum):
-    def __new__(cls, value: int) -> "ConstructedTag":
-        obj = object.__new__(cls)
-        obj._value_ = 0
-        return obj
-
-    X = 1
-    Y = 2
-
-class WithConstructedTagX(TypedDict):
-    tag: Literal[ConstructedTag.X]
-
-class WithConstructedTagY(TypedDict):
-    tag: Literal[ConstructedTag.Y]
-
-def _(u: WithConstructedTagX | WithConstructedTagY):
-    if u["tag"] == ConstructedTag.X:
-        reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
-    else:
-        reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
-
-class DataTypeBase:
-    def __new__(cls, value: int) -> "DataTypeBase":
-        obj = object.__new__(cls)
-        obj._value_ = 0
-        return obj
-
-class DataTypeMixin(DataTypeBase):
-    pass
-
-class MixinTag(DataTypeMixin, Enum):
-    X = 1
-    Y = 2
-
-class WithMixinTagX(TypedDict):
-    tag: Literal[MixinTag.X]
-    only_x: int
-
-class WithMixinTagY(TypedDict):
-    tag: Literal[MixinTag.Y]
-
-def _(u: WithMixinTagX | WithMixinTagY):
-    if u["tag"] == MixinTag.X:
-        reveal_type(u)  # revealed: WithMixinTagX | WithMixinTagY
-        u["only_x"]  # error: [invalid-key]
-    else:
-        reveal_type(u)  # revealed: WithMixinTagX | WithMixinTagY
-
-class CallableConstructor:
-    def __call__(self, cls: type, value: int) -> object:
-        obj = object.__new__(cls)
-        obj._value_ = 0
-        return obj
-
-class CallableTag(Enum):
-    __new__ = CallableConstructor()
-    X = 1
-    Y = 2
-
-class WithCallableTagX(TypedDict):
-    tag: Literal[CallableTag.X]
-    only_x: int
-
-class WithCallableTagY(TypedDict):
-    tag: Literal[CallableTag.Y]
-
-def _(u: WithCallableTagX | WithCallableTagY):
-    if u["tag"] == CallableTag.X:
-        reveal_type(u)  # revealed: WithCallableTagX | WithCallableTagY
-        u["only_x"]  # error: [invalid-key]
-    else:
-        reveal_type(u)  # revealed: WithCallableTagX | WithCallableTagY
+        reveal_type(u)  # revealed: WithAliasTagB
 ```
 
 We can descend into intersections to discover `TypedDict` types that need narrowing:

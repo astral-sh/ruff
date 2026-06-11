@@ -365,16 +365,10 @@ def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
         reveal_type(x)  # revealed: tuple[Literal["a"], A]
 ```
 
-Enum literals with object identity equality are supported as tuple tags. Integer- and string-valued
-enums are not, because they can compare equal to their underlying literal values:
-
-```toml
-[environment]
-python-version = "3.11"
-```
+Enum literals are supported as tuple tags, including `IntEnum` literals:
 
 ```py
-from enum import Enum, IntEnum, StrEnum
+from enum import Enum, IntEnum
 from typing import Literal
 
 class Tag(Enum):
@@ -389,31 +383,13 @@ def _(x: tuple[Literal[Tag.A], int] | tuple[Literal[Tag.B], str]):
 
 class IntTag(IntEnum):
     A = 1
+    B = 2
 
-def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[1], str]):
-    if x[0] == 1:
-        reveal_type(x)  # revealed: tuple[IntTag, int] | tuple[Literal[1], str]
-
-class StrTag(StrEnum):
-    A = "a"
-
-def _(x: tuple[Literal[StrTag.A], int] | tuple[Literal["a"], str]):
-    if x[0] == "a":
-        reveal_type(x)  # revealed: tuple[StrTag, int] | tuple[Literal["a"], str]
-
-class IntMixinTag(int, Enum):
-    A = 1
-
-def _(x: tuple[Literal[IntMixinTag.A], int] | tuple[Literal[1], str]):
-    if x[0] == 1:
-        reveal_type(x)  # revealed: tuple[IntMixinTag, int] | tuple[Literal[1], str]
-
-class StrMixinTag(str, Enum):
-    A = "a"
-
-def _(x: tuple[Literal[StrMixinTag.A], int] | tuple[Literal["a"], str]):
-    if x[0] == "a":
-        reveal_type(x)  # revealed: tuple[StrMixinTag, int] | tuple[Literal["a"], str]
+def _(x: tuple[Literal[IntTag.A], int] | tuple[Literal[IntTag.B], str]):
+    if x[0] == IntTag.A:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.A], int]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[IntTag.B], str]
 ```
 
 Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the

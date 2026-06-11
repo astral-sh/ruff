@@ -11,7 +11,7 @@ use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, equality_truthiness,
+    TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -544,19 +544,25 @@ pub(super) fn infer_binary_type_comparison<'db>(
                     Some(Ok(result))
                 }
 
-                (LiteralValueTypeKind::Enum(_), LiteralValueTypeKind::Enum(_))
-                    if matches!(op, ast::CmpOp::Eq | ast::CmpOp::NotEq) =>
+                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
+                    if op == ast::CmpOp::Eq =>
                 {
-                    Some(Ok(match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                        Ok(ty) => ty,
-                        Err(_) => match equality_truthiness(db, left, right) {
-                            Truthiness::AlwaysTrue => Type::bool_literal(op == ast::CmpOp::Eq),
-                            Truthiness::AlwaysFalse => {
-                                Type::bool_literal(op == ast::CmpOp::NotEq)
-                            }
-                            Truthiness::Ambiguous => KnownClass::Bool.to_instance(db),
+                    Some(Ok(
+                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                            Ok(ty) => ty,
+                            Err(_) => Type::bool_literal(literal_1 == literal_2),
                         },
-                    }))
+                    ))
+                }
+                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
+                    if op == ast::CmpOp::NotEq =>
+                {
+                    Some(Ok(
+                        match try_dunder(MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                            Ok(ty) => ty,
+                            Err(_) => Type::bool_literal(literal_1 != literal_2),
+                        },
+                    ))
                 }
 
                 _ => None,

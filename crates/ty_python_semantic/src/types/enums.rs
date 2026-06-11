@@ -47,12 +47,6 @@ pub(crate) struct EnumMetadata<'db> {
     /// independently.
     pub(crate) new_function: Option<FunctionType<'db>>,
 
-    /// Whether this enum or a user-defined base declares `__new__`.
-    ///
-    /// This is tracked separately from [`Self::new_function`] because `__new__` can be assigned a
-    /// callable object that cannot be represented as a [`FunctionType`].
-    pub(crate) has_custom_new: bool,
-
     /// The custom `_generate_next_value_` function, if defined on this enum.
     ///
     /// When present, defines the value returned by calls to `auto()`
@@ -165,42 +159,9 @@ impl<'db> EnumMetadata<'db> {
             value_annotation: None,
             init_function: None,
             new_function: None,
-            has_custom_new: false,
             generate_next_value_function: None,
             custom_enum_metaclass_new: false,
         }
-    }
-
-    /// Return whether the canonical identities of all enum members are statically known.
-    pub(crate) fn has_known_member_identities(&self) -> bool {
-        if self.init_function.is_some()
-            || self.new_function.is_some()
-            || self.has_custom_new
-            || self.generate_next_value_function.is_some()
-            || self.custom_enum_metaclass_new
-        {
-            return false;
-        }
-
-        let mut has_false = false;
-        let mut has_true = false;
-        let mut has_zero = false;
-        let mut has_one = false;
-        for value in self.members.values() {
-            match value.as_literal_value_kind() {
-                Some(LiteralValueTypeKind::Bool(false)) => has_false = true,
-                Some(LiteralValueTypeKind::Bool(true)) => has_true = true,
-                Some(LiteralValueTypeKind::Int(value)) => match value.as_i64() {
-                    0 => has_zero = true,
-                    1 => has_one = true,
-                    _ => {}
-                },
-                Some(LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)) => {}
-                _ => return false,
-            }
-        }
-
-        !((has_false && has_zero) || (has_true && has_one))
     }
 
     /// Returns the type of `.value`/`._value_` for a given enum member.
@@ -216,7 +177,6 @@ impl<'db> EnumMetadata<'db> {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
-            || self.has_custom_new
             || self.custom_enum_metaclass_new
         {
             Some(Type::Dynamic(DynamicType::Any))
@@ -254,7 +214,6 @@ impl<'db> EnumMetadata<'db> {
             Some(annotation)
         } else if self.init_function.is_some()
             || self.new_function.is_some()
-            || self.has_custom_new
             || self.custom_enum_metaclass_new
         {
             Some(Type::Dynamic(DynamicType::Any))
@@ -620,12 +579,12 @@ fn alias_detection_value<'db>(
     value_ty: Type<'db>,
     is_auto: bool,
     generate_next_value_function: Option<FunctionType<'db>>,
-    has_custom_new: bool,
+    user_defined_new_function: Option<FunctionType<'db>>,
     custom_enum_metaclass_new: bool,
 ) -> Option<Type<'db>> {
     if !is_auto {
         Some(value_ty)
-    } else if has_custom_new || custom_enum_metaclass_new {
+    } else if user_defined_new_function.is_some() || custom_enum_metaclass_new {
         None
     } else if let Some(func_ty) = generate_next_value_function {
         Some(func_ty.signature(db).overload_return_type_or_unknown(db))
@@ -678,7 +637,6 @@ pub(crate) fn enum_metadata<'db>(
                 value_annotation: None,
                 init_function: None,
                 new_function: None,
-                has_custom_new: false,
                 generate_next_value_function: None,
                 custom_enum_metaclass_new: false,
             });
@@ -713,7 +671,6 @@ pub(crate) fn enum_metadata<'db>(
     let user_defined_new_function =
         custom_new(db, scope_id).or_else(|| inherited_user_defined_new(db, class));
     let new_function = user_defined_new_function.or_else(|| inherited_new(db, class));
-    let has_custom_new = defines_custom_new(db, scope_id) || inherits_user_defined_new(db, class);
     let custom_enum_metaclass_new = custom_enum_metaclass_new(db, class);
     let generate_next_value_function = custom_generate_next_value(db, scope_id)
         .or_else(|| inherited_generate_next_value(db, class));
@@ -858,7 +815,7 @@ pub(crate) fn enum_metadata<'db>(
                 value_ty,
                 auto_members.contains(name),
                 generate_next_value_function,
-                has_custom_new,
+                user_defined_new_function,
                 custom_enum_metaclass_new,
             );
             if let Some(alias_value_ty) = alias_value_ty
@@ -924,7 +881,6 @@ pub(crate) fn enum_metadata<'db>(
         value_annotation,
         init_function,
         new_function,
-        has_custom_new,
         generate_next_value_function,
         custom_enum_metaclass_new,
     })
@@ -946,7 +902,7 @@ fn custom_enum_metaclass_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db
         .filter_map(ClassBase::into_class)
         .filter_map(|base| base.class_literal(db).as_static())
         .take_while(|base| base.known(db) != Some(KnownClass::EnumType))
-        .any(|base| defines_custom_new(db, base.body_scope(db)))
+        .any(|base| custom_new(db, base.body_scope(db)).is_some())
 }
 
 /// Iterates over parent enum classes in the MRO, skipping known enum
@@ -1016,29 +972,14 @@ fn inherited_new<'db>(
     iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
 }
 
-/// Looks up an inherited `__new__` from user-defined base classes in the MRO.
+/// Looks up an inherited `__new__` from user-defined parent enum classes in the MRO.
 fn inherited_user_defined_new<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
-    class
-        .iter_mro(db, None)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|base| base.class_literal(db).as_static())
+    iter_parent_enum_classes(db, class)
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_new(db, base.body_scope(db)))
-}
-
-/// Returns whether a user-defined base class in the MRO declares `__new__`.
-fn inherits_user_defined_new(db: &dyn Db, class: StaticClassLiteral) -> bool {
-    class
-        .iter_mro(db, None)
-        .skip(1)
-        .filter_map(ClassBase::into_class)
-        .filter_map(|base| base.class_literal(db).as_static())
-        .filter(|base| base.known(db).is_none())
-        .any(|base| defines_custom_new(db, base.body_scope(db)))
 }
 
 /// Looks up an inherited `_generate_next_value_` from parent enum classes in the MRO.
@@ -1080,20 +1021,6 @@ fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<
         Type::FunctionLiteral(f) => Some(f),
         _ => None,
     }
-}
-
-/// Returns whether `__new__` is declared in the given scope.
-fn defines_custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> bool {
-    let Some(symbol_id) = place_table(db, scope).symbol_id("__new__") else {
-        return false;
-    };
-    let use_def = use_def_map(db, scope);
-    use_def
-        .end_of_scope_symbol_declarations(symbol_id)
-        .any_reachable(db, |declaration| declaration.is_defined_and(|_| true))
-        || !place_from_bindings(db, use_def.reachable_symbol_bindings(symbol_id))
-            .place
-            .is_undefined()
 }
 
 /// Returns the custom `_generate_next_value_` function type if one is defined on the enum.
