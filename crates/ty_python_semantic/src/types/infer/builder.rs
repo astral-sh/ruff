@@ -6929,7 +6929,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation
+            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
+                && matches!(tcx, Type::NominalInstance(_))
+                && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
+                && specialization.generic_context(self.db()) == generic_context
+                && generic_context.variables(self.db()).all(|typevar| {
+                    !typevar.is_paramspec(self.db())
+                        && typevar
+                            .typevar(self.db())
+                            .bound_or_constraints(self.db())
+                            .is_none()
+                })
+            {
+                // For an instance of the collection class itself, the identity specialization
+                // maps directly to the contextual specialization. Avoid constructing and solving
+                // a general assignability constraint set for this common case.
+                for (typevar, inferred_ty) in generic_context
+                    .variables(self.db())
+                    .zip(specialization.types(self.db()))
+                {
+                    let inferred_ty = inferred_ty
+                        .filter_union(self.db(), |ty| {
+                            !ty.as_typevar()
+                                .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
+                        })
+                        .filter_union(self.db(), |ty| !ty.has_unspecialized_type_var(self.db()));
+                    if inferred_ty.has_unspecialized_type_var(self.db()) {
+                        continue;
+                    }
+
+                    let identity = typevar.identity(self.db());
+                    elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
+                    elt_tcx_variance.insert(identity, typevar.variance(self.db()));
+                }
+            } else if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
             {
                 let db = self.db();
@@ -7002,9 +7035,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
+        // Dictionary unpacking always contributes constraints on the inferred key and value types,
+        // even when the unpacked mapping is assignable to the context. Keep it on the general path
+        // so gradual types such as `Any` are preserved.
+        let has_dict_unpack = collection_class == KnownClass::Dict
+            && elts
+                .iter()
+                .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
+
         // Avoid projecting and solving a constraint set when contextual inference has already
-        // provided the complete specialization for an empty collection literal.
-        if elts.is_empty()
+        // provided the complete specialization and every literal element is compatible with it.
+        if !has_dict_unpack
             && tcx.annotation.is_some()
             && let Some(specialization) = generic_context
                 .variables(self.db())
@@ -7024,14 +7065,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
                 .collect::<Option<Vec<_>>>()
         {
-            let class_type = collection_alias.origin(self.db()).apply_specialization(
-                self.db(),
-                |generic_context| {
-                    generic_context
-                        .specialize_recursive(self.db(), specialization.into_iter().map(Some))
-                },
-            );
-            return Type::from(class_type).to_instance(self.db());
+            // The slow path below adds the contextual specialization as an invariant mapping,
+            // then discards every element constraint that is already assignable to its context.
+            // Probe that case speculatively so that a failed probe can fall back without changing
+            // diagnostics or inferred expression types.
+            let mut speculative_builder = self.speculate();
+            let mut compatible = true;
+
+            'elements: for elts in elts {
+                for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
+                {
+                    let Some(elt) = elt else { continue };
+                    let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                        Type::homogeneous_tuple(self.db(), elt_tcx)
+                    } else {
+                        elt_tcx
+                    };
+                    let inferred_elt_ty = infer_elt_expression(
+                        &mut speculative_builder,
+                        (i, elt, TypeContext::new(Some(elt_tcx))),
+                    );
+
+                    if !inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                        compatible = false;
+                        break 'elements;
+                    }
+                }
+            }
+
+            if compatible {
+                self.extend(speculative_builder);
+
+                let class_type = collection_alias.origin(self.db()).apply_specialization(
+                    self.db(),
+                    |generic_context| {
+                        generic_context
+                            .specialize_recursive(self.db(), specialization.into_iter().map(Some))
+                    },
+                );
+                return Type::from(class_type).to_instance(self.db());
+            }
         }
 
         // Create a set of constraints to infer a precise type for `T`.
