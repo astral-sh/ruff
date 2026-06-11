@@ -69,6 +69,7 @@ use crate::types::diagnostic::{
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+    same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
@@ -5109,13 +5110,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = func
-                        .literal(self.db())
-                        .last_definition_raw_signature(
-                            self.db(),
-                            ReturnCallableTypeVarScope::Lexical,
-                        )
-                        .return_ty;
+                    let return_ty = same_module_uncached_raw_signature(
+                        self.db(),
+                        func,
+                        ReturnCallableTypeVarScope::Lexical,
+                    )
+                    .return_ty;
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
@@ -8748,10 +8748,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
-        let declared_return_ty = enclosing_function
-            .literal(self.db())
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let declared_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
         let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
@@ -8797,10 +8799,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
-        let annotated_return_ty = enclosing_function
-            .literal(self.db())
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let annotated_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
 
         let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {
             let _ = self.infer_expression(value, TypeContext::default());
