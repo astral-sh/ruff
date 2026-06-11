@@ -2274,6 +2274,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.exception_handler_symbol_ty_from_valid_ty(node_ty, type_base_exception)
         {
             symbol_ty
+        } else if is_typevartuple_type_or_instance(self.db(), node_ty) {
+            if let Some(node) = node {
+                report_invalid_exception_caught(&self.context, node, node_ty);
+            }
+            Type::unknown()
         } else if node_ty.is_assignable_to(
             self.db(),
             UnionType::from_two_elements(
@@ -2311,6 +2316,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty: Type<'db>,
         type_base_exception: Type<'db>,
     ) -> Option<Type<'db>> {
+        if is_typevartuple_type_or_instance(self.db(), ty) {
+            return None;
+        }
+
         if let Some(tuple_spec) = ty.tuple_instance_spec(self.db()) {
             // `except (ValueError, TypeError) as e:`
             UnionType::try_from_elements(
@@ -11926,6 +11935,14 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
                         .zip(safe_mutable_class.generic_origin(db))
                         .is_some_and(|(l, r)| l == r)
             })
+    }
+}
+
+fn is_typevartuple_type_or_instance<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::TypeVar(typevar) => typevar.is_typevartuple(db),
+        Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar.is_typevartuple(db),
+        _ => false,
     }
 }
 
