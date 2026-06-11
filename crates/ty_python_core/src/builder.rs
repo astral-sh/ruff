@@ -2005,7 +2005,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         pattern: &ast::Pattern,
-        tuple_subject_targets: &[(ScopedSymbolId, ScopedUseId)],
+        sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId)],
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
         is_catchall: bool,
@@ -2053,11 +2053,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ScopedPredicateId::ALWAYS_TRUE
         } else {
             let predicate_id = self.record_narrowing_constraint(predicate);
-            if !tuple_subject_targets.is_empty() {
+            if !sequence_subject_targets.is_empty() {
                 self.current_use_def_map_mut()
                     .record_narrowing_constraint_for_bindings_at_uses(
                         predicate_id,
-                        tuple_subject_targets,
+                        sequence_subject_targets,
                     );
             }
             predicate_id
@@ -3389,32 +3389,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     return;
                 }
 
-                // A match subject is evaluated once. Retain the bindings read by each name so
+                // A match subject is evaluated once. Retain the bindings read by each place so
                 // that case predicates constrain those values rather than later rebindings.
-                let tuple_subject_targets = if let ast::Expr::Tuple(tuple) = subject.as_ref() {
-                    let places = self.current_place_table();
-                    let ast_ids = self.current_ast_ids();
-                    let mut targets = SmallVec::<[(ScopedSymbolId, ScopedUseId); 2]>::new();
-                    for element in &tuple.elts {
-                        let Some(target) = element
-                            .as_name_expr()
-                            .and_then(|name| places.symbol_id(name.id.as_str()))
-                            .zip(ast_ids.try_use_id(element))
-                        else {
-                            targets.clear();
-                            break;
-                        };
-                        if targets
-                            .iter()
-                            .all(|(existing_symbol, _)| *existing_symbol != target.0)
-                        {
-                            targets.push(target);
+                let places = self.current_place_table();
+                let ast_ids = self.current_ast_ids();
+                let mut sequence_subject_targets =
+                    SmallVec::<[(ScopedPlaceId, ScopedUseId); 2]>::new();
+                let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
+                    ast::Expr::List(list) => list.elts.iter().collect(),
+                    ast::Expr::Tuple(tuple) => tuple.elts.iter().collect(),
+                    _ => Vec::new(),
+                };
+                while let Some(element) = subject_elements.pop() {
+                    match element {
+                        ast::Expr::List(list) => subject_elements.extend(&list.elts),
+                        ast::Expr::Tuple(tuple) => subject_elements.extend(&tuple.elts),
+                        _ => {
+                            let Some(target) = PlaceExpr::try_from_expr(element)
+                                .and_then(|place| places.place_id((&place).into()))
+                                .zip(ast_ids.try_use_id(element))
+                            else {
+                                continue;
+                            };
+                            if sequence_subject_targets
+                                .iter()
+                                .all(|(existing_place, _)| *existing_place != target.0)
+                            {
+                                sequence_subject_targets.push(target);
+                            }
                         }
                     }
-                    targets
-                } else {
-                    SmallVec::new()
-                };
+                }
 
                 let mut no_case_matched = self.flow_snapshot();
 
@@ -3438,7 +3443,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .add_pattern_narrowing_constraint(
                             subject_expr,
                             &case.pattern,
-                            &tuple_subject_targets,
+                            &sequence_subject_targets,
                             case.guard.as_deref(),
                             previous_pattern,
                             is_catchall,

@@ -311,6 +311,48 @@ def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
     reveal_type(a)  # revealed: TupleSubjectA
     reveal_type(b)  # revealed: TupleSubjectB
 
+def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match [a, b]:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+class SequenceSubjectContainer:
+    a: TupleSubjectA
+
+def match_nested_sequence_expression_subject(
+    container: SequenceSubjectContainer,
+    values: list[TupleSubjectB],
+) -> None:
+    match [[container.a], values[0], object()]:
+        case [[TupleSubjectA1()], TupleSubjectB1(), _]:
+            reveal_type(container.a)  # revealed: TupleSubjectA1
+            reveal_type(values[0])  # revealed: TupleSubjectB1
+
+def match_nested_sequence_or_impossible_alternative(
+    a: TupleSubjectA,
+    x: object,
+    y: object,
+) -> None:
+    match [a, [x, y]]:
+        case [TupleSubjectA1(), [_]] | [TupleSubjectA2(), [_, _]]:
+            reveal_type(a)  # revealed: TupleSubjectA2
+
+def match_mapping_expression_subject(value: object) -> None:
+    match [{"value": value}]:
+        case [{"value": int()}]:
+            # TODO: Project mapping-pattern constraints through dictionary displays.
+            reveal_type(value)  # revealed: object
+
+def match_starred_list_expression_subject(
+    a: TupleSubjectA,
+    values: list[object],
+) -> None:
+    match [a, *values]:
+        case [TupleSubjectA1()]:
+            # The starred display has variable runtime length, so it is not projected yet.
+            reveal_type(a)  # revealed: TupleSubjectA
+
 def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
     match a, b:
         case [TupleSubjectA2(), TupleSubjectB2()]:

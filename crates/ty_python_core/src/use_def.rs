@@ -1385,7 +1385,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn record_narrowing_constraint_for_bindings_at_uses(
         &mut self,
         predicate: ScopedPredicateId,
-        targets: &[(ScopedSymbolId, ScopedUseId)],
+        targets: &[(ScopedPlaceId, ScopedUseId)],
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -1394,8 +1394,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         let constraint = self.reachability_constraints.add_atom(predicate);
-        for &(symbol, use_id) in targets {
-            self.symbol_states[symbol].record_narrowing_constraint_for_bindings_at_use(
+        for &(place, use_id) in targets {
+            let state = match place {
+                ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+                ScopedPlaceId::Member(member) => &mut self.member_states[member],
+            };
+            state.record_narrowing_constraint_for_bindings_at_use(
                 &mut self.reachability_constraints,
                 constraint,
                 &self.bindings_by_use[use_id],

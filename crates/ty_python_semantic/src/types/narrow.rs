@@ -2197,54 +2197,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
 
-        // A tuple expression has no place that can be narrowed as a whole. For example:
+        // A tuple or list expression has no place that can be narrowed as a whole. For example:
         //
         //     match (a, b):
         //         case (A(), B()):
         //
         // Project the element constraints onto the subject-time bindings of `a` and `b`.
-        if let ast::Expr::Tuple(tuple) = subject_node {
-            if !tuple.elts.iter().all(ast::Expr::is_name_expr) {
-                return PatternNarrowingResult::Possible(None);
-            }
-
-            let (prefix_patterns, suffix_patterns) =
-                if let Some((prefix, suffix)) = kind.split_around_star() {
-                    if tuple.elts.len() < prefix.len() + suffix.len() {
-                        return PatternNarrowingResult::Impossible;
-                    }
-                    (prefix, suffix)
-                } else {
-                    if tuple.elts.len() != kind.patterns.len() {
-                        return PatternNarrowingResult::Impossible;
-                    }
-                    (kind.patterns.as_ref(), &[][..])
-                };
-
-            if !is_positive {
-                return PatternNarrowingResult::Possible(None);
-            }
-
-            let mut constraints = NarrowingConstraints::default();
-            let element_patterns = tuple
-                .elts
-                .iter()
-                .zip(prefix_patterns)
-                .chain(tuple.elts.iter().rev().zip(suffix_patterns.iter().rev()));
-            for (element, pattern) in element_patterns {
-                let Some(element) = PlaceExpr::try_from_expr(element) else {
-                    return PatternNarrowingResult::Possible(None);
-                };
-                insert_narrowing_constraint(
-                    &mut constraints,
-                    self.expect_place(&element),
-                    NarrowingConstraint::intersection(self.necessary_match_pattern_type(pattern)),
-                );
-            }
-
-            return PatternNarrowingResult::Possible(
-                (!constraints.is_empty()).then_some(constraints),
-            );
+        if let Some(elements) = Self::sequence_expression_elements(subject_node) {
+            return self.evaluate_projected_match_pattern_sequence(elements, kind, is_positive);
         }
 
         let Some(subject) = PlaceExpr::try_from_expr(subject_node) else {
@@ -2265,6 +2225,102 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place, constraint,
+        )])))
+    }
+
+    fn sequence_expression_elements(expression: &ast::Expr) -> Option<&[ast::Expr]> {
+        match expression {
+            ast::Expr::List(list) => Some(&list.elts),
+            ast::Expr::Tuple(tuple) => Some(&tuple.elts),
+            _ => None,
+        }
+    }
+
+    fn evaluate_projected_match_pattern_sequence(
+        &mut self,
+        elements: &[ast::Expr],
+        kind: &SequencePatternPredicateKind<'db>,
+        is_positive: bool,
+    ) -> PatternNarrowingResult<'db> {
+        // A starred display has variable runtime length, so its elements cannot be aligned with
+        // the pattern without separately modeling the value consumed by the star.
+        if elements.iter().any(ast::Expr::is_starred_expr) {
+            return PatternNarrowingResult::Possible(None);
+        }
+
+        let (prefix_patterns, suffix_patterns) =
+            if let Some((prefix, suffix)) = kind.split_around_star() {
+                if elements.len() < prefix.len() + suffix.len() {
+                    return PatternNarrowingResult::Impossible;
+                }
+                (prefix, suffix)
+            } else {
+                if elements.len() != kind.patterns.len() {
+                    return PatternNarrowingResult::Impossible;
+                }
+                (kind.patterns.as_ref(), &[][..])
+            };
+
+        if !is_positive {
+            return PatternNarrowingResult::Possible(None);
+        }
+
+        let element_patterns = elements
+            .iter()
+            .zip(prefix_patterns)
+            .chain(elements.iter().rev().zip(suffix_patterns.iter().rev()));
+        let mut constraints = None;
+        for (element, pattern) in element_patterns {
+            let element_constraints = self.evaluate_projected_match_pattern(element, pattern);
+            match element_constraints {
+                PatternNarrowingResult::Impossible => return PatternNarrowingResult::Impossible,
+                PatternNarrowingResult::Possible(element_constraints) => {
+                    constraints =
+                        Self::merge_optional_constraints_and(constraints, element_constraints);
+                }
+            }
+        }
+
+        PatternNarrowingResult::Possible(constraints)
+    }
+
+    fn evaluate_projected_match_pattern(
+        &mut self,
+        subject: &ast::Expr,
+        pattern: &PatternPredicateKind<'db>,
+    ) -> PatternNarrowingResult<'db> {
+        if let Some(elements) = Self::sequence_expression_elements(subject) {
+            return match pattern {
+                PatternPredicateKind::Sequence(kind) => {
+                    self.evaluate_projected_match_pattern_sequence(elements, kind, true)
+                }
+                PatternPredicateKind::As(Some(pattern), _) => {
+                    self.evaluate_projected_match_pattern(subject, pattern)
+                }
+                PatternPredicateKind::Or(patterns) => {
+                    let mut alternatives = patterns.iter().filter_map(|pattern| {
+                        match self.evaluate_projected_match_pattern(subject, pattern) {
+                            PatternNarrowingResult::Impossible => None,
+                            PatternNarrowingResult::Possible(constraints) => Some(constraints),
+                        }
+                    });
+                    let Some(first) = alternatives.next() else {
+                        return PatternNarrowingResult::Impossible;
+                    };
+                    PatternNarrowingResult::Possible(
+                        alternatives.fold(first, Self::merge_optional_constraints_or),
+                    )
+                }
+                _ => PatternNarrowingResult::Possible(None),
+            };
+        }
+
+        let Some(subject) = PlaceExpr::try_from_expr(subject) else {
+            return PatternNarrowingResult::Possible(None);
+        };
+        PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
+            self.expect_place(&subject),
+            NarrowingConstraint::intersection(self.necessary_match_pattern_type(pattern)),
         )])))
     }
 
