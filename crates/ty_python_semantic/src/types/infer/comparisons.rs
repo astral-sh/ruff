@@ -281,11 +281,13 @@ pub(super) fn infer_binary_type_comparison<'db>(
         (Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
             let unfolded = rec.unfold(db);
             infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
+                .map(|result| rec.fold(db, result))
         })),
 
         (left, Type::Recursive(rec)) => Some(visitor.visit((left, op, right), || {
             let unfolded = rec.unfold(db);
             infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
+                .map(|result| rec.fold(db, result))
         })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and

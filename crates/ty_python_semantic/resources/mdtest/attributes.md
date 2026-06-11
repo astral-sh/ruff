@@ -3426,6 +3426,9 @@ class S:
 reveal_type(S().x)  # revealed: list[Divergent]
 reveal_type(S().x[0])  # revealed: list[Divergent]
 reveal_type(S().x[0][0])  # revealed: list[Divergent]
+
+for item in S().x:
+    reveal_type(item)  # revealed: list[Divergent]
 ```
 
 ## Attributes of standard library modules that aren't yet defined

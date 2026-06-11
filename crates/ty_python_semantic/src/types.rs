@@ -970,6 +970,7 @@ pub(super) struct RecursiveTypeNormalization<'db> {
     marker: Type<'db>,
     fold_body: Option<Type<'db>>,
     nested: bool,
+    preserve_top_level_recursive: bool,
 }
 
 impl<'db> RecursiveTypeNormalization<'db> {
@@ -978,11 +979,19 @@ impl<'db> RecursiveTypeNormalization<'db> {
             marker,
             fold_body: None,
             nested: false,
+            preserve_top_level_recursive: false,
         }
     }
 
     fn with_fold_body(self, fold_body: Option<Type<'db>>) -> Self {
         Self { fold_body, ..self }
+    }
+
+    pub(super) fn preserve_top_level_recursive(self) -> Self {
+        Self {
+            preserve_top_level_recursive: true,
+            ..self
+        }
     }
 
     pub(super) fn marker(self) -> Type<'db> {
@@ -998,6 +1007,10 @@ impl<'db> RecursiveTypeNormalization<'db> {
 
     fn is_nested(self) -> bool {
         self.nested
+    }
+
+    fn should_preserve_top_level_recursive(self) -> bool {
+        !self.nested && self.preserve_top_level_recursive
     }
 
     pub(super) fn fold_body(self) -> Option<Type<'db>> {
@@ -2226,7 +2239,11 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) => {
                 let marker = Type::divergent(rec.binder_id(db));
                 if normalization.matches_marker(marker) {
-                    Some(marker)
+                    Some(if normalization.should_preserve_top_level_recursive() {
+                        self
+                    } else {
+                        marker
+                    })
                 } else {
                     let body = rec
                         .body(db)

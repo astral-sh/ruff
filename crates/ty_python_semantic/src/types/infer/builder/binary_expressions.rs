@@ -399,6 +399,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     op,
                     visitor,
                 )
+                .map(|result| recursive.fold(db, result))
             }),
 
             (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
@@ -410,6 +411,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     op,
                     visitor,
                 )
+                .map(|result| recursive.fold(db, result))
             }),
 
             (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
