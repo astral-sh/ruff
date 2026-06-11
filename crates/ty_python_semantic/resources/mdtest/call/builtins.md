@@ -213,6 +213,27 @@ def _(xs: Unknown):
     reveal_type("".join(map("{}".format, xs)))  # revealed: Unknown
 ```
 
+## Mapping methods accept arbitrary object types
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from collections.abc import Mapping
+
+def _(mapping: Mapping[str, int], dictionary: dict[str, int], key: object) -> None:
+    mapping.get(key)
+    mapping.get(key, 0)
+    mapping.get(key, "default")
+    dictionary.get(key)
+    dictionary.get(key, 0)
+    dictionary.get(key, "default")
+    dictionary.keys().isdisjoint(key)
+    dictionary.items().isdisjoint(key)
+```
+
 ## The builtin `NotImplemented` constant is not callable
 
 ```py

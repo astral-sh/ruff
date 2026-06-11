@@ -958,19 +958,19 @@ def ab(a: int, *, c: int):
         let test = cursor_test(
             r#"
         d: dict[str, int] = {"a": 1}
-        d.get(<CURSOR>
+        d.pop(<CURSOR>
         "#,
         );
 
         let result = test.signature_help().expect("Should have signature help");
 
-        // dict.get has multiple overloads; use the active signature
+        // dict.pop has multiple overloads; use the active signature
         let active_idx = result
             .active_signature
             .expect("Should have an active signature");
         let signature = &result.signatures[active_idx];
 
-        // The first parameter of dict.get is `key`, whose annotation is
+        // The first parameter of dict.pop is `key`, whose annotation is
         // the TypeVar `_KT`. After TypeVar resolution at this call site,
         // the parameter type should be `str` (not `_KT`).
         let key_param = &signature.parameters[0];

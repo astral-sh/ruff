@@ -51,17 +51,17 @@ class Future(Awaitable[_T]):
     def add_done_callback(self, fn: Callable[[Self], object], /, *, context: Context | None = None) -> None:
         """Add a callback to be run when the future becomes done.
 
-        The callback is called with a single argument - the future object. If
-        the future is already done when this is called, the callback is
+        The callback is called with a single argument - the future object.
+        If the future is already done when this is called, the callback is
         scheduled with call_soon.
         """
 
     def cancel(self, msg: Any | None = None) -> bool:
         """Cancel the future and schedule callbacks.
 
-        If the future is already done or cancelled, return False.  Otherwise,
-        change the future's state to cancelled, schedule the callbacks and
-        return True.
+        If the future is already done or cancelled, return False.
+        Otherwise, change the future's state to cancelled, schedule the
+        callbacks and return True.
         """
 
     def cancelled(self) -> bool:
@@ -70,8 +70,8 @@ class Future(Awaitable[_T]):
     def done(self) -> bool:
         """Return True if the future is done.
 
-        Done means either that a result / exception are available, or that the
-        future was cancelled.
+        Done means either that a result / exception are available, or that
+        the future was cancelled.
         """
 
     def result(self) -> _T:
@@ -79,7 +79,8 @@ class Future(Awaitable[_T]):
 
         If the future has been cancelled, raises CancelledError.  If the
         future's result isn't yet available, raises InvalidStateError.  If
-        the future is done and has an exception set, this exception is raised.
+        the future is done and has an exception set, this exception is
+        raised.
         """
 
     def exception(self) -> BaseException | None:

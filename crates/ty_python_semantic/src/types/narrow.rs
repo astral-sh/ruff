@@ -4,6 +4,7 @@ use crate::subscript::PyIndex;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
+use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -1058,6 +1059,75 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    /// Filter a type based on an equality or inequality comparison against an exact length.
+    ///
+    /// Exact tuple types are specialized to the observed length. Other types that encode their
+    /// possible lengths are filtered. Unknown-length types are left unchanged because persisting
+    /// an observed length would become stale after mutation.
+    fn narrow_type_by_exact_len(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        length: usize,
+        is_equality: bool,
+    ) -> Type<'db> {
+        let resolved = ty.resolve_type_alias(db);
+
+        let narrowed = match resolved {
+            Type::Union(union) => union.map(db, |element| {
+                Self::narrow_type_by_exact_len(db, *element, length, is_equality)
+            }),
+            Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                Self::narrow_type_by_exact_len(db, *element, length, is_equality)
+            }),
+            _ => {
+                if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
+                    match tuple.resize(db, TupleLength::Fixed(length)) {
+                        Ok(tuple) => Type::tuple(TupleType::new(db, &tuple)),
+                        Err(_) => Type::Never,
+                    }
+                } else {
+                    let tuple_length = resolved
+                        .as_nominal_instance()
+                        .and_then(|instance| instance.tuple_spec(db))
+                        .map(|spec| spec.len());
+                    let satisfies_comparison = |length_type: Type<'db>| {
+                        length_type
+                            .as_int_literal()
+                            .and_then(|actual| usize::try_from(actual).ok())
+                            .is_some_and(|actual| (actual == length) == is_equality)
+                    };
+                    let comparison_possible = resolved
+                        .len(db)
+                        .map(|length_type| match length_type {
+                            Type::Union(union) => union
+                                .elements(db)
+                                .iter()
+                                .any(|element| satisfies_comparison(*element)),
+                            _ => satisfies_comparison(length_type),
+                        })
+                        .or_else(|| {
+                            tuple_length
+                                .and_then(TupleLength::into_fixed_length)
+                                .map(|actual| (actual == length) == is_equality)
+                        });
+
+                    match comparison_possible {
+                        Some(false) => Type::Never,
+                        None if is_equality
+                            && tuple_length
+                                .is_some_and(|tuple_length| length < tuple_length.minimum()) =>
+                        {
+                            Type::Never
+                        }
+                        _ => resolved,
+                    }
+                }
+            }
+        };
+
+        if narrowed == resolved { ty } else { narrowed }
+    }
+
     fn evaluate_simple_expr(
         &mut self,
         expr: &ast::Expr,
@@ -1495,7 +1565,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]) {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
-            let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
+            let is_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
 
             let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
                 let Type::FunctionLiteral(function_type) = inference.expression_type(&*call.func)
@@ -1516,38 +1586,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 else {
                     return;
                 };
-                if length_literal < 0 {
+                let Ok(length) = usize::try_from(length_literal) else {
                     return;
-                }
+                };
                 let Some(target) = PlaceExpr::try_from_expr(arg) else {
                     return;
                 };
 
-                // `False == 0` and `True == 1`, so the protocol must accept both literals.
-                let protocol_length = match length_literal {
-                    0 => UnionType::from_two_elements(
-                        self.db,
-                        Type::int_literal(0),
-                        Type::bool_literal(false),
-                    ),
-                    1 => UnionType::from_two_elements(
-                        self.db,
-                        Type::int_literal(1),
-                        Type::bool_literal(true),
-                    ),
-                    _ => Type::int_literal(length_literal),
-                };
-                let exactly_sized =
-                    KnownClass::ExactlySized.to_specialized_instance(self.db, &[protocol_length]);
-                let constraint = NarrowingConstraint::intersection(
-                    exactly_sized.negate_if(self.db, !constrain_with_equality),
-                );
-                constraints
-                    .entry(self.expect_place(&target))
-                    .and_modify(|existing| {
-                        *existing = existing.merge_constraint_and(constraint.clone());
-                    })
-                    .or_insert(constraint);
+                let arg_type = inference.expression_type(arg);
+                let narrowed =
+                    Self::narrow_type_by_exact_len(self.db, arg_type, length, is_equality);
+                if narrowed != arg_type {
+                    insert_narrowing_constraint(
+                        &mut constraints,
+                        self.expect_place(&target),
+                        NarrowingConstraint::replacement(narrowed),
+                    );
+                }
             };
 
             // E.g., `len(items) == 2`
@@ -1569,7 +1624,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     &subscript.value,
                     slice_type,
                     other_type,
-                    constrain_with_equality,
+                    is_equality,
                 ) {
                     insert_narrowing_constraint(&mut constraints, place, constraint);
                 } else if let Some((place, constraint)) = self.narrow_tuple_subscript(
@@ -1577,7 +1632,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     &subscript.value,
                     slice_type,
                     other_type,
-                    constrain_with_equality,
+                    is_equality,
                 ) {
                     insert_narrowing_constraint(&mut constraints, place, constraint);
                 }
@@ -1599,7 +1654,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     &attribute.value,
                     attribute.attr.id(),
                     other_type,
-                    constrain_with_equality,
+                    is_equality,
                 ) {
                     insert_narrowing_constraint(&mut constraints, place, constraint);
                 }
@@ -2296,7 +2351,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subscript_value_expr: &ast::Expr,
         subscript_key_type: Type<'db>,
         rhs_type: Type<'db>,
-        constrain_with_equality: bool,
+        is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         // Check preconditions: we need a TypedDict, a string key, and a supported tag literal.
         if !is_or_contains_typeddict(self.db, subscript_value_type) {
@@ -2315,7 +2370,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         // implement `__eq__` in any perverse way they like. On the other hand, if this is an
         // *inequality* constraint, then we can go ahead and assert "you can't be this exact
         // literal type" without worrying about what other types might be present.
-        if constrain_with_equality
+        if is_equality
             && !all_matching_typeddict_fields_have_literal_types(
                 self.db,
                 subscript_value_type,
@@ -2328,10 +2383,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let field_name = Name::from(key_literal.value(self.db));
         // To avoid excluding non-`TypedDict` types, our constraints are always expressed
         // as a negative intersection (i.e. "you're *not* this kind of `TypedDict`"). If
-        // `constrain_with_equality` is true, the whole constraint is going to be a double
+        // `is_equality` is true, the whole constraint is going to be a double
         // negative, i.e. "you're *not* a `TypedDict` *without* this literal field". As the
         // first step of building that, we negate the right hand side.
-        let field_type = rhs_type.negate_if(self.db, constrain_with_equality);
+        let field_type = rhs_type.negate_if(self.db, is_equality);
         // Create the synthesized `TypedDict` with that (possibly negated) field. We don't
         // want to constrain the mutability or required-ness of the field, so the most
         // compatible form is not-required and read-only.
@@ -2391,7 +2446,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subscript_value_expr: &ast::Expr,
         subscript_index_type: Type<'db>,
         rhs_type: Type<'db>,
-        constrain_with_equality: bool,
+        is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         // We need a union type for narrowing to be useful.
         let Type::Union(union) = subscript_value_type.resolve_type_alias(self.db) else {
@@ -2417,9 +2472,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         // For equality constraints, all matching elements must have literal types to safely narrow.
         // For inequality constraints, we can narrow even with non-literal element types.
-        if constrain_with_equality
-            && !all_matching_tuple_elements_have_literal_types(self.db, union, index)
-        {
+        if is_equality && !all_matching_tuple_elements_have_literal_types(self.db, union, index) {
             return None;
         }
 
@@ -2429,7 +2482,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .and_then(|inst| inst.tuple_spec(self.db))
                 .and_then(|spec| spec.py_index(self.db, index).ok())
                 .is_none_or(|el_ty| {
-                    if constrain_with_equality {
+                    if is_equality {
                         // Keep tuples where element could be equal to rhs.
                         !el_ty.is_disjoint_from(self.db, rhs_type)
                     } else {
@@ -2454,7 +2507,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         attribute_value_expr: &ast::Expr,
         attribute_name: &str,
         rhs_type: Type<'db>,
-        constrain_with_equality: bool,
+        is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
             return None;
@@ -2465,7 +2518,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let narrowed = union.filter(self.db, |element| {
             nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
-                if constrain_with_equality {
+                if is_equality {
                     !is_supported_tag_literal(attribute_type)
                         || !attribute_type.is_disjoint_from(self.db, rhs_type)
                 } else {

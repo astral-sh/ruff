@@ -38,9 +38,9 @@ if sys.version_info >= (3, 15):
     ) -> None:
         """Dump the traceback of all threads in timeout seconds.
 
-        If repeat is true, the tracebacks of all threads are dumped every timeout
-        seconds. If exit is true, call _exit(1) which is not safe. max_threads
-        caps the number of threads dumped.
+        If repeat is true, the tracebacks of all threads are dumped every
+        timeout seconds.  If exit is true, call _exit(1) which is not safe.
+        max_threads caps the number of threads dumped.
         """
 
 else:

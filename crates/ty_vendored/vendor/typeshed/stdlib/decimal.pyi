@@ -241,12 +241,12 @@ class Decimal:
     def to_eng_string(self, context: Context | None = None) -> str:
         """Convert to an engineering-type string.
 
-        Engineering notation has an exponent which is a multiple of 3, so there
-        are up to 3 digits left of the decimal place. For example,
+        Engineering notation has an exponent which is a multiple of 3, so
+        there are up to 3 digits left of the decimal place.  For example,
         Decimal('123E+1') is converted to Decimal('1.23E+3').
 
-        The value of context.capitals determines whether the exponent sign is
-        lower or upper case. Otherwise, the context does not affect the
+        The value of context.capitals determines whether the exponent sign
+        is lower or upper case.  Otherwise, the context does not affect the
         operation.
         """
 
@@ -313,10 +313,10 @@ class Decimal:
         """Return the remainder from dividing self by other.
 
         This differs from self % other in that the sign of the remainder is
-        chosen so as to minimize its absolute value. More precisely, the return
-        value is self - n * other where n is the integer nearest to the exact
-        value of self / other, and if two integers are equally near then the
-        even one is chosen.
+        chosen so as to minimize its absolute value. More precisely, the
+        return value is self - n * other where n is the integer nearest to
+        the exact value of self / other, and if two integers are equally
+        near then the even one is chosen.
 
         If the result is zero then its sign will be the sign of self.
         """
@@ -392,11 +392,11 @@ class Decimal:
         Also unlike other operations, quantize never signals Underflow, even
         if the result is subnormal and inexact.
 
-        If the exponent of the second operand is larger than that of the first,
-        then rounding may be necessary. In this case, the rounding mode is
-        determined by the rounding argument if given, else by the given context
-        argument; if neither argument is given, the rounding mode of the
-        current thread's context is used.
+        If the exponent of the second operand is larger than that of the
+        first, then rounding may be necessary.  In this case, the rounding
+        mode is determined by the rounding argument if given, else by the
+        given context argument; if neither argument is given, the rounding
+        mode of the current thread's context is used.
         """
 
     def same_quantum(self, other: _Decimal, context: Context | None = None) -> bool:
@@ -411,10 +411,10 @@ class Decimal:
     def to_integral_exact(self, rounding: str | None = None, context: Context | None = None) -> Decimal:
         """Round to the nearest integer.
 
-        Decimal.to_integral_exact() signals Inexact or Rounded as appropriate
-        if rounding occurs.  The rounding mode is determined by the rounding
-        parameter if given, else by the given context. If neither parameter is
-        given, then the rounding mode of the current default context is used.
+        This method signals Inexact or Rounded as appropriate if rounding
+        occurs.  The rounding mode is determined by the rounding parameter
+        if given, else by the given context.  If neither parameter is given,
+        then the rounding mode of the current default context is used.
         """
 
     def to_integral_value(self, rounding: str | None = None, context: Context | None = None) -> Decimal:
@@ -435,7 +435,8 @@ class Decimal:
     def sqrt(self, context: Context | None = None) -> Decimal:
         """Return the square root of the argument to full precision.
 
-        The result is correctly rounded using the ROUND_HALF_EVEN rounding mode.
+        The result is correctly rounded using the ROUND_HALF_EVEN rounding
+        mode.
         """
 
     def max(self, other: _Decimal, context: Context | None = None) -> Decimal:
@@ -468,25 +469,25 @@ class Decimal:
     def compare_total(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Compare two operands using their abstract representation.
 
-        Similar to the compare() method, but the result
-        gives a total ordering on Decimal instances.  Two Decimal instances with
-        the same numeric value but different representations compare unequal
-        in this ordering:
+        Similar to the compare() method, but the result gives a total
+        ordering on Decimal instances.  Two Decimal instances with the same
+        numeric value but different representations compare unequal in this
+        ordering:
 
             >>> Decimal('12.0').compare_total(Decimal('12'))
             Decimal('-1')
 
-        Quiet and signaling NaNs are also included in the total ordering. The
-        result of this function is Decimal('0') if both operands have the same
-        representation, Decimal('-1') if the first operand is lower in the
-        total order than the second, and Decimal('1') if the first operand is
-        higher in the total order than the second operand. See the
-        specification for details of the total order.
+        Quiet and signaling NaNs are also included in the total ordering.
+        The result of this function is Decimal('0') if both operands have
+        the same representation, Decimal('-1') if the first operand is lower
+        in the total order than the second, and Decimal('1') if the first
+        operand is higher in the total order than the second operand.  See
+        the specification for details of the total order.
 
         This operation is unaffected by context and is quiet: no flags are
-        changed and no rounding is performed. As an exception, the C version
-        may raise InvalidOperation if the second operand cannot be converted
-        exactly.
+        changed and no rounding is performed.  As an exception, the C
+        version may raise InvalidOperation if the second operand cannot be
+        converted exactly.
         """
 
     def compare_total_mag(self, other: _Decimal, context: Context | None = None) -> Decimal:
@@ -597,9 +598,9 @@ class Decimal:
     def logb(self, context: Context | None = None) -> Decimal:
         """Return the adjusted exponent of the operand as a Decimal instance.
 
-        If the operand is a zero, then Decimal('-Infinity') is returned and the
-        DivisionByZero condition is raised. If the operand is an infinity then
-        Decimal('Infinity') is returned.
+        If the operand is a zero, then Decimal('-Infinity') is returned and
+        the DivisionByZero condition is raised.  If the operand is an
+        infinity then Decimal('Infinity') is returned.
         """
 
     def logical_and(self, other: _Decimal, context: Context | None = None) -> Decimal:
@@ -641,10 +642,10 @@ class Decimal:
     def next_toward(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Returns the number closest to self, in the direction towards other.
 
-        If the two operands are unequal, return the number closest to the first
-        operand in the direction of the second operand.  If both operands are
-        numerically equal, return a copy of the first operand with the sign set
-        to be the same as the sign of the second operand.
+        If the two operands are unequal, return the number closest to the
+        first operand in the direction of the second operand.  If both
+        operands are numerically equal, return a copy of the first operand
+        with the sign set to be the same as the sign of the second operand.
         """
 
     def number_class(self, context: Context | None = None) -> str:
@@ -664,26 +665,28 @@ class Decimal:
             * '+Normal', indicating that the operand is a positive normal
               number.
             * '+Infinity', indicating that the operand is positive infinity.
-            * 'NaN', indicating that the operand is a quiet NaN (Not a Number).
+            * 'NaN', indicating that the operand is a quiet NaN (Not a
+              Number).
             * 'sNaN', indicating that the operand is a signaling NaN.
         """
 
     def radix(self) -> Decimal:
         """Return Decimal(10).
 
-        This is the radix (base) in which the Decimal class does
-        all its arithmetic. Included for compatibility with the specification.
+        This is the radix (base) in which the Decimal class does all its
+        arithmetic. Included for compatibility with the specification.
         """
 
     def rotate(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Returns a rotated copy of self's digits, value-of-other times.
 
-        The second operand must be an integer in the range -precision through
-        precision. The absolute value of the second operand gives the number of
-        places to rotate. If the second operand is positive then rotation is to
-        the left; otherwise rotation is to the right.  The coefficient of the
-        first operand is padded on the left with zeros to length precision if
-        necessary. The sign and exponent of the first operand are unchanged.
+        The second operand must be an integer in the range -precision
+        through precision.  The absolute value of the second operand gives
+        the number of places to rotate.  If the second operand is positive
+        then rotation is to the left; otherwise rotation is to the right.
+        The coefficient of the first operand is padded on the left with
+        zeros to length precision if necessary.  The sign and exponent of
+        the first operand are unchanged.
         """
 
     def scaleb(self, other: _Decimal, context: Context | None = None) -> Decimal:
@@ -696,12 +699,12 @@ class Decimal:
     def shift(self, other: _Decimal, context: Context | None = None) -> Decimal:
         """Returns a shifted copy of self's digits, value-of-other times.
 
-        The second operand must be an integer in the range -precision through
-        precision. The absolute value of the second operand gives the number
-        of places to shift. If the second operand is positive, then the shift
-        is to the left; otherwise the shift is to the right. Digits shifted
-        into the coefficient are zeros. The sign and exponent of the first
-        operand are unchanged.
+        The second operand must be an integer in the range -precision
+        through precision.  The absolute value of the second operand gives
+        the number of places to shift.  If the second operand is positive,
+        then the shift is to the left; otherwise the shift is to the right.
+        Digits shifted into the coefficient are zeros.  The sign and
+        exponent of the first operand are unchanged.
         """
 
     def __reduce__(self) -> tuple[type[Self], tuple[str]]:
@@ -776,8 +779,8 @@ class Context:
     def Etop(self) -> int:
         """Return a value equal to Emax - prec + 1.
 
-        This is the maximum exponent if the _clamp field of the context is set
-        to 1 (IEEE clamp mode).  Etop() must not be negative.
+        This is the maximum exponent if the _clamp field of the context is
+        set to 1 (IEEE clamp mode).  Etop() must not be negative.
         """
 
     def create_decimal(self, num: _DecimalNew = "0", /) -> Decimal:
@@ -1030,7 +1033,8 @@ class Context:
             * all three arguments must be integral
             * 'b' must be nonnegative
             * at least one of 'a' or 'b' must be nonzero
-            * modulo must be nonzero and less than 10**prec in absolute value
+            * modulo must be nonzero and less than 10**prec in absolute
+              value
         """
 
     def quantize(self, x: _Decimal, y: _Decimal, /) -> Decimal:
@@ -1049,8 +1053,8 @@ class Context:
     def remainder_near(self, x: _Decimal, y: _Decimal, /) -> Decimal:
         """Return x - y * n.
 
-        Here n is the integer nearest the exact value of x / y (if the result
-        is 0 then its sign will be the sign of x).
+        Here n is the integer nearest the exact value of x / y (if the
+        result is 0 then its sign will be the sign of x).
         """
 
     def rotate(self, x: _Decimal, y: _Decimal, /) -> Decimal:

@@ -247,14 +247,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         self.items.iter().map(|item| (item.argument, &item.types))
     }
 
-    pub(crate) fn iter_mut(
-        &mut self,
-    ) -> impl Iterator<Item = (Argument<'a>, &mut CallArgumentTypes<'db>)> + '_ {
-        self.items
-            .iter_mut()
-            .map(|item| (item.argument, &mut item.types))
-    }
-
     /// Create a new [`CallArguments`] starting from the specified index.
     pub(crate) fn start_from(&self, index: usize) -> Self {
         Self {

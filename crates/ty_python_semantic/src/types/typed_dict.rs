@@ -10,16 +10,16 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field, KnownClass};
 use super::context::InferContext;
 use super::diagnostic::{
-    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, PARAMETER_ALREADY_ASSIGNED,
+    self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY, PARAMETER_ALREADY_ASSIGNED,
     TOO_MANY_POSITIONAL_ARGUMENTS, report_invalid_key_on_typed_dict, report_missing_typed_dict_key,
 };
 use super::infer::{TypeExpressionFlags, infer_deferred_types};
 use super::{
     ApplyTypeMappingVisitor, ErrorContext, IntersectionType, Type, TypeMapping, TypeQualifiers,
-    UnionBuilder, definition_expression_type, visitor,
+    UnionBuilder, definition_expression_annotation, definition_expression_type, visitor,
 };
 use crate::Db;
 use crate::types::TypeContext;
@@ -45,6 +45,137 @@ impl get_size2::GetSize for TypedDictParams {}
 impl Default for TypedDictParams {
     fn default() -> Self {
         Self::TOTAL
+    }
+}
+
+/// The undeclared-item policy of a `TypedDict`.
+///
+/// An implicitly open `TypedDict` may contain hidden items, but those items are not directly
+/// accessible through most operations. A `TypedDict` with explicit extra items exposes those items
+/// with a known type.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub enum TypedDictOpenness<'db> {
+    /// Undeclared items may exist at runtime, but are not directly accessible through most
+    /// `TypedDict` operations.
+    #[default]
+    ImplicitlyOpen,
+    /// Undeclared items cannot exist.
+    Closed,
+    /// Undeclared items are explicitly exposed with the given value type and mutability.
+    Extra(TypedDictExtraItems<'db>),
+}
+
+impl<'db> TypedDictOpenness<'db> {
+    /// Creates an explicit extra-items policy, canonicalizing `Never` to [`Self::Closed`].
+    ///
+    /// This makes the two equivalent declarations below share the same internal representation:
+    ///
+    /// ```python
+    /// class ByExtraItems(TypedDict, extra_items=Never): ...
+    /// class ByClosed(TypedDict, closed=True): ...
+    /// ```
+    pub(crate) fn extra(db: &'db dyn Db, declared_ty: Type<'db>, is_read_only: bool) -> Self {
+        if declared_ty.resolve_type_alias(db).is_never() {
+            Self::Closed
+        } else {
+            Self::Extra(TypedDictExtraItems {
+                declared_ty,
+                is_read_only,
+            })
+        }
+    }
+
+    /// Returns extra items only when they were explicitly declared.
+    ///
+    /// An implicitly open `TypedDict` returns `None` here because its hidden items are not directly
+    /// accessible. Use [`Self::effective_extra_items`] for structural relations that must account
+    /// for those hidden items.
+    pub(crate) const fn explicit_extra_items(self) -> Option<TypedDictExtraItems<'db>> {
+        match self {
+            Self::Extra(extra_items) => Some(extra_items),
+            Self::ImplicitlyOpen | Self::Closed => None,
+        }
+    }
+
+    /// Returns the effective extra-items policy.
+    ///
+    /// An implicitly open `TypedDict` behaves like it has read-only extra items of type `object`
+    /// for these purposes, while a closed `TypedDict` has no extra items.
+    pub(crate) fn effective_extra_items(self) -> Option<TypedDictExtraItems<'db>> {
+        match self {
+            Self::ImplicitlyOpen => Some(TypedDictExtraItems {
+                declared_ty: Type::object(),
+                is_read_only: true,
+            }),
+            Self::Closed => None,
+            Self::Extra(extra_items) => Some(extra_items),
+        }
+    }
+
+    pub(crate) const fn is_implicitly_open(self) -> bool {
+        matches!(self, Self::ImplicitlyOpen)
+    }
+
+    pub(crate) const fn is_closed(self) -> bool {
+        matches!(self, Self::Closed)
+    }
+
+    fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        match self {
+            Self::ImplicitlyOpen | Self::Closed => self,
+            Self::Extra(extra_items) => Self::extra(
+                db,
+                extra_items
+                    .declared_ty
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                extra_items.is_read_only,
+            ),
+        }
+    }
+
+    pub(crate) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::ImplicitlyOpen | Self::Closed => Some(self),
+            Self::Extra(extra_items) => {
+                let declared_ty = extra_items
+                    .declared_ty
+                    .recursive_type_normalized_impl(db, div, true);
+                let declared_ty = if nested {
+                    declared_ty?
+                } else {
+                    declared_ty.unwrap_or(div)
+                };
+                Some(Self::extra(db, declared_ty, extra_items.is_read_only))
+            }
+        }
+    }
+}
+
+/// The value type and mutability of a `TypedDict`'s extra items.
+///
+/// This represents either an explicit `extra_items` declaration or the synthetic read-only
+/// `object` policy returned for an implicitly open `TypedDict` by
+/// [`TypedDictOpenness::effective_extra_items`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub struct TypedDictExtraItems<'db> {
+    pub(crate) declared_ty: Type<'db>,
+    is_read_only: bool,
+}
+
+impl TypedDictExtraItems<'_> {
+    pub(crate) const fn is_read_only(self) -> bool {
+        self.is_read_only
     }
 }
 
@@ -95,6 +226,254 @@ impl<'db> TypedDictType<'db> {
             Self::Class(defining_class) => Some(defining_class),
             Self::Synthesized(_) => None,
         }
+    }
+
+    /// Returns whether this `TypedDict` is implicitly open, closed, or has explicit extra items.
+    ///
+    /// A class-based `TypedDict` inherits the first explicit policy from its bases unless it
+    /// declares its own `closed` or `extra_items` argument.
+    pub(crate) fn openness(self, db: &'db dyn Db) -> TypedDictOpenness<'db> {
+        #[salsa::tracked(
+            cycle_initial=|_, _, _| TypedDictOpenness::ImplicitlyOpen,
+            heap_size=ruff_memory_usage::heap_size
+        )]
+        fn class_based_openness<'db>(
+            db: &'db dyn Db,
+            class: ClassType<'db>,
+        ) -> TypedDictOpenness<'db> {
+            let (class_literal, specialization) = class.class_literal_and_specialization(db);
+            let static_class = match class_literal {
+                ClassLiteral::Static(static_class) => static_class,
+                ClassLiteral::DynamicTypedDict(dynamic) => return dynamic.openness(db),
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicEnum(_) => {
+                    // A `TypedDictType::Class` is only constructed from classes known to be TypedDicts.
+                    unreachable!("non-TypedDict dynamic class wrapped in `TypedDictType`")
+                }
+            };
+
+            let module = parsed_module(db, static_class.file(db)).load(db);
+            let class_definition = static_class.definition(db);
+            let class_stmt = class_definition
+                .kind(db)
+                .as_class()
+                .expect("StaticClassLiteral definition should be a class")
+                .node(&module);
+
+            if let Some(arguments) = &class_stmt.arguments {
+                if let Some(extra_items) = arguments.find_keyword("extra_items") {
+                    let annotation =
+                        definition_expression_annotation(db, class_definition, &extra_items.value)
+                            .map_type(|ty| ty.apply_optional_specialization(db, specialization));
+                    return TypedDictOpenness::extra(
+                        db,
+                        annotation.inner_type(),
+                        annotation.qualifiers().contains(TypeQualifiers::READ_ONLY),
+                    );
+                }
+
+                if let Some(closed) = arguments.find_keyword("closed") {
+                    let closed_ty = definition_expression_type(db, class_definition, &closed.value);
+                    return if closed_ty.bool(db).is_always_true() {
+                        TypedDictOpenness::Closed
+                    } else {
+                        TypedDictOpenness::ImplicitlyOpen
+                    };
+                }
+            }
+
+            for base in static_class.explicit_bases(db) {
+                let base = base.apply_optional_specialization(db, specialization);
+                let base_class = match base {
+                    Type::ClassLiteral(base) => ClassType::NonGeneric(base),
+                    Type::GenericAlias(base) => ClassType::Generic(base),
+                    _ => continue,
+                };
+
+                if base_class.class_literal(db).is_typed_dict(db) {
+                    let openness = TypedDictType::new(base_class).openness(db);
+                    if !openness.is_implicitly_open() {
+                        return openness;
+                    }
+                }
+            }
+
+            TypedDictOpenness::ImplicitlyOpen
+        }
+
+        match self {
+            Self::Class(defining_class) => class_based_openness(db, defining_class),
+            Self::Synthesized(synthesized) => synthesized.openness(db),
+        }
+    }
+
+    /// Returns extra items only when they were explicitly declared.
+    pub(crate) fn explicit_extra_items(self, db: &'db dyn Db) -> Option<TypedDictExtraItems<'db>> {
+        self.openness(db).explicit_extra_items()
+    }
+
+    /// Returns a type that contains every value that may be stored in this `TypedDict`.
+    ///
+    /// An implicitly open `TypedDict` immediately returns `object` because hidden items may have
+    /// any value type. This also avoids unnecessarily materializing its declared items.
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let openness = self.openness(db);
+        if openness.is_implicitly_open() {
+            return Type::object();
+        }
+
+        let mut builder = UnionBuilder::new(db);
+        for field in self.items(db).values() {
+            builder = builder.add(field.declared_ty);
+        }
+        if let Some(extra_items) = openness.explicit_extra_items() {
+            builder = builder.add(extra_items.declared_ty);
+        }
+        builder.build()
+    }
+
+    /// Returns the type of keys that may be present in this `TypedDict`.
+    ///
+    /// A closed `TypedDict` has a finite set of literal keys. Open and extra-items `TypedDict`s may
+    /// contain arbitrary string keys.
+    pub(crate) fn key_type(self, db: &'db dyn Db) -> Type<'db> {
+        if !self.openness(db).is_closed() {
+            return KnownClass::Str.to_instance(db);
+        }
+
+        self.items(db)
+            .iter()
+            .filter(|(_, field)| field.may_be_present(db))
+            .fold(UnionBuilder::new(db), |builder, (name, _)| {
+                builder.add(Type::string_literal(db, name))
+            })
+            .build()
+    }
+
+    /// Returns the field exposed by a literal key.
+    ///
+    /// Undeclared keys synthesize a field only for explicit extra items. Hidden items on an
+    /// implicitly open `TypedDict` are intentionally not directly accessible.
+    pub(crate) fn item(self, db: &'db dyn Db, key: &str) -> Option<TypedDictField<'db>> {
+        self.items(db).get(key).cloned().or_else(|| {
+            let extra_items = self.explicit_extra_items(db)?;
+            Some(
+                TypedDictFieldBuilder::new(extra_items.declared_ty)
+                    .read_only(extra_items.is_read_only())
+                    .build(),
+            )
+        })
+    }
+
+    /// Returns the type that a value must be assignable to when initializing an arbitrary string
+    /// key.
+    ///
+    /// The runtime key may name either an extra item or any declared item, so the result is the
+    /// intersection of all possible destination item types. Returns `None` unless extra items are
+    /// explicit.
+    pub(crate) fn arbitrary_key_initialization_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.arbitrary_key_initialization_type_excluding(db, &OrderSet::new())
+    }
+
+    /// Returns the arbitrary-key initialization type after excluding keys that are known to be
+    /// shadowed.
+    ///
+    /// This is used while validating merged dictionary literals, where later entries determine the
+    /// final value for a known key.
+    fn arbitrary_key_initialization_type_excluding(
+        self,
+        db: &'db dyn Db,
+        excluded_keys: &OrderSet<Name>,
+    ) -> Option<Type<'db>> {
+        let extra_items = self.explicit_extra_items(db)?;
+
+        Some(IntersectionType::from_elements(
+            db,
+            std::iter::once(extra_items.declared_ty).chain(
+                self.items(db)
+                    .iter()
+                    .filter(|(name, _)| !excluded_keys.contains(*name))
+                    .map(|(_, field)| field.declared_ty),
+            ),
+        ))
+    }
+
+    /// Returns the type that a value must be assignable to when mutating an arbitrary string key.
+    ///
+    /// A mutation may target any declared or extra item, so no such mutation is allowed if any
+    /// possible destination is read-only.
+    pub(crate) fn arbitrary_key_mutation_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        if self
+            .explicit_extra_items(db)
+            .is_some_and(TypedDictExtraItems::is_read_only)
+            || self.items(db).values().any(TypedDictField::is_read_only)
+        {
+            return None;
+        }
+
+        self.arbitrary_key_initialization_type(db)
+    }
+
+    /// Returns whether operations that delete an arbitrary key are safe.
+    ///
+    /// Operations such as `clear()` and `popitem()` require a closed `TypedDict` or mutable explicit
+    /// extra items, and cannot be exposed when any declared item is required or read-only.
+    pub(crate) fn supports_arbitrary_key_deletion(self, db: &'db dyn Db) -> bool {
+        let openness_supports_deletion = match self.openness(db) {
+            TypedDictOpenness::ImplicitlyOpen => false,
+            TypedDictOpenness::Closed => true,
+            TypedDictOpenness::Extra(extra_items) => !extra_items.is_read_only(),
+        };
+
+        openness_supports_deletion
+            && self
+                .items(db)
+                .values()
+                .all(|field| !field.is_required() && !field.is_read_only())
+    }
+
+    /// Returns the value type if this `TypedDict` is a subtype of `dict[str, VT]`.
+    ///
+    /// This requires mutable explicit extra items and optional, mutable declared items whose value
+    /// types are equivalent to the extra-items type.
+    pub(crate) fn dict_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let extra_items = self.explicit_extra_items(db)?;
+        if extra_items.is_read_only()
+            || self.items(db).values().any(|field| {
+                field.is_required()
+                    || field.is_read_only()
+                    || !field
+                        .declared_ty
+                        .is_equivalent_to(db, extra_items.declared_ty)
+            })
+        {
+            return None;
+        }
+        Some(extra_items.declared_ty)
+    }
+
+    /// Returns the value type if this `TypedDict` is assignable to `dict[str, VT]`.
+    ///
+    /// This uses mutual assignability rather than equivalence so gradual value types can satisfy
+    /// the mutable `dict` contract.
+    pub(crate) fn assignable_dict_value_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let extra_items = self.explicit_extra_items(db)?;
+        if extra_items.is_read_only()
+            || self.items(db).values().any(|field| {
+                field.is_required()
+                    || field.is_read_only()
+                    || !field
+                        .declared_ty
+                        .is_assignable_to(db, extra_items.declared_ty)
+                    || !extra_items
+                        .declared_ty
+                        .is_assignable_to(db, field.declared_ty)
+            })
+        {
+            return None;
+        }
+        Some(extra_items.declared_ty)
     }
 
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
@@ -165,17 +544,30 @@ impl<'db> TypedDictType<'db> {
     }
 
     pub(crate) fn from_schema_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::Synthesized(SynthesizedTypedDictType::schema(db, items))
+        Self::from_schema_items_with_openness(db, items, TypedDictOpenness::ImplicitlyOpen)
     }
 
-    fn from_patch_items(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::Synthesized(SynthesizedTypedDictType::patch(db, items))
+    /// Creates a synthesized schema while preserving its undeclared-item policy.
+    pub(crate) fn from_schema_items_with_openness(
+        db: &'db dyn Db,
+        items: TypedDictSchema<'db>,
+        openness: TypedDictOpenness<'db>,
+    ) -> Self {
+        Self::Synthesized(SynthesizedTypedDictType::schema(db, items, openness))
+    }
+
+    fn from_patch_items_with_openness(
+        db: &'db dyn Db,
+        items: TypedDictSchema<'db>,
+        openness: TypedDictOpenness<'db>,
+    ) -> Self {
+        Self::Synthesized(SynthesizedTypedDictType::patch(db, items, openness))
     }
 
     /// Returns a partial version of this `TypedDict` where all fields are optional. This is used
-    /// to model PEP 584 update operands, accepting dictionary literals that update any subset of
-    /// known keys, and also accepting other `TypedDict`s as long as any overlapping keys are
-    /// compatible.
+    /// to model non-mutating PEP 584 merge operands, accepting dictionary literals that supply any
+    /// subset of known keys, and also accepting other `TypedDict`s as long as any overlapping keys
+    /// are compatible.
     pub(crate) fn to_partial(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)
@@ -183,14 +575,15 @@ impl<'db> TypedDictType<'db> {
             .map(|(name, field)| (name.clone(), field.clone().with_required(false)))
             .collect();
 
-        Self::from_patch_items(db, items)
+        Self::from_patch_items_with_openness(db, items, self.openness(db))
     }
 
-    /// Returns a patch version of this `TypedDict` for `TypedDict.update()`.
+    /// Returns a patch version of this `TypedDict` for in-place mutations such as `update()` and
+    /// `__ior__` (`|=`).
     ///
     /// All fields become optional, and read-only fields become bottom-typed. This preserves the
-    /// PEP 705 rule that `update()` must reject any source that can write a read-only key, while
-    /// still accepting `NotRequired[Never]` placeholders for keys that cannot be present.
+    /// PEP 705 rule that these operations must reject any source that can write a read-only key,
+    /// while still accepting `NotRequired[Never]` placeholders for keys that cannot be present.
     pub(crate) fn to_update_patch(self, db: &'db dyn Db) -> Self {
         let items: TypedDictSchema<'db> = self
             .items(db)
@@ -204,7 +597,15 @@ impl<'db> TypedDictType<'db> {
             })
             .collect();
 
-        Self::from_patch_items(db, items)
+        let openness = match self.openness(db) {
+            TypedDictOpenness::ImplicitlyOpen => TypedDictOpenness::ImplicitlyOpen,
+            TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
+                TypedDictOpenness::Extra(extra_items)
+            }
+            TypedDictOpenness::Closed | TypedDictOpenness::Extra(_) => TypedDictOpenness::Closed,
+        };
+
+        Self::from_patch_items_with_openness(db, items, openness)
     }
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
@@ -236,25 +637,70 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         {
             let source_items = source.items(db);
             let target_items = synthesized_target.items(db);
+            let target_openness = synthesized_target.openness(db);
             let mut result = self.always();
 
             for (source_item_name, source_item_field) in source_items {
-                let Some(target_item_field) = target_items.get(source_item_name) else {
-                    continue;
+                let target_ty = if let Some(target_item_field) = target_items.get(source_item_name)
+                {
+                    target_item_field.declared_ty
+                } else {
+                    match target_openness {
+                        TypedDictOpenness::ImplicitlyOpen => continue,
+                        TypedDictOpenness::Closed => return self.never(),
+                        TypedDictOpenness::Extra(extra_items) => extra_items.declared_ty,
+                    }
                 };
 
                 result.intersect(
                     db,
                     self.constraints,
-                    self.check_type_pair(
-                        db,
-                        source_item_field.declared_ty,
-                        target_item_field.declared_ty,
-                    ),
+                    self.check_type_pair(db, source_item_field.declared_ty, target_ty),
                 );
 
                 if result.is_never_satisfied(db) {
                     return result;
+                }
+            }
+
+            let source_extra_items = if target_openness.is_implicitly_open() {
+                source.explicit_extra_items(db)
+            } else {
+                source.openness(db).effective_extra_items()
+            };
+            if let Some(source_extra_items) = source_extra_items {
+                for (target_item_name, target_item_field) in target_items {
+                    if source_items.contains_key(target_item_name) {
+                        continue;
+                    }
+                    result.intersect(
+                        db,
+                        self.constraints,
+                        self.check_type_pair(
+                            db,
+                            source_extra_items.declared_ty,
+                            target_item_field.declared_ty,
+                        ),
+                    );
+                    if result.is_never_satisfied(db) {
+                        return result;
+                    }
+                }
+
+                match target_openness {
+                    TypedDictOpenness::ImplicitlyOpen => {}
+                    TypedDictOpenness::Closed => return self.never(),
+                    TypedDictOpenness::Extra(target_extra_items) => {
+                        result.intersect(
+                            db,
+                            self.constraints,
+                            self.check_type_pair(
+                                db,
+                                source_extra_items.declared_ty,
+                                target_extra_items.declared_ty,
+                            ),
+                        );
+                    }
                 }
             }
 
@@ -273,6 +719,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_items = source.items(db);
         let target_items = target.items(db);
+        let source_openness = source.openness(db);
+        let target_openness = target.openness(db);
         // Many rules violations short-circuit with "never", but asking whether one field is
         // [relation] to/of another can produce more complicated constraints, and we collect those.
         let mut result = self.always();
@@ -337,12 +785,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             } else {
                 // `NotRequired[]` target fields
                 if target_item_field.is_read_only() {
-                    // As above, for `NotRequired[]` + `ReadOnly[]` fields in the target. It's
-                    // tempting to refactor things and unify some of these calls to
-                    // `check_typeddict_pair`, but this branch will get more complicated when we
-                    // add support for `closed` and `extra_items` (which is why the rules in the
-                    // spec are structured like they are), and following the structure of the spec
-                    // makes it easier to check the logic here.
+                    // A missing read-only field is checked against the source's effective extra
+                    // items. Missing mutable fields below require explicit mutable extra items and
+                    // a relation in both directions.
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         self.check_type_pair(
                             db,
@@ -350,23 +795,17 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             target_item_field.declared_ty,
                         )
                     } else {
-                        // `source` is missing this not-required, read-only item. However, since all
-                        // `TypedDict`s by default are allowed to have "extra items" of any type
-                        // (until we support `closed` and explicit `extra_items`), this key could
-                        // actually turn out to have a value. To make sure this is type-safe, the
-                        // not-required field in the target needs to be assignable from `object`.
-                        // TODO: `closed` and `extra_items` support will go here.
-                        Type::object().when_assignable_to(
-                            db,
-                            target_item_field.declared_ty,
-                            self.constraints,
-                            self.inferable,
-                        )
+                        match source_openness.effective_extra_items() {
+                            // A closed source cannot contain this key, so the check succeeds.
+                            None => self.always(),
+                            Some(source_extra_items) => self.check_type_pair(
+                                db,
+                                source_extra_items.declared_ty,
+                                target_item_field.declared_ty,
+                            ),
+                        }
                     }
                 } else {
-                    // As above, for `NotRequired[]` mutable fields in the target. Again the logic
-                    // is largely the same for now, but it will get more complicated with `closed`
-                    // and `extra_items`.
                     if let Some(source_item_field) = source_items.get(target_item_name) {
                         if source_item_field.is_read_only() {
                             // A read-only field can't be assigned to a mutable target.
@@ -405,14 +844,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             )
                         })
                     } else {
-                        // `source` is missing this not-required, mutable field. This isn't OK if
-                        // `source has read-only extra items, which all `TypedDict`s effectively
-                        // do until we support `closed` and explicit `extra_items`. See "A subtle
-                        // interaction between two structural assignability rules prevents
-                        // unsoundness" in `typed_dict.md`.
-                        //
-                        // TODO: `closed` and `extra_items` support will go here.
-                        self.never()
+                        let Some(source_extra_items) = source_openness.explicit_extra_items()
+                        else {
+                            return self.never();
+                        };
+                        if source_extra_items.is_read_only() {
+                            return self.never();
+                        }
+                        self.check_type_pair(
+                            db,
+                            source_extra_items.declared_ty,
+                            target_item_field.declared_ty,
+                        )
+                        .and(db, self.constraints, || {
+                            self.check_type_pair(
+                                db,
+                                target_item_field.declared_ty,
+                                source_extra_items.declared_ty,
+                            )
+                        })
                     }
                 }
             };
@@ -430,6 +880,97 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 return result;
             }
         }
+
+        match target_openness {
+            TypedDictOpenness::Closed => {
+                if !source_openness.is_closed()
+                    || source_items
+                        .keys()
+                        .any(|source_item_name| !target_items.contains_key(source_item_name))
+                {
+                    return self.never();
+                }
+            }
+            TypedDictOpenness::Extra(target_extra_items) if !target_extra_items.is_read_only() => {
+                let Some(source_extra_items) = source_openness.explicit_extra_items() else {
+                    return self.never();
+                };
+                if source_extra_items.is_read_only() {
+                    return self.never();
+                }
+                result.intersect(
+                    db,
+                    self.constraints,
+                    self.check_type_pair(
+                        db,
+                        source_extra_items.declared_ty,
+                        target_extra_items.declared_ty,
+                    )
+                    .and(db, self.constraints, || {
+                        self.check_type_pair(
+                            db,
+                            target_extra_items.declared_ty,
+                            source_extra_items.declared_ty,
+                        )
+                    }),
+                );
+                for (source_item_name, source_item_field) in source_items {
+                    if !target_items.contains_key(source_item_name) {
+                        if source_item_field.is_required() || source_item_field.is_read_only() {
+                            return self.never();
+                        }
+                        result.intersect(
+                            db,
+                            self.constraints,
+                            self.check_type_pair(
+                                db,
+                                source_item_field.declared_ty,
+                                target_extra_items.declared_ty,
+                            )
+                            .and(db, self.constraints, || {
+                                self.check_type_pair(
+                                    db,
+                                    target_extra_items.declared_ty,
+                                    source_item_field.declared_ty,
+                                )
+                            }),
+                        );
+                    }
+                }
+            }
+            TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Extra(_) => {
+                // An open target shares the read-only extra-items path, using `object` as its
+                // effective extra-items type.
+                let target_extra_items = target_openness.effective_extra_items().expect(
+                    "open or read-only extra-items TypedDict should have effective extra items",
+                );
+                if let Some(source_extra_items) = source_openness.effective_extra_items() {
+                    result.intersect(
+                        db,
+                        self.constraints,
+                        self.check_type_pair(
+                            db,
+                            source_extra_items.declared_ty,
+                            target_extra_items.declared_ty,
+                        ),
+                    );
+                }
+                for (source_item_name, source_item_field) in source_items {
+                    if !target_items.contains_key(source_item_name) {
+                        result.intersect(
+                            db,
+                            self.constraints,
+                            self.check_type_pair(
+                                db,
+                                source_item_field.declared_ty,
+                                target_extra_items.declared_ty,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
         result
     }
 }
@@ -439,9 +980,10 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// `TypedDict` `C` that's fully-static and assignable to both of them.
     ///
     /// `TypedDict` assignability is determined field-by-field, so we determine disjointness
-    /// similarly. For any field that's only in `A`, it's always possible for our hypothetical `C`
-    /// to copy/paste that field without losing assignability to `B` (and vice versa), so we only
-    /// need to consider fields that are present in both `A` and `B`.
+    /// similarly. Fields that are present in both `A` and `B` can conflict directly. A required or
+    /// mutable optional field that's only in one side can also conflict with the other side's
+    /// openness: a closed `TypedDict` rejects it, and explicit extra items constrain whether it can
+    /// be present.
     ///
     /// There are three properties of each field to consider: the declared type, whether it's
     /// mutable ("mut" vs "imm" below), and whether it's required ("req" vs "opt" below). Here's a
@@ -493,52 +1035,193 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
     /// 4. If both sides are immutable, and their types are disjoint. (Because the type in `C` must
     ///    be assignable to both.)
     ///
-    /// TODO: Adding support for `closed` and `extra_items` will complicate this.
     pub(super) fn check_typeddict_pair(
         &self,
         db: &'db dyn Db,
         left: TypedDictType<'db>,
         right: TypedDictType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let fields_in_common = btreemap_values_with_same_key(left.items(db), right.items(db));
-        fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
-            // Condition 1 above.
-            if left_field.is_required() || right_field.is_required() {
-                if (!left_field.is_required() && !left_field.is_read_only())
-                    || (!right_field.is_required() && !right_field.is_read_only())
-                {
-                    // One side demands a `Required` source field, while the other side demands a
-                    // `NotRequired` one. They must be disjoint.
-                    return self.always();
+        let left_items = left.items(db);
+        let right_items = right.items(db);
+        let fields_in_common = btreemap_values_with_same_key(left_items, right_items);
+        let common_fields_disjoint =
+            fields_in_common.when_any(db, self.constraints, |(left_field, right_field)| {
+                // Condition 1 above.
+                if left_field.is_required() || right_field.is_required() {
+                    if (!left_field.is_required() && !left_field.is_read_only())
+                        || (!right_field.is_required() && !right_field.is_read_only())
+                    {
+                        // One side demands a `Required` source field, while the other side demands a
+                        // `NotRequired` one. They must be disjoint.
+                        return self.always();
+                    }
                 }
-            }
-            if !left_field.is_read_only() && !right_field.is_read_only() {
-                // Condition 2 above. This field is mutable on both sides, so the so the types must
-                // be compatible, i.e. mutually assignable.
-                let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
-                relation_checker
-                    .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                    .and(db, self.constraints, || {
-                        relation_checker.check_type_pair(
-                            db,
-                            right_field.declared_ty,
-                            left_field.declared_ty,
-                        )
-                    })
-                    .negate(db, self.constraints)
-            } else if !left_field.is_read_only() {
-                // Half of condition 3 above.
-                self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
-                    .negate(db, self.constraints)
-            } else if !right_field.is_read_only() {
-                // The other half of condition 3 above.
-                self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
-                    .negate(db, self.constraints)
-            } else {
-                // Condition 4 above.
-                self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                if !left_field.is_read_only() && !right_field.is_read_only() {
+                    // Condition 2 above. This field is mutable on both sides, so the so the types must
+                    // be compatible, i.e. mutually assignable.
+                    let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
+                    relation_checker
+                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                        .and(db, self.constraints, || {
+                            relation_checker.check_type_pair(
+                                db,
+                                right_field.declared_ty,
+                                left_field.declared_ty,
+                            )
+                        })
+                        .negate(db, self.constraints)
+                } else if !left_field.is_read_only() {
+                    // Half of condition 3 above.
+                    self.as_relation_checker(TypeRelation::Assignability)
+                        .check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                        .negate(db, self.constraints)
+                } else if !right_field.is_read_only() {
+                    // The other half of condition 3 above.
+                    self.as_relation_checker(TypeRelation::Assignability)
+                        .check_type_pair(db, right_field.declared_ty, left_field.declared_ty)
+                        .negate(db, self.constraints)
+                } else {
+                    // Condition 4 above.
+                    self.check_type_pair(db, left_field.declared_ty, right_field.declared_ty)
+                }
+            });
+
+        let required_fields_disjoint = common_fields_disjoint.or(db, self.constraints, || {
+            left_items
+                .iter()
+                .filter(|(name, field)| field.is_required() && !right_items.contains_key(*name))
+                .map(|(_, field)| (field, right.openness(db)))
+                .chain(
+                    right_items
+                        .iter()
+                        .filter(|(name, field)| {
+                            field.is_required() && !left_items.contains_key(*name)
+                        })
+                        .map(|(_, field)| (field, left.openness(db))),
+                )
+                .when_any(db, self.constraints, |(required_field, other_openness)| {
+                    let check_read_only_extra_items = |extra_items_ty| {
+                        if required_field.is_read_only() {
+                            self.check_type_pair(db, required_field.declared_ty, extra_items_ty)
+                        } else {
+                            self.as_relation_checker(TypeRelation::Assignability)
+                                .check_type_pair(db, required_field.declared_ty, extra_items_ty)
+                                .negate(db, self.constraints)
+                        }
+                    };
+
+                    match other_openness {
+                        TypedDictOpenness::Closed => self.always(),
+                        TypedDictOpenness::Extra(extra_items) if !extra_items.is_read_only() => {
+                            self.always()
+                        }
+                        TypedDictOpenness::ImplicitlyOpen => {
+                            check_read_only_extra_items(Type::object())
+                        }
+                        TypedDictOpenness::Extra(extra_items) => {
+                            check_read_only_extra_items(extra_items.declared_ty)
+                        }
+                    }
+                })
+        });
+
+        let unshared_fields_disjoint = required_fields_disjoint.or(db, self.constraints, || {
+            left_items
+                .iter()
+                .map(|(name, field)| (name, field, right_items, right.openness(db)))
+                .chain(
+                    right_items
+                        .iter()
+                        .map(|(name, field)| (name, field, left_items, left.openness(db))),
+                )
+                .filter_map(|(name, field, other_items, other_openness)| {
+                    if field.is_required() || other_items.contains_key(name) {
+                        return None;
+                    }
+                    match other_openness {
+                        TypedDictOpenness::Closed if !field.is_read_only() => Some((field, None)),
+                        TypedDictOpenness::Extra(extra_items)
+                            if !field.is_read_only() || !extra_items.is_read_only() =>
+                        {
+                            Some((field, Some(extra_items)))
+                        }
+                        TypedDictOpenness::ImplicitlyOpen
+                        | TypedDictOpenness::Closed
+                        | TypedDictOpenness::Extra(_) => None,
+                    }
+                })
+                .when_any(db, self.constraints, |(field, extra_items)| {
+                    let Some(extra_items) = extra_items else {
+                        return self.always();
+                    };
+                    let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
+                    if field.is_read_only() {
+                        relation_checker
+                            .check_type_pair(db, extra_items.declared_ty, field.declared_ty)
+                            .negate(db, self.constraints)
+                    } else if extra_items.is_read_only() {
+                        relation_checker
+                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .negate(db, self.constraints)
+                    } else {
+                        relation_checker
+                            .check_type_pair(db, field.declared_ty, extra_items.declared_ty)
+                            .and(db, self.constraints, || {
+                                relation_checker.check_type_pair(
+                                    db,
+                                    extra_items.declared_ty,
+                                    field.declared_ty,
+                                )
+                            })
+                            .negate(db, self.constraints)
+                    }
+                })
+        });
+
+        unshared_fields_disjoint.or(db, self.constraints, || {
+            let left_openness = left.openness(db);
+            let right_openness = right.openness(db);
+            let relation_checker = self.as_relation_checker(TypeRelation::Assignability);
+
+            match (left_openness, right_openness) {
+                (TypedDictOpenness::Closed, TypedDictOpenness::Extra(extra_items))
+                | (TypedDictOpenness::Extra(extra_items), TypedDictOpenness::Closed)
+                    if !extra_items.is_read_only() =>
+                {
+                    self.always()
+                }
+                (TypedDictOpenness::Extra(left_extra), TypedDictOpenness::Extra(right_extra))
+                    if !left_extra.is_read_only() && !right_extra.is_read_only() =>
+                {
+                    relation_checker
+                        .check_type_pair(db, left_extra.declared_ty, right_extra.declared_ty)
+                        .and(db, self.constraints, || {
+                            relation_checker.check_type_pair(
+                                db,
+                                right_extra.declared_ty,
+                                left_extra.declared_ty,
+                            )
+                        })
+                        .negate(db, self.constraints)
+                }
+                (TypedDictOpenness::Extra(mutable_extra), other)
+                | (other, TypedDictOpenness::Extra(mutable_extra))
+                    if !mutable_extra.is_read_only() =>
+                {
+                    other.effective_extra_items().map_or_else(
+                        || self.always(),
+                        |other_extra| {
+                            relation_checker
+                                .check_type_pair(
+                                    db,
+                                    mutable_extra.declared_ty,
+                                    other_extra.declared_ty,
+                                )
+                                .negate(db, self.constraints)
+                        },
+                    )
+                }
+                _ => self.never(),
             }
         })
     }
@@ -556,6 +1239,9 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypedDictType::Synthesized(synthesized) => {
             for field in synthesized.items(db).values() {
                 visitor.visit_type(db, field.declared_ty);
+            }
+            if let Some(extra_items) = synthesized.openness(db).explicit_extra_items() {
+                visitor.visit_type(db, extra_items.declared_ty);
             }
         }
     }
@@ -613,6 +1299,51 @@ pub(super) fn deferred_functional_typed_dict_schema<'db>(
     }
 
     schema
+}
+
+/// Resolves the undeclared-item policy of a functional `TypedDict` definition.
+///
+/// The `extra_items` expression is inferred as an annotation so qualifiers such as `ReadOnly` are
+/// preserved. `extra_items=Never` is canonicalized to the same closed policy as `closed=True`.
+///
+/// ```python
+/// Movie = TypedDict("Movie", {"name": str}, extra_items=ReadOnly[int])
+/// ```
+#[salsa::tracked(
+    cycle_initial = |_, _, _| TypedDictOpenness::ImplicitlyOpen,
+    heap_size = ruff_memory_usage::heap_size
+)]
+pub(super) fn deferred_functional_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> TypedDictOpenness<'db> {
+    let module = parsed_module(db, definition.file(db)).load(db);
+    let node = definition
+        .kind(db)
+        .value(&module)
+        .expect("Expected `TypedDict` definition to be an assignment")
+        .as_call_expr()
+        .expect("Expected `TypedDict` definition r.h.s. to be a call expression");
+
+    if let Some(extra_items) = node.arguments.find_keyword("extra_items") {
+        let deferred_inference = infer_deferred_types(db, definition);
+        return TypedDictOpenness::extra(
+            db,
+            deferred_inference.expression_type(&extra_items.value),
+            deferred_inference
+                .qualifiers(&extra_items.value)
+                .contains(TypeQualifiers::READ_ONLY),
+        );
+    }
+
+    if let Some(closed) = node.arguments.find_keyword("closed") {
+        let closed_ty = definition_expression_type(db, definition, &closed.value);
+        if closed_ty.bool(db).is_always_true() {
+            return TypedDictOpenness::Closed;
+        }
+    }
+
+    TypedDictOpenness::ImplicitlyOpen
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
@@ -684,8 +1415,8 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
         let db = self.context.db();
         let items = self.typed_dict.items(db);
 
-        // Check if key exists in `TypedDict`
-        let Some((_, item)) = items.iter().find(|(name, _)| *name == self.key) else {
+        // Check if key exists in `TypedDict` or is accepted by explicit extra items.
+        let Some(item) = self.typed_dict.item(db, self.key) else {
             if self.emit_diagnostic {
                 report_invalid_key_on_typed_dict(
                     self.context,
@@ -719,7 +1450,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
                 self.add_object_type_annotation(db, &mut diagnostic);
                 Self::add_item_definition_subdiagnostic(
                     db,
-                    item,
+                    &item,
                     &mut diagnostic,
                     "Read-only item declared here",
                 );
@@ -765,7 +1496,7 @@ impl<'db> TypedDictKeyAssignment<'_, 'db, '_> {
 
             Self::add_item_definition_subdiagnostic(
                 db,
-                item,
+                &item,
                 &mut diagnostic,
                 "Item declared here",
             );
@@ -864,6 +1595,94 @@ pub(crate) struct UnpackedTypedDictKey<'db> {
     pub(crate) definition: Option<Definition<'db>>,
 }
 
+/// A normalized view of a `TypedDict`-shaped value used when unpacking it.
+///
+/// Union and intersection inputs are combined into one set of possible keys and one openness
+/// policy describing arbitrary undeclared keys.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct UnpackedTypedDict<'db> {
+    /// Declared keys that may be present after unpacking.
+    pub(crate) keys: BTreeMap<Name, UnpackedTypedDictKey<'db>>,
+    pub(crate) openness: TypedDictOpenness<'db>,
+}
+
+/// Combines the openness policies of intersected `TypedDict`-shaped values.
+///
+/// An intersection must satisfy every constituent, so `Closed` dominates, `ImplicitlyOpen` adds no
+/// constraint, and explicit extra-item value types are intersected. Conceptually,
+/// `ImplicitlyOpen & Extra[int]` becomes a read-only `Extra[int]`, while
+/// `Closed & Extra[int]` is `Closed`.
+///
+/// The combined explicit policy can be read-only because unpacking observes extra items but never
+/// writes through the synthesized policy.
+fn intersect_unpacked_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
+) -> TypedDictOpenness<'db> {
+    let mut explicit_value_types = Vec::new();
+
+    for openness in openness {
+        match openness {
+            TypedDictOpenness::Closed => return TypedDictOpenness::Closed,
+            TypedDictOpenness::ImplicitlyOpen => {}
+            TypedDictOpenness::Extra(extra_items) => {
+                explicit_value_types.push(extra_items.declared_ty);
+            }
+        }
+    }
+
+    if explicit_value_types.is_empty() {
+        TypedDictOpenness::ImplicitlyOpen
+    } else {
+        TypedDictOpenness::extra(
+            db,
+            IntersectionType::from_elements(db, explicit_value_types),
+            true,
+        )
+    }
+}
+
+/// Combines the openness policies of unioned `TypedDict`-shaped values.
+///
+/// A union may contain extra items from any constituent, so `Closed` contributes no values and
+/// explicit extra-item value types are unioned. An `ImplicitlyOpen` constituent widens explicit
+/// extra items to `object` while preserving explicit-extra-item behavior: conceptually,
+/// `ImplicitlyOpen | Extra[int]` becomes a read-only `Extra[object]`. With no explicit extra items,
+/// any implicitly open constituent makes the result `ImplicitlyOpen`; otherwise the result is
+/// `Closed`.
+///
+/// As with intersections, a synthesized explicit policy is read-only because unpacking only
+/// observes its values.
+fn union_unpacked_typed_dict_openness<'db>(
+    db: &'db dyn Db,
+    openness: impl IntoIterator<Item = TypedDictOpenness<'db>>,
+) -> TypedDictOpenness<'db> {
+    let mut value_types = UnionBuilder::new(db);
+    let mut has_implicitly_open = false;
+    let mut has_explicit_extra_items = false;
+
+    for openness in openness {
+        match openness {
+            TypedDictOpenness::Closed => {}
+            TypedDictOpenness::ImplicitlyOpen => has_implicitly_open = true,
+            TypedDictOpenness::Extra(extra_items) => {
+                value_types = value_types.add(extra_items.declared_ty);
+                has_explicit_extra_items = true;
+            }
+        }
+    }
+
+    if has_implicitly_open && has_explicit_extra_items {
+        TypedDictOpenness::extra(db, Type::object(), true)
+    } else if has_implicitly_open {
+        TypedDictOpenness::ImplicitlyOpen
+    } else if has_explicit_extra_items {
+        TypedDictOpenness::extra(db, value_types.build(), true)
+    } else {
+        TypedDictOpenness::Closed
+    }
+}
+
 /// Extracts `TypedDict` keys, their value types, and whether they are required when an unpacked
 /// `**kwargs` value has this type, resolving type aliases and handling intersections and unions.
 ///
@@ -877,6 +1696,14 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+    extract_unpacked_typed_dict_from_value_type(db, ty).map(|unpacked| unpacked.keys)
+}
+
+/// Extracts the declared keys and openness from a `TypedDict`-shaped value.
+pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<UnpackedTypedDict<'db>> {
     match ty {
         Type::TypedDict(td) => {
             let keys = td
@@ -893,29 +1720,30 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                     )
                 })
                 .collect();
-            Some(keys)
+            Some(UnpackedTypedDict {
+                keys,
+                openness: td.openness(db),
+            })
         }
         Type::Intersection(intersection) => {
-            // Collect key maps from all TypedDicts in the intersection
-            let all_key_maps: Vec<_> = intersection
+            // Collect TypedDict shapes from all TypedDicts in the intersection.
+            let unpacked_elements: Vec<_> = intersection
                 .positive(db)
                 .iter()
-                .filter_map(|element| {
-                    extract_unpacked_typed_dict_keys_from_value_type(db, *element)
-                })
+                .filter_map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
                 .collect();
 
-            if all_key_maps.is_empty() {
+            if unpacked_elements.is_empty() {
                 return None;
             }
 
             // Union all keys from all TypedDicts, intersecting value types for shared keys.
             let mut result: BTreeMap<Name, UnpackedTypedDictKey<'db>> = BTreeMap::new();
 
-            for key_map in all_key_maps {
-                for (key, unpacked_key) in key_map {
+            for unpacked in &unpacked_elements {
+                for (key, unpacked_key) in &unpacked.keys {
                     result
-                        .entry(key)
+                        .entry(key.clone())
                         .and_modify(|existing| {
                             existing.value_ty = IntersectionType::from_two_elements(
                                 db,
@@ -928,22 +1756,46 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                                 unpacked_key.definition,
                             );
                         })
-                        .or_insert(unpacked_key);
+                        .or_insert(*unpacked_key);
                 }
             }
 
-            Some(result)
+            for (key, unpacked_key) in &mut result {
+                for unpacked in &unpacked_elements {
+                    if unpacked.keys.contains_key(key) {
+                        continue;
+                    }
+                    if let Some(extra_items) = unpacked.openness.effective_extra_items() {
+                        unpacked_key.value_ty = IntersectionType::from_two_elements(
+                            db,
+                            unpacked_key.value_ty,
+                            extra_items.declared_ty,
+                        );
+                        unpacked_key.definition = None;
+                    }
+                }
+            }
+
+            let openness = intersect_unpacked_typed_dict_openness(
+                db,
+                unpacked_elements.iter().map(|unpacked| unpacked.openness),
+            );
+
+            Some(UnpackedTypedDict {
+                keys: result,
+                openness,
+            })
         }
         Type::Union(union) => {
-            let key_maps: Vec<_> = union
+            let unpacked_elements: Vec<_> = union
                 .elements(db)
                 .iter()
-                .map(|element| extract_unpacked_typed_dict_keys_from_value_type(db, *element))
+                .map(|element| extract_unpacked_typed_dict_from_value_type(db, *element))
                 .collect::<Option<_>>()?;
 
-            let all_keys: OrderSet<Name> = key_maps
+            let all_keys: OrderSet<Name> = unpacked_elements
                 .iter()
-                .flat_map(|key_map| key_map.keys().cloned())
+                .flat_map(|unpacked| unpacked.keys.keys().cloned())
                 .collect();
             let mut result = BTreeMap::new();
 
@@ -953,8 +1805,8 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                 let mut definition = None;
                 let mut saw_key = false;
 
-                for key_map in &key_maps {
-                    if let Some(unpacked_key) = key_map.get(&key) {
+                for unpacked in &unpacked_elements {
+                    if let Some(unpacked_key) = unpacked.keys.get(&key) {
                         saw_key = true;
                         value_ty = value_ty.add(unpacked_key.value_ty);
                         is_required &= unpacked_key.is_required;
@@ -963,6 +1815,11 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                         } else {
                             unpacked_key.definition
                         });
+                    } else if let Some(extra_items) = unpacked.openness.effective_extra_items() {
+                        saw_key = true;
+                        value_ty = value_ty.add(extra_items.declared_ty);
+                        is_required = false;
+                        definition = Some(None);
                     } else {
                         is_required = false;
                         definition = Some(None);
@@ -981,10 +1838,18 @@ pub(crate) fn extract_unpacked_typed_dict_keys_from_value_type<'db>(
                 }
             }
 
-            Some(result)
+            let openness = union_unpacked_typed_dict_openness(
+                db,
+                unpacked_elements.iter().map(|unpacked| unpacked.openness),
+            );
+
+            Some(UnpackedTypedDict {
+                keys: result,
+                openness,
+            })
         }
         Type::TypeAlias(alias) => {
-            extract_unpacked_typed_dict_keys_from_value_type(db, alias.value_type(db))
+            extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
@@ -1203,7 +2068,7 @@ pub(super) fn typed_dict_without_keys<'db>(
         .map(|(name, field)| (name.clone(), field.clone()))
         .collect();
 
-    TypedDictType::from_schema_items(db, filtered_items)
+    TypedDictType::from_schema_items_with_openness(db, filtered_items, typed_dict.openness(db))
 }
 
 /// Returns a `TypedDict` schema for mixed positional-constructor inference.
@@ -1233,7 +2098,7 @@ pub(super) fn typed_dict_with_relaxed_keys<'db>(
         })
         .collect();
 
-    TypedDictType::from_schema_items(db, relaxed_items)
+    TypedDictType::from_schema_items_with_openness(db, relaxed_items, typed_dict.openness(db))
 }
 
 fn full_object_ty_annotation(ty: Type<'_>) -> Option<Type<'_>> {
@@ -1303,6 +2168,90 @@ fn validate_extracted_typed_dict_keys<'db, 'ast>(
     (provided_keys, valid)
 }
 
+/// Validates the arbitrary keys of a `TypedDict`-shaped constructor argument.
+///
+/// The source's effective extra items must be valid for every target field they could provide and
+/// for the target's explicit extra-items type. Implicitly open sources retain ty's existing
+/// leniency when constructing another implicitly open `TypedDict`.
+fn validate_extracted_typed_dict_openness<'db, 'ast>(
+    context: &InferContext<'db, 'ast>,
+    typed_dict: TypedDictType<'db>,
+    source_keys: &BTreeMap<Name, UnpackedTypedDictKey<'db>>,
+    source_openness: TypedDictOpenness<'db>,
+    nodes: TypedDictAssignmentNodes<'ast>,
+    ignored_keys: &OrderSet<Name>,
+) -> bool {
+    let db = context.db();
+    let Some(extra_items) = source_openness.effective_extra_items() else {
+        return true;
+    };
+    let extra_items_ty = extra_items.declared_ty;
+    let target_openness = typed_dict.openness(db);
+
+    if target_openness.is_implicitly_open() && source_openness.is_implicitly_open() {
+        return true;
+    }
+
+    let typed_dict_ty = Type::TypedDict(typed_dict);
+
+    if let Some(target_extra_items) = target_openness.explicit_extra_items() {
+        if let Some((target_name, target_field)) =
+            typed_dict.items(db).iter().find(|(name, field)| {
+                !source_keys.contains_key(*name)
+                    && !ignored_keys.contains(*name)
+                    && !extra_items_ty.is_assignable_to(db, field.declared_ty)
+            })
+        {
+            if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Unpacked argument has extra items of type `{}` that are not assignable to item `{target_name}` with type `{}` on TypedDict `{}`",
+                    extra_items_ty.display(db),
+                    target_field.declared_ty.display(db),
+                    typed_dict_ty.display(db),
+                ));
+                diagnostic.annotate(
+                    context
+                        .secondary(nodes.typed_dict)
+                        .message(format_args!("TypedDict `{}`", typed_dict_ty.display(db))),
+                );
+            }
+            return false;
+        }
+
+        if extra_items_ty.is_assignable_to(db, target_extra_items.declared_ty) {
+            return true;
+        }
+
+        if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Unpacked argument has extra items of type `{}` that are not assignable to extra items type `{}` on TypedDict `{}`",
+                extra_items_ty.display(db),
+                target_extra_items.declared_ty.display(db),
+                typed_dict_ty.display(db),
+            ));
+            diagnostic.annotate(
+                context
+                    .secondary(nodes.typed_dict)
+                    .message(format_args!("TypedDict `{}`", typed_dict_ty.display(db))),
+            );
+        }
+        return false;
+    }
+
+    if let Some(builder) = context.report_lint(&INVALID_KEY, nodes.key) {
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Unpacked argument may contain unknown keys for TypedDict `{}`",
+            typed_dict_ty.display(db),
+        ));
+        diagnostic.annotate(
+            context
+                .secondary(nodes.typed_dict)
+                .message(format_args!("TypedDict `{}`", typed_dict_ty.display(db))),
+        );
+    }
+    false
+}
+
 /// Validates a mixed-constructor positional argument when its type can be viewed as a `TypedDict`.
 ///
 /// If `arg_ty` exposes concrete `TypedDict` keys, only keys that overlap the constructor target
@@ -1320,26 +2269,39 @@ fn validate_from_typed_dict_argument<'db, 'ast>(
 ) -> Option<OrderSet<Name>> {
     let db = context.db();
     let typed_dict_items = typed_dict.items(db);
-    let unpacked_keys = extract_unpacked_typed_dict_keys_from_value_type(db, arg_ty)?
+    let unpacked = extract_unpacked_typed_dict_from_value_type(db, arg_ty)?;
+    let source_openness = unpacked.openness;
+    let validate_extra_keys = !typed_dict.openness(db).is_implicitly_open();
+    let unpacked_keys = unpacked
+        .keys
         .into_iter()
-        .filter(|(key_name, _)| typed_dict_items.contains_key(key_name))
+        .filter(|(key_name, _)| validate_extra_keys || typed_dict_items.contains_key(key_name))
         .collect();
 
-    Some(
-        validate_extracted_typed_dict_keys(
-            context,
-            typed_dict,
-            &unpacked_keys,
-            TypedDictAssignmentNodes {
-                typed_dict: typed_dict_node,
-                key: arg.into(),
-                value: arg.into(),
-            },
-            full_object_ty_annotation(arg_ty),
-            ignored_keys,
-        )
-        .0,
+    let nodes = TypedDictAssignmentNodes {
+        typed_dict: typed_dict_node,
+        key: arg.into(),
+        value: arg.into(),
+    };
+    let provided_keys = validate_extracted_typed_dict_keys(
+        context,
+        typed_dict,
+        &unpacked_keys,
+        nodes,
+        full_object_ty_annotation(arg_ty),
+        ignored_keys,
     )
+    .0;
+    validate_extracted_typed_dict_openness(
+        context,
+        typed_dict,
+        &unpacked_keys,
+        source_openness,
+        nodes,
+        ignored_keys,
+    );
+
+    Some(provided_keys)
 }
 
 fn report_duplicate_typed_dict_constructor_key<'db, 'ast>(
@@ -1454,7 +2416,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             let positional_inference_target =
                 typed_dict_with_relaxed_keys(db, typed_dict, &keyword_keys);
             let positional_target = typed_dict_without_keys(db, typed_dict, &keyword_keys);
-            let positional_target_is_empty = positional_target.items(db).is_empty();
+            let positional_target_is_unconstrained = positional_target.items(db).is_empty()
+                && positional_target.openness(db).is_implicitly_open();
             let positional_target_ty = Type::TypedDict(positional_target);
             let positional_inference_target_ty = Type::TypedDict(positional_inference_target);
             let arg_ty =
@@ -1470,7 +2433,8 @@ pub(super) fn validate_typed_dict_constructor<'db, 'ast>(
             ) {
                 provided_keys
             } else {
-                if !positional_target_is_empty && !arg_ty.is_assignable_to(db, positional_target_ty)
+                if !positional_target_is_unconstrained
+                    && !arg_ty.is_assignable_to(db, positional_target_ty)
                 {
                     if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, arg) {
                         builder.into_diagnostic(format_args!(
@@ -1577,7 +2541,6 @@ fn validate_from_keywords<'db, 'ast>(
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> OrderSet<Name> {
     let db = context.db();
-    let items = typed_dict.items(db);
     debug_assert_eq!(arguments.keywords.len(), unpacked_keyword_types.len());
 
     let mut guaranteed_keys = BTreeMap::new();
@@ -1600,8 +2563,8 @@ fn validate_from_keywords<'db, 'ast>(
                 keyword_node,
             );
 
-            let value_tcx = items
-                .get(arg_name.id.as_str())
+            let value_tcx = typed_dict
+                .item(db, arg_name.id.as_str())
                 .map(|field| TypeContext::new(Some(field.declared_ty)))
                 .unwrap_or_default();
             let value_ty = expression_type_fn(&keyword.value, value_tcx);
@@ -1674,13 +2637,50 @@ fn validate_merged_dict_literal<'db, 'ast>(
     expression_type_fn: &mut impl FnMut(&ast::Expr, TypeContext<'db>) -> Type<'db>,
 ) -> bool {
     let db = context.db();
-    let items = typed_dict.items(db);
     let mut valid = true;
 
     for item in dict_expr.items.iter().rev() {
         if let Some(key_expr) = &item.key {
             let key_ty = expression_type_fn(key_expr, TypeContext::default());
             let Some(key_literal) = key_ty.as_string_literal() else {
+                if key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+                    if let Some(expected_ty) =
+                        typed_dict.arbitrary_key_initialization_type_excluding(db, shadowed_keys)
+                    {
+                        let value_ty =
+                            expression_type_fn(&item.value, TypeContext::new(Some(expected_ty)));
+                        if !value_ty.is_assignable_to(db, expected_ty) {
+                            valid = false;
+                            if let Some(builder) =
+                                context.report_lint(&INVALID_ARGUMENT_TYPE, &item.value)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Value of type `{}` is not assignable to arbitrary key value type `{}` on TypedDict `{}`",
+                                    value_ty.display(db),
+                                    expected_ty.display(db),
+                                    Type::TypedDict(typed_dict).display(db),
+                                ));
+                            }
+                        }
+                    } else if typed_dict.openness(db).is_closed() {
+                        valid = false;
+                        if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                            builder.into_diagnostic(format_args!(
+                                "Non-literal string key may be unknown for TypedDict `{}`",
+                                Type::TypedDict(typed_dict).display(db),
+                            ));
+                        }
+                    }
+                } else {
+                    valid = false;
+                    if let Some(builder) = context.report_lint(&INVALID_KEY, key_expr) {
+                        builder.into_diagnostic(format_args!(
+                            "TypedDict `{}` requires string keys, got key of type `{}`",
+                            Type::TypedDict(typed_dict).display(db),
+                            key_ty.display(db),
+                        ));
+                    }
+                }
                 continue;
             };
 
@@ -1688,8 +2688,8 @@ fn validate_merged_dict_literal<'db, 'ast>(
             let is_shadowed = shadowed_keys.contains(&key);
 
             if !is_shadowed {
-                let field = items.get(key.as_str());
-                let value_tcx = field
+                let value_tcx = typed_dict
+                    .item(db, key.as_str())
                     .map(|field| TypeContext::new(Some(field.declared_ty)))
                     .unwrap_or_default();
                 let value_ty = expression_type_fn(&item.value, value_tcx);
@@ -1769,20 +2769,26 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
             guaranteed_keys.entry(key_name.clone()).or_insert(None);
         }
         return true;
-    } else if let Some(unpacked_keys) =
-        extract_unpacked_typed_dict_keys_from_value_type(db, unpacked_type)
-    {
+    } else if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(db, unpacked_type) {
         let ignored_keys = shadowed_keys.clone();
-        let (_, unpacked_valid) = validate_extracted_typed_dict_keys(
+        let (_, mut unpacked_valid) = validate_extracted_typed_dict_keys(
             context,
             typed_dict,
-            &unpacked_keys,
+            &unpacked.keys,
             nodes,
             full_object_ty_annotation(unpacked_type),
             &ignored_keys,
         );
+        unpacked_valid &= validate_extracted_typed_dict_openness(
+            context,
+            typed_dict,
+            &unpacked.keys,
+            unpacked.openness,
+            nodes,
+            &ignored_keys,
+        );
 
-        for (key_name, unpacked_key) in unpacked_keys {
+        for (key_name, unpacked_key) in unpacked.keys {
             if unpacked_key.is_required && !ignored_keys.contains(&key_name) {
                 guaranteed_keys
                     .entry(key_name.clone())
@@ -1797,6 +2803,27 @@ fn validate_merged_unpacked_keyword_argument<'db, 'ast>(
         }
 
         return unpacked_valid;
+    } else if let Some((key_ty, value_ty)) = unpacked_type.unpack_keys_and_items(db) {
+        if !key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+            if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, nodes.value) {
+                builder.into_diagnostic(format_args!(
+                    "Unpacked argument has key type `{}` that is not assignable to `str`",
+                    key_ty.display(db),
+                ));
+            }
+            return false;
+        }
+
+        if !typed_dict.openness(db).is_implicitly_open() {
+            return validate_extracted_typed_dict_openness(
+                context,
+                typed_dict,
+                &BTreeMap::new(),
+                TypedDictOpenness::extra(db, value_ty, true),
+                nodes,
+                shadowed_keys,
+            );
+        }
     }
 
     true
@@ -1845,18 +2872,28 @@ pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
     pub(crate) kind: SynthesizedTypedDictKind,
+    /// Whether keys absent from `items` are hidden, forbidden, or explicitly typed.
+    pub(crate) openness: TypedDictOpenness<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
 
 impl<'db> SynthesizedTypedDictType<'db> {
-    fn schema(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::new(db, items, SynthesizedTypedDictKind::Schema)
+    fn schema(
+        db: &'db dyn Db,
+        items: TypedDictSchema<'db>,
+        openness: TypedDictOpenness<'db>,
+    ) -> Self {
+        Self::new(db, items, SynthesizedTypedDictKind::Schema, openness)
     }
 
-    fn patch(db: &'db dyn Db, items: TypedDictSchema<'db>) -> Self {
-        Self::new(db, items, SynthesizedTypedDictKind::Patch)
+    fn patch(
+        db: &'db dyn Db,
+        items: TypedDictSchema<'db>,
+        openness: TypedDictOpenness<'db>,
+    ) -> Self {
+        Self::new(db, items, SynthesizedTypedDictKind::Patch, openness)
     }
 
     fn is_patch(self, db: &'db dyn Db) -> bool {
@@ -1882,9 +2919,13 @@ impl<'db> SynthesizedTypedDictType<'db> {
             })
             .collect::<TypedDictSchema<'db>>();
 
+        let openness = self
+            .openness(db)
+            .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
         match self.kind(db) {
-            SynthesizedTypedDictKind::Schema => Self::schema(db, items),
-            SynthesizedTypedDictKind::Patch => Self::patch(db, items),
+            SynthesizedTypedDictKind::Schema => Self::schema(db, items, openness),
+            SynthesizedTypedDictKind::Patch => Self::patch(db, items, openness),
         }
     }
 }
@@ -1960,6 +3001,11 @@ impl<'db> TypedDictField<'db> {
 
     pub(crate) const fn is_read_only(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::READ_ONLY)
+    }
+
+    /// Returns `false` for optional fields whose declared type is uninhabited.
+    pub(crate) fn may_be_present(&self, db: &'db dyn Db) -> bool {
+        self.is_required() || !self.declared_ty.resolve_type_alias(db).is_never()
     }
 
     pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {

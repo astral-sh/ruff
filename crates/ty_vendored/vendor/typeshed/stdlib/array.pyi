@@ -136,15 +136,15 @@ class array(MutableSequence[_T]):
     def buffer_info(self) -> tuple[int, int]:
         """Return a tuple (address, length) giving the current memory address and the length in items of the buffer used to hold array's contents.
 
-        The length should be multiplied by the itemsize attribute to calculate
-        the buffer length in bytes.
+        The length should be multiplied by the itemsize attribute to
+        calculate the buffer length in bytes.
         """
 
     def byteswap(self) -> None:
         """Byteswap all items of the array.
 
-        If the items in the array are not 1, 2, 4, 8 or 16 bytes in size, RuntimeError
-        is raised.  Note, that for complex types the order of
+        If the items in the array are not 1, 2, 4, 8 or 16 bytes in size,
+        RuntimeError is raised.  Note, that for complex types the order of
         components (the real part, followed by imaginary part) is preserved.
         """
 
@@ -166,9 +166,9 @@ class array(MutableSequence[_T]):
     def fromunicode(self, ustr: str, /) -> None:
         """Extends this array with data from the unicode string ustr.
 
-        The array must be a unicode type array; otherwise a ValueError is raised.
-        Use array.frombytes(ustr.encode(...)) to append Unicode data to an array of
-        some other type.
+        The array must be a unicode type array; otherwise a ValueError is
+        raised.  Use array.frombytes(ustr.encode(...)) to append Unicode
+        data to an array of some other type.
         """
 
     def index(self, v: _T, start: int = 0, stop: int = sys.maxsize, /) -> int:
@@ -201,9 +201,10 @@ class array(MutableSequence[_T]):
     def tounicode(self) -> str:
         """Extends this array with data from the unicode string ustr.
 
-        Convert the array to a unicode string.  The array must be a unicode type array;
-        otherwise a ValueError is raised.  Use array.tobytes().decode() to obtain a
-        unicode string from an array of some other type.
+        Convert the array to a unicode string.  The array must be a unicode
+        type array; otherwise a ValueError is raised.  Use
+        array.tobytes().decode() to obtain a unicode string from an array of
+        some other type.
         """
 
     __hash__: ClassVar[None]  # type: ignore[assignment]

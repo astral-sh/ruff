@@ -612,76 +612,15 @@ impl<'a> SuppressionsBuilder<'a> {
 
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
-            let (before, after) = tokens.split_at(suppression.range.start());
 
             // Standalone suppression comments
-
-            if suppression.action == SuppressionAction::Ignore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
-                    {
-                        // own-line ignore
-                        Self::standalone_comment_range(suppression.range, before, after)
-                    } else {
-                        // trailing ignore
-                        self.trailing_comment_range(suppression.range, before)
-                    };
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:ignore comment found but not active, enable preview mode"
-                    );
-                }
-                suppressions.next();
-                continue;
-            } else if suppression.action == SuppressionAction::FileIgnore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    match indentation_at_offset(suppression.range.start(), self.source) {
-                        // Module scope
-                        Some("") => {
-                            let range = TextRange::up_to(self.source.text_len());
-                            for code in suppression.codes_as_str(self.source) {
-                                self.valid.push(Suppression {
-                                    code: code.into(),
-                                    range,
-                                    used: false.into(),
-                                    comments: SuppressionComments::Single(suppression.clone()),
-                                });
-                            }
-                        }
-                        // Indented/inside block
-                        Some(_) => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::NotModuleScope,
-                                comment: suppression.clone(),
-                            });
-                        }
-                        // Trailing
-                        None => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression.clone(),
-                            });
-                        }
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:file-ignore comment found but not active, enable preview mode"
-                    );
-                }
+            if self.register_standalone_suppression(suppression, tokens) {
                 suppressions.next();
                 continue;
             }
 
             // Matched suppression comments
+            let (before, after) = tokens.split_at(suppression.range.start());
 
             let mut count = 0;
             let last_indent = before
@@ -723,6 +662,10 @@ impl<'a> SuppressionsBuilder<'a> {
                         else {
                             continue;
                         };
+
+                        if self.register_standalone_suppression(&suppression, tokens) {
+                            continue;
+                        }
 
                         let Some(indent) =
                             indentation_at_offset(suppression.range.start(), self.source)
@@ -781,6 +724,82 @@ impl<'a> SuppressionsBuilder<'a> {
             invalid: self.invalid,
             errors,
             preview: self.settings.preview,
+        }
+    }
+
+    /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns
+    /// `true` if such a comment was found.
+    fn register_standalone_suppression(
+        &mut self,
+        suppression: &SuppressionComment,
+        tokens: &Tokens,
+    ) -> bool {
+        match suppression.action {
+            SuppressionAction::Ignore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    let (before, after) = tokens.split_at(suppression.range.start());
+                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                        .is_some()
+                    {
+                        // own-line ignore
+                        Self::standalone_comment_range(suppression.range, before, after)
+                    } else {
+                        // trailing ignore
+                        self.trailing_comment_range(suppression.range, before)
+                    };
+                    for code in suppression.codes_as_str(self.source) {
+                        self.valid.push(Suppression {
+                            code: code.into(),
+                            range,
+                            used: false.into(),
+                            comments: SuppressionComments::Single(suppression.clone()),
+                        });
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::FileIgnore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    match indentation_at_offset(suppression.range.start(), self.source) {
+                        // Module scope
+                        Some("") => {
+                            let range = TextRange::up_to(self.source.text_len());
+                            for code in suppression.codes_as_str(self.source) {
+                                self.valid.push(Suppression {
+                                    code: code.into(),
+                                    range,
+                                    used: false.into(),
+                                    comments: SuppressionComments::Single(suppression.clone()),
+                                });
+                            }
+                        }
+                        // Indented/inside block
+                        Some(_) => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::NotModuleScope,
+                                comment: suppression.clone(),
+                            });
+                        }
+                        // Trailing
+                        None => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Trailing,
+                                comment: suppression.clone(),
+                            });
+                        }
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:file-ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::Disable | SuppressionAction::Enable => false,
         }
     }
 

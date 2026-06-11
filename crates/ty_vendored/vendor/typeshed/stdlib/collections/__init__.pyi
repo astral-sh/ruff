@@ -697,7 +697,8 @@ class OrderedDict(dict[_KT, _VT]):
     def popitem(self, last: bool = True) -> tuple[_KT, _VT]:
         """Remove and return a (key, value) pair from the dictionary.
 
-        Pairs are returned in LIFO order if last is true or FIFO order if false.
+        Pairs are returned in LIFO order if last is true or FIFO order if
+        false.
         """
 
     def move_to_end(self, key: _KT, last: bool = True) -> None:

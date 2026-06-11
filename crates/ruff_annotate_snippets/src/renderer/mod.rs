@@ -90,7 +90,7 @@ impl Renderer {
     /// # Example
     ///
     /// ```text
-    ///   --> $DIR/whitespace-trimming.rs:4:193
+    ///   --> $DIR/whitespace-trimming.rs:LL:193
     ///    |
     /// LL | ...                   let _: () = 42;
     ///    |                                   ^^ expected (), found integer

@@ -96,7 +96,7 @@ if sys.version_info >= (3, 15):
         wrapcol
           Split result into lines of provided width.
         pad
-          Pad input to a multiple of 4 before encoding.
+          Retain zero-padding bytes at end of output.
         adobe
           Wrap result in '<~' and '~>' as in Adobe Ascii85.
         """
@@ -115,7 +115,8 @@ if sys.version_info >= (3, 15):
         foldspaces
           Allow 'y' as a short form encoding four spaces.
         adobe
-          Expect data to be wrapped in '<~' and '~>' as in Adobe Ascii85.
+          Expect data to be terminated with '~>' as in Adobe Ascii85, and
+          optionally accept leading '<~'.
         ignorechars
           A byte string containing characters to ignore from the input.
         canonical
@@ -126,7 +127,7 @@ if sys.version_info >= (3, 15):
         """Base85-code line of data.
 
         pad
-          Pad input to a multiple of 4 before encoding.
+          Retain zero-padding bytes at end of output.
         """
 
     def a2b_base85(
