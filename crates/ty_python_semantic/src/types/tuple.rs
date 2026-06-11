@@ -198,6 +198,18 @@ impl<'db> TupleType<'db> {
         }
     }
 
+    /// Packs a `TypeVarTuple` into the tuple value used for generic specialization relations.
+    pub(crate) fn unpacked_typevartuple(
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+    ) -> Self {
+        debug_assert!(typevar.is_typevartuple(db));
+        TupleType::new_internal(
+            db,
+            VariableLengthTuple::mixed([], Type::TypeVar(typevar), []),
+        )
+    }
+
     // N.B. If this method is not Salsa-tracked, we take 10 minutes to check
     // `static-frame` as part of the ecosystem analysis. This is because it's called
     // from `NominalInstanceType::class()`, which is a very hot method.
@@ -1129,16 +1141,33 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            self.variable()
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let prefix = self
+            .prefix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+        let variable = self.variable();
+        let mapped_variable = variable.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        let suffix = self
+            .suffix_elements()
+            .iter()
+            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+
+        if let Type::TypeVar(typevar) = variable
+            && typevar.is_typevartuple(db)
+            && let Some(mapped_tuple) = mapped_variable.exact_tuple_instance_spec(db)
+        {
+            let mut builder = TupleSpecBuilder::with_capacity(self.elements.len());
+            for element in prefix {
+                builder.push(element);
+            }
+            builder = builder.concat(db, &mapped_tuple);
+            for element in suffix {
+                builder.push(element);
+            }
+            return builder.build();
+        }
+
+        Self::mixed(prefix, mapped_variable, suffix)
     }
 
     fn find_legacy_typevars_impl(
