@@ -474,6 +474,32 @@ def _(cls: Intersection[type[A], type[B], Not[Meta]]):
     reveal_type(cls.make())  # revealed: A & B
 ```
 
+### Deferred class-object projection arms
+
+```py
+from typing import Protocol, Self
+from ty_extensions import Intersection
+
+class A:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+class B: ...
+
+class HasClassMarker(Protocol):
+    marker: int
+
+def structural_arm(cls: Intersection[type[A], type[B], HasClassMarker]):
+    # TODO: This should reveal `A & B`. The protocol constrains the class object itself and should
+    # not prevent the nominal class-object arms from being projected onto instances.
+    reveal_type(cls.make())  # revealed: A
+
+def typevar_arm[U](cls: Intersection[type[A], type[U]]):
+    # TODO: This should reveal `A & U@typevar_arm` once class-object TypeVar arms are projected.
+    reveal_type(cls.make())  # revealed: A
+```
+
 ### Calling `super()` in overridden methods with `Self` return type
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.

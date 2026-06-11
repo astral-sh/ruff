@@ -350,6 +350,11 @@ def _(cls: type[A]):
     if not issubclass(cls, B):
         reveal_type(f1(cls))  # revealed: type[A] & ~type[B]
 
+def typevar_arm[U](cls: Intersection[type[A], type[U]]):
+    # TODO: This should reveal `type[A] & type[U@typevar_arm]` once class-object TypeVar arms are
+    # projected as a single inference constraint.
+    reveal_type(f1(cls))  # revealed: type[A | U@typevar_arm]
+
 def f2[T](x: T) -> type[T]:
     return type(x)
 
