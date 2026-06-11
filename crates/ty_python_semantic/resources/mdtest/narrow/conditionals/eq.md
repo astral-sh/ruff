@@ -122,6 +122,33 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+Enum member identities must also be statically known. A custom constructor can make two members
+aliases at runtime even when their declared values differ:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class ConstructedAlias(Enum):
+    def __new__(cls, value: int) -> "ConstructedAlias":
+        obj = object.__new__(cls)
+        obj._value_ = 0
+        return obj
+
+    X = 1
+    Y = 2
+
+def _(value: Literal[ConstructedAlias.Y]):
+    if value == ConstructedAlias.X:
+        reveal_type(value)  # revealed: Literal[ConstructedAlias.Y]
+
+def _(value: ConstructedAlias):
+    if value == ConstructedAlias.X:
+        reveal_type(value)  # revealed: ConstructedAlias
+    else:
+        reveal_type(value)  # revealed: ConstructedAlias
+```
+
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
 
 ```py

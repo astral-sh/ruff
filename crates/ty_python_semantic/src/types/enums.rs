@@ -171,6 +171,38 @@ impl<'db> EnumMetadata<'db> {
         }
     }
 
+    /// Return whether the canonical identities of all enum members are statically known.
+    pub(crate) fn has_known_member_identities(&self) -> bool {
+        if self.init_function.is_some()
+            || self.new_function.is_some()
+            || self.has_custom_new
+            || self.generate_next_value_function.is_some()
+            || self.custom_enum_metaclass_new
+        {
+            return false;
+        }
+
+        let mut has_false = false;
+        let mut has_true = false;
+        let mut has_zero = false;
+        let mut has_one = false;
+        for value in self.members.values() {
+            match value.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(false)) => has_false = true,
+                Some(LiteralValueTypeKind::Bool(true)) => has_true = true,
+                Some(LiteralValueTypeKind::Int(value)) => match value.as_i64() {
+                    0 => has_zero = true,
+                    1 => has_one = true,
+                    _ => {}
+                },
+                Some(LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)) => {}
+                _ => return false,
+            }
+        }
+
+        !((has_false && has_zero) || (has_true && has_one))
+    }
+
     /// Returns the type of `.value`/`._value_` for a given enum member.
     ///
     /// Priority: explicit `_value_` annotation, then custom construction hooks

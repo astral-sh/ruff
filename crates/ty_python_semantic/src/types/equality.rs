@@ -3,9 +3,9 @@ use ruff_python_ast::name::Name;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
-    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
-    enums::{enum_member_literals, enum_metadata},
+    ClassLiteral, EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind,
+    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    enums::{EnumMetadata, enum_member_literals, enum_metadata},
 };
 
 /// The result of evaluating a runtime comparison between two types.
@@ -163,33 +163,7 @@ pub(super) fn has_known_identity_equality_semantics<'db>(db: &'db dyn Db, ty: Ty
         return false;
     };
 
-    if metadata.init_function.is_some()
-        || metadata.new_function.is_some()
-        || metadata.has_custom_new
-        || metadata.generate_next_value_function.is_some()
-        || metadata.custom_enum_metaclass_new
-    {
-        return false;
-    }
-
-    let mut has_false = false;
-    let mut has_true = false;
-    let mut has_zero = false;
-    let mut has_one = false;
-    for value in metadata.members.values() {
-        match value.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(false)) => has_false = true,
-            Some(LiteralValueTypeKind::Bool(true)) => has_true = true,
-            Some(LiteralValueTypeKind::Int(value)) => match value.as_i64() {
-                0 => has_zero = true,
-                1 => has_one = true,
-                _ => {}
-            },
-            Some(LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)) => {}
-            _ => return false,
-        }
-    }
-    if (has_false && has_zero) || (has_true && has_one) {
+    if !metadata.has_known_member_identities() {
         return false;
     }
 
@@ -509,14 +483,15 @@ fn enum_literal_constraint<'db>(
     };
     let enum_class = right.enum_class(db);
 
-    if !is_same_enum_domain(db, left, right)
+    let metadata = enum_metadata(db, enum_class)?;
+    if !metadata.has_known_member_identities()
+        || !is_same_enum_domain(db, left, right)
         || KnownComparisonSemantics::of_instance(db, right.enum_class_instance(db), operator)
             .is_none()
     {
         return None;
     }
 
-    let metadata = enum_metadata(db, enum_class)?;
     let name = metadata.resolve_member(right.name(db))?.clone();
     let equal_to_right = Type::enum_literal(EnumLiteralType::new(db, enum_class, name));
     Some(equal_to_right.negate_if(db, !condition_expects_equality))
@@ -754,21 +729,24 @@ fn finite_alternatives<'db>(
     operator: ComparisonOperator,
 ) -> Option<Vec<Type<'db>>> {
     match ty {
-        Type::EnumComplement(complement) => KnownComparisonSemantics::of_type(db, ty, operator)
-            .is_some()
-            .then(|| complement.remaining_literal_types(db)),
+        Type::EnumComplement(complement) => {
+            (enum_member_identities_are_known(db, complement.enum_class(db))
+                && KnownComparisonSemantics::of_type(db, ty, operator).is_some())
+            .then(|| complement.remaining_literal_types(db))
+        }
         Type::Intersection(intersection) => {
             let complement = intersection.enum_complement(db)?;
-            KnownComparisonSemantics::of_type(db, ty, operator)
-                .is_some()
-                .then(|| complement.remaining_literal_types(db))
+            (enum_member_identities_are_known(db, complement.enum_class(db))
+                && KnownComparisonSemantics::of_type(db, ty, operator).is_some())
+            .then(|| complement.remaining_literal_types(db))
         }
         Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
         }
         Type::NominalInstance(instance)
             if enum_metadata(db, instance.class_literal(db)).is_some()
-                && KnownComparisonSemantics::of_type(db, ty, operator).is_some() =>
+                && KnownComparisonSemantics::of_type(db, ty, operator).is_some()
+                && enum_member_identities_are_known(db, instance.class_literal(db)) =>
         {
             Some(
                 enum_member_literals(db, instance.class_literal(db), None)
@@ -778,6 +756,10 @@ fn finite_alternatives<'db>(
         }
         _ => None,
     }
+}
+
+fn enum_member_identities_are_known<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    enum_metadata(db, class).is_some_and(EnumMetadata::has_known_member_identities)
 }
 
 fn narrow_literal_comparison<'db>(
@@ -854,18 +836,25 @@ fn compare_literal_to_other<'db>(
     else {
         return ComparisonResult::Ambiguous;
     };
+    let literal_is_reliably_single_valued = literal_type.is_single_valued(db)
+        && match literal {
+            LiteralValueTypeKind::Enum(enum_literal) => {
+                enum_member_identities_are_known(db, enum_literal.enum_class(db))
+            }
+            _ => true,
+        };
     let condition_expects_equality = operator.condition_expects_equality(is_positive);
     match KnownComparisonSemantics::of_type(db, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
-        Some(_) if !literal_is_target && literal_type.is_single_valued(db) => {
+        Some(_) if !literal_is_target && literal_is_reliably_single_valued => {
             ComparisonResult::CanNarrow(literal_type.negate_if(db, !condition_expects_equality))
         }
         Some(_) => ComparisonResult::Ambiguous,
         None if !literal_is_target
             && !condition_expects_equality
-            && literal_type.is_single_valued(db) =>
+            && literal_is_reliably_single_valued =>
         {
             ComparisonResult::CanNarrow(literal_type.negate(db))
         }
@@ -1217,7 +1206,7 @@ fn known_literal_equality<'db>(
                 return Some(false);
             }
             if left_semantics == KnownComparisonSemantics::Object {
-                return Some(same_enum_member(db, left, right));
+                return same_enum_member(db, left, right);
             }
             known_literal_equality(
                 db,
@@ -1281,12 +1270,16 @@ fn same_enum_member<'db>(
     db: &'db dyn Db,
     left: EnumLiteralType<'db>,
     right: EnumLiteralType<'db>,
-) -> bool {
-    if left.enum_class(db) != right.enum_class(db) {
-        return false;
+) -> Option<bool> {
+    if left == right {
+        return Some(true);
     }
-    let Some(metadata) = enum_metadata(db, left.enum_class(db)) else {
-        return left == right;
-    };
-    metadata.resolve_member(left.name(db)) == metadata.resolve_member(right.name(db))
+    if left.enum_class(db) != right.enum_class(db) {
+        return Some(false);
+    }
+    let metadata = enum_metadata(db, left.enum_class(db))?;
+    if !metadata.has_known_member_identities() {
+        return None;
+    }
+    Some(metadata.resolve_member(left.name(db)) == metadata.resolve_member(right.name(db)))
 }
