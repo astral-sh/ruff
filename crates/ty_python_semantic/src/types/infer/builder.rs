@@ -5828,7 +5828,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         continue;
                     }
 
-                    let mut inferred_by_cache_key = FxHashMap::default();
+                    // Match the inline capacity of `parameter_contexts`; most arguments avoid both
+                    // allocating and hashing for this short-lived cache.
+                    let mut inferred_by_cache_key: SmallVec<[(Type<'db>, Type<'db>); 4]> =
+                        SmallVec::new();
 
                     // Cache expressions inferred across speculative inference attempts.
                     //
@@ -5839,7 +5842,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for parameter_context in parameter_contexts {
                         let inference_cache_key = parameter_context.inference_cache_key();
                         if let Some(inferred_ty) =
-                            inferred_by_cache_key.get(&inference_cache_key).copied()
+                            inferred_by_cache_key
+                                .iter()
+                                .find_map(|(cache_key, inferred_ty)| {
+                                    (*cache_key == inference_cache_key).then_some(*inferred_ty)
+                                })
                         {
                             // Even when the inference cache key is identical, this overload may later
                             // look up the inferred type through a different original `ParamSpec`
@@ -5865,7 +5872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             ),
                         );
 
-                        inferred_by_cache_key.insert(inference_cache_key, inferred_ty);
+                        inferred_by_cache_key.push((inference_cache_key, inferred_ty));
                         self.union_expected_types(&speculative_builder.expected_types);
                         parameter_context.insert_inferred_type(
                             arguments_types,
