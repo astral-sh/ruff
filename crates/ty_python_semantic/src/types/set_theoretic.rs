@@ -388,15 +388,6 @@ impl<'db> UnionType<'db> {
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
-        if normalization.is_nested()
-            && let Some(Type::Union(fold_body)) = normalization.fold_body()
-            && fold_body
-                .elements(db)
-                .iter()
-                .all(|fold_element| self.elements(db).contains(fold_element))
-        {
-            return Some(normalization.marker());
-        }
         let mut empty = true;
         for ty in self.elements(db) {
             if normalization.is_nested() {

@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::{Cell, OnceCell};
+use std::cell::OnceCell;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -100,9 +100,7 @@ pub use crate::types::typevar::{
 };
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
-use crate::types::visitor::{
-    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
-};
+use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
@@ -1060,7 +1058,6 @@ impl<'db> GeneratorTypes<'db> {
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RecursiveTypeNormalization<'db> {
     marker: Type<'db>,
-    fold_body: Option<Type<'db>>,
     nested: bool,
     preserve_top_level_recursive: bool,
 }
@@ -1069,14 +1066,9 @@ impl<'db> RecursiveTypeNormalization<'db> {
     fn new(marker: Type<'db>) -> Self {
         Self {
             marker,
-            fold_body: None,
             nested: false,
             preserve_top_level_recursive: false,
         }
-    }
-
-    fn with_fold_body(self, fold_body: Option<Type<'db>>) -> Self {
-        Self { fold_body, ..self }
     }
 
     pub(super) fn preserve_top_level_recursive(self) -> Self {
@@ -1105,55 +1097,12 @@ impl<'db> RecursiveTypeNormalization<'db> {
         !self.nested && self.preserve_top_level_recursive
     }
 
-    pub(super) fn fold_body(self) -> Option<Type<'db>> {
-        self.fold_body
-    }
-
     fn matches_marker(self, ty: Type<'db>) -> bool {
         ty.same_divergent_marker(self.marker)
     }
 
-    fn should_fold_exact(self, ty: Type<'db>) -> bool {
-        self.nested && self.fold_body == Some(ty)
-    }
-
     fn contains_marker(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        struct ContainsMarkerVisitor<'db> {
-            normalization: RecursiveTypeNormalization<'db>,
-            found: Cell<bool>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for ContainsMarkerVisitor<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                if self.found.get() {
-                    return;
-                }
-
-                if self.normalization.matches_marker(ty) {
-                    self.found.set(true);
-                    return;
-                }
-
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-
-            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-                self.visit_type(db, recursive.body(db));
-            }
-        }
-
-        let visitor = ContainsMarkerVisitor {
-            normalization: self,
-            found: Cell::new(false),
-            recursion_guard: TypeCollector::default(),
-        };
-        visitor.visit_type(db, ty);
-        visitor.found.get()
+        any_over_type(db, ty, false, |inner| self.matches_marker(inner))
     }
 }
 
@@ -1326,40 +1275,49 @@ impl<'db> Type<'db> {
         let recovered = if let Some(previous) = previous {
             let previous = cycle_head_body(previous);
 
-            // When we encounter a salsa cycle, we want to avoid oscillating between two or more
-            // types without converging on a fixed-point result. Most of the time, we union
-            // together the types from each cycle iteration to ensure monotonicity.
+            // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
+            // without converging on a fixed-point result. Most of the time, we union together the
+            // types from each cycle iteration to ensure that our result is monotonic, even if we
+            // encounter oscillation.
             //
-            // However, for the first couple iterations we are prone to get values including
-            // Divergent that will soon converge, but where unioning in the early value causes a
-            // loss of precision that we can't recover from.
-            if cycle.iteration() > crate::TAINTED_CYCLES
-                && let Some(normalized) = cycle.head_ids().find_map(|id| {
-                    self.recursive_nominal_growth_normalized(db, previous, Type::divergent(id))
-                })
-            {
-                normalized
-            } else if cycle.iteration() <= crate::TAINTED_CYCLES {
+            // However, for the first couple iterations we are prone to get values including Divergent
+            // that will soon converge, but where unioning in the early value causes a loss of
+            // precision that we can't recover from. For example, a narrowing condition that looks like
+            // `is not Divergent` instead of `is not None` in the first iteration may cause us to lose
+            // the effect of that narrowing permanently, due to the union-previous-iteration behavior.
+            // So we avoid unioning in the first couple iterations, and just use the later iteration's
+            // result directly. We still ensure monotonicity after the first couple iterations, which
+            // still ensures convergence in cases that are prone to oscillation.
+            if cycle.iteration() <= crate::TAINTED_CYCLES {
                 let self_degraded_by_overload =
                     any_over_type(db, self, false, |ty| {
                         matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
                     }) && !any_over_type(db, self, false, |ty| ty.is_divergent())
                         && any_over_type(db, previous, false, |ty| ty.is_divergent());
+                // Generally, the precision of type inference improves with each iteration.
+                // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
+                // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
 
                 if self_degraded_by_overload {
                     UnionType::from_elements_cycle_recovery(db, [previous, self])
                 } else {
                     self
                 }
+            } else if let Some(normalized) = cycle.head_ids().find_map(|id| {
+                self.recursive_nominal_growth_normalized(db, previous, Type::divergent(id))
+            }) {
+                normalized
             } else if let (Type::GenericAlias(current), Type::GenericAlias(previous)) =
                 (self, previous)
                 && let Some(merged) = current.merge_cycle_recovery(db, previous)
             {
                 Type::GenericAlias(merged)
             } else {
-                // Use the previous union type as the base and only add new element types in this
-                // cycle. Unioning in the reverse order can make fixed-point iteration converge
-                // slowly or fail when union element order oscillates.
+                // The current type is unioned to the previous type. Unioning in the reverse order can
+                // cause the fixed-point iterations to converge slowly or even fail. Consider the case
+                // where the order of union types is different between the previous and current cycle.
+                // We should use the previous union type as the base and only add new element types in
+                // this cycle, if any.
                 UnionType::from_elements_cycle_recovery(db, [previous, self])
             }
         } else {
@@ -1372,13 +1330,6 @@ impl<'db> Type<'db> {
             .fold(cycle_head_body(recovered), |ty, id| {
                 let marker = Type::divergent(id);
                 let normalization = RecursiveTypeNormalization::new(marker);
-                let fold_body = previous
-                    .and_then(|previous| match previous {
-                        Type::Recursive(rec) if rec.binder_id(db) == id => Some(rec.body(db)),
-                        _ => None,
-                    })
-                    .filter(|body| normalization.contains_marker(db, *body));
-                let normalization = normalization.with_fold_body(fold_body);
                 let normalized = ty
                     .recursive_type_normalized_impl(db, normalization)
                     .unwrap_or(marker);
@@ -2487,9 +2438,6 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        if normalization.should_fold_exact(self) {
-            return Some(normalization.marker());
-        }
         if normalization.is_nested() && normalization.matches_marker(self) {
             return None;
         }
