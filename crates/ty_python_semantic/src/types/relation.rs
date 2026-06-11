@@ -395,9 +395,28 @@ impl<'db> Type<'db> {
     /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
     /// reasoning depending on inferable typevars.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        let constraints = ConstraintSetBuilder::new();
-        self.when_constraint_set_assignable_to(db, target, &constraints)
-            .is_always_satisfied(db)
+        self.when_constraint_set_assignable_to_owned(db, target)
+            .query(|builder, when| when.is_always_satisfied(db))
+    }
+
+    /// Return true if this type is possibly assignable to type `target` using constraint-set
+    /// assignability.
+    ///
+    /// This uses `TypeRelation::ConstraintSetAssignability`, which encodes typevar relations into
+    /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
+    /// reasoning depending on inferable typevars.
+    ///
+    /// This is a cheaper check than
+    /// [`is_constraint_set_assignable_to`][Self::is_always_satisfied], and can be used when false
+    /// positives are acceptable. (If this method returns `true`, then `self` is definitely
+    /// assignable to `target`. If it returns false, it might or might not be.)
+    pub fn is_possibly_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
+        self.when_constraint_set_assignable_to_owned(db, target)
+            .query(|builder, when| when.is_possibly_always_satisfied(db))
     }
 
     pub(super) fn when_assignable_to<'c>(

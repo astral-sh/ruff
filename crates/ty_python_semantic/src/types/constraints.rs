@@ -485,6 +485,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             .is_always_satisfied(db, self.builder)
     }
 
+    /// Returns whether this constraint set possibly always holds. This is a cheaper check than
+    /// [`is_always_satisfied`][Self::is_always_satisfied], and can be used when false positives
+    /// are acceptable. (If this method returns `true`, then the constraint set is definitely
+    /// always satisfied. If it returns false, it might or might not be.)
+    pub(crate) fn is_possibly_always_satisfied(self, db: &'db dyn Db) -> bool {
+        self.node.is_always_satisfied(db, self.builder)
+    }
+
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)
@@ -1598,14 +1606,27 @@ impl ConstraintId {
         {
             return false;
         }
+
+        // Constraint implication is only used to derive additional sequent facts while
+        // walking a constraint set. It is always safe to be conservative and decline
+        // to derive a fact. In particular, don't force deferred quantification for
+        // generic callable/protocol bounds here: exact semantic assignability can
+        // require an expensive existential abstraction, while a raw unconditional
+        // relation is a sufficient implication witness.
         other_constraint
             .bounds
             .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
+            .is_possibly_constraint_set_assignable_to(
+                db,
+                self_constraint.bounds.materialized_lower(),
+            )
             && self_constraint
                 .bounds
                 .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+                .is_possibly_constraint_set_assignable_to(
+                    db,
+                    other_constraint.bounds.materialized_upper(),
+                )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
