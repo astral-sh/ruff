@@ -583,6 +583,24 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
 
 type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
 
+/// The narrowing constraints contributed by a match pattern.
+///
+/// An impossible alternative is omitted from an OR pattern, while a possible alternative with no
+/// constraints prevents the OR pattern from narrowing.
+enum PatternNarrowingResult<'db> {
+    Impossible,
+    Possible(Option<NarrowingConstraints<'db>>),
+}
+
+impl<'db> PatternNarrowingResult<'db> {
+    fn into_constraints(self) -> Option<NarrowingConstraints<'db>> {
+        match self {
+            Self::Impossible | Self::Possible(None) => None,
+            Self::Possible(Some(constraints)) => Some(constraints),
+        }
+    }
+}
+
 #[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct ExpressionNarrowingConstraints<'db> {
     positive: Option<NarrowingConstraints<'db>>,
@@ -902,30 +920,32 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> PatternNarrowingResult<'db> {
         match pattern_predicate_kind {
-            PatternPredicateKind::Singleton(singleton) => {
-                self.evaluate_match_pattern_singleton(subject, *singleton, is_positive)
-            }
-            PatternPredicateKind::Class(cls, kind) => {
-                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
-            }
-            PatternPredicateKind::Mapping(kind) => {
-                self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
-            }
+            PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
+            ),
+            PatternPredicateKind::Class(cls, kind) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive),
+            ),
+            PatternPredicateKind::Mapping(kind) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_mapping(subject, *kind, is_positive),
+            ),
             PatternPredicateKind::Sequence(kind) => {
                 self.evaluate_match_pattern_sequence(subject, kind, is_positive)
             }
-            PatternPredicateKind::Value(expr) => {
-                self.evaluate_match_pattern_value(subject, *expr, is_positive)
-            }
+            PatternPredicateKind::Value(expr) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_value(subject, *expr, is_positive),
+            ),
             PatternPredicateKind::Or(predicates) => {
                 self.evaluate_match_pattern_or(subject, predicates, is_positive)
             }
-            PatternPredicateKind::As(pattern, _) => pattern
-                .as_deref()
-                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
-            PatternPredicateKind::MatchStar => None,
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.evaluate_pattern_predicate_kind(pattern, subject, is_positive)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::MatchStar => {
+                PatternNarrowingResult::Possible(None)
+            }
         }
     }
 
@@ -939,6 +959,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             pattern.subject(self.db),
             is_positive,
         )
+        .into_constraints()
     }
 
     fn places(&self) -> &'db PlaceTable {
@@ -2173,7 +2194,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         kind: &SequencePatternPredicateKind<'db>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
 
         // A tuple expression has no place that can be narrowed as a whole. For example:
@@ -2183,22 +2204,26 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //
         // Project the element constraints onto the subject-time bindings of `a` and `b`.
         if let ast::Expr::Tuple(tuple) = subject_node {
-            if !is_positive || !tuple.elts.iter().all(ast::Expr::is_name_expr) {
-                return None;
+            if !tuple.elts.iter().all(ast::Expr::is_name_expr) {
+                return PatternNarrowingResult::Possible(None);
             }
 
             let (prefix_patterns, suffix_patterns) =
                 if let Some((prefix, suffix)) = kind.split_around_star() {
                     if tuple.elts.len() < prefix.len() + suffix.len() {
-                        return None;
+                        return PatternNarrowingResult::Impossible;
                     }
                     (prefix, suffix)
                 } else {
                     if tuple.elts.len() != kind.patterns.len() {
-                        return None;
+                        return PatternNarrowingResult::Impossible;
                     }
                     (kind.patterns.as_ref(), &[][..])
                 };
+
+            if !is_positive {
+                return PatternNarrowingResult::Possible(None);
+            }
 
             let mut constraints = NarrowingConstraints::default();
             let element_patterns = tuple
@@ -2207,7 +2232,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .zip(prefix_patterns)
                 .chain(tuple.elts.iter().rev().zip(suffix_patterns.iter().rev()));
             for (element, pattern) in element_patterns {
-                let element = PlaceExpr::try_from_expr(element)?;
+                let Some(element) = PlaceExpr::try_from_expr(element) else {
+                    return PatternNarrowingResult::Possible(None);
+                };
                 insert_narrowing_constraint(
                     &mut constraints,
                     self.expect_place(&element),
@@ -2215,24 +2242,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 );
             }
 
-            return (!constraints.is_empty()).then_some(constraints);
+            return PatternNarrowingResult::Possible(
+                (!constraints.is_empty()).then_some(constraints),
+            );
         }
 
-        let subject = PlaceExpr::try_from_expr(subject_node)?;
+        let Some(subject) = PlaceExpr::try_from_expr(subject_node) else {
+            return PatternNarrowingResult::Possible(None);
+        };
 
         let constraint = if is_positive {
             NarrowingConstraint::intersection(self.necessary_sequence_pattern_type(kind))
         } else {
             let sequence_type = definite_sequence_pattern_type(self.db, kind);
             if sequence_type.is_never() {
-                return None;
+                return PatternNarrowingResult::Possible(None);
             }
             NarrowingConstraint::intersection(sequence_type.negate(self.db))
         };
 
         let place = self.expect_place(&subject);
 
-        Some(NarrowingConstraints::from_iter([(place, constraint)]))
+        PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
+            place, constraint,
+        )])))
     }
 
     fn evaluate_match_pattern_value(
@@ -2310,18 +2343,24 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
         is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> PatternNarrowingResult<'db> {
         let merge_constraints = if is_positive {
             Self::merge_optional_constraints_or
         } else {
             Self::merge_optional_constraints_and
         };
 
-        predicates
-            .iter()
-            .map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject, is_positive))
-            .reduce(merge_constraints)
-            .flatten()
+        let mut alternatives = predicates.iter().filter_map(|predicate| {
+            match self.evaluate_pattern_predicate_kind(predicate, subject, is_positive) {
+                PatternNarrowingResult::Impossible => None,
+                PatternNarrowingResult::Possible(constraints) => Some(constraints),
+            }
+        });
+        let Some(first) = alternatives.next() else {
+            return PatternNarrowingResult::Impossible;
+        };
+
+        PatternNarrowingResult::Possible(alternatives.fold(first, merge_constraints))
     }
 
     fn evaluate_bool_op(

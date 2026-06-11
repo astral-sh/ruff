@@ -335,6 +335,15 @@ def match_tuple_expression_constrained_or_pattern(
             reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1 | TupleSubjectB2
 
+def match_tuple_expression_or_impossible_alternative(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
+
 def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
     match a, a:
         case [TupleSubjectA1(), TupleSubjectA()]:
