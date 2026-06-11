@@ -480,5 +480,20 @@ fn is_ignore_file(path: &SystemPath) -> bool {
 }
 
 fn is_project_config_file(path: &SystemPath) -> bool {
-    matches!(path.file_name(), Some("ty.toml" | "pyproject.toml"))
+    matches!(
+        path.file_name(),
+        Some("ty.toml" | "pyproject.toml" | "uv.toml")
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::system::SystemPath;
+
+    use super::is_project_config_file;
+
+    #[test]
+    fn recognizes_uv_configuration() {
+        assert!(is_project_config_file(SystemPath::new("/project/uv.toml")));
+    }
 }

@@ -1,5 +1,6 @@
 #![cfg(feature = "test-uv")]
 
+use std::path::PathBuf;
 use std::process::Command;
 
 use insta_cmd::assert_cmd_snapshot;
@@ -15,6 +16,69 @@ fn command_with_uv(case: &CliTest) -> Command {
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());
 
     command
+}
+
+const TEST_TY_VERSION: &str = "0.0.999";
+
+fn uv_check_command(case: &CliTest) -> Command {
+    let mut command = Command::new("uv");
+    command
+        .current_dir(case.root())
+        .arg("check")
+        .arg("--ty-version")
+        .arg(TEST_TY_VERSION)
+        .arg("--offline")
+        .arg("--quiet")
+        .env("UV_CACHE_DIR", case.root().join("uv-cache"))
+        .env("UV_PREVIEW", "1")
+        .env("UV_PYTHON_DOWNLOADS", "never")
+        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env_remove("VIRTUAL_ENV");
+
+    command
+}
+
+fn uv_cached_ty_path() -> anyhow::Result<PathBuf> {
+    let platform = match (std::env::consts::ARCH, std::env::consts::OS) {
+        ("aarch64", "macos") => "aarch64-apple-darwin",
+        ("x86_64", "macos") => "x86_64-apple-darwin",
+        ("aarch64", "linux") if cfg!(target_env = "musl") => "aarch64-unknown-linux-musl",
+        ("aarch64", "linux") => "aarch64-unknown-linux-gnu",
+        ("x86_64", "linux") if cfg!(target_env = "musl") => "x86_64-unknown-linux-musl",
+        ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
+        ("aarch64", "windows") => "aarch64-pc-windows-msvc",
+        ("x86_64", "windows") => "x86_64-pc-windows-msvc",
+        (arch, os) => anyhow::bail!("unsupported uv test platform: {arch}-{os}"),
+    };
+
+    Ok(PathBuf::from("uv-cache")
+        .join("binaries-v0")
+        .join("ty")
+        .join(TEST_TY_VERSION)
+        .join(platform)
+        .join(format!("ty{}", std::env::consts::EXE_SUFFIX)))
+}
+
+#[test]
+fn uv_check_uses_workspace_metadata() -> anyhow::Result<()> {
+    // Populate uv's pinned-binary cache with this test's ty build so the command stays offline.
+    let case = workspace_case()?.with_ty_at(uv_cached_ty_path()?)?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
+    let mut command = uv_check_command(&case);
+    command.current_dir(case.root().join("packages/member"));
+
+    assert_cmd_snapshot!(command, @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
 }
 
 #[test]
@@ -222,6 +286,49 @@ fn uv_metadata_environment_variable_reads_metadata_from_stdin() -> anyhow::Resul
     All checks passed!
 
     ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn invalid_uv_metadata_from_stdin_is_an_error() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    let mut command = case.command();
+    command.env("TY_UV_METADATA", "1");
+
+    assert_cmd_snapshot!(command.pass_stdin("{"), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Failed to use `uv workspace metadata` output from stdin
+      Cause: invalid `uv workspace metadata` JSON: EOF while parsing an object at line 1 column 1
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn unsupported_uv_metadata_schema_from_stdin_is_an_error() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    let mut metadata = workspace_metadata_json(&case, None);
+    metadata["schema"]["version"] = serde_json::json!("future");
+
+    let mut command = case.command();
+    command.env("TY_UV_METADATA", "1");
+
+    assert_cmd_snapshot!(command.pass_stdin(metadata.to_string()), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Failed to use `uv workspace metadata` output from stdin
+      Cause: unsupported `uv workspace metadata` schema version `future`
     ");
 
     Ok(())

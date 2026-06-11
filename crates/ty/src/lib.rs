@@ -3,10 +3,10 @@ mod logging;
 mod printer;
 mod python_version;
 mod rule;
-mod uv;
 mod version;
 
 use std::fmt::Write;
+use std::io::Read;
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -27,6 +27,7 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
+use ty_project::metadata::uv::UvWorkspace;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
@@ -129,49 +130,42 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             }
         })
         .transpose()?;
+    let project_path = explicit_project_path
+        .as_deref()
+        .unwrap_or(&cwd)
+        .to_path_buf();
+
+    let system = OsSystem::new(&cwd);
     let uv_workspace = if args.uv_metadata {
-        uv::discover_workspace(&cwd, uv::WorkspaceMetadataSource::Stdin)
+        let mut metadata = Vec::new();
+        std::io::stdin()
+            .read_to_end(&mut metadata)
+            .context("Failed to read `uv workspace metadata` output from stdin")?;
+        Some(
+            UvWorkspace::from_metadata(&cwd, &metadata, &system)
+                .context("Failed to use `uv workspace metadata` output from stdin")?,
+        )
     } else if explicit_project_path.is_none() {
-        uv::discover_workspace(&cwd, uv::WorkspaceMetadataSource::Command)
+        UvWorkspace::discover(&cwd, &system)
     } else {
         None
     };
-    let (project_path, uv_workspace_member, uv_environment, uv_requires_python) =
-        match (explicit_project_path, uv_workspace) {
+    let (stdin_uv_environment, stdin_uv_requires_python) = if args.uv_metadata {
+        uv_workspace.as_ref().map_or((None, None), |workspace| {
             (
-                Some(project_path),
-                Some(uv::UvWorkspace {
-                    environment,
-                    requires_python,
-                    ..
-                }),
-            ) => (project_path, None, environment, requires_python),
-            (Some(project_path), None) => (project_path, None, None, None),
-            (
-                None,
-                Some(uv::UvWorkspace {
-                    root,
-                    member,
-                    environment,
-                    requires_python,
-                }),
-            ) => (root, member, environment, requires_python),
-            (None, None) => (cwd.clone(), None, None, None),
-        };
+                workspace.environment().map(SystemPath::to_path_buf),
+                workspace.requires_python().cloned(),
+            )
+        })
+    } else {
+        (None, None)
+    };
 
     let mut check_paths: Vec<_> = args
         .paths
         .iter()
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
-    // Use uv to discover workspace settings without checking sibling workspace members by default.
-    if check_paths.is_empty()
-        && let Some(workspace_member) = uv_workspace_member
-        && workspace_member != project_path
-    {
-        check_paths.push(workspace_member);
-    }
-
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
@@ -180,7 +174,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
-    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let config_file = args
@@ -192,16 +185,30 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut project_metadata = match &config_file {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+                .with_uv_workspace(uv_workspace)
         }
-        None => ProjectMetadata::discover(&project_path, &system)?,
+        None if explicit_project_path.is_some() => {
+            ProjectMetadata::discover_with_uv_workspace(&project_path, &system, None)?
+                .with_uv_workspace(uv_workspace)
+        }
+        None => ProjectMetadata::discover_with_uv_workspace(&project_path, &system, uv_workspace)?,
     };
+
+    // Use uv to discover workspace settings without checking sibling workspace members by default.
+    if check_paths.is_empty()
+        && explicit_project_path.is_none()
+        && let Some(workspace_member) = project_metadata.uv_workspace_member()
+        && workspace_member != project_metadata.root()
+    {
+        check_paths.push(workspace_member.to_path_buf());
+    }
 
     project_metadata.apply_configuration_files(&system)?;
 
     let mut project_options_overrides =
         ProjectOptionsOverrides::new(config_file, args.into_options());
-    project_options_overrides.fallback_python = uv_environment.map(RelativePathBuf::cli);
-    project_options_overrides.fallback_python_version = uv_requires_python;
+    project_options_overrides.fallback_python = stdin_uv_environment.map(RelativePathBuf::cli);
+    project_options_overrides.fallback_python_version = stdin_uv_requires_python;
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
