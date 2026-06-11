@@ -597,6 +597,29 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Returns whether this constraint set is a positive conjunction of concrete lower bounds for
+    /// inferable typevars.
+    ///
+    /// This classifies the final BDD shape only. A caller that wants to reuse data accumulated
+    /// while constructing the constraint set must separately prove that the data has matching
+    /// provenance.
+    pub(crate) fn is_simple_inferable_lower_bound_conjunction(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+    ) -> bool {
+        self.verify_builder(builder);
+        self.node
+            .simple_lower_bound_conjunction(db, builder)
+            .is_some_and(|constraints| {
+                !constraints.is_empty()
+                    && constraints
+                        .iter()
+                        .all(|(typevar, _, _)| typevar.is_inferable(db, inferable))
+            })
+    }
+
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
     /// The `choose` hook is called for each typevar on each BDD path with the typevar's explicit
