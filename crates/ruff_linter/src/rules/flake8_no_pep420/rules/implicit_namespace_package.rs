@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PySourceType;
@@ -82,6 +82,9 @@ pub(crate) fn implicit_namespace_package(
         && !path
             .parent()
             .is_some_and( |parent| src.iter().any(|src| src == parent))
+        // Ignore test files in the top-level `tests` directory, as recommended pytest layouts do
+        // not require `tests` to be a package.
+        && !is_top_level_tests_file(path, project_root)
         // Ignore files that contain a shebang.
         && comment_ranges
             .first().filter(|range| range.start() == TextSize::from(0))
@@ -115,4 +118,16 @@ pub(crate) fn implicit_namespace_package(
             }
         }
     }
+}
+
+fn is_top_level_tests_file(path: &Path, project_root: &Path) -> bool {
+    let Ok(relative) = path.strip_prefix(project_root) else {
+        return false;
+    };
+
+    let mut components = relative.components();
+    matches!(
+        components.next(),
+        Some(Component::Normal(component)) if component == "tests"
+    ) && components.next().is_some()
 }
