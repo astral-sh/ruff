@@ -86,7 +86,7 @@ pub(super) fn evaluate_type_equality<'db>(
     is_positive: bool,
 ) -> Option<Type<'db>> {
     enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
-        .or_else(|| primitive_literal_constraint(db, left, right, is_positive))
+        .or_else(|| builtin_literal_constraint(db, left, right, is_positive))
         .or_else(|| {
             if comparison_domain(db, left, right, ComparisonOperator::Equality)
                 == ComparisonDomain::Known
@@ -132,7 +132,7 @@ pub(super) fn evaluate_type_inequality<'db>(
         ComparisonOperator::Inequality,
         !is_positive,
     )
-    .or_else(|| primitive_literal_constraint(db, left, right, !is_positive))
+    .or_else(|| builtin_literal_constraint(db, left, right, !is_positive))
     .or_else(|| {
         comparison_result(db, left, right, is_positive, ComparisonOperator::Inequality)
             .constraint(is_positive)
@@ -324,7 +324,11 @@ fn comparison_result<'db>(
     }
 }
 
-fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
+/// Return whether `ty` is handled by [`builtin_literal_constraint`].
+///
+/// This includes `int`, `bool`, `str`, and `bytes` literals, along with `bool` itself because its
+/// only possible values are `Literal[True]` and `Literal[False]`.
+fn is_builtin_literal_type(db: &dyn Db, ty: Type) -> bool {
     match ty.resolve_type_alias(db) {
         Type::LiteralValue(literal) => matches!(
             literal.kind(),
@@ -338,7 +342,8 @@ fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
     }
 }
 
-/// Return a predicate-shaped constraint for comparison with a primitive literal.
+/// Return a predicate-shaped constraint for comparison with an `int`, `bool`, `str`, or `bytes`
+/// literal.
 ///
 /// Narrowing constraints participate in cyclic inference. Filtering `"B" | "C"` to `"B"` for the
 /// false branch of `x == "C"` can freeze a loop before later iterations widen `x`. Constraining the
@@ -347,7 +352,7 @@ fn is_builtin_primitive(db: &dyn Db, ty: Type) -> bool {
 ///
 /// The constraint also follows Python's equality between booleans and integers: `x != 0` excludes
 /// both `Literal[0]` and `Literal[False]`, while `x != 1` excludes `Literal[1]` and `Literal[True]`.
-fn primitive_literal_constraint<'db>(
+fn builtin_literal_constraint<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
@@ -422,8 +427,8 @@ fn primitive_literal_constraint<'db>(
             .elements(db)
             .iter()
             .copied()
-            .all(|element| is_builtin_primitive(db, element)),
-        left => is_builtin_primitive(db, left),
+            .all(|element| is_builtin_literal_type(db, element)),
+        left => is_builtin_literal_type(db, left),
     }
     .then_some(equal_to_right)
 }
