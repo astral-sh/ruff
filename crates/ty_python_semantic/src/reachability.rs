@@ -633,8 +633,8 @@ impl ProjectedNarrowingGraph<'_> {
         if node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_TRUE {
             return ProjectedNarrowingNodeId::ALWAYS_TRUE;
         }
-        if node.if_true == node.if_false {
-            return self.or(node.if_true, node.if_uncertain);
+        if node.if_true == node.if_false && node.if_true == node.if_uncertain {
+            return node.if_true;
         }
 
         // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
