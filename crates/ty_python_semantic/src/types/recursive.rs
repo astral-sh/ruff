@@ -7,6 +7,13 @@
 //! cycle recovery, and finite type-transform traversal. Type relations use
 //! recursive types through their public operations, but relation-specific cycle
 //! guards live with the relation checker.
+//!
+//! Type operations on a [`RecursiveType`] should follow the sequence
+//! `unfold -> operation -> fold`: first expose one layer of structure, then run
+//! the operation, then fold any re-created body fragments back under the same
+//! binder. Keeping the fold at the operation boundary prevents inferred types
+//! from growing by repeated unfoldings while still allowing operations to inspect
+//! the recursive body.
 
 use crate::Db;
 use crate::types::visitor;
@@ -194,6 +201,10 @@ impl<'db> RecursiveType<'db> {
     /// position so further structural operations (iteration, subscript, …) can
     /// continue to descend.
     ///
+    /// This is only the first step of a type operation. The operation result
+    /// should be passed to [`fold`][Self::fold] before it is returned to the
+    /// surrounding inference flow.
+    ///
     /// Compare with [`body_with_origin_marker`][Self::body_with_origin_marker],
     /// which substitutes the source type instead — used for display and for
     /// `IntersectionBuilder`'s distribution where re-finding the recursive name
@@ -211,13 +222,46 @@ impl<'db> RecursiveType<'db> {
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 
-    pub(crate) fn fold(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    /// Fold the result of operating on [`unfold`][Self::unfold] back under this binder.
+    ///
+    /// This is the final step of the `unfold -> operation -> fold` discipline.
+    /// Without it, repeated operations can keep materializing copies of the
+    /// recursive body instead of preserving the fixed-point shape.
+    pub(crate) fn fold(self, db: &'db dyn Db, unfold_operated: Type<'db>) -> Type<'db> {
         let marker = Type::divergent(self.binder_id(db));
         let normalization = RecursiveTypeNormalization::new(marker)
             .with_fold_body(Some(self.body(db)))
             .preserve_top_level_recursive();
-        ty.recursive_type_normalized_impl(db, normalization)
+        unfold_operated
+            .recursive_type_normalized_impl(db, normalization)
             .unwrap_or(marker)
+    }
+
+    /// Apply a type operation to one unfolded layer, then fold the result.
+    pub(crate) fn map(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.fold(db, f(self.unfold(db)))
+    }
+
+    /// Fallible version of [`map`][Self::map].
+    pub(crate) fn try_map<E>(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(Type<'db>) -> Result<Type<'db>, E>,
+    ) -> Result<Type<'db>, E> {
+        Ok(self.fold(db, f(self.unfold(db))?))
+    }
+
+    /// Optional version of [`map`][Self::map].
+    pub(crate) fn option_map(
+        self,
+        db: &'db dyn Db,
+        mut f: impl FnMut(Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        Some(self.fold(db, f(self.unfold(db))?))
     }
 
     /// Whether this μ-binder is *non-contractive*: its body is the bare α-binder marker itself

@@ -279,15 +279,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // Mirror the `Type::TypeAlias` arms for an opaque μ-binder: compare the one-step unfold,
         // keyed on the pre-unfold pair so the visitor breaks the recursion.
         (Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
-            let unfolded = rec.unfold(db);
-            infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
-                .map(|result| rec.fold(db, result))
+            rec.try_map(db, |unfolded| infer_binary_type_comparison(context, unfolded, op, right, range, visitor))
         })),
 
         (left, Type::Recursive(rec)) => Some(visitor.visit((left, op, right), || {
-            let unfolded = rec.unfold(db);
-            infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
-                .map(|result| rec.fold(db, result))
+            rec.try_map(db, |unfolded| infer_binary_type_comparison(context, left, op, unfolded, range, visitor))
         })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and

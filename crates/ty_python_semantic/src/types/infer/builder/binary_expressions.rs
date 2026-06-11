@@ -391,27 +391,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(rec)
             }
             (Type::Recursive(recursive), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
+                recursive.option_map(db, |unfolded| self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
-                    recursive.unfold(db),
+                    unfolded,
                     rhs,
                     op,
                     visitor,
-                )
-                .map(|result| recursive.fold(db, result))
+                ))
             }),
 
             (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
+                recursive.option_map(db, |unfolded| self.infer_binary_expression_type_impl(
                     node,
                     emitted_division_by_zero_diagnostic,
                     lhs,
-                    recursive.unfold(db),
+                    unfolded,
                     op,
                     visitor,
-                )
-                .map(|result| recursive.fold(db, result))
+                ))
             }),
 
             (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
