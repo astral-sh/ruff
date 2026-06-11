@@ -62,3 +62,17 @@ def func4():
     Notes:
         This IS a real section and should still be detected.
     """
+# Regression test for nested directive state.
+def func5():
+    """A nested directive whose outer body contains section-like content.
+
+    .. note::
+
+        .. code-block:: yaml
+
+            references:
+              - ref: Some reference.
+
+        references:
+            Still part of the note body, not a section.
+    """

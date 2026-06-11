@@ -155,36 +155,44 @@ impl<'a> SectionContexts<'a> {
         // Skip the first line, which is the summary.
         let mut previous_line = lines.next();
 
-        // Track the indentation of an active RST directive (e.g., `.. code-block:: python`).
-        // Lines indented deeper than this are the directive body and should be skipped
-        // from section detection. See: https://github.com/astral-sh/ruff/issues/23562
-        let mut directive_indent: Option<TextSize> = None;
+        // Track the indentation of active RST directives (e.g., `.. code-block:: python`).
+        // Lines indented deeper than the innermost active directive are the directive body
+        // and should be skipped from section detection.
+        // See: https://github.com/astral-sh/ruff/issues/23562
+        let mut directive_indents: Vec<TextSize> = Vec::new();
 
         while let Some(line) = lines.next() {
             let trimmed = line.trim_start();
 
-            // Detect RST directive start (lines like `.. code-block:: yaml`)
+            if line.trim().is_empty() {
+                // Blank lines don't end directive bodies.
+                if !directive_indents.is_empty() {
+                    previous_line = Some(line);
+                    continue;
+                }
+            } else {
+                let current_indent = leading_space(&line).text_len();
+
+                // Indentation returned to or above a directive level; we've exited that
+                // directive body, but may still be inside an outer directive body.
+                while directive_indents
+                    .last()
+                    .is_some_and(|directive_indent| current_indent <= *directive_indent)
+                {
+                    directive_indents.pop();
+                }
+            }
+
+            // Detect RST directive start (lines like `.. code-block:: yaml`).
             if trimmed.starts_with(".. ") {
-                directive_indent = Some(leading_space(&line).text_len());
+                directive_indents.push(leading_space(&line).text_len());
                 previous_line = Some(line);
                 continue;
             }
 
-            // If inside a directive body, skip indented lines (the directive body)
-            if let Some(dir_indent) = directive_indent {
-                if line.trim().is_empty() {
-                    // Blank lines don't end directive bodies
-                    previous_line = Some(line);
-                    continue;
-                }
-                let current_indent = leading_space(&line).text_len();
-                if current_indent > dir_indent {
-                    // Still inside the directive body
-                    previous_line = Some(line);
-                    continue;
-                }
-                // Indentation returned to or above directive level — we've exited
-                directive_indent = None;
+            if !directive_indents.is_empty() {
+                previous_line = Some(line);
+                continue;
             }
 
             if let Some(section_kind) = suspected_as_section(&line, style) {

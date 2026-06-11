@@ -55,3 +55,5 @@ help: Add blank line after "Notes"
 63 |         This IS a real section and should still be detected.
 64 + 
 65 |     """
+66 | # Regression test for nested directive state.
+67 | def func5():
