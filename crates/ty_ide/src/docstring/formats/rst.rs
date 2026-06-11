@@ -5,7 +5,7 @@ use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 
-use super::preformatted::PreformattedBlockScanner;
+use super::super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
 pub(super) struct Docstring {
@@ -20,7 +20,7 @@ impl Docstring {
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
+    pub(super) fn parameter_documentation(&self) -> Vec<super::ParameterDocumentation> {
         let mut parameters = Vec::new();
 
         for field_list in &self.field_lists {
@@ -38,7 +38,7 @@ impl Docstring {
                     continue;
                 }
 
-                parameters.push(ParameterDocumentation {
+                parameters.push(super::ParameterDocumentation {
                     name: lookup_name.clone(),
                     description: description.clone(),
                 });
@@ -270,7 +270,7 @@ impl<'a> FieldBuilder<'a> {
                 ty,
             } => Field::Parameter {
                 display_name: display_name.to_compact_string(),
-                lookup_name: lookup_name.to_compact_string(),
+                lookup_name: lookup_name.to_string(),
                 ty: ty.map(|ty| ty.to_compact_string()),
                 description: body,
             },
@@ -559,7 +559,7 @@ impl<'a> FieldKind<'a> {
 enum Field {
     Parameter {
         display_name: CompactString,
-        lookup_name: CompactString,
+        lookup_name: String,
         ty: Option<CompactString>,
         description: String,
     },
@@ -593,12 +593,6 @@ enum Field {
         argument: CompactString,
         body: String,
     },
-}
-
-/// Parameter documentation extracted from a reST field list.
-pub(super) struct ParameterDocumentation {
-    pub(super) name: CompactString,
-    pub(super) description: String,
 }
 
 /// Container for the display name (shown to the user) and the lookup name
