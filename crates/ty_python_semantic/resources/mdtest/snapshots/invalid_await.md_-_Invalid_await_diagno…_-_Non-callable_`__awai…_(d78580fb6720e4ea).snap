@@ -78,11 +78,6 @@ error[invalid-await]: `A | B` is not awaitable
 23 |     await x  # error: [invalid-await]
    |           ^
    |
-  ::: src/mdtest_snippet.py:15:5
-   |
-15 |     __await__ = 42
-   |     --------- attribute defined here
-   |
 info: `__await__` is not callable
 
 ```
