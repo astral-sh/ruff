@@ -420,10 +420,26 @@ fn primitive_literal_constraint<'db>(
     .then_some(equal_to_right)
 }
 
-/// Return a direct enum-member constraint when the target is entirely from the same enum domain.
+/// Return a constraint when every possible value of `left` is a member of the same enum as `right`.
 ///
-/// This is only valid when the enum inherits comparison behavior that `ty` understands; custom
-/// equality or inequality methods make the result ambiguous.
+/// For example:
+///
+/// ```python
+/// from enum import Enum
+///
+/// class Answer(Enum):
+///     NO = 0
+///     YES = 1
+///
+/// def f(answer: Answer):
+///     if answer != Answer.NO:
+///         reveal_type(answer)  # Literal[Answer.YES]
+///     else:
+///         reveal_type(answer)  # Literal[Answer.NO]
+/// ```
+///
+/// This shortcut is disabled if the enum defines or inherits custom `__eq__` or `__ne__` methods,
+/// because those methods can change whether two members compare equal.
 fn enum_literal_constraint<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
