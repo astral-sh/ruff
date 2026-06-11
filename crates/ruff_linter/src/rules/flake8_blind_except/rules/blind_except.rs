@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
+use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -60,9 +61,19 @@ use crate::settings::LinterSettings;
 ///     logging.exception("Something went wrong")
 /// ```
 ///
+/// Calls to callables configured via `logger-callables` will also suppress
+/// this rule:
+/// ```python
+/// try:
+///     foo()
+/// except BaseException as e:
+///     sentry_sdk.capture_exception(e)
+/// ```
+///
 /// ## Options
 ///
 /// - `lint.logger-objects`
+/// - `lint.logger-callables`
 ///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
@@ -125,6 +136,7 @@ pub(crate) fn blind_except(
     let mut visitor = LogExceptionVisitor::new(
         semantic,
         &checker.settings().logger_objects,
+        &checker.settings().logger_callables,
         checker.settings(),
     );
     visitor.visit_body(body);
@@ -213,6 +225,7 @@ fn is_exc_info_enabled(
 struct LogExceptionVisitor<'a> {
     semantic: &'a SemanticModel<'a>,
     logger_objects: &'a [String],
+    logger_callables: &'a [String],
     settings: &'a LinterSettings,
     seen: bool,
 }
@@ -222,11 +235,13 @@ impl<'a> LogExceptionVisitor<'a> {
     fn new(
         semantic: &'a SemanticModel<'a>,
         logger_objects: &'a [String],
+        logger_callables: &'a [String],
         settings: &'a LinterSettings,
     ) -> Self {
         Self {
             semantic,
             logger_objects,
+            logger_callables,
             settings,
             seen: false,
         }
@@ -249,6 +264,18 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                     func, arguments, ..
                 }) = value.as_ref()
                 {
+                    let qualified_name = self.semantic.resolve_qualified_name(func);
+
+                    // Check if the call matches a user-configured logger callable.
+                    if qualified_name.as_ref().is_some_and(|qualified_name| {
+                        self.logger_callables.iter().any(|callable| {
+                            QualifiedName::from_dotted_name(callable) == *qualified_name
+                        })
+                    }) {
+                        self.seen = true;
+                        return;
+                    }
+
                     match func.as_ref() {
                         Expr::Attribute(ast::ExprAttribute { attr, .. })
                             if logging::is_logger_candidate(
@@ -269,8 +296,8 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             self.seen = true;
                         }
                         Expr::Name(ast::ExprName { .. })
-                            if self.semantic.resolve_qualified_name(func).is_some_and(
-                                |qualified_name| match qualified_name.segments() {
+                            if qualified_name.as_ref().is_some_and(|qualified_name| {
+                                match qualified_name.segments() {
                                     ["logging", "exception"] => true,
                                     ["logging", method] if is_logger_method_name(method) => {
                                         is_exc_info_enabled(
@@ -281,8 +308,8 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                         )
                                     }
                                     _ => false,
-                                },
-                            ) =>
+                                }
+                            }) =>
                         {
                             self.seen = true;
                         }
