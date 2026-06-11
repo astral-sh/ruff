@@ -4,7 +4,7 @@ use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
-use std::cell::OnceCell;
+use std::cell::{Cell, OnceCell};
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -1082,6 +1082,13 @@ impl<'db> RecursiveTypeNormalization<'db> {
         self.marker
     }
 
+    pub(super) const fn marker_id(self) -> Option<salsa::Id> {
+        match self.marker {
+            Type::Divergent(divergent) => Some(divergent.id()),
+            _ => None,
+        }
+    }
+
     pub(super) const fn nested(self) -> Self {
         Self {
             nested: true,
@@ -1101,8 +1108,49 @@ impl<'db> RecursiveTypeNormalization<'db> {
         ty.same_divergent_marker(self.marker)
     }
 
+    fn matches_recursive_marker(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
+        self.matches_marker(Type::divergent(recursive.binder_id(db)))
+    }
+
     fn contains_marker(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        any_over_type(db, ty, false, |inner| self.matches_marker(inner))
+        struct ContainsMarkerVisitor<'db> {
+            normalization: RecursiveTypeNormalization<'db>,
+            recursion_guard: visitor::TypeCollector<'db>,
+            found: std::cell::Cell<bool>,
+        }
+
+        impl<'db> visitor::TypeVisitor<'db> for ContainsMarkerVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if self.found.get() {
+                    return;
+                }
+                if self.normalization.matches_marker(ty) {
+                    self.found.set(true);
+                    return;
+                }
+                visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+
+            fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
+                if self.normalization.matches_recursive_marker(db, recursive) {
+                    self.found.set(true);
+                } else {
+                    self.visit_type(db, recursive.body(db));
+                }
+            }
+        }
+
+        let visitor = ContainsMarkerVisitor {
+            normalization: self,
+            recursion_guard: visitor::TypeCollector::default(),
+            found: std::cell::Cell::new(false),
+        };
+        visitor::TypeVisitor::visit_type(&visitor, db, ty);
+        visitor.found.get()
     }
 }
 
@@ -1141,8 +1189,40 @@ impl<'db> Type<'db> {
         self.same_divergent_marker(div)
             || matches!(
                 self,
-                Type::Recursive(recursive) if recursive.is_non_contractive(db)
+                Type::Recursive(recursive)
+                    if recursive.is_non_contractive(db)
+                        && Type::divergent(recursive.binder_id(db)).same_divergent_marker(div)
             )
+    }
+
+    pub(crate) fn contains_recursive_type(self, db: &'db dyn Db) -> bool {
+        struct ContainsRecursiveTypeVisitor<'db> {
+            recursion_guard: visitor::TypeCollector<'db>,
+            found: Cell<bool>,
+        }
+
+        impl<'db> visitor::TypeVisitor<'db> for ContainsRecursiveTypeVisitor<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if !self.found.get() {
+                    visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                }
+            }
+
+            fn visit_recursive_type(&self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) {
+                self.found.set(true);
+            }
+        }
+
+        let visitor = ContainsRecursiveTypeVisitor {
+            recursion_guard: visitor::TypeCollector::default(),
+            found: Cell::new(false),
+        };
+        visitor::TypeVisitor::visit_type(&visitor, db, self);
+        visitor.found.get()
     }
 
     /// Construct a `Type::Recursive` with the given μ-binder id, origin, and body.
@@ -1334,32 +1414,37 @@ impl<'db> Type<'db> {
                     .recursive_type_normalized_impl(db, normalization)
                     .unwrap_or(marker);
                 let contains_marker = |ty| normalization.contains_marker(db, ty);
-                let has_structural_marker = match normalized {
-                    Type::Divergent(_) => false,
-                    Type::Union(union) => union.elements(db).iter().any(|element| {
-                        !matches!(element, Type::Divergent(d) if d.id() == id)
-                            && contains_marker(*element)
-                    }),
-                    other => contains_marker(other),
-                };
+                let body_without_top_level_marker = match normalized {
+                    Type::Union(union) => {
+                        let elements = union.elements(db);
+                        let kept: Vec<_> = elements
+                            .iter()
+                            .copied()
+                            .filter(|element| {
+                                !matches!(element, Type::Divergent(divergent) if divergent.id() == id)
+                            })
+                            .collect();
 
-                // Implicit callable cycles stay in `Divergent` form for signature recovery.
+                        if kept.len() == elements.len() || kept.is_empty() {
+                            normalized
+                        } else {
+                            UnionType::from_elements_cycle_recovery(db, kept)
+                        }
+                    }
+                    _ => normalized,
+                };
+                let has_structural_marker =
+                    !matches!(body_without_top_level_marker, Type::Divergent(_))
+                        && contains_marker(body_without_top_level_marker);
+
+                // Function signature cycles stay in `Divergent` form for signature recovery.
                 if has_structural_marker
-                    && !matches!(normalized, Type::Callable(_) | Type::FunctionLiteral(_))
-                    && normalized.is_recursion_value_like(db)
+                    && !matches!(body_without_top_level_marker, Type::FunctionLiteral(_))
+                    && body_without_top_level_marker.is_recursion_value_like(db)
                 {
-                    let body = match normalized {
-                        Type::Union(union) => UnionType::from_elements_cycle_recovery(
-                            db,
-                            union.elements(db).iter().copied().filter(
-                                |element| !matches!(element, Type::Divergent(d) if d.id() == id),
-                            ),
-                        ),
-                        _ => normalized,
-                    };
-                    Type::implicit_recursive(db, id, body)
+                    Type::implicit_recursive(db, id, body_without_top_level_marker)
                 } else {
-                    normalized
+                    body_without_top_level_marker
                 }
             })
     }

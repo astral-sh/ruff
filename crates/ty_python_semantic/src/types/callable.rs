@@ -12,6 +12,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters, Signature,
         SubclassOfInner, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
+        cyclic::ActiveRecursionDetector,
         known_instance::FunctoolsPartialInstance,
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
@@ -447,6 +448,20 @@ pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CallableType<'_> {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+struct CallableRecursiveTypeNormalizationKey {
+    // Recursive callable aliases create fresh callable identities while unfolding,
+    // so the cycle key must be tied to the marker being normalized.
+    marker: salsa::Id,
+    nested: bool,
+}
+
+std::thread_local! {
+    static ACTIVE_CALLABLE_RECURSIVE_TYPE_NORMALIZATIONS:
+        ActiveRecursionDetector<CallableRecursiveTypeNormalizationKey> =
+            ActiveRecursionDetector::default();
+}
+
 impl<'db> CallableType<'db> {
     pub(crate) fn single(db: &'db dyn Db, signature: Signature<'db>) -> CallableType<'db> {
         CallableType::new(
@@ -584,13 +599,34 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        Some(CallableType::new(
-            db,
-            self.signatures(db)
-                .recursive_type_normalized_impl(db, normalization)?,
-            self.kind(db),
-            self.provenance(db),
-        ))
+        let Some(marker) = normalization.marker_id() else {
+            return Some(CallableType::new(
+                db,
+                self.signatures(db)
+                    .recursive_type_normalized_impl(db, normalization)?,
+                self.kind(db),
+                self.provenance(db),
+            ));
+        };
+
+        ACTIVE_CALLABLE_RECURSIVE_TYPE_NORMALIZATIONS.with(|detector| {
+            detector.visit(
+                &CallableRecursiveTypeNormalizationKey {
+                    marker,
+                    nested: normalization.is_nested(),
+                },
+                || None,
+                || {
+                    Some(CallableType::new(
+                        db,
+                        self.signatures(db)
+                            .recursive_type_normalized_impl(db, normalization)?,
+                        self.kind(db),
+                        self.provenance(db),
+                    ))
+                },
+            )
+        })
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(

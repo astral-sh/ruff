@@ -2,7 +2,7 @@ use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeMapping,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -330,21 +330,27 @@ impl<'db> Type<'db> {
             };
         }
 
-        // Iterating a recursive type means iterating one-step unfold of
-        // its body. Substituting the binder's `Divergent` α-markers with the
-        // recursive type itself preserves the recursive structure for the
-        // element types — `for item in (x: μα. list[α | str])` gives `item:
-        // μα. list[α | str] | str`, not just `α | str`.
+        // Iterate the recursive body with its α-marker as a gradual leaf, then
+        // rebind markers in the element type to this recursive type. This keeps
+        // `μα. α | tuple[...]` from recursively iterating the top-level `α`
+        // branch while still preserving recursive element structure.
         // A non-contractive `μα.α` carries no structure to iterate; unfolding it loops, so leave it
         // for `non_async_special_case` below (which yields `homogeneous(μα.α)`, like `Divergent`).
         if let Type::Recursive(rec) = self
             && !rec.is_non_contractive(db)
         {
-            let spec = rec.unfold(db).try_iterate_with_mode(db, mode)?;
-            return Ok(Cow::Owned(
-                spec.into_owned()
-                    .map_elements(|element| rec.fold(db, element)),
-            ));
+            let spec = rec.body(db).try_iterate_with_mode(db, mode)?;
+            let replacement = rec.origin(db).source_type().unwrap_or(Type::Recursive(rec));
+            let type_mapping = TypeMapping::ReplaceDivergent {
+                binder_id: rec.binder(db),
+                replacement,
+            };
+            return Ok(Cow::Owned(spec.into_owned().map_elements(|element| {
+                rec.fold(
+                    db,
+                    element.apply_type_mapping(db, &type_mapping, TypeContext::default()),
+                )
+            })));
         }
 
         if let Type::TypeAlias(alias) = self {
