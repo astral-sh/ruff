@@ -567,7 +567,7 @@ reveal_type(only_variadic)  # revealed: (...) -> None
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
-reveal_type(unpack_variadic)  # revealed: (...) -> None
+reveal_type(unpack_variadic)  # revealed: (*args: str, **kwargs: int) -> None
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls

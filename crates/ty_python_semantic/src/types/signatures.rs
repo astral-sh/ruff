@@ -2477,12 +2477,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
+                    let source_parameters = source
+                        .parameters
+                        .clone()
+                        .expand_starred_variadic_annotations(db);
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: source.parameters.iter(),
+                        source_iter: source_parameters.iter(),
                         target_iter: target_prefix_params.iter(),
                     };
 
