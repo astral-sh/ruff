@@ -428,6 +428,28 @@ reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
 reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
+### Class-object intersection
+
+```py
+from typing import Self
+from ty_extensions import Intersection
+
+class A:
+    @classmethod
+    def make(cls) -> Self:
+        return cls()
+
+    @classmethod
+    def self_type(cls) -> type[Self]:
+        return cls
+
+class B: ...
+
+def _(cls: Intersection[type[A], type[B]]):
+    reveal_type(cls.make())  # revealed: A & B
+    reveal_type(cls.self_type())  # revealed: type[A] & type[B]
+```
+
 ### Calling `super()` in overridden methods with `Self` return type
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/2122>.

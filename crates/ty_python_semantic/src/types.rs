@@ -3940,8 +3940,12 @@ impl<'db> Type<'db> {
 
                     let class_attr_plain = this.class_object_member(db, name_str, policy);
 
-                    let self_instance = this
-                        .to_instance(db)
+                    let receiver_instance = match receiver {
+                        Type::Intersection(intersection) => intersection.to_instance(db),
+                        _ => receiver.to_instance(db),
+                    };
+                    let self_instance = receiver_instance
+                        .or_else(|| this.to_instance(db))
                         .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                     let class_attr_plain =
                         class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
@@ -5560,7 +5564,11 @@ impl<'db> Type<'db> {
             // mapped through `to_instance`.
             Type::TypeVar(bound_typevar) => Some(Type::TypeVar(bound_typevar.to_instance(db)?)),
             Type::TypeAlias(alias) => alias.value_type(db).to_instance(db),
-            Type::Intersection(_) => Some(todo_type!("Type::Intersection.to_instance")),
+            Type::Intersection(intersection) => Some(
+                intersection
+                    .to_instance(db)
+                    .unwrap_or_else(|| todo_type!("Type::Intersection.to_instance")),
+            ),
             // An instance of class `C` may itself have instances if `C` is a subclass of `type`.
             Type::NominalInstance(instance)
                 if KnownClass::Type

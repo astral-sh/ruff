@@ -160,7 +160,13 @@ impl<'db> SubclassOfType<'db> {
             },
             SubclassOfInner::TypeVar(typevar) => {
                 let mapped = typevar.apply_type_mapping_impl(db, type_mapping, visitor);
-                mapped.to_meta_type(db)
+                if let Type::Intersection(intersection) = mapped
+                    && let Some(meta_type) = intersection.to_meta_type(db)
+                {
+                    meta_type
+                } else {
+                    mapped.to_meta_type(db)
+                }
             }
         }
     }
