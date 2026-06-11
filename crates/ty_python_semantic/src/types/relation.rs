@@ -1890,25 +1890,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
             }
 
-            // TypedDicts hide mutating methods from normal access, but synthesized non-method
-            // protocols such as `hasattr()` constraints describe runtime attribute presence.
-            // Check those against the actual `dict` surface.
-            (Type::TypedDict(_), Type::ProtocolInstance(target_proto))
-                if target_proto.to_nominal_instance().is_none()
-                    && target_proto
-                        .interface(db)
-                        .members(db)
-                        .all(|member| !member.is_method()) =>
-            {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_satisfies_protocol(
-                        db,
-                        typed_dict_runtime_dict(db),
-                        target_proto,
-                    )
-                })
-            }
-
             (_, Type::ProtocolInstance(target_proto)) => {
                 self.with_recursion_guard(source, target, || {
                     self.check_type_satisfies_protocol(db, source, target_proto)
