@@ -169,27 +169,14 @@ impl ModulePath {
 
     /// Get the `py.typed` info for this package (not considering parent packages)
     pub(super) fn py_typed(&self, resolver: &ResolverContext) -> PyTyped {
-        let Some(py_typed_contents) = self.to_system_path().and_then(|path| {
+        let Some(py_typed_file) = self.to_system_path().and_then(|path| {
             let py_typed_path = path.join("py.typed");
-            let py_typed_file = system_path_to_file(resolver.db, py_typed_path).ok()?;
-            // If we fail to read it let's say that's like it doesn't exist
-            // (right now the difference between Untyped and Full is academic)
-            py_typed_file.read_to_string(resolver.db).ok()
+            system_path_to_file(resolver.db, py_typed_path).ok()
         }) else {
             return PyTyped::Untyped;
         };
-        // The python typing spec says to look for "partial\n" but in the wild we've seen:
-        //
-        // * PARTIAL\n
-        // * partial\\n (as in they typed "\n")
-        // * partial/n
-        //
-        // since the py.typed file never really grew any other contents, let's be permissive
-        if py_typed_contents.to_ascii_lowercase().contains("partial") {
-            PyTyped::Partial
-        } else {
-            PyTyped::Full
-        }
+
+        py_typed_file_status(resolver.db, py_typed_file)
     }
 
     pub(super) fn to_system_path(&self) -> Option<SystemPathBuf> {
@@ -328,6 +315,28 @@ impl ModulePath {
 
     pub(crate) fn into_search_path(self) -> SearchPath {
         self.search_path
+    }
+}
+
+#[salsa::tracked]
+fn py_typed_file_status(db: &dyn Db, py_typed_file: File) -> PyTyped {
+    // If we fail to read it let's say that's like it doesn't exist
+    // (right now the difference between Untyped and Full is academic)
+    let Ok(py_typed_contents) = py_typed_file.read_to_string(db) else {
+        return PyTyped::Untyped;
+    };
+
+    // The python typing spec says to look for "partial\n" but in the wild we've seen:
+    //
+    // * PARTIAL\n
+    // * partial\\n (as in they typed "\n")
+    // * partial/n
+    //
+    // since the py.typed file never really grew any other contents, let's be permissive
+    if py_typed_contents.to_ascii_lowercase().contains("partial") {
+        PyTyped::Partial
+    } else {
+        PyTyped::Full
     }
 }
 
@@ -837,6 +846,7 @@ impl std::fmt::Display for SystemOrVendoredPathRef<'_> {
 #[cfg(test)]
 mod tests {
     use ruff_db::Db;
+    use ruff_db::system::DbWithWritableSystem as _;
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
@@ -858,6 +868,27 @@ mod tests {
         fn join(&self, component: &str) -> ModulePath {
             self.to_module_path().join(component)
         }
+    }
+
+    #[test]
+    fn py_typed_cache_invalidates_when_file_changes() {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/py.typed", "")])
+            .build();
+        let package = SearchPath::first_party(db.system(), src.clone())
+            .unwrap()
+            .join("package");
+
+        let resolver =
+            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        assert_eq!(package.py_typed(&resolver), PyTyped::Full);
+
+        db.write_file(src.join("package/py.typed"), "partial\n")
+            .unwrap();
+
+        let resolver =
+            ResolverContext::new(&db, PythonVersion::PY38, ModuleResolveMode::StubsAllowed);
+        assert_eq!(package.py_typed(&resolver), PyTyped::Partial);
     }
 
     #[test]
