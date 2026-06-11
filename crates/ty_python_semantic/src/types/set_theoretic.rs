@@ -806,10 +806,11 @@ impl<'db> IntersectionType<'db> {
     /// Convert a class-object intersection such as `type[A] & type[B]` to `A & B`.
     ///
     /// This is deliberately conservative: every positive element must map to a nominal or gradual
-    /// instance, and intersections with negative elements are left unsupported. Structural
+    /// instance. Negative subclass constraints that map to nominal instances are retained; other
+    /// negative elements constrain the class object itself and are omitted. Structural positive
     /// elements do not have a lossless instance-space projection.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        if self.positive(db).is_empty() || !self.negative(db).is_empty() {
+        if self.positive(db).is_empty() {
             return None;
         }
 
@@ -830,6 +831,18 @@ impl<'db> IntersectionType<'db> {
             }
             builder = builder.add_positive(instance);
         }
+
+        for element in self.negative(db) {
+            let Type::SubclassOf(subclass_of) = element else {
+                continue;
+            };
+            let instance = subclass_of.to_instance(db);
+            if !matches!(instance, Type::NominalInstance(_)) {
+                continue;
+            }
+            builder = builder.add_negative(instance);
+        }
+
         Some(builder.build())
     }
 
@@ -840,7 +853,7 @@ impl<'db> IntersectionType<'db> {
     /// Unsupported elements retain the existing intersection meta-type fallback instead of being
     /// discarded.
     pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        if self.positive(db).is_empty() || !self.negative(db).is_empty() {
+        if self.positive(db).is_empty() {
             return None;
         }
 
@@ -851,6 +864,14 @@ impl<'db> IntersectionType<'db> {
             }
             builder = builder.add_positive(element.to_meta_type(db));
         }
+
+        for element in self.negative(db) {
+            if !matches!(element, Type::NominalInstance(_)) {
+                return None;
+            }
+            builder = builder.add_negative(element.to_meta_type(db));
+        }
+
         Some(builder.build())
     }
 

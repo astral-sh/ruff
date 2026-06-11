@@ -346,6 +346,10 @@ def _(cls: Intersection[type[A], type[Any]]):
 def _(cls: Intersection[type[A], type[Unknown]]):
     reveal_type(f1(cls))  # revealed: type[A] & type[Unknown]
 
+def _(cls: type[A]):
+    if not issubclass(cls, B):
+        reveal_type(f1(cls))  # revealed: type[A] & ~type[B]
+
 def f2[T](x: T) -> type[T]:
     return type(x)
 
@@ -362,6 +366,10 @@ reveal_type(f2(foo))  # revealed: <class 'FunctionType'>
 
 def _(x: Callable[[int], int]):
     reveal_type(f2(x))  # revealed: type
+
+def _(x: A):
+    if not isinstance(x, B):
+        reveal_type(f2(x))  # revealed: type[A] & ~type[B]
 
 class Meta(type): ...
 class Base(metaclass=Meta): ...

@@ -432,7 +432,7 @@ reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 
 ```py
 from typing import Any, Self
-from ty_extensions import Intersection, Unknown
+from ty_extensions import Intersection, Not, Unknown
 
 class A:
     @classmethod
@@ -457,6 +457,21 @@ def _(cls: Intersection[type[A], type[Any]]):
 
 def _(cls: Intersection[type[A], type[Unknown]]):
     reveal_type(cls.make())  # revealed: A & Unknown
+
+def _(cls: Intersection[type[A], Not[type[B]]]):
+    reveal_type(cls.make())  # revealed: A & ~B
+
+# Exact-class and metaclass exclusions constrain the class object itself, so they are skipped while
+# the other class-object arms are projected onto instances.
+def _(cls: Intersection[type[A], Any]):
+    if cls is not A:
+        reveal_type(cls.make())  # revealed: A & Any
+
+class Meta(type): ...
+
+def _(cls: Intersection[type[A], type[B], Not[Meta]]):
+    reveal_type(cls)  # revealed: type[A] & type[B] & ~Meta
+    reveal_type(cls.make())  # revealed: A & B
 ```
 
 ### Calling `super()` in overridden methods with `Self` return type
