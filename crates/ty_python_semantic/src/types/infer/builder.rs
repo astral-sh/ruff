@@ -7040,20 +7040,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // For unconstrained collection literals, collect any constraints created by later uses
             // of this definition in the scope.
-            for (statement, use_expression) in
-                self.index.constraining_collection_uses(collection_def)
-            {
+            let collection_uses: SmallVec<[_; 4]> = self
+                .index
+                .constraining_collection_uses(collection_def)
+                .collect();
+            let has_concrete_collection_use_constraint =
+                collection_uses.iter().any(|(statement, _)| {
+                    let statement_use_types = infer_statement_types(self.db(), *statement);
+                    self.has_concrete_collection_use_constraint(
+                        statement_use_types.collection_use_constraints(collection_def),
+                    )
+                });
+
+            for (statement, use_expression) in collection_uses {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                if let Type::Divergent(divergent) =
-                    statement_use_types.expression_type(use_expression)
-                {
+                let expression_ty = statement_use_types.expression_type(use_expression);
+                let constraints = statement_use_types.collection_use_constraints(collection_def);
+                let divergent_ty = match expression_ty {
+                    Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
+                    Type::Recursive(rec) if !has_concrete_collection_use_constraint => {
+                        Some(Type::divergent(rec.binder_id(self.db())))
+                    }
+                    _ => None,
+                };
+                if let Some(divergent_ty) = divergent_ty {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
                         .origin(self.db())
                         .apply_specialization(self.db(), |generic_context| {
-                            generic_context
-                                .repeat_specialization(self.db(), Type::Divergent(divergent))
+                            generic_context.repeat_specialization(self.db(), divergent_ty)
                         });
 
                     builder
@@ -7062,9 +7078,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::instance(self.db(), divergent_instance),
                         )
                         .ok()?;
-                } else if let Some(constraints) =
-                    statement_use_types.collection_use_constraints(collection_def)
-                {
+                } else if let Some(constraints) = constraints {
                     for constraint in constraints {
                         if constraint.has_unspecialized_type_var(self.db()) {
                             continue;
@@ -7216,6 +7230,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         Type::from(class_type).to_instance(self.db())
+    }
+
+    fn has_concrete_collection_use_constraint(
+        &self,
+        constraints: Option<&FxIndexSet<Type<'db>>>,
+    ) -> bool {
+        constraints.is_some_and(|constraints| {
+            constraints.iter().any(|constraint| {
+                !constraint.has_unspecialized_type_var(self.db())
+                    && !any_over_type(self.db(), *constraint, false, |ty| {
+                        matches!(ty, Type::Divergent(_) | Type::Recursive(_))
+                    })
+            })
+        })
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
