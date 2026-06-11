@@ -972,7 +972,7 @@
         },
         "invalid-type-guard-call": {
           "title": "detects type guard function calls that has no narrowing effect",
-          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
+          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef is_int(value: object = object()) -> TypeIs[int]:\n    return isinstance(value, int)\n\nis_int()  # Error: no positional narrowing target\n\nis_int(value=1)  # Error: narrowing target passed by keyword\n```",
           "default": "error",
           "oneOf": [
             {

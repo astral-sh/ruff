@@ -1848,11 +1848,12 @@ declare_lint! {
     /// ```python
     /// from typing import TypeIs
     ///
-    /// def f(v: object) -> TypeIs[int]: ...
+    /// def is_int(value: object = object()) -> TypeIs[int]:
+    ///     return isinstance(value, int)
     ///
-    /// f()  # Error
-    /// f(*a)  # Error
-    /// f(10)  # Error
+    /// is_int()  # Error: no positional narrowing target
+    ///
+    /// is_int(value=1)  # Error: narrowing target passed by keyword
     /// ```
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
         summary: "detects type guard function calls that has no narrowing effect",
