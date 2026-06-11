@@ -953,17 +953,21 @@ impl<'db> FunctionLiteral<'db> {
     }
 }
 
-/// Returns the uncached raw signature for a function defined in the calling query's module.
+/// ## Warning
 ///
-/// Calling this for a function from another module creates a direct dependency on that module's
-/// AST and leads to over-invalidation. Cross-module callers should use the tracked
+/// This uses the semantic index to find the definition of the function. This means that if the
+/// calling query is not in the same file as this function is defined in, then this will create
+/// a cross-module dependency directly on the full AST which will lead to cache
+/// over-invalidation. Cross-module callers should use the tracked
 /// [`FunctionType::last_definition_raw_signature`] query instead.
 pub(super) fn same_module_uncached_raw_signature<'db>(
     db: &'db dyn Db,
-    function: FunctionLiteral<'db>,
+    function: FunctionType<'db>,
     return_callable_typevar_scope: ReturnCallableTypeVarScope,
 ) -> Signature<'db> {
-    function.last_definition_raw_signature(db, return_callable_typevar_scope)
+    function
+        .literal(db)
+        .last_definition_raw_signature(db, return_callable_typevar_scope)
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.

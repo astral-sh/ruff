@@ -5112,7 +5112,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
                     let return_ty = same_module_uncached_raw_signature(
                         self.db(),
-                        func.literal(self.db()),
+                        func,
                         ReturnCallableTypeVarScope::Lexical,
                     )
                     .return_ty;
@@ -8677,7 +8677,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let declared_return_ty = same_module_uncached_raw_signature(
             self.db(),
-            enclosing_function.literal(self.db()),
+            enclosing_function,
             ReturnCallableTypeVarScope::Public,
         )
         .return_ty;
@@ -8728,7 +8728,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let annotated_return_ty = same_module_uncached_raw_signature(
             self.db(),
-            enclosing_function.literal(self.db()),
+            enclosing_function,
             ReturnCallableTypeVarScope::Public,
         )
         .return_ty;

@@ -81,19 +81,15 @@ impl<'db> ExpectedReturnType<'db> {
 
         let public = normalize(
             db,
-            same_module_uncached_raw_signature(
-                db,
-                function.literal(db),
-                ReturnCallableTypeVarScope::Public,
-            )
-            .return_ty,
+            same_module_uncached_raw_signature(db, function, ReturnCallableTypeVarScope::Public)
+                .return_ty,
         );
         let lexical = function_node.type_params.is_some().then(|| {
             normalize(
                 db,
                 same_module_uncached_raw_signature(
                     db,
-                    function.literal(db),
+                    function,
                     ReturnCallableTypeVarScope::Lexical,
                 )
                 .return_ty,
@@ -176,7 +172,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .expect("should be in a function body scope");
             let declared_ty = same_module_uncached_raw_signature(
                 db,
-                enclosing_function.literal(db),
+                enclosing_function,
                 ReturnCallableTypeVarScope::Public,
             )
             .return_ty;
