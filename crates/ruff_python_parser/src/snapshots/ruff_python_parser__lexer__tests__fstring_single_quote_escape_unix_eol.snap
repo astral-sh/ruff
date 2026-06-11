@@ -5,32 +5,9 @@ expression: fstring_single_quote_escape_eol(UNIX_EOL)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..2,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "text \\\n more text",
-        ),
-        2..19,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        19..20,
-        TokenFlags(
-            F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        20..20,
-    ),
+    FStringStart 0..2 (flags = F_STRING),
+    FStringMiddle 2..19 (flags = F_STRING),
+    FStringEnd 19..20 (flags = F_STRING),
+    Newline 20..20,
 ]
 ```

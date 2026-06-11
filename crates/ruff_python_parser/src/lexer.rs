@@ -1910,6 +1910,8 @@ mod tests {
     use std::fmt::Write;
 
     use insta::assert_snapshot;
+    use ruff_python_ast::token::Token;
+    use ruff_text_size::Ranged;
 
     use super::*;
 
@@ -1917,33 +1919,8 @@ mod tests {
     const MAC_EOL: &str = "\r";
     const UNIX_EOL: &str = "\n";
 
-    /// Same as [`Token`] except that this includes the [`TokenValue`] as well.
-    struct TestToken {
-        kind: TokenKind,
-        value: TokenValue,
-        range: TextRange,
-        flags: TokenFlags,
-    }
-
-    impl std::fmt::Debug for TestToken {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            let mut tuple = f.debug_tuple("");
-            let mut tuple = if matches!(self.value, TokenValue::None) {
-                tuple.field(&self.kind)
-            } else {
-                tuple.field(&self.value)
-            };
-            tuple = tuple.field(&self.range);
-            if self.flags.is_empty() {
-                tuple.finish()
-            } else {
-                tuple.field(&self.flags).finish()
-            }
-        }
-    }
-
     struct LexerOutput {
-        tokens: Vec<TestToken>,
+        tokens: Vec<Token>,
         errors: Vec<LexicalError>,
     }
 
@@ -1967,12 +1944,11 @@ mod tests {
             if kind.is_eof() {
                 break;
             }
-            tokens.push(TestToken {
+            tokens.push(Token::new(
                 kind,
-                value: lexer.take_value(),
-                range: lexer.current_range(),
-                flags: lexer.current_flags(),
-            });
+                lexer.current_range(),
+                lexer.current_flags(),
+            ));
         }
         LexerOutput {
             tokens,
@@ -2165,10 +2141,10 @@ quux = !pwd?"
         assert_snapshot!(lex_jupyter_source(source));
     }
 
-    fn assert_no_ipython_escape_command(tokens: &[TestToken]) {
+    fn assert_no_ipython_escape_command(tokens: &[Token]) {
         for token in tokens {
-            if matches!(token.kind, TokenKind::IpyEscapeCommand) {
-                panic!("Unexpected escape command token at {:?}", token.range)
+            if matches!(token.kind(), TokenKind::IpyEscapeCommand) {
+                panic!("Unexpected escape command token at {:?}", token.range())
             }
         }
     }
@@ -2420,7 +2396,7 @@ if first:
     fn get_tokens_only(source: &str) -> Vec<TokenKind> {
         let output = lex(source, Mode::Module, TextSize::default());
         assert!(output.errors.is_empty());
-        output.tokens.into_iter().map(|token| token.kind).collect()
+        output.tokens.into_iter().map(|token| token.kind()).collect()
     }
 
     #[test]
@@ -2959,30 +2935,13 @@ t"{(lambda x:{x})}"
     fn lex_fstring_unclosed() {
         let source = r#"f"hello"#;
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                InterpolatedStringMiddle(
-                    "hello",
-                ),
-                2..7,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                Newline,
-                7..7,
-            ),
+            FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+            FStringMiddle 2..7 (flags = DOUBLE_QUOTES | F_STRING),
+            Newline 7..7,
         ]
         ```
         ## Errors
@@ -2996,41 +2955,21 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]
     fn lex_fstring_missing_brace() {
         let source = "f'{'";
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    F_STRING,
-                ),
-            ),
-            (
-                Lbrace,
-                2..3,
-            ),
-            (
-                String(
-                    "",
-                ),
-                3..4,
-                TokenFlags(
-                    UNCLOSED_STRING,
-                ),
-            ),
-            (
-                Newline,
-                4..4,
-            ),
+            FStringStart 0..2 (flags = F_STRING),
+            Lbrace 2..3,
+            String 3..4 (flags = UNCLOSED_STRING),
+            Newline 4..4,
         ]
         ```
         ## Errors
@@ -3048,51 +2987,23 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]
     fn lex_fstring_missing_brace_after_format_spec() {
         let source = r#"f"{foo!r""#;
 
-        assert_snapshot!(lex_invalid(source, Mode::Module), @r#"
+        assert_snapshot!(lex_invalid(source, Mode::Module), @"
         ## Tokens
         ```
         [
-            (
-                FStringStart,
-                0..2,
-                TokenFlags(
-                    DOUBLE_QUOTES | F_STRING,
-                ),
-            ),
-            (
-                Lbrace,
-                2..3,
-            ),
-            (
-                Name(
-                    Name("foo"),
-                ),
-                3..6,
-            ),
-            (
-                Exclamation,
-                6..7,
-            ),
-            (
-                String(
-                    "",
-                ),
-                7..9,
-                TokenFlags(
-                    DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING,
-                ),
-            ),
-            (
-                Newline,
-                9..9,
-            ),
+            FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+            Lbrace 2..3,
+            Name 3..6,
+            Exclamation 6..7,
+            String 7..9 (flags = DOUBLE_QUOTES | RAW_STRING_LOWERCASE | UNCLOSED_STRING),
+            Newline 9..9,
         ]
         ```
         ## Errors
@@ -3110,7 +3021,7 @@ t"{(lambda x:{x})}"
             },
         ]
         ```
-        "#);
+        ");
     }
 
     #[test]

@@ -5,59 +5,14 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        TStringStart,
-        0..2,
-        TokenFlags(
-            DOUBLE_QUOTES | T_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "foo ",
-        ),
-        2..6,
-        TokenFlags(
-            DOUBLE_QUOTES | T_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        6..7,
-    ),
-    (
-        Exclamation,
-        7..8,
-    ),
-    (
-        Name(
-            Name("pwd"),
-        ),
-        8..11,
-    ),
-    (
-        Rbrace,
-        11..12,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " bar",
-        ),
-        12..16,
-        TokenFlags(
-            DOUBLE_QUOTES | T_STRING,
-        ),
-    ),
-    (
-        TStringEnd,
-        16..17,
-        TokenFlags(
-            DOUBLE_QUOTES | T_STRING,
-        ),
-    ),
-    (
-        Newline,
-        17..17,
-    ),
+    TStringStart 0..2 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringMiddle 2..6 (flags = DOUBLE_QUOTES | T_STRING),
+    Lbrace 6..7,
+    Exclamation 7..8,
+    Name 8..11,
+    Rbrace 11..12,
+    TStringMiddle 12..16 (flags = DOUBLE_QUOTES | T_STRING),
+    TStringEnd 16..17 (flags = DOUBLE_QUOTES | T_STRING),
+    Newline 17..17,
 ]
 ```
