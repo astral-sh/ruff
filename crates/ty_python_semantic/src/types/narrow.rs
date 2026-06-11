@@ -593,6 +593,24 @@ enum PatternNarrowingResult<'db> {
 }
 
 impl<'db> PatternNarrowingResult<'db> {
+    fn merge_alternatives(
+        alternatives: impl Iterator<Item = Self>,
+        merge_constraints: fn(
+            Option<NarrowingConstraints<'db>>,
+            Option<NarrowingConstraints<'db>>,
+        ) -> Option<NarrowingConstraints<'db>>,
+    ) -> Self {
+        let mut alternatives = alternatives.filter_map(|alternative| match alternative {
+            Self::Impossible => None,
+            Self::Possible(constraints) => Some(constraints),
+        });
+        let Some(first) = alternatives.next() else {
+            return Self::Impossible;
+        };
+
+        Self::Possible(alternatives.fold(first, merge_constraints))
+    }
+
     fn into_constraints(self) -> Option<NarrowingConstraints<'db>> {
         match self {
             Self::Impossible | Self::Possible(None) => None,
@@ -2202,7 +2220,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //     match (a, b):
         //         case (A(), B()):
         //
-        // Project the element constraints onto the subject-time bindings of `a` and `b`.
+        // Project the element constraints onto the narrowable elements of the subject expression.
         if let Some(elements) = Self::sequence_expression_elements(subject_node) {
             return self.evaluate_projected_match_pattern_sequence(elements, kind, is_positive);
         }
@@ -2271,8 +2289,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .chain(elements.iter().rev().zip(suffix_patterns.iter().rev()));
         let mut constraints = None;
         for (element, pattern) in element_patterns {
-            let element_constraints = self.evaluate_projected_match_pattern(element, pattern);
-            match element_constraints {
+            match self.evaluate_projected_match_pattern(element, pattern) {
                 PatternNarrowingResult::Impossible => return PatternNarrowingResult::Impossible,
                 PatternNarrowingResult::Possible(element_constraints) => {
                     constraints =
@@ -2297,20 +2314,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 PatternPredicateKind::As(Some(pattern), _) => {
                     self.evaluate_projected_match_pattern(subject, pattern)
                 }
-                PatternPredicateKind::Or(patterns) => {
-                    let mut alternatives = patterns.iter().filter_map(|pattern| {
-                        match self.evaluate_projected_match_pattern(subject, pattern) {
-                            PatternNarrowingResult::Impossible => None,
-                            PatternNarrowingResult::Possible(constraints) => Some(constraints),
-                        }
-                    });
-                    let Some(first) = alternatives.next() else {
-                        return PatternNarrowingResult::Impossible;
-                    };
-                    PatternNarrowingResult::Possible(
-                        alternatives.fold(first, Self::merge_optional_constraints_or),
-                    )
-                }
+                PatternPredicateKind::Or(patterns) => PatternNarrowingResult::merge_alternatives(
+                    patterns
+                        .iter()
+                        .map(|pattern| self.evaluate_projected_match_pattern(subject, pattern)),
+                    Self::merge_optional_constraints_or,
+                ),
                 _ => PatternNarrowingResult::Possible(None),
             };
         }
@@ -2406,17 +2415,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Self::merge_optional_constraints_and
         };
 
-        let mut alternatives = predicates.iter().filter_map(|predicate| {
-            match self.evaluate_pattern_predicate_kind(predicate, subject, is_positive) {
-                PatternNarrowingResult::Impossible => None,
-                PatternNarrowingResult::Possible(constraints) => Some(constraints),
-            }
-        });
-        let Some(first) = alternatives.next() else {
-            return PatternNarrowingResult::Impossible;
-        };
-
-        PatternNarrowingResult::Possible(alternatives.fold(first, merge_constraints))
+        PatternNarrowingResult::merge_alternatives(
+            predicates.iter().map(|predicate| {
+                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
+            }),
+            merge_constraints,
+        )
     }
 
     fn evaluate_bool_op(

@@ -2053,13 +2053,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ScopedPredicateId::ALWAYS_TRUE
         } else {
             let predicate_id = self.record_narrowing_constraint(predicate);
-            if !sequence_subject_targets.is_empty() {
-                self.current_use_def_map_mut()
-                    .record_narrowing_constraint_for_bindings_at_uses(
-                        predicate_id,
-                        sequence_subject_targets,
-                    );
-            }
+            self.current_use_def_map_mut()
+                .record_narrowing_constraint_for_bindings_at_uses(
+                    predicate_id,
+                    sequence_subject_targets,
+                );
             predicate_id
         };
         (predicate, predicate_id, pattern_predicate)

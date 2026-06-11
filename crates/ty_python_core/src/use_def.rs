@@ -1387,7 +1387,8 @@ impl<'db> UseDefMapBuilder<'db> {
         predicate: ScopedPredicateId,
         targets: &[(ScopedPlaceId, ScopedUseId)],
     ) {
-        if predicate == ScopedPredicateId::ALWAYS_TRUE
+        if targets.is_empty()
+            || predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
             return;
