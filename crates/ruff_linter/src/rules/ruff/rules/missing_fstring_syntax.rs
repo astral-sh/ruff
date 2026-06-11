@@ -259,8 +259,7 @@ fn should_be_fstring(
                 has_name = true;
             }
             if let Some(spec) = &element.format_spec {
-                let spec = &fstring_expr[spec.range()];
-                if FormatSpec::parse(spec).is_err() {
+                if !is_valid_format_spec(spec, &fstring_expr) {
                     return false;
                 }
             }
@@ -271,6 +270,23 @@ fn should_be_fstring(
     }
 
     true
+}
+
+fn is_valid_format_spec(spec: &ast::InterpolatedStringFormatSpec, fstring_expr: &str) -> bool {
+    let mut decoded_spec = String::new();
+
+    for element in &spec.elements {
+        match element {
+            ast::InterpolatedStringElement::Literal(literal) => {
+                decoded_spec.push_str(&literal.value);
+            }
+            ast::InterpolatedStringElement::Interpolation(_) => {
+                return FormatSpec::parse(&fstring_expr[spec.range()]).is_ok();
+            }
+        }
+    }
+
+    FormatSpec::parse(&decoded_spec).is_ok()
 }
 
 // fast check to disqualify any string literal without brackets

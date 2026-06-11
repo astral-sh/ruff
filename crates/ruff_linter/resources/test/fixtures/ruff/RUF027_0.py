@@ -111,6 +111,7 @@ def hash_in_format_spec_test():
     n = 255
     print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
     print("Oct: {n:#o}")   # RUF027: same
+    print("Dec: {n:\x64}")  # RUF027: escape sequences are valid in format specs
 
 # Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
 # The `#` is a comment inside a nested interpolation — should NOT trigger RUF027 on Python < 3.12
