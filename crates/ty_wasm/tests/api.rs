@@ -186,6 +186,41 @@ class VeryEggyOmelette(
 }
 
 #[wasm_bindgen_test]
+fn primary_diagnostic_secondary_annotations_include_messages_and_locations() {
+    ty_wasm::before_main();
+
+    let mut workspace = Workspace::new(
+        "/",
+        PositionEncoding::Utf32,
+        js_sys::JSON::parse("{}").unwrap(),
+    )
+    .expect("Workspace to be created");
+
+    workspace
+        .open_file("test.py", "value: int = \"foo\"\n")
+        .expect("File to be opened");
+
+    let result = workspace.check().expect("Check to succeed");
+    let diagnostic = result
+        .iter()
+        .find(|diagnostic| diagnostic.id() == "invalid-assignment")
+        .expect("Expected an invalid-assignment diagnostic");
+    let annotations = diagnostic.secondary_annotations(&workspace);
+
+    assert_eq!(annotations.len(), 1);
+    let annotation = &annotations[0];
+    assert!(!annotation.primary);
+    assert_eq!(annotation.message.as_deref(), Some("Declared type"));
+
+    let location = annotation
+        .location
+        .as_ref()
+        .expect("Expected a declared type location");
+    assert_eq!(location.path, "/test.py");
+    assert_eq!(location.range.start, Position { line: 1, column: 8 });
+}
+
+#[wasm_bindgen_test]
 fn secondary_only_sub_diagnostic_annotations_have_messages_and_locations() {
     ty_wasm::before_main();
 

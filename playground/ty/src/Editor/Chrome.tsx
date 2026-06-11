@@ -332,6 +332,7 @@ function useCheckResult(
       const serializedDiagnostics = diagnostics.map((diagnostic) => ({
         id: diagnostic.id(),
         message: diagnostic.message(),
+        secondaryAnnotations: diagnostic.secondaryAnnotations(workspace),
         subDiagnostics: diagnostic.subDiagnostics(workspace),
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,

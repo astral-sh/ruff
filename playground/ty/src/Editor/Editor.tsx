@@ -24,6 +24,7 @@ import {
   Range as TyRange,
   SemanticToken,
   Severity,
+  type DiagnosticAnnotation,
   type Workspace,
   CompletionKind,
   type FileHandle,
@@ -983,22 +984,39 @@ class PlaygroundServer
   private diagnosticRelatedInformation(
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
-    return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
-      return subDiagnostic.annotations.flatMap((annotation) => {
-        const location = annotation.location;
+    // Match ty_server's LSP rendering: omit message-less secondary annotations.
+    // Unlike subdiagnostics, these have no parent message to use as a fallback.
+    const secondaryAnnotations = diagnostic.secondaryAnnotations.flatMap(
+      (annotation) =>
+        this.diagnosticAnnotationRelatedInformation(
+          annotation,
+          annotation.message,
+        ),
+    );
 
-        if (location == null) {
-          return [];
-        }
+    const subDiagnosticAnnotations = diagnostic.subDiagnostics.flatMap(
+      (subDiagnostic) =>
+        subDiagnostic.annotations.flatMap((annotation) =>
+          this.diagnosticAnnotationRelatedInformation(
+            annotation,
+            formatSubDiagnosticAnnotation(subDiagnostic, annotation),
+          ),
+        ),
+    );
 
-        return [
-          {
-            message: formatSubDiagnosticAnnotation(subDiagnostic, annotation),
-            ...this.mapLocation(location),
-          },
-        ];
-      });
-    });
+    return secondaryAnnotations.concat(subDiagnosticAnnotations);
+  }
+
+  private diagnosticAnnotationRelatedInformation(
+    annotation: DiagnosticAnnotation,
+    message: string | undefined,
+  ): editor.IRelatedInformation[] {
+    const location = annotation.location;
+    if (location == null || message == null) {
+      return [];
+    }
+
+    return [{ message, ...this.mapLocation(location) }];
   }
 
   private mapNavigationTargets(

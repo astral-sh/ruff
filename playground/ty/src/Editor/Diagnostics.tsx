@@ -1,9 +1,9 @@
 import { SubDiagnosticSeverity } from "ty_wasm";
 import type {
+  DiagnosticAnnotation,
   Severity,
   Range,
   SubDiagnostic,
-  SubDiagnosticAnnotation,
   TextRange,
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
@@ -93,6 +93,14 @@ function Items({
           currentFilePath == null || position == null
             ? null
             : { path: currentFilePath, range: position };
+        // Match ty_server's LSP rendering: omit message-less secondary annotations.
+        // Unlike subdiagnostics, these have no parent message to use as a fallback.
+        const secondaryAnnotations = diagnostic.secondaryAnnotations.filter(
+          (
+            annotation,
+          ): annotation is DiagnosticAnnotation & { message: string } =>
+            annotation.message != null,
+        );
 
         const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
 
@@ -119,10 +127,21 @@ function Items({
                 </span>
               </button>
             )}
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <DiagnosticAnnotationItem
+                      message={annotation.message}
+                      annotation={annotation}
+                      currentFilePath={currentFilePath}
+                      onGoTo={onGoTo}
+                    />
+                  </li>
+                ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
+                  <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
                       currentFilePath={currentFilePath}
@@ -142,6 +161,7 @@ function Items({
 export interface Diagnostic {
   id: string;
   message: string;
+  secondaryAnnotations: DiagnosticAnnotation[];
   subDiagnostics: SubDiagnostic[];
   severity: Severity;
   range: Range | null;
@@ -163,8 +183,8 @@ function SubDiagnosticItem({
   currentFilePath: string | null;
   onGoTo(location: DiagnosticLocation): void;
 }) {
-  let primaryAnnotation: SubDiagnosticAnnotation | undefined;
-  const additionalAnnotations: SubDiagnosticAnnotation[] = [];
+  let primaryAnnotation: DiagnosticAnnotation | undefined;
+  const additionalAnnotations: DiagnosticAnnotation[] = [];
 
   for (const annotation of subDiagnostic.annotations) {
     if (annotation.primary && primaryAnnotation == null) {
@@ -179,7 +199,7 @@ function SubDiagnosticItem({
       {primaryAnnotation == null ? (
         <span>{formatSubDiagnostic(subDiagnostic)}</span>
       ) : (
-        <SubDiagnosticAnnotationItem
+        <DiagnosticAnnotationItem
           prefix={`${formatSubDiagnosticSeverity(subDiagnostic.severity)}: `}
           message={formatSubDiagnosticAnnotation(
             subDiagnostic,
@@ -194,7 +214,7 @@ function SubDiagnosticItem({
         <ul className="pl-3">
           {additionalAnnotations.map((annotation, index) => (
             <li key={index}>
-              <SubDiagnosticAnnotationItem
+              <DiagnosticAnnotationItem
                 message={formatSubDiagnosticAnnotation(
                   subDiagnostic,
                   annotation,
@@ -212,7 +232,7 @@ function SubDiagnosticItem({
   );
 }
 
-function SubDiagnosticAnnotationItem({
+function DiagnosticAnnotationItem({
   prefix,
   message,
   annotation,
@@ -221,7 +241,7 @@ function SubDiagnosticAnnotationItem({
 }: {
   prefix?: string;
   message: string;
-  annotation: SubDiagnosticAnnotation;
+  annotation: DiagnosticAnnotation;
   currentFilePath: string | null;
   onGoTo(location: DiagnosticLocation): void;
 }) {
@@ -261,7 +281,7 @@ export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
 
 export function formatSubDiagnosticAnnotation(
   subDiagnostic: SubDiagnostic,
-  annotation: SubDiagnosticAnnotation,
+  annotation: DiagnosticAnnotation,
   includeSubDiagnosticMessage = annotation.primary,
 ): string {
   if (annotation.message == null) {
