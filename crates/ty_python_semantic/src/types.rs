@@ -1047,6 +1047,16 @@ struct GeneratorTypes<'db> {
     return_ty: Option<Type<'db>>,
 }
 
+impl<'db> GeneratorTypes<'db> {
+    fn map_types(self, f: impl Fn(Type<'db>) -> Type<'db>) -> Self {
+        Self {
+            yield_ty: self.yield_ty.map(&f),
+            send_ty: self.send_ty.map(&f),
+            return_ty: self.return_ty.map(&f),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RecursiveTypeNormalization<'db> {
     marker: Type<'db>,
@@ -2915,7 +2925,8 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if rec.is_non_contractive(db) => Some(Place::bound(self).into()),
             Type::Recursive(rec) => rec
                 .unfold(db)
-                .find_name_in_mro_with_policy(db, name, policy),
+                .find_name_in_mro_with_policy(db, name, policy)
+                .map(|place| place.map_type(|ty| rec.fold(db, ty))),
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -3223,7 +3234,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
-            Type::Recursive(rec) => rec.unfold(db).instance_member(db, name),
+            Type::Recursive(rec) => rec.unfold(db).instance_member(db, name).map_type(|ty| rec.fold(db, ty)),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3876,7 +3887,8 @@ impl<'db> Type<'db> {
                 Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(this).into(),
                 Type::Recursive(rec) => rec
                     .unfold(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                    .map_type(|ty| rec.fold(db, ty)),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -5898,7 +5910,7 @@ impl<'db> Type<'db> {
                 })
             }
             Type::Recursive(rec) if !rec.is_non_contractive(db) => {
-                rec.unfold(db).generator_types(db)
+                Some(rec.unfold(db).generator_types(db)?.map_types(|ty| rec.fold(db, ty)))
             }
             ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
                 Some(GeneratorTypes {
@@ -6174,10 +6186,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
             Type::Recursive(rec) if rec.is_non_contractive(db) => Ok(*self),
-            Type::Recursive(rec) => rec
-                .unfold(db)
-                .in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
-                .map(|_| *self),
+            Type::Recursive(rec) => rec.try_map(db, |unfolded| unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6262,7 +6271,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             Type::Divergent(_) => self,
             Type::Recursive(rec) if rec.is_non_contractive(db) => self,
-            Type::Recursive(rec) => rec.unfold(db).to_meta_type(db),
+            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.to_meta_type(db)),
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -6302,7 +6311,7 @@ impl<'db> Type<'db> {
         if let Type::Recursive(rec) = self
             && !rec.is_non_contractive(db)
         {
-            return rec.unfold(db).dunder_class(db);
+            return rec.map(db, |unfolded| unfolded.dunder_class(db));
         }
 
         if self.is_typed_dict() {

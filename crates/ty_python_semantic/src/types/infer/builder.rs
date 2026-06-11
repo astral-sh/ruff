@@ -10396,7 +10396,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Recursive(rec)) if rec.is_non_contractive(self.db()) => operand_type,
             (_, Type::Recursive(rec)) => {
-                self.infer_unary_expression_type(op, rec.unfold(self.db()), unary)
+                rec.map(self.db(), |unfolded| self.infer_unary_expression_type(op, unfolded, unary))
             }
             (_, Type::Never) => Type::Never,
 
