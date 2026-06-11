@@ -856,7 +856,7 @@ impl<'db> Type<'db> {
                     },
                 ));
             }
-            Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+            Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                 return Err(SubscriptError::new(
                     bindings.return_type(db),
                     SubscriptErrorKind::DunderCallError {
@@ -902,7 +902,7 @@ impl<'db> Type<'db> {
                         },
                     ));
                 }
-                Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+                Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
                     return Err(SubscriptError::new(
                         bindings.return_type(db),
                         SubscriptErrorKind::DunderCallError {

@@ -69,6 +69,7 @@ use crate::types::diagnostic::{
 use crate::types::enums::{enum_ignored_names, is_enum_class_by_inheritance};
 use crate::types::function::{
     FunctionDecorators, FunctionType, KnownFunction, report_revealed_type,
+    same_module_uncached_raw_signature,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
@@ -3374,7 +3375,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         return true;
                     }
-                    Err(CallDunderError::CallError(kind, _bindings)) => {
+                    Err(CallDunderError::CallError(kind, _bindings, _)) => {
                         if emit_diagnostics {
                             report_bad_dunder_delattr_call(
                                 &self.context,
@@ -3434,7 +3435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     match delete_dunder_call_result {
                         Ok(_) | Err(CallDunderError::PossiblyUnbound { .. }) => return true,
-                        Err(CallDunderError::CallError(kind, bindings)) => {
+                        Err(CallDunderError::CallError(kind, bindings, _)) => {
                             if emit_diagnostics {
                                 let failure = CallError(kind, bindings);
                                 report_bad_dunder_delete_call(
@@ -4909,7 +4910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             binary_return_ty(self, value_ty),
                         )
                     }
-                    Err(CallDunderError::CallError(_, bindings)) => {
+                    Err(CallDunderError::CallError(_, bindings, _)) => {
                         let value_ty = bindings.type_for_argument(&call_arguments, 0);
                         report_unsupported_augmented_assignment(
                             &self.context,
@@ -5125,13 +5126,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // the expected type passed should be the "raw" type,
                     // i.e. type variables in the return type are non-inferable,
                     // and the return types of async functions are not wrapped in `CoroutineType[...]`.
-                    let return_ty = func
-                        .literal(self.db())
-                        .last_definition_raw_signature(
-                            self.db(),
-                            ReturnCallableTypeVarScope::Lexical,
-                        )
-                        .return_ty;
+                    let return_ty = same_module_uncached_raw_signature(
+                        self.db(),
+                        func,
+                        ReturnCallableTypeVarScope::Lexical,
+                    )
+                    .return_ty;
 
                     // For generator functions, the declared return type is e.g.
                     // `Generator[YieldType, SendType, ReturnType]`. The type context
@@ -5435,6 +5435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                provenance,
                 ..
             }) => {
                 let mut bindings = self
@@ -5448,7 +5449,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     &mut bindings,
                     call_expression_tcx,
                 ) {
-                    return Err(CallDunderError::CallError(call_error, Box::new(bindings)));
+                    return Err(CallDunderError::CallError(
+                        call_error,
+                        Box::new(bindings),
+                        provenance,
+                    ));
                 }
 
                 if boundness == Definedness::PossiblyUndefined {
@@ -8776,10 +8781,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_optional_expression(value.as_deref(), TypeContext::default());
             return Type::unknown();
         };
-        let declared_return_ty = enclosing_function
-            .literal(self.db())
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let declared_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
         let return_type_span = enclosing_function.spans(self.db()).return_type;
 
         let Some(generator_type_params) = declared_return_ty.generator_types(self.db()) else {
@@ -8825,10 +8832,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let _ = self.infer_expression(value, TypeContext::default());
             return Type::unknown();
         };
-        let annotated_return_ty = enclosing_function
-            .literal(self.db())
-            .last_definition_raw_signature(self.db(), ReturnCallableTypeVarScope::Public)
-            .return_ty;
+        let annotated_return_ty = same_module_uncached_raw_signature(
+            self.db(),
+            enclosing_function,
+            ReturnCallableTypeVarScope::Public,
+        )
+        .return_ty;
 
         let Some(outer_expected) = annotated_return_ty.generator_types(self.db()) else {
             let _ = self.infer_expression(value, TypeContext::default());
@@ -9139,7 +9148,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
                     let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    Place::bound(binding_type(db, definition)).with_definition(definition)
                 } else {
                     Place::Undefined
                 };

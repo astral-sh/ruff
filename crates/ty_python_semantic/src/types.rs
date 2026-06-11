@@ -15,6 +15,7 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -51,8 +52,8 @@ pub(crate) use self::signatures::Signature;
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
-    imported_symbol, known_module_symbol,
+    DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, TypeOrigin,
+    builtins_module_scope, imported_symbol, known_module_symbol,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -597,12 +598,13 @@ pub enum PropertyAccessorRole {
     Deleter,
 }
 
-/// Represents an instance of `builtins.property`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+/// Represents an instance of `builtins.property` or `enum.property`.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
     pub setter: Option<Type<'db>>,
     pub deleter: Option<Type<'db>>,
+    instance_class: KnownClass,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -625,6 +627,38 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    pub fn new(
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, KnownClass::Property)
+    }
+
+    fn new_enum_property(
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, KnownClass::EnumProperty)
+    }
+
+    fn with_accessors(
+        self,
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, self.instance_class(db))
+    }
+
+    fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
+        self.instance_class(db).to_instance(db)
+    }
+
     /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
     /// `def` is not one of this property's accessors.
     ///
@@ -672,7 +706,7 @@ impl<'db> PropertyInstanceType<'db> {
         let deleter = self
             .deleter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        Self::new(db, getter, setter, deleter)
+        self.with_accessors(db, getter, setter, deleter)
     }
 
     fn recursive_type_normalized_impl(
@@ -710,7 +744,7 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(Self::new(db, getter, setter, deleter))
+        Some(self.with_accessors(db, getter, setter, deleter))
     }
 
     fn find_legacy_typevars_impl(
@@ -1633,6 +1667,7 @@ impl<'db> Type<'db> {
                 bound.nominal_class(db)
             }
             Type::LiteralValue(literal) => literal.fallback_instance(db).nominal_class(db),
+            Type::PropertyInstance(property) => property.instance_fallback(db).nominal_class(db),
             _ => None,
         }
     }
@@ -2803,13 +2838,13 @@ impl<'db> Type<'db> {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
                         Some(Place::Undefined.into())
                     }
-                    (Some(KnownClass::Property), "__get__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__get__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderGet,
                         ))
                         .into(),
                     ),
-                    (Some(KnownClass::Property), "__set__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__set__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderSet,
                         ))
@@ -3154,9 +3189,9 @@ impl<'db> Type<'db> {
 
             Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
 
-            Type::PropertyInstance(_) => KnownClass::Property
-                .to_instance(db)
-                .instance_member(db, name),
+            Type::PropertyInstance(property) => {
+                property.instance_fallback(db).instance_member(db, name)
+            }
 
             // Note: `super(pivot, owner).__dict__` refers to the `__dict__` of the `builtins.super` instance,
             // not that of the owner.
@@ -3346,6 +3381,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness: boundness,
                         public_type_policy,
+                        provenance: attribute_provenance,
                     }),
                 qualifiers,
             } => (
@@ -3358,8 +3394,10 @@ impl<'db> Type<'db> {
                             origin,
                             definedness: boundness,
                             public_type_policy,
+                            provenance: Provenance::Unknown,
                         })
                     })
+                    .with_provenance(attribute_provenance)
                     .with_qualifiers(qualifiers),
                 // TODO: avoid the duplication here:
                 if union.elements(db).iter().all(|elem| {
@@ -3379,6 +3417,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness,
                         public_type_policy,
+                        provenance: attribute_provenance,
                     }),
                 qualifiers,
             } => (
@@ -3394,8 +3433,10 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                provenance: Provenance::Unknown,
                             })
                         })
+                        .with_provenance(attribute_provenance)
                         .with_qualifiers(qualifiers)
                 },
                 // TODO: Discover data descriptors in intersections.
@@ -3409,6 +3450,7 @@ impl<'db> Type<'db> {
                         origin,
                         definedness: boundness,
                         public_type_policy,
+                        provenance,
                     }),
                 qualifiers: _,
             } => {
@@ -3421,6 +3463,7 @@ impl<'db> Type<'db> {
                             origin,
                             definedness: boundness,
                             public_type_policy,
+                            provenance,
                         })
                         .into(),
                         attribute_kind,
@@ -3543,6 +3586,7 @@ impl<'db> Type<'db> {
                     ty: meta_attr_ty,
                     origin: meta_origin,
                     definedness: Definedness::PossiblyUndefined,
+                    provenance: meta_attr_provenance,
                     ..
                 }),
                 AttributeKind::DataDescriptor,
@@ -3551,12 +3595,14 @@ impl<'db> Type<'db> {
                     origin: fallback_origin,
                     definedness: fallback_boundness,
                     public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
                 public_type_policy: fallback_public_type_policy,
+                provenance: fallback_provenance.or(meta_attr_provenance),
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -3587,6 +3633,7 @@ impl<'db> Type<'db> {
                     ty: meta_attr_ty,
                     origin: meta_origin,
                     definedness: meta_attr_boundness,
+                    provenance: meta_attr_provenance,
                     ..
                 }),
                 AttributeKind::NormalOrNonDataDescriptor,
@@ -3595,12 +3642,14 @@ impl<'db> Type<'db> {
                     origin: fallback_origin,
                     definedness: fallback_boundness,
                     public_type_policy: fallback_public_type_policy,
+                    provenance: fallback_provenance,
                 }),
             ) => Place::Defined(DefinedPlace {
                 ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
                 public_type_policy: fallback_public_type_policy,
+                provenance: fallback_provenance.or(meta_attr_provenance),
             })
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -4035,12 +4084,14 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                provenance,
                                 ..
                             }) => Place::Defined(DefinedPlace {
                                 ty: wrapped,
                                 origin,
                                 definedness,
                                 public_type_policy,
+                                provenance,
                             })
                             .into(),
                             Place::Undefined => Place::bound(wrapped).into(),
@@ -4230,7 +4281,7 @@ impl<'db> Type<'db> {
 
             // TODO: emit a diagnostic
             Err(CallDunderError::MethodNotAvailable) => return None,
-            Err(CallDunderError::CallError(_, bindings)) => bindings.return_type(db),
+            Err(CallDunderError::CallError(_, bindings, _)) => bindings.return_type(db),
         };
 
         non_negative_int_literal(db, return_ty)
@@ -5356,24 +5407,29 @@ impl<'db> Type<'db> {
 
         // Implicit calls to dunder methods never access instance members, so we pass
         // `NO_INSTANCE_FALLBACK` here in addition to other policies:
+        let policy = policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK;
         match self
-            .member_lookup_with_policy(
-                db,
-                name.into(),
-                policy | MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-            )
+            .member_lookup_with_policy(db, name.into(), policy)
             .place
         {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                provenance,
                 ..
             }) => {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, &constraints, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, tcx, &[]);
+
+                let bindings = match bindings {
+                    Ok(bindings) => bindings,
+                    Err(CallError(kind, bindings)) => {
+                        return Err(CallDunderError::CallError(kind, bindings, provenance));
+                    }
+                };
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound {
@@ -5405,13 +5461,21 @@ impl<'db> Type<'db> {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
+                provenance,
                 ..
             }) => {
                 let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, &constraints, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, tcx, &[]);
+
+                let bindings = match bindings {
+                    Ok(bindings) => bindings,
+                    Err(CallError(kind, bindings)) => {
+                        return Err(CallDunderError::CallError(kind, bindings, provenance));
+                    }
+                };
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound {
@@ -6028,7 +6092,7 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
-            Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
+            Type::PropertyInstance(property) => property.instance_class(db).to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::TypeForm(_) => Type::object().to_meta_type(db),
@@ -7217,18 +7281,24 @@ impl<'db> IntersectionType<'db> {
         let positive = self.positive(db);
         let mut successful_bindings = Vec::with_capacity(positive.len());
         let mut last_error = None;
+        let mut error_provenance = Provenance::Unknown;
 
         for element in positive {
             match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
                 Ok(bindings) => successful_bindings.push(bindings),
-                Err(err) => last_error = Some(err),
+                Err(err) => {
+                    error_provenance = error_provenance.or(err.provenance());
+                    last_error = Some(err);
+                }
             }
         }
 
         if successful_bindings.is_empty() {
             // TODO we are only showing one of the errors here; should we aggregate
             // them somehow or show all of them?
-            return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
+            return Err(last_error
+                .unwrap_or(CallDunderError::MethodNotAvailable)
+                .with_provenance(error_provenance));
         }
 
         Ok(Bindings::from_intersection(
@@ -7258,6 +7328,7 @@ impl<'db> UnionType<'db> {
         let mut unbound_on: Vec<Type<'db>> = Vec::new();
         let mut any_defined = false;
         let mut possibly_undefined = false;
+        let mut provenance = Provenance::Unknown;
 
         for element in elements {
             match element
@@ -7271,15 +7342,22 @@ impl<'db> UnionType<'db> {
                 Place::Defined(DefinedPlace {
                     ty,
                     definedness: Definedness::PossiblyUndefined,
+                    provenance: member_provenance,
                     ..
                 }) => {
                     builder = builder.add(ty);
                     any_defined = true;
                     possibly_undefined = true;
+                    provenance = provenance.or(member_provenance);
                 }
-                Place::Defined(DefinedPlace { ty, .. }) => {
+                Place::Defined(DefinedPlace {
+                    ty,
+                    provenance: member_provenance,
+                    ..
+                }) => {
                     builder = builder.add(ty);
                     any_defined = true;
+                    provenance = provenance.or(member_provenance);
                 }
                 Place::Undefined => {
                     unbound_on.push(*element);
@@ -7294,10 +7372,16 @@ impl<'db> UnionType<'db> {
 
         let dunder_callable = builder.build();
         let constraints = ConstraintSetBuilder::new();
-        let bindings = dunder_callable
+        let bindings = match dunder_callable
             .bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, &constraints, argument_types, tcx, &[])?;
+            .check_types(db, &constraints, argument_types, tcx, &[])
+        {
+            Ok(bindings) => bindings,
+            Err(CallError(kind, bindings)) => {
+                return Err(CallDunderError::CallError(kind, bindings, provenance));
+            }
+        };
 
         if possibly_undefined {
             return Err(CallDunderError::PossiblyUnbound {
@@ -7865,6 +7949,7 @@ pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
     qualifiers: TypeQualifiers,
+    provenance: Provenance<'db>,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -7873,6 +7958,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin,
             qualifiers,
+            provenance: Provenance::Unknown,
         }
     }
 
@@ -7881,7 +7967,17 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
+            provenance: Provenance::Unknown,
         }
+    }
+
+    pub(crate) fn with_provenance(mut self, provenance: Provenance<'db>) -> Self {
+        self.provenance = provenance;
+        self
+    }
+
+    pub(crate) fn provenance(&self) -> Provenance<'db> {
+        self.provenance
     }
 
     /// Forget about type qualifiers and only return the inner type.
@@ -7912,6 +8008,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner: f(self.inner),
             origin: self.origin,
             qualifiers: self.qualifiers,
+            provenance: self.provenance,
         }
     }
 }
@@ -8240,7 +8337,7 @@ impl<'db> AwaitError<'db> {
             format_args!("`{type}` is not awaitable", type = context_expression_type.display(db)),
         );
         match self {
-            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings)) => {
+            Self::Call(CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)) => {
                 diag.info("`__await__` requires arguments and cannot be called implicitly");
                 if let Some(definition_spans) = bindings.callable_type().function_spans(db) {
                     diag.annotate(
@@ -8251,7 +8348,8 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::CallError(
                 kind @ (CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable),
-                bindings,
+                _,
+                attribute_provenance,
             )) => {
                 let possibly = if matches!(kind, CallErrorKind::PossiblyNotCallable) {
                     " possibly"
@@ -8259,11 +8357,10 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                if let Some(definition) = bindings.callable_type().definition(db)
-                    && let Some(definition_range) = definition.focus_range(db)
-                {
+                if let Some(definition) = attribute_provenance.definition() {
+                    let module = parsed_module(db, definition.file(db)).load(db);
                     diag.annotate(
-                        Annotation::secondary(definition_range.into())
+                        Annotation::secondary(definition.focus_range(db, &module).into())
                             .message("attribute defined here"),
                     );
                 }
@@ -8427,6 +8524,7 @@ impl<'db> ModuleLiteralType<'db> {
                 return PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace {
                         ty: outcome.return_type(db),
+                        provenance: Provenance::Unknown,
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,

@@ -18,13 +18,14 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_ruff_ignore_enabled;
+use crate::preview::{is_human_readable_names_enabled, is_ruff_ignore_enabled};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
+use crate::settings::types::PreviewMode;
 use crate::{Locator, Violation, warn_user_once};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -115,6 +116,19 @@ impl Suppression {
             })
         )
     }
+
+    /// Return the [`Rule`] associated with this suppression.
+    fn rule(&self, preview: PreviewMode) -> Option<Rule> {
+        if let Ok(rule) = Rule::from_code(get_redirect_target(&self.code).unwrap_or(&self.code)) {
+            return Some(rule);
+        }
+
+        if is_human_readable_names_enabled(preview) {
+            return Rule::from_name(&self.code).ok();
+        }
+
+        None
+    }
 }
 
 #[derive(Debug)]
@@ -171,6 +185,8 @@ pub struct Suppressions {
 
     /// Parse errors from suppression comments
     errors: Vec<ParseError>,
+
+    preview: PreviewMode,
 }
 
 #[derive(Debug)]
@@ -180,6 +196,12 @@ struct SuppressionDiagnostic<'a> {
     duplicated_codes: Vec<&'a str>,
     disabled_codes: Vec<&'a str>,
     unused_codes: Vec<&'a str>,
+
+    /// Whether one of the invalid codes was totally unknown and may be external.
+    has_unknown_code: bool,
+
+    /// Whether one of the invalid codes was a rule name with preview disabled.
+    has_stable_rule_name: bool,
 }
 
 impl<'a> SuppressionDiagnostic<'a> {
@@ -190,6 +212,8 @@ impl<'a> SuppressionDiagnostic<'a> {
             duplicated_codes: Vec::new(),
             disabled_codes: Vec::new(),
             unused_codes: Vec::new(),
+            has_unknown_code: false,
+            has_stable_rule_name: false,
         }
     }
 
@@ -256,9 +280,6 @@ impl Suppressions {
             return false;
         }
 
-        let Some(code) = diagnostic.secondary_code() else {
-            return false;
-        };
         let Some(span) = diagnostic.primary_span() else {
             return false;
         };
@@ -270,7 +291,14 @@ impl Suppressions {
             let suppression_code =
                 get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
 
-            if *code != suppression_code {
+            let code_matches = diagnostic
+                .secondary_code()
+                .is_some_and(|code| *code == suppression_code);
+
+            let name_matches = is_human_readable_names_enabled(self.preview)
+                && diagnostic.name() == suppression_code;
+
+            if !code_matches && !name_matches {
                 continue;
             }
 
@@ -323,9 +351,14 @@ impl Suppressions {
                         whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
                     },
                 ) {
-                    diagnostic.help(
-                        "Add non-Ruff rule codes to the `lint.external` configuration option",
-                    );
+                    if group.has_unknown_code {
+                        diagnostic.help(
+                            "Add non-Ruff rule codes to the `lint.external` configuration option",
+                        );
+                    }
+                    if group.has_stable_rule_name {
+                        diagnostic.help("Enable `lint.preview` to use rule names");
+                    }
                 }
             }
 
@@ -366,16 +399,20 @@ impl Suppressions {
 
             let code_str = suppression.code.as_str();
 
-            if !code_is_valid(&suppression.code, &context.settings().external) {
+            let code_is_valid = code_is_valid(&suppression.code, &context.settings().external);
+            let name_is_known = Rule::from_name(&suppression.code).is_ok();
+            let name_is_valid = is_human_readable_names_enabled(self.preview) && name_is_known;
+
+            if !code_is_valid && !name_is_valid {
                 // InvalidRuleCode
                 let (_key, group) = grouped_diagnostic
                     .get_or_insert_with(|| (key, SuppressionDiagnostic::new(suppression)));
                 group.invalid_codes.push(code_str);
+                group.has_unknown_code |= !name_is_known;
+                group.has_stable_rule_name |= name_is_known;
             } else if !suppression.used.get() {
                 // UnusedNOQA
-                let Ok(rule) = Rule::from_code(
-                    get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
-                ) else {
+                let Some(rule) = suppression.rule(self.preview) else {
                     continue; // "external" lint code, don't treat it as unused
                 };
 
@@ -575,76 +612,15 @@ impl<'a> SuppressionsBuilder<'a> {
 
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
-            let (before, after) = tokens.split_at(suppression.range.start());
 
             // Standalone suppression comments
-
-            if suppression.action == SuppressionAction::Ignore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    let range = if indentation_at_offset(suppression.range.start(), self.source)
-                        .is_some()
-                    {
-                        // own-line ignore
-                        Self::standalone_comment_range(suppression.range, before, after)
-                    } else {
-                        // trailing ignore
-                        self.trailing_comment_range(suppression.range, before)
-                    };
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:ignore comment found but not active, enable preview mode"
-                    );
-                }
-                suppressions.next();
-                continue;
-            } else if suppression.action == SuppressionAction::FileIgnore {
-                if is_ruff_ignore_enabled(self.settings) {
-                    match indentation_at_offset(suppression.range.start(), self.source) {
-                        // Module scope
-                        Some("") => {
-                            let range = TextRange::up_to(self.source.text_len());
-                            for code in suppression.codes_as_str(self.source) {
-                                self.valid.push(Suppression {
-                                    code: code.into(),
-                                    range,
-                                    used: false.into(),
-                                    comments: SuppressionComments::Single(suppression.clone()),
-                                });
-                            }
-                        }
-                        // Indented/inside block
-                        Some(_) => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::NotModuleScope,
-                                comment: suppression.clone(),
-                            });
-                        }
-                        // Trailing
-                        None => {
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression.clone(),
-                            });
-                        }
-                    }
-                } else {
-                    warn_user_once!(
-                        "#ruff:file-ignore comment found but not active, enable preview mode"
-                    );
-                }
+            if self.register_standalone_suppression(suppression, tokens) {
                 suppressions.next();
                 continue;
             }
 
             // Matched suppression comments
+            let (before, after) = tokens.split_at(suppression.range.start());
 
             let mut count = 0;
             let last_indent = before
@@ -686,6 +662,10 @@ impl<'a> SuppressionsBuilder<'a> {
                         else {
                             continue;
                         };
+
+                        if self.register_standalone_suppression(&suppression, tokens) {
+                            continue;
+                        }
 
                         let Some(indent) =
                             indentation_at_offset(suppression.range.start(), self.source)
@@ -743,6 +723,83 @@ impl<'a> SuppressionsBuilder<'a> {
             valid: self.valid,
             invalid: self.invalid,
             errors,
+            preview: self.settings.preview,
+        }
+    }
+
+    /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns
+    /// `true` if such a comment was found.
+    fn register_standalone_suppression(
+        &mut self,
+        suppression: &SuppressionComment,
+        tokens: &Tokens,
+    ) -> bool {
+        match suppression.action {
+            SuppressionAction::Ignore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    let (before, after) = tokens.split_at(suppression.range.start());
+                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                        .is_some()
+                    {
+                        // own-line ignore
+                        Self::standalone_comment_range(suppression.range, before, after)
+                    } else {
+                        // trailing ignore
+                        self.trailing_comment_range(suppression.range, before)
+                    };
+                    for code in suppression.codes_as_str(self.source) {
+                        self.valid.push(Suppression {
+                            code: code.into(),
+                            range,
+                            used: false.into(),
+                            comments: SuppressionComments::Single(suppression.clone()),
+                        });
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::FileIgnore => {
+                if is_ruff_ignore_enabled(self.settings) {
+                    match indentation_at_offset(suppression.range.start(), self.source) {
+                        // Module scope
+                        Some("") => {
+                            let range = TextRange::up_to(self.source.text_len());
+                            for code in suppression.codes_as_str(self.source) {
+                                self.valid.push(Suppression {
+                                    code: code.into(),
+                                    range,
+                                    used: false.into(),
+                                    comments: SuppressionComments::Single(suppression.clone()),
+                                });
+                            }
+                        }
+                        // Indented/inside block
+                        Some(_) => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::NotModuleScope,
+                                comment: suppression.clone(),
+                            });
+                        }
+                        // Trailing
+                        None => {
+                            self.invalid.push(InvalidSuppression {
+                                kind: InvalidSuppressionKind::Trailing,
+                                comment: suppression.clone(),
+                            });
+                        }
+                    }
+                } else {
+                    warn_user_once!(
+                        "#ruff:file-ignore comment found but not active, enable preview mode"
+                    );
+                }
+                true
+            }
+            SuppressionAction::Disable | SuppressionAction::Enable => false,
         }
     }
 

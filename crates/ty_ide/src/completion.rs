@@ -4669,8 +4669,8 @@ Answer.<CURSOR>
                 NO :: Literal[Answer.NO]
                 YES :: Literal[Answer.YES]
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
-                name :: property
-                value :: property
+                name :: enum.property
+                value :: enum.property
                 __annotations__ :: dict[str, Any]
                 __base__ :: type | None
                 __bases__ :: tuple[type, ...]

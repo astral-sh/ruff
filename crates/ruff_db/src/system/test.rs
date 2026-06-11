@@ -101,6 +101,10 @@ impl System for TestSystem {
         self.system().canonicalize_path(path)
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.system().is_same_file(first, second)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         self.system().read_to_string(path)
     }
@@ -358,6 +362,12 @@ impl System for InMemorySystem {
 
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf> {
         self.memory_fs.canonicalize(path)
+    }
+
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
     }
 
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {

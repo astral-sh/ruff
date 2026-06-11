@@ -1612,7 +1612,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         false
                     }
-                    CallDunderError::CallError(call_error_kind, bindings) => {
+                    CallDunderError::CallError(call_error_kind, bindings, _) => {
                         let slice_ty = bindings.type_for_argument(&call_arguments, 0);
                         let rhs_value_ty = bindings.type_for_argument(&call_arguments, 1);
 
@@ -1865,7 +1865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 attach_original_type_info(&mut diagnostic);
                             }
                         }
-                        CallDunderError::CallError(call_error_kind, bindings) => {
+                        CallDunderError::CallError(call_error_kind, bindings, _) => {
                             match call_error_kind {
                                 CallErrorKind::NotCallable => {
                                     if let Some(builder) =

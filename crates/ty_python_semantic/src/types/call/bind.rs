@@ -1643,7 +1643,7 @@ impl<'db> Bindings<'db> {
                                     let mut ty_property = bound_method.self_instance(db);
                                     if let Type::PropertyInstance(property) = ty_property {
                                         ty_property =
-                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                            Type::PropertyInstance(property.with_accessors(
                                                 db,
                                                 property.getter(db),
                                                 Some(*setter),
@@ -1658,7 +1658,7 @@ impl<'db> Bindings<'db> {
                                     let mut ty_property = bound_method.self_instance(db);
                                     if let Type::PropertyInstance(property) = ty_property {
                                         ty_property =
-                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                            Type::PropertyInstance(property.with_accessors(
                                                 db,
                                                 Some(*getter),
                                                 property.setter(db),
@@ -1673,7 +1673,7 @@ impl<'db> Bindings<'db> {
                                     let mut ty_property = bound_method.self_instance(db);
                                     if let Type::PropertyInstance(property) = ty_property {
                                         ty_property =
-                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                            Type::PropertyInstance(property.with_accessors(
                                                 db,
                                                 property.getter(db),
                                                 property.setter(db),

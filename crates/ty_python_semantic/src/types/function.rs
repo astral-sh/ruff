@@ -871,7 +871,7 @@ impl<'db> FunctionLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    pub(super) fn last_definition_raw_signature(
+    fn last_definition_raw_signature(
         self,
         db: &'db dyn Db,
         return_callable_typevar_scope: ReturnCallableTypeVarScope,
@@ -951,6 +951,23 @@ impl<'db> FunctionLiteral<'db> {
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )
     }
+}
+
+/// ## Warning
+///
+/// This uses the semantic index to find the definition of the function. This means that if the
+/// calling query is not in the same file as this function is defined in, then this will create
+/// a cross-module dependency directly on the full AST which will lead to cache
+/// over-invalidation. Cross-module callers should use the tracked
+/// [`FunctionType::last_definition_raw_signature`] query instead.
+pub(super) fn same_module_uncached_raw_signature<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    return_callable_typevar_scope: ReturnCallableTypeVarScope,
+) -> Signature<'db> {
+    function
+        .literal(db)
+        .last_definition_raw_signature(db, return_callable_typevar_scope)
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.

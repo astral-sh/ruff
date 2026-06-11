@@ -19,7 +19,7 @@ use super::{
     TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
-use crate::place::{DefinedPlace, TypeOrigin};
+use crate::place::{DefinedPlace, Provenance, TypeOrigin};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::constraints::{
     ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
@@ -2454,6 +2454,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
+        let mut provenance = Provenance::Unknown;
 
         for superclass in self.mro_iter {
             match superclass {
@@ -2473,6 +2474,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ty,
                                 origin,
                                 definedness: boundness,
+                                provenance: member_provenance,
                                 ..
                             }),
                         qualifiers,
@@ -2492,6 +2494,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                         // higher up in the MRO, and build a union of all inferred types (and
                         // possibly-declared types):
                         union = union.add(ty);
+                        provenance = provenance.or(member_provenance);
 
                         // TODO: We could raise a diagnostic here if there are conflicting type
                         // qualifiers
@@ -2518,6 +2521,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                 origin: TypeOrigin::Inferred,
                 definedness: boundness,
                 public_type_policy: PublicTypePolicy::Raw,
+                provenance,
             })
             .with_qualifiers(union_qualifiers)
         };
@@ -2550,11 +2554,12 @@ impl<'db> CompletedMemberLookup<'db> {
 
             (
                 PlaceAndQualifiers {
-                    place: Place::Defined(DefinedPlace { ty, .. }),
+                    place: Place::Defined(DefinedPlace { ty, provenance, .. }),
                     qualifiers,
                 },
                 Some(dynamic),
             ) => Place::bound(IntersectionType::from_two_elements(db, ty, dynamic))
+                .with_provenance(provenance)
                 .with_qualifiers(qualifiers),
 
             (

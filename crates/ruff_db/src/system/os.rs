@@ -93,6 +93,10 @@ impl System for OsSystem {
         })
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        same_file::is_same_file(first.as_std_path(), second.as_std_path())
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         std::fs::read_to_string(path.as_std_path())
     }

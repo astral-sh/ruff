@@ -7,7 +7,10 @@ use rustc_hash::FxHashSet;
 
 use crate::{
     Db, TypeQualifiers,
-    place::{DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin},
+    place::{
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
+        TypeOrigin,
+    },
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
@@ -1572,6 +1575,7 @@ impl<'db> TypeVarConstraints<'db> {
                         Definedness::AlwaysDefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
+                    provenance: Provenance::Unknown,
                 })
             },
             qualifiers,

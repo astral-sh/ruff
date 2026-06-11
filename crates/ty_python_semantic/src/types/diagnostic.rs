@@ -1391,7 +1391,6 @@ declare_lint! {
     /// from typing import TypeVar
     ///
     /// T = TypeVar("T")  # okay
-    /// Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
     /// T = TypeVar("T")  # error: TypeVars should not be redefined
     ///
     /// # error: TypeVar must be immediately assigned to a variable
@@ -1849,11 +1848,12 @@ declare_lint! {
     /// ```python
     /// from typing import TypeIs
     ///
-    /// def f(v: object) -> TypeIs[int]: ...
+    /// def is_int(value: object = object()) -> TypeIs[int]:
+    ///     return isinstance(value, int)
     ///
-    /// f()  # Error
-    /// f(*a)  # Error
-    /// f(10)  # Error
+    /// is_int()  # Error: no positional narrowing target
+    ///
+    /// is_int(value=1)  # Error: narrowing target passed by keyword
     /// ```
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
         summary: "detects type guard function calls that has no narrowing effect",
@@ -5311,14 +5311,14 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         }
                     }
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
                         base_type.display(db)
                     ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
@@ -5330,7 +5330,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \

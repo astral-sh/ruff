@@ -16,11 +16,13 @@ name: Sync typeshed
 # 3. Once the Windows worker is done, a MacOS worker:
 #    a. Checks out the branch created by the Linux worker
 #    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
-#    c. Formats the code again
-#    d. Commits and pushes the completed sync to the same upstream branch
-#    e. Applies the typeshed patches in a standalone commit
-#    f. Pushes the patch commit and creates a PR against the `main` branch
-# 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
+#    c. Formats the code again and pushes the completed sync
+#    d. Applies the typeshed patches in a standalone commit and pushes it
+# 4. A second Linux worker attempts to update and push any snapshots that changed
+#    (this step is allowed to fail)
+# 5. Once the snapshot update finishes, fails, or times out, a third Linux worker creates a PR
+#    against the `main` branch as long as step 3 succeeded
+# 6. If any required step failed, an issue is created in the `astral-sh/ruff` repository
 
 on:
   workflow_dispatch:
@@ -36,16 +38,19 @@ permissions: {}
 
 env:
   # Don't set this flag globally for the workflow: it does strange things
-  # to the snapshots in the `cargo insta test --accept` step in the MacOS job.
+  # to the snapshots in the `cargo insta test --accept` step in the snapshot job.
   #
   # FORCE_COLOR: 1
 
+  CARGO_NET_RETRY: 10
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
   CARGO_TERM_COLOR: always
   NEXTEST_PROFILE: "ci"
+  RUSTUP_MAX_RETRIES: 10
   GH_TOKEN: ${{ github.token }}
 
   # The name of the upstream branch that the first worker creates,
-  # and which all three workers push to.
+  # and which the later jobs update.
   UPSTREAM_BRANCH: typeshedbot/sync-typeshed
 
   # The path to the directory that contains the vendored typeshed stubs,
@@ -153,10 +158,12 @@ jobs:
           git commit -am "Sync Windows docstrings" --allow-empty
           git push
 
-  # Checkout the branch created by the sync job,
-  # and sync all docstrings available on macOS that are not available on Linux or Windows.
-  # Push the changes to the same branch and create a PR against the `main` branch using that branch.
-  docstrings-macos-and-pr:
+  # - Checkout the branch created by the sync job.
+  # - Sync all docstrings available on macOS that are not available on Linux or Windows.
+  # - Format the stubs.
+  # - Apply the typeshed patches.
+  # - Push the changes to the same branch.
+  docstrings-macos:
     runs-on: macos-latest
     timeout-minutes: 20
     needs: [sync, docstrings-windows]
@@ -169,7 +176,6 @@ jobs:
 
     permissions:
       contents: write # to push back to the repository
-      pull-requests: write # to create a PR
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         name: Checkout Ruff
@@ -214,24 +220,108 @@ jobs:
       - name: Push synced changes upstream
         if: ${{ success() }}
         run: git push
-      - name: Apply typeshed patches
+      - name: Apply and push typeshed patches
         if: ${{ success() }}
         run: |
           git apply --directory="${VENDORED_TYPESHED}" crates/ty_vendored/typeshed_patches/*.patch
           git add "${VENDORED_TYPESHED}"
           git commit -m "Apply typeshed patches"
-      - name: Push changes upstream and create a PR
+          git push
+
+  # Best-effort snapshot update. A failure or timeout here must not prevent PR creation.
+  update-snapshots:
+    name: Update snapshots
+    # Use a beefier depot runner if possible, because Rust compile times are really slow on GitHub runners
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-16' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    needs: [sync, docstrings-windows, docstrings-macos]
+
+    # Don't run the cron job on forks.
+    # The job will also be skipped if the docstrings-macos job failed.
+    if: ${{ github.repository == 'astral-sh/ruff' || github.event_name != 'schedule' }}
+
+    # Allow any failure in this best-effort job without failing the overall workflow.
+    # This does not automatically cause later steps to run after a failure; a step-level
+    # `continue-on-error: true` is also required for that (which we do below for one of the steps).
+    continue-on-error: true
+
+    permissions:
+      contents: write # to push back to the repository
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        name: Checkout Ruff
+        with:
+          persist-credentials: true
+          ref: ${{ env.UPSTREAM_BRANCH}}
+      - name: Setup git
+        run: |
+          git config --global user.name typeshedbot
+          git config --global user.email '<>'
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          # Reuse the cache populated by the `cargo test (linux)` CI job on `main`.
+          shared-key: ruff-linux-debug
+          # This infrequent workflow should not overwrite the shared cache.
+          save-if: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+      - name: "Install cargo nextest and insta"
+        uses: taiki-e/install-action@25435dc8dd3baed7417e0c96d3fe89013a5b2e09 # v2.81.3
+        with:
+          tool: |
+            cargo-nextest
+            cargo-insta
+      - name: Update snapshots
+        # Snapshot failures are force-passed by cargo-insta, but other tests might still fail
+        # in this test, causing the step overall to fail. We want to continue to later steps
+        # anyway here, so that snapshots are updated and pushed even if other tests fail.
+        continue-on-error: true
+        env:
+          # Work around https://github.com/mitsuhiko/insta/pull/924 until its fix is released.
+          CI: "0"
+          MDTEST_UPDATE_SNAPSHOTS: "1"
+        run: cargo insta test --accept --all-features --test-runner nextest --disable-nextest-doctest
+      - name: Commit and push snapshot changes
         if: ${{ success() }}
         run: |
-          git push
+          git add --all
+          if git diff --cached --quiet; then
+            echo "No snapshot changes to commit"
+          else
+            git commit -m "Update snapshots"
+            git push
+          fi
+
+  # Publish the required changes even if the best-effort snapshot update failed or timed out.
+  create-pr:
+    name: Create PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [sync, docstrings-windows, docstrings-macos, update-snapshots]
+
+    # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out.
+    if: ${{ always() && needs.sync.result == 'success' && needs.docstrings-windows.result == 'success' && needs.docstrings-macos.result == 'success' && (github.repository == 'astral-sh/ruff' || github.event_name != 'schedule') }}
+
+    permissions:
+      contents: read
+      pull-requests: write # to create a PR
+    steps:
+      - name: Create a PR
+        run: |
           gh pr list --repo "${GITHUB_REPOSITORY}" --head "${UPSTREAM_BRANCH}" --json id --jq length | grep 1 && exit 0 # exit if there is existing pr
-          gh pr create --title "[ty] Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "ty"
+          gh pr create --repo "${GITHUB_REPOSITORY}" --base main --head "${UPSTREAM_BRANCH}" --title "[ty] Sync vendored typeshed stubs" --body "Close and reopen this PR to trigger CI" --label "ty"
 
   create-issue-on-failure:
     name: Create an issue if the typeshed sync failed
     runs-on: ubuntu-latest
-    needs: [sync, docstrings-windows, docstrings-macos-and-pr]
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result != 'success' || needs.docstrings-windows.result != 'success' || needs.docstrings-macos-and-pr.result != 'success') }}
+    needs: [sync, docstrings-windows, docstrings-macos, create-pr]
+
+    # update-snapshots is deliberately NOT included here: it shouldn't block PR creation if it fails or times out,
+    # so there's no need for the bot to create an issue if that happens.
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result != 'success' || needs.docstrings-windows.result != 'success' || needs.docstrings-macos.result != 'success' || needs.create-pr.result != 'success') }}
+
     permissions:
       issues: write # to create an issue on failure
     steps:

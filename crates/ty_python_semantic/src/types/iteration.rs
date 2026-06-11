@@ -319,7 +319,7 @@ impl<'db> Type<'db> {
                         }
                     }
                 }
-                Err(CallDunderError::CallError(kind, bindings)) => {
+                Err(CallDunderError::CallError(kind, bindings, _)) => {
                     Err(IterationError::IterCallError {
                         kind,
                         bindings,
@@ -448,11 +448,13 @@ impl<'db> Type<'db> {
             }
 
             // `__iter__` is definitely bound but it can't be called with the expected arguments
-            Err(CallDunderError::CallError(kind, bindings)) => Err(IterationError::IterCallError {
-                kind,
-                bindings,
-                mode,
-            }),
+            Err(CallDunderError::CallError(kind, bindings, _)) => {
+                Err(IterationError::IterCallError {
+                    kind,
+                    bindings,
+                    mode,
+                })
+            }
 
             // There's no `__iter__` method. Try `__getitem__` instead...
             Err(CallDunderError::MethodNotAvailable) => try_call_dunder_getitem()
@@ -577,10 +579,10 @@ impl<'db> IterationError<'db> {
                     *dunder_next_return,
                     dunder_getitem_outcome.return_type(db),
                 )),
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     Some(*dunder_next_return)
                 }
-                CallDunderError::CallError(_, dunder_getitem_bindings) => {
+                CallDunderError::CallError(_, dunder_getitem_bindings, _) => {
                     let dunder_getitem_return = dunder_getitem_bindings.return_type(db);
                     Some(UnionType::from_two_elements(
                         db,
@@ -791,21 +793,21 @@ impl<'db> IterationError<'db> {
                             iterator_type = iterator.display(db),
                         ), ErrorContext::Enabled);
                     }
-                    CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                    CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                         reporter.is_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which has a `{dunder_next_name}` attribute that is not callable",
                             iterator_type = iterator.display(db),
                         ), ErrorContext::Disabled);
                     }
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                         reporter.may_not(format_args!(
                             "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
                             which has a `{dunder_next_name}` attribute that may not be callable",
                             iterator_type = iterator.display(db),
                         ), ErrorContext::Enabled);
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                         if bindings.is_single() =>
                     {
                         reporter
@@ -816,7 +818,7 @@ impl<'db> IterationError<'db> {
                             ), ErrorContext::Enabled)
                             .info(format_args!("Expected signature for `{dunder_next_name}` is `def {dunder_next_name}(self): ...`"));
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                    CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                         reporter
                             .may_not(format_args!(
                                 "Its `{dunder_iter_name}` method returns an object of type `{iterator_type}`, \
@@ -843,7 +845,7 @@ impl<'db> IterationError<'db> {
                         "It may not have an `__iter__` method or a `__getitem__` method",
                         ErrorContext::Disabled,
                     ),
-                    CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => reporter
+                    CallDunderError::CallError(CallErrorKind::NotCallable, bindings, _) => reporter
                         .may_not(
                             format_args!(
                                 "It may not have an `__iter__` method \
@@ -853,7 +855,7 @@ impl<'db> IterationError<'db> {
                             ),
                             ErrorContext::Disabled,
                         ),
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _)
                         if bindings.is_single() =>
                     {
                         reporter.may_not(
@@ -862,7 +864,7 @@ impl<'db> IterationError<'db> {
                             ErrorContext::Disabled,
                         )
                     }
-                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
+                    CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _) => {
                         reporter.may_not(
                             format_args!(
                                 "It may not have an `__iter__` method \
@@ -873,7 +875,7 @@ impl<'db> IterationError<'db> {
                             ErrorContext::Disabled,
                         )
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                         if bindings.is_single() =>
                     {
                         let mut diag = reporter.may_not(
@@ -889,7 +891,7 @@ impl<'db> IterationError<'db> {
                         );
                         diag
                     }
-                    CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
+                    CallDunderError::CallError(CallErrorKind::BindingError, bindings, _) => {
                         let mut diag = reporter.may_not(
                             format_args!(
                                 "It may not have an `__iter__` method \
@@ -932,7 +934,7 @@ impl<'db> IterationError<'db> {
                         ErrorContext::Disabled,
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, bindings) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, bindings, _) => {
                     reporter.is_not(
                         format_args!(
                             "It has no `__iter__` method and \
@@ -943,7 +945,7 @@ impl<'db> IterationError<'db> {
                         ErrorContext::Disabled,
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings)
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _)
                     if bindings.is_single() =>
                 {
                     reporter.may_not(
@@ -952,7 +954,7 @@ impl<'db> IterationError<'db> {
                         ErrorContext::Disabled,
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings) => {
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, bindings, _) => {
                     reporter.may_not(
                         "It has no `__iter__` method and its `__getitem__` attribute is invalid",
                         ErrorContext::Disabled,
@@ -961,7 +963,7 @@ impl<'db> IterationError<'db> {
                         dunder_getitem_type = bindings.callable_type().display(db),
                     ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings)
+                CallDunderError::CallError(CallErrorKind::BindingError, bindings, _)
                     if bindings.is_single() =>
                 {
                     reporter
@@ -977,7 +979,7 @@ impl<'db> IterationError<'db> {
                              to satisfy the old-style iteration protocol",
                         );
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, bindings) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, bindings, _) => {
                     reporter
                         .may_not(
                             format_args!(
