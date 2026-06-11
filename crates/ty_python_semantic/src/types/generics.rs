@@ -1849,6 +1849,9 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     // Whether `pending` only contains direct covariant mappings from unbounded ordinary typevars
     // to types that contain no typevars.
     simple_covariant_mappings_only: bool,
+    // Whether `pending` contains a checked root-level mapping from `typing.Self` to a concrete
+    // nominal receiver type.
+    simple_self_mapping: bool,
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
@@ -1865,6 +1868,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
             simple_covariant_mappings_only: true,
+            simple_self_mapping: false,
         }
     }
 
@@ -1909,6 +1913,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             Option<ConstraintBounds<'db>>,
         ) -> Option<Type<'db>>,
     ) -> FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>> {
+        if self.can_solve_simple_self_mapping(generic_context) {
+            return self.solve_hash_map_with(generic_context, choose, true);
+        }
+
         if self.can_solve_simple_covariant_mappings(generic_context) {
             return self.solve_hash_map_with(generic_context, choose, true);
         }
@@ -2013,6 +2021,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         .typevar(self.db)
                         .bound_or_constraints(self.db)
                         .is_none()
+                })
+    }
+
+    fn can_solve_simple_self_mapping(&self, generic_context: GenericContext<'db>) -> bool {
+        self.simple_self_mapping
+            && self.simple_covariant_mappings_only
+            && self.types.len() == 1
+            && generic_context.variables_inner(self.db).len() == 1
+            && generic_context
+                .variables_inner(self.db)
+                .iter()
+                .next()
+                .is_some_and(|(identity, typevar)| {
+                    typevar.typevar(self.db).is_self(self.db) && self.types.contains_key(identity)
                 })
     }
 
@@ -2448,6 +2470,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if let Type::TypeVar(bound_typevar) = formal
+            && bound_typevar.is_inferable(self.db, self.inferable)
+            && bound_typevar.typevar(self.db).is_self(self.db)
+            && matches!(actual, Type::NominalInstance(_))
+            && !actual.has_typevar(self.db)
+            && !actual.has_unspecialized_type_var(self.db)
+            && let Some(bound) = bound_typevar.typevar(self.db).upper_bound(self.db)
+            && actual
+                .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                .is_always_satisfied(self.db)
+        {
+            self.simple_self_mapping = true;
+            self.add_simple_covariant_type_mapping(bound_typevar, actual);
+            return Ok(());
+        }
+
         if let Type::TypeVar(bound_typevar) = formal
             && bound_typevar.is_inferable(self.db, self.inferable)
             && matches!(
