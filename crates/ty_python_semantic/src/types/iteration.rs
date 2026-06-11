@@ -2,7 +2,7 @@ use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, MaterializationKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
@@ -105,7 +105,38 @@ impl<'db> Type<'db> {
             const MAX_TUPLE_LENGTH: usize = 128;
 
             match ty {
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
+                Type::NominalInstance(nominal) => match nominal.known_class(db) {
+                    // Iteration over these exact builtin classes cannot be customized. Subclasses
+                    // have no `KnownClass`, so they continue through the dunder lookup below.
+                    Some(KnownClass::List | KnownClass::Dict) => {
+                        let element_type = nominal.class(db).into_generic_alias().map_or(
+                            Type::unknown(),
+                            |alias| {
+                                let specialization = alias.specialization(db);
+                                let element_type = specialization
+                                    .types(db)
+                                    .first()
+                                    .copied()
+                                    .unwrap_or(Type::unknown());
+                                if element_type.has_dynamic(db) {
+                                    match specialization.materialization_kind(db) {
+                                        Some(MaterializationKind::Top) => {
+                                            element_type.top_materialization(db)
+                                        }
+                                        Some(MaterializationKind::Bottom) => {
+                                            element_type.bottom_materialization(db)
+                                        }
+                                        None => element_type,
+                                    }
+                                } else {
+                                    element_type
+                                }
+                            },
+                        );
+                        Some(Cow::Owned(TupleSpec::homogeneous(element_type)))
+                    }
+                    _ => nominal.tuple_spec(db),
+                },
                 Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
