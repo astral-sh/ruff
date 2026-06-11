@@ -757,6 +757,40 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 }
 
 #[test]
+fn rule_names_in_cli_require_preview() -> Result<()> {
+    let fixture = CliTest::new()?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "unused-import", "-"])
+        .pass_stdin("import os\n"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Selection `unused-import` has no effect because preview is not enabled.
+    ");
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "unused-import", "--preview", "-"])
+        .pass_stdin("import os\n"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:8: error[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)

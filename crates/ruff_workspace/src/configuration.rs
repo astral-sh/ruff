@@ -22,6 +22,7 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
@@ -1011,6 +1012,8 @@ impl LintConfiguration {
             for (kind, selector) in selection.selectors_by_kind() {
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
                 // and use with, e.g., `--ignore` or `--fixable` is okay
+                let selector_is_enabled = is_human_readable_names_enabled(preview.mode)
+                    || !matches!(selector, RuleSelector::Name(_));
 
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
@@ -1029,14 +1032,14 @@ impl LintConfiguration {
                 }
 
                 // Deprecated rules
-                if kind.is_enable() && selector.is_exact() {
+                if selector_is_enabled && kind.is_enable() && selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_deprecated()) {
                         deprecated_selectors.insert(selector.clone());
                     }
                 }
 
                 // Removed rules
-                if selector.is_exact() {
+                if selector_is_enabled && selector.is_exact() {
                     if selector.all_rules().all(|rule| rule.is_removed()) {
                         if kind.is_disable() {
                             removed_ignored_rules.insert(selector);
