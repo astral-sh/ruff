@@ -213,9 +213,9 @@ reveal_type(x)  # revealed: Literal["E"]
 ### Recursively-defined loop variables
 
 A local variable that is redefined in terms of itself across loop iterations diverges, just like a
-recursive implicit attribute. The recursive position is filled with `Divergent`, and the variable is
-inferred as a true recursive type (a μ-binder) that unfolds on demand under subscript/iteration
-rather than bottoming out at the bare `Divergent` marker:
+recursive implicit attribute. The initial arm is preserved, the recursive position is filled with
+`Divergent`, and the variable is inferred as a true recursive type (a μ-binder) that unfolds on
+demand under subscript/iteration rather than bottoming out at the bare `Divergent` marker:
 
 ```py
 def f():
@@ -223,10 +223,10 @@ def f():
     while True:
         reveal_type(x)  # revealed: list[int] | list[Divergent]
         x = [x]
-        reveal_type(x)  # revealed: list[Divergent]
+        reveal_type(x)  # revealed: list[list[int] | list[Divergent]]
         # Subscripting unfolds the recursive type instead of collapsing to `Divergent`:
-        reveal_type(x[0])  # revealed: list[Divergent]
-        reveal_type(x[0][0])  # revealed: list[Divergent]
+        reveal_type(x[0])  # revealed: list[int] | list[Divergent]
+        reveal_type(x[0][0])  # revealed: int | list[Divergent]
 ```
 
 ### `break` and `continue`

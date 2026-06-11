@@ -201,10 +201,10 @@ use crate::{
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
         ActiveRecursionDetector, CallableTypes, EnumClassLiteral, IntersectionBuilder,
-        NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
-        definite_match_pattern_type, equality_truthiness, expand_type, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, pattern_binding_fallthrough_type,
-        sequence_pattern_type_builder, singleton_pattern_type,
+        KnownFunction, NarrowingConstraint, SpecialFormType, Type, TypeContext, UnionType,
+        callable_pattern_type, definite_match_pattern_type, equality_truthiness, expand_type,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        pattern_binding_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -1258,6 +1258,19 @@ fn analyze_non_terminal_call<'db>(
     // so heavily congested because there are only very few dynamic types, in which case Salsa's
     // sharding the locks by value doesn't help much. See <https://github.com/astral-sh/ty/issues/968>.
     if matches!(ty, Type::Dynamic(_)) {
+        return Truthiness::AlwaysTrue;
+    }
+    // These diagnostic helpers return their argument type. If the argument is temporarily
+    // `Never` during fixed-point iteration, that must not make the following statement
+    // unreachable.
+    if matches!(
+        ty,
+        Type::FunctionLiteral(function)
+            if matches!(
+                function.known(db),
+                Some(KnownFunction::RevealType | KnownFunction::AssertType)
+            )
+    ) {
         return Truthiness::AlwaysTrue;
     }
 
