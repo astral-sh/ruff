@@ -1,0 +1,12 @@
+$schema: https://raw.githubusercontent.com/CodSpeedHQ/codspeed/refs/heads/main/schemas/codspeed.schema.json
+
+options:
+  working-directory: target/benchmark_cache/homeassistant
+  warmup-time: 0s
+  min-rounds: 10
+  max-rounds: 10
+
+benchmarks:
+  - id: homeassistant
+    name: ty check Home Assistant
+    exec: ./run-ty

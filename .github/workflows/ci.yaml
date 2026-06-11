@@ -1187,7 +1187,7 @@ jobs:
           github.ref == 'refs/heads/main'
         )
       )
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -1212,12 +1212,24 @@ jobs:
       - name: "Build benchmarks"
         run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
 
+      - name: "Build ty"
+        run: cargo build --profile profiling --bin ty
+
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: benchmarks-walltime-binary
           compression-level: 1
           path: target/codspeed
+          if-no-files-found: "error"
+          retention-days: 1
+
+      - name: "Upload ty binary"
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ty-profiling-binary
+          compression-level: 1
+          path: target/profiling/ty
           if-no-files-found: "error"
           retention-days: 1
 
@@ -1271,6 +1283,107 @@ jobs:
         with:
           mode: walltime
           run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
+
+  benchmark-homeassistant:
+    name: "benchmark Home Assistant"
+    runs-on: codspeed-macro
+    needs: benchmarks-walltime-build
+    timeout-minutes: 60
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+        with:
+          version: "0.11.19"
+
+      - name: "Download ty binary"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: ty-profiling-binary
+          path: target/profiling
+
+      - name: "Restore binary permissions"
+        run: chmod +x target/profiling/ty
+
+      - name: "Set up Home Assistant"
+        env:
+          HOME_ASSISTANT_COMMIT: a0162d2ff0ed061501405a617961be149b15bd1f
+          HOME_ASSISTANT_ROOT: target/benchmark_cache/homeassistant
+        run: |
+          mkdir -p "${HOME_ASSISTANT_ROOT}"
+          git init --quiet "${HOME_ASSISTANT_ROOT}"
+          git -C "${HOME_ASSISTANT_ROOT}" fetch \
+            https://github.com/home-assistant/core.git \
+            "${HOME_ASSISTANT_COMMIT}" \
+            --quiet \
+            --depth 1 \
+            --no-tags
+          git -C "${HOME_ASSISTANT_ROOT}" reset --hard FETCH_HEAD --quiet
+
+          uv venv \
+            --quiet \
+            --python 3.14 \
+            "${HOME_ASSISTANT_ROOT}/venv"
+          uv pip install \
+            --python "${HOME_ASSISTANT_ROOT}/venv/bin/python" \
+            --quiet \
+            --exclude-newer 2026-06-07T00:00:00Z \
+            --excludes scripts/ty_benchmark/src/benchmark/homeassistant-excludes.txt \
+            mypy==2.1.0 \
+            -r "${HOME_ASSISTANT_ROOT}/requirements_all.txt" \
+            -r "${HOME_ASSISTANT_ROOT}/requirements_test.txt"
+
+          cat > "${HOME_ASSISTANT_ROOT}/ty.toml" <<EOF
+          [src]
+          include = ["homeassistant"]
+          exclude = []
+
+          [environment]
+          python-version = "3.14"
+          python = "venv"
+          EOF
+
+          cat > "${HOME_ASSISTANT_ROOT}/run-ty" <<'EOF'
+          #!/usr/bin/env bash
+          ../../profiling/ty check --output-format=concise --no-progress > /dev/null 2>&1
+          status=$?
+          if [[ ${status} -le 1 ]]; then
+            exit 0
+          fi
+          exit "${status}"
+          EOF
+          chmod +x "${HOME_ASSISTANT_ROOT}/run-ty"
+
+      - name: "Verify Home Assistant diagnostics"
+        working-directory: target/benchmark_cache/homeassistant
+        run: |
+          set +e
+          ../../profiling/ty check --output-format=concise --no-progress \
+            > diagnostics.stdout \
+            2> diagnostics.stderr
+          status=$?
+          set -e
+          if [[ ${status} -gt 1 ]]; then
+            exit "${status}"
+          fi
+          sha256sum diagnostics.stdout diagnostics.stderr
+          wc -l diagnostics.stdout diagnostics.stderr
+          ./run-ty
+          ./run-ty
+
+      - name: "Run Home Assistant benchmark"
+        uses: CodSpeedHQ/action@9d332c4d90b43981c3e55ae8e38e68709996240f # v4.17.0
+        env:
+          CODSPEED_PERF_ENABLED: false
+        with:
+          mode: walltime
+          config: codspeed-homeassistant.yml
 
   required-checks-passed:
     name: "all required checks passed"
