@@ -1350,6 +1350,17 @@ impl TestServerBuilder {
         self
     }
 
+    /// Set the hover content format preference for the client
+    pub(crate) fn with_hover_content_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .hover
+            .get_or_insert_default()
+            .content_format = Some(formats);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
