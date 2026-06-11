@@ -242,6 +242,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     expression_cache: Option<Rc<RefCell<ExpressionCache<'db>>>>,
 
     /// Reachability evaluations reused while inferring this region.
+    ///
+    /// Speculative builders share this cache with their parent so repeated place lookups performed
+    /// during multi-inference can reuse predicate truthiness computed by the parent builder.
     reachability_cache: Rc<ReachabilityEvaluationCache<'db>>,
 
     /// Type qualifiers (`Required`, `NotRequired`, etc.) for annotation expressions.
