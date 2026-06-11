@@ -19,7 +19,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, TypedDictType, UnionType, UpcastPolicy,
+    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -3296,71 +3296,29 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // Other than the special cases enumerated above, a TypedDict type is always disjoint
-            // from any type that cannot overlap with `dict[str, Any]`. TypedDict is not statically
-            // assignable to mutable dictionary types, but every inhabitant is a runtime `dict`,
-            // so disjointness must preserve that possible overlap.
-            (Type::TypedDict(typed_dict), other) | (other, Type::TypedDict(typed_dict)) => {
-                self.check_typed_dict_runtime_dict_disjointness(db, typed_dict, other)
-            }
-        }
-    }
-
-    fn check_typed_dict_runtime_dict_disjointness(
-        &self,
-        db: &'db dyn Db,
-        typed_dict: TypedDictType<'db>,
-        other: Type<'db>,
-    ) -> ConstraintSet<'db, 'c> {
-        let other_mapping = other
-            .nominal_class(db)
-            .and_then(|class| {
-                let dict = KnownClass::Dict.try_to_class_literal(db)?;
-                dict.iter_mro(db, None)
-                    .filter_map(ClassBase::into_class)
-                    .any(|base| base.class_literal(db) == class.class_literal(db))
-                    .then_some(class)
-            })
-            .and_then(|class| {
-                let mapping = KnownClass::Mapping.try_to_class_literal(db)?;
-                class.iter_mro(db).find_map(|base| {
-                    let ClassType::Generic(alias) = base.into_class()? else {
-                        return None;
-                    };
-                    (alias.origin(db) == mapping).then(|| alias.specialization(db))
-                })
-            });
-
-        if let Some(other_mapping) = other_mapping {
-            let required_fields = typed_dict
-                .items(db)
-                .values()
-                .filter(|field| field.is_required());
-
-            // An optional-only TypedDict can be empty, so it overlaps every dictionary type via
-            // `{}` regardless of the dictionary's key and value types.
-            if required_fields.clone().next().is_none() {
-                return self.never();
-            }
-
-            if let [other_key, other_value, ..] = other_mapping.types(db) {
-                // Every TypedDict key is a string. In addition, every required field is present at
-                // runtime, so a single required value type that is disjoint from the dictionary's
-                // value type is enough to prove that no object can inhabit both types.
-                return self
-                    .check_type_pair(db, KnownClass::Str.to_instance(db), *other_key)
-                    .or(db, self.constraints, || {
-                        required_fields.when_any(db, self.constraints, |field| {
-                            self.check_type_pair(db, field.declared_ty, *other_value)
+            // TypedDict inhabitants have exact runtime type `dict`. Preserve overlap with
+            // supertypes of `dict` regardless of their type arguments; an empty TypedDict value
+            // can inhabit both types even when those arguments are otherwise incompatible.
+            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
+                if other.nominal_class(db).is_some_and(|other_class| {
+                    KnownClass::Dict
+                        .try_to_class_literal(db)
+                        .is_some_and(|dict| {
+                            dict.unknown_specialization(db)
+                                .is_subtype_of_class_literal(db, other_class.class_literal(db))
                         })
-                    });
-            }
-            return self.never();
-        }
+                }) {
+                    return self.never();
+                }
 
-        self.as_relation_checker(TypeRelation::Assignability)
-            .check_type_pair(db, typed_dict_runtime_dict(db), other)
-            .negate(db, self.constraints)
+                let dict_str_any = KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+                self.as_relation_checker(TypeRelation::Assignability)
+                    .check_type_pair(db, dict_str_any, other)
+                    .negate(db, self.constraints)
+            }
+        }
     }
 
     fn check_property_instance_pair(
