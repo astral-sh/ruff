@@ -11,7 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use std::slice::Iter;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -3194,12 +3194,56 @@ struct ParametersData<'db> {
     kind: ParametersKind<'db>,
 }
 
+static GRADUAL_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+        ]),
+        kind: ParametersKind::Gradual,
+    })
+});
+
+static UNKNOWN_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+        ]),
+        kind: ParametersKind::Gradual,
+    })
+});
+
+static TOP_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        // We always emit `called-top-callable` for any call to the top callable (based on this
+        // `kind`), so we otherwise give it the most permissive signature `(*object, **object)` to
+        // avoid emitting any other errors about arity mismatches.
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::object()),
+        ]),
+        kind: ParametersKind::Top,
+    })
+});
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
     data: Arc<ParametersData<'db>>,
 }
 
 impl<'db> Parameters<'db> {
+    fn from_static(data: &'static LazyLock<Arc<ParametersData<'static>>>) -> Self {
+        Self {
+            data: Arc::clone(data),
+        }
+    }
+
     fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
         Self {
             data: Arc::new(ParametersData {
@@ -3421,15 +3465,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self::from_parts(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-            ],
-            ParametersKind::Gradual,
-        )
+        Self::from_static(&GRADUAL_PARAMETERS)
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
@@ -3479,15 +3515,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self::from_parts(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-            ],
-            ParametersKind::Gradual,
-        )
+        Self::from_static(&UNKNOWN_PARAMETERS)
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
@@ -3509,17 +3537,7 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self::from_parts(
-            // We always emit `called-top-callable` for any call to the top callable (based on the
-            // `kind` below), so we otherwise give it the most permissive signature`(*object,
-            // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
-            ],
-            ParametersKind::Top,
-        )
+        Self::from_static(&TOP_PARAMETERS)
     }
 
     fn from_parameters(
