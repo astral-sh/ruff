@@ -66,9 +66,7 @@ pub trait System: Debug + Sync + Send {
     fn canonicalize_path(&self, path: &SystemPath) -> Result<SystemPathBuf>;
 
     /// Returns `true` if both paths refer to the same file.
-    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
-        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
-    }
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool>;
 
     /// Returns the source type for `path` if known or `None`.
     ///

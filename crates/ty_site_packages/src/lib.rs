@@ -541,26 +541,33 @@ impl PythonInterpreterLayout {
             && version.free_threaded_build_available()
             && let Some(parent) = path.parent()
         {
-            let variant = PythonBuildVariant::FreeThreaded.suffix();
-            let free_threaded_executable = parent.join(format!(
-                "python{version}{variant}{}",
-                std::env::consts::EXE_SUFFIX
-            ));
+            let mut variant = PythonBuildVariant::Default;
 
-            // CPython's Unix installer hard-links `pythonX.Y` to `pythonX.Yt` for a
-            // free-threaded build, so neither the file name nor canonicalization can
-            // distinguish the two executable paths.
-            if !system.is_file(&free_threaded_executable) {
-                layout.variant = PythonBuildVariant::Default;
-            } else if let Ok(is_free_threaded) =
-                system.is_same_file(path, &free_threaded_executable)
-            {
-                layout.variant = if is_free_threaded {
-                    PythonBuildVariant::FreeThreaded
-                } else {
-                    PythonBuildVariant::Default
-                };
+            // CPython's Unix installer hard-links `pythonX.Y` to its versioned executable for a
+            // free-threaded build, so neither the file name nor canonicalization can distinguish
+            // the two executable paths. Debug builds use the `td` ABI flags but retain the `t`
+            // suffix for their library directory.
+            for abi_flags in ["t", "td"] {
+                let free_threaded_executable = parent.join(format!(
+                    "python{version}{abi_flags}{}",
+                    std::env::consts::EXE_SUFFIX
+                ));
+
+                if !system.is_file(&free_threaded_executable) {
+                    continue;
+                }
+
+                match system.is_same_file(path, &free_threaded_executable) {
+                    Ok(true) => {
+                        variant = PythonBuildVariant::FreeThreaded;
+                        break;
+                    }
+                    Ok(false) => {}
+                    Err(_) => variant = PythonBuildVariant::Unknown,
+                }
             }
+
+            layout.variant = variant;
         }
 
         Some(layout)
@@ -652,6 +659,9 @@ impl PythonBuildVariant {
     }
 
     fn split_executable_suffix(version: &str) -> (&str, Self) {
+        // Debug builds add `d` to the ABI flags, but this does not change the library layout.
+        let version = version.strip_suffix('d').unwrap_or(version);
+
         if let Some(version) = version.strip_suffix('t') {
             (version, Self::FreeThreaded)
         } else {
@@ -3907,40 +3917,42 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn identifies_unsuffixed_free_threaded_hard_link() {
+    fn identifies_free_threaded_hard_links() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
         let system = OsSystem::new(root);
 
-        let prefix = root.join("prefix");
-        let bin = prefix.join("bin");
-        let versioned_executable = bin.join("python3.14");
-        let free_threaded_executable = bin.join("python3.14t");
-        let free_threaded_site_packages = prefix.join("lib/python3.14t/site-packages");
+        for executable_name in ["python3.14t", "python3.14td"] {
+            let prefix = root.join(executable_name);
+            let bin = prefix.join("bin");
+            let versioned_executable = bin.join("python3.14");
+            let free_threaded_executable = bin.join(executable_name);
+            let free_threaded_site_packages = prefix.join("lib/python3.14t/site-packages");
 
-        std::fs::create_dir_all(bin.as_std_path()).unwrap();
-        std::fs::File::create(free_threaded_executable.as_std_path()).unwrap();
-        std::fs::hard_link(
-            free_threaded_executable.as_std_path(),
-            versioned_executable.as_std_path(),
-        )
-        .unwrap();
-        std::fs::create_dir_all(prefix.join("lib/python3.14/site-packages").as_std_path()).unwrap();
-        std::fs::create_dir_all(free_threaded_site_packages.as_std_path()).unwrap();
+            std::fs::create_dir_all(bin.as_std_path()).unwrap();
+            std::fs::File::create(free_threaded_executable.as_std_path()).unwrap();
+            std::fs::hard_link(
+                free_threaded_executable.as_std_path(),
+                versioned_executable.as_std_path(),
+            )
+            .unwrap();
+            std::fs::create_dir_all(prefix.join("lib/python3.14/site-packages").as_std_path())
+                .unwrap();
+            std::fs::create_dir_all(free_threaded_site_packages.as_std_path()).unwrap();
 
-        let environment = PythonEnvironment::new(
-            &versioned_executable,
-            SysPrefixPathOrigin::PythonCliFlag,
-            &system,
-        )
-        .unwrap();
+            for executable in [&versioned_executable, &free_threaded_executable] {
+                let environment =
+                    PythonEnvironment::new(executable, SysPrefixPathOrigin::PythonCliFlag, &system)
+                        .unwrap();
 
-        assert_eq!(
-            environment.site_packages_paths(&system).unwrap().into_vec(),
-            [system
-                .canonicalize_path(&free_threaded_site_packages)
-                .unwrap()]
-        );
+                assert_eq!(
+                    environment.site_packages_paths(&system).unwrap().into_vec(),
+                    [system
+                        .canonicalize_path(&free_threaded_site_packages)
+                        .unwrap()]
+                );
+            }
+        }
     }
 
     #[cfg(unix)]

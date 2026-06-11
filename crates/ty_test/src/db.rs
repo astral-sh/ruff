@@ -372,6 +372,15 @@ impl System for MdtestSystem {
         }
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .is_same_file(&self.normalize_path(first), &self.normalize_path(second))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
