@@ -12,7 +12,6 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
-use self::typed_dict::synthesize_typed_dict_merge;
 pub(super) use self::typed_dict::{
     DynamicTypedDictAnchor, DynamicTypedDictLiteral, open_empty_typed_dict_member,
 };
@@ -1633,17 +1632,6 @@ impl<'db> ClassType<'db> {
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
                 let specialization = generic.specialization(db);
-
-                if matches!(name, "__or__" | "__ror__")
-                    && Self::is_top_dict_specialization(db, class_literal, specialization)
-                {
-                    return Member::definitely_declared(synthesize_typed_dict_merge(
-                        db,
-                        Type::instance(db, self),
-                        name,
-                    ))
-                    .inner;
-                }
 
                 if let Some(readonly_projection) =
                     Self::dict_top_readonly_projection(db, class_literal, specialization, name)

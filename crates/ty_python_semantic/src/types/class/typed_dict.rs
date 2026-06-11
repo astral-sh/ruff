@@ -683,7 +683,7 @@ fn synthesize_typed_dict_view_method<'db>(
 }
 
 /// Synthesize a merge operator (`__or__`, `__ror__`, or `__ior__`) for a `TypedDict`.
-pub(super) fn synthesize_typed_dict_merge<'db>(
+fn synthesize_typed_dict_merge<'db>(
     db: &'db dyn Db,
     instance_ty: Type<'db>,
     name: &str,
@@ -752,7 +752,7 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             .to_instance_unknown(db)
             .top_materialization(db);
         let open_empty_typed_dict_ty = Type::TypedDict(TypedDictType::open_empty(db));
-        if instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty {
+        if instance_ty == open_empty_typed_dict_ty {
             let runtime_dict_top =
                 UnionType::from_elements(db, [top_dict_ty, open_empty_typed_dict_ty]);
             let parameters = [
