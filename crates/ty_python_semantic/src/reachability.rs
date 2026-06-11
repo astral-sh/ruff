@@ -938,16 +938,29 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
 
-            let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-            let true_ty = self.narrow(node.if_true, true_accumulated);
+            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
+            {
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                self.narrow(node.if_false, false_accumulated)
+            } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
+            {
+                let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                self.narrow(node.if_true, true_accumulated)
+            } else {
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_ty = self.narrow(node.if_true, true_accumulated);
 
-            let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+                let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
 
-            let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-            let false_ty = self.narrow(node.if_false, false_accumulated);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_ty = self.narrow(node.if_false, false_accumulated);
 
-            let true_or_uncertain = UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
-            UnionType::from_two_elements(self.db, true_or_uncertain, false_ty)
+                let true_or_uncertain =
+                    UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
+                UnionType::from_two_elements(self.db, true_or_uncertain, false_ty)
+            }
         }
     }
 }
