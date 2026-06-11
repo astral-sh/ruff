@@ -1,6 +1,7 @@
 use super::context::InferContext;
 use super::{Signature, Type, TypeContext};
 use crate::Db;
+use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
 use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use ruff_python_ast as ast;
@@ -191,14 +192,7 @@ pub(super) enum CallDunderError<'db> {
     /// The dunder attribute exists but it can't be called with the given arguments.
     ///
     /// This includes non-callable dunder attributes that are possibly unbound.
-    ///
-    /// The binding site of the dunder on the receiver's class, when statically
-    /// resolvable. See <https://github.com/astral-sh/ty/issues/3250>.
-    CallError(
-        CallErrorKind,
-        Box<Bindings<'db>>,
-        Option<ty_python_core::definition::Definition<'db>>,
-    ),
+    CallError(CallErrorKind, Box<Bindings<'db>>, Provenance<'db>),
 
     /// The type has the specified dunder method and it is callable
     /// with the specified arguments without any binding errors
@@ -218,6 +212,20 @@ pub(super) enum CallDunderError<'db> {
 }
 
 impl<'db> CallDunderError<'db> {
+    pub(super) fn provenance(&self) -> Provenance<'db> {
+        match self {
+            Self::CallError(_, _, provenance) => *provenance,
+            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => Provenance::Unknown,
+        }
+    }
+
+    pub(super) fn with_provenance(self, provenance: Provenance<'db>) -> Self {
+        match self {
+            Self::CallError(kind, bindings, _) => Self::CallError(kind, bindings, provenance),
+            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => self,
+        }
+    }
+
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
             Self::MethodNotAvailable | Self::CallError(CallErrorKind::NotCallable, _, _) => None,

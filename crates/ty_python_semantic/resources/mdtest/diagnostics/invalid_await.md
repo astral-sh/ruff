@@ -93,9 +93,9 @@ async def main() -> None:
     await DeepInheritedNonCallableAwait()  # error: [invalid-await]
 ```
 
-When the expression type is a union, the diagnostic does not include a secondary annotation. ty does
-not currently preserve which union member caused the call to fail, so pointing at any one member's
-binding site could be misleading.
+When multiple union members contribute different binding sites, the diagnostic does not include a
+secondary annotation. ty does not currently preserve which union member caused the call to fail, so
+pointing at any one member's binding site could be misleading.
 
 ```py
 class A:

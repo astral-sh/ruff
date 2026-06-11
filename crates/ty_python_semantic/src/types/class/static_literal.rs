@@ -12,8 +12,8 @@ use std::cell::RefCell;
 use crate::{
     Db, FxIndexMap, FxIndexSet, Program, TypeQualifiers,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, PublicTypePolicy, TypeOrigin,
-        place_from_bindings, place_from_declarations,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, PublicTypePolicy,
+        TypeOrigin, place_from_bindings, place_from_declarations,
     },
     reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
@@ -2190,7 +2190,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
-        let mut first_binding: Option<Definition<'db>> = None;
+        let mut provenance = Provenance::Unknown;
 
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
@@ -2474,7 +2474,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
-                    first_binding.get_or_insert(binding);
+                    provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }
@@ -2488,7 +2488,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .promote(db)
                         .promote_singletons(db),
                 )
-                .with_definition(first_binding)
+                .with_provenance(provenance)
                 .with_qualifiers(qualifiers)
             } else {
                 Place::Undefined.with_qualifiers(qualifiers)
@@ -2530,7 +2530,7 @@ impl<'db> StaticClassLiteral<'db> {
                         mut declared @ Place::Defined(DefinedPlace {
                             ty: declared_ty,
                             definedness: declaredness,
-                            definition: declared_definition,
+                            provenance: declared_provenance,
                             ..
                         }),
                     qualifiers,
@@ -2573,7 +2573,7 @@ impl<'db> StaticClassLiteral<'db> {
                             Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
-                            definition: implicit_definition,
+                            provenance: implicit_provenance,
                             ..
                         }) = implicit.inner.place
                         {
@@ -2595,7 +2595,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
-                                        definition: implicit_definition.or(declared_definition),
+                                        provenance: implicit_provenance.or(declared_provenance),
                                     })
                                     .with_qualifiers(qualifiers),
                                 }
@@ -2641,7 +2641,7 @@ impl<'db> StaticClassLiteral<'db> {
                         } else {
                             if let Place::Defined(DefinedPlace {
                                 ty: implicit_ty,
-                                definition: implicit_definition,
+                                provenance: implicit_provenance,
                                 ..
                             }) = Self::implicit_attribute(
                                 db,
@@ -2662,7 +2662,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
                                         public_type_policy: PublicTypePolicy::Raw,
-                                        definition: implicit_definition.or(declared_definition),
+                                        provenance: implicit_provenance.or(declared_provenance),
                                     })
                                     .with_qualifiers(qualifiers),
                                 }

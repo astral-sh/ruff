@@ -76,7 +76,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 place:
                     Place::Defined(DefinedPlace {
                         ty,
-                        definition: declared_definition,
+                        provenance: declared_provenance,
                         ..
                     }),
                 qualifiers,
@@ -94,7 +94,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
                         Place::Defined(place) => Place::Defined(DefinedPlace {
                             ty,
-                            definition: place.definition.or(declared_definition),
+                            provenance: place.provenance.or(declared_provenance),
                             ..place
                         })
                         .with_qualifiers(qualifiers),

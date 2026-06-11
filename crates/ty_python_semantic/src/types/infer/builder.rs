@@ -5418,7 +5418,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Place::Defined(DefinedPlace {
                 ty: dunder_callable,
                 definedness: boundness,
-                definition,
+                provenance,
                 ..
             }) => {
                 let mut bindings = self
@@ -5435,7 +5435,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Err(CallDunderError::CallError(
                         call_error,
                         Box::new(bindings),
-                        definition,
+                        provenance,
                     ));
                 }
 

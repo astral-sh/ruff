@@ -94,14 +94,53 @@ impl PublicTypePolicy {
     }
 }
 
-/// A defined place with its raw type, origin, definedness, and public-type policy.
+/// The source definition provenance for a place.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum Provenance<'db> {
+    /// No source definition is known.
+    #[default]
+    Unknown,
+    /// Exactly one source definition is known.
+    SingleDefinition(Definition<'db>),
+    /// Multiple distinct source definitions contribute to the place. Instead of storing all of
+    /// them, or selecting one arbitrarily, we currently discard provenance information in this
+    /// case.
+    MultipleDefinitions,
+}
+
+impl<'db> Provenance<'db> {
+    pub(crate) fn from_definition(definition: Option<Definition<'db>>) -> Self {
+        definition.map_or(Self::Unknown, Self::SingleDefinition)
+    }
+
+    /// Merge the provenance from two places.
+    pub(crate) fn or(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::Unknown, provenance) | (provenance, Self::Unknown) => provenance,
+            (Self::MultipleDefinitions, _) | (_, Self::MultipleDefinitions) => {
+                Self::MultipleDefinitions
+            }
+            (Self::SingleDefinition(left), Self::SingleDefinition(right)) if left == right => self,
+            (Self::SingleDefinition(_), Self::SingleDefinition(_)) => Self::MultipleDefinitions,
+        }
+    }
+
+    pub(crate) fn definition(self) -> Option<Definition<'db>> {
+        match self {
+            Self::SingleDefinition(definition) => Some(definition),
+            Self::Unknown | Self::MultipleDefinitions => None,
+        }
+    }
+}
+
+/// A defined place with its raw type, origin, definedness, public-type policy, and provenance.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinedPlace<'db> {
     pub(crate) ty: Type<'db>,
     pub(crate) origin: TypeOrigin,
     pub(crate) definedness: Definedness,
     pub(crate) public_type_policy: PublicTypePolicy,
-    pub(crate) definition: Option<Definition<'db>>,
+    pub(crate) provenance: Provenance<'db>,
 }
 
 impl<'db> DefinedPlace<'db> {
@@ -111,7 +150,7 @@ impl<'db> DefinedPlace<'db> {
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
             public_type_policy: PublicTypePolicy::Raw,
-            definition: None,
+            provenance: Provenance::Unknown,
         }
     }
 
@@ -131,7 +170,12 @@ impl<'db> DefinedPlace<'db> {
     }
 
     pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
-        self.definition = definition;
+        self.provenance = Provenance::from_definition(definition);
+        self
+    }
+
+    pub(crate) fn with_provenance(mut self, provenance: Provenance<'db>) -> Self {
+        self.provenance = provenance;
         self
     }
 
@@ -192,6 +236,15 @@ impl<'db> Place<'db> {
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         match self {
             Place::Defined(defined) => Place::Defined(defined.with_definition(definition)),
+            Place::Undefined => Place::Undefined,
+        }
+    }
+
+    /// Returns this place with the given provenance attached. A no-op for [`Place::Undefined`].
+    #[must_use]
+    pub(crate) fn with_provenance(self, provenance: Provenance<'db>) -> Self {
+        match self {
+            Place::Defined(defined) => Place::Defined(defined.with_provenance(provenance)),
             Place::Undefined => Place::Undefined,
         }
     }
@@ -290,7 +343,7 @@ impl<'db> Place<'db> {
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
-                        definition: None,
+                        provenance: Provenance::Unknown,
                         ..defined
                     })
                 } else {
@@ -319,7 +372,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
             Ok(type_and_qualifiers) => Place::Defined(
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin())
-                    .with_definition(type_and_qualifiers.definition()),
+                    .with_provenance(type_and_qualifiers.provenance()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
@@ -327,7 +380,7 @@ impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
                 DefinedPlace::new(type_and_qualifiers.inner_type())
                     .with_origin(type_and_qualifiers.origin())
                     .with_definedness(Definedness::PossiblyUndefined)
-                    .with_definition(type_and_qualifiers.definition()),
+                    .with_provenance(type_and_qualifiers.provenance()),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
         }
@@ -357,7 +410,7 @@ impl<'db> LookupError<'db> {
                 ty.origin().merge(ty2.origin()),
                 ty.qualifiers().union(ty2.qualifiers()),
             )
-            .with_definition(ty.definition().or(ty2.definition()))),
+            .with_provenance(ty.provenance().or(ty2.provenance()))),
             (LookupError::PossiblyUndefined(ty), Err(LookupError::PossiblyUndefined(ty2))) => {
                 Err(LookupError::PossiblyUndefined(
                     TypeAndQualifiers::new(
@@ -365,7 +418,7 @@ impl<'db> LookupError<'db> {
                         ty.origin().merge(ty2.origin()),
                         ty.qualifiers().union(ty2.qualifiers()),
                     )
-                    .with_definition(ty.definition().or(ty2.definition())),
+                    .with_provenance(ty.provenance().or(ty2.provenance())),
                 ))
             }
         }
@@ -761,7 +814,7 @@ impl<'db> PlaceAndQualifiers<'db> {
             } => {
                 let ty = place.public_type_policy.apply_if_needed(db, place.ty);
                 let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers)
-                    .with_definition(place.definition);
+                    .with_provenance(place.provenance);
                 match place.definedness {
                     Definedness::AlwaysDefined => Ok(type_and_qualifiers),
                     Definedness::PossiblyUndefined => {
@@ -838,7 +891,7 @@ impl<'db> PlaceAndQualifiers<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                definition: prev.definition.or(current.definition),
+                provenance: prev.provenance.or(current.provenance),
                 ..current
             }),
             // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
@@ -932,7 +985,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: Type::Dynamic(DynamicType::Unknown),
                     origin,
                     definedness,
-                    definition: declared_definition,
+                    provenance: declared_provenance,
                     ..
                 }),
             qualifiers,
@@ -943,14 +996,14 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred,
                     origin,
                     definedness: boundness,
-                    definition: inferred_definition,
+                    provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_two_elements(db, Type::unknown(), inferred),
                     origin,
                     definedness: boundness,
                     public_type_policy: PublicTypePolicy::Raw,
-                    definition: inferred_definition.or(declared_definition),
+                    provenance: inferred_provenance.or(declared_provenance),
                 })
                 .with_qualifiers(qualifiers),
                 Place::Undefined => Place::Defined(DefinedPlace {
@@ -958,7 +1011,7 @@ pub(crate) fn place_by_id<'db>(
                     origin,
                     definedness,
                     public_type_policy: PublicTypePolicy::Raw,
-                    definition: declared_definition,
+                    provenance: declared_provenance,
                 })
                 .with_qualifiers(qualifiers),
             }
@@ -979,7 +1032,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: declared_ty,
                     origin,
                     definedness: Definedness::PossiblyUndefined,
-                    definition: declared_definition,
+                    provenance: declared_provenance,
                     ..
                 }),
             qualifiers,
@@ -999,7 +1052,7 @@ pub(crate) fn place_by_id<'db>(
                         origin,
                         definedness: Definedness::AlwaysDefined,
                         public_type_policy: PublicTypePolicy::Raw,
-                        definition: declared_definition,
+                        provenance: declared_provenance,
                     })
                 }
                 // Place is possibly undeclared and (possibly) bound
@@ -1007,7 +1060,7 @@ pub(crate) fn place_by_id<'db>(
                     ty: inferred_ty,
                     origin,
                     definedness: boundness,
-                    definition: inferred_definition,
+                    provenance: inferred_provenance,
                     ..
                 }) => Place::Defined(DefinedPlace {
                     ty: UnionType::from_two_elements(db, inferred_ty, declared_ty),
@@ -1018,7 +1071,7 @@ pub(crate) fn place_by_id<'db>(
                         boundness
                     },
                     public_type_policy: PublicTypePolicy::Raw,
-                    definition: inferred_definition.or(declared_definition),
+                    provenance: inferred_provenance.or(declared_provenance),
                 }),
             };
 
@@ -1392,6 +1445,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
+    let mut provenance = Provenance::Unknown;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
 
@@ -1504,6 +1558,7 @@ fn place_from_bindings_impl<'db>(
             }
 
             first_definition.get_or_insert(binding);
+            provenance = provenance.or(Provenance::SingleDefinition(binding));
             let binding_ty = binding_type(db, binding);
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
@@ -1550,13 +1605,13 @@ fn place_from_bindings_impl<'db>(
             Truthiness::AlwaysFalse => Place::Defined(
                 DefinedPlace::new(ty)
                     .with_definedness(boundness)
-                    .with_definition(first_definition),
+                    .with_provenance(provenance),
             ),
             Truthiness::AlwaysTrue => Place::Undefined,
             Truthiness::Ambiguous => Place::Defined(
                 DefinedPlace::new(ty)
                     .with_definedness(Definedness::PossiblyUndefined)
-                    .with_definition(first_definition),
+                    .with_provenance(provenance),
             ),
         }
     } else {
@@ -1748,6 +1803,7 @@ fn place_from_declarations_impl<'db>(
     };
 
     let mut first_declaration = None;
+    let mut provenance = Provenance::Unknown;
     let mut all_declarations_definitely_reachable = true;
 
     let mut types = declarations.filter_map(|declaration_with_constraint| {
@@ -1773,6 +1829,7 @@ fn place_from_declarations_impl<'db>(
         } else {
             let declared_type = inferred_declaration(db, declaration).declared()?;
             first_declaration.get_or_insert(declaration);
+            provenance = provenance.or(Provenance::SingleDefinition(declaration));
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 
@@ -1799,7 +1856,7 @@ fn place_from_declarations_impl<'db>(
             DefinedPlace::new(declared.inner_type())
                 .with_origin(TypeOrigin::Declared)
                 .with_definedness(boundness)
-                .with_definition(first_declaration),
+                .with_provenance(provenance),
         )
         .with_qualifiers(declared.qualifiers());
 
@@ -2158,7 +2215,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2168,7 +2225,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2179,7 +2236,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2189,7 +2246,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2214,7 +2271,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .into()
         );
@@ -2225,7 +2282,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                definition: None,
+                provenance: Provenance::Unknown,
             })
             .into()
         );

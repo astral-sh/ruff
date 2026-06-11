@@ -372,7 +372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Place::Defined(DefinedPlace {
                         ty,
                         definedness: boundness,
-                        definition: source_definition,
+                        provenance: source_provenance,
                         ..
                     }),
                 qualifiers,
@@ -391,7 +391,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 if qualifiers.contains(TypeQualifiers::FROM_MODULE_GETATTR) {
-                    from_module_getattr = Some((ty, qualifiers, source_definition));
+                    from_module_getattr = Some((ty, qualifiers, source_provenance));
                 } else {
                     self.add_declaration_with_binding(
                         alias.into(),
@@ -401,7 +401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 inner: ty,
                                 origin: TypeOrigin::Declared,
                                 qualifiers,
-                                definition: source_definition,
+                                provenance: source_provenance,
                             },
                             inferred_ty: ty,
                         },
@@ -449,7 +449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // We've checked for a submodule, so now we can go ahead and use a type from module
         // `__getattr__`.
-        if let Some((ty, qualifiers, source_definition)) = from_module_getattr {
+        if let Some((ty, qualifiers, source_provenance)) = from_module_getattr {
             self.add_declaration_with_binding(
                 alias.into(),
                 definition,
@@ -458,7 +458,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         inner: ty,
                         origin: TypeOrigin::Declared,
                         qualifiers,
-                        definition: source_definition,
+                        provenance: source_provenance,
                     },
                     inferred_ty: ty,
                 },
