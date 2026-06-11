@@ -680,7 +680,7 @@ This can still be useful if the comment itself has a diagnostic:
 # TODO this comment has a todo # ruff:ignore[FIX002]
 ```
 
-## unused-noqa
+## `unused-noqa`
 
 ```toml
 [lint]
@@ -688,8 +688,9 @@ preview = true
 select = ["E501", "F821", "RUF10"]
 ```
 
-RUF100 should omit a fix when deleting a leading suppression would change the placement semantics
-of a later suppression:
+`RUF100` should omit a fix when deleting a leading suppression would change the placement semantics
+of a later suppression. The `file-ignore` is initially invalid here, but removing the unused
+`ignore` would make it valid, so the fix is suppressed:
 
 ```py
 # snapshot: unused-noqa
@@ -709,8 +710,10 @@ error[RUF100]: Unused suppression (unused: `E501`)
 help: Remove unused suppression
 ```
 
-A later valid suppression also needs to be considered because its RUF100 fix can remove it on the
-first iteration:
+A later valid suppression also needs to be considered because removing the preceding comment can
+change its semantics. In this case, removing the `disable` comment would transform the `ignore` from
+a trailing comment on the `disable` comment to an own-line `ignore` comment, which would start
+suppressing the `F821` diagnostic:
 
 ```py
 # error: [unused-noqa] "E501"
@@ -721,7 +724,7 @@ undefined_name
 # ruff:enable[E501]
 ```
 
-## unused-noqa paired fix
+## `unused-noqa` paired fix
 
 ```toml
 [lint]
@@ -752,7 +755,7 @@ error[RUF100]: Unused suppression (unused: `E501`)
 help: Remove unused suppression
 ```
 
-## unused-noqa partial fix
+## `unused-noqa` partial fix
 
 ```toml
 [lint]
@@ -785,7 +788,7 @@ help: Remove unused suppression
 4 | undefined_name
 ```
 
-## invalid-rule-code
+## `invalid-rule-code`
 
 ```toml
 [lint]
@@ -793,7 +796,7 @@ preview = true
 select = ["F821", "RUF10"]
 ```
 
-RUF102 should also omit a fix that would promote a later suppression:
+`RUF102` should also omit a fix that would promote a later suppression:
 
 ```py
 # snapshot: invalid-rule-code
@@ -814,7 +817,7 @@ help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
 ```
 
-## invalid-suppression-comment
+## `invalid-suppression-comment`
 
 ```toml
 [lint]
