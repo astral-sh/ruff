@@ -2268,7 +2268,7 @@ impl<'db> StaticClassLiteral<'db> {
                     continue;
                 };
                 let annotation = Place::declared(annotation.inner)
-                    .with_definition(Some(declaration))
+                    .with_definition(declaration)
                     .with_qualifiers(
                         annotation.qualifiers | TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE,
                     );
@@ -2286,7 +2286,7 @@ impl<'db> StaticClassLiteral<'db> {
                         );
                         return Member {
                             inner: Place::bound(inferred_ty)
-                                .with_definition(Some(declaration))
+                                .with_definition(declaration)
                                 .with_qualifiers(all_qualifiers),
                         };
                     }

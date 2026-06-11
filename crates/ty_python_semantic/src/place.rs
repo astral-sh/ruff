@@ -169,8 +169,8 @@ impl<'db> DefinedPlace<'db> {
         self
     }
 
-    pub(crate) fn with_definition(mut self, definition: Option<Definition<'db>>) -> Self {
-        self.provenance = Provenance::from_definition(definition);
+    pub(crate) fn with_definition(mut self, definition: Definition<'db>) -> Self {
+        self.provenance = Provenance::SingleDefinition(definition);
         self
     }
 
@@ -233,7 +233,7 @@ impl<'db> Place<'db> {
 
     /// Returns this place with the given definition attached. A no-op for [`Place::Undefined`].
     #[must_use]
-    pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
+    pub(crate) fn with_definition(self, definition: Definition<'db>) -> Self {
         match self {
             Place::Defined(defined) => Place::Defined(defined.with_definition(definition)),
             Place::Undefined => Place::Undefined,
