@@ -17,7 +17,7 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { Theme } from "shared";
+import { isDiagnosticAnnotationMessage, Theme } from "shared";
 import {
   Hint,
   Position as TyPosition,
@@ -1012,7 +1012,7 @@ class PlaygroundServer
     message: string | undefined,
   ): editor.IRelatedInformation[] {
     const location = annotation.location;
-    if (location == null || message == null) {
+    if (location == null || !isDiagnosticAnnotationMessage(message)) {
       return [];
     }
 

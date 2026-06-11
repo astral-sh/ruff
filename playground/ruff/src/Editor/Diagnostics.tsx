@@ -1,6 +1,15 @@
-import type { Diagnostic, SubDiagnostic } from "ruff_wasm";
+import type {
+  Diagnostic,
+  DiagnosticAnnotation,
+  DiagnosticLocation,
+  SubDiagnostic,
+} from "ruff_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
+import {
+  DiagnosticLocationItem,
+  isDiagnosticAnnotationMessage,
+  Theme,
+} from "shared";
 import { useMemo } from "react";
 import { PLAYGROUND_FILE_PATH } from "./SourceEditor";
 
@@ -74,6 +83,12 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
+        const secondaryAnnotations = diagnostic.secondaryAnnotations.filter(
+          (
+            annotation,
+          ): annotation is DiagnosticAnnotation & { message: string } =>
+            isDiagnosticAnnotationMessage(annotation.message),
+        );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
 
         const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
@@ -91,10 +106,20 @@ function Items({
                 Col {column}]
               </span>
             </button>
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <RuffDiagnosticLocationItem
+                      message={annotation.message}
+                      location={annotation.location}
+                      onGoTo={onGoTo}
+                    />
+                  </li>
+                ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
+                  <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
                       onGoTo={onGoTo}
@@ -110,6 +135,39 @@ function Items({
   );
 }
 
+function RuffDiagnosticLocationItem({
+  prefix,
+  message,
+  location,
+  onGoTo,
+}: {
+  prefix?: string;
+  message: string;
+  location: DiagnosticLocation | null;
+  onGoTo(line: number, column: number): void;
+}) {
+  const start = location?.start_location;
+  const locationLabel =
+    location == null || start == null
+      ? undefined
+      : location.path === PLAYGROUND_FILE_PATH
+        ? `[Ln ${start.row}, Col ${start.column}]`
+        : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
+
+  return (
+    <DiagnosticLocationItem
+      prefix={prefix}
+      message={message}
+      locationLabel={locationLabel}
+      onGoTo={
+        location?.path === PLAYGROUND_FILE_PATH && start != null
+          ? () => onGoTo(start.row, start.column)
+          : undefined
+      }
+    />
+  );
+}
+
 function SubDiagnosticItem({
   subDiagnostic,
   onGoTo,
@@ -117,39 +175,12 @@ function SubDiagnosticItem({
   subDiagnostic: SubDiagnostic;
   onGoTo(line: number, column: number): void;
 }) {
-  const location = subDiagnostic.location;
-
-  if (location == null) {
-    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
-  }
-
-  const start = location.start_location;
-  const locationLabel =
-    location.path === PLAYGROUND_FILE_PATH
-      ? `[Ln ${start.row}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
-
   return (
-    <>
-      {subDiagnostic.severity}:{" "}
-      {location.path === PLAYGROUND_FILE_PATH ? (
-        <button
-          onClick={() => onGoTo(start.row, start.column)}
-          className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-        >
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </button>
-      ) : (
-        <span>
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </span>
-      )}
-    </>
+    <RuffDiagnosticLocationItem
+      prefix={`${subDiagnostic.severity}: `}
+      message={subDiagnostic.message}
+      location={subDiagnostic.location}
+      onGoTo={onGoTo}
+    />
   );
-}
-
-function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
-  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
 }

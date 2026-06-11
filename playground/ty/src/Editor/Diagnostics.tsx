@@ -8,7 +8,11 @@ import type {
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
+import {
+  DiagnosticLocationItem,
+  isDiagnosticAnnotationMessage,
+  Theme,
+} from "shared";
 import { useMemo } from "react";
 
 interface Props {
@@ -99,7 +103,7 @@ function Items({
           (
             annotation,
           ): annotation is DiagnosticAnnotation & { message: string } =>
-            annotation.message != null,
+            isDiagnosticAnnotationMessage(annotation.message),
         );
 
         const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
@@ -246,32 +250,21 @@ function DiagnosticAnnotationItem({
   onGoTo(location: DiagnosticLocation): void;
 }) {
   const location = annotation.location;
-  if (location == null) {
-    return (
-      <span>
-        {prefix}
-        {message}
-      </span>
-    );
-  }
-
-  const start = location.range.start;
-  const locationLabel =
-    location.path === currentFilePath
-      ? `[Ln ${start.line}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.line}, Col ${start.column}]`;
+  const start = location?.range.start;
 
   return (
-    <>
-      {prefix}
-      {message}{" "}
-      <button
-        onClick={() => onGoTo(location)}
-        className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-      >
-        {locationLabel}
-      </button>
-    </>
+    <DiagnosticLocationItem
+      prefix={prefix}
+      message={message}
+      locationLabel={
+        location == null || start == null
+          ? undefined
+          : location.path === currentFilePath
+            ? `[Ln ${start.line}, Col ${start.column}]`
+            : `[${location.path}: Ln ${start.line}, Col ${start.column}]`
+      }
+      onGoTo={location == null ? undefined : () => onGoTo(location)}
+    />
   );
 }
 
