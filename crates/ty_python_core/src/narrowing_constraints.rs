@@ -52,7 +52,7 @@ impl ScopedNarrowingConstraint {
 
 impl Idx for ScopedNarrowingConstraint {
     fn new(value: usize) -> Self {
-        assert!(value <= Self::ALWAYS_FALSE.0 as usize);
+        assert!(value < Self::ALWAYS_FALSE.0 as usize);
         #[expect(clippy::cast_possible_truncation)]
         Self(value as u32)
     }
@@ -73,31 +73,13 @@ const MAX_INTERIOR_NODES: usize = 512 * 1024;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub struct InteriorNode {
     /// The predicate tested by this node.
-    atom: ScopedPredicateId,
+    pub atom: ScopedPredicateId,
     /// The remaining formula when the predicate is true.
-    if_true: ScopedNarrowingConstraint,
+    pub if_true: ScopedNarrowingConstraint,
     /// The part of the formula that applies regardless of the predicate.
-    if_uncertain: ScopedNarrowingConstraint,
+    pub if_uncertain: ScopedNarrowingConstraint,
     /// The remaining formula when the predicate is false.
-    if_false: ScopedNarrowingConstraint,
-}
-
-impl InteriorNode {
-    pub const fn atom(self) -> ScopedPredicateId {
-        self.atom
-    }
-
-    pub const fn if_true(self) -> ScopedNarrowingConstraint {
-        self.if_true
-    }
-
-    pub const fn if_uncertain(self) -> ScopedNarrowingConstraint {
-        self.if_uncertain
-    }
-
-    pub const fn if_false(self) -> ScopedNarrowingConstraint {
-        self.if_false
-    }
+    pub if_false: ScopedNarrowingConstraint,
 }
 
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -188,8 +170,8 @@ impl NarrowingConstraintsBuilder {
         if node.if_uncertain == ALWAYS_TRUE {
             return ALWAYS_TRUE;
         }
-        if node.if_true == node.if_false {
-            return self.add_or_constraint(node.if_true, node.if_uncertain);
+        if node.if_true == node.if_false && node.if_true == node.if_uncertain {
+            return node.if_true;
         }
 
         // `if_uncertain` contributes to both cofactors. If either cofactor is already true,

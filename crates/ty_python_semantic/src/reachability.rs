@@ -835,17 +835,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             Id::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
             _ => {
                 let node = self.constraints.get_interior_node(id);
-                let predicate = self.predicates[node.atom()];
+                let predicate = self.predicates[node.atom];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
-                    let if_uncertain = self.project(node.if_uncertain());
+                    let if_uncertain = self.project(node.if_uncertain);
                     match analyze_single(self.db, &predicate) {
                         Truthiness::AlwaysTrue => {
-                            let if_true = self.project(node.if_true());
+                            let if_true = self.project(node.if_true);
                             self.graph.or(if_true, if_uncertain)
                         }
                         Truthiness::AlwaysFalse => {
-                            let if_false = self.project(node.if_false());
+                            let if_false = self.project(node.if_false);
                             self.graph.or(if_false, if_uncertain)
                         }
                         Truthiness::Ambiguous => {
@@ -853,17 +853,17 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
                         }
                     }
                 } else {
-                    let if_true = self.project(node.if_true());
-                    let if_uncertain = self.project(node.if_uncertain());
-                    let if_false = self.project(node.if_false());
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
+                    let if_true = self.project(node.if_true);
+                    let if_uncertain = self.project(node.if_uncertain);
+                    let if_false = self.project(node.if_false);
+                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     if pos_constraint.is_none() && neg_constraint.is_none() {
                         let either = self.graph.or(if_true, if_false);
                         self.graph.or(either, if_uncertain)
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
-                            atom: node.atom(),
+                            atom: node.atom,
                             if_true,
                             if_uncertain,
                             if_false,
