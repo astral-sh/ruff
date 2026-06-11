@@ -228,7 +228,13 @@ fn settings_diagnostic_path_from_sys_prefix(
 /// Returns `true` if the file name appears to be that of a versioned interpreter
 /// (e.g., `python3.15`).
 fn is_versioned_interpreter_path(file_name: &str) -> bool {
-    PythonInterpreterLayout::from_file_name(file_name).is_some()
+    matches!(
+        PythonInterpreterLayout::from_file_name(file_name),
+        Some(PythonInterpreterLayout {
+            version: Some(_),
+            ..
+        })
+    )
 }
 
 impl<const N: usize> From<[SystemPathBuf; N]> for SitePackagesPaths {
@@ -349,7 +355,11 @@ impl PythonEnvironment {
             Err(SitePackagesDiscoveryError::NoPyvenvCfgFile(_, _, _))
                 if !path.origin().must_be_virtual_env() =>
             {
-                Ok(Self::System(SystemEnvironment::new(path)))
+                tracing::trace!(
+                    "Resolved system Python environment from `{}`",
+                    path.selected_path()
+                );
+                Ok(Self::System(SystemEnvironment { path }))
             }
             Err(err) => Err(err),
         }
@@ -490,66 +500,118 @@ pub(crate) enum PythonImplementation {
     Unknown,
 }
 
+impl PythonImplementation {
+    const fn is_cpython(self) -> bool {
+        matches!(self, Self::CPython)
+    }
+
+    fn split_executable_name(file_name: &str) -> Option<(Self, &str)> {
+        if let Some(suffix) = file_name.strip_prefix("python") {
+            Some((Self::CPython, suffix))
+        } else if let Some(suffix) = file_name.strip_prefix("pypy") {
+            Some((Self::PyPy, suffix))
+        } else {
+            file_name
+                .strip_prefix("graalpy")
+                .map(|suffix| (Self::GraalPy, suffix))
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
 struct PythonInterpreterLayout {
     version: Option<PythonVersion>,
     implementation: PythonImplementation,
-    /// `None` when the executable name does not distinguish between regular and free-threaded.
-    free_threaded: Option<bool>,
+    variant: PythonBuildVariant,
 }
 
 impl PythonInterpreterLayout {
+    const fn unknown(implementation: PythonImplementation, version: Option<PythonVersion>) -> Self {
+        Self {
+            version,
+            implementation,
+            variant: PythonBuildVariant::Unknown,
+        }
+    }
+
     fn from_file_name(file_name: &str) -> Option<Self> {
         let file_name = file_name
             .strip_suffix(std::env::consts::EXE_SUFFIX)
             .unwrap_or(file_name);
 
-        let (version, implementation) = if let Some(version) = file_name.strip_prefix("python") {
-            (version, PythonImplementation::CPython)
-        } else {
-            (file_name.strip_prefix("pypy")?, PythonImplementation::PyPy)
-        };
+        let (implementation, version) = PythonImplementation::split_executable_name(file_name)?;
+        let (version, mut variant) = PythonBuildVariant::split_executable_suffix(version);
+        let version = PythonVersion::from_str(version).ok();
 
-        let (version, free_threaded) = if implementation == PythonImplementation::CPython {
-            version
-                .strip_suffix('t')
-                .map_or((version, false), |version| (version, true))
-        } else {
-            (version, false)
-        };
-
-        let version = PythonVersion::from_str(version).ok()?;
-        if free_threaded && !version.free_threaded_build_available() {
+        if variant == PythonBuildVariant::FreeThreaded
+            && (!implementation.is_cpython()
+                || !version.is_some_and(PythonVersion::free_threaded_build_available))
+        {
             return None;
         }
 
+        if version.is_none() {
+            variant = PythonBuildVariant::Unknown;
+        }
+
         Some(Self {
-            version: Some(version),
+            version,
             implementation,
-            free_threaded: Some(free_threaded),
+            variant,
         })
+    }
+
+    /// Return the relative path from `sys.prefix` to the directory containing the Python stdlib's
+    /// `.py` files if the interpreter layout is known.
+    fn relative_stdlib_path(self) -> Option<String> {
+        let version = self.version?;
+
+        match self.implementation {
+            PythonImplementation::CPython => {
+                let variant = self.variant.directory_suffix();
+                Some(format!("lib/python{version}{variant}"))
+            }
+            PythonImplementation::GraalPy => Some(format!("lib/python{version}")),
+            PythonImplementation::PyPy => Some(format!("lib/pypy{version}")),
+            PythonImplementation::Unknown => None,
+        }
+    }
+
+    fn free_threaded_stdlib_fallback_path(self) -> Option<String> {
+        let version = self.version?;
+
+        (self.implementation.is_cpython()
+            && self.variant.is_unknown()
+            && version.free_threaded_build_available())
+        .then(|| format!("lib/python{version}t"))
     }
 }
 
-impl PythonImplementation {
-    /// Return the relative path from `sys.prefix` to the directory containing the python stdlib's
-    /// .pys if this is a known implementation. Return `None` if this is an unknown implementation.
-    fn relative_stdlib_path(
-        self,
-        version: Option<PythonVersion>,
-        free_threaded: Option<bool>,
-    ) -> Option<String> {
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Default)]
+enum PythonBuildVariant {
+    #[default]
+    Unknown,
+    Default,
+    FreeThreaded,
+}
+
+impl PythonBuildVariant {
+    const fn is_unknown(self) -> bool {
+        matches!(self, Self::Unknown)
+    }
+
+    fn split_executable_suffix(version: &str) -> (&str, Self) {
+        if let Some(version) = version.strip_suffix('t') {
+            (version, Self::FreeThreaded)
+        } else {
+            (version, Self::Default)
+        }
+    }
+
+    const fn directory_suffix(self) -> &'static str {
         match self {
-            Self::CPython | Self::GraalPy => version.map(|version| {
-                let suffix = if self == Self::CPython && free_threaded == Some(true) {
-                    "t"
-                } else {
-                    ""
-                };
-                format!("lib/python{version}{suffix}")
-            }),
-            Self::PyPy => version.map(|version| format!("lib/pypy{version}")),
-            Self::Unknown => None,
+            Self::Unknown | Self::Default => "",
+            Self::FreeThreaded => "t",
         }
     }
 }
@@ -709,9 +771,10 @@ impl VirtualEnvironment {
         } = self;
 
         let version = version.as_ref().map(|v| v.version);
+        let layout = PythonInterpreterLayout::unknown(*implementation, version);
 
         let mut site_packages_directories =
-            site_packages_directories_from_sys_prefix(root_path, version, *implementation, system)?;
+            site_packages_directories_from_sys_prefix(root_path, layout, system)?;
 
         if let Some(parent_env_site_packages) = parent_environment.as_deref() {
             match parent_env_site_packages.site_packages_paths(system) {
@@ -736,12 +799,7 @@ impl VirtualEnvironment {
             // or if we fail to resolve the `site-packages` from the `sys.prefix` path,
             // we should probably print a warning but *not* abort type checking
             if let Some(sys_prefix_path) = system_sys_prefix {
-                match site_packages_directories_from_sys_prefix(
-                    &sys_prefix_path,
-                    version,
-                    *implementation,
-                    system,
-                ) {
+                match site_packages_directories_from_sys_prefix(&sys_prefix_path, layout, system) {
                     Ok(system_directories) => {
                         site_packages_directories.extend(system_directories);
                     }
@@ -789,15 +847,12 @@ System site-packages will not be used for module resolution.",
         // `include_system_site_packages` is true, as those site-packages should be a subdir
         // of the dir we're looking for.
         let version = version.as_ref().map(|v| v.version);
+        let layout = PythonInterpreterLayout::unknown(*implementation, version);
         if let Some(system_sys_prefix) =
             SysPrefixPath::from_executable_home_path_real(system, base_executable_home_path)
         {
-            let real_stdlib_directory = real_stdlib_directory_from_sys_prefix(
-                &system_sys_prefix,
-                version,
-                *implementation,
-                system,
-            );
+            let real_stdlib_directory =
+                real_stdlib_directory_from_sys_prefix(&system_sys_prefix, layout, system);
             match &real_stdlib_directory {
                 Ok(path) => tracing::debug!(
                     "Resolved real stdlib path for this virtual environment is: {path}"
@@ -1028,17 +1083,6 @@ pub struct SystemEnvironment {
 }
 
 impl SystemEnvironment {
-    /// Create a system environment from the selected environment path.
-    ///
-    /// Validation remains lazy and occurs when resolving site-packages or the stdlib.
-    fn new(path: PythonEnvironmentPath) -> Self {
-        tracing::trace!(
-            "Resolved system Python environment from `{}`",
-            path.selected_path()
-        );
-        Self { path }
-    }
-
     /// Return a list of `site-packages` directories that are available from this environment.
     ///
     /// See the documentation for [`site_packages_directories_from_sys_prefix`] for more details.
@@ -1046,7 +1090,7 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-        let site_packages_directories = site_packages_directories_from_sys_prefix_with_layout(
+        let site_packages_directories = site_packages_directories_from_sys_prefix(
             self.path.sys_prefix(),
             self.path.interpreter_layout().unwrap_or_default(),
             system,
@@ -1065,7 +1109,7 @@ impl SystemEnvironment {
         &self,
         system: &dyn System,
     ) -> StdlibDiscoveryResult<SystemPathBuf> {
-        let stdlib_directory = real_stdlib_directory_from_sys_prefix_with_layout(
+        let stdlib_directory = real_stdlib_directory_from_sys_prefix(
             self.path.sys_prefix(),
             self.path.interpreter_layout().unwrap_or_default(),
             system,
@@ -1367,7 +1411,7 @@ fn probe_package_dirs(
     let PythonInterpreterLayout {
         version: Some(python_version),
         implementation,
-        free_threaded,
+        variant,
     } = layout
     else {
         return;
@@ -1378,21 +1422,23 @@ fn probe_package_dirs(
     // Returns `true` if a matching directory was found, so the caller can
     // decide whether to fall back to probing other implementations.
     let probe_cpython_path = |directories: &mut SitePackagesPaths| {
-        let path = |free_threaded| {
-            let suffix_marker = if free_threaded { "t" } else { "" };
-            prefix_dir.join(format!("python{python_version}{suffix_marker}/{suffix}"))
+        let path = |variant: PythonBuildVariant| {
+            prefix_dir.join(format!(
+                "python{python_version}{variant}/{suffix}",
+                variant = variant.directory_suffix()
+            ))
         };
 
-        let path = match free_threaded {
-            Some(free_threaded) => path(free_threaded),
-            None => {
+        let path = match variant {
+            PythonBuildVariant::Default | PythonBuildVariant::FreeThreaded => path(variant),
+            PythonBuildVariant::Unknown => {
                 // Preserve the existing regular-first fallback when the build flavor is unknown.
-                let regular = path(false);
+                let regular = path(PythonBuildVariant::Default);
                 if system.is_directory(&regular) || !python_version.free_threaded_build_available()
                 {
                     regular
                 } else {
-                    path(true)
+                    path(PythonBuildVariant::FreeThreaded)
                 }
             }
         };
@@ -1486,27 +1532,8 @@ fn discover_package_dirs(
 /// associated with a given Python installation.
 ///
 /// The location of the `site-packages` directories can vary according to the
-/// Python version that this installation represents. The Python version may
-/// or may not be known at this point, which is why the `python_version`
-/// parameter is an `Option`.
+/// interpreter layout represented by this installation.
 fn site_packages_directories_from_sys_prefix(
-    sys_prefix_path: &SysPrefixPath,
-    python_version: Option<PythonVersion>,
-    implementation: PythonImplementation,
-    system: &dyn System,
-) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-    site_packages_directories_from_sys_prefix_with_layout(
-        sys_prefix_path,
-        PythonInterpreterLayout {
-            version: python_version,
-            implementation,
-            free_threaded: None,
-        },
-        system,
-    )
-}
-
-fn site_packages_directories_from_sys_prefix_with_layout(
     sys_prefix_path: &SysPrefixPath,
     layout: PythonInterpreterLayout,
     system: &dyn System,
@@ -1653,28 +1680,9 @@ fn site_packages_directories_from_sys_prefix_with_layout(
 /// Attempt to retrieve the real stdlib directory
 /// associated with a given Python installation.
 ///
-/// The location of the stdlib directory can vary according to the
-/// Python version that this installation represents. The Python version may
-/// or may not be known at this point, which is why the `python_version`
-/// parameter is an `Option`.
+/// The location of the stdlib directory can vary according to the interpreter
+/// layout represented by this installation.
 fn real_stdlib_directory_from_sys_prefix(
-    sys_prefix_path: &SysPrefixPath,
-    python_version: Option<PythonVersion>,
-    implementation: PythonImplementation,
-    system: &dyn System,
-) -> StdlibDiscoveryResult<SystemPathBuf> {
-    real_stdlib_directory_from_sys_prefix_with_layout(
-        sys_prefix_path,
-        PythonInterpreterLayout {
-            version: python_version,
-            implementation,
-            free_threaded: None,
-        },
-        system,
-    )
-}
-
-fn real_stdlib_directory_from_sys_prefix_with_layout(
     sys_prefix_path: &SysPrefixPath,
     layout: PythonInterpreterLayout,
     system: &dyn System,
@@ -1693,22 +1701,15 @@ fn real_stdlib_directory_from_sys_prefix_with_layout(
 
     // If we were able to figure out what Python version this installation is,
     // we should be able to avoid iterating through all items in the `lib/` directory:
-    if let Some(expected_relative_path) = layout
-        .implementation
-        .relative_stdlib_path(layout.version, layout.free_threaded)
-    {
+    if let Some(expected_relative_path) = layout.relative_stdlib_path() {
         let expected_absolute_path = sys_prefix_path.join(expected_relative_path);
         if system.is_directory(&expected_absolute_path) {
             return Ok(expected_absolute_path);
         }
 
         // CPython free-threaded (3.13+) variant: pythonXYt
-        if let Some(version) = layout.version
-            && matches!(layout.implementation, PythonImplementation::CPython)
-            && layout.free_threaded.is_none()
-            && version.free_threaded_build_available()
-        {
-            let alternative_path = sys_prefix_path.join(format!("lib/python{version}t"));
+        if let Some(alternative_relative_path) = layout.free_threaded_stdlib_fallback_path() {
+            let alternative_path = sys_prefix_path.join(alternative_relative_path);
             if system.is_directory(&alternative_path) {
                 return Ok(alternative_path);
             }
@@ -1819,8 +1820,7 @@ impl PythonEnvironmentPath {
         let executable_path = (!origin.must_point_directly_to_sys_prefix()
             && system.is_file(unvalidated_path)
             && unvalidated_path.file_name().is_some_and(|name| {
-                name.starts_with("python")
-                    || name.starts_with("pypy")
+                PythonImplementation::split_executable_name(name).is_some()
                     || name.eq_ignore_ascii_case(&format!("ty{}", std::env::consts::EXE_SUFFIX))
             }))
         .then_some(unvalidated_path);
@@ -1875,25 +1875,30 @@ impl PythonEnvironmentPath {
         }
 
         let layout = executable_path.and_then(|executable_path| {
-            if let Some(layout) = executable_path
+            let direct_layout = executable_path
                 .file_name()
-                .and_then(PythonInterpreterLayout::from_file_name)
-            {
-                return Some(layout);
+                .and_then(PythonInterpreterLayout::from_file_name);
+
+            if direct_layout.is_some_and(|layout| layout.version.is_some()) {
+                return direct_layout;
             }
 
-            let canonical_executable = system.canonicalize_path(executable_path).ok()?;
-            let layout = canonical_executable
-                .file_name()
-                .and_then(PythonInterpreterLayout::from_file_name)?;
-            let canonical_executable_prefix =
-                sys_prefix_from_executable_path(&canonical_executable)?;
-            let canonical_executable_prefix =
-                system.canonicalize_path(canonical_executable_prefix).ok()?;
+            let target_layout = (|| {
+                let canonical_executable = system.canonicalize_path(executable_path).ok()?;
+                let layout = canonical_executable
+                    .file_name()
+                    .and_then(PythonInterpreterLayout::from_file_name)?;
+                let canonical_executable_prefix =
+                    sys_prefix_from_executable_path(&canonical_executable)?;
+                let canonical_executable_prefix =
+                    system.canonicalize_path(canonical_executable_prefix).ok()?;
 
-            // Metadata from a symlink target can only describe the selected environment when both
-            // executable paths resolve to the same installation prefix.
-            (canonical_executable_prefix == sys_prefix).then_some(layout)
+                // Metadata from a symlink target can only describe the selected environment when
+                // both executable paths resolve to the same installation prefix.
+                (canonical_executable_prefix == sys_prefix).then_some(layout)
+            })();
+
+            target_layout.or(direct_layout)
         });
 
         let sys_prefix = SysPrefixPath {
@@ -3057,11 +3062,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3102,11 +3109,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3143,11 +3152,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::PyPy,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::PyPy,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3189,11 +3200,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3229,11 +3242,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3276,11 +3291,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3317,8 +3334,7 @@ mod tests {
         // Use Unknown implementation to trigger fallback enumeration
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            None,
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(PythonImplementation::Unknown, None),
             &system,
         )
         .unwrap();
@@ -3360,8 +3376,7 @@ mod tests {
         // Use Unknown implementation to trigger fallback enumeration
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            None,
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(PythonImplementation::Unknown, None),
             &system,
         )
         .unwrap();
@@ -3397,8 +3412,7 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            None,
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(PythonImplementation::Unknown, None),
             &system,
         )
         .unwrap();
@@ -3435,8 +3449,7 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            None,
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(PythonImplementation::CPython, None),
             &system,
         )
         .unwrap();
@@ -3478,8 +3491,7 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            None,
-            PythonImplementation::PyPy,
+            PythonInterpreterLayout::unknown(PythonImplementation::PyPy, None),
             &system,
         )
         .unwrap();
@@ -3520,11 +3532,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3564,11 +3578,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::Unknown,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3610,11 +3626,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::Unknown,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3649,11 +3667,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::Unknown,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::Unknown,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3695,11 +3715,13 @@ mod tests {
 
         let directories = site_packages_directories_from_sys_prefix(
             &sys_prefix_path,
-            Some(PythonVersion {
-                major: 3,
-                minor: 12,
-            }),
-            PythonImplementation::CPython,
+            PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                Some(PythonVersion {
+                    major: 3,
+                    minor: 12,
+                }),
+            ),
             &system,
         )
         .unwrap();
@@ -3741,6 +3763,11 @@ mod tests {
                 "lib/python3.14t",
             ),
             ("pypy3.14", "lib/pypy3.14/site-packages", "lib/pypy3.14"),
+            (
+                "graalpy3.14",
+                "lib/python3.14/site-packages",
+                "lib/python3.14",
+            ),
         ];
 
         for (executable, site_packages, _) in layouts {
@@ -3771,6 +3798,33 @@ mod tests {
         }
     }
 
+    #[cfg(not(windows))]
+    #[test]
+    fn recognizes_unversioned_graalpy_executable() {
+        let system = TestSystem::default();
+        let memory_fs = system.memory_file_system();
+        let sys_prefix = SystemPathBuf::from("/graal");
+
+        memory_fs
+            .write_file_all(sys_prefix.join("bin/graalpy"), "")
+            .unwrap();
+        memory_fs
+            .create_directory_all(sys_prefix.join("lib/python3.14/site-packages"))
+            .unwrap();
+
+        let environment = PythonEnvironment::new(
+            sys_prefix.join("bin/graalpy"),
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap().into_vec(),
+            [sys_prefix.join("lib/python3.14/site-packages")]
+        );
+    }
+
     #[cfg(unix)]
     #[test]
     fn only_uses_symlink_target_layout_within_same_prefix() {
@@ -3796,7 +3850,7 @@ mod tests {
             Some(PythonInterpreterLayout {
                 version: Some(PythonVersion::PY314),
                 implementation: PythonImplementation::CPython,
-                free_threaded: Some(false),
+                variant: PythonBuildVariant::Default,
             })
         );
 
@@ -3818,7 +3872,10 @@ mod tests {
             )
             .unwrap()
             .interpreter_layout(),
-            None
+            Some(PythonInterpreterLayout::unknown(
+                PythonImplementation::CPython,
+                None
+            ))
         );
     }
 }
