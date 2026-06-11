@@ -96,14 +96,13 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    CycleDetector, DynamicType, InferenceFlags, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters,
-    SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type,
-    binding_type, infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment,
-    todo_type,
+    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -5625,28 +5624,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         fn contains_type_form<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-            struct ContainsTypeForm;
-            type ContainsTypeFormVisitor<'db> = CycleDetector<ContainsTypeForm, Type<'db>, bool>;
-
-            fn imp<'db>(
-                db: &'db dyn Db,
-                ty: Type<'db>,
-                visitor: &ContainsTypeFormVisitor<'db>,
-            ) -> bool {
-                match ty {
-                    Type::TypeForm(_) => true,
-                    Type::TypeAlias(alias) => {
-                        visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
-                    }
-                    Type::Union(union) => union
-                        .elements(db)
-                        .iter()
-                        .any(|element| imp(db, *element, visitor)),
-                    _ => false,
-                }
+            match ty.resolve_type_alias(db) {
+                Type::TypeForm(_) => true,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))),
+                _ => false,
             }
-
-            imp(db, ty, &ContainsTypeFormVisitor::default())
         }
 
         fn can_reuse_default_argument_type<'db>(
@@ -5655,18 +5640,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default_ty: Type<'db>,
             parameter_contexts: &[ArgumentTypeContext<'db>],
         ) -> bool {
-            if !matches!(ast_argument, ast::Expr::Name(_) | ast::Expr::Attribute(_)) {
-                return false;
-            }
-
-            if matches!(
-                default_ty.resolve_type_alias(db),
-                Type::ClassLiteral(_)
-                    | Type::LiteralValue(_)
-                    | Type::SubclassOf(_)
-                    | Type::TypeForm(_)
-            ) {
-                return false;
+            match ast_argument {
+                ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
+                    if matches!(
+                        default_ty.resolve_type_alias(db),
+                        Type::ClassLiteral(_) | Type::SubclassOf(_) | Type::TypeForm(_)
+                    ) {
+                        return false;
+                    }
+                }
+                ast::Expr::StringLiteral(_)
+                | ast::Expr::BytesLiteral(_)
+                | ast::Expr::NumberLiteral(_)
+                | ast::Expr::BooleanLiteral(_)
+                | ast::Expr::NoneLiteral(_)
+                | ast::Expr::EllipsisLiteral(_)
+                | ast::Expr::FString(_)
+                | ast::Expr::TString(_)
+                | ast::Expr::UnaryOp(_)
+                | ast::Expr::Compare(_)
+                | ast::Expr::Subscript(_)
+                | ast::Expr::Slice(_)
+                | ast::Expr::Named(_) => {}
+                _ => return false,
             }
 
             parameter_contexts.iter().all(|parameter_context| {
@@ -5806,11 +5802,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     default_ty,
                     &parameter_contexts,
                 ) {
+                    if matches!(ast_argument, ast::Expr::StringLiteral(_))
+                        && let Some(expected) = parameter_contexts
+                            .iter()
+                            .filter_map(|context| context.type_context().annotation)
+                            .filter(|expected| {
+                                self.has_string_literal_completion_candidates(*expected)
+                            })
+                            .reduce(|left, right| UnionType::from_two_elements(db, left, right))
+                    {
+                        self.store_expected_type(ast_argument, expected);
+                    }
+
                     for parameter_context in parameter_contexts {
+                        let inferred_ty = self.apply_literal_type_context(
+                            default_ty,
+                            parameter_context.type_context(),
+                        );
                         parameter_context.insert_inferred_type(
                             arguments_types,
                             argument_index,
-                            default_ty,
+                            inferred_ty,
                         );
                     }
                     continue;
@@ -6061,6 +6073,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_value_expression_impl(expression, tcx)
     }
 
+    fn apply_literal_type_context(&self, ty: Type<'db>, tcx: TypeContext<'db>) -> Type<'db> {
+        let db = self.db();
+        if let Type::LiteralValue(literal) = ty
+            && let Some(tcx) = tcx.annotation
+            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
+                .resolve_type_alias(db)
+                .filter_union(db, |ty| ty.as_literal_value().is_some())
+            && ty.is_assignable_to(db, literal_tcx)
+        {
+            Type::LiteralValue(literal.to_unpromotable())
+        } else {
+            ty
+        }
+    }
+
     /// Infer an expression without implicitly treating this root as a `TypeForm`.
     ///
     /// Child expressions still use their normal contextual inference, so the
@@ -6132,15 +6159,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Avoid promoting explicitly annotated literal values.
-        if let Type::LiteralValue(literal) = ty
-            && let Some(tcx) = tcx.annotation
-            && let literal_tcx @ (Type::Union(_) | Type::LiteralValue(_)) = tcx
-                .resolve_type_alias(self.db())
-                .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
-            && ty.is_assignable_to(self.db(), literal_tcx)
-        {
-            ty = Type::LiteralValue(literal.to_unpromotable());
-        }
+        ty = self.apply_literal_type_context(ty, tcx);
 
         if let Some(tcx) = tcx.annotation
             && let Some(collection_def) = self.index.unconstrained_collection_binding(expression)
