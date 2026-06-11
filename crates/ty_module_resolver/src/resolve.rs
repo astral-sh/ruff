@@ -317,13 +317,18 @@ fn file_to_module_impl<'db, 'a>(
     path: SystemOrVendoredPathRef<'a>,
     mut search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<Module<'db>> {
-    let module_name = search_paths.find_map(|candidate: &SearchPath| {
-        let relative_path = match path {
+    let (module_path, module_name) = search_paths.find_map(|candidate: &SearchPath| {
+        let module_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
         }?;
-        relative_path.to_module_name()
+        let module_name = module_path.to_module_name()?;
+        Some((module_path, module_name))
     })?;
+
+    if let Some(module) = file_to_module_from_parent(db, file, path, &module_path, &module_name) {
+        return Some(module);
+    }
 
     // Resolve the module name to see if Python would resolve the name to the same path.
     // If it doesn't, then that means that multiple modules have the same name in different
@@ -354,6 +359,86 @@ fn file_to_module_impl<'db, 'a>(
     // The module name of `src/foo.py` is `foo`, but the module loaded by Python is `src/foo/__init__.py`.
     // That means we need to ignore `src/foo.py` even though it resolves to the same module name.
     None
+}
+
+/// Resolve a first-party file from its already-resolved parent package.
+///
+/// Once a regular parent package has been resolved to a specific search path, resolving one of
+/// its children cannot switch to a different search path. Resolving the parent through its own
+/// cached query means each package in a large tree is validated once instead of re-resolving every
+/// child module name from the root.
+fn file_to_module_from_parent<'db>(
+    db: &'db dyn Db,
+    file: File,
+    path: SystemOrVendoredPathRef<'_>,
+    module_path: &ModulePath,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    let SystemOrVendoredPathRef::System(path) = path else {
+        return None;
+    };
+    let search_path = module_path.search_path();
+    if !search_path.is_first_party() {
+        return None;
+    }
+
+    let is_package = matches!(path.file_name(), Some("__init__.py" | "__init__.pyi"));
+    let parent_name = module_name.parent()?;
+
+    let mut parent_path = module_path.clone();
+    parent_path.pop();
+    if is_package {
+        parent_path.pop();
+    }
+    parent_path.push("__init__");
+
+    let context = ResolverContext::new(db, db.python_version(), ModuleResolveMode::StubsAllowed);
+    let parent_init = resolve_file_module_without_case_check(&parent_path, &context)?;
+    let mut parent_package_path = parent_path.clone();
+    parent_package_path.pop();
+    if is_legacy_namespace_package(&parent_package_path, &context, parent_init) {
+        return None;
+    }
+    let parent = resolve_module(db, parent_init, &parent_name)?;
+    if parent.kind(db) != ModuleKind::Package
+        || parent.name(db) != &parent_name
+        || parent.search_path(db) != Some(search_path)
+        || parent.file(db) != Some(parent_init)
+    {
+        return None;
+    }
+
+    // A regular package has priority over a same-named file module.
+    if !is_package {
+        let mut package_path = module_path.clone();
+        package_path.pop();
+        package_path.push(module_name.last_component());
+        package_path.push("__init__");
+        if resolve_file_module(&package_path, &context).is_some() {
+            return None;
+        }
+    }
+
+    // `system_path_to_file` follows the host filesystem's casing rules. Import resolution does
+    // not, so preserve the case-sensitive check performed by `resolve_file_module`.
+    let system = db.system();
+    if !system.case_sensitivity().is_case_sensitive()
+        && !system.path_exists_case_sensitive(path, search_path.as_system_path()?)
+    {
+        return None;
+    }
+
+    Some(Module::file_module(
+        db,
+        module_name.clone(),
+        if is_package {
+            ModuleKind::Package
+        } else {
+            ModuleKind::Module
+        },
+        search_path.clone(),
+        file,
+    ))
 }
 
 pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
@@ -1061,11 +1146,61 @@ struct ModuleNameIngredient<'db> {
     pub(super) mode: ModuleResolveMode,
 }
 
+/// The first two components of a module name, cached independently from the full name.
+///
+/// Large projects often have thousands of modules under the same second-level package. Caching
+/// exactly this prefix captures that reuse without creating a Salsa query for every intermediate
+/// package in the module tree.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+struct ModuleNamePrefixIngredient<'db> {
+    #[returns(ref)]
+    name: ModuleName,
+    mode: ModuleResolveMode,
+    is_non_shadowable: bool,
+}
+
+#[salsa::tracked(returns(ref))]
+fn resolve_two_component_prefix<'db>(
+    db: &'db dyn Db,
+    prefix: ModuleNamePrefixIngredient<'db>,
+) -> ResolvedNames {
+    let name = prefix.name(db);
+    let mode = prefix.mode(db);
+    let search_paths = search_paths(db, mode);
+    let candidates = initial_resolution_candidates(search_paths, prefix.is_non_shadowable(db));
+    resolve_name_components(db, name.components(), mode, candidates, true).unwrap_or_default()
+}
+
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
-    let search_paths = search_paths(db, mode);
-    resolve_name_impl(db, name, mode, search_paths)
+    let mut components = name.components();
+    let first = components.next().expect("module names are non-empty");
+    let Some(second) = components.next() else {
+        return resolve_name_impl(db, name, mode, search_paths(db, mode));
+    };
+    let Some(third) = components.next() else {
+        return resolve_name_impl(db, name, mode, search_paths(db, mode));
+    };
+
+    let python_version = db.python_version();
+    let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
+    let prefix_name = ModuleName::from_components([first, second])
+        .expect("components came from a valid module name");
+    let prefix = ModuleNamePrefixIngredient::new(db, prefix_name, mode, is_non_shadowable);
+    let candidates = resolve_two_component_prefix(db, prefix).clone();
+
+    if candidates.is_empty() {
+        return None;
+    }
+
+    resolve_name_components(
+        db,
+        std::iter::once(third).chain(components),
+        mode,
+        candidates,
+        false,
+    )
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1082,7 +1217,7 @@ fn desperately_resolve_name(
     resolve_name_impl(db, name, mode, search_paths.iter().flatten())
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
 enum ResolvedModule {
     NamespacePackage,
     LegacyNamespacePackage(File),
@@ -1090,7 +1225,7 @@ enum ResolvedModule {
     Module(File),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 struct ModuleResolutionCandidate {
     path: ModulePath,
     module: ResolvedModule,
@@ -1193,11 +1328,17 @@ fn resolve_name_impl<'a>(
     search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<ResolvedNames> {
     let python_version = db.python_version();
-    let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
-    let mut stub_name = None;
+    let candidates = initial_resolution_candidates(search_paths, is_non_shadowable);
 
-    let mut cur_candidates = search_paths
+    resolve_name_components(db, name.components(), mode, candidates, true)
+}
+
+fn initial_resolution_candidates<'a>(
+    search_paths: impl Iterator<Item = &'a SearchPath>,
+    is_non_shadowable: bool,
+) -> ResolvedNames {
+    search_paths
         .filter_map(|search_path| {
             // When a builtin module is imported, standard module resolution is bypassed:
             // the module name always resolves to the stdlib module,
@@ -1215,15 +1356,25 @@ fn resolve_name_impl<'a>(
                 is_stub_package: false,
             })
         })
-        .collect::<Vec<_>>();
+        .collect()
+}
+
+fn resolve_name_components<'a>(
+    db: &dyn Db,
+    components: impl Iterator<Item = &'a str>,
+    mode: ModuleResolveMode,
+    mut cur_candidates: ResolvedNames,
+    mut is_root: bool,
+) -> Option<ResolvedNames> {
+    let context = ResolverContext::new(db, db.python_version(), mode);
+    let mut stub_name = None;
     let mut next_candidates = vec![];
 
     // FIXME?: because we have to search every candidate on each step of this loop,
     // in theory we can search them all in parallel. However we need to join the parallelism
     // at the end of each iteration, and after the first iteration in 99% of cases we will have
     // reduced down to a single candidate, so maybe meh?
-    let mut is_root = true;
-    for component in name.components() {
+    for component in components {
         // Search for the next component in every search-path
         for mut candidate in cur_candidates.drain(..) {
             // On the first iteration, look for `mypackage-stubs` as well
@@ -1447,17 +1598,7 @@ pub(super) fn resolve_file_module(
     module: &ModulePath,
     resolver_state: &ResolverContext,
 ) -> Option<File> {
-    // Stubs have precedence over source files
-    let stub_file = if resolver_state.mode.stubs_allowed() {
-        module.with_pyi_extension().to_file(resolver_state)
-    } else {
-        None
-    };
-    let file = stub_file.or_else(|| {
-        module
-            .with_py_extension()
-            .and_then(|path| path.to_file(resolver_state))
-    })?;
+    let file = resolve_file_module_without_case_check(module, resolver_state)?;
 
     // For system files, test if the path has the correct casing.
     // We can skip this step for vendored files or virtual files because
@@ -1473,6 +1614,23 @@ pub(super) fn resolve_file_module(
     }
 
     Some(file)
+}
+
+fn resolve_file_module_without_case_check(
+    module: &ModulePath,
+    resolver_state: &ResolverContext,
+) -> Option<File> {
+    // Stubs have precedence over source files
+    let stub_file = if resolver_state.mode.stubs_allowed() {
+        module.with_pyi_extension().to_file(resolver_state)
+    } else {
+        None
+    };
+    stub_file.or_else(|| {
+        module
+            .with_py_extension()
+            .and_then(|path| path.to_file(resolver_state))
+    })
 }
 
 /// Determines whether a package is a legacy namespace package.
@@ -1519,9 +1677,14 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(context.db, init);
+    is_legacy_namespace_package_file(context.db, init)
+}
+
+#[salsa::tracked]
+fn is_legacy_namespace_package_file(db: &dyn Db, init: File) -> bool {
+    let parsed = ruff_db::parsed::parsed_module(db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(context.db).suite());
+    visitor.visit_body(parsed.load(db).suite());
 
     visitor.is_legacy_namespace_package
 }
@@ -2233,6 +2396,89 @@ mod tests {
             path_to_module(&db, &FilePath::from(src.join("foo.py")))
         );
         assert!(foo_real != foo);
+    }
+
+    #[test]
+    fn nested_stub_over_module_source() {
+        const SRC: &[FileSpec] = &[
+            ("foo/__init__.py", ""),
+            ("foo/bar.py", ""),
+            ("foo/bar.pyi", ""),
+        ];
+
+        let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
+        let name = ModuleName::new_static("foo.bar").unwrap();
+        let stub = resolve_module_confident(&db, &name).unwrap();
+        let implementation = resolve_real_module_confident(&db, &name).unwrap();
+
+        assert_eq!(
+            Some(stub),
+            path_to_module(&db, &FilePath::from(src.join("foo/bar.pyi")))
+        );
+        assert_eq!(
+            Some(implementation),
+            path_to_module(&db, &FilePath::from(src.join("foo/bar.py")))
+        );
+    }
+
+    #[test]
+    fn stub_package_controls_runtime_submodule_visibility() {
+        const SRC: &[FileSpec] = &[("foo/__init__.py", ""), ("foo/bar.py", "")];
+        const STUBS: &[FileSpec] = &[("foo-stubs/__init__.pyi", ""), ("foo-stubs/py.typed", "")];
+
+        let TestCase {
+            mut db,
+            src,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(SRC)
+            .with_site_packages_files(STUBS)
+            .build();
+        let bar_path = src.join("foo/bar.py");
+        let bar_name = ModuleName::new_static("foo.bar").unwrap();
+
+        assert_eq!(None, resolve_module_confident(&db, &bar_name));
+        let runtime_bar = path_to_module(&db, &FilePath::from(bar_path.clone()))
+            .expect("desperate resolution should still identify the runtime file");
+        assert_eq!(runtime_bar.file(&db).unwrap().path(&db), &bar_path);
+
+        db.write_file(site_packages.join("foo-stubs/py.typed"), "partial\n")
+            .unwrap();
+        let bar = resolve_module_confident(&db, &bar_name)
+            .expect("partial stub package should fall back to runtime submodule");
+        assert_eq!(Some(bar), path_to_module(&db, &FilePath::from(bar_path)));
+    }
+
+    #[test]
+    fn file_to_module_in_second_legacy_namespace_root() {
+        const LEGACY_INIT: &str =
+            "__path__ = __import__('pkgutil').extend_path(__path__, __name__)";
+
+        let first = SystemPathBuf::from("/first");
+        let second = SystemPathBuf::from("/second");
+        let second_child = second.join("foo/child.py");
+        let mut db = TestDb::new();
+        db.write_files([
+            (first.join("foo/__init__.py"), LEGACY_INIT),
+            (second.join("foo/__init__.py"), LEGACY_INIT),
+            (second_child.clone(), ""),
+        ])
+        .unwrap();
+        db.set_search_paths(
+            SearchPathSettings {
+                src_roots: vec![first, second.clone()],
+                ..SearchPathSettings::empty()
+            }
+            .to_search_paths(db.system(), db.vendored(), &FallibleStrategy)
+            .unwrap(),
+        );
+
+        let child = path_to_module(&db, &FilePath::from(second_child)).unwrap();
+        assert_eq!(
+            child.search_path(&db),
+            Some(&SearchPath::first_party(db.system(), second).unwrap())
+        );
     }
 
     #[test]
