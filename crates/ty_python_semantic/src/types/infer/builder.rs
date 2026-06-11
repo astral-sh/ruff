@@ -6903,6 +6903,186 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        let unconstrained_collection_def = if tcx.annotation.is_none()
+            && let Some(collection_expr) = collection_expr
+            && let InferenceRegion::Expression(current_expr, _) = self.region
+            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
+            && let Some(assignment) = current_expr.assigned_to(self.db())
+            && let Ok(collection_def) =
+                DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
+        {
+            self.index.try_definition(collection_def)
+        } else {
+            None
+        };
+
+        let has_constraining_collection_uses =
+            unconstrained_collection_def.is_some_and(|collection_def| {
+                self.index
+                    .constraining_collection_uses(collection_def)
+                    .next()
+                    .is_some()
+            });
+
+        // For an unconstrained literal using the standard built-in collection shape, direct
+        // typevar inference is just a union of the promoted element types. Avoid constructing a
+        // specialization builder and its constraint set in this common case. If an element type
+        // contains a typevar, replay the already-inferred types through the general solver.
+        if tcx.annotation.is_none()
+            && collection_expr.is_some()
+            && !has_constraining_collection_uses
+            && let simple_collection_typevars = generic_context
+                .variables(self.db())
+                .take(N + 1)
+                .collect::<SmallVec<[_; 2]>>()
+            && simple_collection_typevars.len() == N
+            && simple_collection_typevars.iter().all(|typevar| {
+                matches!(
+                    typevar.kind(self.db()),
+                    TypeVarKind::Legacy | TypeVarKind::Pep695
+                ) && typevar
+                    .typevar(self.db())
+                    .bound_or_constraints(self.db())
+                    .is_none()
+            })
+        {
+            let mut inferred_tys: SmallVec<[SmallVec<[Type<'db>; 4]>; 2]> =
+                std::iter::repeat_with(SmallVec::new).take(N).collect();
+            let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
+            let mut can_build_directly = true;
+
+            for elts in elts {
+                // An unpacking expression for a dictionary.
+                if let &[None, Some(value_expr)] = elts.as_slice() {
+                    let unpack_ty =
+                        infer_elt_expression(self, (1, value_expr, TypeContext::default()));
+
+                    let Some((unpacked_key_ty, unpacked_value_ty)) =
+                        unpack_ty.unpack_keys_and_items(self.db())
+                    else {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_ARGUMENT_TYPE, value_expr)
+                        {
+                            let mut diag = builder.into_diagnostic(
+                                "Argument expression after ** must be a mapping type",
+                            );
+
+                            diag.set_primary_message(format_args!(
+                                "Found `{}`",
+                                unpack_ty.display(self.db())
+                            ));
+                        }
+
+                        continue;
+                    };
+
+                    for (index, unpacked_ty) in
+                        [unpacked_key_ty, unpacked_value_ty].into_iter().enumerate()
+                    {
+                        can_build_directly &= !(unpacked_ty.has_typevar(self.db())
+                            || unpacked_ty.has_unspecialized_type_var(self.db()));
+
+                        tuple_size_promotion_constraints.record_unpromotable_type(
+                            self.db(),
+                            simple_collection_typevars[index].identity(self.db()),
+                            unpacked_ty.promote(self.db()),
+                        );
+                        inferred_tys[index].push(unpacked_ty);
+                    }
+
+                    continue;
+                }
+
+                for (i, elt, typevar) in
+                    itertools::izip!(0.., elts, simple_collection_typevars.iter().copied())
+                {
+                    let Some(elt) = elt else { continue };
+                    let inferred_elt_ty =
+                        infer_elt_expression(self, (i, elt, TypeContext::default()))
+                            .promote(self.db());
+                    let inferred_type_for_typevar = if elt.is_starred_expr() {
+                        inferred_elt_ty
+                            .iterate(self.db())
+                            .homogeneous_element_type(self.db())
+                    } else {
+                        inferred_elt_ty
+                    };
+
+                    can_build_directly &= !(inferred_type_for_typevar.has_typevar(self.db())
+                        || inferred_type_for_typevar.has_unspecialized_type_var(self.db()));
+
+                    tuple_size_promotion_constraints.record_inferred_expression_type(
+                        self.db(),
+                        typevar.identity(self.db()),
+                        elt,
+                        inferred_type_for_typevar,
+                    );
+                    inferred_tys[i].push(inferred_type_for_typevar);
+                }
+            }
+
+            let finalize_inferred_ty =
+                |typevar: BoundTypeVarInstance<'db>, inferred_ty: Type<'db>| {
+                    let inferred_ty = inferred_ty.promote(self.db());
+                    let inferred_ty =
+                        if tuple_size_promotion_constraints.allow(typevar.identity(self.db())) {
+                            inferred_ty.promote_tuple_size_in_union(self.db())
+                        } else {
+                            inferred_ty
+                        };
+                    inferred_ty.promote_singletons_recursively(self.db())
+                };
+
+            let class_type = if can_build_directly {
+                collection_alias.origin(self.db()).apply_specialization(
+                    self.db(),
+                    |generic_context| {
+                        generic_context.specialize_recursive(
+                            self.db(),
+                            inferred_tys
+                                .into_iter()
+                                .zip(simple_collection_typevars)
+                                .map(|(inferred_tys, typevar)| {
+                                    let mut inferred_tys = inferred_tys.into_iter();
+                                    let mut inferred_ty =
+                                        UnionAccumulator::new(inferred_tys.next()?);
+                                    for ty in inferred_tys {
+                                        inferred_ty.add(self.db(), ty);
+                                    }
+                                    Some(finalize_inferred_ty(
+                                        typevar,
+                                        inferred_ty.into_type(self.db()),
+                                    ))
+                                }),
+                        )
+                    },
+                )
+            } else {
+                let constraints = ConstraintSetBuilder::new();
+                let inferable = generic_context.inferable_typevars(self.db());
+                let mut builder = SpecializationBuilder::new(self.db(), &constraints, inferable);
+
+                for (typevar, inferred_tys) in
+                    simple_collection_typevars.into_iter().zip(inferred_tys)
+                {
+                    for inferred_ty in inferred_tys {
+                        builder.infer(Type::TypeVar(typevar), inferred_ty).ok()?;
+                    }
+                }
+
+                collection_alias.origin(self.db()).apply_specialization(
+                    self.db(),
+                    |generic_context| {
+                        builder.build_with(generic_context, |typevar, bounds| {
+                            Some(finalize_inferred_ty(typevar, bounds?.lower?))
+                        })
+                    },
+                )
+            };
+
+            return Type::from(class_type).to_instance(self.db());
+        }
+
         let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
         let identity_instance = Type::instance(self.db(), ClassType::Generic(collection_alias));
@@ -7149,15 +7329,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if tcx.annotation.is_none()
-            && let Some(collection_expr) = collection_expr
-            && let InferenceRegion::Expression(current_expr, _) = self.region
-            && current_expr.node_ref(self.db()).index() == *collection_expr.node_index()
-            && let Some(assignment) = current_expr.assigned_to(self.db())
-            && let Ok(collection_def) =
-                DefinitionNodeKey::from_assignment(assignment.node(self.module())).exactly_one()
-            && let Some(collection_def) = self.index.try_definition(collection_def)
-        {
+        if let Some(collection_def) = unconstrained_collection_def {
             // For unconstrained collection literals, collect any constraints created by later uses
             // of this definition in the scope.
             for (statement, use_expression) in
