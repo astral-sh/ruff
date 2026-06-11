@@ -58,6 +58,39 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "_source",
 ];
 
+#[salsa::tracked(
+    cycle_initial=|_, id, _, _| Place::bound(Type::divergent(id)).into(),
+    heap_size=ruff_memory_usage::heap_size
+)]
+#[allow(
+    clippy::needless_pass_by_value,
+    reason = "Salsa tracked query keys must be owned"
+)]
+fn superclass_instance_member<'db>(
+    db: &'db dyn Db,
+    superclass: ClassType<'db>,
+    name: Name,
+) -> PlaceAndQualifiers<'db> {
+    let instance = Type::instance(db, superclass);
+    let Some((literal, _)) = superclass.static_class_literal(db) else {
+        return instance.member(db, &name);
+    };
+    let own_class_member = superclass.own_class_member(db, None, &name);
+
+    if matches!(
+        own_class_member.inner.place,
+        Place::Defined(DefinedPlace {
+            definedness: crate::place::Definedness::AlwaysDefined,
+            ..
+        })
+    ) && enum_metadata(db, literal.into()).is_none()
+    {
+        instance.member_from_own_class_member(db, &name, own_class_member.inner)
+    } else {
+        instance.member(db, &name)
+    }
+}
+
 // TODO: Support dynamic class literals. If we allow dynamic classes to define attributes in their
 // namespace dictionary, we should also check whether those attributes are valid overrides of
 // attributes in their superclasses.
@@ -369,7 +402,7 @@ fn check_class_declaration<'db>(
             }
 
             let superclass_instance_member =
-                Type::instance(db, superclass).member(db, &member.name);
+                superclass_instance_member(db, superclass, member.name.clone());
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
