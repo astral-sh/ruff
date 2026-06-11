@@ -1112,6 +1112,35 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Maps the specialization's types without allocating if every type is unchanged.
+    fn map_types(
+        self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(usize, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+    ) -> Cow<'db, [Type<'db>]> {
+        let types = self.types(db);
+        let mut mapped_types: Option<Vec<Type<'db>>> = None;
+
+        for (index, (typevar, ty)) in self
+            .generic_context(db)
+            .variables(db)
+            .zip(types.iter().copied())
+            .enumerate()
+        {
+            let mapped_ty = map(index, typevar, ty);
+            if let Some(mapped_types) = &mut mapped_types {
+                mapped_types.push(mapped_ty);
+            } else if mapped_ty != ty {
+                let mut changed_types = Vec::with_capacity(types.len());
+                changed_types.extend_from_slice(&types[..index]);
+                changed_types.push(mapped_ty);
+                mapped_types = Some(changed_types);
+            }
+        }
+
+        mapped_types.map_or(Cow::Borrowed(types), Cow::Owned)
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1217,32 +1246,31 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(self.generic_context(db).variables(db))
-            .enumerate()
-            .map(|(i, (ty, typevar))| {
-                let tcx = TypeContext::new(tcx.get(i).copied());
-                if typevar.variance(db).is_covariant() {
-                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                } else {
-                    ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
-                }
-            })
-            .collect();
+        let types = self.map_types(db, |i, typevar, ty| {
+            let tcx = TypeContext::new(tcx.get(i).copied());
+            if typevar.variance(db).is_covariant() {
+                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            } else {
+                ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+            }
+        });
 
-        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+        let original_tuple_inner = self.tuple_inner(db);
+        let tuple_inner = original_tuple_inner.and_then(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
-        Specialization::new(
-            db,
-            self.generic_context(db),
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        )
+        if matches!(types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner {
+            self
+        } else {
+            Specialization::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                tuple_inner,
+            )
+        }
     }
 
     /// Applies an optional specialization to this specialization.

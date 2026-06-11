@@ -245,12 +245,14 @@ impl<'db> GenericAlias<'db> {
             .map(|specialization| specialization.types(db))
             .unwrap_or(&[]);
 
-        Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-        )
+        let original_specialization = self.specialization(db);
+        let specialization =
+            original_specialization.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if specialization == original_specialization {
+            self
+        } else {
+            Self::new(db, self.origin(db), specialization)
+        }
     }
 
     pub(super) fn find_legacy_typevars_impl(
