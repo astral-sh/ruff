@@ -4782,6 +4782,7 @@ dependencies = [
  "ruff_text_size",
  "strum",
  "strum_macros",
+ "tempfile",
  "tracing",
  "ty_static",
 ]
