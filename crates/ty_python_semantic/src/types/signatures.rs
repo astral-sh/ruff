@@ -11,7 +11,7 @@
 //! arguments must match _at least one_ overload.
 
 use std::slice::Iter;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -927,13 +927,15 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = self.parameters.data.value.first()
-            && first_parameter.is_positional()
-            && first_parameter.annotated_type.is_unknown()
-            && first_parameter.inferred_annotation
+        let needs_annotation = self.parameters.as_slice().first().is_some_and(|parameter| {
+            parameter.is_positional()
+                && parameter.annotated_type.is_unknown()
+                && parameter.inferred_annotation
+        });
+        if needs_annotation
             && let Some(self_type) = self_type()
-            && let Some(first_parameter) =
-                Arc::make_mut(&mut self.parameters.data).value.first_mut()
+            && let Some(data) = self.parameters.data.as_mut()
+            && let Some(first_parameter) = Arc::make_mut(data).value.first_mut()
         {
             first_parameter.annotated_type = self_type;
 
@@ -3194,18 +3196,62 @@ struct ParametersData<'db> {
     kind: ParametersKind<'db>,
 }
 
+static GRADUAL_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Any)),
+        ]),
+        kind: ParametersKind::Gradual,
+    })
+});
+
+static UNKNOWN_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
+        ]),
+        kind: ParametersKind::Gradual,
+    })
+});
+
+static TOP_PARAMETERS: LazyLock<Arc<ParametersData<'static>>> = LazyLock::new(|| {
+    Arc::new(ParametersData {
+        value: Box::new([
+            Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+            Parameter::keyword_variadic(Name::new_static("kwargs"))
+                .with_annotated_type(Type::object()),
+        ]),
+        kind: ParametersKind::Top,
+    })
+});
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameters<'db> {
-    data: Arc<ParametersData<'db>>,
+    /// `None` represents the common standard empty parameter list without allocating.
+    data: Option<Arc<ParametersData<'db>>>,
 }
 
 impl<'db> Parameters<'db> {
-    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+    fn from_static(data: &'static LazyLock<Arc<ParametersData<'static>>>) -> Self {
         Self {
-            data: Arc::new(ParametersData {
-                value: value.into(),
-                kind,
-            }),
+            data: Some(Arc::clone(data)),
+        }
+    }
+
+    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+        let value = value.into();
+        if value.is_empty() && kind == ParametersKind::Standard {
+            Self::empty()
+        } else {
+            Self {
+                data: Some(Arc::new(ParametersData { value, kind })),
+            }
         }
     }
 
@@ -3341,34 +3387,36 @@ impl<'db> Parameters<'db> {
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self::from_parts(Box::default(), ParametersKind::Standard)
+        Self { data: None }
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
-        &self.data.value
+        self.data.as_deref().map_or(&[], |data| &data.value)
     }
 
     pub(crate) fn kind(&self) -> ParametersKind<'db> {
-        self.data.kind
+        self.data
+            .as_deref()
+            .map_or(ParametersKind::Standard, |data| data.kind)
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
     pub(crate) fn is_gradual(&self) -> bool {
         matches!(
-            self.data.kind,
+            self.kind(),
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
     pub(crate) fn is_top(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Top)
+        matches!(self.kind(), ParametersKind::Top)
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
     pub(crate) fn is_standard(&self) -> bool {
-        matches!(self.data.kind, ParametersKind::Standard)
+        matches!(self.kind(), ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -3377,7 +3425,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
     pub(crate) fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
-        match self.data.kind {
+        match self.kind() {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -3392,12 +3440,11 @@ impl<'db> Parameters<'db> {
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        match self.data.kind {
+        match self.kind() {
             ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
-            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => Some((
-                &self.data.value[..self.data.value.len().saturating_sub(2)],
-                typevar,
-            )),
+            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => {
+                Some((&self.as_slice()[..self.len().saturating_sub(2)], typevar))
+            }
             _ => None,
         }
     }
@@ -3421,15 +3468,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self::from_parts(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Any)),
-            ],
-            ParametersKind::Gradual,
-        )
+        Self::from_static(&GRADUAL_PARAMETERS)
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
@@ -3479,15 +3518,7 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self::from_parts(
-            [
-                Parameter::variadic(Name::new_static("args"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
-            ],
-            ParametersKind::Gradual,
-        )
+        Self::from_static(&UNKNOWN_PARAMETERS)
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
@@ -3509,17 +3540,7 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self::from_parts(
-            // We always emit `called-top-callable` for any call to the top callable (based on the
-            // `kind` below), so we otherwise give it the most permissive signature`(*object,
-            // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            [
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
-            ],
-            ParametersKind::Top,
-        )
+        Self::from_static(&TOP_PARAMETERS)
     }
 
     fn from_parameters(
@@ -3647,7 +3668,7 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
-                self.data.kind,
+                self.kind(),
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
@@ -3667,20 +3688,18 @@ impl<'db> Parameters<'db> {
         let type_mapping = type_mapping.flip();
 
         let value: Box<[_]> = self
-            .data
-            .value
             .iter()
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts(value, self.data.kind)
+        Self::from_parts(value, self.kind())
     }
     pub(crate) fn len(&self) -> usize {
-        self.data.value.len()
+        self.as_slice().len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
-        self.data.value.iter()
+        self.as_slice().iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -3694,7 +3713,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.data.value.get(index)
+        self.as_slice().get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -3792,9 +3811,9 @@ impl<'db> Parameters<'db> {
         };
 
         let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.data.value[..variadic_index]);
+        expanded.extend_from_slice(&self.as_slice()[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
+        expanded.extend_from_slice(&self.as_slice()[variadic_index + 2..]);
         Parameters::new(db, expanded)
     }
 }
@@ -3804,7 +3823,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.data.value.iter()
+        self.iter()
     }
 }
 
@@ -3812,7 +3831,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.data.value[index]
+        &self.as_slice()[index]
     }
 }
 
