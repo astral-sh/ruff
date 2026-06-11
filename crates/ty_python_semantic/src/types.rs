@@ -4809,7 +4809,10 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if rec.is_non_contractive(db) => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
-            Type::Recursive(rec) => rec.unfold(db).bindings(db),
+            Type::Recursive(rec) => rec
+                .unfold(db)
+                .bindings(db)
+                .fields_mapped(&mut |ty| rec.fold(db, ty)),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(

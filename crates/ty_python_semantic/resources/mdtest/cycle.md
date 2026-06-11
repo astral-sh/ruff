@@ -189,6 +189,23 @@ class RecursiveOperation:
         reveal_type(self.x)  # revealed: list[int] | list[Divergent]
 ```
 
+The same rule applies to call bindings. Calling `self.fn` unfolds the recursive callable type to
+inspect its signature, but the returned list still has to be folded before it is exposed as the
+call result.
+
+```py
+class RecursiveCallOperation:
+    def __init__(self):
+        self.fn = lambda: [0]
+
+    def make_recursive(self):
+        self.fn = lambda: [self.fn]
+
+    def use_call_result(self):
+        result = self.fn()
+        reveal_type(result)  # revealed: list[int] | list[Divergent]
+```
+
 ## Decorated methods with implicit class attributes
 
 This is a regression test for <https://github.com/astral-sh/ty/issues/3471>.
