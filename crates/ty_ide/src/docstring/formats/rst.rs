@@ -8,7 +8,7 @@ use ruff_text_size::{TextRange, TextSize};
 use super::super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
-pub(super) struct Docstring {
+pub(in crate::docstring) struct Docstring {
     field_lists: Vec<FieldList>,
 }
 
@@ -46,6 +46,10 @@ impl Docstring {
         }
 
         parameters
+    }
+
+    pub(in crate::docstring) fn field_lists(&self) -> &[FieldList] {
+        &self.field_lists
     }
 }
 
@@ -98,7 +102,7 @@ impl<'a> DocstringLine<'a> {
 ///
 /// <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#field-lists>
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FieldList {
+pub(in crate::docstring) struct FieldList {
     start_line: usize,
     end_line: usize,
     range: TextRange,
@@ -107,6 +111,18 @@ struct FieldList {
 }
 
 impl FieldList {
+    pub(in crate::docstring) fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub(in crate::docstring) fn indent(&self) -> TextSize {
+        self.indent
+    }
+
+    pub(in crate::docstring) fn fields(&self) -> &[Field] {
+        &self.fields
+    }
+
     /// Parse all the field lists in the given lines of a docstring.
     fn parse_all(raw: &str) -> Vec<Self> {
         let mut field_lists = Vec::new();
@@ -556,7 +572,7 @@ impl<'a> FieldKind<'a> {
 
 /// Represents the reST fields captured by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Field {
+pub(in crate::docstring) enum Field {
     Parameter {
         display_name: CompactString,
         lookup_name: String,

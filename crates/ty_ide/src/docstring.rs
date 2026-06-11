@@ -80,9 +80,7 @@ impl Docstring {
         param_docs.extend(extract_numpy_style_params(&self.0));
 
         // reST/Sphinx-style docstrings
-        for parameter in Formats::parse(&self.0).parameter_documentation() {
-            param_docs.insert(parameter.name, parameter.description);
-        }
+        param_docs.extend(Formats::parse(&self.0).parameter_documentation());
 
         param_docs
     }
@@ -1569,6 +1567,20 @@ mod tests {
     }
 
     #[test]
+    fn rest_parameter_documentation_preserves_first_line_continuation_after_pep257_trim() {
+        // PEP-257 trimming treats the first docstring line specially, which can erase the only
+        // indentation distinguishing a first-line field header from its continuation.
+        let docstring = Docstring::new(":param value: First line.\n    Second line.".to_owned());
+        let param_docs = docstring.parameter_documentation();
+
+        assert_eq!(param_docs.len(), 1);
+        assert_eq!(
+            param_docs.get("value").expect("value should exist"),
+            "First line.\nSecond line."
+        );
+    }
+
+    #[test]
     fn test_rest_style_parameter_documentation() {
         let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
@@ -1613,12 +1625,14 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        :param str param1: The first parameter description<HB>
-        :param int param2: The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        :param param3: A parameter without type annotation<HB>
-        :returns: The return value description<HB>
-        :rtype: str
+        `param3`: A parameter without type annotation<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -1682,8 +1696,9 @@ mod tests {
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
         <HB>
-        :param int param2: reST-style parameter<HB>
-        :param param3: Another reST-style parameter<HB>
+        ## Parameters<HB>
+        `param2` (`int`): reST-style parameter<HB>
+        `param3`: Another reST-style parameter<HB>
         <HB>
         Parameters<HB>
         ----------<HB>

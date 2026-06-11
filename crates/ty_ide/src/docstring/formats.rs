@@ -1,3 +1,5 @@
+use indexmap::IndexMap;
+
 pub(super) mod rst;
 
 /// Represents documentation for a single parameter parsed from a docstring.
@@ -25,7 +27,18 @@ impl Formats {
     }
 
     /// Returns docs for all parameters recognized in a parsed docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
-        self.rst.parameter_documentation()
+    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut parameters = IndexMap::new();
+
+        for parameter in self.rst.parameter_documentation() {
+            parameters.insert(parameter.name, parameter.description);
+        }
+
+        parameters
+    }
+
+    /// Returns the outcome of parsing the reStructuredText format.
+    pub(super) fn rst(&self) -> &rst::Docstring {
+        &self.rst
     }
 }
