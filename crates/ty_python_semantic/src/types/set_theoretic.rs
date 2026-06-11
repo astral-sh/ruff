@@ -803,10 +803,10 @@ impl<'db> IntersectionType<'db> {
         }
     }
 
-    /// Convert a pure class-object intersection such as `type[A] & type[B]` to `A & B`.
+    /// Convert a class-object intersection such as `type[A] & type[B]` to `A & B`.
     ///
-    /// This is deliberately conservative: every positive element must map to a nominal instance,
-    /// and intersections with negative elements are left unsupported. Structural and gradual
+    /// This is deliberately conservative: every positive element must map to a nominal or gradual
+    /// instance, and intersections with negative elements are left unsupported. Structural
     /// elements do not have a lossless instance-space projection.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if self.positive(db).is_empty() || !self.negative(db).is_empty() {
@@ -817,12 +817,15 @@ impl<'db> IntersectionType<'db> {
         for element in self.positive(db) {
             if !matches!(
                 element,
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
+                Type::ClassLiteral(_)
+                    | Type::GenericAlias(_)
+                    | Type::SubclassOf(_)
+                    | Type::Dynamic(_)
             ) {
                 return None;
             }
             let instance = element.to_instance(db)?;
-            if !matches!(instance, Type::NominalInstance(_)) {
+            if !matches!(instance, Type::NominalInstance(_) | Type::Dynamic(_)) {
                 return None;
             }
             builder = builder.add_positive(instance);
@@ -830,7 +833,7 @@ impl<'db> IntersectionType<'db> {
         Some(builder.build())
     }
 
-    /// Convert a pure nominal instance intersection such as `A & B` to
+    /// Convert a nominal or gradual instance intersection such as `A & B` to
     /// `type[A] & type[B]`.
     ///
     /// This is the corresponding instance-to-class-object projection for [`Self::to_instance`].
@@ -843,7 +846,7 @@ impl<'db> IntersectionType<'db> {
 
         let mut builder = IntersectionBuilder::new(db);
         for element in self.positive(db) {
-            if !matches!(element, Type::NominalInstance(_)) {
+            if !matches!(element, Type::NominalInstance(_) | Type::Dynamic(_)) {
                 return None;
             }
             builder = builder.add_positive(element.to_meta_type(db));

@@ -431,8 +431,8 @@ reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ### Class-object intersection
 
 ```py
-from typing import Self
-from ty_extensions import Intersection
+from typing import Any, Self
+from ty_extensions import Intersection, Unknown
 
 class A:
     @classmethod
@@ -448,6 +448,15 @@ class B: ...
 def _(cls: Intersection[type[A], type[B]]):
     reveal_type(cls.make())  # revealed: A & B
     reveal_type(cls.self_type())  # revealed: type[A] & type[B]
+
+def _(cls: Intersection[type[A], Any]):
+    reveal_type(cls.make())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Any]]):
+    reveal_type(cls.make())  # revealed: A & Any
+
+def _(cls: Intersection[type[A], type[Unknown]]):
+    reveal_type(cls.make())  # revealed: A & Unknown
 ```
 
 ### Calling `super()` in overridden methods with `Self` return type

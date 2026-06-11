@@ -319,7 +319,8 @@ def _[T](x: X[type[T]]):
 ## Generic Type Inference
 
 ```py
-from typing import Callable
+from typing import Any, Callable
+from ty_extensions import Intersection, Unknown
 
 def f1[T](x: type[T]) -> type[T]:
     return x
@@ -335,6 +336,15 @@ def _(x: type[object]) -> None:
         reveal_type(f1(x))  # revealed: type[A]
         if issubclass(x, B):
             reveal_type(f1(x))  # revealed: type[A] & type[B]
+
+def _(cls: Intersection[type[A], Any]):
+    reveal_type(f1(cls))  # revealed: type[A] & type[Any]
+
+def _(cls: Intersection[type[A], type[Any]]):
+    reveal_type(f1(cls))  # revealed: type[A] & type[Any]
+
+def _(cls: Intersection[type[A], type[Unknown]]):
+    reveal_type(f1(cls))  # revealed: type[A] & type[Unknown]
 
 def f2[T](x: T) -> type[T]:
     return type(x)
