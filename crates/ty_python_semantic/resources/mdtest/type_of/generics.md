@@ -327,6 +327,15 @@ def f1[T](x: type[T]) -> type[T]:
 reveal_type(f1(int))  # revealed: type[int]
 reveal_type(f1(object))  # revealed: type
 
+class A: ...
+class B: ...
+
+def _(x: type[object]) -> None:
+    if issubclass(x, A):
+        reveal_type(f1(x))  # revealed: type[A]
+        if issubclass(x, B):
+            reveal_type(f1(x))  # revealed: type[A] & type[B]
+
 def f2[T](x: T) -> type[T]:
     return type(x)
 

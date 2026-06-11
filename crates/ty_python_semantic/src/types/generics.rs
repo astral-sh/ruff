@@ -2742,7 +2742,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, seen)?;
                 }
             }
-            (_, Type::Intersection(actual_intersection)) => {
+            (formal, Type::Intersection(actual_intersection)) => {
+                if let Type::SubclassOf(formal_subclass) = formal
+                    && let Some(formal_typevar) = formal_subclass.into_type_var()
+                    && let Some(actual_instance) = actual_intersection.to_instance(self.db)
+                {
+                    // `type[A] & type[B]` is the class-object form of `A & B`. Preserve that
+                    // conjunction as one inference constraint instead of inferring from each
+                    // positive element separately, which would produce `A | B`.
+                    return self.infer_map_impl(
+                        Type::TypeVar(formal_typevar),
+                        actual_instance,
+                        polarity,
+                        seen,
+                    );
+                }
+
                 // Try to infer type mappings by checking against each intersection element. This
                 // is the dual of the `union_formal` arm above, and it handles cases like:
                 //
