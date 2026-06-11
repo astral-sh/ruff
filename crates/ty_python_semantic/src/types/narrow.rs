@@ -2174,6 +2174,38 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         kind: &SequencePatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        let subject_node = subject.node_ref(self.db).node(self.module);
+
+        // A tuple expression has no place that can be narrowed as a whole. For example:
+        //
+        //     match (a, b):
+        //         case (A(), B()):
+        //
+        // Project the element constraints onto the subject-time bindings of `a` and `b`.
+        if let ast::Expr::Tuple(tuple) = subject_node {
+            if !is_positive
+                || !kind.is_exact_length()
+                || tuple.elts.len() != kind.patterns.len()
+                || !tuple.elts.iter().all(ast::Expr::is_name_expr)
+            {
+                return None;
+            }
+
+            let mut constraints = NarrowingConstraints::default();
+            for (element, pattern) in tuple.elts.iter().zip(&kind.patterns) {
+                let element = PlaceExpr::try_from_expr(element)?;
+                insert_narrowing_constraint(
+                    &mut constraints,
+                    self.expect_place(&element),
+                    NarrowingConstraint::intersection(self.necessary_match_pattern_type(pattern)),
+                );
+            }
+
+            return (!constraints.is_empty()).then_some(constraints);
+        }
+
+        let subject = PlaceExpr::try_from_expr(subject_node)?;
+
         let constraint = if is_positive {
             NarrowingConstraint::intersection(self.necessary_sequence_pattern_type(kind))
         } else {
@@ -2184,7 +2216,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             NarrowingConstraint::intersection(sequence_type.negate(self.db))
         };
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
         let place = self.expect_place(&subject);
 
         Some(NarrowingConstraints::from_iter([(place, constraint)]))
@@ -2266,22 +2297,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         predicates: &Vec<PatternPredicateKind<'db>>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        // DeMorgan's law---if the overall `or` is negated, we need to `and` the negated sub-constraints.
         let merge_constraints = if is_positive {
-            merge_constraints_or
+            Self::merge_optional_constraints_or
         } else {
-            merge_constraints_and
+            Self::merge_optional_constraints_and
         };
 
         predicates
             .iter()
-            .filter_map(|predicate| {
-                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
-            })
-            .reduce(|mut constraints, constraints_| {
-                merge_constraints(&mut constraints, constraints_);
-                constraints
-            })
+            .map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject, is_positive))
+            .reduce(merge_constraints)
+            .flatten()
     }
 
     fn evaluate_bool_op(

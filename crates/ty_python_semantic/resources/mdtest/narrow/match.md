@@ -291,6 +291,85 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
             # intersection above.
             reveal_type(subj[1])  # revealed: int | str
 
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectA2(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+class TupleSubjectB2(TupleSubjectB): ...
+
+def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+        case _:
+            # Failing the first pattern does not tell us which element failed to match.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+    reveal_type(a)  # revealed: TupleSubjectA
+    reveal_type(b)  # revealed: TupleSubjectB
+
+def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA2(), TupleSubjectB2()]:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_or_pattern(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [*_]:
+            # The second alternative does not constrain either tuple element.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+def match_tuple_expression_constrained_or_pattern(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [TupleSubjectA2(), TupleSubjectB2()]:
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1 | TupleSubjectB2
+
+def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
+    match a, a:
+        case [TupleSubjectA1(), TupleSubjectA()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+
+def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> None:
+    if flag:
+        a: TupleSubjectA = TupleSubjectA1()
+    else:
+        a = TupleSubjectA2()
+
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), a]:
+            # The pattern binding has replaced the subject-time binding of `a`.
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+
+def match_tuple_expression_guard_rebinding(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+    flag: bool,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] if (a := TupleSubjectA2()) and flag:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            # Projection only constrains the subject-time binding, not the guard assignment.
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
+
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
         case int(value):
