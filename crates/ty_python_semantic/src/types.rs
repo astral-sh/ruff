@@ -65,9 +65,10 @@ use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
 pub(crate) use crate::types::enums::{EnumComplementType, enum_metadata};
+pub(crate) use crate::types::function::KnownFunction;
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
-    FunctionType, KnownFunction,
+    FunctionType,
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
@@ -1010,7 +1011,6 @@ pub(super) struct RecursiveTypeNormalization<'db> {
     marker: Type<'db>,
     nested: bool,
     preserve_top_level_recursive: bool,
-    replace_nested_never: bool,
     active_callable_normalizations: ActiveCallableNormalizations,
 }
 
@@ -1049,7 +1049,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
             marker,
             nested: false,
             preserve_top_level_recursive: false,
-            replace_nested_never: false,
             active_callable_normalizations: ActiveCallableNormalizations::default(),
         }
     }
@@ -1057,13 +1056,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
     pub(super) fn preserve_top_level_recursive(self) -> Self {
         Self {
             preserve_top_level_recursive: true,
-            ..self
-        }
-    }
-
-    fn replace_nested_never(self) -> Self {
-        Self {
-            replace_nested_never: true,
             ..self
         }
     }
@@ -1085,10 +1077,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
 
     fn should_preserve_top_level_recursive(self) -> bool {
         !self.nested && self.preserve_top_level_recursive
-    }
-
-    fn should_replace_nested_never(self) -> bool {
-        self.nested && self.replace_nested_never
     }
 
     pub(super) fn enter_callable_normalization(self) -> Option<Self> {
@@ -1344,51 +1332,6 @@ impl<'db> Type<'db> {
         previous: Option<Self>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        fn remove_nested_never_fallbacks<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            head_ids: &[salsa::Id],
-        ) -> Type<'db> {
-            let Type::Union(union) = ty else {
-                return ty;
-            };
-
-            let elements = union.elements(db);
-            let mut remove = vec![false; elements.len()];
-
-            // Some type operations use `Never` as their local recursion-guard fallback.
-            // If the same recovery union already contains the corresponding structured
-            // marker form, keep that form and drop the bottomed-out fallback.
-            for (index, element) in elements.iter().copied().enumerate() {
-                for id in head_ids {
-                    let marker = Type::divergent(*id);
-                    let normalization =
-                        RecursiveTypeNormalization::new(marker).replace_nested_never();
-                    let replaced = element
-                        .recursive_type_normalized_impl(db, normalization)
-                        .unwrap_or(marker);
-
-                    if replaced != element && elements.contains(&replaced) {
-                        remove[index] = true;
-                        break;
-                    }
-                }
-            }
-
-            if remove.iter().all(|remove| !remove) {
-                return ty;
-            }
-
-            UnionType::from_elements_cycle_recovery(
-                db,
-                elements
-                    .iter()
-                    .copied()
-                    .enumerate()
-                    .filter_map(|(index, element)| (!remove[index]).then_some(element)),
-            )
-        }
-
         let head_ids: Vec<_> = cycle.head_ids().collect();
         let cycle_head_body = |ty: Self| match ty {
             Type::Recursive(rec) if head_ids.iter().any(|id| *id == rec.binder_id(db)) => {
@@ -1469,8 +1412,6 @@ impl<'db> Type<'db> {
                     }
                     _ => normalized,
                 };
-                let body_without_top_level_marker =
-                    remove_nested_never_fallbacks(db, body_without_top_level_marker, &head_ids);
                 let has_structural_marker =
                     !matches!(body_without_top_level_marker, Type::Divergent(_))
                         && contains_marker(body_without_top_level_marker);
@@ -2498,16 +2439,15 @@ impl<'db> Type<'db> {
             Type::NewTypeInstance(newtype) => newtype
                 .recursive_type_normalized_impl(db, normalization)
                 .map(Type::NewTypeInstance),
-            Type::Never if normalization.should_replace_nested_never() => None,
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
+            | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::ModuleLiteral(_)
             | Type::SpecialForm(_)
             | Type::LiteralValue(_) => Some(self),
-            Type::Never => Some(self),
         }
     }
 

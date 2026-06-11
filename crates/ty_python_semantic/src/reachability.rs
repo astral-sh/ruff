@@ -198,10 +198,11 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
-        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
-        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+        CallableTypes, ClassLiteral, IntersectionBuilder, KnownFunction, NarrowingConstraint,
+        SpecialFormType, Type, TypeContext, UnionType, callable_pattern_type,
+        definite_match_pattern_type, enum_metadata, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
+        singleton_pattern_type,
     },
 };
 use ruff_index::IndexSlice;
@@ -1093,6 +1094,19 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // doesn't help much.
             // See <https://github.com/astral-sh/ty/issues/968>.
             if matches!(ty, Type::Dynamic(_)) {
+                return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
+            }
+            // These diagnostic helpers return their argument type. If the argument is temporarily
+            // `Never` during fixed-point iteration, that must not make the following statement
+            // unreachable.
+            if matches!(
+                ty,
+                Type::FunctionLiteral(function)
+                    if matches!(
+                        function.known(db),
+                        Some(KnownFunction::RevealType | KnownFunction::AssertType)
+                    )
+            ) {
                 return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
             }
 
