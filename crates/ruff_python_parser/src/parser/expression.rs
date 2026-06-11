@@ -16,7 +16,7 @@ use crate::error::{
     ComprehensionUnpackingKind, FStringKind, StarTupleKind, UnparenthesizedNamedExprKind,
 };
 use crate::parser::progress::ParserProgress;
-use crate::parser::{FunctionKind, Parser, helpers};
+use crate::parser::{FunctionKind, IpyEscapeContext, Parser, helpers};
 use crate::string::{
     InterpolatedStringKind, StringType, parse_interpolated_string_literal_element,
     parse_string_literal,
@@ -3063,7 +3063,7 @@ impl<'src> Parser<'src> {
     fn parse_ipython_escape_command_expression(&mut self) -> ast::ExprIpyEscapeCommand {
         let start = self.node_start();
 
-        let (value, kind) = self.bump_ipython_escape_command(false);
+        let (value, kind) = self.bump_ipython_escape_command(IpyEscapeContext::Assignment);
 
         if !matches!(kind, IpyEscapeKind::Magic | IpyEscapeKind::Shell) {
             // This should never occur as the lexer won't allow it.

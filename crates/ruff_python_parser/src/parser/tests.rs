@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, IpyEscapeKind, Stmt};
+use ruff_python_ast::{Expr, IpyEscapeKind, Number, Stmt};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -72,6 +72,43 @@ fn nfkc_normalizes_names() {
 }
 
 #[test]
+fn number_values() {
+    let cases = [
+        ("1E400", Number::Float(f64::INFINITY)),
+        (
+            "1E400J",
+            Number::Complex {
+                real: 0.0,
+                imag: f64::INFINITY,
+            },
+        ),
+        (
+            "123456789123456789123456789123456789",
+            Number::Int("123456789123456789123456789123456789".parse().unwrap()),
+        ),
+        (
+            "123456789123456789123456789123456789J",
+            Number::Complex {
+                real: 0.0,
+                imag: 1.234_567_891_234_567_8e35,
+            },
+        ),
+    ];
+
+    for (source, expected) in cases {
+        let parsed = parse_expression(source).unwrap();
+        let Expr::NumberLiteral(number) = parsed.expr() else {
+            panic!(
+                "expected number expression for {source:?}, got {:?}",
+                parsed.expr()
+            );
+        };
+
+        assert_eq!(number.value, expected, "source: {source:?}");
+    }
+}
+
+#[test]
 fn ipython_escape_command_values() {
     let cases = [
         ("?foo?", IpyEscapeKind::Help, "foo"),
@@ -93,6 +130,34 @@ fn ipython_escape_command_values() {
             .into_suite();
         let [Stmt::IpyEscapeCommand(command)] = suite.as_slice() else {
             panic!("expected one IPython escape command for {source:?}, got {suite:?}");
+        };
+
+        assert_eq!(command.kind, expected_kind, "source: {source:?}");
+        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+    }
+}
+
+#[test]
+fn ipython_escape_command_expression_values() {
+    let cases = [
+        ("x = !!foo", IpyEscapeKind::Shell, "!foo"),
+        ("x = %%foo", IpyEscapeKind::Magic, "%foo"),
+    ];
+
+    for (source, expected_kind, expected_value) in cases {
+        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+            .unwrap()
+            .try_into_module()
+            .unwrap()
+            .into_suite();
+        let [Stmt::Assign(assign)] = suite.as_slice() else {
+            panic!("expected one assignment for {source:?}, got {suite:?}");
+        };
+        let Expr::IpyEscapeCommand(command) = assign.value.as_ref() else {
+            panic!(
+                "expected an IPython escape command for {source:?}, got {:?}",
+                assign.value
+            );
         };
 
         assert_eq!(command.kind, expected_kind, "source: {source:?}");

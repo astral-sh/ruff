@@ -455,9 +455,12 @@ impl<'src> Parser<'src> {
         value
     }
 
-    fn bump_ipython_escape_command(&mut self, allows_help_end: bool) -> (Box<str>, IpyEscapeKind) {
+    fn bump_ipython_escape_command(
+        &mut self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
         let range = self.current_token_range();
-        let (value, kind) = self.cook_ipython_escape_command_value(range, allows_help_end);
+        let (value, kind) = self.cook_ipython_escape_command_value(range, context);
         self.bump(TokenKind::IpyEscapeCommand);
         (value, kind)
     }
@@ -469,18 +472,20 @@ impl<'src> Parser<'src> {
     fn cook_ipython_escape_command_value(
         &self,
         range: TextRange,
-        allows_help_end: bool,
+        context: IpyEscapeContext,
     ) -> (Box<str>, IpyEscapeKind) {
         let raw = self.src_text(range);
-        let initial_kind = IpyEscapeKind::try_from([
-            raw.as_bytes()[0] as char,
-            raw[1..].chars().next().unwrap_or('\0'),
-        ])
-        .ok()
-        .filter(|kind| kind.as_str().len() == 2)
-        .unwrap_or_else(|| {
+        let initial_kind = if context.is_logical_line_start()
+            && let Ok(kind) = IpyEscapeKind::try_from([
+                raw.as_bytes()[0] as char,
+                raw[1..].chars().next().unwrap_or('\0'),
+            ])
+            && kind.as_str().len() == 2
+        {
+            kind
+        } else {
             IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
-        });
+        };
 
         let mut kind = initial_kind;
         let mut value = String::new();
@@ -499,7 +504,7 @@ impl<'src> Parser<'src> {
                         question_count += 1;
                     }
 
-                    if !allows_help_end
+                    if !context.is_logical_line_start()
                         || !matches!(
                             initial_kind,
                             IpyEscapeKind::Magic
@@ -914,6 +919,18 @@ fn strip_underscores(text: &str) -> Cow<'_, str> {
 #[cold]
 fn normalize_name(text: &str) -> Name {
     text.nfkc().collect::<Name>()
+}
+
+#[derive(Copy, Clone)]
+enum IpyEscapeContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeContext {
+    const fn is_logical_line_start(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
+    }
 }
 
 struct ParserCheckpoint {
