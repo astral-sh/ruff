@@ -165,6 +165,7 @@ pub(super) fn has_known_identity_equality_semantics<'db>(db: &'db dyn Db, ty: Ty
 
     if metadata.init_function.is_some()
         || metadata.new_function.is_some()
+        || metadata.has_custom_new
         || metadata.generate_next_value_function.is_some()
         || metadata.custom_enum_metaclass_new
     {
@@ -1263,6 +1264,7 @@ fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Op
     let name = metadata.resolve_member(literal.name(db))?;
     if metadata.init_function.is_some()
         || metadata.new_function.is_some()
+        || metadata.has_custom_new
         || metadata.custom_enum_metaclass_new
     {
         return None;

@@ -4878,6 +4878,31 @@ def _(u: WithMixinTagX | WithMixinTagY):
         u["only_x"]  # error: [invalid-key]
     else:
         reveal_type(u)  # revealed: WithMixinTagX | WithMixinTagY
+
+class CallableConstructor:
+    def __call__(self, cls: type, value: int) -> object:
+        obj = object.__new__(cls)
+        obj._value_ = 0
+        return obj
+
+class CallableTag(Enum):
+    __new__ = CallableConstructor()
+    X = 1
+    Y = 2
+
+class WithCallableTagX(TypedDict):
+    tag: Literal[CallableTag.X]
+    only_x: int
+
+class WithCallableTagY(TypedDict):
+    tag: Literal[CallableTag.Y]
+
+def _(u: WithCallableTagX | WithCallableTagY):
+    if u["tag"] == CallableTag.X:
+        reveal_type(u)  # revealed: WithCallableTagX | WithCallableTagY
+        u["only_x"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: WithCallableTagX | WithCallableTagY
 ```
 
 We can descend into intersections to discover `TypedDict` types that need narrowing:
