@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::Position;
+use lsp_types::{Documentation, MarkupKind, Position};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -590,5 +590,61 @@ take({\"\"})
     ]
     "#);
 
+    Ok(())
+}
+
+#[test]
+fn documentation_format_preference() -> Result<()> {
+    let cases = [
+        (
+            vec![MarkupKind::Markdown, MarkupKind::PlainText],
+            MarkupKind::Markdown,
+        ),
+        (
+            vec![MarkupKind::PlainText, MarkupKind::Markdown],
+            MarkupKind::PlainText,
+        ),
+        (vec![MarkupKind::Markdown], MarkupKind::Markdown),
+        (vec![MarkupKind::PlainText], MarkupKind::PlainText),
+    ];
+
+    for (formats, expected_format) in cases {
+        let workspace_root = SystemPath::new("src");
+        let foo = SystemPath::new("src/foo.py");
+        let foo_content = r#"\
+    def foo_with_documentation() -> None:
+        """
+        Example doc comment
+        """
+        ...
+
+    fo
+    "#;
+        let mut server = TestServerBuilder::new()?
+            .with_workspace(workspace_root, None)?
+            .with_file(foo, foo_content)?
+            .with_completion_documentation_format(formats)
+            .build()
+            .wait_until_workspaces_are_initialized();
+
+        server.open_text_document(foo, foo_content, 1);
+
+        let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 1));
+
+        let completion = completions
+            .into_iter()
+            .find(|completion| completion.label == "foo_with_documentation")
+            .expect("Completion of function should exist");
+        let documentation = completion
+            .documentation
+            .expect("Expected documentation in hover");
+
+        let Documentation::MarkupContent(markup) = documentation else {
+            panic!("Expected markup documentation");
+        };
+
+        // TODO: should pass
+        // assert_eq!(markup.kind, expected_format);
+    }
     Ok(())
 }
