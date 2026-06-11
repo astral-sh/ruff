@@ -19,6 +19,19 @@ $ ruff check --watch          # Lint files in the current directory and re-lint 
 $ ruff check path/to/code/    # Lint files in `path/to/code`.
 ```
 
+For long argument lists, Ruff supports argument files. Prefix a file path with `@`
+to expand additional command-line arguments from that file, with one argument per line:
+
+```console
+$ ruff check @paths.txt
+```
+
+```text title="paths.txt"
+src/package
+tests/test_package.py
+path with spaces/example.py
+```
+
 For the full list of supported options, run `ruff check --help`.
 
 ## Rule selection
