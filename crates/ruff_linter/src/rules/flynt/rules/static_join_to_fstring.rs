@@ -2,7 +2,9 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
+use ruff_python_ast::{
+    self as ast, Arguments, Expr, StringFlags, str::Quote, str_prefix::StringLiteralPrefix,
+};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -74,14 +76,15 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     // If all elements are string constants, join them into a single string.
     if joinees.iter().all(Expr::is_string_literal_expr) {
         let mut flags: Option<ast::StringLiteralFlags> = None;
+        let mut any_raw = false;
+
         let content = joinees
             .iter()
             .filter_map(|expr| {
                 if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = expr {
-                    if flags.is_none() {
-                        // Take the flags from the first Expr
-                        flags = Some(value.first_literal_flags());
-                    }
+                    let curr_flags = value.first_literal_flags();
+                    flags.get_or_insert(curr_flags);
+                    any_raw |= curr_flags.prefix().is_raw();
                     Some(value.to_str())
                 } else {
                     None
@@ -90,6 +93,30 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
             .join(joiner);
 
         let mut flags = flags?;
+
+        // If any input was raw but the content cannot be safely represented as a raw string,
+        // use non-raw representation. This handles cases where raw strings would create invalid
+        // syntax or behavior changes.
+        if any_raw && !content.is_empty() {
+            let quote_str = flags.quote_str();
+            let needs_non_raw = content.contains(['\r', '\0']) || content.contains(quote_str) || {
+                // A raw string cannot end with an odd number of backslashes if it's immediately
+                // followed by the quote delimiter, as that would be invalid syntax.
+                let mut trailing_backslashes = 0;
+                for char in content.chars().rev() {
+                    if char == '\\' {
+                        trailing_backslashes += 1;
+                    } else {
+                        break;
+                    }
+                }
+                trailing_backslashes % 2 != 0
+            };
+
+            if needs_non_raw {
+                flags = flags.with_prefix(StringLiteralPrefix::Empty);
+            }
+        }
 
         // If the result is a raw string and contains a newline, use triple quotes.
         if flags.prefix().is_raw() && content.contains(['\n', '\r']) {
