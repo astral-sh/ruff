@@ -8,12 +8,14 @@
 //! recursive types through their public operations, but relation-specific cycle
 //! guards live with the relation checker.
 //!
-//! Type operations on a [`RecursiveType`] should follow the sequence
+//! Structural type operations on a [`RecursiveType`] should follow the sequence
 //! `unfold -> operation -> fold`: first expose one layer of structure, then run
 //! the operation, then fold any re-created body fragments back under the same
 //! binder. Keeping the fold at the operation boundary prevents inferred types
 //! from growing by repeated unfoldings while still allowing operations to inspect
-//! the recursive body.
+//! the recursive body. Transformations that operate under the μ-binder, such as
+//! type mappings, instead transform the body while keeping the binder marker
+//! bound.
 
 use crate::Db;
 use crate::types::visitor;

@@ -3234,7 +3234,10 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
-            Type::Recursive(rec) => rec.unfold(db).instance_member(db, name).map_type(|ty| rec.fold(db, ty)),
+            Type::Recursive(rec) => rec
+                .unfold(db)
+                .instance_member(db, name)
+                .map_type(|ty| rec.fold(db, ty)),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -5912,9 +5915,11 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
-                Some(rec.unfold(db).generator_types(db)?.map_types(|ty| rec.fold(db, ty)))
-            }
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(
+                rec.unfold(db)
+                    .generator_types(db)?
+                    .map_types(|ty| rec.fold(db, ty)),
+            ),
             ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
                 Some(GeneratorTypes {
                     yield_ty: Some(ty),
@@ -6189,7 +6194,9 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
             Type::Recursive(rec) if rec.is_non_contractive(db) => Ok(*self),
-            Type::Recursive(rec) => rec.try_map(db, |unfolded| unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)),
+            Type::Recursive(rec) => rec.try_map(db, |unfolded| {
+                unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
+            }),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -6780,25 +6787,22 @@ impl<'db> Type<'db> {
                 } if divergent.id() == binder_id.into_id() => *replacement,
                 _ => self,
             },
-            Type::Recursive(recursive) => match type_mapping {
-                TypeMapping::Materialize(_) => {
-                    visitor.visit(db, self, type_mapping, || {
-                        let body = recursive.body(db);
-                        let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                        if mapped == body {
-                            self
-                        } else {
-                            Type::recursive(
-                                db,
-                                recursive.binder_id(db),
-                                recursive.origin(db),
-                                mapped,
-                            )
-                        }
-                    })
-                }
-                _ => self,
-            },
+            Type::Recursive(recursive) if let TypeMapping::ReplaceDivergent { binder_id, .. } = type_mapping && recursive.binder(db) == *binder_id => {
+                self
+            }
+            Type::Recursive(recursive) => {
+                visitor.visit(db, self, type_mapping, || {
+                    // Type mappings are substitutions under the μ-binder. Keep the binder
+                    // marker bound instead of unfolding the recursive structure.
+                    let body = recursive.body(db);
+                    let mapped = body.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                    if mapped == body {
+                        self
+                    } else {
+                        Type::recursive(db, recursive.binder_id(db), recursive.origin(db), mapped)
+                    }
+                })
+            }
 
             Type::Never
             | Type::AlwaysTruthy

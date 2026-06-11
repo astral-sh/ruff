@@ -3431,6 +3431,25 @@ for item in S().x:
     reveal_type(item)  # revealed: list[Divergent]
 ```
 
+Generic class specializations also apply inside recursive implicit attribute types:
+
+```py
+from typing import Generic, TypeVar
+
+GenericT = TypeVar("GenericT")
+
+class GenericSelfRecursive(Generic[GenericT]):
+    def __init__(self, value: GenericT):
+        self.x = [value]
+
+    def f(self):
+        self.x = [self.x]
+
+def _(c: GenericSelfRecursive[int]):
+    reveal_type(c.x)  # revealed: list[int] | list[Divergent]
+    reveal_type(c.x[0])  # revealed: int | list[int] | list[Divergent]
+```
+
 ## Attributes of standard library modules that aren't yet defined
 
 For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
