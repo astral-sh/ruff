@@ -1,4 +1,9 @@
 mod postprocess;
+mod structured;
+
+use std::borrow::Cow;
+
+use super::formats::Formats;
 
 /// Represents a fenced code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,5 +45,15 @@ impl<'a> MarkdownFence<'a> {
 }
 
 pub(super) fn render(raw: &str) -> String {
-    postprocess::render(raw)
+    let source = if may_contain_unindented_rest_field(raw) {
+        let formats = Formats::parse(raw);
+        structured::render(raw, &formats)
+    } else {
+        Cow::Borrowed(raw)
+    };
+    postprocess::render(source.as_ref())
+}
+
+fn may_contain_unindented_rest_field(raw: &str) -> bool {
+    raw.starts_with(':') || raw.contains("\n:")
 }

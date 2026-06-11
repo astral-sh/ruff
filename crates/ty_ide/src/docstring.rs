@@ -1613,12 +1613,14 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        :param str param1: The first parameter description<HB>
-        :param int param2: The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        :param param3: A parameter without type annotation<HB>
-        :returns: The return value description<HB>
-        :rtype: str
+        `param3`: A parameter without type annotation<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -1682,8 +1684,9 @@ mod tests {
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
         <HB>
-        :param int param2: reST-style parameter<HB>
-        :param param3: Another reST-style parameter<HB>
+        ## Parameters<HB>
+        `param2` (`int`): reST-style parameter<HB>
+        `param3`: Another reST-style parameter<HB>
         <HB>
         Parameters<HB>
         ----------<HB>
