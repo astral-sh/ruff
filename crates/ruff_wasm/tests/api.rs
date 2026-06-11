@@ -25,6 +25,21 @@ macro_rules! check {
     }};
 }
 
+fn primary_annotation(
+    start_location: Location,
+    end_location: Location,
+) -> ExpandedDiagnosticAnnotation {
+    ExpandedDiagnosticAnnotation {
+        primary: true,
+        message: None,
+        location: Some(ExpandedDiagnosticLocation {
+            path: "<filename>".to_string(),
+            start_location,
+            end_location,
+        }),
+    }
+}
+
 #[wasm_bindgen_test]
 fn empty_config() {
     ruff_wasm::before_main();
@@ -35,7 +50,16 @@ fn empty_config() {
         [ExpandedMessage {
             code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
-            secondary_annotations: vec![],
+            annotations: vec![primary_annotation(
+                Location {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(3),
+                },
+                Location {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(9),
+                },
+            )],
             sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
@@ -60,7 +84,16 @@ fn syntax_error() {
         [ExpandedMessage {
             code: "invalid-syntax".to_string(),
             message: "Expected an expression".to_string(),
-            secondary_annotations: vec![],
+            annotations: vec![primary_annotation(
+                Location {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(3),
+                },
+                Location {
+                    row: OneIndexed::from_zero_indexed(1),
+                    column: OneIndexed::from_zero_indexed(0),
+                },
+            )],
             sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
@@ -86,7 +119,16 @@ fn unsupported_syntax_error() {
             code: "invalid-syntax".to_string(),
             message: "Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"
                 .to_string(),
-            secondary_annotations: vec![],
+            annotations: vec![primary_annotation(
+                Location {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(0),
+                },
+                Location {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(5),
+                },
+            )],
             sub_diagnostics: vec![],
             start_location: Location {
                 row: OneIndexed::from_zero_indexed(0),
@@ -124,7 +166,7 @@ fn sub_diagnostics() {
 }
 
 #[wasm_bindgen_test]
-fn secondary_annotations_include_messages_and_locations() {
+fn annotations_preserve_order() {
     ruff_wasm::before_main();
 
     let config = js_sys::JSON::parse(r#"{"select": ["B033"]}"#).unwrap();
@@ -135,22 +177,34 @@ fn secondary_annotations_include_messages_and_locations() {
     let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
 
     assert_eq!(
-        result[0].secondary_annotations,
-        [ExpandedDiagnosticAnnotation {
-            primary: false,
-            message: Some("Previous occurrence here".to_string()),
-            location: Some(ExpandedDiagnosticLocation {
-                path: "<filename>".to_string(),
-                start_location: Location {
+        result[0].annotations,
+        [
+            primary_annotation(
+                Location {
                     row: OneIndexed::from_zero_indexed(0),
-                    column: OneIndexed::from_zero_indexed(5),
+                    column: OneIndexed::from_zero_indexed(8),
                 },
-                end_location: Location {
+                Location {
                     row: OneIndexed::from_zero_indexed(0),
-                    column: OneIndexed::from_zero_indexed(6),
+                    column: OneIndexed::from_zero_indexed(9),
                 },
-            }),
-        }]
+            ),
+            ExpandedDiagnosticAnnotation {
+                primary: false,
+                message: Some("Previous occurrence here".to_string()),
+                location: Some(ExpandedDiagnosticLocation {
+                    path: "<filename>".to_string(),
+                    start_location: Location {
+                        row: OneIndexed::from_zero_indexed(0),
+                        column: OneIndexed::from_zero_indexed(5),
+                    },
+                    end_location: Location {
+                        row: OneIndexed::from_zero_indexed(0),
+                        column: OneIndexed::from_zero_indexed(6),
+                    },
+                }),
+            }
+        ]
     );
 }
 

@@ -8,6 +8,7 @@ import classNames from "classnames";
 import {
   DiagnosticLocationItem,
   isDiagnosticAnnotationMessage,
+  secondaryDiagnosticAnnotations,
   Theme,
 } from "shared";
 import { useMemo } from "react";
@@ -83,7 +84,9 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
-        const secondaryAnnotations = diagnostic.secondaryAnnotations.filter(
+        const secondaryAnnotations = secondaryDiagnosticAnnotations(
+          diagnostic.annotations,
+        ).filter(
           (
             annotation,
           ): annotation is DiagnosticAnnotation & { message: string } =>
@@ -143,7 +146,7 @@ function RuffDiagnosticLocationItem({
 }: {
   prefix?: string;
   message: string;
-  location: DiagnosticLocation | null;
+  location: DiagnosticLocation | null | undefined;
   onGoTo(line: number, column: number): void;
 }) {
   const start = location?.start_location;

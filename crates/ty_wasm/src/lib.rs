@@ -899,10 +899,11 @@ impl Diagnostic {
         JsString::from(self.inner.concise_message().to_string())
     }
 
-    #[wasm_bindgen(js_name = "secondaryAnnotations")]
-    pub fn secondary_annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+    #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
         self.inner
-            .secondary_annotations()
+            .annotations()
+            .iter()
             .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
             .collect()
     }

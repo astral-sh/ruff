@@ -186,7 +186,7 @@ class VeryEggyOmelette(
 }
 
 #[wasm_bindgen_test]
-fn primary_diagnostic_secondary_annotations_include_messages_and_locations() {
+fn primary_diagnostic_annotations_preserve_order() {
     ty_wasm::before_main();
 
     let mut workspace = Workspace::new(
@@ -205,10 +205,16 @@ fn primary_diagnostic_secondary_annotations_include_messages_and_locations() {
         .iter()
         .find(|diagnostic| diagnostic.id() == "invalid-assignment")
         .expect("Expected an invalid-assignment diagnostic");
-    let annotations = diagnostic.secondary_annotations(&workspace);
+    let annotations = diagnostic.annotations(&workspace);
 
-    assert_eq!(annotations.len(), 1);
-    let annotation = &annotations[0];
+    assert_eq!(
+        annotations
+            .iter()
+            .map(|annotation| annotation.primary)
+            .collect::<Vec<_>>(),
+        [true, false]
+    );
+    let annotation = &annotations[1];
     assert!(!annotation.primary);
     assert_eq!(annotation.message.as_deref(), Some("Declared type"));
 

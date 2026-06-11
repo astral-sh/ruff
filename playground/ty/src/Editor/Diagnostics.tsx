@@ -11,6 +11,7 @@ import classNames from "classnames";
 import {
   DiagnosticLocationItem,
   isDiagnosticAnnotationMessage,
+  secondaryDiagnosticAnnotations,
   Theme,
 } from "shared";
 import { useMemo } from "react";
@@ -99,7 +100,9 @@ function Items({
             : { path: currentFilePath, range: position };
         // Match ty_server's LSP rendering: omit message-less secondary annotations.
         // Unlike subdiagnostics, these have no parent message to use as a fallback.
-        const secondaryAnnotations = diagnostic.secondaryAnnotations.filter(
+        const secondaryAnnotations = secondaryDiagnosticAnnotations(
+          diagnostic.annotations,
+        ).filter(
           (
             annotation,
           ): annotation is DiagnosticAnnotation & { message: string } =>
@@ -165,7 +168,7 @@ function Items({
 export interface Diagnostic {
   id: string;
   message: string;
-  secondaryAnnotations: DiagnosticAnnotation[];
+  annotations: DiagnosticAnnotation[];
   subDiagnostics: SubDiagnostic[];
   severity: Severity;
   range: Range | null;

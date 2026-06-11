@@ -47,3 +47,20 @@ export function isDiagnosticAnnotationMessage(
 ): message is string {
   return message != null && message.length > 0;
 }
+
+export function secondaryDiagnosticAnnotations<T extends { primary: boolean }>(
+  annotations: readonly T[],
+): T[] {
+  let seenPrimary = false;
+
+  return annotations.filter((annotation) => {
+    if (seenPrimary) {
+      return true;
+    }
+    if (annotation.primary) {
+      seenPrimary = true;
+      return false;
+    }
+    return true;
+  });
+}

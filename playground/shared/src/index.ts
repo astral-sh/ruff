@@ -10,6 +10,7 @@ export { downloadZip } from "./downloadZip";
 export {
   DiagnosticLocationItem,
   isDiagnosticAnnotationMessage,
+  secondaryDiagnosticAnnotations,
 } from "./DiagnosticLocationItem";
 export {
   default as SideBar,

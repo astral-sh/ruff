@@ -32,7 +32,7 @@ const TYPES: &'static str = r#"
 export interface Diagnostic {
     code: string | null;
     message: string;
-    secondaryAnnotations: DiagnosticAnnotation[];
+    annotations: DiagnosticAnnotation[];
     subDiagnostics: SubDiagnostic[];
     start_location: {
         row: number;
@@ -60,8 +60,8 @@ export interface Diagnostic {
 
 export interface DiagnosticAnnotation {
     primary: boolean;
-    message: string | null;
-    location: DiagnosticLocation | null;
+    message: string | undefined;
+    location: DiagnosticLocation | undefined;
 }
 
 export interface SubDiagnostic {
@@ -95,8 +95,7 @@ export interface DiagnosticLocation {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
-    #[serde(rename = "secondaryAnnotations")]
-    pub secondary_annotations: Vec<ExpandedDiagnosticAnnotation>,
+    pub annotations: Vec<ExpandedDiagnosticAnnotation>,
     #[serde(rename = "subDiagnostics")]
     pub sub_diagnostics: Vec<ExpandedSubDiagnostic>,
     pub start_location: Location,
@@ -375,8 +374,9 @@ impl Workspace {
             .into_iter()
             .map(|msg| {
                 let range = msg.range().unwrap_or_default();
-                let secondary_annotations = msg
-                    .secondary_annotations()
+                let annotations = msg
+                    .annotations()
+                    .iter()
                     .map(|annotation| ExpandedDiagnosticAnnotation {
                         primary: annotation.is_primary(),
                         message: annotation.get_message().map(ToOwned::to_owned),
@@ -405,7 +405,7 @@ impl Workspace {
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
                     message: msg.concise_message().to_string(),
-                    secondary_annotations,
+                    annotations,
                     sub_diagnostics,
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
