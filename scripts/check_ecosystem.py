@@ -543,7 +543,8 @@ if __name__ == "__main__":
     )
     # https://stackoverflow.com/a/58840987/3549270
     for signal in [SIGINT, SIGTERM]:
-        loop.add_signal_handler(signal, main_task.cancel)
+        # TODO: Remove once starred variadic annotations are expanded for callable matching.
+        loop.add_signal_handler(signal, main_task.cancel)  # ty: ignore[invalid-argument-type]
     try:
         loop.run_until_complete(main_task)
     finally:
