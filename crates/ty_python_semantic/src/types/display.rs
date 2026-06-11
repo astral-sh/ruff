@@ -33,8 +33,9 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType, Type, TypeAliasType,
-    TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    RecursiveTypeNormalization, SpecialFormType, StringLiteralType, SubclassOfInner,
+    SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
+    WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -126,6 +127,9 @@ pub struct DisplaySettings<'db> {
     /// Function types that are currently being displayed.
     /// Used to prevent infinite recursion when displaying self-referential function types.
     pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
+    /// Recursive type binders that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying recursive bodies.
+    visited_recursive_type_binders: Rc<FxHashSet<salsa::Id>>,
     /// Whether to hide the return type of the outermost signature.
     /// Return types of nested callable types inside parameters are still shown.
     pub hide_return_type: bool,
@@ -204,6 +208,16 @@ impl<'db> DisplaySettings<'db> {
             )
         } else {
             self.clone()
+        }
+    }
+
+    #[must_use]
+    fn with_recursive_type_binder(&self, binder_id: salsa::Id) -> Self {
+        let mut visited_recursive_type_binders = (*self.visited_recursive_type_binders).clone();
+        visited_recursive_type_binders.insert(binder_id);
+        Self {
+            visited_recursive_type_binders: Rc::new(visited_recursive_type_binders),
+            ..self.clone()
         }
     }
 
@@ -995,10 +1009,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             // `μα. int | tuple[α, ...] | None` shows as
             // `int | tuple[OptNestedInt, ...] | None`. If no explicit origin is known
             // (implicit recursion from inference cycles), fall back to the body as-is.
-            Type::Recursive(r) => r
-                .body_with_origin_marker(self.db)
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::Recursive(r) => {
+                let binder_id = r.binder_id(self.db);
+                let marker = Type::divergent(binder_id);
+                if self
+                    .settings
+                    .visited_recursive_type_binders
+                    .contains(&binder_id)
+                {
+                    return f.with_type(marker).write_str("Divergent");
+                }
+                let body = r
+                    .body_with_origin_marker(self.db)
+                    .recursive_type_normalized_impl(
+                        self.db,
+                        RecursiveTypeNormalization::new(marker),
+                    )
+                    .unwrap_or(marker);
+                body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))
+                    .fmt_detailed(f)
+            }
             Type::Never => f.with_type(self.ty).write_str("Never"),
             Type::NominalInstance(instance) => {
                 let class = instance.class(self.db);

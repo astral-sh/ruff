@@ -7045,18 +7045,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
-                let expression_ty = statement_use_types.expression_type(use_expression);
-                let divergent_ty = match expression_ty {
-                    Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
-                    Type::Recursive(rec) => Some(Type::divergent(rec.binder_id(self.db()))),
-                    _ => None,
-                };
-                if let Some(divergent_ty) = divergent_ty {
+                if let Type::Divergent(divergent) =
+                    statement_use_types.expression_type(use_expression)
+                {
                     // Infer `collection[Divergent]` for the initial cycle result.
                     let divergent_instance = collection_alias
                         .origin(self.db())
                         .apply_specialization(self.db(), |generic_context| {
-                            generic_context.repeat_specialization(self.db(), divergent_ty)
+                            generic_context
+                                .repeat_specialization(self.db(), Type::Divergent(divergent))
                         });
 
                     builder
@@ -10747,6 +10744,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             types: DefinitionTypes::from_parts(bindings.into_vec(), declarations.into_vec()),
             extra,
         }
+    }
+
+    pub(super) fn finish_type_expression(mut self, expression: &'ast ast::Expr) -> Type<'db> {
+        let ty =
+            self.infer_type_expression_with_state(expression, DeferredExpressionState::Deferred);
+        let _ = self.context.finish();
+        ty
     }
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {

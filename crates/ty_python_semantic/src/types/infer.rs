@@ -260,6 +260,28 @@ pub(crate) fn infer_deferred_types<'db>(
         .finish_definition()
 }
 
+/// Infer a single type expression that belongs to a definition.
+///
+/// This is used when a lazy type-parameter attribute needs the value of one
+/// sub-expression without forcing all deferred expressions in the same definition.
+pub(crate) fn infer_definition_type_expression<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    if scope == definition.scope(db) {
+        TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
+            .finish_type_expression(expression)
+    } else {
+        infer_complete_scope_types(db, scope).expression_type(expression)
+    }
+}
+
 /// Infer all types for a [`ScopeId`], including all definitions and expressions in that scope.
 /// Use when checking a scope, or needing to provide a type for an arbitrary expression in the
 /// scope.

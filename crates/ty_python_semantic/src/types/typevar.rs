@@ -13,6 +13,7 @@ use crate::{
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, binding_type, definition_expression_type,
+        infer::infer_definition_type_expression,
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -448,7 +449,7 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("bound")?.value;
-                definition_expression_type(db, definition, expr)
+                infer_definition_type_expression(db, definition, expr)
             }
             _ => return None,
         };
@@ -582,22 +583,17 @@ impl<'db> TypeVarInstance<'db> {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                definition_expression_type(db, definition, typevar_node.default.as_ref()?)
+                infer_definition_type_expression(db, definition, typevar_node.default.as_ref()?)
             }
             // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
-                let func_ty = definition_expression_type(db, definition, &call_expr.func);
-                let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
-                let default_type = definition_expression_type(db, definition, expr);
-                if matches!(
-                    known_class,
-                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
-                ) {
+                if self.is_paramspec(db) {
+                    let default_type = definition_expression_type(db, definition, expr);
                     convert_type_to_paramspec_value(db, default_type)
                 } else {
-                    default_type
+                    infer_definition_type_expression(db, definition, expr)
                 }
             }
             // PEP 695 ParamSpec
@@ -1291,8 +1287,8 @@ fn lazy_bound_cycle_recover<'db>(
     current: Option<Type<'db>>,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    // Normalize the bounds/constraints to ensure cycle convergence.
     match (previous, current) {
+        (_, Some(current)) if current.contains_recursive_type(db) => *previous,
         (Some(prev), Some(current)) => Some(current.cycle_normalized(db, Some(*prev), cycle)),
         (None, Some(current)) => Some(current.cycle_normalized(db, None, cycle)),
         (_, None) => None,

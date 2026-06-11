@@ -24,7 +24,7 @@ use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    TypeMapping, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -537,13 +537,33 @@ impl<'db> Type<'db> {
             // so treat it as a gradual leaf and return the marker itself (like `Divergent` above).
             (Type::Recursive(rec), _) if rec.is_non_contractive(db) => Some(Ok(value_ty)),
 
-            // Subscripting an opaque recursive type means subscripting one-step
-            // unfold of its body. The `Divergent` α-markers in the body are
-            // substituted with the recursive type itself so element results
-            // preserve the recursive structure.
-            (Type::Recursive(rec), _) => Some(
-                rec.try_map(db, |unfolded| unfolded.subscript(db, slice_ty, expr_context))
-            ),
+            // Subscript the body with α as a gradual leaf, then rebind α in the
+            // result. A top-level α branch would otherwise recurse into the same
+            // subscript operation indefinitely.
+            (Type::Recursive(rec), _) => {
+                let rebind = |ty: Type<'db>| {
+                    let replacement = rec.origin(db).source_type().unwrap_or(Type::Recursive(rec));
+                    let type_mapping = TypeMapping::ReplaceDivergent {
+                        binder_id: rec.binder(db),
+                        replacement,
+                    };
+                    rec.fold(
+                        db,
+                        ty.apply_type_mapping(db, &type_mapping, TypeContext::default()),
+                    )
+                };
+                Some(match rec.body(db).subscript(db, slice_ty, expr_context) {
+                    Ok(ty) => Ok(rebind(ty)),
+                    Err(error) => {
+                        let result_ty = if error.result_type().is_unknown() {
+                            value_ty
+                        } else {
+                            rebind(error.result_type())
+                        };
+                        Err(SubscriptError::with_errors(result_ty, error.into_errors()))
+                    }
+                })
+            }
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))

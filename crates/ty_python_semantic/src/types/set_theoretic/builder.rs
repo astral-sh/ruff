@@ -1126,7 +1126,13 @@ impl<'db> IntersectionBuilder<'db> {
                 self.add_positive_impl(value_type, seen_aliases)
             }
             Type::Recursive(rec) => {
-                if seen_aliases.contains(&ty) {
+                if seen_aliases.iter().any(|seen| {
+                    matches!(
+                        seen,
+                        Type::Recursive(seen_rec)
+                            if seen_rec.binder_id(self.db) == rec.binder_id(self.db)
+                    )
+                }) {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
@@ -1202,7 +1208,13 @@ impl<'db> IntersectionBuilder<'db> {
                 self.add_negative_impl(value_type, seen_aliases)
             }
             Type::Recursive(rec) => {
-                if seen_aliases.contains(&ty) {
+                if seen_aliases.iter().any(|seen| {
+                    matches!(
+                        seen,
+                        Type::Recursive(seen_rec)
+                            if seen_rec.binder_id(self.db) == rec.binder_id(self.db)
+                    )
+                }) {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }

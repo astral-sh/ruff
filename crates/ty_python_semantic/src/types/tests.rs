@@ -266,7 +266,7 @@ fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() 
 }
 
 #[test]
-fn top_level_union_cycle_normalization_drops_other_cycle_markers() {
+fn top_level_union_cycle_normalization_preserves_other_cycle_markers() {
     let db = setup_db();
     let marker = Type::divergent(Id::from_bits(1));
     let other_non_contractive =
@@ -277,7 +277,7 @@ fn top_level_union_cycle_normalization_drops_other_cycle_markers() {
     let normalized =
         union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker));
 
-    assert_eq!(normalized, Some(int));
+    assert_eq!(normalized, Some(Type::Union(union)));
 }
 
 #[test]
