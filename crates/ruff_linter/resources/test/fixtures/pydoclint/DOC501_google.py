@@ -1,7 +1,5 @@
 import something
-import urllib.error
 from somewhere import AnotherError
-from urllib import error as url_error
 
 
 class FasterThanLightError(Exception):
@@ -248,6 +246,10 @@ def foo():
         raise TypeError  # no DOC501 here because we already emitted a diagnostic for the earlier `raise TypeError`
     raise ValueError  # DOC501
     return 42
+
+
+import urllib.error
+from urllib import error as url_error
 
 
 # OK - exception raised via classmethod, documented in Raises section

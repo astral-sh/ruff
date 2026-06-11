@@ -889,6 +889,18 @@ impl Ranged for ExceptionEntry<'_> {
     }
 }
 
+impl ExceptionEntry<'_> {
+    fn matches_docstring_exception(&self, exception: &QualifiedName) -> bool {
+        self.qualified_name
+            .segments()
+            .ends_with(exception.segments())
+            || self
+                .extra_candidate
+                .as_ref()
+                .is_some_and(|candidate| candidate.segments().ends_with(exception.segments()))
+    }
+}
+
 /// A summary of documentable statements from the function body
 #[derive(Debug)]
 struct BodyEntries<'a> {
@@ -965,10 +977,6 @@ impl<'a> BodyVisitor<'a> {
     }
 }
 
-/// For chained method calls like `f(...).g(...).h(...)`, walk down to the
-/// inner-most `Call`. This lets the standard `map_callable` + `resolve_qualified_name`
-/// pipeline handle expressions like `Error.create(...).with_traceback(tb)` by
-/// reducing them to a resolvable form before resolution.
 /// Walk down an `Attribute` chain to the leftmost `Name`, if any.
 fn head_name(expr: &Expr) -> Option<&ast::ExprName> {
     let mut current = expr;
@@ -981,6 +989,10 @@ fn head_name(expr: &Expr) -> Option<&ast::ExprName> {
     }
 }
 
+/// For chained method calls like `f(...).g(...).h(...)`, walk down to the
+/// inner-most `Call`. This lets the standard `map_callable` + `resolve_qualified_name`
+/// pipeline handle expressions like `Error.create(...).with_traceback(tb)` by
+/// reducing them to a resolvable form before resolution.
 fn peel_chained_method_calls(expr: &Expr) -> &Expr {
     let mut current = expr;
     while let Expr::Call(ast::ExprCall { func, .. }) = current {
@@ -1424,18 +1436,10 @@ pub(crate) fn check_docstring(
             }
 
             if !docstring_sections.raises.as_ref().is_some_and(|section| {
-                section.raised_exceptions.iter().any(|exception| {
-                    body_raise
-                        .qualified_name
-                        .segments()
-                        .ends_with(exception.segments())
-                        || body_raise
-                            .extra_candidate
-                            .as_ref()
-                            .is_some_and(|candidate| {
-                                candidate.segments().ends_with(exception.segments())
-                            })
-                })
+                section
+                    .raised_exceptions
+                    .iter()
+                    .any(|exception| body_raise.matches_docstring_exception(exception))
             }) {
                 checker.report_diagnostic(
                     DocstringMissingException {
@@ -1494,12 +1498,11 @@ pub(crate) fn check_docstring(
             if let Some(docstring_raises) = docstring_sections.raises {
                 let mut extraneous_exceptions = Vec::new();
                 for docstring_raise in &docstring_raises.raised_exceptions {
-                    if !body_entries.raised_exceptions.iter().any(|exception| {
-                        exception
-                            .qualified_name
-                            .segments()
-                            .ends_with(docstring_raise.segments())
-                    }) {
+                    if !body_entries
+                        .raised_exceptions
+                        .iter()
+                        .any(|exception| exception.matches_docstring_exception(docstring_raise))
+                    {
                         extraneous_exceptions.push(docstring_raise.to_string());
                     }
                 }
