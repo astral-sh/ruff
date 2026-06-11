@@ -643,8 +643,7 @@ fn documentation_format_preference() -> Result<()> {
             panic!("Expected markup documentation");
         };
 
-        // TODO: should pass
-        // assert_eq!(markup.kind, expected_format);
+        assert_eq!(markup.kind, expected_format);
     }
     Ok(())
 }

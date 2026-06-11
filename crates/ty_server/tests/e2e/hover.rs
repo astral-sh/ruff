@@ -42,8 +42,7 @@ fn hover_content_format_preference() -> Result<()> {
             panic!("Expected markup content");
         };
 
-        // TODO: should pass
-        // assert_eq!(markup.kind, expected_format);
+        assert_eq!(markup.kind, expected_format);
     }
 
     Ok(())
