@@ -1361,6 +1361,22 @@ impl TestServerBuilder {
         self
     }
 
+    /// Set the completion documentation format preference for the client
+    pub(crate) fn with_completion_documentation_format(
+        mut self,
+        formats: Vec<lsp_types::MarkupKind>,
+    ) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .completion
+            .get_or_insert_default()
+            .completion_item
+            .get_or_insert_default()
+            .documentation_format = Some(formats);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
