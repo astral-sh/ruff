@@ -48,14 +48,6 @@ fn is_empty_subscript_slice(slice: &ast::Expr) -> bool {
     )
 }
 
-fn contains_recursive_type_or_alias<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    any_over_type(db, ty, false, |inner| match inner {
-        Type::Recursive(_) => true,
-        Type::TypeAlias(alias) => alias.value_type(db).contains_recursive_type(db),
-        _ => false,
-    })
-}
-
 /// Given a string literal or a union of string literals, return an iterator over the contained
 /// strings, or `None` if the type is neither.
 fn string_literal_values<'db>(
@@ -1172,17 +1164,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         expr_context: ExprContext,
     ) -> Type<'db> {
         let db = self.db();
-
-        if is_empty_subscript_slice(subscript.slice.as_ref())
-            && contains_recursive_type_or_alias(db, value_ty)
-        {
-            return value_ty;
-        }
+        let is_empty_subscript = is_empty_subscript_slice(subscript.slice.as_ref());
 
         // Special typing forms for which subscriptions are context-dependent are parsed here,
         // outside of `Type::subscript`, which is a pure function that doesn't depend on the
         // semantic index or any context-dependent state.
         let subscript_result = match value_ty {
+            Type::Recursive(_) if is_empty_subscript => Ok(value_ty),
+            Type::TypeAlias(alias)
+                if is_empty_subscript && alias.value_type(db).contains_recursive_type(db) =>
+            {
+                Ok(value_ty)
+            }
             Type::SpecialForm(SpecialFormType::Generic) => infer_legacy_generic_subscript(
                 db,
                 self.index,

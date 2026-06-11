@@ -7044,22 +7044,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .index
                 .constraining_collection_uses(collection_def)
                 .collect();
-            let has_concrete_collection_use_constraint =
+            let has_inferable_collection_use_constraint =
                 collection_uses.iter().any(|(statement, _)| {
                     let statement_use_types = infer_statement_types(self.db(), *statement);
-                    self.has_concrete_collection_use_constraint(
-                        statement_use_types.collection_use_constraints(collection_def),
-                    )
+                    statement_use_types
+                        .collection_use_constraints(collection_def)
+                        .is_some_and(|constraints| {
+                            constraints
+                                .iter()
+                                .any(|constraint| !constraint.has_unspecialized_type_var(self.db()))
+                        })
                 });
 
             for (statement, use_expression) in collection_uses {
                 let statement_use_types = infer_statement_types(self.db(), statement);
 
                 let expression_ty = statement_use_types.expression_type(use_expression);
-                let constraints = statement_use_types.collection_use_constraints(collection_def);
                 let divergent_ty = match expression_ty {
                     Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
-                    Type::Recursive(rec) if !has_concrete_collection_use_constraint => {
+                    Type::Recursive(rec) if !has_inferable_collection_use_constraint => {
                         Some(Type::divergent(rec.binder_id(self.db())))
                     }
                     _ => None,
@@ -7078,7 +7081,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::instance(self.db(), divergent_instance),
                         )
                         .ok()?;
-                } else if let Some(constraints) = constraints {
+                } else if let Some(constraints) =
+                    statement_use_types.collection_use_constraints(collection_def)
+                {
                     for constraint in constraints {
                         if constraint.has_unspecialized_type_var(self.db()) {
                             continue;
@@ -7230,20 +7235,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         Type::from(class_type).to_instance(self.db())
-    }
-
-    fn has_concrete_collection_use_constraint(
-        &self,
-        constraints: Option<&FxIndexSet<Type<'db>>>,
-    ) -> bool {
-        constraints.is_some_and(|constraints| {
-            constraints.iter().any(|constraint| {
-                !constraint.has_unspecialized_type_var(self.db())
-                    && !any_over_type(self.db(), *constraint, false, |ty| {
-                        matches!(ty, Type::Divergent(_) | Type::Recursive(_))
-                    })
-            })
-        })
     }
 
     /// Infer the type of the `iter` expression of the first comprehension.
