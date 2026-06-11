@@ -511,9 +511,7 @@ impl PythonImplementation {
         } else if let Some(suffix) = file_name.strip_prefix("pypy") {
             Some((Self::PyPy, suffix))
         } else {
-            file_name
-                .strip_prefix("graalpy")
-                .map(|suffix| (Self::GraalPy, suffix))
+            Some((Self::GraalPy, file_name.strip_prefix("graalpy")?))
         }
     }
 }
@@ -534,12 +532,16 @@ impl PythonInterpreterLayout {
         }
     }
 
+    fn from_path(path: &SystemPath) -> Option<Self> {
+        Self::from_file_name(path.file_name()?)
+    }
+
     fn from_file_name(file_name: &str) -> Option<Self> {
         let file_name = file_name
             .strip_suffix(std::env::consts::EXE_SUFFIX)
             .unwrap_or(file_name);
 
-        let (implementation, version) = PythonImplementation::split_executable_name(file_name)?;
+        let (mut implementation, version) = PythonImplementation::split_executable_name(file_name)?;
         let (version, mut variant) = PythonBuildVariant::split_executable_suffix(version);
         let version = PythonVersion::from_str(version).ok();
 
@@ -552,6 +554,12 @@ impl PythonInterpreterLayout {
 
         if version.is_none() {
             variant = PythonBuildVariant::Unknown;
+
+            // PyPy also uses generic executable names such as `python` and `python3`, so an
+            // unversioned name in the `python` family does not identify the implementation.
+            if implementation.is_cpython() {
+                implementation = PythonImplementation::Unknown;
+            }
         }
 
         Some(Self {
@@ -1786,13 +1794,12 @@ fn sys_prefix_from_executable_path(path: &SystemPath) -> Option<&SystemPath> {
         // depending on whether it's a virtual environment or a system installation.
         // System installations have their executable at `<sys.prefix>/python.exe`,
         // whereas virtual environments have their executable at `<sys.prefix>/Scripts/python.exe`.
-        path.parent().and_then(|parent| {
-            if parent.file_name() == Some("Scripts") {
-                parent.parent()
-            } else {
-                Some(parent)
-            }
-        })
+        let parent = path.parent()?;
+        if parent.file_name() == Some("Scripts") {
+            parent.parent()
+        } else {
+            Some(parent)
+        }
     } else {
         // On Unix, `sys.prefix` is always the grandparent directory of the Python executable,
         // regardless of whether it's a virtual environment or a system installation.
@@ -1875,30 +1882,21 @@ impl PythonEnvironmentPath {
         }
 
         let layout = executable_path.and_then(|executable_path| {
-            let direct_layout = executable_path
-                .file_name()
-                .and_then(PythonInterpreterLayout::from_file_name);
+            let direct_layout = PythonInterpreterLayout::from_path(executable_path);
 
-            if direct_layout.is_some_and(|layout| layout.version.is_some()) {
-                return direct_layout;
+            if let Some(layout) = direct_layout
+                && layout.version.is_some()
+            {
+                return Some(layout);
             }
 
-            let target_layout = (|| {
-                let canonical_executable = system.canonicalize_path(executable_path).ok()?;
-                let layout = canonical_executable
-                    .file_name()
-                    .and_then(PythonInterpreterLayout::from_file_name)?;
-                let canonical_executable_prefix =
-                    sys_prefix_from_executable_path(&canonical_executable)?;
-                let canonical_executable_prefix =
-                    system.canonicalize_path(canonical_executable_prefix).ok()?;
+            if let Ok(canonical_executable) = system.canonicalize_path(executable_path)
+                && let Some(layout) = PythonInterpreterLayout::from_path(&canonical_executable)
+            {
+                return Some(layout);
+            }
 
-                // Metadata from a symlink target can only describe the selected environment when
-                // both executable paths resolve to the same installation prefix.
-                (canonical_executable_prefix == sys_prefix).then_some(layout)
-            })();
-
-            target_layout.or(direct_layout)
+            direct_layout
         });
 
         let sys_prefix = SysPrefixPath {
@@ -3827,7 +3825,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn only_uses_symlink_target_layout_within_same_prefix() {
+    fn uses_symlink_target_layout() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
         let system = OsSystem::new(root);
@@ -3858,24 +3856,38 @@ mod tests {
         let other_bin = other_prefix.join("bin");
         std::fs::create_dir_all(other_bin.as_std_path()).unwrap();
         std::fs::File::create(other_bin.join("python3.14").as_std_path()).unwrap();
+
+        let facade_prefix = root.join("facade");
+        let facade_bin = facade_prefix.join("bin");
+        let python313_site_packages = facade_prefix.join("lib/python3.13/site-packages");
+        let python314_site_packages = facade_prefix.join("lib/python3.14/site-packages");
+        std::fs::create_dir_all(facade_bin.as_std_path()).unwrap();
+        std::fs::create_dir_all(python313_site_packages.as_std_path()).unwrap();
+        std::fs::create_dir_all(python314_site_packages.as_std_path()).unwrap();
         std::os::unix::fs::symlink(
             other_bin.join("python3.14").as_std_path(),
-            bin.join("python-other").as_std_path(),
+            facade_bin.join("python").as_std_path(),
         )
         .unwrap();
 
+        let executable = facade_bin.join("python");
         assert_eq!(
-            PythonEnvironmentPath::new(
-                &bin.join("python-other"),
-                SysPrefixPathOrigin::PythonCliFlag,
-                &system,
-            )
-            .unwrap()
-            .interpreter_layout(),
-            Some(PythonInterpreterLayout::unknown(
-                PythonImplementation::CPython,
-                None
-            ))
+            PythonEnvironmentPath::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system,)
+                .unwrap()
+                .interpreter_layout(),
+            Some(PythonInterpreterLayout {
+                version: Some(PythonVersion::PY314),
+                implementation: PythonImplementation::CPython,
+                variant: PythonBuildVariant::Default,
+            })
+        );
+
+        let environment =
+            PythonEnvironment::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system)
+                .unwrap();
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap().into_vec(),
+            [system.canonicalize_path(&python314_site_packages).unwrap()]
         );
     }
 }
