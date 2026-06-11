@@ -583,6 +583,42 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
             # intersection above.
             reveal_type(subj[1])  # revealed: int | str
 
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+
+def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+        case _:
+            # Failing the first pattern does not tell us which element failed to match.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+def match_tuple_expression_or_pattern(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [*_]:
+            # The second alternative does not constrain either tuple element.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
+    match a, a:
+        case [TupleSubjectA1(), TupleSubjectA()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+
+def match_tuple_expression_subject_rebinding(
+    x: TupleSubjectA | TupleSubjectB,
+    b: TupleSubjectB,
+) -> None:
+    match x, (x := b):
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            # The second subject expression rebinds `x` after the tuple stores its first value.
+            reveal_type(x)  # revealed: TupleSubjectB
+
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
         case int(value):
@@ -971,6 +1007,11 @@ def _(x: A | B | C):
             reveal_type(x)  # revealed: A
         case _:
             reveal_type(x)  # revealed: (B & ~A) | (C & ~A)
+
+def unconstrained_or_alternative(x: A | B, flag: bool) -> None:
+    match x:
+        case A() | _ if flag:
+            reveal_type(x)  # revealed: A | B
 ```
 
 ## Or patterns with guard

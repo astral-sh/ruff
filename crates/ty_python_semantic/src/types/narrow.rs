@@ -1102,9 +1102,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Return the type a subject can have after successfully matching `pattern`.
     ///
-    /// This is used for `as` bindings and nested captures. Unlike ordinary subject narrowing, it
-    /// must retain arms that can match through custom equality and preserve the original identity
-    /// of generic subjects where possible.
+    /// This is used for `as` bindings, nested captures, and tuple-subject projections. Unlike
+    /// ordinary subject narrowing, it must retain arms that can match through custom equality and
+    /// preserve the original identity of generic subjects where possible.
     fn match_pattern_subject_type(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
@@ -1238,7 +1238,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer each sequence capture from subject arms that can satisfy the complete pattern.
+    /// Infer each sequence element type from subject arms that can satisfy the complete pattern.
     ///
     /// Filtering the whole arm before combining element types preserves correlations such as the
     /// first element of `tuple[Literal[1], int] | tuple[Literal[2], str]`.
@@ -2634,20 +2634,53 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         kind: &SequencePatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let constraint = if is_positive {
-            NarrowingConstraint::intersection(self.necessary_sequence_pattern_type(kind))
-        } else {
-            let sequence_type = definite_sequence_pattern_type(self.db, kind);
-            if sequence_type.is_never() {
-                return None;
-            }
-            NarrowingConstraint::intersection(sequence_type.negate(self.db))
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        if let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) {
+            let constraint_ty = if is_positive {
+                self.necessary_sequence_pattern_type(kind)
+            } else {
+                let sequence_type = definite_sequence_pattern_type(self.db, kind);
+                if sequence_type.is_never() {
+                    return None;
+                }
+                sequence_type.negate(self.db)
+            };
+            return Some(NarrowingConstraints::from_iter([(
+                self.expect_place(&subject_place),
+                NarrowingConstraint::intersection(constraint_ty),
+            )]));
+        }
+
+        // A failed sequence pattern does not tell us which element failed. Only project a
+        // successful exact match when every tuple-subject element is a simple name; evaluating
+        // more complex expressions could rebind or mutate an earlier place.
+        let ast::Expr::Tuple(tuple) = subject_node else {
+            return None;
         };
+        if !is_positive
+            || kind.split_around_star().is_some()
+            || tuple.elts.len() != kind.patterns.len()
+            || !tuple.elts.iter().all(ast::Expr::is_name_expr)
+        {
+            return None;
+        }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject);
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let element_types = self.match_sequence_pattern_element_types(kind, subject_ty);
+        let mut constraints = NarrowingConstraints::default();
 
-        Some(NarrowingConstraints::from_iter([(place, constraint)]))
+        for ((element, pattern), element_ty) in
+            tuple.elts.iter().zip(&kind.patterns).zip(element_types)
+        {
+            let element = PlaceExpr::try_from_expr(element)?;
+            let matched_ty = self.match_pattern_subject_type(pattern, element_ty);
+            insert_narrowing_constraint(
+                &mut constraints,
+                self.expect_place(&element),
+                NarrowingConstraint::intersection(matched_ty),
+            );
+        }
+        (!constraints.is_empty()).then_some(constraints)
     }
 
     fn evaluate_match_pattern_value(
@@ -2726,22 +2759,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         predicates: &Vec<PatternPredicateKind<'db>>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        // DeMorgan's law---if the overall `or` is negated, we need to `and` the negated sub-constraints.
-        let merge_constraints = if is_positive {
-            merge_constraints_or
-        } else {
-            merge_constraints_and
+        // An unconstrained positive alternative cancels narrowing; negated alternatives combine.
+        let merge_constraints = |left, right| {
+            if is_positive {
+                Self::merge_optional_constraints_or(left, right)
+            } else {
+                Self::merge_optional_constraints_and(left, right)
+            }
         };
-
         predicates
             .iter()
-            .filter_map(|predicate| {
-                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
-            })
-            .reduce(|mut constraints, constraints_| {
-                merge_constraints(&mut constraints, constraints_);
-                constraints
-            })
+            .map(|predicate| self.evaluate_pattern_predicate_kind(predicate, subject, is_positive))
+            .reduce(merge_constraints)
+            .flatten()
     }
 
     fn evaluate_bool_op(

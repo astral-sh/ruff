@@ -796,6 +796,16 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             places.insert(place);
         }
 
+        // This is a conservative upper bound. Semantic evaluation decides whether the pattern can
+        // actually project constraints onto these names.
+        if let ast::Expr::Tuple(tuple) = subject_node
+            && tuple.elts.iter().all(ast::Expr::is_name_expr)
+        {
+            for element in &tuple.elts {
+                places.extend(self.simple_expr(element));
+            }
+        }
+
         places.extend(self.pattern_aliases_kind(kind));
         places
     }
