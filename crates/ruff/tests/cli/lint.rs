@@ -787,6 +787,32 @@ fn rule_names_in_cli_require_preview() -> Result<()> {
     ----- stderr -----
     ");
 
+    fixture.write_file("test.py", "import os\n")?;
+
+    for args in [
+        ["--extend-select", "unused-import"],
+        ["--ignore", "unused-import"],
+        ["--fixable", "unused-import"],
+        ["--extend-fixable", "unused-import"],
+        ["--unfixable", "unused-import"],
+        ["--config", "lint.extend-safe-fixes=['unused-import']"],
+        ["--config", "lint.extend-unsafe-fixes=['unused-import']"],
+        ["--per-file-ignores", "test.py:unused-import"],
+        ["--extend-per-file-ignores", "test.py:unused-import"],
+    ] {
+        let output = fixture
+            .check_command()
+            .args(["--select", "F401"])
+            .args(args)
+            .arg("test.py")
+            .output()?;
+        assert_eq!(
+            str::from_utf8(&output.stderr)?,
+            "warning: Selection `unused-import` has no effect because preview is not enabled.\n",
+            "arguments: {args:?}"
+        );
+    }
+
     Ok(())
 }
 
