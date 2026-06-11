@@ -60,7 +60,7 @@ use crate::rules::flake8_pytest_style::helpers::is_pytest_fixture;
 /// - [`pytest` documentation: Sharing fixtures across classes, modules, packages or session](https://docs.pytest.org/en/stable/how-to/fixtures.html#scope-sharing-fixtures-across-classes-modules-packages-or-session)
 /// - [`pytest` documentation: Fixtures can request other fixtures](https://docs.pytest.org/en/stable/how-to/fixtures.html#fixtures-can-request-other-fixtures)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.17")]
 pub(crate) struct PytestFixtureAutouse;
 
 impl Violation for PytestFixtureAutouse {
