@@ -1906,6 +1906,27 @@ def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.desc)  # revealed: A & B
 ```
 
+### Descriptor owner binding uses the full class-object intersection
+
+```py
+from typing import TypeVar
+from ty_extensions import Intersection
+
+T = TypeVar("T")
+
+class Descriptor:
+    def __get__(self, instance: object, owner: T, /) -> T:
+        return owner
+
+class A:
+    desc = Descriptor()
+
+class B: ...
+
+def _(a_and_b: Intersection[type[A], type[B]]):
+    reveal_type(a_and_b.desc)  # revealed: type[A] & type[B]
+```
+
 ### Negation types
 
 Make sure that attributes accessible on `object` are also accessible on a negation type like `~P`,
