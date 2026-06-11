@@ -1026,6 +1026,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
             .next()
             .map(|live_binding| BindingWithConstraints {
                 binding: self.all_definitions[live_binding.binding()],
+                binding_order: live_binding.binding(),
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint(),
                     predicates,
@@ -1040,6 +1041,8 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 pub struct BindingWithConstraints<'map, 'db> {
     pub binding: DefinitionState<'db>,
+    /// Stable binding order within the containing scope.
+    pub binding_order: ScopedDefinitionId,
     pub narrowing_constraint: NarrowingEvaluator<'map, 'db>,
     pub reachability_constraint: ScopedReachabilityConstraintId,
 }

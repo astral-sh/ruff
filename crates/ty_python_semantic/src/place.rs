@@ -1484,7 +1484,7 @@ fn place_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             reachability_constraint,
-            narrowing_constraint: _,
+            ..
         }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
         _ => None,
     };
@@ -1515,6 +1515,7 @@ fn place_from_bindings_impl<'db>(
              binding,
              narrowing_constraint,
              reachability_constraint,
+             ..
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding)
