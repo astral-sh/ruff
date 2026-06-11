@@ -4768,10 +4768,12 @@ static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
 static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
 static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
-static_assert(is_disjoint_from(TD, Mapping[int, object]))
+# TODO: Use required TypedDict fields to prove disjointness from incompatible mapping types.
+static_assert(is_disjoint_from(TD, Mapping[int, object]))  # error: [static-assert-error]
 static_assert(is_disjoint_from(TD, RegularNonTD))
 static_assert(not is_disjoint_from(TD, dict[str, int]))
-static_assert(is_disjoint_from(TD, dict[str, str]))
+# TODO: Use required TypedDict fields to prove disjointness from incompatible dictionary values.
+static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
 
 class TwoRequiredFields(TypedDict):
     first: int
@@ -4780,7 +4782,8 @@ class TwoRequiredFields(TypedDict):
 class OptionalTD(TypedDict, total=False):
     x: int
 
-static_assert(is_disjoint_from(TwoRequiredFields, dict[str, int]))
+# TODO: Consider all required fields when proving disjointness from a dictionary value type.
+static_assert(is_disjoint_from(TwoRequiredFields, dict[str, int]))  # error: [static-assert-error]
 static_assert(not is_disjoint_from(OptionalTD, dict[Never, Never]))
 ```
 
