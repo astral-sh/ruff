@@ -2,14 +2,19 @@ use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 
+use pep440_rs::VersionSpecifiers;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
+use ty_project::metadata::pyproject::resolve_requires_python_lower_bound;
+use ty_project::metadata::python_version::SupportedPythonVersion;
+use ty_project::metadata::value::RangedValue;
 use ty_static::EnvVars;
 
 pub(crate) struct UvWorkspace {
     pub(crate) root: SystemPathBuf,
     pub(crate) member: Option<SystemPathBuf>,
     pub(crate) environment: Option<SystemPathBuf>,
+    pub(crate) requires_python: Option<RangedValue<SupportedPythonVersion>>,
 }
 
 pub(crate) enum WorkspaceMetadataSource {
@@ -85,6 +90,18 @@ fn parse_workspace_metadata(cwd: &SystemPath, metadata: &[u8]) -> Option<UvWorks
         return None;
     }
 
+    let requires_python = match resolve_requires_python_lower_bound(&RangedValue::cli(
+        metadata.requires_python,
+    )) {
+        Ok(requires_python) => requires_python,
+        Err(error) => {
+            tracing::debug!(
+                "Ignoring invalid `requires_python` returned by `uv workspace metadata`: {error}"
+            );
+            None
+        }
+    };
+
     let root = existing_directory(metadata.workspace_root, "workspace root")?;
 
     let environment = metadata
@@ -106,6 +123,7 @@ fn parse_workspace_metadata(cwd: &SystemPath, metadata: &[u8]) -> Option<UvWorks
         root,
         member,
         environment,
+        requires_python,
     })
 }
 
@@ -136,6 +154,8 @@ struct WorkspaceMetadata {
     schema: WorkspaceMetadataSchema,
     workspace_root: PathBuf,
     environment: Option<WorkspaceEnvironment>,
+    requires_python: VersionSpecifiers,
+    #[serde(default)]
     members: Vec<WorkspaceMember>,
 }
 

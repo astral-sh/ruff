@@ -228,6 +228,70 @@ fn uv_metadata_environment_variable_reads_metadata_from_stdin() -> anyhow::Resul
 }
 
 #[test]
+fn uv_metadata_members_can_be_omitted() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file("shared.py", "value: int = 1")?;
+    case.write_file("packages/member/member.py", "import shared")?;
+
+    let mut metadata = workspace_metadata_json(&case, None);
+    metadata.as_object_mut().unwrap().remove("members");
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("TY_UV_METADATA", "1")
+        .arg(".");
+
+    assert_cmd_snapshot!(command.pass_stdin(metadata.to_string()), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn uses_requires_python_from_uv_metadata() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    case.write_file(
+        "packages/member/member.py",
+        "import sys\nprint(sys.last_exc)",
+    )?;
+
+    let mut metadata = workspace_metadata_json(&case, None);
+    metadata["requires_python"] = serde_json::json!(">=3.11");
+
+    let mut command = case.command();
+    command
+        .current_dir(case.root().join("packages/member"))
+        .env("TY_UV_METADATA", "1");
+
+    assert_cmd_snapshot!(command.pass_stdin(metadata.to_string()), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-attribute]: Module `sys` has no member `last_exc`
+     --> member.py:2:7
+      |
+    2 | print(sys.last_exc)
+      |       ^^^^^^^^^^^^
+      |
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.11 was assumed when resolving the `last_exc` attribute because it was specified on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn uses_python_environment_from_uv_metadata() -> anyhow::Result<()> {
     let case = workspace_case()?;
     let environment = case.root().join("uv-venv");
@@ -333,6 +397,7 @@ fn workspace_metadata_json(
             "version": "preview",
         },
         "workspace_root": case.root(),
+        "requires_python": ">=3.8",
         "members": [
             {
                 "path": case.root().join("packages/member"),

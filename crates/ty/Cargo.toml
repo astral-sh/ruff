@@ -35,6 +35,7 @@ crossbeam = { workspace = true }
 ctrlc = { version = "3.4.4" }
 indicatif = { workspace = true }
 jiff = { workspace = true }
+pep440_rs = { workspace = true }
 rayon = { workspace = true }
 salsa = { workspace = true }
 serde = { workspace = true }

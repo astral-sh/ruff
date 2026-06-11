@@ -136,21 +136,27 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         None
     };
-    let (project_path, uv_workspace_member, uv_environment) =
+    let (project_path, uv_workspace_member, uv_environment, uv_requires_python) =
         match (explicit_project_path, uv_workspace) {
-            (Some(project_path), Some(uv::UvWorkspace { environment, .. })) => {
-                (project_path, None, environment)
-            }
-            (Some(project_path), None) => (project_path, None, None),
+            (
+                Some(project_path),
+                Some(uv::UvWorkspace {
+                    environment,
+                    requires_python,
+                    ..
+                }),
+            ) => (project_path, None, environment, requires_python),
+            (Some(project_path), None) => (project_path, None, None, None),
             (
                 None,
                 Some(uv::UvWorkspace {
                     root,
                     member,
                     environment,
+                    requires_python,
                 }),
-            ) => (root, member, environment),
-            (None, None) => (cwd.clone(), None, None),
+            ) => (root, member, environment, requires_python),
+            (None, None) => (cwd.clone(), None, None, None),
         };
 
     let mut check_paths: Vec<_> = args
@@ -195,6 +201,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut project_options_overrides =
         ProjectOptionsOverrides::new(config_file, args.into_options());
     project_options_overrides.fallback_python = uv_environment.map(RelativePathBuf::cli);
+    project_options_overrides.fallback_python_version = uv_requires_python;
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;

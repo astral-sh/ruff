@@ -46,20 +46,6 @@ When set, ty will use this format for output instead of the default.
 
 Accepts the same values as the `--output-format` command-line argument.
 
-### `TY_UV`
-
-Enable uv integration.
-
-When set to `"1"` or `"true"`, ty invokes `uv workspace metadata` to discover the workspace
-root.
-
-### `TY_UV_METADATA`
-
-Read `uv workspace metadata` output from stdin instead of invoking uv.
-
-When set to `"1"` or `"true"`, this is equivalent to the `--uv-metadata` command-line
-argument.
-
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:
@@ -86,12 +72,6 @@ Specifies an upper limit for the number of threads ty uses when performing work 
 Equivalent to `TY_MAX_PARALLELISM`.
 
 This is a standard Rayon environment variable.
-
-### `UV`
-
-The path to the uv executable to use for workspace discovery.
-
-ty uses this path when uv integration is enabled by `TY_UV`.
 
 ### `VIRTUAL_ENV`
 
