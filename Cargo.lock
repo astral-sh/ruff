@@ -3086,6 +3086,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa",
+ "same-file",
  "schemars",
  "serde",
  "serde_json",
@@ -4806,6 +4807,7 @@ dependencies = [
  "ruff_text_size",
  "strum",
  "strum_macros",
+ "tempfile",
  "tracing",
  "ty_static",
 ]

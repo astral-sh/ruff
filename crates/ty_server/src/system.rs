@@ -177,6 +177,10 @@ impl System for LSPSystem {
         self.native_system.canonicalize_path(path)
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.native_system.is_same_file(first, second)
+    }
+
     fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
         self.native_system.path_exists_case_sensitive(path, prefix)
     }
