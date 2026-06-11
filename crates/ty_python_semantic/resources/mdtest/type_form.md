@@ -340,7 +340,10 @@ bad_literal_var: TypeForm = Literal[var]  # error: [invalid-type-form]
 bad_literal_f_string: TypeForm = Literal[f""]  # error: [invalid-type-form]
 bad_qualifier: TypeForm = ClassVar[int]  # error: [invalid-type-form]
 bad_final: TypeForm = Final[int]  # error: [invalid-type-form]
-bad_unpack: TypeForm = Unpack[Ts]  # error: [invalid-type-form]
+# error: [invalid-type-form] "`Unpack` is not allowed in type expressions"
+bad_unpack: TypeForm = Unpack[Ts]
+# error: [invalid-type-form] "`Unpack` is not allowed in type expressions"
+bad_concrete_unpack: TypeForm = Unpack[tuple[int, ...]]
 bad_optional: TypeForm = Optional  # error: [invalid-type-form]
 bad_quoted_operator: TypeForm = "int + str"  # error: [invalid-type-form]
 ```

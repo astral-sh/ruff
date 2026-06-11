@@ -42,8 +42,11 @@ def blocking_function() -> int:
 async def main():
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
+        # TODO: No `invalid-argument-type` diagnostic should be emitted here.
+        # error: [invalid-argument-type] "Argument to bound method `AbstractEventLoop.run_in_executor` is incorrect: Expected `(*tuple[Unknown, ...]) -> Unknown`, found `def blocking_function() -> int`"
         result = await loop.run_in_executor(pool, blocking_function)
-        reveal_type(result)  # revealed: int
+        # TODO: revealed: int
+        reveal_type(result)  # revealed: Unknown
 ```
 
 ### `asyncio.Task`

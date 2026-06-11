@@ -1213,10 +1213,7 @@ impl<'db> Type<'db> {
             | DynamicType::UnknownGeneric(_)
             | DynamicType::UnspecializedTypeVar
             | DynamicType::AmbiguousOverload => false,
-            DynamicType::Todo(_)
-            | DynamicType::TodoStarredExpression
-            | DynamicType::TodoUnpack
-            | DynamicType::TodoTypeVarTuple => true,
+            DynamicType::Todo(_) => true,
         })
     }
 
@@ -1956,11 +1953,8 @@ impl<'db> Type<'db> {
                 DynamicType::Unknown
                 | DynamicType::UnknownGeneric(_)
                 | DynamicType::UnspecializedTypeVar
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoTypeVarTuple
                 | DynamicType::Todo(_)
                 | DynamicType::InvalidConcatenateUnknown
-                | DynamicType::TodoStarredExpression
                 | DynamicType::AmbiguousOverload => false,
             },
         }
@@ -5596,6 +5590,16 @@ impl<'db> Type<'db> {
                             fallback_type: Type::unknown(),
                         });
                     }
+                    if !inference_flags.contains(InferenceFlags::IN_UNPACK_TYPE_ARGUMENT)
+                        && typevar.is_typevartuple(db)
+                    {
+                        return Err(InvalidTypeExpressionError {
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::InvalidBareTypeVarTuple(*typevar)
+                            ],
+                            fallback_type: Type::unknown(),
+                        });
+                    }
                     let index = semantic_index(db, scope_id.file(db));
                     Ok(bind_typevar(
                         db,
@@ -5728,7 +5732,9 @@ impl<'db> Type<'db> {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
-                Some(KnownClass::TypeVarTuple) => Ok(Type::Dynamic(DynamicType::TodoTypeVarTuple)),
+                Some(KnownClass::TypeVarTuple | KnownClass::ExtensionsTypeVarTuple) => Ok(
+                    todo_type!("Support for `typing.TypeVarTuple` instances in type expressions"),
+                ),
                 _ => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
                         *self, scope_id
@@ -6314,6 +6320,14 @@ impl<'db> Type<'db> {
                 {
                     Some(*bound_typevar)
                 }
+                TypeVarKind::TypeVarTuple
+                    if binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db)
+                            == BindingContext::Definition(binding_context)
+                    }) =>
+                {
+                    Some(*bound_typevar)
+                }
                 TypeVarKind::ParamSpec => {
                     // For `ParamSpec`, we're only interested in `P` itself, not `P.args` or
                     // `P.kwargs`.
@@ -6750,9 +6764,6 @@ impl<'db> Type<'db> {
             Self::Divergent(_)
             | Self::Dynamic(
                 DynamicType::Todo(_)
-                | DynamicType::TodoUnpack
-                | DynamicType::TodoStarredExpression
-                | DynamicType::TodoTypeVarTuple
                 | DynamicType::InvalidConcatenateUnknown
                 | DynamicType::UnspecializedTypeVar,
             )
@@ -7414,12 +7425,6 @@ pub enum DynamicType<'db> {
     ///
     /// This variant should be created with the `todo_type!` macro.
     Todo(TodoType),
-    /// A special Todo-variant for `Unpack[Ts]`, so that we can treat it specially in `Generic[Unpack[Ts]]`
-    TodoUnpack,
-    /// A special Todo-variant for `*Ts`, so that we can treat it specially in `Generic[*Ts]`
-    TodoStarredExpression,
-    /// A special Todo-variant for `TypeVarTuple` instances encountered in type expressions
-    TodoTypeVarTuple,
 }
 
 impl DynamicType<'_> {
@@ -7428,7 +7433,7 @@ impl DynamicType<'_> {
     }
 
     pub(crate) fn is_todo(&self) -> bool {
-        matches!(self, Self::Todo(_) | Self::TodoUnpack)
+        matches!(self, Self::Todo(_))
     }
 }
 
@@ -7444,9 +7449,6 @@ impl std::fmt::Display for DynamicType<'_> {
             // `DynamicType::Todo`'s display should be explicit that is not a valid display of
             // any other type
             DynamicType::Todo(todo) => write!(f, "@Todo{todo}"),
-            DynamicType::TodoUnpack => f.write_str("@Todo(typing.Unpack)"),
-            DynamicType::TodoStarredExpression => f.write_str("@Todo(StarredExpression)"),
-            DynamicType::TodoTypeVarTuple => f.write_str("@Todo(TypeVarTuple)"),
         }
     }
 }
@@ -7650,6 +7652,7 @@ enum InvalidTypeExpression<'db> {
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
     InvalidBareParamSpec(TypeVarInstance<'db>),
+    InvalidBareTypeVarTuple(TypeVarInstance<'db>),
 }
 
 impl<'db> InvalidTypeExpression<'db> {
@@ -7771,6 +7774,11 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Bare ParamSpec `{}` is not valid in this context in a {location}",
                         paramspec.name(self.db)
                     ),
+                    InvalidTypeExpression::InvalidBareTypeVarTuple(typevartuple) => write!(
+                        f,
+                        "Bare TypeVarTuple `{}` is not valid in this context in a {location}",
+                        typevartuple.name(self.db)
+                    ),
                     InvalidTypeExpression::Concatenate => write!(
                         f,
                         "`typing.Concatenate` is not allowed in this context in a {location}",
@@ -7849,6 +7857,8 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the default type for another ParamSpec");
             diagnostic.info(" - as part of a type parameter list when defining a generic class");
             diagnostic.info(" - or as part of an argument list when specializing a generic class");
+        } else if matches!(self, InvalidTypeExpression::InvalidBareTypeVarTuple(_)) {
+            diagnostic.info("A TypeVarTuple must be unpacked with `*` or `Unpack[]`.");
         } else if matches!(self, InvalidTypeExpression::Concatenate) {
             diagnostic.info("`typing.Concatenate` is only valid:");
             diagnostic.info(" - as the first argument to `Callable`");

@@ -1478,7 +1478,7 @@ fn anyio(criterion: &mut Criterion) {
             max_dep_date: "2025-06-17",
             python_version: SupportedPythonVersion::Py313,
         },
-        150,
+        170,
     );
 
     bench_project(&benchmark, criterion);
