@@ -1928,6 +1928,14 @@
           ],
           "format": "int"
         },
+        "lines-before-imports": {
+          "description": "The number of blank lines to place before imports.\nUse `-1` for automatic determination.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "int"
+        },
         "lines-between-types": {
           "description": "The number of lines to place between \"direct\" and `import from` imports.\n\nWhen using the formatter, only the values `0` and `1` are compatible because\nit preserves up to one empty line after imports in nested blocks.",
           "type": [
