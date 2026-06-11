@@ -95,6 +95,22 @@ pub(super) fn evaluate_type_equality<'db>(
 ///
 /// Returns `None` when the comparison behavior of either operand is not precise enough to safely
 /// constrain `left`.
+///
+/// For example, comparing a literal union against one of its members constrains both branches:
+///
+/// ```python
+/// from typing import Literal
+///
+/// def f(x: Literal[1, 2]):
+///     if x != 1:
+///         reveal_type(x)  # Literal[2]
+///     else:
+///         reveal_type(x)  # Literal[1]
+///
+/// def g(x: Literal[1]):
+///     if x != 1:
+///         reveal_type(x)  # Never
+/// ```
 pub(super) fn evaluate_type_inequality<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
