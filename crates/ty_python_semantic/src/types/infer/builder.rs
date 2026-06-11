@@ -9955,9 +9955,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Recursive(rec)) if rec.is_non_contractive(self.db()) => operand_type,
-            (_, Type::Recursive(rec)) => {
-                rec.map(self.db(), |unfolded| self.infer_unary_expression_type(op, unfolded, unary))
-            }
+            (_, Type::Recursive(rec)) => rec.map(self.db(), |unfolded| {
+                self.infer_unary_expression_type(op, unfolded, unary)
+            }),
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {
