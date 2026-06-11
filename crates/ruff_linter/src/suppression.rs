@@ -6,8 +6,8 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
-use rustc_hash::FxHashSet;
-use std::cell::Cell;
+use rustc_hash::{FxHashMap, FxHashSet};
+use std::cell::{Cell, OnceCell};
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -209,6 +209,18 @@ pub struct Suppressions {
     errors: Vec<ParseError>,
 
     preview: PreviewMode,
+
+    /// A mapping of all comment token ranges for valid and invalid suppression comments to the
+    /// latest comment start in that token.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// # this comment token # ruff:ignore[range-one] # ruff:ignore[range-two]
+    /// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ key
+    ///                                               - value
+    /// ```
+    token_ranges: OnceCell<FxHashMap<TextRange, TextSize>>,
 }
 
 #[derive(Debug)]
@@ -259,6 +271,39 @@ impl Suppressions {
     ) -> Suppressions {
         let builder = SuppressionsBuilder::new(source, settings);
         builder.load_from_tokens(tokens, indexer)
+    }
+
+    fn new(
+        valid: Vec<Suppression>,
+        invalid: Vec<InvalidSuppression>,
+        errors: Vec<ParseError>,
+        preview: PreviewMode,
+    ) -> Self {
+        Self {
+            valid,
+            invalid,
+            errors,
+            preview,
+            token_ranges: OnceCell::new(),
+        }
+    }
+
+    fn token_ranges(&self) -> &FxHashMap<TextRange, TextSize> {
+        self.token_ranges.get_or_init(|| {
+            let mut token_ranges = FxHashMap::default();
+            for comment in self
+                .valid
+                .iter()
+                .flat_map(|suppression| suppression.comments.iter())
+                .chain(self.invalid.iter().map(|invalid| &invalid.comment))
+            {
+                let latest = token_ranges
+                    .entry(comment.token_range)
+                    .or_insert(comment.range.start());
+                *latest = std::cmp::max(*latest, comment.range.start());
+            }
+            token_ranges
+        })
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -421,7 +466,7 @@ impl Suppressions {
                     },
                     error.range,
                 );
-                if !self.has_later_suppression(error.range) {
+                if !self.has_later_suppression(error.range, error.token_range) {
                     diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
                 }
             }
@@ -435,7 +480,7 @@ impl Suppressions {
                     },
                     invalid.comment.range,
                 );
-                if !self.has_later_suppression(invalid.comment.range) {
+                if !self.has_later_suppression(invalid.comment.range, invalid.comment.token_range) {
                     diagnostic.set_fix(Fix::unsafe_edit(delete_comment(
                         invalid.comment.range,
                         locator,
@@ -515,6 +560,10 @@ impl Suppressions {
         highlight_only_code: bool,
         kind: T,
     ) -> Option<DiagnosticGuard<'a, 'b>> {
+        if !context.is_rule_enabled(T::rule()) {
+            return None;
+        }
+
         let first_comment = suppression.comments.first();
         let (range, edit) = self.edit_suppression_comment(
             locator,
@@ -522,24 +571,25 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
-            let fix = if let Some(second_comment) = suppression.comments.second() {
-                let (second_range, second_edit) = self.edit_suppression_comment(
-                    locator,
-                    second_comment,
-                    remove_codes,
-                    highlight_only_code,
-                );
-                diagnostic.secondary_annotation("", second_range);
-                edit.zip(second_edit)
-                    .map(|(edit, second_edit)| Fix::safe_edits(edit, [second_edit]))
-            } else {
-                edit.map(Fix::safe_edit)
-            };
-            diagnostic.set_optional_fix(fix);
-            return Some(diagnostic);
-        }
-        None
+
+        let mut diagnostic = context.report_custom_diagnostic(kind, range);
+
+        let fix = if let Some(second_comment) = suppression.comments.second() {
+            let (second_range, second_edit) = self.edit_suppression_comment(
+                locator,
+                second_comment,
+                remove_codes,
+                highlight_only_code,
+            );
+            diagnostic.secondary_annotation("", second_range);
+            edit.zip(second_edit)
+                .map(|(edit, second_edit)| Fix::safe_edits(edit, [second_edit]))
+        } else {
+            edit.map(Fix::safe_edit)
+        };
+        diagnostic.set_optional_fix(fix);
+
+        Some(diagnostic)
     }
 
     fn edit_suppression_comment(
@@ -598,7 +648,7 @@ impl Suppressions {
         // one within the same comment token.
         let edit = if edit.is_deletion()
             && edit.range().contains_range(comment.range)
-            && self.has_later_suppression(comment.range)
+            && self.has_later_suppression(comment.range, comment.token_range)
         {
             None
         } else {
@@ -609,15 +659,10 @@ impl Suppressions {
     }
 
     /// Check whether another suppression occurs later in the same comment token.
-    fn has_later_suppression(&self, current_range: TextRange) -> bool {
-        self.valid
-            .iter()
-            .flat_map(|suppression| suppression.comments.iter())
-            .chain(self.invalid.iter().map(|invalid| &invalid.comment))
-            .any(|suppression| {
-                suppression.token_range.contains_range(current_range)
-                    && suppression.range.start() > current_range.start()
-            })
+    fn has_later_suppression(&self, range: TextRange, token_range: TextRange) -> bool {
+        self.token_ranges()
+            .get(&token_range)
+            .is_some_and(|latest| *latest > range.start())
     }
 }
 
@@ -771,12 +816,7 @@ impl<'a> SuppressionsBuilder<'a> {
                 ))
         });
 
-        Suppressions {
-            valid: self.valid,
-            invalid: self.invalid,
-            errors,
-            preview: self.settings.preview,
-        }
+        Suppressions::new(self.valid, self.invalid, errors, self.settings.preview)
     }
 
     /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns
@@ -1093,11 +1133,16 @@ pub(crate) enum ParseErrorKind {
 struct ParseError {
     kind: ParseErrorKind,
     range: TextRange,
+    token_range: TextRange,
 }
 
 impl ParseError {
-    fn new(kind: ParseErrorKind, range: TextRange) -> Self {
-        Self { kind, range }
+    fn new(kind: ParseErrorKind, range: TextRange, token_range: TextRange) -> Self {
+        Self {
+            kind,
+            range,
+            token_range,
+        }
     }
 }
 
@@ -1130,6 +1175,7 @@ impl<'src> SuppressionParser<'src> {
                 Err(ParseError::new(
                     kind,
                     TextRange::new(comment_start, self.offset()),
+                    self.range,
                 ))
             }
         }
@@ -2548,6 +2594,7 @@ def foo():
             ParseError {
                 kind: NotASuppression,
                 range: 0..13,
+                token_range: 0..13,
             },
         )
         ",
@@ -2563,6 +2610,7 @@ def foo():
             ParseError {
                 kind: UnknownAction,
                 range: 0..15,
+                token_range: 0..15,
             },
         )
         ",
@@ -2578,6 +2626,7 @@ def foo():
             ParseError {
                 kind: MissingCodes,
                 range: 0..15,
+                token_range: 0..15,
             },
         )
         ",
@@ -2593,6 +2642,7 @@ def foo():
             ParseError {
                 kind: MissingCodes,
                 range: 0..17,
+                token_range: 0..17,
             },
         )
         ",
@@ -2608,6 +2658,7 @@ def foo():
             ParseError {
                 kind: MissingBracket,
                 range: 0..19,
+                token_range: 0..19,
             },
         )
         ",
@@ -2623,6 +2674,7 @@ def foo():
             ParseError {
                 kind: MissingComma,
                 range: 0..24,
+                token_range: 0..24,
             },
         )
         ",
