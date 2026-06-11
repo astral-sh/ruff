@@ -190,6 +190,129 @@ reveal_type(Box[int]().specialized)  # revealed: bound method Box[int].specializ
 reveal_type(Box[str]().specialized)  # revealed: Overload[(x: str) -> str, (x: int) -> int]
 ```
 
+## Class-object intersection receivers
+
+Binding a classmethod to a class-object intersection filters overloads whose explicit `cls`
+annotation cannot accept that receiver. The bound method type is filtered correctly, but the call
+diagnostic still includes rejected overloads.
+
+### Multiple matching receivers
+
+```py
+from __future__ import annotations
+
+from typing import overload
+from ty_extensions import Intersection
+
+class Base:
+    @overload
+    @classmethod
+    def choose(cls: type[C], value: str) -> str: ...
+    @overload
+    @classmethod
+    def choose(cls: type[A], value: int) -> int: ...
+    @overload
+    @classmethod
+    def choose(cls: type[A], value: bytes) -> bytes: ...
+    @classmethod
+    def choose(cls: type[Base], value: object) -> object:
+        return value
+
+class A(Base): ...
+class B: ...
+class C(Base): ...
+
+def _(cls: Intersection[type[A], type[B]]):
+    reveal_type(cls.choose)  # revealed: Overload[(value: int) -> int, (value: bytes) -> bytes]
+    # TODO: The diagnostic should list only the two `type[A]` overloads and point to the `int`
+    # overload as the first candidate.
+    cls.choose(1.0)  # snapshot: no-matching-overload
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Base.choose` matches arguments
+  --> src/mdtest_snippet.py:28:5
+   |
+28 |     cls.choose(1.0)  # snapshot: no-matching-overload
+   |     ^^^^^^^^^^^^^^^
+   |
+info: First overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | /     @overload
+8 | |     @classmethod
+9 | |     def choose(cls: type[C], value: str) -> str: ...
+  | |____________________________________________________^ First overload defined here
+  |
+info: Possible overloads for bound method `choose`:
+info:   (cls: type[C], value: str) -> str
+info:   (cls: type[A], value: int) -> int
+info:   (cls: type[A], value: bytes) -> bytes
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:17:9
+   |
+17 |     def choose(cls: type[Base], value: object) -> object:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
+### One matching receiver
+
+```py
+from __future__ import annotations
+
+from typing import overload
+from ty_extensions import Intersection
+
+class Base:
+    @overload
+    @classmethod
+    def choose(cls: type[A], value: int) -> int: ...
+    @overload
+    @classmethod
+    def choose(cls: type[C], value: str) -> str: ...
+    @classmethod
+    def choose(cls: type[Base], value: object) -> object:
+        return value
+
+class A(Base): ...
+class B: ...
+class C(Base): ...
+
+def _(cls: Intersection[type[A], type[B]]):
+    # revealed: bound method (type[A] & type[B]).choose(value: int) -> int
+    reveal_type(cls.choose)
+    # TODO: The diagnostic should list only the surviving `type[A]` overload.
+    result = cls.choose(1.0)  # snapshot: no-matching-overload
+    reveal_type(result)  # revealed: Unknown
+```
+
+```snapshot
+error[no-matching-overload]: No overload of bound method `Base.choose` matches arguments
+  --> src/mdtest_snippet.py:25:14
+   |
+25 |     result = cls.choose(1.0)  # snapshot: no-matching-overload
+   |              ^^^^^^^^^^^^^^^
+   |
+info: First overload defined here
+ --> src/mdtest_snippet.py:7:5
+  |
+7 | /     @overload
+8 | |     @classmethod
+9 | |     def choose(cls: type[A], value: int) -> int: ...
+  | |____________________________________________________^ First overload defined here
+  |
+info: Possible overloads for bound method `choose`:
+info:   (cls: type[A], value: int) -> int
+info:   (cls: type[C], value: str) -> str
+info: Overload implementation defined here
+  --> src/mdtest_snippet.py:14:9
+   |
+14 |     def choose(cls: type[Base], value: object) -> object:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+```
+
 ## Nominal receiver mismatches
 
 `BaseForAny[Any]` has a dynamic type argument, but it is not necessarily an instance of its subclass
