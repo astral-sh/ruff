@@ -14,7 +14,7 @@ pub(crate) use self::static_literal::{
 };
 use self::typed_dict::synthesize_typed_dict_merge;
 pub(super) use self::typed_dict::{
-    DynamicTypedDictAnchor, DynamicTypedDictLiteral, synthesized_typed_dict_member,
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, open_empty_typed_dict_member,
 };
 use super::{
     BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy, MroIterator, SpecialFormType,
