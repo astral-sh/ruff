@@ -340,7 +340,11 @@ impl<'db> Type<'db> {
         if let Type::Recursive(rec) = self
             && !rec.is_non_contractive(db)
         {
-            return rec.unfold(db).try_iterate_with_mode(db, mode);
+            let spec = rec.unfold(db).try_iterate_with_mode(db, mode)?;
+            return Ok(Cow::Owned(
+                spec.into_owned()
+                    .map_elements(|element| rec.fold(db, element)),
+            ));
         }
 
         if let Type::TypeAlias(alias) = self {

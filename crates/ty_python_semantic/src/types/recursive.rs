@@ -211,10 +211,11 @@ impl<'db> RecursiveType<'db> {
         body.apply_type_mapping(db, &mapping, TypeContext::default())
     }
 
-    pub(crate) fn fold_unfolded(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    pub(crate) fn fold(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         let marker = Type::divergent(self.binder_id(db));
-        let normalization =
-            RecursiveTypeNormalization::new(marker).with_fold_body(Some(self.body(db)));
+        let normalization = RecursiveTypeNormalization::new(marker)
+            .with_fold_body(Some(self.body(db)))
+            .preserve_top_level_recursive();
         ty.recursive_type_normalized_impl(db, normalization)
             .unwrap_or(marker)
     }

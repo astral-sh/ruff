@@ -1309,6 +1309,30 @@ impl<'db> Tuple<Type<'db>> {
         UnionType::from_elements_leave_aliases(db, self.all_elements())
     }
 
+    pub(crate) fn map_elements(self, mut f: impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        match self {
+            Tuple::Fixed(tuple) => Tuple::Fixed(FixedLengthTuple::from_elements(
+                tuple.owned_elements().into_iter().map(f),
+            )),
+            Tuple::Variable(tuple) => {
+                let prefix = tuple
+                    .prefix_elements()
+                    .iter()
+                    .copied()
+                    .map(&mut f)
+                    .collect::<Vec<_>>();
+                let variable = f(tuple.variable());
+                let suffix = tuple
+                    .suffix_elements()
+                    .iter()
+                    .copied()
+                    .map(f)
+                    .collect::<Vec<_>>();
+                VariableLengthTuple::mixed(prefix, variable, suffix)
+            }
+        }
+    }
+
     /// Resizes this tuple to a different length, if possible. If this tuple cannot satisfy the
     /// desired minimum or maximum length, we return an error. If we return an `Ok` result, the
     /// [`len`][Self::len] of the resulting tuple is guaranteed to be equal to `new_length`.

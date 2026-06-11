@@ -543,7 +543,8 @@ impl<'db> Type<'db> {
             // preserve the recursive structure.
             (Type::Recursive(rec), _) => Some(
                 rec.unfold(db)
-                    .subscript(db, slice_ty, expr_context),
+                    .subscript(db, slice_ty, expr_context)
+                    .map(|result| rec.fold(db, result)),
             ),
 
             (Type::TypeAlias(alias), _) => {

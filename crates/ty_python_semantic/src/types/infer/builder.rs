@@ -2680,10 +2680,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // This closure should only be called if `value_ty` was inferred with `attr_ty` as type context.
         let ensure_assignable_to =
             |builder: &Self, value_ty: Type<'db>, attr_ty: Type<'db>| -> bool {
-                let value_ty = match attr_ty {
-                    Type::Recursive(rec) => rec.fold_unfolded(db, value_ty),
-                    _ => value_ty,
-                };
                 let assignable = value_ty.is_assignable_to(db, attr_ty);
                 if !assignable && emit_diagnostics {
                     report_invalid_attribute_assignment(
