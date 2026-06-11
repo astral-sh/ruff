@@ -69,8 +69,7 @@ async def main() -> None:
 
 ## Non-callable `__await__`
 
-This diagnostic doesn't point to the attribute definition, but complains about it being possibly not
-awaitable.
+This diagnostic points to the non-callable attribute definition.
 
 ```py
 class NonCallableAwait:

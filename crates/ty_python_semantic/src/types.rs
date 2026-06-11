@@ -15,6 +15,7 @@ use context::InferContext;
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span};
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::Ranged;
@@ -52,7 +53,7 @@ pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     DefinedPlace, Definedness, Place, PlaceAndQualifiers, TypeOrigin, builtins_module_scope,
-    imported_symbol, known_module_symbol,
+    imported_symbol, known_module_symbol, place_from_bindings,
 };
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
@@ -108,7 +109,7 @@ pub use special_form::SpecialFormType;
 use ty_python_core::definition::Definition;
 use ty_python_core::place::ScopedPlaceId;
 use ty_python_core::scope::ScopeId;
-use ty_python_core::{Truthiness, place_table, semantic_index};
+use ty_python_core::{Truthiness, place_table, semantic_index, use_def_map};
 
 mod bool;
 mod bound_super;
@@ -7910,7 +7911,7 @@ impl<'db> AwaitError<'db> {
             }
             Self::Call(CallDunderError::CallError(
                 kind @ (CallErrorKind::NotCallable | CallErrorKind::PossiblyNotCallable),
-                bindings,
+                _,
             )) => {
                 let possibly = if matches!(kind, CallErrorKind::PossiblyNotCallable) {
                     " possibly"
@@ -7918,12 +7919,15 @@ impl<'db> AwaitError<'db> {
                     ""
                 };
                 diag.info(format_args!("`__await__` is{possibly} not callable"));
-                if let Some(definition) = bindings.callable_type().definition(db)
-                    && let Some(definition_range) = definition.focus_range(db)
+                if let Some(definition) =
+                    first_member_definition(db, context_expression_type, "__await__")
                 {
+                    let definition_module = parsed_module(db, definition.file(db));
                     diag.annotate(
-                        Annotation::secondary(definition_range.into())
-                            .message("attribute defined here"),
+                        Annotation::secondary(Span::from(
+                            definition.focus_range(db, &definition_module.load(db)),
+                        ))
+                        .message("attribute defined here"),
                     );
                 }
             }
@@ -7971,6 +7975,25 @@ impl<'db> AwaitError<'db> {
             }
         }
     }
+}
+
+fn first_member_definition<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    member_name: &str,
+) -> Option<Definition<'db>> {
+    ty.nominal_class(db)?.iter_mro(db).find_map(|base| {
+        let class = base.into_class()?.class_literal(db).as_static()?;
+        let scope = class.body_scope(db);
+        let symbol = place_table(db, scope).symbol_id(member_name)?;
+        let bindings = use_def_map(db, scope).end_of_scope_bindings(ScopedPlaceId::Symbol(symbol));
+        let place_with_definition = place_from_bindings(db, bindings);
+        if place_with_definition.place.is_undefined() {
+            None
+        } else {
+            place_with_definition.first_definition
+        }
+    })
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
