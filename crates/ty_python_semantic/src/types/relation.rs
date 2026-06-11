@@ -15,6 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::typed_dict::TypedDictField;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -3277,26 +3278,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 })
             }
 
-            // TypedDict inhabitants have exact runtime type `dict`. Preserve overlap with
-            // supertypes of `dict` regardless of their type arguments; an empty TypedDict value
-            // can inhabit both types even when those arguments are otherwise incompatible.
-            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-                if other.nominal_class(db).is_some_and(|other_class| {
-                    KnownClass::Dict
-                        .try_to_class_literal(db)
-                        .is_some_and(|dict| {
-                            dict.unknown_specialization(db)
-                                .is_subtype_of_class_literal(db, other_class.class_literal(db))
-                        })
-                }) {
-                    return self.never();
-                }
-
-                let dict_str_any = KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+            (Type::TypedDict(typed_dict), other) | (other, Type::TypedDict(typed_dict)) => {
+                // A TypedDict with no required fields contains `{}`, so its runtime key type cannot
+                // prove disjointness from any generic instantiation of a `dict` supertype.
+                let key_ty = if typed_dict
+                    .items(db)
+                    .values()
+                    .any(TypedDictField::is_required)
+                {
+                    KnownClass::Str.to_instance(db)
+                } else {
+                    Type::any()
+                };
+                let dict = KnownClass::Dict.to_specialized_instance(db, &[key_ty, Type::any()]);
 
                 self.as_relation_checker(TypeRelation::Assignability)
-                    .check_type_pair(db, dict_str_any, other)
+                    .check_type_pair(db, dict, other)
                     .negate(db, self.constraints)
             }
         }

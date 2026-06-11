@@ -5055,13 +5055,14 @@ class TD(TypedDict):
     x: int
 
 class RegularNonTD: ...
+class DictSubclass(dict[str, object]): ...
 
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
 static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
 static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
-# TODO: Use required TypedDict fields to prove disjointness from incompatible mapping types.
-static_assert(is_disjoint_from(TD, Mapping[int, object]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(EmptyTypedDict, DictSubclass))
+static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
 static_assert(not is_disjoint_from(TD, dict[str, int]))
 # TODO: Use required TypedDict fields to prove disjointness from incompatible dictionary values.
