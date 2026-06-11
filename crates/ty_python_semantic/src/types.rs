@@ -3306,6 +3306,24 @@ impl<'db> Type<'db> {
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let class_member = self.class_member_with_policy(db, name.into(), member_policy);
+        self.invoke_descriptor_protocol_with_class_member(
+            db,
+            receiver,
+            class_member,
+            fallback,
+            policy,
+        )
+    }
+
+    fn invoke_descriptor_protocol_with_class_member(
+        self,
+        db: &'db dyn Db,
+        receiver: Type<'db>,
+        class_member: PlaceAndQualifiers<'db>,
+        fallback: PlaceAndQualifiers<'db>,
+        policy: InstanceFallbackShadowsNonDataDescriptor,
+    ) -> PlaceAndQualifiers<'db> {
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3314,7 +3332,7 @@ impl<'db> Type<'db> {
             meta_attr_kind,
         ) = Self::try_call_dunder_get_on_attribute(
             db,
-            self.class_member_with_policy(db, name.into(), member_policy),
+            class_member,
             Some(receiver),
             self.to_meta_type(db),
         );
@@ -3432,6 +3450,26 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy(db, name.into(), MemberLookupPolicy::default())
+    }
+
+    /// Resolve an instance member whose class-level definition is known to be definitely bound on
+    /// the first class in the MRO.
+    pub(crate) fn member_from_own_class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        class_member: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        let fallback = self.instance_member(db, name);
+        let result = self.invoke_descriptor_protocol_with_class_member(
+            db,
+            self,
+            class_member,
+            fallback,
+            InstanceFallbackShadowsNonDataDescriptor::No,
+        );
+        self.fallback_to_getattr(db, &Name::new(name), result, MemberLookupPolicy::default())
+            .map_type(|ty| ty.bind_self_typevars(db, self))
     }
 
     /// Similar to [`Type::member`], but allows the caller to specify what policy should be used
