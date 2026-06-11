@@ -2183,16 +2183,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //
         // Project the element constraints onto the subject-time bindings of `a` and `b`.
         if let ast::Expr::Tuple(tuple) = subject_node {
-            if !is_positive
-                || !kind.is_exact_length()
-                || tuple.elts.len() != kind.patterns.len()
-                || !tuple.elts.iter().all(ast::Expr::is_name_expr)
-            {
+            if !is_positive || !tuple.elts.iter().all(ast::Expr::is_name_expr) {
                 return None;
             }
 
+            let (prefix_patterns, suffix_patterns) =
+                if let Some((prefix, suffix)) = kind.split_around_star() {
+                    if tuple.elts.len() < prefix.len() + suffix.len() {
+                        return None;
+                    }
+                    (prefix, suffix)
+                } else {
+                    if tuple.elts.len() != kind.patterns.len() {
+                        return None;
+                    }
+                    (kind.patterns.as_ref(), &[][..])
+                };
+
             let mut constraints = NarrowingConstraints::default();
-            for (element, pattern) in tuple.elts.iter().zip(&kind.patterns) {
+            let element_patterns = tuple
+                .elts
+                .iter()
+                .zip(prefix_patterns)
+                .chain(tuple.elts.iter().rev().zip(suffix_patterns.iter().rev()));
+            for (element, pattern) in element_patterns {
                 let element = PlaceExpr::try_from_expr(element)?;
                 insert_narrowing_constraint(
                     &mut constraints,

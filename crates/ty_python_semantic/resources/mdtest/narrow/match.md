@@ -340,6 +340,17 @@ def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
         case [TupleSubjectA1(), TupleSubjectA()]:
             reveal_type(a)  # revealed: TupleSubjectA1
 
+def match_tuple_expression_starred_pattern(
+    a: TupleSubjectA,
+    middle: object,
+    b: TupleSubjectB,
+) -> None:
+    match a, middle, b:
+        case [TupleSubjectA1(), *_, TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(middle)  # revealed: object
+            reveal_type(b)  # revealed: TupleSubjectB1
+
 def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> None:
     if flag:
         a: TupleSubjectA = TupleSubjectA1()
