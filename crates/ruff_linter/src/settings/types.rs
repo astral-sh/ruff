@@ -940,7 +940,7 @@ impl CompiledPerFileIgnoreList {
                         None
                     }
                 })
-                .flat_map(|selector| selector.all_rules())
+                .flat_map(|selector| selector.all_rules(preview))
                 .collect();
             PerFile {
                 basename,

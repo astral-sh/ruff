@@ -13,7 +13,7 @@ use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
 use log::debug;
 use regex::Regex;
-use ruff_linter::preview::is_warn_on_unknown_selectors_enabled;
+use ruff_linter::preview::{is_human_readable_names_enabled, is_warn_on_unknown_selectors_enabled};
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
 use shellexpand::LookupError;
@@ -914,7 +914,7 @@ impl LintConfiguration {
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.all_rules(preview.mode).collect();
 
         let rule_selections = self
             .rule_selections
@@ -994,7 +994,7 @@ impl LintConfiguration {
                     .chain(&selection.extend_fixable)
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -1004,7 +1004,7 @@ impl LintConfiguration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -1072,6 +1072,8 @@ impl LintConfiguration {
             for (kind, selector) in selection.selectors_by_kind() {
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
                 // and use with, e.g., `--ignore` or `--fixable` is okay
+                let selector_is_enabled = is_human_readable_names_enabled(preview.mode)
+                    || !matches!(selector, RuleSelector::Name(_));
 
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
@@ -1090,15 +1092,19 @@ impl LintConfiguration {
                 }
 
                 // Deprecated rules
-                if kind.is_enable() && selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_deprecated()) {
+                if selector_is_enabled && kind.is_enable() && selector.is_exact() {
+                    if selector
+                        .all_rules(preview.mode)
+                        .all(|rule| rule.is_deprecated())
+                    {
                         deprecated_selectors.insert(selector);
                     }
                 }
 
                 // Removed rules
                 if selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_removed()) {
+                    let mut rules = selector.all_rules(preview.mode).peekable();
+                    if rules.peek().is_some() && rules.all(|rule| rule.is_removed()) {
                         if kind.is_disable() {
                             removed_ignored_rules.insert(selector);
                         } else {
