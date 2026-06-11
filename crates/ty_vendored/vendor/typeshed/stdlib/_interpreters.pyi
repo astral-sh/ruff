@@ -120,7 +120,8 @@ def run_func(
     """Execute the body of the provided function in the identified interpreter.
 
     Code objects are also supported.  In both cases, closures and args
-    are not supported.  Methods and other callables are not supported either.
+    are not supported.  Methods and other callables are not supported
+    either.
 
     (See _interpreters.exec().)
     """
@@ -137,8 +138,9 @@ def is_shareable(obj: object) -> bool:
 def capture_exception(exc: BaseException) -> types.SimpleNamespace:
     """Return a snapshot of an exception.
 
-    If "exc" is None then the current exception, if any, is used (but not cleared).
-    The returned snapshot is the same as what _interpreters.exec() returns.
+    If "exc" is None then the current exception, if any, is used (but not
+    cleared).  The returned snapshot is the same as what
+    _interpreters.exec() returns.
     """
 @overload
 def capture_exception(exc: None = None) -> types.SimpleNamespace | None: ...

@@ -19,9 +19,7 @@ use crate::types::infer::original_class_type;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -124,21 +122,21 @@ pub(crate) fn bind_typevar<'db>(
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
     // Class-scoped type variables are not visible from inner class scopes.
     let mut crossed_class_scope = false;
-    for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
+    for (ancestor_scope_id, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
-        let generic_context = match ancestor_scope.node() {
-            NodeWithScopeKind::FunctionTypeParameters(function) => {
+        if let NodeWithScopeKind::FunctionTypeParameters(function) = ancestor_scope.node() {
+            // PEP 695 type parameters are defined in the function's type-parameter scope.
+            // Check that directly instead of reconstructing the function's signature.
+            if typevar
+                .definition(db)
+                .is_some_and(|definition| definition.file_scope(db) == ancestor_scope_id)
+            {
                 let definition = index.expect_single_definition(function);
-                infer_definition_types(db, definition)
-                    .function_type(definition)
-                    .and_then(|function_type| {
-                        function_type
-                            .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
-                            .generic_context
-                    })
+                return Some(typevar.with_binding_context(db, definition));
             }
-            node => GenericContext::of_node(db, node, index),
-        };
+            continue;
+        }
+        let generic_context = GenericContext::of_node(db, ancestor_scope.node(), index);
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
@@ -1553,28 +1551,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 MaterializationKind::Bottom,
             ),
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
-            (
-                None,
-                Some(target_mat),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Bottom,
-                target_type,
-                target_mat,
-            ),
-            (
-                Some(source_mat),
-                None,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Top,
-            ),
+            (None, Some(target_mat), TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    MaterializationKind::Bottom,
+                    target_type,
+                    target_mat,
+                ),
+            (Some(source_mat), None, TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    source_mat,
+                    target_type,
+                    MaterializationKind::Top,
+                ),
         }
     }
 

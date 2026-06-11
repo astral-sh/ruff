@@ -161,8 +161,9 @@ if sys.version_info >= (3, 15):
 def frexp(x: _SupportsFloatOrIndex, /) -> tuple[float, int]:
     """Return the mantissa and exponent of x, as pair (m, e).
 
-    m is a float and e is an int, such that x = m * 2.**e.
-    If x is 0, m and e are both 0.  Else 0.5 <= abs(m) < 1.0.
+    If x is a finite nonzero number, then m is a float with
+    0.5 <= abs(m) < 1.0 and an integer e is such that
+    x == m * 2**e exactly.  Else, return (x, 0).
     """
 
 def fsum(seq: Iterable[_SupportsFloatOrIndex], /) -> float:
@@ -280,8 +281,8 @@ if sys.version_info >= (3, 12):
 
         If steps is not specified or is None, it defaults to 1.
 
-        Raises a TypeError, if x or y is not a double, or if steps is not an integer.
-        Raises ValueError if steps is negative.
+        Raises a TypeError, if x or y is not a double, or if steps is not
+        an integer.  Raises ValueError if steps is negative.
         """
 
 else:

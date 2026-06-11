@@ -1863,10 +1863,10 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the attribute. Once
-found, however, descriptors and `Self` must be bound using the full `A & B` receiver.
-
 ### Method binding uses the full intersection type
+
+For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
+found, however, `Self` must be bound using the full `A & B` receiver.
 
 ```py
 from typing_extensions import Self
@@ -1884,19 +1884,18 @@ def _(a_and_b: Intersection[A, B]):
 
 ### Descriptor binding uses the full intersection type
 
+Descriptors found while searching the individual elements of an intersection must also be bound
+using the full intersection as the receiver.
+
 ```py
-from typing import Any, TypeVar, overload
-from typing_extensions import Self
+from typing import TypeVar
 from ty_extensions import Intersection
 
-T = TypeVar("T")
+T = TypeVar(name="T")
 
 class Descriptor:
-    @overload
-    def __get__(self, instance: None, owner: type, /) -> Self: ...
-    @overload
-    def __get__(self, instance: T, owner: type | None = None, /) -> T: ...
-    def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
+    def __get__(self, instance: T, owner: type | None = None, /) -> T:
+        return instance
 
 class A:
     desc = Descriptor()

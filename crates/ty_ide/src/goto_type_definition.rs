@@ -70,17 +70,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        4 | ab = Literal
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Literal
+           | ^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:493:1
-            |
-        493 | Literal: _SpecialForm
-            | -------
-            |
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Literal: _SpecialForm
+           | -------
+           |
         ");
     }
 
@@ -98,17 +98,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        4 | ab = Any
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Any
+           | ^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:172:7
-            |
-        172 | class Any:
-            |       ---
-            |
+          --> stdlib/typing.pyi:LL:7
+           |
+        LL | class Any:
+           |       ---
+           |
         ");
     }
 
@@ -125,17 +125,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        4 | ab = Generic
-          | ^^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | ab = Generic
+           | ^^ Clicking here
+           |
         info: Found 1 type definition
-            --> stdlib/typing.pyi:1328:1
-             |
-        1328 | Generic: type[_Generic]
-             | -------
-             |
+          --> stdlib/typing.pyi:LL:1
+           |
+        LL | Generic: type[_Generic]
+           | -------
+           |
         ");
     }
 
@@ -151,15 +151,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        4 | ab = AlwaysTruthy
-          | ^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:15:1
+          --> main.py:LL:1
            |
-        15 | AlwaysTruthy: _SpecialForm
+        LL | ab = AlwaysTruthy
+           | ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | AlwaysTruthy: _SpecialForm
            | ------------
            |
         ");
@@ -632,17 +632,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:1
-          |
-        4 | a
-          | ^ Clicking here
-          |
+          --> main.py:LL:1
+           |
+        LL | a
+           | ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         ");
     }
     #[test]
@@ -655,17 +655,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:10
-          |
-        2 | a: str = "test"
-          |          ^^^^^^ Clicking here
-          |
+          --> main.py:LL:10
+           |
+        LL | a: str = "test"
+           |          ^^^^^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         "#);
     }
 
@@ -826,22 +826,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "None | MyClass" = 1
-          |    ^^^^^^^^^^^^^^^^ Clicking here
-          |
+          --> main.py:LL:4
+           |
+        LL | a: "None | MyClass" = 1
+           |    ^^^^^^^^^^^^^^^^ Clicking here
+           |
         info: Found 2 type definitions
-           --> main.py:4:7
-            |
-          4 | class MyClass:
-            |       -------
-            |
-           ::: stdlib/types.pyi:994:7
-            |
-        994 | class NoneType:
-            |       --------
-            |
+          --> main.py:LL:7
+           |
+        LL | class MyClass:
+           |       -------
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
+           |
         "#);
     }
 
@@ -885,22 +885,22 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "None | MyClass" = 1
-          |    ^^^^^^^^^^^^^^^^ Clicking here
-          |
+          --> main.py:LL:4
+           |
+        LL | a: "None | MyClass" = 1
+           |    ^^^^^^^^^^^^^^^^ Clicking here
+           |
         info: Found 2 type definitions
-           --> main.py:4:7
-            |
-          4 | class MyClass:
-            |       -------
-            |
-           ::: stdlib/types.pyi:994:7
-            |
-        994 | class NoneType:
-            |       --------
-            |
+          --> main.py:LL:7
+           |
+        LL | class MyClass:
+           |       -------
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
+           |
         "#);
     }
 
@@ -917,15 +917,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:4
-          |
-        2 | a: "MyClass |" = 1
-          |    ^^^^^^^^^^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> main.py:LL:4
            |
-        14 | Unknown: _SpecialForm
+        LL | a: "MyClass |" = 1
+           |    ^^^^^^^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         "#);
@@ -971,15 +971,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:15
-          |
-        2 | a: "MyClass | No" = 1
-          |               ^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> main.py:LL:15
            |
-        14 | Unknown: _SpecialForm
+        LL | a: "MyClass | No" = 1
+           |               ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         "#);
@@ -995,15 +995,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:6
-          |
-        2 | ab: "ab"
-          |      ^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> main.py:LL:6
            |
-        14 | Unknown: _SpecialForm
+        LL | ab: "ab"
+           |      ^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         "#);
@@ -1019,15 +1019,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:5
-          |
-        2 | x: "foobar"
-          |     ^^^^^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> main.py:LL:5
            |
-        14 | Unknown: _SpecialForm
+        LL | x: "foobar"
+           |     ^^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         "#);
@@ -1181,15 +1181,15 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:2:13
-          |
-        2 | x: """'list["MyClass" | "str"]' | None"""
-          |             ^^^^^^^^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> main.py:LL:13
            |
-        14 | Unknown: _SpecialForm
+        LL | x: """'list["MyClass" | "str"]' | None"""
+           |             ^^^^^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         "#);
@@ -1505,17 +1505,17 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:6
-          |
-        4 | test(a= "123")
-          |      ^ Clicking here
-          |
+          --> main.py:LL:6
+           |
+        LL | test(a= "123")
+           |      ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         "#);
     }
 
@@ -1534,17 +1534,17 @@ mod tests {
         //   is an int. Navigating to `str` would match pyright's behavior.
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:6
-          |
-        4 | test(a= 123)
-          |      ^ Clicking here
-          |
+          --> main.py:LL:6
+           |
+        LL | test(a= 123)
+           |      ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        348 | class int:
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+           |
         ");
     }
 
@@ -1562,17 +1562,17 @@ f(**kwargs<CURSOR>)
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:6:5
-          |
-        6 | f(**kwargs)
-          |     ^^^^^^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL | f(**kwargs)
+           |     ^^^^^^ Clicking here
+           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:3049:7
-             |
-        3049 | class dict(MutableMapping[_KT, _VT]):
-             |       ----
-             |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class dict(MutableMapping[_KT, _VT]):
+           |       ----
+           |
         ");
     }
 
@@ -1595,17 +1595,17 @@ def outer():
         // Should find the variable declaration in the outer scope, not the nonlocal statement
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:8:16
-          |
-        8 |         return x  # Should find the nonlocal x declaration in outer scope
-          |                ^ Clicking here
-          |
+          --> main.py:LL:16
+           |
+        LL |         return x  # Should find the nonlocal x declaration in outer scope
+           |                ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         ");
     }
 
@@ -1645,17 +1645,17 @@ def function():
         // Should find the global variable declaration, not the global statement
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:7:12
-          |
-        7 |     return global_var  # Should find the global variable declaration
-          |            ^^^^^^^^^^ Clicking here
-          |
+          --> main.py:LL:12
+           |
+        LL |     return global_var  # Should find the global variable declaration
+           |            ^^^^^^^^^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         ");
     }
 
@@ -1687,17 +1687,17 @@ def function():
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:3:5
-          |
-        3 |     a
-          |     ^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL |     a
+           |     ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         ");
     }
 
@@ -1768,17 +1768,17 @@ def function():
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:4:15
-          |
-        4 |         print(a)
-          |               ^ Clicking here
-          |
+          --> main.py:LL:15
+           |
+        LL |         print(a)
+           |               ^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
         ");
     }
 
@@ -1793,22 +1793,22 @@ def function():
 
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> main.py:3:5
-          |
-        3 |     a
-          |     ^ Clicking here
-          |
+          --> main.py:LL:5
+           |
+        LL |     a
+           |     ^ Clicking here
+           |
         info: Found 2 type definitions
-           --> stdlib/builtins.pyi:926:7
-            |
-        926 | class str(Sequence[str]):
-            |       ---
-            |
-           ::: stdlib/types.pyi:994:7
-            |
-        994 | class NoneType:
-            |       --------
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ---
+           |
+          ::: stdlib/types.pyi:LL:7
+           |
+        LL | class NoneType:
+           |       --------
+           |
         ");
     }
 
@@ -1905,15 +1905,15 @@ def function():
         // Unknown is correct, `submod` is not in scope
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:4:5
-          |
-        4 | x = submod
-          |     ^^^^^^ Clicking here
-          |
-        info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:14:1
+          --> mypackage/__init__.py:LL:5
            |
-        14 | Unknown: _SpecialForm
+        LL | x = submod
+           |     ^^^^^^ Clicking here
+           |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:LL:1
+           |
+        LL | Unknown: _SpecialForm
            | -------
            |
         ");
@@ -2016,17 +2016,17 @@ def function():
         // `int` is correct
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:2:21
-          |
-        2 | from .subpkg import subpkg
-          |                     ^^^^^^ Clicking here
-          |
+          --> mypackage/__init__.py:LL:21
+           |
+        LL | from .subpkg import subpkg
+           |                     ^^^^^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        348 | class int:
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+           |
         ");
     }
 
@@ -2052,17 +2052,17 @@ def function():
         // `int` is correct
         assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
-         --> mypackage/__init__.py:4:5
-          |
-        4 | x = subpkg
-          |     ^^^^^^ Clicking here
-          |
+          --> mypackage/__init__.py:LL:5
+           |
+        LL | x = subpkg
+           |     ^^^^^^ Clicking here
+           |
         info: Found 1 type definition
-           --> stdlib/builtins.pyi:348:7
-            |
-        348 | class int:
-            |       ---
-            |
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class int:
+           |       ---
+           |
         ");
     }
 

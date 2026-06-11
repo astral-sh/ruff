@@ -81,6 +81,7 @@ impl<'db> ExpectedReturnType<'db> {
         let public = normalize(
             db,
             function
+                .literal(db)
                 .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
                 .return_ty,
         );
@@ -88,6 +89,7 @@ impl<'db> ExpectedReturnType<'db> {
             normalize(
                 db,
                 function
+                    .literal(db)
                     .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
                     .return_ty,
             )
@@ -168,6 +170,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
             let declared_ty = enclosing_function
+                .literal(db)
                 .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
                 .return_ty;
             let expected_return =
@@ -413,9 +416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
             function.returns.is_some(),
         );
-        let function_literal = FunctionLiteral {
-            last_definition: overload_literal,
-        };
+        let function_literal = FunctionLiteral::new(db, overload_literal);
 
         let mut inferred_ty = Type::FunctionLiteral(FunctionType::new(db, function_literal, None));
         if !decorator_list.is_empty() {

@@ -997,7 +997,8 @@ if sys.version_info >= (3, 15):
         The mode parameter must be one of the following strings:
         - "all": All top-level imports become potentially lazy
         - "none": All lazy imports are suppressed (even explicitly marked ones)
-        - "normal": Only explicitly marked imports (with 'lazy' keyword) are lazy
+        - "normal": Only explicitly marked imports (with 'lazy' keyword) are
+          lazy
 
         In addition to the mode, lazy imports can be controlled via the filter
         provided to sys.set_lazy_imports_filter
@@ -1054,16 +1055,16 @@ if sys.version_info >= (3, 14):
         """Executes a file containing Python code in a given remote Python process.
 
         This function returns immediately, and the code will be executed by the
-        target process's main thread at the next available opportunity, similarly
-        to how signals are handled. There is no interface to determine when the
-        code has been executed. The caller is responsible for making sure that
-        the file still exists whenever the remote process tries to read it and that
-        it hasn't been overwritten.
+        target process's main thread at the next available opportunity,
+        similarly to how signals are handled.  There is no interface to
+        determine when the code has been executed.  The caller is responsible
+        for making sure that the file still exists whenever the remote process
+        tries to read it and that it hasn't been overwritten.
 
-        The remote process must be running a CPython interpreter of the same major
-        and minor version as the local process. If either the local or remote
-        interpreter is pre-release (alpha, beta, or release candidate) then the
-        local and remote interpreters must be the same exact version.
+        The remote process must be running a CPython interpreter of the same
+        major and minor version as the local process.  If either the local or
+        remote interpreter is pre-release (alpha, beta, or release candidate)
+        then the local and remote interpreters must be the same exact version.
 
         Args:
              pid (int): The process ID of the target Python process.

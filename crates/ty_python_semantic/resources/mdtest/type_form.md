@@ -137,7 +137,9 @@ already a `TypeForm`. This matters for names, subscripts, conditional expression
 ordinary value expressions that can produce a `TypeForm` at runtime.
 
 ```py
+from typing import Protocol, assert_type, cast
 from typing_extensions import TypeForm
+from ty_extensions import Intersection, Not
 
 def get_form() -> TypeForm[str]:
     return str
@@ -158,6 +160,38 @@ def use_existing(
 
 def reject_incompatible_existing(value: TypeForm[int]) -> None:
     invalid: TypeForm[str] = value  # error: [invalid-assignment]
+
+type FormUnion = TypeForm[int] | TypeForm[str]
+
+def use_existing_union(form: TypeForm[int] | TypeForm[str]) -> None:
+    reveal_type(cast(form, object()))  # revealed: int | str
+
+def use_existing_alias(form: FormUnion, value: int | str) -> None:
+    assert_type(value, form)
+
+type RecursiveForm = RecursiveForm | TypeForm[int]
+
+def use_recursive_alias(form: RecursiveForm) -> None:
+    reveal_type(cast(form, object()))  # revealed: int
+    preserved: TypeForm[int] = form
+
+class HasX(Protocol):
+    x: int
+
+def use_intersection(form: Intersection[TypeForm[int], HasX], value: int) -> None:
+    reveal_type(cast(form, object()))  # revealed: int
+    assert_type(value, form)
+
+def use_negative_facet(form: Intersection[TypeForm[int], Not[TypeForm[bool]]]) -> None:
+    reveal_type(cast(form, object()))  # revealed: int
+
+def use_bound[T: TypeForm[int]](form: T, value: int) -> None:
+    reveal_type(cast(form, object()))  # revealed: int
+    assert_type(value, form)
+
+def use_constraints[T: (TypeForm[int], TypeForm[str])](form: T, value: int | str) -> None:
+    reveal_type(cast(form, object()))  # revealed: int | str
+    assert_type(value, form)
 ```
 
 ## Runtime class objects and gradual values

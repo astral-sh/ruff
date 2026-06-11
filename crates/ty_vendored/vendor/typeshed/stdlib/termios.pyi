@@ -359,7 +359,8 @@ if sys.platform != "win32":
             """Set the tty winsize for file descriptor fd.
 
             The winsize to be set is taken from the winsize argument, which
-            is a two-item tuple (ws_row, ws_col) like the one returned by tcgetwinsize().
+            is a two-item tuple (ws_row, ws_col) like the one returned by
+            tcgetwinsize().
             """
 
     class error(Exception): ...

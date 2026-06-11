@@ -212,16 +212,21 @@ class RemoteUnwinder:
     def get_stack_trace(self) -> list[InterpreterInfo]:
         """Returns stack traces for all interpreters and threads in process.
 
-        Each element in the returned list is a tuple of (interpreter_id, thread_list), where:
+        Each element in the returned list is a tuple of (interpreter_id,
+        thread_list), where:
         - interpreter_id is the interpreter identifier
-        - thread_list is a list of tuples (thread_id, frame_list) for threads in that interpreter
+        - thread_list is a list of tuples (thread_id, frame_list) for
+          threads in that interpreter
           - thread_id is the OS thread identifier
-          - frame_list is a list of tuples (function_name, filename, line_number) representing
-            the Python stack frames for that thread, ordered from most recent to oldest
+          - frame_list is a list of tuples (function_name, filename,
+            line_number) representing the Python stack frames for that
+            thread, ordered from most recent to oldest
 
         The threads returned depend on the initialization parameters:
-        - If only_active_thread was True: returns only the thread holding the GIL across all interpreters
-        - If all_threads was True: returns all threads across all interpreters
+        - If only_active_thread was True: returns only the thread holding
+          the GIL across all interpreters
+        - If all_threads was True: returns all threads across all
+          interpreters
         - Otherwise: returns only the main thread of each interpreter
 
         Example:
@@ -245,29 +250,36 @@ class RemoteUnwinder:
             ]
 
         Raises:
-            RuntimeError: If there is an error copying memory from the target process
+            RuntimeError: If there is an error copying memory from the
+                target process
             OSError: If there is an error accessing the target process
             PermissionError: If access to the target process is denied
-            UnicodeDecodeError: If there is an error decoding strings from the target process
+            UnicodeDecodeError: If there is an error decoding strings from
+                the target process
         """
 
     def get_all_awaited_by(self) -> list[AwaitedInfo]:
         """Get all tasks and their awaited_by relationships from the remote process.
 
-        This provides a tree structure showing which tasks are waiting for other tasks.
+        This provides a tree structure showing which tasks are waiting for
+        other tasks.
 
         For each task, returns:
-        1. The call stack frames leading to where the task is currently executing
+        1. The call stack frames leading to where the task is currently
+           executing
         2. The name of the task
-        3. A list of tasks that this task is waiting for, with their own frames/names/etc
+        3. A list of tasks that this task is waiting for, with their own
+           frames/names/etc
 
         Returns a list of [frames, task_name, subtasks] where:
-        - frames: List of (func_name, filename, lineno) showing the call stack
+        - frames: List of (func_name, filename, lineno) showing the call
+          stack
         - task_name: String identifier for the task
         - subtasks: List of tasks being awaited by this task, in same format
 
         Raises:
-            RuntimeError: If AsyncioDebug section is not available in the remote process
+            RuntimeError: If AsyncioDebug section is not available in the
+                remote process
             MemoryError: If memory allocation fails
             OSError: If reading from the remote process fails
 
@@ -291,14 +303,16 @@ class RemoteUnwinder:
     def get_async_stack_trace(self) -> list[AwaitedInfo]:
         """Get the currently running async tasks and their dependency graphs from the remote process.
 
-        This returns information about running tasks and all tasks that are waiting for them,
-        forming a complete dependency graph for each thread's active task.
+        This returns information about running tasks and all tasks that are
+        waiting for them, forming a complete dependency graph for each
+        thread's active task.
 
-        For each thread with a running task, returns the running task plus all tasks that
-        transitively depend on it (tasks waiting for the running task, tasks waiting for
-        those tasks, etc.).
+        For each thread with a running task, returns the running task plus
+        all tasks that transitively depend on it (tasks waiting for the
+        running task, tasks waiting for those tasks, etc.).
 
-        Returns a list of per-thread results, where each thread result contains:
+        Returns a list of per-thread results, where each thread result
+        contains:
         - Thread ID
         - List of task information for the running task and all its waiters
 
@@ -309,11 +323,13 @@ class RemoteUnwinder:
         - List of tasks waiting for this task (recursive structure)
 
         Raises:
-            RuntimeError: If AsyncioDebug section is not available in the target process
+            RuntimeError: If AsyncioDebug section is not available in the
+                target process
             MemoryError: If memory allocation fails
             OSError: If reading from the remote process fails
 
-        Example output (similar structure to get_all_awaited_by but only for running tasks):
+        Example output (similar structure to get_all_awaited_by but only for
+        running tasks):
         [
             (140234, [
                 (4345585712, 'main_task',
@@ -338,16 +354,34 @@ class RemoteUnwinder:
                 - total_samples: Total number of get_stack_trace calls
                 - frame_cache_hits: Full cache hits (entire stack unchanged)
                 - frame_cache_misses: Cache misses requiring full walk
-                - frame_cache_partial_hits: Partial hits (stopped at cached frame)
+                - frame_cache_partial_hits: Partial hits (stopped at cached
+                  frame)
                 - frames_read_from_cache: Total frames retrieved from cache
-                - frames_read_from_memory: Total frames read from remote memory
+                - frames_read_from_memory: Total frames read from remote
+                  memory
                 - memory_reads: Total remote memory read operations
                 - memory_bytes_read: Total bytes read from remote memory
                 - code_object_cache_hits: Code object cache hits
                 - code_object_cache_misses: Code object cache misses
-                - stale_cache_invalidations: Times stale cache entries were cleared
-                - frame_cache_hit_rate: Percentage of samples that hit the cache
-                - code_object_cache_hit_rate: Percentage of code object lookups that hit cache
+                - stale_cache_invalidations: Times stale cache entries were
+                  cleared
+                - batched_read_attempts: Batched remote-read attempts
+                - batched_read_successes: Attempts that read all requested
+                  segments
+                - batched_read_misses: Attempts that fell back or partially
+                  read
+                - batched_read_segments_requested: Segments requested by
+                  batched reads
+                - batched_read_segments_completed: Segments completed by
+                  batched reads
+                - frame_cache_hit_rate: Percentage of samples that hit the
+                  cache
+                - code_object_cache_hit_rate: Percentage of code object
+                  lookups that hit cache
+                - batched_read_success_rate: Percentage of batched reads
+                  that completed all segments
+                - batched_read_segment_completion_rate: Percentage of
+                  requested segments read by batched reads
 
         Raises:
             RuntimeError: If stats collection was not enabled (stats=False)
@@ -357,9 +391,11 @@ class RemoteUnwinder:
         """Pause all threads in the target process.
 
         This stops all threads in the target process to allow for consistent
-        memory reads during sampling. Must be paired with a call to resume_threads().
+        memory reads during sampling. Must be paired with a call to
+        resume_threads().
 
-        Returns True if threads were successfully paused, False if they were already paused.
+        Returns True if threads were successfully paused, False if they were
+        already paused.
 
         Raises:
             RuntimeError: If there is an error stopping the threads
@@ -368,9 +404,11 @@ class RemoteUnwinder:
     def resume_threads(self) -> bool:
         """Resume all threads in the target process.
 
-        This resumes threads that were previously paused with pause_threads().
+        This resumes threads that were previously paused with
+        pause_threads().
 
-        Returns True if threads were successfully resumed, False if they were not paused.
+        Returns True if threads were successfully resumed, False if they
+        were not paused.
         """
 
 @final
@@ -401,8 +439,8 @@ class GCMonitor:
                 - duration: Total collection time, in seconds.
 
         Raises:
-            RuntimeError: If the target process cannot be inspected or if its
-                debug offsets or GC stats layout are incompatible.
+            RuntimeError: If the target process cannot be inspected or if
+                its debug offsets or GC stats layout are incompatible.
         """
 
 @final
@@ -419,7 +457,8 @@ class BinaryWriter:
 
         Arguments:
             stack_frames: List of InterpreterInfo objects
-            timestamp_us: Current timestamp in microseconds (from time.monotonic() * 1e6)
+            timestamp_us: Current timestamp in microseconds (from
+                time.monotonic() * 1e6)
         """
 
     def finalize(self) -> None:
@@ -440,8 +479,9 @@ class BinaryWriter:
     def get_stats(self) -> _Stats:
         """Get encoding statistics for the writer.
 
-        Returns a dict with encoding statistics including repeat/full/suffix/pop-push
-        record counts, frames written/saved, and compression ratio.
+        Returns a dict with encoding statistics including
+        repeat/full/suffix/pop-push record counts, frames written/saved, and
+        compression ratio.
         """
 
 @final
@@ -476,8 +516,8 @@ class BinaryReader:
     def get_stats(self) -> _Stats:
         """Get reconstruction statistics from replay.
 
-        Returns a dict with statistics about record types decoded and samples
-        reconstructed during replay.
+        Returns a dict with statistics about record types decoded and
+        samples reconstructed during replay.
         """
 
     def close(self) -> None:
@@ -505,11 +545,12 @@ def get_child_pids(pid: int, *, recursive: bool = True) -> list[int]:
         If True, return all descendants (children, grandchildren, etc.).
         If False, return only direct children.
 
-    Returns a list of child process IDs. Returns an empty list if no children
-    are found.
+    Returns a list of child process IDs.  Returns an empty list if no
+    children are found.
 
-    This function provides a snapshot of child processes at a moment in time.
-    Child processes may exit or new ones may be created after the list is returned.
+    This function provides a snapshot of child processes at a moment in
+    time.  Child processes may exit or new ones may be created after the
+    list is returned.
 
     Raises:
         OSError: If unable to enumerate processes

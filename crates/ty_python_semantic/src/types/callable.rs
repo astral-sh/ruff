@@ -396,9 +396,7 @@ impl From<TypeRelation> for UpcastPolicy {
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
             | TypeRelation::SubtypingAssuming => UpcastPolicy::Sound,
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                UpcastPolicy::Unsound
-            }
+            TypeRelation::Assignability => UpcastPolicy::Unsound,
         }
     }
 }

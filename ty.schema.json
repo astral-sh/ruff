@@ -390,16 +390,6 @@
             }
           ]
         },
-        "conflicting-argument-forms": {
-          "title": "detects when an argument is used as both a value and a type form in a call",
-          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "conflicting-declarations": {
           "title": "detects conflicting declarations",
           "description": "## What it does\nChecks whether a variable has been declared as two conflicting types.\n\n## Why is this bad\nA variable with two conflicting declarations likely indicates a mistake.\nMoreover, it could lead to incorrect or ill-defined type inference for\nother code that relies on these variables.\n\n## Examples\n```python\nif b:\n    a: int\nelse:\n    a: str\n\na = 1\n```",
@@ -872,7 +862,7 @@
         },
         "invalid-paramspec": {
           "title": "detects invalid ParamSpec usage",
-          "description": "## What it does\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\nP2 = ParamSpec(\"S2\")  # error: ParamSpec name must match the variable it's assigned to\n```\n\n## References\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
+          "description": "## What it does\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\nP2 = ParamSpec()  # error: ParamSpec requires a name\n```\n\n## References\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
           "default": "error",
           "oneOf": [
             {
@@ -1092,7 +1082,7 @@
         },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
           "default": "warn",
           "oneOf": [
             {

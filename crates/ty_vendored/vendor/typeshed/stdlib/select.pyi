@@ -34,8 +34,8 @@ if sys.platform != "win32":
     class poll:
         """Returns a polling object.
 
-        This object supports registering and unregistering file descriptors, and then
-        polling them for I/O events.
+        This object supports registering and unregistering file descriptors, and
+        then polling them for I/O events.
         """
 
         # default value is select.POLLIN | select.POLLPRI | select.POLLOUT
@@ -53,7 +53,8 @@ def select(
 ) -> tuple[list[_R], list[_W], list[_X]]:
     """Wait until one or more file descriptors are ready for some kind of I/O.
 
-    The first three arguments are iterables of file descriptors to be waited for:
+    The first three arguments are iterables of file descriptors to be waited
+    for:
     rlist -- wait until ready for reading
     wlist -- wait until ready for writing
     xlist -- wait for an "exceptional condition"
@@ -66,9 +67,9 @@ def select(
     a non-integer to specify fractions of seconds.  If it is absent
     or None, the call will never time out.
 
-    The return value is a tuple of three lists corresponding to the first three
-    arguments; each contains the subset of the corresponding file descriptors
-    that are ready.
+    The return value is a tuple of three lists corresponding to the first
+    three arguments; each contains the subset of the corresponding file
+    descriptors that are ready.
 
     *** IMPORTANT NOTICE ***
     On Windows, only sockets are supported; on Unix, all file
@@ -273,8 +274,8 @@ if sys.platform == "linux":
               maxevents
                 the maximum number of events returned; -1 means no limit
 
-            Returns a list containing any descriptors that have events to report,
-            as a list of (fd, events) 2-tuples.
+            Returns a list containing any descriptors that have events to
+            report, as a list of (fd, events) 2-tuples.
             """
 
         @classmethod

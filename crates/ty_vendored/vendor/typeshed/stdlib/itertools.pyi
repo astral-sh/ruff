@@ -156,8 +156,8 @@ class chain(Generic[_T]):
 class compress(Generic[_T]):
     """Return data elements corresponding to true selector elements.
 
-    Forms a shorter iterator from selected data elements using the selectors to
-    choose the data elements.
+    Forms a shorter iterator from selected data elements using the selectors
+    to choose the data elements.
     """
 
     def __new__(cls, data: Iterable[_T], selectors: Iterable[Any]) -> Self: ...
