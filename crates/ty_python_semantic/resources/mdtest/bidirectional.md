@@ -1031,9 +1031,9 @@ reveal_type(x12)  # revealed: list[list[int]]
 ```py
 x13 = []
 x13.append(x13)
-reveal_type(x13)  # revealed: list[Unknown] | list[list[Unknown]]
-reveal_type(x13[0])  # revealed: Unknown | list[Unknown]
-reveal_type(x13[0][0])  # revealed: Unknown
+reveal_type(x13)  # revealed: list[Divergent]
+reveal_type(x13[0])  # revealed: list[Divergent]
+reveal_type(x13[0][0])  # revealed: list[Divergent]
 ```
 
 ```py
@@ -1043,12 +1043,12 @@ x15 = []
 x14.append(x15)
 x15.append(x14)
 
-reveal_type(x14)  # revealed: list[Unknown] | list[list[Unknown] | list[list[Unknown]]]
-reveal_type(x14[0])  # revealed: Unknown | list[Unknown] | list[list[Unknown]]
-reveal_type(x14[0][0])  # revealed: Unknown | list[Unknown]
-reveal_type(x15)  # revealed: list[Unknown] | list[list[Unknown]]
-reveal_type(x15[0])  # revealed: Unknown | list[Unknown]
-reveal_type(x15[0][0])  # revealed: Unknown
+reveal_type(x14)  # revealed: list[Divergent]
+reveal_type(x14[0])  # revealed: list[Divergent]
+reveal_type(x14[0][0])  # revealed: list[Divergent]
+reveal_type(x15)  # revealed: list[Divergent]
+reveal_type(x15[0])  # revealed: list[Divergent]
+reveal_type(x15[0][0])  # revealed: list[Divergent]
 ```
 
 Collection-use constraints must converge when multiple collection literals are used in a container
@@ -1077,9 +1077,9 @@ def assigned(cond: bool, d: dict[Any, Any]) -> list[Any]:
 def _(i):
     x16 = []
     x16.append(x16)
-    reveal_type(x16)  # revealed: list[Unknown] | list[list[Unknown]]
-    reveal_type(x16[0])  # revealed: Unknown | list[Unknown]
-    reveal_type(x16[0][0])  # revealed: Unknown
+    reveal_type(x16)  # revealed: list[Divergent]
+    reveal_type(x16[0])  # revealed: list[Divergent]
+    reveal_type(x16[0][0])  # revealed: list[Divergent]
 ```
 
 ```py
