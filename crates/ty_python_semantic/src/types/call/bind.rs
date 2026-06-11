@@ -56,7 +56,7 @@ use crate::types::signatures::{
     CallableSignature, Parameter, ParameterDisplayName, ParameterKind, Parameters, ParametersKind,
     PartialApplication, PartialSignatureApplication,
 };
-use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::tuple::{TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{
@@ -5315,11 +5315,86 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         specialization_errors: &mut Vec<BindingError<'db>>,
     ) -> bool {
         let parameters = self.signature.parameters();
+        let starred_typevartuple_declared_type = |parameter: &Parameter<'db>| {
+            if !parameter.has_starred_annotation() {
+                return None;
+            }
+            if let Type::TypeVar(typevar) = parameter.annotated_type()
+                && typevar.is_typevartuple(self.db)
+            {
+                return Some(Type::tuple(TupleType::new(
+                    self.db,
+                    &TupleSpecBuilder::with_capacity(0)
+                        .concat_variadic_typevar(self.db, typevar)
+                        .build(),
+                )));
+            }
+            let tuple = parameter
+                .annotated_type()
+                .exact_tuple_instance_spec(self.db)?;
+            let TupleSpec::Variable(variable) = tuple.as_ref() else {
+                return None;
+            };
+            if matches!(
+                variable.variable(),
+                Type::TypeVar(typevar) if typevar.is_typevartuple(self.db)
+            ) {
+                Some(parameter.annotated_type())
+            } else {
+                None
+            }
+        };
+
+        let starred_typevartuple_declared_types = parameters
+            .iter()
+            .map(starred_typevartuple_declared_type)
+            .collect::<Vec<_>>();
+        let mut starred_typevartuple_arguments = starred_typevartuple_declared_types
+            .iter()
+            .map(|declared_type| declared_type.map(|_| Vec::new()))
+            .collect::<Vec<_>>();
+        if starred_typevartuple_arguments.iter().any(Option::is_some) {
+            for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
+                for matched_parameter in self.argument_matches[argument_index].iter() {
+                    let parameter_index = matched_parameter.index;
+                    if let Some(typevartuple_arguments) =
+                        &mut starred_typevartuple_arguments[parameter_index]
+                    {
+                        typevartuple_arguments
+                            .push(argument_types.get_default().unwrap_or(Type::unknown()));
+                    }
+                }
+            }
+        }
+
+        for (declared_type, argument_types) in starred_typevartuple_declared_types
+            .iter()
+            .zip(&starred_typevartuple_arguments)
+        {
+            let Some((declared_type, argument_types)) =
+                declared_type.as_ref().zip(argument_types.as_ref())
+            else {
+                continue;
+            };
+            let argument_type = Type::heterogeneous_tuple(self.db, argument_types.iter().copied());
+            let specialization_result = builder.infer(*declared_type, argument_type);
+
+            if let Err(error) = specialization_result {
+                specialization_errors.push(BindingError::SpecializationError {
+                    error,
+                    argument_index: None,
+                });
+            }
+        }
+
         for (argument_index, adjusted_argument_index, _, argument_types) in
             self.enumerate_argument_types()
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
+                if starred_typevartuple_arguments[parameter_index].is_some() {
+                    continue;
+                }
                 if self.is_gradual_variadic_parameter(parameter_index) {
                     continue;
                 }
@@ -5487,6 +5562,67 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let is_paramspec_component_parameter = |parameter_index: usize| {
             paramspec_component_start.is_some_and(|start| parameter_index >= start)
         };
+
+        for (parameter_index, parameter) in self.signature.parameters().iter().enumerate() {
+            if !parameter.is_variadic()
+                || !parameter.has_starred_annotation()
+                || parameter
+                    .annotated_type()
+                    .exact_tuple_instance_spec(self.db)
+                    .is_none()
+            {
+                continue;
+            }
+
+            let mut positional_types = Vec::new();
+            let mut diagnostic_argument_index = None;
+            let mut has_unpacked_argument = false;
+            for (argument_index, adjusted_argument_index, argument, argument_types) in
+                self.enumerate_argument_types()
+            {
+                if !self.argument_matches[argument_index]
+                    .iter()
+                    .any(|matched_parameter| matched_parameter.index == parameter_index)
+                {
+                    continue;
+                }
+                if matches!(argument, Argument::Variadic) {
+                    has_unpacked_argument = true;
+                    break;
+                }
+                if !matches!(argument, Argument::Positional | Argument::Synthetic) {
+                    continue;
+                }
+                positional_types
+                    .push(argument_types.get_for_declared_type(parameter.annotated_type()));
+                diagnostic_argument_index = diagnostic_argument_index.or(adjusted_argument_index);
+            }
+            if has_unpacked_argument {
+                continue;
+            }
+
+            let provided_ty = Type::heterogeneous_tuple(self.db, positional_types);
+            let expected_ty = self.specialization.map_or_else(
+                || parameter.annotated_type(),
+                |specialization| {
+                    parameter
+                        .annotated_type()
+                        .apply_specialization(self.db, specialization)
+                },
+            );
+            if provided_ty
+                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
+                .is_never_satisfied(self.db)
+            {
+                self.errors.push(BindingError::InvalidArgumentType {
+                    parameter: ParameterContext::new(parameter, parameter_index, false),
+                    argument_index: diagnostic_argument_index,
+                    expected_ty,
+                    provided_ty,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                });
+            }
+        }
 
         for (argument_index, adjusted_argument_index, argument, argument_types) in
             self.enumerate_argument_types()

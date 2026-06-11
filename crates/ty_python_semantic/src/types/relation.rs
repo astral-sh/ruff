@@ -15,6 +15,7 @@ use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
+use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
@@ -1397,6 +1398,32 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     && let Some(instance) = source.to_instance(db) =>
             {
                 self.check_type_pair(db, instance, Type::TypeVar(type_var))
+            }
+
+            // A TypeVarTuple specialization is represented by one tuple value. Keep inferable
+            // TypeVarTuples bare for constraint solving, but compare fixed symbolic values using
+            // the same tuple relation as concrete specializations.
+            (Type::TypeVar(bound_typevar), target)
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.is_typevartuple(db)
+                    && target.exact_tuple_instance_spec(db).is_some() =>
+            {
+                self.check_type_pair(
+                    db,
+                    Type::tuple(Some(TupleType::unpacked_typevartuple(db, bound_typevar))),
+                    target,
+                )
+            }
+            (source, Type::TypeVar(bound_typevar))
+                if !bound_typevar.is_inferable(db, self.inferable)
+                    && bound_typevar.is_typevartuple(db)
+                    && source.exact_tuple_instance_spec(db).is_some() =>
+            {
+                self.check_type_pair(
+                    db,
+                    source,
+                    Type::tuple(Some(TupleType::unpacked_typevartuple(db, bound_typevar))),
+                )
             }
 
             // A gradual `ParamSpec` value (`...`) is assignability-consistent with any concrete

@@ -32,6 +32,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
+use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
@@ -4034,7 +4035,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::new(value, self.data.kind)
+        Self::new(value, self.data.kind).expand_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -4101,6 +4102,65 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    /// Expands an unpacked `*args` annotation into its logical callable parameters.
+    fn expand_starred_variadic_annotations(self, db: &'db dyn Db) -> Self {
+        if !self
+            .data
+            .value
+            .iter()
+            .any(|parameter| parameter.is_variadic() && parameter.has_starred_annotation())
+        {
+            return self;
+        }
+
+        let mut expanded = false;
+        let mut parameters = Vec::with_capacity(self.data.value.len());
+        for parameter in &self.data.value {
+            if parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db)
+            {
+                expanded = true;
+                match tuple.as_ref() {
+                    Tuple::Fixed(tuple) => {
+                        parameters.extend(
+                            tuple
+                                .iter_all_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                    Tuple::Variable(variable) => {
+                        parameters.extend(
+                            variable
+                                .iter_prefix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                        let name = parameter
+                            .name()
+                            .cloned()
+                            .unwrap_or_else(|| Name::new_static("args"));
+                        parameters.push(
+                            Parameter::variadic(name).with_annotated_type(variable.variable()),
+                        );
+                        parameters.extend(
+                            variable
+                                .iter_suffix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                }
+            } else {
+                parameters.push(parameter.clone());
+            }
+        }
+
+        if expanded {
+            Self::new(db, parameters)
+        } else {
+            self
+        }
     }
 
     /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.

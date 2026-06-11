@@ -245,75 +245,54 @@ U = TypeVar("U")
 class Simple(Generic[*Ts]):
     attr: tuple[*Ts]
 
-# TODO: revealed: tuple[()]
-reveal_type(Simple[()]().attr)  # revealed: tuple[tuple[()], ...]
-# TODO: revealed: tuple[int, str]
-reveal_type(Simple[int, str]().attr)  # revealed: tuple[tuple[int, str], ...]
-# TODO: revealed: tuple[int, str]
-reveal_type(Simple[*tuple[int, str]]().attr)  # revealed: tuple[tuple[int, str], ...]
+reveal_type(Simple[()]().attr)  # revealed: tuple[()]
+reveal_type(Simple[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Simple[*tuple[int, str]]().attr)  # revealed: tuple[int, str]
 
-# TODO: revealed: tuple[Unknown]
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[tuple[Unknown], ...]
-# TODO: revealed: tuple[Unknown, ...]
+reveal_type(Simple[[int, str]]().attr)  # revealed: tuple[Unknown]
 # error: [invalid-type-form] "List literals are not allowed in this context in a type expression"
-reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[tuple[Unknown, ...], ...]
+reveal_type(Simple[*[int, str]]().attr)  # revealed: tuple[Unknown, ...]
 ```
 
 ```py
 class Prefix(Generic[T, *Ts]):
     attr: tuple[T, *Ts]
 
-# TODO: revealed: tuple[int]
-reveal_type(Prefix[int]().attr)  # revealed: tuple[int, *tuple[tuple[()], ...]]
-# TODO: revealed: tuple[int, bool]
-reveal_type(Prefix[int, bool]().attr)  # revealed: tuple[int, *tuple[tuple[bool], ...]]
-# TODO: revealed: tuple[int, bool, str]
-reveal_type(Prefix[int, bool, str]().attr)  # revealed: tuple[int, *tuple[tuple[bool, str], ...]]
-# TODO: revealed: tuple[int, bool, str]
-reveal_type(Prefix[int, *tuple[bool, str]]().attr)  # revealed: tuple[int, *tuple[tuple[bool, str], ...]]
+reveal_type(Prefix[int]().attr)  # revealed: tuple[int]
+reveal_type(Prefix[int, bool]().attr)  # revealed: tuple[int, bool]
+reveal_type(Prefix[int, bool, str]().attr)  # revealed: tuple[int, bool, str]
+reveal_type(Prefix[int, *tuple[bool, str]]().attr)  # revealed: tuple[int, bool, str]
 
 # TODO: Should this raise an error?
-# TODO: revealed: tuple[Unknown, *tuple[Unknown, ...]]
-reveal_type(Prefix().attr)  # revealed: tuple[Unknown, *tuple[tuple[Unknown, ...], ...]]
+reveal_type(Prefix().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...]]
 ```
 
 ```py
 class Suffix(Generic[*Ts, T]):
     attr: tuple[*Ts, T]
 
-# TODO: revealed: tuple[int]
-reveal_type(Suffix[int]().attr)  # revealed: tuple[*tuple[tuple[()], ...], int]
-# TODO: revealed: tuple[int, str]
-reveal_type(Suffix[int, str]().attr)  # revealed: tuple[*tuple[tuple[int], ...], str]
-# TODO: revealed: tuple[int, str, bool]
-reveal_type(Suffix[int, str, bool]().attr)  # revealed: tuple[*tuple[tuple[int, str], ...], bool]
-# TODO: revealed: tuple[int, str, bool]
-reveal_type(Suffix[*tuple[int, str], bool]().attr)  # revealed: tuple[*tuple[tuple[int, str], ...], bool]
+reveal_type(Suffix[int]().attr)  # revealed: tuple[int]
+reveal_type(Suffix[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Suffix[int, str, bool]().attr)  # revealed: tuple[int, str, bool]
+reveal_type(Suffix[*tuple[int, str], bool]().attr)  # revealed: tuple[int, str, bool]
 
 # TODO: Should this raise an error?
-# TODO: revealed: tuple[*tuple[Unknown, ...], Unknown]
-reveal_type(Suffix().attr)  # revealed: tuple[*tuple[tuple[Unknown, ...], ...], Unknown]
+reveal_type(Suffix().attr)  # revealed: tuple[*tuple[Unknown, ...], Unknown]
 ```
 
 ```py
 class Between(Generic[T, *Ts, U]):
     attr: tuple[T, *Ts, U]
 
-# TODO: revealed: tuple[int, str]
-reveal_type(Between[int, str]().attr)  # revealed: tuple[int, *tuple[tuple[()], ...], str]
-# TODO: revealed: tuple[int, bool, str]
-reveal_type(Between[int, bool, str]().attr)  # revealed: tuple[int, *tuple[tuple[bool], ...], str]
-# TODO: revealed: tuple[int, bool, bytes, str]
-reveal_type(Between[int, bool, bytes, str]().attr)  # revealed: tuple[int, *tuple[tuple[bool, bytes], ...], str]
-# TODO: revealed: tuple[int, bool, str]
-reveal_type(Between[int, *tuple[bool], str]().attr)  # revealed: tuple[int, *tuple[tuple[bool], ...], str]
+reveal_type(Between[int, str]().attr)  # revealed: tuple[int, str]
+reveal_type(Between[int, bool, str]().attr)  # revealed: tuple[int, bool, str]
+reveal_type(Between[int, bool, bytes, str]().attr)  # revealed: tuple[int, bool, bytes, str]
+reveal_type(Between[int, *tuple[bool], str]().attr)  # revealed: tuple[int, bool, str]
 
-# TODO: revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
-reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[tuple[Unknown, ...], ...], Unknown]
-# TODO: revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
+reveal_type(Between().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 # error: [invalid-type-arguments] "No type argument provided for required type variable `U` of class `Between`"
-reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[tuple[Unknown, ...], ...], Unknown]
+reveal_type(Between[int]().attr)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
 ### Inferred specialization from construction
@@ -334,21 +313,15 @@ class Variadic(Generic[*Ts]):
     def __init__(self, *shape: *Ts) -> None:
         self.shape = shape
 
-# TODO: revealed: Positional[()]
-reveal_type(Positional(()))  # revealed: Positional[*tuple[Unknown, ...]]
-# TODO: revealed: Positional[int, str]
-reveal_type(Positional((1, "a")))  # revealed: Positional[int | str]
+reveal_type(Positional(()))  # revealed: Positional[()]
+reveal_type(Positional((1, "a")))  # revealed: Positional[int, str]
 
-# TODO: revealed: Variadic[()]
-reveal_type(Variadic())  # revealed: Variadic[*tuple[Unknown, ...]]
-# TODO: revealed: Variadic[int, str]
-reveal_type(Variadic(1, "a"))  # revealed: Variadic[int | str]
+reveal_type(Variadic())  # revealed: Variadic[()]
+reveal_type(Variadic(1, "a"))  # revealed: Variadic[int, str]
 
 def _(i: int, s: str) -> None:
-    # TODO: revealed: Positional[int, str]
-    reveal_type(Positional((i, s)))  # revealed: Positional[int | str]
-    # TODO: revealed: Variadic[int, str]
-    reveal_type(Variadic(i, s))  # revealed: Variadic[int | str]
+    reveal_type(Positional((i, s)))  # revealed: Positional[int, str]
+    reveal_type(Variadic(i, s))  # revealed: Variadic[int, str]
 ```
 
 ### Unspecified type arguments
@@ -368,8 +341,7 @@ class Unspecified(Generic[*Ts]):
 
 unspecified = Unspecified()
 reveal_type(unspecified)  # revealed: Unspecified[*tuple[Unknown, ...]]
-# TODO: revealed: tuple[Unknown, ...]
-reveal_type(unspecified.attr)  # revealed: tuple[tuple[Unknown, ...], ...]
+reveal_type(unspecified.attr)  # revealed: tuple[Unknown, ...]
 ```
 
 ### Default type arguments
@@ -393,10 +365,8 @@ InvalidDefault = TypeVarTuple("InvalidDefault", default=tuple[int, str])
 class WithDefault(Generic[*Ts]):
     attr: tuple[*Ts]
 
-# TODO: revealed: tuple[int, str]
-reveal_type(WithDefault().attr)  # revealed: tuple[tuple[int, str], ...]
-# TODO: revealed: tuple[bool, bytes]
-reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[tuple[bool, bytes], ...]
+reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
+reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
 ```
 
 ### Backported default type arguments
@@ -417,8 +387,7 @@ Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 class WithBackportedDefault(Generic[*Ts]):
     attr: tuple[*Ts]
 
-# TODO: revealed: tuple[int, str]
-reveal_type(WithBackportedDefault().attr)  # revealed: tuple[tuple[int, str], ...]
+reveal_type(WithBackportedDefault().attr)  # revealed: tuple[int, str]
 ```
 
 ## Type Aliases
@@ -450,26 +419,16 @@ def _(
     # error: [invalid-type-arguments] "No type argument provided for required type variable `U`"
     a10: Between[int],
 ):
-    # TODO: revealed: tuple[()]
-    reveal_type(a1)  # revealed: tuple[tuple[()], ...]
-    # TODO: revealed: tuple[int, str]
-    reveal_type(a2)  # revealed: tuple[tuple[int, str], ...]
-    # TODO: revealed: tuple[int, str]
-    reveal_type(a3)  # revealed: tuple[int, *tuple[tuple[()], ...], str]
-    # TODO: revealed: tuple[int, bool, str]
-    reveal_type(a4)  # revealed: tuple[int, *tuple[tuple[bool], ...], str]
-    # TODO: revealed: tuple[int, bool, bytes, str]
-    reveal_type(a5)  # revealed: tuple[int, *tuple[tuple[bool, bytes], ...], str]
-    # TODO: revealed: tuple[bool]
-    reveal_type(a6)  # revealed: tuple[bool, *tuple[tuple[()], ...]]
-    # TODO: revealed: tuple[bool, int, str]
-    reveal_type(a7)  # revealed: tuple[bool, *tuple[tuple[int, str], ...]]
-    # TODO: revealed: tuple[bool]
-    reveal_type(a8)  # revealed: tuple[*tuple[tuple[()], ...], bool]
-    # TODO: revealed: tuple[int, str, bool]
-    reveal_type(a9)  # revealed: tuple[*tuple[tuple[int, str], ...], bool]
-    # TODO: revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
-    reveal_type(a10)  # revealed: tuple[Unknown, *tuple[tuple[Unknown, ...], ...], Unknown]
+    reveal_type(a1)  # revealed: tuple[()]
+    reveal_type(a2)  # revealed: tuple[int, str]
+    reveal_type(a3)  # revealed: tuple[int, str]
+    reveal_type(a4)  # revealed: tuple[int, bool, str]
+    reveal_type(a5)  # revealed: tuple[int, bool, bytes, str]
+    reveal_type(a6)  # revealed: tuple[bool]
+    reveal_type(a7)  # revealed: tuple[bool, int, str]
+    reveal_type(a8)  # revealed: tuple[bool]
+    reveal_type(a9)  # revealed: tuple[int, str, bool]
+    reveal_type(a10)  # revealed: tuple[Unknown, *tuple[Unknown, ...], Unknown]
 ```
 
 ### Unpacked tuple type arguments
@@ -482,10 +441,8 @@ Ts = TypeVarTuple("Ts")
 Alias = tuple[int, *Ts]
 
 def _(a1: Alias[*tuple[str, bool]], a2: Alias[*tuple[str, ...]]) -> None:
-    # TODO: revealed: tuple[int, str, bool]
-    reveal_type(a1)  # revealed: tuple[int, *tuple[tuple[str, bool], ...]]
-    # TODO: revealed: tuple[int, *tuple[str, ...]]
-    reveal_type(a2)  # revealed: tuple[int, *tuple[tuple[str, ...], ...]]
+    reveal_type(a1)  # revealed: tuple[int, str, bool]
+    reveal_type(a2)  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
 ### Unspecified alias type arguments
@@ -500,10 +457,8 @@ Ts = TypeVarTuple("Ts")
 Alias = tuple[bytes, *Ts]
 
 def _(a1: Alias, a2: Alias[*tuple[Any, ...]]) -> None:
-    # TODO: revealed: tuple[bytes, *tuple[Unknown, ...]]
-    reveal_type(a1)  # revealed: tuple[bytes, *tuple[tuple[Unknown, ...], ...]]
-    # TODO: revealed: tuple[bytes, *tuple[Any, ...]]
-    reveal_type(a2)  # revealed: tuple[bytes, *tuple[tuple[Any, ...], ...]]
+    reveal_type(a1)  # revealed: tuple[bytes, *tuple[Unknown, ...]]
+    reveal_type(a2)  # revealed: tuple[bytes, *tuple[Any, ...]]
 ```
 
 ### Splitting arbitrary-length tuples
@@ -523,14 +478,10 @@ def _(
     s1: Second[*tuple[int, ...]],
     s2: Second[str, *tuple[int, ...]],
 ):
-    # TODO: revealed: tuple[*tuple[int, ...], int]
-    reveal_type(f1)  # revealed: tuple[*tuple[tuple[int, ...], ...], int]
-    # TODO: revealed: tuple[*tuple[int, ...], str]
-    reveal_type(f2)  # revealed: tuple[*tuple[tuple[int, ...], ...], str]
-    # TODO: revealed: tuple[int, *tuple[int, ...]]
-    reveal_type(s1)  # revealed: tuple[int, *tuple[tuple[int, ...], ...]]
-    # TODO: revealed: tuple[str, *tuple[int, ...]]
-    reveal_type(s2)  # revealed: tuple[str, *tuple[tuple[int, ...], ...]]
+    reveal_type(f1)  # revealed: tuple[*tuple[int, ...], int]
+    reveal_type(f2)  # revealed: tuple[*tuple[int, ...], str]
+    reveal_type(s1)  # revealed: tuple[int, *tuple[int, ...]]
+    reveal_type(s2)  # revealed: tuple[str, *tuple[int, ...]]
 ```
 
 ### Variadic substitutions
@@ -546,8 +497,6 @@ First = tuple[bytes, *Ts]
 Second = First[int, *Ts]
 
 def f(a1: First[str, bool], a2: Second[str, bool]) -> None:
-    # TODO: revealed: tuple[bytes, str, bool]
-    reveal_type(a1)  # revealed: tuple[bytes, *tuple[tuple[str, bool], ...]]
-    # TODO: revealed: tuple[bytes, int, str, bool]
-    reveal_type(a2)  # revealed: tuple[bytes, *tuple[tuple[int, *tuple[tuple[str, bool], ...]], ...]]
+    reveal_type(a1)  # revealed: tuple[bytes, str, bool]
+    reveal_type(a2)  # revealed: tuple[bytes, int, str, bool]
 ```
