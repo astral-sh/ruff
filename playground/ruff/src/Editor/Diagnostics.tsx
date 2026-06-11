@@ -92,7 +92,7 @@ function Items({
               </span>
             </button>
             {diagnostic.subDiagnostics.length > 0 ? (
-              <ul className="pl-3 text-[0.9375rem] text-gray-500 whitespace-pre-wrap">
+              <ul className="pl-3 text-sm text-gray-500 whitespace-pre-wrap">
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
                   <li key={index}>
                     <SubDiagnosticItem
