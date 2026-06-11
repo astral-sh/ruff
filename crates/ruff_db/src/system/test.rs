@@ -101,6 +101,10 @@ impl System for TestSystem {
         self.system().canonicalize_path(path)
     }
 
+    fn is_same_file(&self, first: &SystemPath, second: &SystemPath) -> Result<bool> {
+        self.system().is_same_file(first, second)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> Result<String> {
         self.system().read_to_string(path)
     }

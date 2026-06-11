@@ -532,8 +532,38 @@ impl PythonInterpreterLayout {
         }
     }
 
-    fn from_path(path: &SystemPath) -> Option<Self> {
-        Self::from_file_name(path.file_name()?)
+    fn from_path(path: &SystemPath, system: &dyn System) -> Option<Self> {
+        let mut layout = Self::from_file_name(path.file_name()?)?;
+
+        if layout.implementation.is_cpython()
+            && layout.variant.is_unknown()
+            && let Some(version) = layout.version
+            && version.free_threaded_build_available()
+            && let Some(parent) = path.parent()
+        {
+            let variant = PythonBuildVariant::FreeThreaded.suffix();
+            let free_threaded_executable = parent.join(format!(
+                "python{version}{variant}{}",
+                std::env::consts::EXE_SUFFIX
+            ));
+
+            // CPython's Unix installer hard-links `pythonX.Y` to `pythonX.Yt` for a
+            // free-threaded build, so neither the file name nor canonicalization can
+            // distinguish the two executable paths.
+            if !system.is_file(&free_threaded_executable) {
+                layout.variant = PythonBuildVariant::Default;
+            } else if let Ok(is_free_threaded) =
+                system.is_same_file(path, &free_threaded_executable)
+            {
+                layout.variant = if is_free_threaded {
+                    PythonBuildVariant::FreeThreaded
+                } else {
+                    PythonBuildVariant::Default
+                };
+            }
+        }
+
+        Some(layout)
     }
 
     fn from_file_name(file_name: &str) -> Option<Self> {
@@ -541,29 +571,42 @@ impl PythonInterpreterLayout {
             .strip_suffix(std::env::consts::EXE_SUFFIX)
             .unwrap_or(file_name);
 
-        let (mut implementation, version) = PythonImplementation::split_executable_name(file_name)?;
-        let (version, mut variant) = PythonBuildVariant::split_executable_suffix(version);
-        let version = PythonVersion::from_str(version).ok();
+        let (implementation, version) = PythonImplementation::split_executable_name(file_name)?;
+        let (version, variant) = PythonBuildVariant::split_executable_suffix(version);
+        let version = match PythonVersion::from_str(version) {
+            Ok(version) => version,
+            Err(_) if variant == PythonBuildVariant::FreeThreaded => return None,
+            Err(_) => {
+                // PyPy also uses generic executable names such as `python` and `python3`, so an
+                // unversioned name in the `python` family does not identify the implementation.
+                let implementation = if implementation.is_cpython() {
+                    PythonImplementation::Unknown
+                } else {
+                    implementation
+                };
+                return Some(Self::unknown(implementation, None));
+            }
+        };
 
         if variant == PythonBuildVariant::FreeThreaded
-            && (!implementation.is_cpython()
-                || !version.is_some_and(PythonVersion::free_threaded_build_available))
+            && (!implementation.is_cpython() || !version.free_threaded_build_available())
         {
             return None;
         }
 
-        if version.is_none() {
-            variant = PythonBuildVariant::Unknown;
-
-            // PyPy also uses generic executable names such as `python` and `python3`, so an
-            // unversioned name in the `python` family does not identify the implementation.
-            if implementation.is_cpython() {
-                implementation = PythonImplementation::Unknown;
-            }
-        }
+        // CPython may install `pythonX.Y` as a hard link to `pythonX.Yt`, so defer the build
+        // variant until `from_path` can compare the two executable paths.
+        let variant = if variant == PythonBuildVariant::Default
+            && implementation.is_cpython()
+            && version.free_threaded_build_available()
+        {
+            PythonBuildVariant::Unknown
+        } else {
+            variant
+        };
 
         Some(Self {
-            version,
+            version: Some(version),
             implementation,
             variant,
         })
@@ -576,7 +619,7 @@ impl PythonInterpreterLayout {
 
         match self.implementation {
             PythonImplementation::CPython => {
-                let variant = self.variant.directory_suffix();
+                let variant = self.variant.suffix();
                 Some(format!("lib/python{version}{variant}"))
             }
             PythonImplementation::GraalPy => Some(format!("lib/python{version}")),
@@ -616,7 +659,7 @@ impl PythonBuildVariant {
         }
     }
 
-    const fn directory_suffix(self) -> &'static str {
+    const fn suffix(self) -> &'static str {
         match self {
             Self::Unknown | Self::Default => "",
             Self::FreeThreaded => "t",
@@ -1433,7 +1476,7 @@ fn probe_package_dirs(
         let path = |variant: PythonBuildVariant| {
             prefix_dir.join(format!(
                 "python{python_version}{variant}/{suffix}",
-                variant = variant.directory_suffix()
+                variant = variant.suffix()
             ))
         };
 
@@ -1882,21 +1925,28 @@ impl PythonEnvironmentPath {
         }
 
         let layout = executable_path.and_then(|executable_path| {
-            let direct_layout = PythonInterpreterLayout::from_path(executable_path);
+            let canonical_layout = system
+                .canonicalize_path(executable_path)
+                .ok()
+                .and_then(|path| PythonInterpreterLayout::from_path(&path, system));
 
+            // A complete layout from the symlink target describes the actual interpreter, while
+            // the selected path may only be a facade. Keep its layout as a fallback when the
+            // target name does not include a version.
+            if let Some(layout) = canonical_layout
+                && layout.version.is_some()
+            {
+                return Some(layout);
+            }
+
+            let direct_layout = PythonInterpreterLayout::from_path(executable_path, system);
             if let Some(layout) = direct_layout
                 && layout.version.is_some()
             {
                 return Some(layout);
             }
 
-            if let Ok(canonical_executable) = system.canonicalize_path(executable_path)
-                && let Some(layout) = PythonInterpreterLayout::from_path(&canonical_executable)
-            {
-                return Some(layout);
-            }
-
-            direct_layout
+            canonical_layout.or(direct_layout)
         });
 
         let sys_prefix = SysPrefixPath {
@@ -3825,6 +3875,76 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn distinguishes_unsuffixed_default_from_free_threaded_executable() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        let system = OsSystem::new(root);
+
+        let prefix = root.join("prefix");
+        let bin = prefix.join("bin");
+        let versioned_executable = bin.join("python3.14");
+        let site_packages = prefix.join("lib/python3.14/site-packages");
+
+        std::fs::create_dir_all(bin.as_std_path()).unwrap();
+        std::fs::File::create(versioned_executable.as_std_path()).unwrap();
+        std::fs::File::create(bin.join("python3.14t").as_std_path()).unwrap();
+        std::fs::create_dir_all(site_packages.as_std_path()).unwrap();
+        std::fs::create_dir_all(prefix.join("lib/python3.14t/site-packages").as_std_path())
+            .unwrap();
+
+        let environment = PythonEnvironment::new(
+            &versioned_executable,
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap().into_vec(),
+            [system.canonicalize_path(&site_packages).unwrap()]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn identifies_unsuffixed_free_threaded_hard_link() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
+        let system = OsSystem::new(root);
+
+        let prefix = root.join("prefix");
+        let bin = prefix.join("bin");
+        let versioned_executable = bin.join("python3.14");
+        let free_threaded_executable = bin.join("python3.14t");
+        let free_threaded_site_packages = prefix.join("lib/python3.14t/site-packages");
+
+        std::fs::create_dir_all(bin.as_std_path()).unwrap();
+        std::fs::File::create(free_threaded_executable.as_std_path()).unwrap();
+        std::fs::hard_link(
+            free_threaded_executable.as_std_path(),
+            versioned_executable.as_std_path(),
+        )
+        .unwrap();
+        std::fs::create_dir_all(prefix.join("lib/python3.14/site-packages").as_std_path()).unwrap();
+        std::fs::create_dir_all(free_threaded_site_packages.as_std_path()).unwrap();
+
+        let environment = PythonEnvironment::new(
+            &versioned_executable,
+            SysPrefixPathOrigin::PythonCliFlag,
+            &system,
+        )
+        .unwrap();
+
+        assert_eq!(
+            environment.site_packages_paths(&system).unwrap().into_vec(),
+            [system
+                .canonicalize_path(&free_threaded_site_packages)
+                .unwrap()]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn uses_symlink_target_layout() {
         let temp_dir = tempfile::tempdir().unwrap();
         let root = SystemPath::from_std_path(temp_dir.path()).unwrap();
@@ -3864,30 +3984,36 @@ mod tests {
         std::fs::create_dir_all(facade_bin.as_std_path()).unwrap();
         std::fs::create_dir_all(python313_site_packages.as_std_path()).unwrap();
         std::fs::create_dir_all(python314_site_packages.as_std_path()).unwrap();
-        std::os::unix::fs::symlink(
-            other_bin.join("python3.14").as_std_path(),
-            facade_bin.join("python").as_std_path(),
-        )
-        .unwrap();
+        for executable_name in ["python", "python3.13"] {
+            std::os::unix::fs::symlink(
+                other_bin.join("python3.14").as_std_path(),
+                facade_bin.join(executable_name).as_std_path(),
+            )
+            .unwrap();
 
-        let executable = facade_bin.join("python");
-        assert_eq!(
-            PythonEnvironmentPath::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system,)
+            let executable = facade_bin.join(executable_name);
+            assert_eq!(
+                PythonEnvironmentPath::new(
+                    &executable,
+                    SysPrefixPathOrigin::PythonCliFlag,
+                    &system,
+                )
                 .unwrap()
                 .interpreter_layout(),
-            Some(PythonInterpreterLayout {
-                version: Some(PythonVersion::PY314),
-                implementation: PythonImplementation::CPython,
-                variant: PythonBuildVariant::Default,
-            })
-        );
+                Some(PythonInterpreterLayout {
+                    version: Some(PythonVersion::PY314),
+                    implementation: PythonImplementation::CPython,
+                    variant: PythonBuildVariant::Default,
+                })
+            );
 
-        let environment =
-            PythonEnvironment::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system)
-                .unwrap();
-        assert_eq!(
-            environment.site_packages_paths(&system).unwrap().into_vec(),
-            [system.canonicalize_path(&python314_site_packages).unwrap()]
-        );
+            let environment =
+                PythonEnvironment::new(&executable, SysPrefixPathOrigin::PythonCliFlag, &system)
+                    .unwrap();
+            assert_eq!(
+                environment.site_packages_paths(&system).unwrap().into_vec(),
+                [system.canonicalize_path(&python314_site_packages).unwrap()]
+            );
+        }
     }
 }

@@ -163,6 +163,7 @@ salsa = { version = "0.27.0", default-features = false, features = [
     "salsa_unstable",
     "inventory",
 ] }
+same-file = { version = "1.0.6" }
 schemars = { version = "1.0.4" }
 seahash = { version = "4.1.0" }
 serde = { version = "1.0.197", features = ["derive"] }

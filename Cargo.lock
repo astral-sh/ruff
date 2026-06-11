@@ -3062,6 +3062,7 @@ dependencies = [
  "ruff_text_size",
  "rustc-hash",
  "salsa",
+ "same-file",
  "schemars",
  "serde",
  "serde_json",
