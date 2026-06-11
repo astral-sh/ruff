@@ -154,6 +154,49 @@ pub(crate) fn equality_truthiness<'db>(
     }
 }
 
+/// Return whether both equality operators use object identity and enum member identities are known.
+pub(super) fn has_known_identity_equality_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let Some(LiteralValueTypeKind::Enum(literal)) = ty.as_literal_value_kind() else {
+        return false;
+    };
+    let Some(metadata) = enum_metadata(db, literal.enum_class(db)) else {
+        return false;
+    };
+
+    if metadata.init_function.is_some()
+        || metadata.new_function.is_some()
+        || metadata.generate_next_value_function.is_some()
+        || metadata.custom_enum_metaclass_new
+    {
+        return false;
+    }
+
+    let mut has_false = false;
+    let mut has_true = false;
+    let mut has_zero = false;
+    let mut has_one = false;
+    for value in metadata.members.values() {
+        match value.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Bool(false)) => has_false = true,
+            Some(LiteralValueTypeKind::Bool(true)) => has_true = true,
+            Some(LiteralValueTypeKind::Int(value)) => match value.as_i64() {
+                0 => has_zero = true,
+                1 => has_one = true,
+                _ => {}
+            },
+            Some(LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)) => {}
+            _ => return false,
+        }
+    }
+    if (has_false && has_zero) || (has_true && has_one) {
+        return false;
+    }
+
+    [ComparisonOperator::Equality, ComparisonOperator::Inequality]
+        .into_iter()
+        .all(|operator| has_known_identity_comparison_semantics(db, ty, operator))
+}
+
 /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
 ///
 /// `is_positive` selects the branch whose constraint is accumulated when either operand expands

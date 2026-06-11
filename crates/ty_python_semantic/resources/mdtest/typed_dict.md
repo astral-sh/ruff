@@ -4745,6 +4745,114 @@ def _(u: Foo | Bar):
         reveal_type(u)  # revealed: Bar
 ```
 
+Enum literals are also supported as tags when their equality behavior is known:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def _(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    if u["tag"] == Tag.A:
+        reveal_type(u)  # revealed: WithEnumTagA
+    elif u["tag"] == Tag.B:
+        reveal_type(u)  # revealed: WithEnumTagB
+    else:
+        reveal_type(u)  # revealed: WithEnumTagC
+```
+
+Enums with custom equality behavior cannot be used to narrow tagged unions:
+
+```py
+class WackyTag(Enum):
+    X = 1
+    Y = 2
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class WithWackyTagX(TypedDict):
+    tag: Literal[WackyTag.X]
+
+class WithWackyTagY(TypedDict):
+    tag: Literal[WackyTag.Y]
+
+def _(u: WithWackyTagX | WithWackyTagY):
+    if u["tag"] == WackyTag.X:
+        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+    else:
+        reveal_type(u)  # revealed: WithWackyTagX | WithWackyTagY
+```
+
+We also avoid narrowing when we cannot determine enum member aliases statically:
+
+```py
+class UnhashableTag(Enum):
+    X = []
+    Y = []
+
+class WithUnhashableTagX(TypedDict):
+    tag: Literal[UnhashableTag.X]
+
+class WithUnhashableTagY(TypedDict):
+    tag: Literal[UnhashableTag.Y]
+
+def _(u: WithUnhashableTagX | WithUnhashableTagY):
+    if u["tag"] == UnhashableTag.X:
+        reveal_type(u)  # revealed: WithUnhashableTagX | WithUnhashableTagY
+    else:
+        reveal_type(u)  # revealed: WithUnhashableTagX | WithUnhashableTagY
+
+class CrossTypeAliasTag(Enum):
+    X = 1
+    Y = True
+
+class WithCrossTypeAliasTagX(TypedDict):
+    tag: Literal[CrossTypeAliasTag.X]
+
+class WithCrossTypeAliasTagY(TypedDict):
+    tag: Literal[CrossTypeAliasTag.Y]
+
+def _(u: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY):
+    if u["tag"] == CrossTypeAliasTag.X:
+        reveal_type(u)  # revealed: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY
+    else:
+        reveal_type(u)  # revealed: WithCrossTypeAliasTagX | WithCrossTypeAliasTagY
+
+class ConstructedTag(Enum):
+    def __new__(cls, value: int) -> "ConstructedTag":
+        obj = object.__new__(cls)
+        obj._value_ = 0
+        return obj
+
+    X = 1
+    Y = 2
+
+class WithConstructedTagX(TypedDict):
+    tag: Literal[ConstructedTag.X]
+
+class WithConstructedTagY(TypedDict):
+    tag: Literal[ConstructedTag.Y]
+
+def _(u: WithConstructedTagX | WithConstructedTagY):
+    if u["tag"] == ConstructedTag.X:
+        reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
+    else:
+        reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
+```
+
 We can descend into intersections to discover `TypedDict` types that need narrowing:
 
 ```py
@@ -5058,6 +5166,35 @@ def match_statements(u: Foo | Bar | Baz | Bing):
             reveal_type(u)  # revealed: Baz
         case _:
             reveal_type(u)  # revealed: Bing
+```
+
+Enum literal tags are also supported in match statements:
+
+```py
+from enum import Enum
+
+class Tag(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+class WithEnumTagA(TypedDict):
+    tag: Literal[Tag.A]
+
+class WithEnumTagB(TypedDict):
+    tag: Literal[Tag.B]
+
+class WithEnumTagC(TypedDict):
+    tag: Literal[Tag.C]
+
+def match_enum_tags(u: WithEnumTagA | WithEnumTagB | WithEnumTagC):
+    match u["tag"]:
+        case Tag.A:
+            reveal_type(u)  # revealed: WithEnumTagA
+        case Tag.B:
+            reveal_type(u)  # revealed: WithEnumTagB
+        case _:
+            reveal_type(u)  # revealed: WithEnumTagC
 ```
 
 We can also narrow a single `TypedDict` type to `Never`:
