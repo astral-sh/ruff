@@ -57,8 +57,7 @@ x: int = 1
         panic!("Expected markup content");
     };
 
-    // TODO: should pass
-    // assert_eq!(markup.kind, MarkupKind::PlainText);
+    assert_eq!(markup.kind, MarkupKind::PlainText);
 
     Ok(())
 }
