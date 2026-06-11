@@ -22,6 +22,15 @@ P = ParamSpec(name="P")
 reveal_type(P.__name__)  # revealed: Literal["P"]
 ```
 
+### Requires a name
+
+```py
+from typing import ParamSpec
+
+# error: [invalid-paramspec] "The `name` parameter of `ParamSpec` is required."
+P = ParamSpec()
+```
+
 ### Must be directly assigned to a variable
 
 ```py

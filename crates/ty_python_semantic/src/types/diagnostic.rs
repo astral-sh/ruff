@@ -1419,7 +1419,7 @@ declare_lint! {
     /// from typing import ParamSpec
     ///
     /// P1 = ParamSpec("P1")  # okay
-    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
+    /// P2 = ParamSpec()  # error: ParamSpec requires a name
     /// ```
     ///
     /// ## References
@@ -1493,10 +1493,11 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// from typing import NewType, TypeVar
+    /// from typing import NewType, ParamSpec, TypeVar
     /// from typing_extensions import TypedDict
     ///
     /// T = TypeVar("U")  # error: [mismatched-type-name]
+    /// P = ParamSpec("Q")  # error: [mismatched-type-name]
     /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
     /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
     /// ```
