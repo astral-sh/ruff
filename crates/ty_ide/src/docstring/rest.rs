@@ -2,8 +2,8 @@ use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
 use ruff_python_trivia::leading_indentation;
-use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
-use ruff_text_size::TextSize;
+use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::{TextRange, TextSize};
 
 use super::markdown;
 
@@ -64,15 +64,33 @@ impl<'a> Lines<'a> {
     }
 
     /// Returns the next line without advancing the cursor.
-    fn peek(&mut self) -> Option<(usize, &'a str)> {
+    fn peek(&mut self) -> Option<DocstringLine<'a>> {
         let (index, line) = self.inner.peek()?;
-        Some((*index, line.as_str()))
+        Some(DocstringLine::new(*index, line))
     }
 
     /// Advances the cursor and returns the next line.
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<DocstringLine<'a>> {
         let (index, line) = self.inner.next()?;
-        Some((index, line.as_str()))
+        Some(DocstringLine::new(index, &line))
+    }
+}
+
+/// A docstring line with its source position.
+#[derive(Debug, Clone)]
+struct DocstringLine<'a> {
+    index: usize,
+    text: &'a str,
+    range: TextRange,
+}
+
+impl<'a> DocstringLine<'a> {
+    fn new(index: usize, line: &SourceLine<'a>) -> Self {
+        Self {
+            index,
+            text: line.as_str(),
+            range: line.range(),
+        }
     }
 }
 
@@ -83,6 +101,7 @@ impl<'a> Lines<'a> {
 struct FieldList {
     start_line: usize,
     end_line: usize,
+    range: TextRange,
     indent: TextSize,
     fields: Vec<Field>,
 }
@@ -94,14 +113,14 @@ impl FieldList {
         let mut preformatted_blocks = PreformattedBlockScanner::default();
         let mut lines = Lines::new(raw);
 
-        while let Some((_, line)) = lines.peek() {
-            if preformatted_blocks.consume_preformatted_line(line) {
+        while let Some(line) = lines.peek() {
+            if preformatted_blocks.consume_preformatted_line(line.text) {
                 lines.next();
                 continue;
             }
 
             let Some(field_list) = Self::parse(&mut lines) else {
-                preformatted_blocks.observe_non_field_line(line);
+                preformatted_blocks.observe_non_field_line(line.text);
                 lines.next();
                 continue;
             };
@@ -114,49 +133,55 @@ impl FieldList {
 
     /// Attempt to parse a single field list from the given lines of a docstring.
     fn parse(lines: &mut Lines<'_>) -> Option<Self> {
-        let (start_line, line) = lines.peek()?;
-        let header = FieldHeader::parse(line)?;
+        let line = lines.peek()?;
+        let start_line = line.index;
+        let range_start = line.range.start();
+        let header = FieldHeader::parse(line.text)?;
         lines.next();
 
         let field_list_indent = header.indent;
         let mut fields = Vec::new();
         let mut current = FieldBuilder::new(header);
         let mut end_line = start_line + 1;
+        let mut range_end = line.range.end();
 
-        while let Some((line_index, line)) = lines.peek() {
-            if line.trim().is_empty() {
+        while let Some(line) = lines.peek() {
+            if line.text.trim().is_empty() {
                 // Blank lines continue the field list only before another field or a continuation.
 
                 if !Self::blank_line_continues_field_list(lines, field_list_indent) {
                     break;
                 }
 
-                current.lines.push(line);
+                current.lines.push(line.text);
                 lines.next();
-                end_line = line_index + 1;
+                end_line = line.index + 1;
+                range_end = line.range.end();
                 continue;
             }
 
-            if let Some(header) = FieldHeader::at_indent(line, field_list_indent) {
+            if let Some(header) = FieldHeader::at_indent(line.text, field_list_indent) {
                 // Same-indent field header starts the next field in this list.
 
                 let previous = std::mem::replace(&mut current, FieldBuilder::new(header));
                 fields.push(previous.finish());
                 lines.next();
-                end_line = line_index + 1;
+                end_line = line.index + 1;
+                range_end = line.range.end();
                 continue;
             }
 
-            if FieldHeader::indentation(line) <= field_list_indent {
+            if FieldHeader::indentation(line.text) <= field_list_indent {
                 // Same- or less-indented content ends this field list.
                 break;
             }
 
             // More-indented non-blank lines continue the current field body
             // (and hence also the current field list).
-            current.lines.push(line);
+            current.lines.push(line.text);
             lines.next();
-            end_line = line_index + 1;
+            end_line = line.index + 1;
+            range_end = line.range.end();
         }
 
         // Finalize the last field.
@@ -165,6 +190,7 @@ impl FieldList {
         Some(Self {
             start_line,
             end_line,
+            range: TextRange::new(range_start, range_end),
             indent: field_list_indent,
             fields,
         })
@@ -198,18 +224,18 @@ impl FieldList {
     /// ```
     fn blank_line_continues_field_list(lines: &Lines<'_>, indent: TextSize) -> bool {
         let mut next = lines.clone();
-        while let Some((_, line)) = next.peek()
-            && line.trim().is_empty()
+        while let Some(line) = next.peek()
+            && line.text.trim().is_empty()
         {
             next.next();
         }
 
-        let Some((_, non_blank_line)) = next.peek() else {
+        let Some(non_blank_line) = next.peek() else {
             return false;
         };
 
-        FieldHeader::indentation(non_blank_line) > indent
-            || FieldHeader::at_indent(non_blank_line, indent).is_some()
+        FieldHeader::indentation(non_blank_line.text) > indent
+            || FieldHeader::at_indent(non_blank_line.text, indent).is_some()
     }
 }
 
@@ -807,9 +833,11 @@ struct ParameterName<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::iter::repeat_n;
+
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::Docstring;
+    use super::{Docstring, FieldList, Lines};
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -917,8 +945,7 @@ mod tests {
 
     #[test]
     fn parser_preserves_supported_and_unknown_fields() {
-        let parsed = Docstring::parse(
-            "\
+        let docstring = "\
 :param tuple[str, ...] *args: Extra positional arguments.
 :type args: tuple[str, ...]
 :var dict[str, int] cache: Cached values.
@@ -927,11 +954,16 @@ mod tests {
 :rtype: str
 :raises ValueError: Error description.
 :meta private:
-:unknown with argument: Unknown description.",
-        );
+:unknown with argument: Unknown description.";
+        let parsed = Docstring::parse(docstring);
 
         assert_eq!(parsed.field_lists[0].start_line, 0);
         assert_eq!(parsed.field_lists[0].end_line, 9);
+        assert_eq!(
+            &docstring[parsed.field_lists[0].range.start().to_usize()
+                ..parsed.field_lists[0].range.end().to_usize()],
+            docstring
+        );
         assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
         [
             Parameter {
@@ -980,6 +1012,45 @@ mod tests {
             },
         ]
         "#);
+    }
+
+    #[test]
+    fn parser_records_field_list_ranges() {
+        let docstring = "\
+Intro paragraph.
+
+:param first: First parameter.
+
+Intervening prose.
+
+:param second: Second parameter.
+    Continued.
+";
+        let parsed = Docstring::parse(docstring);
+
+        assert_eq!(parsed.field_lists.len(), 2);
+
+        let first = &parsed.field_lists[0];
+        assert_eq!(first.start_line, 2);
+        assert_eq!(first.end_line, 3);
+
+        let second = &parsed.field_lists[1];
+        assert_eq!(second.start_line, 6);
+        assert_eq!(second.end_line, 8);
+
+        assert_snapshot!(field_list_ranges(docstring, &parsed.field_lists), @r"
+        | Intro paragraph.
+        |
+        | :param first: First parameter.
+        | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        |
+        | Intervening prose.
+        |
+        | :param second: Second parameter.
+        | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        |     Continued.
+        | ^^^^^^^^^^^^^^
+        ");
     }
 
     #[test]
@@ -1142,6 +1213,39 @@ Section::
                     rendered.push_str("  ");
                     rendered.push_str(line);
                 }
+            }
+        }
+
+        rendered
+    }
+
+    fn field_list_ranges(docstring: &str, field_lists: &[FieldList]) -> String {
+        let mut lines = Lines::new(docstring);
+        let mut rendered = String::new();
+
+        while let Some(line) = lines.next() {
+            if !rendered.is_empty() {
+                rendered.push('\n');
+            }
+
+            rendered.push('|');
+            if !line.text.is_empty() {
+                rendered.push(' ');
+                rendered.push_str(line.text);
+            }
+
+            if let Some(intersection) = field_lists
+                .iter()
+                .filter_map(|field_list| line.range.intersect(field_list.range))
+                .find(|intersection| !intersection.is_empty())
+            {
+                let start = intersection.start().to_usize() - line.range.start().to_usize();
+                let end = intersection.end().to_usize() - line.range.start().to_usize();
+
+                rendered.push('\n');
+                rendered.push_str("| ");
+                rendered.extend(repeat_n(' ', start));
+                rendered.extend(repeat_n('^', end - start));
             }
         }
 
