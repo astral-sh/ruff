@@ -221,12 +221,12 @@ values = [
 
 <!-- fmt:on -->
 
-## `ruff:ignore` comments with a `disable`/`enable` pair
+## `ruff:ignore` comments within a `disable`/`enable` pair
 
 ```toml
 [lint]
 preview = true
-select = ["F401", "RUF10"]
+select = ["E501", "F401", "RUF10"]
 ```
 
 An intervening `ruff:ignore` directive shouldn't cause a `disable`/`enable` pair to be reported as
@@ -252,5 +252,33 @@ This applies to own-line comments too:
 # error: [unused-noqa]
 # ruff:ignore[F401]
 import os
+# ruff:enable[F401]
+```
+
+and cases where the `disable` and `ignore` suppress different codes:
+
+```py
+# ruff:disable[E501]
+import os  # ruff:ignore[F401]
+message = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+# ruff:enable[E501]
+```
+
+## `file-ignore` comments within a `disable`/`enable` pair
+
+```toml
+[lint]
+preview = true
+select = ["F401", "RUF10"]
+```
+
+A `file-ignore` within a range suppression takes precedence and marks the `disable` as unused:
+
+```py
+# error: [unused-noqa]
+# ruff:disable[F401]
+# ruff:file-ignore[F401]
+import os
+message = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 # ruff:enable[F401]
 ```
