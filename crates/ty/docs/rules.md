@@ -1612,7 +1612,6 @@ There are several requirements that you must follow when creating a legacy `Type
 from typing import TypeVar
 
 T = TypeVar("T")  # okay
-Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
 T = TypeVar("T")  # error: TypeVars should not be redefined
 
 # error: TypeVar must be immediately assigned to a variable
