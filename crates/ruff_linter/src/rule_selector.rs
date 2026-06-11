@@ -204,6 +204,13 @@ impl RuleSelector {
         let selector_enabled =
             is_human_readable_names_enabled(preview) || !matches!(self, RuleSelector::Name(_));
 
+        if !selector_enabled && let RuleSelector::Name(rule) = self {
+            crate::warn_user_once_by_message!(
+                "Selection `{}` has no effect because preview is not enabled.",
+                rule.name().as_str()
+            );
+        }
+
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
 

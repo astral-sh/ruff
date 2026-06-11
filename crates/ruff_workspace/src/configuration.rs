@@ -1010,10 +1010,12 @@ impl LintConfiguration {
 
             // Check for selections that require a warning
             for (kind, selector) in selection.selectors_by_kind() {
-                // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
-                // and use with, e.g., `--ignore` or `--fixable` is okay
-                // Unstable rules
-                if preview.mode.is_disabled() && kind.is_enable() {
+                // Preview rule codes and prefixes only warn when enabling rules. Human-readable
+                // names warn for every use in `RuleSelector::all_rules`.
+                if preview.mode.is_disabled()
+                    && kind.is_enable()
+                    && !matches!(selector, RuleSelector::Name(_))
+                {
                     // Check if the selector is empty because preview mode is disabled
                     if selector.rules(&preview).next().is_none()
                         && selector
