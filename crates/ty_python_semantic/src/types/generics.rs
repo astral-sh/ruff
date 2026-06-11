@@ -2981,17 +2981,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // They don't all have to.
                 let mut first_error = None;
                 let mut found_matching_element = false;
-                for positive in actual_intersection
-                    .iter_positive(self.db)
-                    // A TypedDict contributes the fallback `Mapping[str, object]`. Process it
-                    // after other positive elements so it cannot override a more precise mapping.
-                    .sorted_by_key(|positive| positive.resolve_type_alias(self.db).is_typed_dict())
-                {
-                    let is_typed_dict = positive.resolve_type_alias(self.db).is_typed_dict();
-                    if is_typed_dict && found_matching_element {
-                        continue;
-                    }
-
+                for positive in actual_intersection.iter_positive(self.db) {
                     let result = self.infer_map_impl(formal, positive, polarity, seen);
                     if let Err(err) = result {
                         // TODO: `infer_map_impl` can have side effects even in the error case, so

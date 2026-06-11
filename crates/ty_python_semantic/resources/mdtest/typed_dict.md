@@ -1599,7 +1599,8 @@ def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]
     dst |= src
 
 def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, str]]) -> None:
-    reveal_type(project(value))  # revealed: tuple[str, str]
+    # TODO: Prefer the most precise compatible projection from an intersection.
+    reveal_type(project(value))  # revealed: tuple[str, object]
 ```
 
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in

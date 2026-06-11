@@ -18,8 +18,8 @@ use crate::types::member::Member;
 use crate::types::mro::Mro;
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::typed_dict::{
-    SynthesizedTypedDictType, TypedDictField, TypedDictOpenness, TypedDictSchema,
-    deferred_functional_typed_dict_openness, deferred_functional_typed_dict_schema,
+    TypedDictField, TypedDictOpenness, TypedDictSchema, deferred_functional_typed_dict_openness,
+    deferred_functional_typed_dict_schema,
 };
 use crate::types::{
     BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, KnownClass,
@@ -1069,20 +1069,19 @@ pub(super) fn typed_dict_class_member<'db>(
     fallback_member
 }
 
-/// Look up a member on a synthesized `TypedDict` schema.
+/// Look up a member on the open empty `TypedDict` used for runtime `dict` narrowing.
 ///
-/// Synthesized schemas have no class literal to provide an MRO, so synthesize schema-sensitive
-/// methods directly and then use the standard `TypedDict` fallback for shared methods.
-pub(crate) fn synthesized_typed_dict_member<'db>(
+/// This type has no class literal to provide an MRO, so synthesize schema-sensitive methods
+/// directly and then use the standard `TypedDict` fallback for shared methods.
+pub(crate) fn open_empty_typed_dict_member<'db>(
     db: &'db dyn Db,
-    synthesized: SynthesizedTypedDictType<'db>,
     lookup_policy: MemberLookupPolicy,
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
-    let typed_dict = TypedDictType::Synthesized(synthesized);
+    let typed_dict = TypedDictType::open_empty(db);
 
     if let Some(member) = synthesize_typed_dict_method(db, typed_dict, name, || {
-        TypedDictFields::Dynamic(synthesized.items(db))
+        TypedDictFields::Dynamic(typed_dict.items(db))
     }) {
         return Member::definitely_declared(member).inner;
     }
