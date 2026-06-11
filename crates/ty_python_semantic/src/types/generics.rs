@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBounds, Solutions,
+    PathBounds, Solutions, TypeVarSolution,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1846,6 +1846,8 @@ pub(crate) struct SpecializationBuilder<'db, 'c> {
     pending: ConstraintSet<'db, 'c>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, UnionAccumulator<'db>>,
     paramspec_seen: FxHashSet<BoundTypeVarIdentity<'db>>,
+    // The legacy map contains inferred types that `pending` does not represent exactly.
+    has_legacy_only_mappings: bool,
 }
 
 impl<'db, 'c> SpecializationBuilder<'db, 'c> {
@@ -1861,6 +1863,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             pending: ConstraintSet::from_bool(constraints, true),
             types: FxHashMap::default(),
             paramspec_seen: FxHashSet::default(),
+            has_legacy_only_mappings: false,
         }
     }
 
@@ -1913,6 +1916,32 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             return self.solve_hash_map_with(generic_context, choose);
         }
 
+        if !self.has_legacy_only_mappings
+            && let Some(result) = self.pending.try_solve_simple_lower_bound_conjunction_with(
+                self.db,
+                self.constraints,
+                self.inferable,
+                |typevar, _variance, bounds| {
+                    if let Some(ty) = choose(typevar, Some(bounds)) {
+                        return Ok(Some(ty));
+                    }
+
+                    PathBounds::default_solve(self.db, self.constraints, typevar, bounds)
+                },
+            )
+        {
+            return match result {
+                Ok(solutions) => {
+                    let mut types = FxHashMap::default();
+                    for solution in solutions {
+                        self.insert_solution(&mut types, &solution);
+                    }
+                    types
+                }
+                Err(()) => self.solve_hash_map_with(generic_context, choose),
+            };
+        }
+
         // TODO: This projection / solve can be expensive for large-union collection-literal type
         // contexts. During the pending-constraint-set migration, pydantic and hydra-zen regressed
         // on empty dict literals with a context equivalent to
@@ -1945,14 +1974,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let mut types = FxHashMap::default();
         for solution in solutions {
             for binding in solution {
-                let identity = binding.bound_typevar.identity(self.db);
-                types
-                    .entry(identity)
-                    .and_modify(|existing| {
-                        *existing =
-                            UnionType::from_two_elements(self.db, *existing, binding.solution);
-                    })
-                    .or_insert(binding.solution);
+                self.insert_solution(&mut types, &binding);
             }
         }
 
@@ -1985,6 +2007,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         } else {
             types
         }
+    }
+
+    fn insert_solution(
+        &self,
+        types: &mut FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
+        binding: &TypeVarSolution<'db>,
+    ) {
+        let identity = binding.bound_typevar.identity(self.db);
+        types
+            .entry(identity)
+            .and_modify(|existing| {
+                *existing = UnionType::from_two_elements(self.db, *existing, binding.solution);
+            })
+            .or_insert(binding.solution);
     }
 
     fn has_expanding_cycle(
@@ -2239,7 +2275,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             TypeVarVariance::Covariant => ConstraintBounds::new(Some(ty), None),
             TypeVarVariance::Contravariant => ConstraintBounds::new(None, Some(ty)),
             TypeVarVariance::Invariant => ConstraintBounds::exact(ty),
-            TypeVarVariance::Bivariant => return,
+            TypeVarVariance::Bivariant => {
+                self.has_legacy_only_mappings = true;
+                return;
+            }
         };
 
         self.intersect_pending_typevar_constraint(bound_typevar, bounds);
@@ -2257,6 +2296,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
+        self.has_legacy_only_mappings = true;
         let set = set.remove_noninferable(self.db, self.constraints, self.inferable);
         let solutions = match set.solutions(self.db, self.constraints) {
             Solutions::Unsatisfiable => return Err(()),
@@ -2398,6 +2438,39 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
+        if let Type::TypeVar(bound_typevar) = formal
+            && bound_typevar.is_inferable(self.db, self.inferable)
+            && bound_typevar.typevar(self.db).is_self(self.db)
+            && matches!(actual, Type::NominalInstance(_))
+            && !actual.has_typevar(self.db)
+            && !actual.has_unspecialized_type_var(self.db)
+            && let Some(bound) = bound_typevar.typevar(self.db).upper_bound(self.db)
+            && actual
+                .when_assignable_to(self.db, bound, self.constraints, self.inferable)
+                .is_always_satisfied(self.db)
+        {
+            self.add_type_mapping(bound_typevar, actual, TypeVarVariance::Covariant);
+            return Ok(());
+        }
+
+        if let Type::TypeVar(bound_typevar) = formal
+            && bound_typevar.is_inferable(self.db, self.inferable)
+            && matches!(
+                bound_typevar.kind(self.db),
+                TypeVarKind::Legacy | TypeVarKind::Pep695
+            )
+            && bound_typevar
+                .typevar(self.db)
+                .bound_or_constraints(self.db)
+                .is_none()
+            && !actual.has_typevar(self.db)
+            && !actual.has_unspecialized_type_var(self.db)
+        {
+            let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
+            self.add_type_mapping(bound_typevar, actual, TypeVarVariance::Covariant);
+            return Ok(());
+        }
+
         self.infer_map_impl(
             formal,
             actual,
@@ -3012,5 +3085,56 @@ impl<'db> SpecializationError<'db> {
             Self::MismatchedBound { argument, .. } => *argument,
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use ruff_python_ast::name::Name;
+
+    use crate::db::tests::setup_db;
+
+    #[test]
+    fn legacy_only_mappings_disable_pending_only_solution() {
+        let db = setup_db();
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
+        let inferable = InferableTypeVars::from_typevars(
+            &db,
+            [t.identity(&db), u.identity(&db)].into_iter().collect(),
+        );
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder = SpecializationBuilder::new(&db, &constraints, inferable);
+
+        builder.add_type_mapping(
+            t,
+            KnownClass::Int.to_instance(&db),
+            TypeVarVariance::Covariant,
+        );
+        assert!(!builder.has_legacy_only_mappings);
+
+        builder.add_type_mapping(
+            u,
+            KnownClass::Str.to_instance(&db),
+            TypeVarVariance::Bivariant,
+        );
+        assert!(builder.has_legacy_only_mappings);
+
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder = SpecializationBuilder::new(&db, &constraints, inferable);
+        let set = ConstraintSet::constrain_typevar_lower_bound(
+            &db,
+            &constraints,
+            t,
+            KnownClass::Int.to_instance(&db),
+        );
+        builder
+            .add_type_mappings_from_constraint_set(set)
+            .expect("satisfiable constraint set");
+        assert!(builder.has_legacy_only_mappings);
     }
 }

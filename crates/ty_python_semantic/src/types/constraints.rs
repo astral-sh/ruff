@@ -630,6 +630,52 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.node.solutions_with(db, builder, choose)
     }
 
+    /// Solves this constraint set directly if it is a positive conjunction of concrete lower
+    /// bounds for inferable typevars.
+    ///
+    /// Unlike [`Self::solutions_with`], this avoids constructing [`PathBounds`] and [`Solutions`]
+    /// wrappers for the single path. It returns `None` when the constraint set does not have the
+    /// required shape.
+    pub(crate) fn try_solve_simple_lower_bound_conjunction_with(
+        self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        inferable: InferableTypeVars<'db>,
+        mut choose: impl FnMut(
+            BoundTypeVarInstance<'db>,
+            TypeVarVariance,
+            ConstraintBounds<'db>,
+        ) -> Result<Option<Type<'db>>, ()>,
+    ) -> Option<Result<Vec<TypeVarSolution<'db>>, ()>> {
+        self.verify_builder(builder);
+        let mappings = PathBounds::compute_simple_lower_bound_mappings(db, builder, self.node)?;
+        if mappings.is_empty()
+            || mappings
+                .keys()
+                .any(|typevar| !typevar.is_inferable(db, inferable))
+        {
+            return None;
+        }
+
+        let mut solutions = Vec::with_capacity(mappings.len());
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each typevar solution is independent of iteration order"
+        )]
+        for (bound_typevar, bounds) in mappings {
+            let bounds = bounds.finish(db);
+            match choose(bound_typevar, bounds.variance(), bounds) {
+                Ok(Some(solution)) => solutions.push(TypeVarSolution {
+                    bound_typevar,
+                    solution,
+                }),
+                Ok(None) => {}
+                Err(()) => return Some(Err(())),
+            }
+        }
+        Some(Ok(solutions))
+    }
+
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node
             .simplify_for_display(db, self.builder)
@@ -3231,6 +3277,19 @@ impl<'db> PathBounds<'db> {
         builder: &ConstraintSetBuilder<'db>,
         node: NodeId,
     ) -> Option<Self> {
+        let mut mappings = Self::compute_simple_lower_bound_mappings(db, builder, node)?;
+        let path = mappings
+            .drain()
+            .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
+            .collect();
+        Some(PathBounds::Constrained(Box::new([path])))
+    }
+
+    fn compute_simple_lower_bound_mappings(
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        node: NodeId,
+    ) -> Option<FxHashMap<BoundTypeVarInstance<'db>, ConstraintBoundsBuilder<'db>>> {
         let mut constraints = node.simple_lower_bound_conjunction(db, builder)?;
         constraints.sort_by_key(|(_, _, source_order)| *source_order);
 
@@ -3239,12 +3298,7 @@ impl<'db> PathBounds<'db> {
         for (typevar, lower, _) in constraints {
             mappings.entry(typevar).or_default().add_lower(db, lower);
         }
-
-        let path = mappings
-            .drain()
-            .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
-            .collect();
-        Some(PathBounds::Constrained(Box::new([path])))
+        Some(mappings)
     }
 
     pub(crate) fn solve(
@@ -6538,6 +6592,44 @@ mod tests {
         };
 
         let set = set.remove_noninferable(&db, &builder, inferable);
+        assert!(
+            set.try_solve_simple_lower_bound_conjunction_with(
+                &db,
+                &builder,
+                InferableTypeVars::None,
+                |typevar, _variance, bounds| {
+                    PathBounds::default_solve(&db, &builder, typevar, bounds)
+                },
+            )
+            .is_none()
+        );
+        assert!(matches!(
+            set.try_solve_simple_lower_bound_conjunction_with(
+                &db,
+                &builder,
+                inferable,
+                |_typevar, _variance, _bounds| Err(())
+            ),
+            Some(Err(()))
+        ));
+        let direct_solutions = set
+            .try_solve_simple_lower_bound_conjunction_with(
+                &db,
+                &builder,
+                inferable,
+                |typevar, _variance, bounds| {
+                    PathBounds::default_solve(&db, &builder, typevar, bounds)
+                },
+            )
+            .expect("simple conjunction")
+            .expect("satisfiable conjunction");
+        assert_eq!(direct_solutions.len(), 1);
+        assert_eq!(direct_solutions[0].bound_typevar, t);
+        assert_eq!(
+            direct_solutions[0].solution,
+            UnionType::from_elements(&db, [int, str])
+        );
+
         let solutions = set.solutions(&db, &builder);
         assert!(matches!(&solutions, Solutions::Constrained(_)));
         if let Solutions::Constrained(solutions) = solutions {
