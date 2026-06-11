@@ -183,6 +183,14 @@ impl<'db> ConstructorBinding<'db> {
         }
     }
 
+    pub(super) fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        self.entry.map_fields(map);
+        self.constructor_context = self.constructor_context.map_instance_type(map);
+        if let Some(downstream) = self.downstream_constructor.as_mut() {
+            downstream.map_fields(map);
+        }
+    }
+
     /// Compute the overall effective return type of this `ConstructorBinding`.
     pub(super) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
         let constructed_instance_type = self.constructed_instance_type();
@@ -527,6 +535,10 @@ impl<'db> ConstructorContext<'db> {
             instance_type,
             ..self
         }
+    }
+
+    pub(super) fn map_instance_type(self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        self.with_instance_type(map(self.instance_type))
     }
 
     fn instance_type(self) -> Type<'db> {

@@ -62,9 +62,10 @@ use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
     ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
     InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -337,6 +338,13 @@ impl<'db> CallableItem<'db> {
         match self {
             CallableItem::Regular(binding) => CallableItem::Regular(f(binding)),
             CallableItem::Constructor(binding) => CallableItem::Constructor(binding.map(f)),
+        }
+    }
+
+    fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        match self {
+            CallableItem::Regular(binding) => binding.map_fields(map),
+            CallableItem::Constructor(binding) => binding.map_fields(map),
         }
     }
 
@@ -693,6 +701,18 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.set_constructor_instance_type_in_place(db, constructor_instance_type);
         self
+    }
+
+    pub(crate) fn fields_mapped(mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) -> Self {
+        self.map_fields(map);
+        self
+    }
+
+    pub(super) fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        self.callable_type = map(self.callable_type);
+        for item in self.iter_callable_items_mut() {
+            item.map_fields(map);
+        }
     }
 
     pub(crate) fn into_constructor_bindings(
@@ -3189,6 +3209,26 @@ impl<'db> CallableBinding<'db> {
         }
         for binding in &mut self.overloads {
             binding.replace_callable_type(before, after);
+        }
+    }
+
+    fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        self.callable_type = map(self.callable_type);
+        self.signature_type = map(self.signature_type);
+        self.bound_type = self.bound_type.map(&mut *map);
+        self.overload_call_return_type =
+            self.overload_call_return_type
+                .map(|return_type| match return_type {
+                    OverloadCallReturnType::ArgumentTypeExpansion(ty) => {
+                        OverloadCallReturnType::ArgumentTypeExpansion(map(ty))
+                    }
+                    OverloadCallReturnType::ArgumentTypeExpansionLimitReached(limit) => {
+                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(limit)
+                    }
+                    OverloadCallReturnType::Ambiguous => OverloadCallReturnType::Ambiguous,
+                });
+        for binding in &mut self.overloads {
+            binding.map_fields(map);
         }
     }
 
@@ -6256,6 +6296,16 @@ impl<'db> Binding<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
+    }
+
+    fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
+        self.signature = self.signature.clone().map_types(map);
+        self.callable_type = map(self.callable_type);
+        self.signature_type = map(self.signature_type);
+        self.return_ty = map(self.return_ty);
+        self.constructor_context = self
+            .constructor_context
+            .map(|context| context.map_instance_type(map));
     }
 
     fn freshen_bound_typevars(&mut self, db: &'db dyn Db, delta: u32) {
