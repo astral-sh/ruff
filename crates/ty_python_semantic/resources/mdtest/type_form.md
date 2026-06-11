@@ -427,6 +427,25 @@ reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
 ```
 
+Recursive aliases in overload parameter contexts should not cause contextual inference to recurse
+indefinitely.
+
+```py
+from typing import overload
+from typing_extensions import TypeForm
+
+type RecursiveForm = RecursiveForm | TypeForm[int]
+
+@overload
+def consume(value: RecursiveForm, discriminator: int) -> None: ...
+@overload
+def consume(value: RecursiveForm, discriminator: str) -> None: ...
+def consume(value: RecursiveForm, discriminator: int | str) -> None: ...
+
+value: object = object()
+consume(value, 1)
+```
+
 ## Narrowing to runtime classes
 
 A `TypeForm[T]` value may or may not be a runtime class object. An `isinstance(..., type)` check can
