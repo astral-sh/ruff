@@ -1112,33 +1112,26 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
-        self.add_positive_impl(ty, &mut vec![])
+        self.add_positive_impl(ty, &mut FxHashSet::default())
     }
 
     pub(crate) fn add_positive_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
+        seen_recursive_binders: &mut FxHashSet<salsa::Id>,
     ) -> Self {
         match ty {
             Type::TypeAlias(alias) => {
                 let value_type = alias.value_type(self.db);
-                self.add_positive_impl(value_type, seen_aliases)
+                self.add_positive_impl(value_type, seen_recursive_binders)
             }
             Type::Recursive(rec) => {
-                if seen_aliases.iter().any(|seen| {
-                    matches!(
-                        seen,
-                        Type::Recursive(seen_rec)
-                            if seen_rec.binder_id(self.db) == rec.binder_id(self.db)
-                    )
-                }) {
+                if !seen_recursive_binders.insert(rec.binder_id(self.db)) {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
                     return self;
                 }
-                seen_aliases.push(ty);
                 // Unfold the recursive type so that the `Type::Union` arm below can
                 // distribute over the body's union elements (the body is e.g.
                 // `int | tuple[Divergent, ...] | None` for `OptNestedInt`).
@@ -1146,7 +1139,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // so that recursive references inside the body keep their source-name
                 // display and re-trigger this recursive-unfold path if visited again.
                 let body = rec.body_with_origin_marker(self.db);
-                self.add_positive_impl(body, seen_aliases)
+                self.add_positive_impl(body, seen_recursive_binders)
             }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
@@ -1160,7 +1153,10 @@ impl<'db> IntersectionBuilder<'db> {
                 union
                     .elements(self.db)
                     .iter()
-                    .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
+                    .map(|elem| {
+                        self.clone()
+                            .add_positive_impl(*elem, seen_recursive_binders)
+                    })
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
                         builder
@@ -1170,16 +1166,16 @@ impl<'db> IntersectionBuilder<'db> {
             Type::Intersection(other) => {
                 let db = self.db;
                 for pos in other.positive(db) {
-                    self = self.add_positive_impl(*pos, seen_aliases);
+                    self = self.add_positive_impl(*pos, seen_recursive_binders);
                 }
                 for neg in other.negative(db) {
-                    self = self.add_negative_impl(*neg, seen_aliases);
+                    self = self.add_negative_impl(*neg, seen_recursive_binders);
                 }
                 self
             }
             Type::EnumComplement(complement) => {
                 let db = self.db;
-                self.add_positive_impl(complement.to_intersection(db), seen_aliases)
+                self.add_positive_impl(complement.to_intersection(db), seen_recursive_binders)
             }
             _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
@@ -1193,40 +1189,33 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn add_negative(self, ty: Type<'db>) -> Self {
-        self.add_negative_impl(ty, &mut vec![])
+        self.add_negative_impl(ty, &mut FxHashSet::default())
     }
 
     pub(crate) fn add_negative_impl(
         mut self,
         ty: Type<'db>,
-        seen_aliases: &mut Vec<Type<'db>>,
+        seen_recursive_binders: &mut FxHashSet<salsa::Id>,
     ) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
         match ty {
             Type::TypeAlias(alias) => {
                 let value_type = alias.value_type(self.db);
-                self.add_negative_impl(value_type, seen_aliases)
+                self.add_negative_impl(value_type, seen_recursive_binders)
             }
             Type::Recursive(rec) => {
-                if seen_aliases.iter().any(|seen| {
-                    matches!(
-                        seen,
-                        Type::Recursive(seen_rec)
-                            if seen_rec.binder_id(self.db) == rec.binder_id(self.db)
-                    )
-                }) {
+                if !seen_recursive_binders.insert(rec.binder_id(self.db)) {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
                     return self;
                 }
-                seen_aliases.push(ty);
                 let body = rec.body_with_origin_marker(self.db);
-                self.add_negative_impl(body, seen_aliases)
+                self.add_negative_impl(body, seen_recursive_binders)
             }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
-                    self = self.add_negative_impl(*elem, seen_aliases);
+                    self = self.add_negative_impl(*elem, seen_recursive_binders);
                 }
                 self
             }
@@ -1244,7 +1233,7 @@ impl<'db> IntersectionBuilder<'db> {
                     // we negate all the positive constraints while distributing
                     .map(|elem| {
                         self.clone()
-                            .add_negative_impl(*elem, &mut seen_aliases.clone())
+                            .add_negative_impl(*elem, &mut seen_recursive_binders.clone())
                     });
 
                 let negative_side = intersection
@@ -1253,7 +1242,7 @@ impl<'db> IntersectionBuilder<'db> {
                     // all negative constraints end up becoming positive constraints
                     .map(|elem| {
                         self.clone()
-                            .add_positive_impl(*elem, &mut seen_aliases.clone())
+                            .add_positive_impl(*elem, &mut seen_recursive_binders.clone())
                     });
 
                 positive_side.chain(negative_side).fold(
@@ -1266,7 +1255,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             Type::EnumComplement(complement) => {
                 let db = self.db;
-                self.add_negative_impl(complement.to_intersection(db), seen_aliases)
+                self.add_negative_impl(complement.to_intersection(db), seen_recursive_binders)
             }
             _ => {
                 for inner in &mut self.intersections {
