@@ -70,12 +70,14 @@ class Movie(TypedDict):
 
 def _(movie: Movie):
     if not hasattr(movie, "clear"):
-        reveal_type(movie)  # revealed: Never
+        # TODO: Model runtime attribute-presence constraints separately from structural protocols.
+        reveal_type(movie)  # revealed: Movie & ~<Protocol with members 'clear'>
 
 def _(value: object):
     if type(value) is dict:
         if not hasattr(value, "clear"):
-            reveal_type(value)  # revealed: Never
+            # TODO: Model runtime attribute-presence constraints separately from structural protocols.
+            reveal_type(value)  # revealed: <TypedDict with no items> & ~<Protocol with members 'clear'>
 ```
 
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
