@@ -156,6 +156,25 @@ class Cyclic:
 reveal_type(Cyclic("").data)
 ```
 
+## Recursive operation results
+
+Recursive type operations unfold one layer before inspecting the structure. The operation result is
+folded back under the same binder before it flows back into inference; otherwise the result can
+materialize an expanded copy of the recursive body and fail the assignment below.
+
+```py
+class RecursiveOperation:
+    def __init__(self):
+        self.x = [0]
+
+    def make_recursive(self):
+        self.x = [self.x]
+
+    def use_operation_result(self):
+        self.x = self.x + self.x
+        reveal_type(self.x)  # revealed: list[int] | list[Divergent]
+```
+
 ## Meta-type lookups through recursive aliases
 
 Recursive aliases can show up in class-body annotations and in operations that need the meta type,
