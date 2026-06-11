@@ -972,12 +972,16 @@ fn inherited_new<'db>(
     iter_parent_enum_classes(db, class).find_map(|base| custom_new(db, base.body_scope(db)))
 }
 
-/// Looks up an inherited `__new__` from user-defined parent enum classes in the MRO.
+/// Looks up an inherited `__new__` from user-defined base classes in the MRO.
 fn inherited_user_defined_new<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
-    iter_parent_enum_classes(db, class)
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.class_literal(db).as_static())
         .filter(|base| base.known(db).is_none())
         .find_map(|base| custom_new(db, base.body_scope(db)))
 }

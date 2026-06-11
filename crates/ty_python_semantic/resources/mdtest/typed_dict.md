@@ -4851,6 +4851,33 @@ def _(u: WithConstructedTagX | WithConstructedTagY):
         reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
     else:
         reveal_type(u)  # revealed: WithConstructedTagX | WithConstructedTagY
+
+class DataTypeBase:
+    def __new__(cls, value: int) -> "DataTypeBase":
+        obj = object.__new__(cls)
+        obj._value_ = 0
+        return obj
+
+class DataTypeMixin(DataTypeBase):
+    pass
+
+class MixinTag(DataTypeMixin, Enum):
+    X = 1
+    Y = 2
+
+class WithMixinTagX(TypedDict):
+    tag: Literal[MixinTag.X]
+    only_x: int
+
+class WithMixinTagY(TypedDict):
+    tag: Literal[MixinTag.Y]
+
+def _(u: WithMixinTagX | WithMixinTagY):
+    if u["tag"] == MixinTag.X:
+        reveal_type(u)  # revealed: WithMixinTagX | WithMixinTagY
+        u["only_x"]  # error: [invalid-key]
+    else:
+        reveal_type(u)  # revealed: WithMixinTagX | WithMixinTagY
 ```
 
 We can descend into intersections to discover `TypedDict` types that need narrowing:
