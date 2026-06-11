@@ -17,11 +17,7 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import {
-  isDiagnosticAnnotationMessage,
-  secondaryDiagnosticAnnotations,
-  Theme,
-} from "shared";
+import { renderableSecondaryDiagnosticAnnotations, Theme } from "shared";
 import {
   Hint,
   Position as TyPosition,
@@ -988,9 +984,7 @@ class PlaygroundServer
   private diagnosticRelatedInformation(
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
-    // Match ty_server's LSP rendering: omit message-less secondary annotations.
-    // Unlike subdiagnostics, these have no parent message to use as a fallback.
-    const secondaryAnnotations = secondaryDiagnosticAnnotations(
+    const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
       diagnostic.annotations,
     ).flatMap((annotation) =>
       this.diagnosticAnnotationRelatedInformation(
@@ -1014,10 +1008,10 @@ class PlaygroundServer
 
   private diagnosticAnnotationRelatedInformation(
     annotation: DiagnosticAnnotation,
-    message: string | undefined,
+    message: string,
   ): editor.IRelatedInformation[] {
     const location = annotation.location;
-    if (location == null || !isDiagnosticAnnotationMessage(message)) {
+    if (location == null || message.length === 0) {
       return [];
     }
 

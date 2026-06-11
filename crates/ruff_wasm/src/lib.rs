@@ -389,16 +389,12 @@ impl Workspace {
                 let sub_diagnostics = msg
                     .sub_diagnostics()
                     .iter()
-                    .map(|sub_diagnostic| {
-                        let location = sub_diagnostic.primary_span_ref().and_then(|span| {
+                    .map(|sub_diagnostic| ExpandedSubDiagnostic {
+                        severity: sub_diagnostic.severity().into(),
+                        message: sub_diagnostic.concise_message().to_string(),
+                        location: sub_diagnostic.primary_span_ref().and_then(|span| {
                             expanded_diagnostic_location(span, self.position_encoding)
-                        });
-
-                        ExpandedSubDiagnostic {
-                            severity: sub_diagnostic.severity().into(),
-                            message: sub_diagnostic.concise_message().to_string(),
-                            location,
-                        }
+                        }),
                     })
                     .collect();
 

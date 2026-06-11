@@ -1,14 +1,8 @@
-import type {
-  Diagnostic,
-  DiagnosticAnnotation,
-  DiagnosticLocation,
-  SubDiagnostic,
-} from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation, SubDiagnostic } from "ruff_wasm";
 import classNames from "classnames";
 import {
   DiagnosticLocationItem,
-  isDiagnosticAnnotationMessage,
-  secondaryDiagnosticAnnotations,
+  renderableSecondaryDiagnosticAnnotations,
   Theme,
 } from "shared";
 import { useMemo } from "react";
@@ -84,13 +78,8 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
-        const secondaryAnnotations = secondaryDiagnosticAnnotations(
+        const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
           diagnostic.annotations,
-        ).filter(
-          (
-            annotation,
-          ): annotation is DiagnosticAnnotation & { message: string } =>
-            isDiagnosticAnnotationMessage(annotation.message),
         );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
 

@@ -13,11 +13,7 @@ import {
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
 import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
-import {
-  isDiagnosticAnnotationMessage,
-  secondaryDiagnosticAnnotations,
-  Theme,
-} from "shared";
+import { renderableSecondaryDiagnosticAnnotations, Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
@@ -227,9 +223,7 @@ function diagnosticRelatedInformation(
   diagnostic: Diagnostic,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  // Ruff represents highlight-only annotations with empty messages. Monaco related
-  // information requires a message, so intentionally omit those annotations.
-  const secondaryAnnotations = secondaryDiagnosticAnnotations(
+  const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
     diagnostic.annotations,
   ).flatMap((annotation) =>
     diagnosticLocationRelatedInformation(
@@ -251,14 +245,11 @@ function diagnosticRelatedInformation(
 }
 
 function diagnosticLocationRelatedInformation(
-  message: string | null | undefined,
+  message: string,
   location: DiagnosticLocation | null | undefined,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  if (
-    !isDiagnosticAnnotationMessage(message) ||
-    location?.path !== PLAYGROUND_FILE_PATH
-  ) {
+  if (location?.path !== PLAYGROUND_FILE_PATH) {
     return [];
   }
 

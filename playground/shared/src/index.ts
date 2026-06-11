@@ -9,8 +9,7 @@ export { setupMonaco } from "./setupMonaco";
 export { downloadZip } from "./downloadZip";
 export {
   DiagnosticLocationItem,
-  isDiagnosticAnnotationMessage,
-  secondaryDiagnosticAnnotations,
+  renderableSecondaryDiagnosticAnnotations,
 } from "./DiagnosticLocationItem";
 export {
   default as SideBar,

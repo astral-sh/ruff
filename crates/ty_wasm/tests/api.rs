@@ -215,7 +215,6 @@ fn primary_diagnostic_annotations_preserve_order() {
         [true, false]
     );
     let annotation = &annotations[1];
-    assert!(!annotation.primary);
     assert_eq!(annotation.message.as_deref(), Some("Declared type"));
 
     let location = annotation
