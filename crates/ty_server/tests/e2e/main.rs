@@ -33,6 +33,7 @@ mod commands;
 mod completions;
 mod configuration;
 mod folding_range;
+mod hover;
 mod initialize;
 mod inlay_hints;
 mod notebook;
