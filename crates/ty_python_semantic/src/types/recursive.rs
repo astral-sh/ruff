@@ -36,6 +36,7 @@ impl BinderId {
     pub fn new(id: salsa::Id) -> Self {
         Self(id)
     }
+
     pub fn into_id(self) -> salsa::Id {
         self.0
     }
@@ -231,9 +232,7 @@ impl<'db> RecursiveType<'db> {
     /// recursive body instead of preserving the fixed-point shape.
     pub(crate) fn fold(self, db: &'db dyn Db, unfold_operated: Type<'db>) -> Type<'db> {
         let marker = Type::divergent(self.binder_id(db));
-        let normalization = RecursiveTypeNormalization::new(marker)
-            .with_fold_body(Some(self.body(db)))
-            .preserve_top_level_recursive();
+        let normalization = RecursiveTypeNormalization::new(marker).preserve_top_level_recursive();
         unfold_operated
             .recursive_type_normalized_impl(db, normalization)
             .unwrap_or(marker)
