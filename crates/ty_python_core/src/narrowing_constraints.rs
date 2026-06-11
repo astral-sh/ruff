@@ -262,6 +262,9 @@ impl NarrowingConstraintsBuilder {
             return ALWAYS_TRUE;
         }
 
+        // See the "BDDs with lazy unions (or ternary decision diagrams)" section for the edge
+        // calculations below:
+        // https://elixir-lang.org/blog/2025/12/02/lazier-bdds-for-set-theoretic-types/#bdds-with-lazy-unions-or-ternary-decision-diagrams
         let result = match self.cmp_atoms(a, b) {
             Ordering::Equal => {
                 let a_node = self.interiors[a];
@@ -322,6 +325,8 @@ impl NarrowingConstraintsBuilder {
             return ALWAYS_TRUE;
         }
 
+        // See the "Lazier BDDs (for intersections)" section for the edge calculations below:
+        // https://elixir-lang.org/blog/2025/12/02/lazier-bdds-for-set-theoretic-types/#lazier-bdds-for-intersections
         let result = match self.cmp_atoms(a, b) {
             Ordering::Equal => {
                 let a_node = self.interiors[a];
