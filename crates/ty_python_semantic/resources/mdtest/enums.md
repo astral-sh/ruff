@@ -730,7 +730,7 @@ class Answer(Enum):
         return 1
 
     @settable_property.setter
-    def settable_property(self, value: int) -> None:
+    def settable_property(self, value: str) -> None:
         pass
 
     def direct_property_getter(self) -> int:
@@ -743,7 +743,9 @@ reveal_type(enum_members(Answer))
 assert_type(Answer.YES.some_property, str)
 assert_type(Answer.YES.direct_property, int)
 Answer.YES.some_property = "new value"  # error: [invalid-assignment]
-Answer.YES.settable_property = "bad value"  # error: [invalid-assignment]
+Answer.YES.settable_property = "new value"
+assert_type(Answer.YES.settable_property, int)
+Answer.YES.settable_property = 1  # error: [invalid-assignment]
 
 def get(value: Enum) -> str:
     return value.name
