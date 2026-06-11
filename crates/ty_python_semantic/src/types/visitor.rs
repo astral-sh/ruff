@@ -18,9 +18,10 @@ use crate::{
         set_theoretic::{walk_intersection_type, walk_union},
         subclass_of::walk_subclass_of_type,
         type_alias::walk_type_alias_type,
+        type_form::walk_typeform_type,
         typed_dict::walk_typed_dict_type,
         typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-        walk_property_instance_type, walk_typeform_type, walk_typeguard_type, walk_typeis_type,
+        walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
     },
 };
 use std::cell::{Cell, RefCell};

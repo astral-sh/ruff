@@ -1447,14 +1447,11 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             tvar = typevar.typevar(db).name(db)
         );
 
-        let parameter_variance = |parameter: &Parameter<'db>| match parameter.form {
-            ParameterForm::Type => None,
-            ParameterForm::Value => Some(
-                parameter
-                    .annotated_type()
-                    .with_polarity(TypeVarVariance::Contravariant)
-                    .variance_of(db, typevar),
-            ),
+        let parameter_variance = |parameter: &Parameter<'db>| {
+            parameter
+                .annotated_type()
+                .with_polarity(TypeVarVariance::Contravariant)
+                .variance_of(db, typevar)
         };
 
         let parameter_variances = if let Some((prefix_parameters, paramspec)) =
@@ -1463,7 +1460,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             Either::Left(
                 prefix_parameters
                     .iter()
-                    .filter_map(parameter_variance)
+                    .map(parameter_variance)
                     .chain(std::iter::once(
                         Type::TypeVar(paramspec)
                             .with_polarity(TypeVarVariance::Contravariant)
@@ -1471,7 +1468,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                     )),
             )
         } else {
-            Either::Right(self.parameters.iter().filter_map(parameter_variance))
+            Either::Right(self.parameters.iter().map(parameter_variance))
         };
 
         itertools::chain(
@@ -3843,7 +3840,6 @@ pub(crate) struct Parameter<'db> {
     annotation_kind: ParameterAnnotationKind,
 
     kind: ParameterKind<'db>,
-    pub(crate) form: ParameterForm,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -3874,7 +3870,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3888,7 +3883,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3899,7 +3893,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3913,7 +3906,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3924,7 +3916,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3962,11 +3953,6 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    pub(crate) fn type_form(mut self) -> Self {
-        self.form = ParameterForm::Type;
-        self
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -3987,7 +3973,6 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
-            form: self.form,
         }
     }
 
@@ -4004,7 +3989,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
             kind,
-            form: self.form,
         }
     }
 
@@ -4020,7 +4004,6 @@ impl<'db> Parameter<'db> {
             annotation_kind,
             inferred_annotation,
             kind,
-            form,
         } = self;
 
         let annotated_type = if nested {
@@ -4081,7 +4064,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
             kind,
-            form: *form,
         })
     }
 
@@ -4123,10 +4105,9 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type,
             definition,
-            kind,
-            annotation_kind,
-            form: ParameterForm::Value,
             inferred_annotation,
+            annotation_kind,
+            kind,
         }
     }
 
@@ -4387,13 +4368,6 @@ impl<'db> ParameterKind<'db> {
     }
 }
 
-/// Whether a parameter is used as a value or a type form.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) enum ParameterForm {
-    Value,
-    Type,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4432,7 +4406,6 @@ mod tests {
         annotation_kind: ParameterAnnotationKind,
         inferred_annotation: bool,
         kind: &'a ParameterKind<'db>,
-        form: ParameterForm,
     }
 
     impl<'a, 'db> From<&'a Parameter<'db>> for ParameterWithoutDefinition<'a, 'db> {
@@ -4443,7 +4416,6 @@ mod tests {
                 annotation_kind,
                 inferred_annotation,
                 kind,
-                form,
             } = parameter;
 
             Self {
@@ -4451,7 +4423,6 @@ mod tests {
                 annotation_kind: *annotation_kind,
                 inferred_annotation: *inferred_annotation,
                 kind,
-                form: *form,
             }
         }
     }

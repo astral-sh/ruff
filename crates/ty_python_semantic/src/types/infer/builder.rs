@@ -97,10 +97,10 @@ use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
     DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, SentinelInstance,
-    Signature, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
+    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
+    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
@@ -5616,8 +5616,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
-
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
 
@@ -5630,21 +5628,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
-        for (argument_index, (argument_form, ast_argument)) in bindings
-            .argument_forms()
-            .iter()
-            .copied()
-            .zip(ast_arguments.clone())
-            .enumerate()
-        {
+        for (argument_index, ast_argument) in ast_arguments.clone().enumerate() {
             if ast_argument.is_variadic() {
                 continue;
             }
             let ast_argument = ast_argument.value();
-
-            if matches!(argument_form, Some(ParameterForm::Type)) {
-                continue;
-            }
 
             let mut inferred_declared_types = FxHashSet::default();
             for declared_type in overloads_with_binding
@@ -5670,13 +5658,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for (argument_index, (argument_form, ast_argument)) in bindings
-            .argument_forms()
-            .iter()
-            .copied()
-            .zip(ast_arguments)
-            .enumerate()
-        {
+        for (argument_index, ast_argument) in ast_arguments.enumerate() {
             // Splatted arguments are inferred before parameter matching to
             // determine their length.
             //
@@ -5685,17 +5667,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
             let ast_argument = ast_argument.value();
-
-            // Type-form arguments are inferred without type context, so we can infer the argument type directly.
-            if let Some(ParameterForm::Type) = argument_form {
-                arguments_types.insert_type(
-                    argument_index,
-                    TypeContext::default(),
-                    self.infer_type_expression(ast_argument),
-                );
-
-                continue;
-            }
 
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
