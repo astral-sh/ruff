@@ -23,6 +23,14 @@
 //!
 //! The extra edge keeps repeated unions small. For example, `A OR B` can store `A` once on `B`'s
 //! `if_uncertain` edge instead of copying `A` into both of `B`'s other edges.
+//!
+//! We also absorb redundant cofactors when constructing TDD nodes. This is especially useful for
+//! the continuation of a large `if`/`elif` chain. Each branch has narrowing constraints of the
+//! form `A`, `NOT A AND B`, `NOT A AND NOT B AND C`, and so on. The continuation combines those
+//! branch constraints with `OR`. The negative part of each branch constraint is redundant in that
+//! union because it is already covered by the earlier positive branches. These negative prefixes
+//! are cofactors of the earlier positive alternatives and can be absorbed. For example,
+//! `A OR (NOT A AND B)` simplifies to `A OR B`.
 
 use std::cmp::Ordering;
 
@@ -174,6 +182,7 @@ impl NarrowingConstraintsBuilder {
             return node.if_true;
         }
 
+        // Find and absorb cofactors if we can. (See module documentation for more details.)
         // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
         // then the remaining cofactor can be lifted into `if_uncertain`, avoiding shapes like
         // `A or (not A and B)`.

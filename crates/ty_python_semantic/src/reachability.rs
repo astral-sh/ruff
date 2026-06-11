@@ -637,6 +637,8 @@ impl ProjectedNarrowingGraph<'_> {
             return node.if_true;
         }
 
+        // Find and absorb cofactors if we can. (See `ty_python_core::narrowing_constraints` for
+        // more details.)
         // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
         // then the remaining cofactor can be lifted into `if_uncertain`, avoiding shapes like
         // `A or (not A and B)`.
