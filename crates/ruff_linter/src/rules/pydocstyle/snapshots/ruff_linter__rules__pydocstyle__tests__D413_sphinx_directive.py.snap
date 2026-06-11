@@ -12,13 +12,13 @@ D413 [*] Missing blank line after last section ("Returns")
 26 |     """
    |
 help: Add blank line after "Returns"
-23 | 
+23 |
 24 |     Returns:
 25 |         None
-26 + 
+26 +
 27 |     """
-28 | 
-29 | 
+28 |
+29 |
 
 D413 [*] Missing blank line after last section ("Returns")
   --> sphinx_directive.py:50:5
@@ -31,13 +31,13 @@ D413 [*] Missing blank line after last section ("Returns")
 52 |     """
    |
 help: Add blank line after "Returns"
-49 | 
+49 |
 50 |     Returns:
 51 |         None
-52 + 
+52 +
 53 |     """
-54 | 
-55 | 
+54 |
+55 |
 
 D413 [*] Missing blank line after last section ("Notes")
   --> sphinx_directive.py:62:5
@@ -50,10 +50,10 @@ D413 [*] Missing blank line after last section ("Notes")
 64 |     """
    |
 help: Add blank line after "Notes"
-61 | 
+61 |
 62 |     Notes:
 63 |         This IS a real section and should still be detected.
-64 + 
+64 +
 65 |     """
 66 | # Regression test for nested directive state.
 67 | def func5():
