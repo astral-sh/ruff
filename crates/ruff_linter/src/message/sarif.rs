@@ -124,7 +124,7 @@ impl<'a> From<(&'a SecondaryCode, SarifLevel)> for SarifRule<'a> {
         // avoids calling Linter::parse_code twice.
         let (linter, suffix) = Linter::parse_code(code).unwrap();
         let rule = linter
-            .all_rules()
+            .rules()
             .find(|rule| rule.noqa_code().suffix() == suffix)
             .expect("Expected a valid noqa code corresponding to a rule");
         Self {

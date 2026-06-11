@@ -9,7 +9,6 @@ use anyhow::Result;
 use itertools::Itertools;
 use regex::{Captures, Regex};
 use ruff_linter::codes::RuleGroup;
-use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
 use ruff_linter::registry::{Linter, Rule, RuleNamespace};

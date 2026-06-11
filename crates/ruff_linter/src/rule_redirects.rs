@@ -142,7 +142,6 @@ static REDIRECTS: LazyLock<HashMap<&'static str, &'static str>> = LazyLock::new(
 mod tests {
     use crate::codes::{Rule, RuleGroup};
     use crate::rule_redirects::REDIRECTS;
-    use strum::IntoEnumIterator;
 
     /// Tests for rule codes that overlap with a redirect.
     #[test]

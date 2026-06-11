@@ -4,7 +4,6 @@ use std::io::{self, BufWriter, Write};
 use anyhow::Result;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
 use ruff_linter::codes::RuleGroup;

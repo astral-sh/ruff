@@ -20,7 +20,7 @@ impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
         let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
         linter
-            .all_rules()
+            .rules()
             .find(|rule| rule.noqa_code().suffix() == code)
             .ok_or(FromCodeError::Unknown)
     }
@@ -32,7 +32,7 @@ pub enum FromCodeError {
     Unknown,
 }
 
-#[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
+#[derive(EnumIter, Debug, PartialEq, Eq, Copy, Clone, Hash, RuleNamespace)]
 pub enum Linter {
     /// [Airflow](https://pypi.org/project/apache-airflow/)
     #[prefix = "AIR"]
@@ -386,7 +386,6 @@ pub mod clap_completion {
         PossibleValue, PossibleValuesParser, TypedValueParser, ValueParserFactory,
     };
     use clap::error::ContextKind;
-    use strum::IntoEnumIterator;
 
     use crate::registry::Rule;
 
