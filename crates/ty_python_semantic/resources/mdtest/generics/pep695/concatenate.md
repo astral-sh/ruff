@@ -564,8 +564,6 @@ def only_variadic(*args: str, **kwargs: int) -> None: ...
 
 reveal_type(only_variadic)  # revealed: (...) -> None
 
-# TODO: This should accept the callable and reveal `(*args: str, **kwargs: int) -> None`.
-# error: [invalid-argument-type]
 @decorator
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 

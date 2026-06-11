@@ -21,12 +21,9 @@ Ts = TypeVarTuple("Ts")
 class Array(Generic[Unpack[Ts]]):
     value: tuple[Unpack[Ts]]
 
-# TODO: revealed: tuple[()]
-reveal_type(Array[()]().value)  # revealed: tuple[tuple[()], ...]
-# TODO: revealed: tuple[int, str]
-reveal_type(Array[int, str]().value)  # revealed: tuple[tuple[int, str], ...]
-# TODO: revealed: tuple[int, str]
-reveal_type(Array[Unpack[tuple[int, str]]]().value)  # revealed: tuple[tuple[int, str], ...]
+reveal_type(Array[()]().value)  # revealed: tuple[()]
+reveal_type(Array[int, str]().value)  # revealed: tuple[int, str]
+reveal_type(Array[Unpack[tuple[int, str]]]().value)  # revealed: tuple[int, str]
 ```
 
 ## Variadic parameter inference
@@ -43,10 +40,8 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[*Ts@collect]
     raise NotImplementedError
 
-# TODO: revealed: tuple[()]
-reveal_type(collect())  # revealed: tuple[tuple[Unknown, ...], ...]
-# TODO: revealed: tuple[Literal[1], Literal["a"]]
-reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1, "a"], ...]
+reveal_type(collect())  # revealed: tuple[()]
+reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
 ```
 
 ## Callable parameters
@@ -69,13 +64,9 @@ def invoke(
 def format_value(value: int, label: str, /) -> str:
     return f"{label}: {value}"
 
-# TODO: revealed: str
-# error: [invalid-argument-type]
-reveal_type(invoke(format_value, 1, "value"))  # revealed: Unknown
-# TODO: error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
-# TODO: revealed: str
-# error: [invalid-argument-type]
-reveal_type(invoke(format_value, 1))  # revealed: Unknown
+reveal_type(invoke(format_value, 1, "value"))  # revealed: str
+# error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
+reveal_type(invoke(format_value, 1))  # revealed: str
 ```
 
 ## Type aliases
@@ -93,10 +84,8 @@ def f(
     fixed: Alias[str, bool],
     unbounded: Alias[Unpack[tuple[str, ...]]],
 ) -> None:
-    # TODO: revealed: tuple[int, str, bool]
-    reveal_type(fixed)  # revealed: tuple[int, *tuple[tuple[str, bool], ...]]
-    # TODO: revealed: tuple[int, *tuple[str, ...]]
-    reveal_type(unbounded)  # revealed: tuple[int, *tuple[tuple[str, ...], ...]]
+    reveal_type(fixed)  # revealed: tuple[int, str, bool]
+    reveal_type(unbounded)  # revealed: tuple[int, *tuple[str, ...]]
 ```
 
 ## Concrete and nested tuple unpacking
@@ -112,7 +101,7 @@ def accept(
 
 accept(True, "phase", "status", b"ok")
 accept(True, b"ok")
-# TODO: error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
+# error: [invalid-argument-type] "Argument to function `accept` is incorrect: Expected `tuple[bool, *tuple[str, ...], bytes]`"
 accept(True, 1, b"bad")
 ```
 
@@ -133,10 +122,8 @@ Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 class WithDefault(Generic[Unpack[Ts]]):
     value: tuple[Unpack[Ts]]
 
-# TODO: revealed: tuple[int, str]
-reveal_type(WithDefault().value)  # revealed: tuple[tuple[int, str], ...]
-# TODO: revealed: tuple[bool, bytes]
-reveal_type(WithDefault[bool, bytes]().value)  # revealed: tuple[tuple[bool, bytes], ...]
+reveal_type(WithDefault().value)  # revealed: tuple[int, str]
+reveal_type(WithDefault[bool, bytes]().value)  # revealed: tuple[bool, bytes]
 ```
 
 ## Validation
