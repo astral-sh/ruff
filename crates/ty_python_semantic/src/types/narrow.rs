@@ -2766,12 +2766,11 @@ fn key_membership_contains_protocol<'db>(db: &'db dyn Db, key: &str) -> Type<'db
 fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
         ty.as_literal_value_kind(),
-        // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
-        // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
         Some(
             LiteralValueTypeKind::String(_)
                 | LiteralValueTypeKind::Bytes(_)
                 | LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Enum(_)
         )
     )
 }
