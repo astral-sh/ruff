@@ -14,6 +14,7 @@ use crate::{
         function::{
             FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
             OverloadLiteral, function_body_kind, is_implicit_classmethod,
+            same_module_uncached_raw_signature,
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
@@ -80,18 +81,22 @@ impl<'db> ExpectedReturnType<'db> {
 
         let public = normalize(
             db,
-            function
-                .literal(db)
-                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
-                .return_ty,
+            same_module_uncached_raw_signature(
+                db,
+                function.literal(db),
+                ReturnCallableTypeVarScope::Public,
+            )
+            .return_ty,
         );
         let lexical = function_node.type_params.is_some().then(|| {
             normalize(
                 db,
-                function
-                    .literal(db)
-                    .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
-                    .return_ty,
+                same_module_uncached_raw_signature(
+                    db,
+                    function.literal(db),
+                    ReturnCallableTypeVarScope::Lexical,
+                )
+                .return_ty,
             )
         });
 
@@ -169,10 +174,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let enclosing_function = nearest_enclosing_function(db, self.index, self.scope())
                 .expect("should be in a function body scope");
-            let declared_ty = enclosing_function
-                .literal(db)
-                .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Public)
-                .return_ty;
+            let declared_ty = same_module_uncached_raw_signature(
+                db,
+                enclosing_function.literal(db),
+                ReturnCallableTypeVarScope::Public,
+            )
+            .return_ty;
             let expected_return =
                 ExpectedReturnType::from_function(db, enclosing_function, function);
             let expected_ty = expected_return.public();
