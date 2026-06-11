@@ -249,6 +249,19 @@ impl<'db> Place<'db> {
         }
     }
 
+    pub(crate) fn is_equal_ignoring_provenance(self, other: Self) -> bool {
+        match (self, other) {
+            (Place::Defined(left), Place::Defined(right)) => {
+                left.ty == right.ty
+                    && left.origin == right.origin
+                    && left.definedness == right.definedness
+                    && left.public_type_policy == right.public_type_policy
+            }
+            (Place::Undefined, Place::Undefined) => true,
+            _ => false,
+        }
+    }
+
     pub(crate) fn is_undefined(&self) -> bool {
         matches!(self, Place::Undefined)
     }

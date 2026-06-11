@@ -74,7 +74,8 @@ impl<'db> Type<'db> {
             // TODO: if `rhs_reflected` is possibly unbound, we should union the two possible
             // Bindings together
             if !rhs_reflected.is_undefined()
-                && rhs_reflected != left_class.member(db, reflected_dunder).place
+                && !rhs_reflected
+                    .is_equal_ignoring_provenance(left_class.member(db, reflected_dunder).place)
             {
                 return Ok(right_ty
                     .try_call_dunder_with_policy(
