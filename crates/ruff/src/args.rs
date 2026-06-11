@@ -1482,6 +1482,6 @@ pub fn collect_per_file_ignores(pairs: Vec<PatternPrefixPair>) -> Vec<PerFileIgn
     }
     per_file_ignores
         .into_iter()
-        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, &prefixes, None))
+        .map(|(pattern, prefixes)| PerFileIgnore::new(pattern, prefixes, None))
         .collect()
 }

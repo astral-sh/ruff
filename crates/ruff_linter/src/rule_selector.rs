@@ -197,7 +197,13 @@ impl Visitor<'_> for SelectorVisitor {
 
 impl RuleSelector {
     /// Return all matching rules, regardless of rule group filters like preview and deprecated.
-    pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
+    ///
+    /// Human-readable rule names are a separate preview feature and are only matched when preview
+    /// is enabled.
+    pub fn all_rules(&self, preview: PreviewMode) -> impl Iterator<Item = Rule> + '_ {
+        let selector_enabled =
+            is_human_readable_names_enabled(preview) || !matches!(self, RuleSelector::Name(_));
+
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
 
@@ -217,20 +223,15 @@ impl RuleSelector {
             }
             RuleSelector::Name(rule) => RuleSelectorIter::Once(std::iter::once(*rule)),
         }
+        .filter(move |_| selector_enabled)
     }
 
     /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
     pub fn rules<'a>(&'a self, preview: &PreviewOptions) -> impl Iterator<Item = Rule> + use<'a> {
         let preview_enabled = preview.mode.is_enabled();
         let preview_require_explicit = preview.require_explicit;
-        let selector_enabled =
-            is_human_readable_names_enabled(preview.mode) || !matches!(self, RuleSelector::Name(_));
 
-        self.all_rules().filter(move |rule| {
-            if !selector_enabled {
-                return false;
-            }
-
+        self.all_rules(preview.mode).filter(move |rule| {
             match rule.group() {
                 // Always include stable rules
                 RuleGroup::Stable { .. } => true,

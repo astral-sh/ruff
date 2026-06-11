@@ -22,7 +22,6 @@ use ruff_cache::cache_dir;
 use ruff_formatter::IndentStyle;
 use ruff_graph::{AnalyzeSettings, Direction, StringImports};
 use ruff_linter::line_width::{IndentWidth, LineLength};
-use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::registry::{INCOMPATIBLE_CODES, Rule, RuleNamespace, RuleSet};
 use ruff_linter::rule_selector::{PreviewOptions, Specificity};
 use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
@@ -331,6 +330,7 @@ impl Configuration {
                         .into_iter()
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
+                    lint_preview,
                 )?,
                 fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
@@ -788,7 +788,7 @@ impl LintConfiguration {
                     per_file_ignores
                         .into_iter()
                         .map(|(pattern, prefixes)| {
-                            PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                            PerFileIgnore::new(pattern, prefixes, Some(project_root))
                         })
                         .collect()
                 })
@@ -800,7 +800,7 @@ impl LintConfiguration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                        PerFileIgnore::new(pattern, prefixes, Some(project_root))
                     })
                     .collect()
             }),
@@ -860,7 +860,7 @@ impl LintConfiguration {
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.all_rules(preview.mode).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -934,7 +934,7 @@ impl LintConfiguration {
                     .chain(&selection.extend_fixable)
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -944,7 +944,7 @@ impl LintConfiguration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -1012,9 +1012,6 @@ impl LintConfiguration {
             for (kind, selector) in selection.selectors_by_kind() {
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
                 // and use with, e.g., `--ignore` or `--fixable` is okay
-                let selector_is_enabled = is_human_readable_names_enabled(preview.mode)
-                    || !matches!(selector, RuleSelector::Name(_));
-
                 // Unstable rules
                 if preview.mode.is_disabled() && kind.is_enable() {
                     // Check if the selector is empty because preview mode is disabled
@@ -1032,15 +1029,17 @@ impl LintConfiguration {
                 }
 
                 // Deprecated rules
-                if selector_is_enabled && kind.is_enable() && selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_deprecated()) {
+                if kind.is_enable() && selector.is_exact() {
+                    let mut rules = selector.all_rules(preview.mode).peekable();
+                    if rules.peek().is_some() && rules.all(|rule| rule.is_deprecated()) {
                         deprecated_selectors.insert(selector.clone());
                     }
                 }
 
                 // Removed rules
-                if selector_is_enabled && selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_removed()) {
+                if selector.is_exact() {
+                    let mut rules = selector.all_rules(preview.mode).peekable();
+                    if rules.peek().is_some() && rules.all(|rule| rule.is_removed()) {
                         if kind.is_disable() {
                             removed_ignored_rules.insert(selector);
                         } else {
