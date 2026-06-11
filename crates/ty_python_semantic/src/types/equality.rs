@@ -48,6 +48,14 @@ enum ComparisonResult<'db> {
 }
 
 impl<'db> ComparisonResult<'db> {
+    fn from_bool(value: bool) -> Self {
+        if value {
+            ComparisonResult::AlwaysTrue
+        } else {
+            ComparisonResult::AlwaysFalse
+        }
+    }
+
     /// Convert this result into a constraint for a branch with the given truthiness.
     fn constraint(self, is_positive: bool) -> Option<Type<'db>> {
         match self {
@@ -482,16 +490,6 @@ fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralTy
             .enum_complement(db)
             .is_some_and(|complement| complement.enum_class(db) == right.enum_class(db)),
         _ => false,
-    }
-}
-
-impl ComparisonResult<'_> {
-    fn from_bool(value: bool) -> Self {
-        if value {
-            ComparisonResult::AlwaysTrue
-        } else {
-            ComparisonResult::AlwaysFalse
-        }
     }
 }
 
