@@ -133,6 +133,27 @@ for x in (1, "a", b"foo"):
 reveal_type(x)
 ```
 
+## Exact builtin containers and subclass overrides
+
+```py
+from typing import Any, Iterator
+
+def builtins(values: list[int], mapping: dict[str, int]):
+    for value in values:
+        reveal_type(value)  # revealed: int
+
+    for key in mapping:
+        reveal_type(key)  # revealed: str
+
+class CustomList(list[Any]):
+    def __iter__(self) -> Iterator[str]:
+        return iter([""])
+
+def subclass(values: CustomList):
+    for value in values:
+        reveal_type(value)  # revealed: str
+```
+
 ## With non-callable iterator
 
 ```py
