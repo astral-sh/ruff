@@ -594,12 +594,13 @@ pub enum PropertyAccessorRole {
     Deleter,
 }
 
-/// Represents an instance of `builtins.property`.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+/// Represents an instance of `builtins.property` or `enum.property`.
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct PropertyInstanceType<'db> {
     pub getter: Option<Type<'db>>,
     pub setter: Option<Type<'db>>,
     pub deleter: Option<Type<'db>>,
+    instance_class: KnownClass,
 }
 
 fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -622,6 +623,38 @@ fn walk_property_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 impl get_size2::GetSize for PropertyInstanceType<'_> {}
 
 impl<'db> PropertyInstanceType<'db> {
+    pub fn new(
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, KnownClass::Property)
+    }
+
+    fn new_enum_property(
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, KnownClass::EnumProperty)
+    }
+
+    fn with_accessors(
+        self,
+        db: &'db dyn Db,
+        getter: Option<Type<'db>>,
+        setter: Option<Type<'db>>,
+        deleter: Option<Type<'db>>,
+    ) -> Self {
+        Self::new_internal(db, getter, setter, deleter, self.instance_class(db))
+    }
+
+    fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
+        self.instance_class(db).to_instance(db)
+    }
+
     /// Returns the [`PropertyAccessorRole`] that `def` plays in this property, or `None` when
     /// `def` is not one of this property's accessors.
     ///
@@ -669,7 +702,7 @@ impl<'db> PropertyInstanceType<'db> {
         let deleter = self
             .deleter(db)
             .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-        Self::new(db, getter, setter, deleter)
+        self.with_accessors(db, getter, setter, deleter)
     }
 
     fn recursive_type_normalized_impl(
@@ -702,7 +735,7 @@ impl<'db> PropertyInstanceType<'db> {
             ),
             None => None,
         };
-        Some(Self::new(db, getter, setter, deleter))
+        Some(self.with_accessors(db, getter, setter, deleter))
     }
 
     fn find_legacy_typevars_impl(
@@ -1369,6 +1402,7 @@ impl<'db> Type<'db> {
                 bound.nominal_class(db)
             }
             Type::LiteralValue(literal) => literal.fallback_instance(db).nominal_class(db),
+            Type::PropertyInstance(property) => property.instance_fallback(db).nominal_class(db),
             _ => None,
         }
     }
@@ -2538,13 +2572,13 @@ impl<'db> Type<'db> {
                         // Hard code this knowledge, as we look up `__set__` and `__delete__` on `FunctionType` often.
                         Some(Place::Undefined.into())
                     }
-                    (Some(KnownClass::Property), "__get__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__get__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderGet,
                         ))
                         .into(),
                     ),
-                    (Some(KnownClass::Property), "__set__") => Some(
+                    (Some(KnownClass::Property | KnownClass::EnumProperty), "__set__") => Some(
                         Place::bound(Type::WrapperDescriptor(
                             WrapperDescriptorKind::PropertyDunderSet,
                         ))
@@ -2887,9 +2921,9 @@ impl<'db> Type<'db> {
 
             Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
 
-            Type::PropertyInstance(_) => KnownClass::Property
-                .to_instance(db)
-                .instance_member(db, name),
+            Type::PropertyInstance(property) => {
+                property.instance_fallback(db).instance_member(db, name)
+            }
 
             // Note: `super(pivot, owner).__dict__` refers to the `__dict__` of the `builtins.super` instance,
             // not that of the owner.
@@ -5804,7 +5838,7 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance.to_meta_type(db),
             Type::KnownInstance(known_instance) => known_instance.to_meta_type(db),
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
-            Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
+            Type::PropertyInstance(property) => property.instance_class(db).to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::TypeForm(_) => Type::object().to_meta_type(db),

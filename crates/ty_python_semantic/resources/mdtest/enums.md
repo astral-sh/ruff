@@ -725,6 +725,14 @@ class Answer(Enum):
     def some_property(self) -> str:
         return "property value"
 
+    @enum_property
+    def settable_property(self) -> int:
+        return 1
+
+    @settable_property.setter
+    def settable_property(self, value: str) -> None:
+        pass
+
     def direct_property_getter(self) -> int:
         return 1
 
@@ -734,6 +742,25 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 assert_type(Answer.YES.some_property, str)
 assert_type(Answer.YES.direct_property, int)
+Answer.YES.some_property = "new value"  # error: [invalid-assignment]
+Answer.YES.settable_property = "new value"
+assert_type(Answer.YES.settable_property, int)
+Answer.YES.settable_property = 1  # error: [invalid-assignment]
+
+def get(value: Enum) -> str:
+    return value.name
+
+descriptor = enum_property(get)
+reveal_type(descriptor)  # revealed: enum.property
+# revealed: <method-wrapper '__get__' of enum.property 'get'>
+reveal_type(descriptor.__get__)
+retained: enum_property = descriptor
+retained_as_property: property = descriptor
+not_enum_property: enum_property = property(get)  # error: [invalid-assignment]
+retained_getter: enum_property = descriptor.getter(get)
+assert_type(descriptor.name, str)
+assert_type(descriptor.clsname, str)
+assert_type(descriptor.member, Enum | None)
 ```
 
 Enum attributes defined using `enum.property` take precedence over generated attributes.
