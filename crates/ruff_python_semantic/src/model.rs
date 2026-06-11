@@ -1543,6 +1543,7 @@ impl<'a> SemanticModel<'a> {
             "airflow" => self.seen.insert(Modules::AIRFLOW),
             "hashlib" => self.seen.insert(Modules::HASHLIB),
             "crypt" => self.seen.insert(Modules::CRYPT),
+            "pyspark" => self.seen.insert(Modules::PYSPARK),
             _ => {}
         }
     }
@@ -2321,6 +2322,7 @@ bitflags! {
         const AIRFLOW = 1 << 27;
         const HASHLIB = 1 << 28;
         const CRYPT = 1 << 29;
+        const PYSPARK = 1 << 30;
     }
 }
 
