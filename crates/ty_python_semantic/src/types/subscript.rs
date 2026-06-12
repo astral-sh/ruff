@@ -20,11 +20,12 @@ use super::diagnostic::{
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
+use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypeMapping, TypedDictType, UnionBuilder, UnionType, todo_type,
+    TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -180,6 +181,78 @@ impl<'db> SubscriptError<'db> {
         let slice_node = subscript.slice.as_ref();
         for error in &self.errors {
             error.report_diagnostic(context, subscript, value_node, slice_node);
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            result_ty: self.result_ty.fold(db, rec),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.fold(db, rec))
+                .collect(),
+        }
+    }
+}
+
+impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::IndexOutOfBounds {
+                kind,
+                tuple_ty,
+                length,
+                index,
+            } => Self::IndexOutOfBounds {
+                kind,
+                tuple_ty: tuple_ty.fold(db, rec),
+                length,
+                index,
+            },
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.fold(db, rec),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+            } => Self::DunderCallError {
+                method,
+                value_ty: value_ty.fold(db, rec),
+                slice_ty: slice_ty.fold(db, rec),
+                kind,
+                bindings: bindings.fold(db, rec),
+            },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty,
+            } => Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty: slice_ty.fold(db, rec),
+                full_object_ty: full_object_ty.fold(db, rec),
+            },
+            Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
+                value_ty: value_ty.fold(db, rec),
+                method,
+            },
+            Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty,
+            } => Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty: argument_ty.fold(db, rec),
+            },
+            Self::NonGenericTypeAlias { .. }
+            | Self::DuplicateTypevar { .. }
+            | Self::TypeVarTupleNotUnpacked { .. }
+            | Self::SliceStepSizeZero => self,
         }
     }
 }
@@ -536,34 +609,7 @@ impl<'db> Type<'db> {
             // A non-contractive `μα.α` carries no structure to subscript into; unfolding it loops,
             // so treat it as a gradual leaf and return the marker itself (like `Divergent` above).
             (Type::Recursive(rec), _) if rec.is_non_contractive(db) => Some(Ok(value_ty)),
-
-            // Subscript the body with α as a gradual leaf, then rebind α in the
-            // result. A top-level α branch would otherwise recurse into the same
-            // subscript operation indefinitely.
-            (Type::Recursive(rec), _) => {
-                let rebind = |ty: Type<'db>| {
-                    let replacement = rec.origin(db).source_type().unwrap_or(Type::Recursive(rec));
-                    let type_mapping = TypeMapping::ReplaceDivergent {
-                        binder_id: rec.binder(db),
-                        replacement,
-                    };
-                    rec.fold(
-                        db,
-                        ty.apply_type_mapping(db, &type_mapping, TypeContext::default()),
-                    )
-                };
-                Some(match rec.body(db).subscript(db, slice_ty, expr_context) {
-                    Ok(ty) => Ok(rebind(ty)),
-                    Err(error) => {
-                        let result_ty = if error.result_type().is_unknown() {
-                            value_ty
-                        } else {
-                            rebind(error.result_type())
-                        };
-                        Err(SubscriptError::with_errors(result_ty, error.into_errors()))
-                    }
-                })
-            }
+            (Type::Recursive(rec), _) => Some(rec.map(db, |unfolded| unfolded.subscript(db, slice_ty, expr_context))),
 
             (Type::TypeAlias(alias), _) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
