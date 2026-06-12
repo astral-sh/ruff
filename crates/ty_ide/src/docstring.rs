@@ -8,6 +8,7 @@
 
 mod formats;
 mod markdown;
+mod parsing;
 mod preformatted;
 
 use formats::Formats;
@@ -18,17 +19,6 @@ use ruff_source_file::UniversalNewlines;
 use std::sync::LazyLock;
 
 use crate::MarkupKind;
-
-// Static regex instances to avoid recompilation
-static GOOGLE_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\s*(Args|Arguments|Parameters)\s*:\s*$")
-        .expect("Google section regex should be valid")
-});
-
-static GOOGLE_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:\s*(.+)")
-        .expect("Google parameter regex should be valid")
-});
 
 static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)^\s*Parameters\s*$").expect("NumPy section regex should be valid")
@@ -71,16 +61,12 @@ impl Docstring {
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
     pub fn parameter_documentation(&self) -> IndexMap<String, String> {
-        let mut param_docs = IndexMap::new();
-
-        // Google-style docstrings
-        param_docs.extend(extract_google_style_params(&self.0));
+        let mut param_docs = Formats::parse(&self.0).parameter_documentation();
 
         // NumPy-style docstrings
-        param_docs.extend(extract_numpy_style_params(&self.0));
-
-        // reST/Sphinx-style docstrings
-        param_docs.extend(Formats::parse(&self.0).parameter_documentation());
+        for (name, documentation) in extract_numpy_style_params(&self.0) {
+            param_docs.entry(name).or_insert(documentation);
+        }
 
         param_docs
     }
@@ -175,89 +161,6 @@ fn documentation_trim(docs: &str) -> String {
     }
 
     output
-}
-
-/// Extract parameter documentation from Google-style docstrings.
-fn extract_google_style_params(docstring: &str) -> IndexMap<String, String> {
-    let mut param_docs = IndexMap::new();
-
-    let mut in_args_section = false;
-    let mut current_param: Option<String> = None;
-    let mut current_doc = String::new();
-
-    for line_obj in docstring.universal_newlines() {
-        let line = line_obj.as_str();
-        if GOOGLE_SECTION_REGEX.is_match(line) {
-            in_args_section = true;
-            continue;
-        }
-
-        if in_args_section {
-            // Check if we hit another section (starts with a word followed by colon at line start)
-            if !line.starts_with(' ') && !line.starts_with('\t') && line.contains(':') {
-                if let Some(colon_pos) = line.find(':') {
-                    let section_name = line[..colon_pos].trim();
-                    // If this looks like another section, stop processing args
-                    if !section_name.is_empty()
-                        && section_name
-                            .chars()
-                            .all(|c| c.is_alphabetic() || c.is_whitespace())
-                    {
-                        // Check if this is a known section name
-                        let known_sections = [
-                            "Returns", "Return", "Raises", "Yields", "Yield", "Examples",
-                            "Example", "Note", "Notes", "Warning", "Warnings",
-                        ];
-                        if known_sections.contains(&section_name) {
-                            if let Some(param_name) = current_param.take() {
-                                param_docs.insert(param_name, current_doc.trim().to_string());
-                                current_doc.clear();
-                            }
-                            in_args_section = false;
-                            continue;
-                        }
-                    }
-                }
-            }
-
-            if let Some(captures) = GOOGLE_PARAM_REGEX.captures(line) {
-                // Save previous parameter if exists
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-
-                // Start new parameter
-                if let (Some(param), Some(desc)) = (captures.get(1), captures.get(3)) {
-                    current_param = Some(param.as_str().to_string());
-                    current_doc = desc.as_str().to_string();
-                }
-            } else if line.starts_with(' ') || line.starts_with('\t') {
-                // This is a continuation of the current parameter documentation
-                if current_param.is_some() {
-                    if !current_doc.is_empty() {
-                        current_doc.push('\n');
-                    }
-                    current_doc.push_str(line.trim());
-                }
-            } else {
-                // This is a line that doesn't start with whitespace and isn't a parameter
-                // It might be a section or other content, so stop processing args
-                if let Some(param_name) = current_param.take() {
-                    param_docs.insert(param_name, current_doc.trim().to_string());
-                    current_doc.clear();
-                }
-                in_args_section = false;
-            }
-        }
-    }
-
-    // Don't forget the last parameter
-    if let Some(param_name) = current_param {
-        param_docs.insert(param_name, current_doc.trim().to_string());
-    }
-
-    param_docs
 }
 
 /// Calculate the indentation level of a line.
@@ -1336,9 +1239,12 @@ mod tests {
         This is a function description.
 
         Args:
+            Values accepted by the function.
             param1 (str): The first parameter description
             param2 (int): The second parameter description
                 This is a continuation of param2 description.
+
+                This is a second paragraph of param2 description.
             param3: A parameter without type annotation
 
         Returns:
@@ -1352,7 +1258,7 @@ mod tests {
         assert_eq!(&param_docs["param1"], "The first parameter description");
         assert_eq!(
             &param_docs["param2"],
-            "The second parameter description\nThis is a continuation of param2 description."
+            "The second parameter description\nThis is a continuation of param2 description.\n\nThis is a second paragraph of param2 description."
         );
         assert_eq!(&param_docs["param3"], "A parameter without type annotation");
 
@@ -1360,9 +1266,12 @@ mod tests {
         This is a function description.
 
         Args:
+            Values accepted by the function.
             param1 (str): The first parameter description
             param2 (int): The second parameter description
                 This is a continuation of param2 description.
+
+                This is a second paragraph of param2 description.
             param3: A parameter without type annotation
 
         Returns:
@@ -1373,14 +1282,42 @@ mod tests {
         This is a function description.<HB>
         <HB>
         Args:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Values accepted by the function.<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): The first parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        <HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a second paragraph of param2 description.<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param3: A parameter without type annotation<HB>
         <HB>
         Returns:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;str: The return value description
         ");
+    }
+
+    #[test]
+    fn google_style_parameter_documentation_keeps_prose_with_colons() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = r#"
+        This is a function description.
+
+        Args:
+            param1 (str): The first parameter description.
+            For example: pass an absolute path.
+            *args: Extra positional arguments.
+            **kwargs: Extra keyword arguments.
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+        let param_docs = docstring.parameter_documentation();
+
+        assert_eq!(param_docs.len(), 3);
+        assert_eq!(
+            &param_docs["param1"],
+            "The first parameter description.\nFor example: pass an absolute path."
+        );
+        assert_eq!(&param_docs["*args"], "Extra positional arguments.");
+        assert_eq!(&param_docs["**kwargs"], "Extra keyword arguments.");
     }
 
     #[test]
