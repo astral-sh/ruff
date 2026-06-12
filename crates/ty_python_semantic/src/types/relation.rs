@@ -396,7 +396,7 @@ impl<'db> Type<'db> {
     /// reasoning depending on inferable typevars.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_constraint_set_assignable_to_owned(db, target)
-            .query(|builder, when| when.is_always_satisfied(db))
+            .query(|_builder, when| when.is_always_satisfied(db))
     }
 
     pub(super) fn when_assignable_to<'c>(

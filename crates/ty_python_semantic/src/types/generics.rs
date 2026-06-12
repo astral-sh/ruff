@@ -308,6 +308,33 @@ impl<'db> InferableTypeVars<'db> {
 
     // This is not an IntoIterator implementation because I have no desire to try to name the
     // iterator type.
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        match self {
+            InferableTypeVars::None => false,
+            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&bound_typevar),
+        }
+    }
+
+    pub(crate) fn difference(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => self,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                Self::from_typevars(
+                    db,
+                    self_inner
+                        .inferable(db)
+                        .difference(other_inner.inferable(db))
+                        .copied()
+                        .collect(),
+                )
+            }
+        }
+    }
+
     pub(crate) fn iter(
         self,
         db: &'db dyn Db,

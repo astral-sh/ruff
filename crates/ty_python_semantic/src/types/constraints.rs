@@ -46,12 +46,13 @@
 //!
 //! The raw [`Node`] and [`NodeId`] layer only represents the TDD formula itself. The public
 //! [`ConstraintSet`] wrapper adds deferred existential quantification metadata for callable-local
-//! type variables. While constructing larger positive formulas, those variables remain visible in
-//! the raw TDD and the deferred metadata is merged globally. A small number of construction sites
-//! with known-independent operands can eagerly quantify operand-local variables for performance.
-//! Before terminal semantic observations or solution extraction, the wrapper interprets the set as
-//! `∃ deferred_vars . raw_formula`. Operations that introduce negation-like semantics force this
-//! interpretation first, because
+//! type variables, plus metadata for the type variables mentioned by the raw formula. While
+//! constructing larger positive formulas, deferred variables remain visible in the raw TDD and the
+//! metadata is merged globally. A small number of construction sites with known-independent
+//! operands can use the mentioned-typevar metadata to eagerly quantify operand-local variables for
+//! performance. Before terminal semantic observations or solution extraction, the wrapper
+//! interprets the set as `∃ deferred_vars . raw_formula`. Operations that introduce negation-like
+//! semantics force this interpretation first, because
 //! preserving quantifier structure through negation would require a more expressive representation.
 //!
 //! NOTE: This module is currently in a transitional state. We've added the BDD [`ConstraintSet`]
@@ -220,6 +221,7 @@ where
         // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
         // regression.
         let mut deferred_quantification = InferableTypeVars::None;
+        let mut mentioned_typevars = InferableTypeVars::None;
         let node = NodeId::distributed_or(
             db,
             builder,
@@ -228,13 +230,15 @@ where
                 constraint.verify_builder(builder);
                 deferred_quantification =
                     deferred_quantification.merge(db, constraint.deferred_quantification);
+                mentioned_typevars = mentioned_typevars.merge(db, constraint.mentioned_typevars);
                 constraint.node
             }),
         );
-        ConstraintSet::from_node_with_deferred_quantification(
+        ConstraintSet::from_node_with_metadata(
             builder,
             node,
             deferred_quantification,
+            mentioned_typevars,
         )
     }
 
@@ -250,6 +254,7 @@ where
         // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
         // regression.
         let mut deferred_quantification = InferableTypeVars::None;
+        let mut mentioned_typevars = InferableTypeVars::None;
         let node = NodeId::distributed_and(
             db,
             builder,
@@ -258,13 +263,15 @@ where
                 constraint.verify_builder(builder);
                 deferred_quantification =
                     deferred_quantification.merge(db, constraint.deferred_quantification);
+                mentioned_typevars = mentioned_typevars.merge(db, constraint.mentioned_typevars);
                 constraint.node
             }),
         );
-        ConstraintSet::from_node_with_deferred_quantification(
+        ConstraintSet::from_node_with_metadata(
             builder,
             node,
             deferred_quantification,
+            mentioned_typevars,
         )
     }
 
@@ -284,13 +291,14 @@ where
             constraints.push(constraint);
         }
 
-        let (constraints, deferred_quantification) =
+        let (constraints, deferred_quantification, mentioned_typevars) =
             prepare_distributed_constraints(db, builder, constraints);
         let node = NodeId::distributed_and(db, builder, constraints.into_iter().map(|c| c.node));
-        ConstraintSet::from_node_with_deferred_quantification(
+        ConstraintSet::from_node_with_metadata(
             builder,
             node,
             deferred_quantification,
+            mentioned_typevars,
         )
     }
 }
@@ -299,27 +307,96 @@ fn prepare_distributed_constraints<'db, 'c>(
     db: &'db dyn Db,
     builder: &'c ConstraintSetBuilder<'db>,
     constraints: Vec<ConstraintSet<'db, 'c>>,
-) -> (Vec<ConstraintSet<'db, 'c>>, InferableTypeVars<'db>) {
+) -> (
+    Vec<ConstraintSet<'db, 'c>>,
+    InferableTypeVars<'db>,
+    InferableTypeVars<'db>,
+) {
+    let mut mention_counts: FxHashMap<BoundTypeVarIdentity<'db>, usize> = FxHashMap::default();
+    for constraint in &constraints {
+        for identity in constraint.mentioned_typevars.iter(db) {
+            *mention_counts.entry(identity).or_default() += 1;
+        }
+    }
+
     let mut pruned = Vec::with_capacity(constraints.len());
     let mut deferred_quantification = InferableTypeVars::None;
+    let mut mentioned_typevars = InferableTypeVars::None;
 
-    for (index, constraint) in constraints.iter().copied().enumerate() {
+    for constraint in constraints.iter().copied() {
         let constraint = constraint.quantify_unkept_deferred(db, builder, |identity| {
-            constraints.iter().enumerate().any(|(other_index, other)| {
-                other_index != index && other.node.mentions_typevar(db, builder, identity)
-            })
+            let count = mention_counts.get(&identity).copied().unwrap_or_default();
+            let current_mentions = constraint.mentioned_typevars.contains(db, identity);
+            count > usize::from(current_mentions)
         });
         deferred_quantification =
             deferred_quantification.merge(db, constraint.deferred_quantification);
+        mentioned_typevars = mentioned_typevars.merge(db, constraint.mentioned_typevars);
         pruned.push(constraint);
     }
 
-    (pruned, deferred_quantification)
+    (pruned, deferred_quantification, mentioned_typevars)
+}
+
+fn mentioned_typevars_for_constraint_parts<'db>(
+    db: &'db dyn Db,
+    typevar: BoundTypeVarInstance<'db>,
+    lower: Option<Type<'db>>,
+    upper: Option<Type<'db>>,
+) -> InferableTypeVars<'db> {
+    let mut typevars = mentioned_typevars_in_type(db, Type::TypeVar(typevar));
+    if let Some(lower) = lower {
+        typevars.extend(mentioned_typevars_in_type(db, lower));
+    }
+    if let Some(upper) = upper {
+        typevars.extend(mentioned_typevars_in_type(db, upper));
+    }
+    InferableTypeVars::from_typevars(db, typevars)
+}
+
+fn mentioned_typevars_for_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> InferableTypeVars<'db> {
+    InferableTypeVars::from_typevars(db, mentioned_typevars_in_type(db, ty))
+}
+
+fn mentioned_typevars_in_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> FxOrderSet<BoundTypeVarIdentity<'db>> {
+    #[derive(Default)]
+    struct CollectMentionedTypevars<'db> {
+        typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
+        recursion_guard: TypeCollector<'db>,
+    }
+
+    impl<'db> TypeVisitor<'db> for CollectMentionedTypevars<'db> {
+        fn should_visit_lazy_type_attributes(&self) -> bool {
+            false
+        }
+
+        fn visit_bound_type_var_type(
+            &self,
+            db: &'db dyn Db,
+            bound_typevar: BoundTypeVarInstance<'db>,
+        ) {
+            self.typevars
+                .borrow_mut()
+                .insert(bound_typevar.identity(db));
+        }
+
+        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+        }
+    }
+
+    let visitor = CollectMentionedTypevars::default();
+    visitor.visit_type(db, ty);
+    visitor.typevars.into_inner()
 }
 
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
 /// arenas that hold its BDD. It also stores any deferred-quantification metadata that should be
-/// applied to the raw BDD before terminal semantic observation or solution extraction.
+/// applied to the raw BDD before terminal semantic observation or solution extraction, plus the
+/// set of type variables mentioned by the raw BDD formula.
 ///
 /// Owned constraint sets are immutable snapshots of a builder's arenas. They are used by
 /// Salsa-cached relation queries, and by the
@@ -333,6 +410,7 @@ fn prepare_distributed_constraints<'db, 'c>(
 pub struct OwnedConstraintSet<'db> {
     node: NodeId,
     deferred_quantification: InferableTypeVars<'db>,
+    mentioned_typevars: InferableTypeVars<'db>,
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
     typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     nodes: IndexVec<NodeId, InteriorNodeData>,
@@ -343,6 +421,7 @@ impl Default for OwnedConstraintSet<'_> {
         Self {
             node: ALWAYS_FALSE,
             deferred_quantification: InferableTypeVars::None,
+            mentioned_typevars: InferableTypeVars::None,
             constraints: IndexVec::default(),
             typevars: IndexVec::default(),
             nodes: IndexVec::default(),
@@ -355,6 +434,7 @@ impl<'db> OwnedConstraintSet<'db> {
         Self {
             node: ALWAYS_TRUE,
             deferred_quantification: InferableTypeVars::None,
+            mentioned_typevars: InferableTypeVars::None,
             constraints: IndexVec::default(),
             typevars: IndexVec::default(),
             nodes: IndexVec::default(),
@@ -397,10 +477,11 @@ impl<'db> OwnedConstraintSet<'db> {
         let builder = ConstraintSetBuilder {
             storage: RefCell::new(storage),
         };
-        let set = ConstraintSet::from_node_with_deferred_quantification(
+        let set = ConstraintSet::from_node_with_metadata(
             &builder,
             self.node,
             self.deferred_quantification,
+            self.mentioned_typevars,
         );
         f(&builder, set)
     }
@@ -411,10 +492,11 @@ impl<'db> OwnedConstraintSet<'db> {
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
 /// A `ConstraintSet` is a raw TDD formula plus a set of type variables whose existential
-/// quantification is deferred. Positive construction operations preserve the raw formula and merge
-/// deferred metadata so later constraints can still mention those type variables. Public semantic
-/// observations and solution extraction first interpret the set as
-/// `∃ deferred_vars . raw_formula`; raw [`NodeId`] operations intentionally do not.
+/// quantification is deferred and a conservative set of type variables mentioned by the raw
+/// formula. Positive construction operations preserve the raw formula and merge metadata so later
+/// constraints can still mention deferred type variables. Public semantic observations and
+/// solution extraction first interpret the set as `∃ deferred_vars . raw_formula`; raw [`NodeId`]
+/// operations intentionally do not.
 ///
 /// The underlying representation tracks the order that individual constraints are added to the
 /// constraint set, which typically tracks when they appear in the underlying Python source. For
@@ -430,6 +512,11 @@ pub struct ConstraintSet<'db, 'c> {
     /// Type variables that should be existentially quantified before solution extraction or final
     /// semantic observation.
     deferred_quantification: InferableTypeVars<'db>,
+
+    /// Type variables mentioned anywhere in the raw BDD formula. This is an overapproximation;
+    /// callers can use it to conservatively decide whether a deferred type variable might still be
+    /// constrained by another operand.
+    mentioned_typevars: InferableTypeVars<'db>,
 
     /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
@@ -455,9 +542,24 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         node: NodeId,
         deferred_quantification: InferableTypeVars<'db>,
     ) -> Self {
+        Self::from_node_with_metadata(
+            builder,
+            node,
+            deferred_quantification,
+            InferableTypeVars::None,
+        )
+    }
+
+    fn from_node_with_metadata(
+        builder: &'c ConstraintSetBuilder<'db>,
+        node: NodeId,
+        deferred_quantification: InferableTypeVars<'db>,
+        mentioned_typevars: InferableTypeVars<'db>,
+    ) -> Self {
         Self {
             node,
             deferred_quantification,
+            mentioned_typevars,
             builder,
             _invariant: PhantomData,
         }
@@ -498,9 +600,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
-        Self::from_node(
+        Self::from_node_with_metadata(
             builder,
             Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
+            InferableTypeVars::None,
+            mentioned_typevars_for_constraint_parts(db, typevar, lower, upper),
         )
     }
 
@@ -557,10 +661,17 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         // TODO: Preserve quantifier structure through negation-like operations instead of forcing
         // deferred quantification before checking the implication.
-        Self::from_node(
+        let mentioned_typevars = self
+            .mentioned_typevars
+            .difference(db, self.deferred_quantification)
+            .merge(db, mentioned_typevars_for_type(db, lhs))
+            .merge(db, mentioned_typevars_for_type(db, rhs));
+        Self::from_node_with_metadata(
             builder,
             self.apply_deferred_quantification(db, builder)
                 .implies_subtype_of(db, builder, lhs, rhs),
+            InferableTypeVars::None,
+            mentioned_typevars,
         )
     }
 
@@ -605,6 +716,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.deferred_quantification = self
             .deferred_quantification
             .merge(db, other.deferred_quantification);
+        self.mentioned_typevars = self.mentioned_typevars.merge(db, other.mentioned_typevars);
         *self
     }
 
@@ -624,6 +736,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.deferred_quantification = self
             .deferred_quantification
             .merge(db, other.deferred_quantification);
+        self.mentioned_typevars = self.mentioned_typevars.merge(db, other.mentioned_typevars);
         *self
     }
 
@@ -632,10 +745,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         // TODO: Preserve quantifier structure through negation instead of forcing deferred
         // quantification before negating.
-        Self::from_node(
+        Self::from_node_with_metadata(
             builder,
             self.apply_deferred_quantification(db, builder)
                 .negate(builder),
+            InferableTypeVars::None,
+            self.mentioned_typevars
+                .difference(db, self.deferred_quantification),
         )
     }
 
@@ -716,10 +832,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other.verify_builder(builder);
         // TODO: Preserve quantifier structure through equivalence instead of forcing deferred
         // quantification before the negation-like operation.
-        Self::from_node(
+        let mentioned_typevars = self
+            .mentioned_typevars
+            .difference(db, self.deferred_quantification)
+            .merge(
+                db,
+                other
+                    .mentioned_typevars
+                    .difference(db, other.deferred_quantification),
+            );
+        Self::from_node_with_metadata(
             builder,
             self.apply_deferred_quantification(db, builder)
                 .iff_with_offset(builder, other.apply_deferred_quantification(db, builder)),
+            InferableTypeVars::None,
+            mentioned_typevars,
         )
     }
 
@@ -730,11 +857,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         deferred_quantification: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node_with_deferred_quantification(
+        Self::from_node_with_metadata(
             builder,
             self.node,
             self.deferred_quantification
                 .merge(db, deferred_quantification),
+            self.mentioned_typevars,
         )
     }
 
@@ -762,10 +890,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
 
-        Self::from_node_with_deferred_quantification(
+        let quantified = InferableTypeVars::from_typevars(db, quantified);
+        Self::from_node_with_metadata(
             builder,
-            self.node.exists(db, builder, quantified.iter().copied()),
+            self.node.exists(db, builder, quantified.iter(db)),
             InferableTypeVars::from_typevars(db, kept),
+            self.mentioned_typevars.difference(db, quantified),
         )
     }
 
@@ -882,6 +1012,7 @@ impl Debug for ConstraintSet<'_, '_> {
         f.debug_struct("ConstraintSet")
             .field("node", &self.node)
             .field("deferred_quantification", &self.deferred_quantification)
+            .field("mentioned_typevars", &self.mentioned_typevars)
             .finish()
     }
 }
@@ -969,6 +1100,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         let constraint = f(&self);
         let node = constraint.node;
         let deferred_quantification = constraint.deferred_quantification;
+        let mentioned_typevars = constraint.mentioned_typevars;
         let mut storage = self.storage.into_inner();
 
         storage.nodes.shrink_to_fit();
@@ -978,6 +1110,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         OwnedConstraintSet {
             node,
             deferred_quantification,
+            mentioned_typevars,
             constraints: storage.constraints,
             typevars: storage.typevars,
             nodes: storage.nodes,
@@ -1055,10 +1188,11 @@ impl<'db> ConstraintSetBuilder<'db> {
         // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(self, other, &constraints, &mut cache, other.node);
-        ConstraintSet::from_node_with_deferred_quantification(
+        ConstraintSet::from_node_with_metadata(
             self,
             node,
             other.deferred_quantification,
+            other.mentioned_typevars,
         )
     }
 
