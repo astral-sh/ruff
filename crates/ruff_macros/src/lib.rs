@@ -111,7 +111,9 @@ pub fn map_codes(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn derive_message_formats(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let func = parse_macro_input!(item as ItemFn);
-    derive_message_formats::derive_message_formats(&func).into()
+    derive_message_formats::derive_message_formats(&func)
+        .unwrap_or_else(syn::Error::into_compile_error)
+        .into()
 }
 
 /// Derives a newtype wrapper that can be used as an index.
