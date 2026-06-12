@@ -468,6 +468,51 @@ def _(x: object, cls: type[Invariant[int]], y: Invariant[str]):
         reveal_type(x.get())  # revealed: object
 ```
 
+Constrained type variables retain their constraints for both forms of runtime class object:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Constrained(Generic[T]):
+    value: T
+    def set(self, value: T) -> None: ...
+
+def _(x: object, cls: type[Constrained[int]], y: Constrained[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[Constrained[Unknown]]
+        reveal_type(x.value)  # revealed: int | str
+        x.set(1)  # error: [invalid-argument-type]
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[Constrained[Unknown]]
+        reveal_type(x.value)  # revealed: int | str
+        x.set("value")  # error: [invalid-argument-type]
+```
+
+ParamSpec specializations likewise produce an unknown callable parameter list instead of leaking the
+ParamSpec from the class definition:
+
+```py
+from typing import Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class WithParamSpec(Generic[P]):
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> int:
+        return 1
+
+def _(x: object, cls: type[WithParamSpec[[int]]], y: WithParamSpec[[str, int]]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[WithParamSpec[(...)]]
+        x.invoke("anything", keyword=True)
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[WithParamSpec[(...)]]
+        x.invoke()
+```
+
 The same applies to final generic classes. Their `type[]` types still describe runtime class
 objects, even though they cannot have subclasses:
 
