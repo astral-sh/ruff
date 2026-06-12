@@ -38,10 +38,7 @@ pub(crate) use self::match_pattern::{
     exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type,
 };
-pub use self::print_type::{
-    FullyQualifiedNameResolver, NameQualification, PrintTypeError, PrintTypeSettings,
-    TypeNameReference, TypeNameResolver, print_type, print_type_for_provide_type,
-};
+pub use self::print_type::{PrintTypeError, print_type, print_type_for_provide_type};
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
 pub(crate) use self::set_theoretic::builder::{

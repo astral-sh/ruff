@@ -39,9 +39,8 @@
 //!
 //! # Grammar
 //!
-//! The emitted language is described by this grammar. `name` is supplied by a
-//! [`TypeNameResolver`]; in fully-qualified mode it can contain dots in every name position,
-//! including after `def`.
+//! The emitted language is described by this grammar. Names are fully-qualified lexical paths and
+//! may contain dots in every name position, including after `def`.
 //!
 //! ```text
 //! type          ::= union
@@ -99,112 +98,12 @@ use super::function::FunctionType;
 use super::generics::{GenericContext, Specialization};
 use super::signatures::{CallableSignature, Parameter, Signature};
 use super::tuple::TupleSpec;
-use super::typevar::BoundTypeVarIdentity;
 use super::{
     BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType, GenericAlias, KnownClass,
     KnownInstanceType, KnownUnion, LiteralValueType, LiteralValueTypeKind, ParameterKind,
     SubclassOfInner, Type, TypeAliasType, TypeVarBoundOrConstraints, TypeVarKind, TypedDictType,
 };
 use crate::Db;
-
-/// Controls how semantic names are resolved in a printed type.
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub enum NameQualification {
-    /// Select a name suitable for the caller's source context.
-    #[default]
-    Contextual,
-    /// Select the declaration's fully-qualified lexical path.
-    FullyQualified,
-}
-
-/// Settings for [`print_type`].
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct PrintTypeSettings {
-    qualification: NameQualification,
-    allow_experimental: bool,
-}
-
-impl PrintTypeSettings {
-    #[must_use]
-    pub const fn with_qualification(mut self, qualification: NameQualification) -> Self {
-        self.qualification = qualification;
-        self
-    }
-
-    #[must_use]
-    pub const fn with_experimental_syntax(mut self, allow: bool) -> Self {
-        self.allow_experimental = allow;
-        self
-    }
-}
-
-/// A semantic declaration identity passed to a [`TypeNameResolver`].
-///
-/// The identity is intentionally opaque. Resolvers can use the complete reference as a stable map
-/// key and inspect its source definition and canonical names without depending on ty's internal
-/// type representation.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub struct TypeNameReference<'db> {
-    identity: TypeNameIdentity<'db>,
-    definition: Option<Definition<'db>>,
-    name: String,
-    qualified_name: Option<String>,
-}
-
-impl<'db> TypeNameReference<'db> {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn qualified_name(&self) -> Option<&str> {
-        self.qualified_name.as_deref()
-    }
-
-    pub fn definition(&self) -> Option<Definition<'db>> {
-        self.definition
-    }
-}
-
-// Keep the concrete identity private so adding semantic name categories does not change the
-// resolver interface.
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum TypeNameIdentity<'db> {
-    Intrinsic(String),
-    Definition(Definition<'db>),
-    Function(FunctionType<'db>),
-    TypeVar(BoundTypeVarIdentity<'db>),
-}
-
-/// Chooses the textual name for a semantic declaration.
-pub trait TypeNameResolver<'db> {
-    fn resolve_name(
-        &mut self,
-        reference: &TypeNameReference<'db>,
-        qualification: NameQualification,
-    ) -> Result<String, PrintTypeError>;
-}
-
-/// Resolves names to their lexical fully-qualified form, or to their leaf name in contextual mode.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct FullyQualifiedNameResolver;
-
-impl<'db> TypeNameResolver<'db> for FullyQualifiedNameResolver {
-    fn resolve_name(
-        &mut self,
-        reference: &TypeNameReference<'db>,
-        qualification: NameQualification,
-    ) -> Result<String, PrintTypeError> {
-        match qualification {
-            NameQualification::Contextual => Ok(reference.name().to_string()),
-            NameQualification::FullyQualified => reference
-                .qualified_name()
-                .map(ToOwned::to_owned)
-                .ok_or_else(|| PrintTypeError::UnresolvedName {
-                    name: reference.name().to_string(),
-                }),
-        }
-    }
-}
 
 #[derive(Clone, Debug, Error, Eq, PartialEq)]
 pub enum PrintTypeError {
@@ -216,42 +115,32 @@ pub enum PrintTypeError {
     AmbiguousName { name: String },
     #[error("name `{name}` cannot be resolved")]
     UnresolvedName { name: String },
-    #[error("extension `{extension}` is disabled")]
-    DisabledExtension { extension: &'static str },
 }
 
-/// Prints `ty` exactly under `settings`.
-pub fn print_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-    settings: PrintTypeSettings,
-    resolver: &mut impl TypeNameResolver<'db>,
-) -> Result<String, PrintTypeError> {
-    print_type_with_normalization(db, ty, settings, resolver, Normalization::Exact)
+/// Prints `ty` exactly.
+pub fn print_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Result<String, PrintTypeError> {
+    print_type_with_normalization(db, ty, Normalization::Exact)
 }
 
-/// Prints `ty` using the documented provide-type normalizations.
+/// Prints the endpoint-specific public representation of `ty`.
+///
+/// This applies the documented, potentially lossy provide-type normalizations. Use [`print_type`]
+/// when the caller requires an exact, general-purpose type representation.
 pub fn print_type_for_provide_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    settings: PrintTypeSettings,
-    resolver: &mut impl TypeNameResolver<'db>,
 ) -> Result<String, PrintTypeError> {
-    print_type_with_normalization(db, ty, settings, resolver, Normalization::ProvideType)
+    print_type_with_normalization(db, ty, Normalization::ProvideType)
 }
 
 fn print_type_with_normalization<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    settings: PrintTypeSettings,
-    resolver: &mut impl TypeNameResolver<'db>,
     normalization: Normalization,
 ) -> Result<String, PrintTypeError> {
     let mut printer = PrintType {
         db,
-        settings,
         normalization,
-        resolver,
         output: String::new(),
         active: FxHashSet::default(),
         binders: Vec::new(),
@@ -260,11 +149,9 @@ fn print_type_with_normalization<'db>(
     Ok(printer.output)
 }
 
-struct PrintType<'a, 'db, R> {
+struct PrintType<'db> {
     db: &'db dyn Db,
-    settings: PrintTypeSettings,
     normalization: Normalization,
-    resolver: &'a mut R,
     output: String,
     active: FxHashSet<Type<'db>>,
     binders: Vec<GenericContext<'db>>,
@@ -285,7 +172,7 @@ enum Precedence {
     Primary,
 }
 
-impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
+impl<'db> PrintType<'db> {
     fn print(
         &mut self,
         ty: Type<'db>,
@@ -322,7 +209,7 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
     fn print_inner(&mut self, ty: Type<'db>) -> Result<(), PrintTypeError> {
         match ty {
             Type::Dynamic(DynamicType::Any) => {
-                self.print_intrinsic("typing", "Any")?;
+                self.print_intrinsic("typing", "Any");
             }
             Type::Dynamic(DynamicType::Unknown) => self.output.push_str("Unknown"),
             Type::Dynamic(
@@ -337,7 +224,7 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
             ) => return Self::unsupported("internal dynamic type"),
             Type::Divergent(_) => return Self::unsupported("divergent inference type"),
             Type::Never => {
-                self.print_intrinsic("typing", "Never")?;
+                self.print_intrinsic("typing", "Never");
             }
             Type::FunctionLiteral(function) => {
                 self.print_named_callable(function, function.signature(self.db))?;
@@ -360,26 +247,24 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
             }
             Type::ModuleLiteral(_) => return Self::unsupported("module type"),
             Type::ClassLiteral(class) => {
-                self.require_experimental("exact class-object types")?;
-                self.print_intrinsic("ty_extensions", "TypeOf")?;
+                self.print_intrinsic("ty_extensions", "TypeOf");
                 self.output.push('[');
                 self.print_class_literal(class)?;
                 self.output.push(']');
             }
             Type::GenericAlias(alias) => {
-                self.require_experimental("exact class-object types")?;
-                self.print_intrinsic("ty_extensions", "TypeOf")?;
+                self.print_intrinsic("ty_extensions", "TypeOf");
                 self.output.push('[');
                 self.print_generic_alias(alias)?;
                 self.output.push(']');
             }
             Type::SubclassOf(subclass) => {
-                self.print_intrinsic("builtins", "type")?;
+                self.print_intrinsic("builtins", "type");
                 self.output.push('[');
                 match subclass.subclass_of() {
                     SubclassOfInner::Class(class) => self.print_instance_class_type(class)?,
                     SubclassOfInner::Dynamic(DynamicType::Any) => {
-                        self.print_intrinsic("typing", "Any")?;
+                        self.print_intrinsic("typing", "Any");
                     }
                     SubclassOfInner::Dynamic(DynamicType::Unknown) => {
                         self.output.push_str("Unknown");
@@ -450,7 +335,7 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
                         }
                         shorthand_emitted = true;
                         self.write_separator(&mut first, " | ");
-                        self.print_intrinsic("builtins", known.name())?;
+                        self.print_intrinsic("builtins", known.name());
                     } else {
                         self.write_separator(&mut first, " | ");
                         self.print(*element, Precedence::Union)?;
@@ -475,10 +360,6 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
                 if positive_count + negative_count == 0 {
                     return Self::unsupported("synthesized protocol");
                 }
-                if positive_count + negative_count > 1 || negative_count > 0 {
-                    self.require_experimental("intersection and negation types")?;
-                }
-
                 let mut first = true;
                 for element in intersection.positive(self.db).iter().filter(|ty| !omit(ty)) {
                     self.write_separator(&mut first, " & ");
@@ -492,12 +373,10 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
             }
             Type::EnumComplement(_) => return Self::unsupported("enum complement"),
             Type::AlwaysTruthy => {
-                self.require_experimental("truthiness types")?;
-                self.print_intrinsic("ty_extensions", "AlwaysTruthy")?;
+                self.print_intrinsic("ty_extensions", "AlwaysTruthy");
             }
             Type::AlwaysFalsy => {
-                self.require_experimental("truthiness types")?;
-                self.print_intrinsic("ty_extensions", "AlwaysFalsy")?;
+                self.print_intrinsic("ty_extensions", "AlwaysFalsy");
             }
             Type::LiteralValue(literal) => self.print_literal_type(literal)?,
             Type::TypeVar(typevar) => self.print_bound_typevar(typevar)?,
@@ -566,8 +445,8 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
             return self.print_class_type(class);
         };
 
-        self.require_experimental("exact float and complex instance types")?;
-        self.print_intrinsic("ty_extensions", exact_name)
+        self.print_intrinsic("ty_extensions", exact_name);
+        Ok(())
     }
 
     fn should_omit_intersection_conjunct(normalization: Normalization, ty: Type<'db>) -> bool {
@@ -667,7 +546,7 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         let attr = typevar.paramspec_attr(self.db);
 
         if typevar.kind(self.db) == TypeVarKind::TypingSelf {
-            self.print_intrinsic("typing", "Self")?;
+            self.print_intrinsic("typing", "Self");
         } else if self
             .binders
             .iter()
@@ -679,9 +558,6 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
                 let _ = write!(self.output, ".{attr}");
             }
         } else {
-            if self.settings.qualification == NameQualification::FullyQualified {
-                self.require_experimental("scoped type variable names")?;
-            }
             if typevar.freshness(self.db).value() != 0 {
                 return Self::unsupported("fresh inference type variable");
             }
@@ -705,15 +581,8 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
                     self.qualified_definition_name(binding_definition, &binding_name)
                 })
                 .map(|binding_name| format!("{name}@{binding_name}"));
-
-            let reference = TypeNameReference {
-                identity: TypeNameIdentity::TypeVar(identity),
-                definition: Some(definition),
-                name,
-                qualified_name,
-            };
-            let name = self.resolve(&reference)?;
-            self.output.push_str(&name);
+            let qualified_name = qualified_name.ok_or(PrintTypeError::UnresolvedName { name })?;
+            self.output.push_str(&qualified_name);
         }
         Ok(())
     }
@@ -725,13 +594,11 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
     ) -> Result<(), PrintTypeError> {
         let definition = function.definition(self.db);
         self.check_ambiguity(definition, Some(function))?;
-        let reference = TypeNameReference {
-            identity: TypeNameIdentity::Function(function),
-            definition: Some(definition),
-            name: function.name(self.db).to_string(),
-            qualified_name: self.qualified_definition_name(definition, function.name(self.db)),
-        };
-        let name = self.resolve(&reference)?;
+        let name = self
+            .qualified_definition_name(definition, function.name(self.db))
+            .ok_or_else(|| PrintTypeError::UnresolvedName {
+                name: function.name(self.db).to_string(),
+            })?;
         let is_async = self.function_is_async(definition);
         self.print_callable(signatures, Some(&name), is_async)
     }
@@ -747,11 +614,7 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         }
 
         let overloaded = signatures.overloads.len() > 1;
-        if name.is_none() {
-            self.require_experimental("callable syntax")?;
-        }
         if overloaded {
-            self.require_experimental("overload groups")?;
             self.output.push_str("Overloads[");
         }
         for (index, signature) in signatures.overloads.iter().enumerate() {
@@ -970,11 +833,11 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
     fn print_literal_type(&mut self, literal: LiteralValueType<'db>) -> Result<(), PrintTypeError> {
         match literal.kind() {
             LiteralValueTypeKind::LiteralString => {
-                self.print_intrinsic("typing", "LiteralString")?;
+                self.print_intrinsic("typing", "LiteralString");
                 Ok(())
             }
             _ => {
-                self.print_intrinsic("typing", "Literal")?;
+                self.print_intrinsic("typing", "Literal");
                 self.output.push('[');
                 self.print_literal_value(literal)?;
                 self.output.push(']');
@@ -1034,10 +897,10 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         ) {
             return Self::unsupported("internal nominal type");
         }
-        self.intrinsic(
+        Ok(Self::intrinsic(
             class.canonical_module(self.db).as_str(),
             class.name(self.db),
-        )
+        ))
     }
 
     fn write_separator(&mut self, first: &mut bool, separator: &str) {
@@ -1048,21 +911,12 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         }
     }
 
-    fn print_intrinsic(&mut self, module: &str, name: &str) -> Result<(), PrintTypeError> {
-        let name = self.intrinsic(module, name)?;
-        self.output.push_str(&name);
-        Ok(())
+    fn print_intrinsic(&mut self, module: &str, name: &str) {
+        let _ = write!(self.output, "{module}.{name}");
     }
 
-    fn intrinsic(&mut self, module: &str, name: &str) -> Result<String, PrintTypeError> {
-        let qualified_name = format!("{module}.{name}");
-        let reference = TypeNameReference {
-            identity: TypeNameIdentity::Intrinsic(qualified_name.clone()),
-            definition: None,
-            name: name.to_string(),
-            qualified_name: Some(qualified_name),
-        };
-        self.resolve(&reference)
+    fn intrinsic(module: &str, name: &str) -> String {
+        format!("{module}.{name}")
     }
 
     fn definition_name(
@@ -1071,18 +925,10 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         name: &str,
     ) -> Result<String, PrintTypeError> {
         self.check_ambiguity(definition, None)?;
-        let reference = TypeNameReference {
-            identity: TypeNameIdentity::Definition(definition),
-            definition: Some(definition),
-            name: name.to_string(),
-            qualified_name: self.qualified_definition_name(definition, name),
-        };
-        self.resolve(&reference)
-    }
-
-    fn resolve(&mut self, reference: &TypeNameReference<'db>) -> Result<String, PrintTypeError> {
-        self.resolver
-            .resolve_name(reference, self.settings.qualification)
+        self.qualified_definition_name(definition, name)
+            .ok_or_else(|| PrintTypeError::UnresolvedName {
+                name: name.to_string(),
+            })
     }
 
     fn qualified_definition_name(&self, definition: Definition<'db>, name: &str) -> Option<String> {
@@ -1178,14 +1024,6 @@ impl<'db, R: TypeNameResolver<'db>> PrintType<'_, 'db, R> {
         function.node(&parsed).is_async
     }
 
-    fn require_experimental(&self, extension: &'static str) -> Result<(), PrintTypeError> {
-        if self.settings.allow_experimental {
-            Ok(())
-        } else {
-            Err(PrintTypeError::DisabledExtension { extension })
-        }
-    }
-
     fn unsupported<T>(kind: &'static str) -> Result<T, PrintTypeError> {
         Err(PrintTypeError::UnsupportedType { kind })
     }
@@ -1205,12 +1043,6 @@ mod tests {
     use crate::types::{KnownClass, Parameters, Signature, SpecialFormType, Type, todo_type};
     use ruff_db::files::system_path_to_file;
 
-    fn settings() -> PrintTypeSettings {
-        PrintTypeSettings::default()
-            .with_qualification(NameQualification::FullyQualified)
-            .with_experimental_syntax(true)
-    }
-
     fn print_symbol(source: &str, symbol: &str) -> Result<String, PrintTypeError> {
         let db = TestDbBuilder::new()
             .with_file("/src/foo.py", source)
@@ -1218,7 +1050,7 @@ mod tests {
             .expect("valid test database");
         let file = system_path_to_file(&db, "/src/foo.py").expect("test file exists");
         let ty = global_symbol(&db, file, symbol).place.expect_type();
-        print_type(&db, ty, settings(), &mut FullyQualifiedNameResolver)
+        print_type(&db, ty)
     }
 
     fn print_provided_symbol(source: &str, symbol: &str) -> Result<String, PrintTypeError> {
@@ -1228,27 +1060,7 @@ mod tests {
             .expect("valid test database");
         let file = system_path_to_file(&db, "/src/foo.py").expect("test file exists");
         let ty = global_symbol(&db, file, symbol).place.expect_type();
-        print_type_for_provide_type(&db, ty, settings(), &mut FullyQualifiedNameResolver)
-    }
-
-    #[test]
-    fn qualification_is_a_resolver_mode() {
-        let db = setup_db();
-        let ty = KnownClass::Int.to_instance(&db);
-
-        assert_eq!(
-            print_type(
-                &db,
-                ty,
-                PrintTypeSettings::default(),
-                &mut FullyQualifiedNameResolver,
-            ),
-            Ok("int".to_string())
-        );
-        assert_eq!(
-            print_type(&db, ty, settings(), &mut FullyQualifiedNameResolver),
-            Ok("builtins.int".to_string())
-        );
+        print_type_for_provide_type(&db, ty)
     }
 
     #[test]
@@ -1348,7 +1160,7 @@ def identity[T](value: T) -> T:
         );
 
         assert_eq!(
-            print_type(&db, callable, settings(), &mut FullyQualifiedNameResolver),
+            print_type(&db, callable),
             Ok("() -> typing.Self".to_string())
         );
     }
@@ -1515,19 +1327,19 @@ def convert(value: int | str) -> int | str:
         );
 
         assert_eq!(
-            print_type(&db, generic, settings(), &mut FullyQualifiedNameResolver),
+            print_type(&db, generic),
             Ok("builtins.list[ty_extensions.JustFloat]".to_string())
         );
         assert_eq!(
-            print_type_for_provide_type(&db, generic, settings(), &mut FullyQualifiedNameResolver),
+            print_type_for_provide_type(&db, generic),
             Ok("builtins.list[builtins.float]".to_string())
         );
         assert_eq!(
-            print_type(&db, callable, settings(), &mut FullyQualifiedNameResolver,),
+            print_type(&db, callable),
             Ok("(ty_extensions.JustFloat, /) -> ty_extensions.JustComplex".to_string())
         );
         assert_eq!(
-            print_type_for_provide_type(&db, callable, settings(), &mut FullyQualifiedNameResolver),
+            print_type_for_provide_type(&db, callable),
             Ok("(builtins.float, /) -> builtins.complex".to_string())
         );
     }
@@ -1574,7 +1386,7 @@ def convert(value: int | str) -> int | str:
 
         for ty in [positive, negative] {
             assert_eq!(
-                print_type_for_provide_type(&db, ty, settings(), &mut FullyQualifiedNameResolver),
+                print_type_for_provide_type(&db, ty),
                 Ok("ty_extensions.AlwaysTruthy".to_string())
             );
         }
@@ -1583,7 +1395,7 @@ def convert(value: int | str) -> int | str:
         let nested = KnownClass::List.to_specialized_instance(&db, &[synthesized]);
         for ty in [synthesized, only_synthesized, nested] {
             assert_eq!(
-                print_type_for_provide_type(&db, ty, settings(), &mut FullyQualifiedNameResolver),
+                print_type_for_provide_type(&db, ty),
                 Err(PrintTypeError::UnsupportedType {
                     kind: "synthesized protocol"
                 })
@@ -1600,61 +1412,8 @@ def convert(value: int | str) -> int | str:
             .build();
 
         assert_eq!(
-            print_type(&db, ty, settings(), &mut FullyQualifiedNameResolver),
+            print_type(&db, ty),
             Ok("ty_extensions.AlwaysTruthy & ~builtins.int".to_string())
-        );
-    }
-
-    #[test]
-    fn experimental_syntax_can_be_disabled() {
-        let db = setup_db();
-        for (ty, extension) in [
-            (
-                Type::Callable(CallableType::unknown(&db)),
-                "callable syntax",
-            ),
-            (
-                KnownClass::Int.to_class_literal(&db),
-                "exact class-object types",
-            ),
-            (
-                KnownClass::Float.to_instance(&db),
-                "exact float and complex instance types",
-            ),
-        ] {
-            assert_eq!(
-                print_type(
-                    &db,
-                    ty,
-                    PrintTypeSettings::default()
-                        .with_qualification(NameQualification::FullyQualified),
-                    &mut FullyQualifiedNameResolver,
-                ),
-                Err(PrintTypeError::DisabledExtension { extension })
-            );
-        }
-    }
-
-    #[test]
-    fn named_signatures_do_not_require_experimental_syntax() {
-        let db = TestDbBuilder::new()
-            .with_file(
-                "/src/foo.py",
-                "def convert(value: int) -> str:\n    return str(value)\n",
-            )
-            .build()
-            .expect("valid test database");
-        let file = system_path_to_file(&db, "/src/foo.py").expect("test file exists");
-        let ty = global_symbol(&db, file, "convert").place.expect_type();
-
-        assert_eq!(
-            print_type(
-                &db,
-                ty,
-                PrintTypeSettings::default(),
-                &mut FullyQualifiedNameResolver,
-            ),
-            Ok("def convert(value: int) -> str: ...".to_string())
         );
     }
 
@@ -1729,7 +1488,7 @@ value = FirstC()
             ),
         ] {
             assert_eq!(
-                print_type(&db, ty, settings(), &mut FullyQualifiedNameResolver),
+                print_type(&db, ty),
                 Err(PrintTypeError::UnsupportedType { kind })
             );
         }
@@ -1739,12 +1498,9 @@ value = FirstC()
     fn anonymous_recursion_is_rejected() {
         let db = setup_db();
         let ty = Type::Callable(CallableType::unknown(&db));
-        let mut resolver = FullyQualifiedNameResolver;
         let mut printer = PrintType {
             db: &db,
-            settings: settings(),
             normalization: Normalization::Exact,
-            resolver: &mut resolver,
             output: String::new(),
             active: FxHashSet::from_iter([ty]),
             binders: Vec::new(),
@@ -1764,8 +1520,7 @@ value = FirstC()
             ty = Type::single_callable(&db, Signature::new(Parameters::empty(), ty));
         }
 
-        let printed = print_type(&db, ty, settings(), &mut FullyQualifiedNameResolver)
-            .expect("nested type is printable");
+        let printed = print_type(&db, ty).expect("nested type is printable");
         assert_eq!(printed.matches("() -> ").count(), 128);
         assert!(printed.ends_with("builtins.int"));
     }

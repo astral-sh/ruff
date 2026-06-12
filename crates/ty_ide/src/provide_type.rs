@@ -4,22 +4,18 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::types::{
-    FullyQualifiedNameResolver, NameQualification, PrintTypeSettings, Type,
-    print_type_for_provide_type,
-};
+use ty_python_semantic::types::{Type, print_type_for_provide_type};
 use ty_python_semantic::{HasType, SemanticModel};
 
+/// Returns the endpoint-specific public type representation for each requested range.
+///
+/// This applies provide-type normalizations and is not a general-purpose type printing API.
 pub fn provide_types<I>(db: &dyn Db, file: File, ranges: I) -> Vec<Option<String>>
 where
     I: IntoIterator<Item = Option<TextRange>>,
 {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
-    let settings = PrintTypeSettings::default()
-        .with_qualification(NameQualification::FullyQualified)
-        .with_experimental_syntax(true);
-    let mut resolver = FullyQualifiedNameResolver;
 
     ranges
         .into_iter()
@@ -49,7 +45,7 @@ where
                 }
             };
 
-            print_type_for_provide_type(db, ty, settings, &mut resolver).ok()
+            print_type_for_provide_type(db, ty).ok()
         })
         .collect()
 }
