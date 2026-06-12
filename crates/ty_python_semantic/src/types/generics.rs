@@ -1261,15 +1261,19 @@ impl<'db> Specialization<'db> {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
-        match types {
-            Cow::Borrowed(_) if tuple_inner == original_tuple_inner => self,
-            types => Specialization::new(
+        // Keep this check in sync with every field that can be transformed above.
+        let specialization_unchanged =
+            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        if specialization_unchanged {
+            self
+        } else {
+            Specialization::new(
                 db,
                 self.generic_context(db),
                 types,
                 self.materialization_kind(db),
                 tuple_inner,
-            ),
+            )
         }
     }
 
@@ -1397,17 +1401,20 @@ impl<'db> Specialization<'db> {
         } else {
             None
         };
-        let metadata_unchanged = tuple_inner == original_tuple_inner
+        // Keep this check in sync with every field that can be transformed above.
+        let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
+            && tuple_inner == original_tuple_inner
             && new_materialization_kind == self.materialization_kind(db);
-        match types {
-            Cow::Borrowed(_) if metadata_unchanged => self,
-            types => Specialization::new(
+        if specialization_unchanged {
+            self
+        } else {
+            Specialization::new(
                 db,
                 self.generic_context(db),
                 types,
                 new_materialization_kind,
                 tuple_inner,
-            ),
+            )
         }
     }
 
