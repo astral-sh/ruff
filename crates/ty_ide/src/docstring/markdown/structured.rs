@@ -1,6 +1,10 @@
 use std::borrow::Cow;
 use std::ops::Range;
 
+mod rst;
+
+use super::super::formats::Formats;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum DocstringSectionKind {
     Parameters,
@@ -450,8 +454,8 @@ mod section_tests {
     }
 }
 
-pub(super) fn render(raw: &str) -> Cow<'_, str> {
-    let blocks = parse_blocks(raw, Vec::new());
+pub(super) fn render<'a>(raw: &'a str, formats: &Formats) -> Cow<'a, str> {
+    let blocks = parse_blocks(raw, formats);
     ParsedDocstring { raw, blocks }.render_markdown_source()
 }
 
@@ -464,7 +468,9 @@ pub(super) struct ParsedDocstring<'a> {
 impl<'a> ParsedDocstring<'a> {
     #[cfg(test)]
     pub(super) fn parse(raw: &'a str) -> Self {
-        let blocks = parse_blocks(raw, Vec::new());
+        let formats = Formats::parse(raw);
+        let blocks = parse_blocks(raw, &formats);
+
         Self { raw, blocks }
     }
 
@@ -516,10 +522,6 @@ pub(super) struct SectionBlock {
 }
 
 impl SectionBlock {
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by follow-up structured docstring parsers")
-    )]
     pub(super) fn new(items: Vec<SectionItem>) -> Self {
         Self { items }
     }
@@ -578,10 +580,6 @@ pub(super) struct SectionItem {
 }
 
 impl SectionItem {
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by follow-up structured docstring parsers")
-    )]
     pub(super) fn new(
         kind: DocstringSectionKind,
         display_name: Option<&str>,
@@ -647,7 +645,8 @@ impl SectionItem {
     }
 }
 
-fn parse_blocks(raw: &str, mut sections: Vec<SectionCandidate>) -> Vec<Block<'_>> {
+fn parse_blocks<'a>(raw: &'a str, formats: &Formats) -> Vec<Block<'a>> {
+    let mut sections = rst::section_candidates(formats.rst());
     sections.sort_by_key(|section| section.range.start);
     let mut blocks = Vec::new();
     let mut rendered_through = 0;
@@ -691,7 +690,7 @@ pub(super) struct SectionCandidate {
 
 #[cfg(test)]
 mod tests {
-    use insta::assert_snapshot;
+    use insta::{Settings, assert_snapshot};
 
     use super::{Block, DocstringSectionKind, ParsedDocstring, SectionBlock, SectionItem};
 
@@ -708,6 +707,267 @@ mod tests {
         };
 
         assert_eq!(parsed.render_markdown_source(), "Summary.");
+    }
+
+    #[test]
+    fn rest_field_lists_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+:param str value: The value.
+:param other: Another value.
+:type other: int
+:returns: Whether validation passed.
+:rtype: bool
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value` (`str`): The value.
+        `other` (`int`): Another value.
+
+        ## Returns
+        `bool`: Whether validation passed.
+        ");
+
+        let docstring = "\
+:param value: Stale description.
+:param value: Corrected description.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        ## Parameters
+        `value`: Stale description.
+        `value`: Corrected description.
+        ");
+
+        let docstring = "\
+Summary.
+
+:param value: The value.
+:rtype: str
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value`: The value.
+
+        ## Returns
+        `str`
+        ");
+
+        let docstring = "\
+Summary.
+
+:rtype: str
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Returns
+        `str`
+        ");
+    }
+
+    #[test]
+    fn rest_field_lists_render_edge_cases() {
+        let docstring = "\
+This is a function description.
+:class:`Foo` instances can be passed here.
+
+:param str param1: The first parameter description
+:meta private:
+:param param2: The second parameter description
+:type param2: int
+:kwparam retries: Retry attempts.
+:paramtype retries: int
+:param *args: Extra positional arguments.
+:type args: tuple[str, ...]
+:param **kwargs: Extra keyword arguments.
+:type **kwargs: dict[str, object]
+:var cache: Cached data.
+:vartype cache: dict[str,
+    object]
+:ivar state: Instance state.
+:var str title: Display title.
+:cvar VERSION: Package version.
+:vartype VERSION: str
+:returns baz: The return value description
+:rtype: dict[str,
+    int]
+:raises ValueError: If the value is invalid.
+:meta hide-value:
+:exception RuntimeError: If the system is unavailable.";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        This is a function description.
+        :class:`Foo` instances can be passed here.
+
+        ## Parameters
+        `param1` (`str`): The first parameter description
+        `param2` (`int`): The second parameter description
+        `retries` (`int`): Retry attempts.
+        `*args` (`tuple[str, ...]`): Extra positional arguments.
+        `**kwargs` (`dict[str, object]`): Extra keyword arguments.
+
+        ## Attributes
+        `cache` (`dict[str, object]`): Cached data.
+        `state`: Instance state.
+        `title` (`str`): Display title.
+        `VERSION` (`str`): Package version.
+
+        ## Returns
+        `baz` (`dict[str, int]`): The return value description
+
+        ## Raises
+        `ValueError`: If the value is invalid.
+        `RuntimeError`: If the system is unavailable.
+        ");
+    }
+
+    #[test]
+    fn rest_field_lists_preserve_unrenderable_and_preformatted_lists() {
+        let docstring = "\
+:param first: First parameter.
+:type orphan: str
+
+Some prose between field lists.
+
+:meta private:
+
+Markdown input:
+
+```text
+:param sample: This is sample input
+```
+
+Doctest output:
+
+>>> print(\"field list\")
+:param sample: This is sample output
+
+Literal block::
+
+    :param sample: This is sample input
+
+:param quoted: Example::
+
+:param sample: This is sample input
+:returns: This is still sample input
+
+:param second:
+    - First option.
+    - Second option.
+:param third:
+    1. Validate the input.
+    2. Return the result.
+:param done: Whether work is done.";
+        let parsed = ParsedDocstring::parse(docstring);
+        let mut settings = Settings::clone_current();
+        settings.add_filter("\n    \n", "\n<INDENTED-BLANK>\n");
+        let _snap = settings.bind_to_scope();
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        :param first: First parameter.
+        :type orphan: str
+
+        Some prose between field lists.
+
+        :meta private:
+
+        Markdown input:
+
+        ```text
+        :param sample: This is sample input
+        ```
+
+        Doctest output:
+
+        >>> print(\"field list\")
+        :param sample: This is sample output
+
+        Literal block::
+
+            :param sample: This is sample input
+
+        ## Parameters
+        `quoted`: Example::
+        <INDENTED-BLANK>
+            :param sample: This is sample input
+            :returns: This is still sample input
+        `second`:
+        - First option.
+        - Second option.
+
+        `third`:
+        1. Validate the input.
+        2. Return the result.
+
+        `done`: Whether work is done.
+        ");
+    }
+
+    #[test]
+    fn indented_sections_stay_raw() {
+        let docstring = "\
+Summary.
+
+    :param value: The value.
+    :returns: Another value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+    }
+
+    #[test]
+    fn unsupported_rest_field_lists_stay_raw() {
+        for docstring in [
+            "\
+Summary.
+
+:param value: The value.
+:unknown field: Preserve this field list.
+",
+            "\
+Summary.
+
+:returns:
+:raises:
+",
+            "\
+Summary.
+
+:param str value: The value.
+:type value: int
+",
+            "\
+Summary.
+
+:param value: The value.
+:type value: str
+:type value: int
+",
+            "\
+Summary.
+
+:param value: The value.
+:returns:
+",
+        ] {
+            let parsed = ParsedDocstring::parse(docstring);
+            assert_eq!(parsed.render_markdown_source(), docstring);
+        }
     }
 
     #[test]
