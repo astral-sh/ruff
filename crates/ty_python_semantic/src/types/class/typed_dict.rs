@@ -688,6 +688,22 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
     instance_ty: Type<'db>,
     name: &str,
 ) -> Type<'db> {
+    let top_dict_ty = KnownClass::Dict
+        .to_instance_unknown(db)
+        .top_materialization(db);
+    let open_empty_typed_dict_ty = Type::TypedDict(TypedDictType::open_empty(db));
+    let runtime_dict_return_ty =
+        KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
+    // `__or__` and `__ror__` create a fresh `dict` for the types synthesized by
+    // `isinstance(..., dict)` narrowing, while `__ior__` preserves the receiver.
+    let instance_return_ty = if name != "__ior__"
+        && (instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty)
+    {
+        runtime_dict_return_ty
+    } else {
+        instance_ty
+    };
+
     let first_overload_value_ty = if name == "__ior__"
         && let Type::TypedDict(typed_dict) = instance_ty
     {
@@ -705,7 +721,7 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
     let mut overloads: smallvec::SmallVec<[Signature<'db>; 4]> =
         smallvec::smallvec![Signature::new(
             Parameters::standard(first_overload_parameters),
-            instance_ty,
+            instance_return_ty,
         )];
 
     if name != "__ior__" {
@@ -734,7 +750,7 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
         ];
         overloads.push(Signature::new(
             Parameters::standard(overload_two_parameters),
-            instance_ty,
+            instance_return_ty,
         ));
 
         let overload_three_parameters = [
@@ -748,10 +764,6 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
             dict_return_ty,
         ));
 
-        let top_dict_ty = KnownClass::Dict
-            .to_instance_unknown(db)
-            .top_materialization(db);
-        let open_empty_typed_dict_ty = Type::TypedDict(TypedDictType::open_empty(db));
         if instance_ty == top_dict_ty || instance_ty == open_empty_typed_dict_ty {
             let runtime_dict_top =
                 UnionType::from_elements(db, [top_dict_ty, open_empty_typed_dict_ty]);
@@ -761,9 +773,10 @@ pub(super) fn synthesize_typed_dict_merge<'db>(
                 Parameter::positional_only(Some(Name::new_static("value")))
                     .with_annotated_type(runtime_dict_top),
             ];
-            let return_ty =
-                KnownClass::Dict.to_specialized_instance(db, &[Type::unknown(), Type::unknown()]);
-            overloads.push(Signature::new(Parameters::standard(parameters), return_ty));
+            overloads.push(Signature::new(
+                Parameters::standard(parameters),
+                runtime_dict_return_ty,
+            ));
         }
     }
 
