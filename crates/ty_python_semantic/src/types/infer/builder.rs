@@ -436,16 +436,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn extend_definition(&mut self, inference: &DefinitionInference<'db>) {
+    fn extend_definition(
+        &mut self,
+        definition: Definition<'db>,
+        inference: &DefinitionInference<'db>,
+    ) {
         #[cfg(debug_assertions)]
         assert_eq!(self.scope, inference.scope);
 
         self.expressions
             .extend(inference.expressions.iter().copied());
-        self.declarations.extend(inference.declarations());
+        self.declarations.extend(inference.declarations(definition));
 
         if !matches!(self.region, InferenceRegion::Scope(..)) {
-            self.bindings.extend(inference.bindings());
+            self.bindings.extend(inference.bindings(definition));
         }
 
         if let Some(extra) = &inference.extra {
@@ -479,7 +483,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let inference = match inference {
             StatementInference::Other(inference) => inference,
             StatementInference::Expression(inference) => return self.extend_expression(inference),
-            StatementInference::Definition(inference) => return self.extend_definition(inference),
+            StatementInference::Definition(definition, inference) => {
+                return self.extend_definition(*definition, inference);
+            }
         };
 
         #[cfg(debug_assertions)]
@@ -870,7 +876,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Infer deferred types for all definitions.
         let deferred_definitions: Vec<_> = std::mem::take(&mut self.deferred).into_iter().collect();
         for definition in &deferred_definitions {
-            self.extend_definition(infer_deferred_types(self.db(), *definition));
+            self.extend_definition(*definition, infer_deferred_types(self.db(), *definition));
         }
 
         assert!(
@@ -1753,7 +1759,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_definition(&mut self, node: impl Into<DefinitionNodeKey> + std::fmt::Debug + Copy) {
         let definition = self.index.expect_single_definition(node);
         let result = infer_definition_types(self.db(), definition);
-        self.extend_definition(result);
+        self.extend_definition(definition, result);
     }
 
     fn infer_type_alias_definition(
@@ -7704,7 +7710,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if named.target.is_name_expr() {
             let definition = self.index.expect_single_definition(named);
             let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
+            self.extend_definition(definition, result);
             result.binding_type(definition)
         } else {
             // For syntactically invalid targets, we still need to run type inference:
@@ -10701,7 +10707,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    pub(super) fn finish_definition(mut self) -> DefinitionInference<'db> {
+    pub(super) fn finish_definition(
+        mut self,
+        definition: Definition<'db>,
+    ) -> DefinitionInference<'db> {
         self.infer_region();
 
         let Self {
@@ -10786,7 +10795,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             expressions: FrozenMap::from(expressions),
             #[cfg(debug_assertions)]
             scope,
-            types: DefinitionTypes::from_parts(bindings.into_vec(), declarations.into_vec()),
+            types: DefinitionTypes::from_parts(
+                definition,
+                bindings.into_vec(),
+                declarations.into_vec(),
+            ),
             extra,
         }
     }

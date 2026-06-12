@@ -56,6 +56,49 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 }
 
 #[test]
+fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
+    assert!(
+        std::mem::size_of::<DefinitionTypes>()
+            <= std::mem::size_of::<TypeAndQualifiers>() + std::mem::size_of::<usize>()
+    );
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/definitions.py",
+        r#"
+        first = 1
+        second = 2
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "/src/definitions.py").unwrap();
+    let module = parsed_module(&db, file).load(&db);
+    let first_assignment = module.syntax().body[0].as_assign_stmt().unwrap();
+    let second_assignment = module.syntax().body[1].as_assign_stmt().unwrap();
+    let first = semantic_index(&db, file)
+        .expect_single_definition(first_assignment.targets[0].as_name_expr().unwrap());
+    let second = semantic_index(&db, file)
+        .expect_single_definition(second_assignment.targets[0].as_name_expr().unwrap());
+
+    let owner_type = Type::unknown();
+    let owner = DefinitionTypes::from_parts(first, vec![(first, owner_type)], vec![]);
+    assert!(matches!(owner, DefinitionTypes::Binding(ty) if ty == owner_type));
+    assert_eq!(
+        owner.bindings(first).collect::<Vec<_>>(),
+        [(first, owner_type)]
+    );
+
+    let non_owner = DefinitionTypes::from_parts(first, vec![(second, owner_type)], vec![]);
+    assert!(matches!(non_owner, DefinitionTypes::Other(_)));
+    assert_eq!(
+        non_owner.bindings(first).collect::<Vec<_>>(),
+        [(second, owner_type)]
+    );
+
+    Ok(())
+}
+
+#[test]
 fn not_literal_string() -> anyhow::Result<()> {
     let mut db = setup_db();
     let content = format!(
