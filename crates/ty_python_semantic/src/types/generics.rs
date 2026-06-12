@@ -1457,6 +1457,40 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
+    /// Merge two specializations that occur as positive elements of an intersection.
+    pub(super) fn merge_intersection(self, db: &'db dyn Db, other: Self) -> Option<Self> {
+        let generic_context = self.generic_context(db);
+        if other.generic_context(db) != generic_context
+            || self.materialization_kind(db).is_some()
+            || other.materialization_kind(db).is_some()
+            || self.tuple_inner(db).is_some()
+            || other.tuple_inner(db).is_some()
+        {
+            return None;
+        }
+
+        let types: Option<Box<[_]>> = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        )
+        .map(
+            |(typevar, left, right)| match specialization_variance(db, typevar) {
+                TypeVarVariance::Covariant => {
+                    Some(IntersectionType::from_two_elements(db, *left, *right))
+                }
+                TypeVarVariance::Contravariant => {
+                    Some(UnionType::from_two_elements(db, *left, *right))
+                }
+                TypeVarVariance::Invariant if left == right => Some(*left),
+                TypeVarVariance::Invariant | TypeVarVariance::Bivariant => None,
+            },
+        )
+        .collect();
+
+        Some(Self::new(db, generic_context, types?, None, None))
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -2808,6 +2842,36 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         )
     }
 
+    fn when_assignable_with_polarity(
+        &self,
+        formal: Type<'db>,
+        actual: Type<'db>,
+        polarity: TypeVarVariance,
+    ) -> ConstraintSet<'db, 'c> {
+        match polarity {
+            TypeVarVariance::Covariant => self.constraints.load(
+                self.db,
+                &actual.when_constraint_set_assignable_to_owned(self.db, formal),
+            ),
+            TypeVarVariance::Contravariant => self.constraints.load(
+                self.db,
+                &formal.when_constraint_set_assignable_to_owned(self.db, actual),
+            ),
+            TypeVarVariance::Invariant => {
+                let covariant = self.constraints.load(
+                    self.db,
+                    &actual.when_constraint_set_assignable_to_owned(self.db, formal),
+                );
+                let contravariant = self.constraints.load(
+                    self.db,
+                    &formal.when_constraint_set_assignable_to_owned(self.db, actual),
+                );
+                covariant.and(self.db, self.constraints, || contravariant)
+            }
+            TypeVarVariance::Bivariant => ConstraintSet::from_bool(self.constraints, true),
+        }
+    }
+
     fn infer_map_impl(
         &mut self,
         formal: Type<'db>,
@@ -3156,46 +3220,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, seen)?;
                 }
             }
-            (_, Type::Intersection(actual_intersection)) => {
-                // Try to infer type mappings by checking against each intersection element. This
-                // is the dual of the `union_formal` arm above, and it handles cases like:
-                //
-                // ```py
-                // def f[T](t: P[T]) -> T: ...
-                //
-                // def _(x: P[str] & Q[str]):
-                //     reveal_type(f(x))  # revealed: str
-                // ```
-                //
-                // It's important that this arm comes after the `TypeVar` arm above, so that a bare
-                // typevar bound to an intersection gets the whole thing.
-                //
-                // It's sufficient for one intersection element to satisfy the constraints here.
-                // They don't all have to.
-                let mut first_error = None;
-                let mut found_matching_element = false;
-                for positive in actual_intersection.iter_positive(self.db) {
-                    let result = self.infer_map_impl(formal, positive, polarity, seen);
-                    if let Err(err) = result {
-                        // TODO: `infer_map_impl` can have side effects even in the error case, so
-                        // to be fully correct here we'd need to snapshot `self.types` before each
-                        // call and roll it back if we get an error. The `Union` arm has the same
-                        // issue above.
-                        first_error.get_or_insert(err);
-                    } else {
-                        // The recursive call to `infer_map_impl` may succeed even if the actual
-                        // type is not assignable to the formal element.
-                        if !positive
-                            .when_assignable_to(self.db, formal, self.constraints, self.inferable)
-                            .is_never_satisfied(self.db)
-                        {
-                            found_matching_element = true;
-                        }
-                    }
+            (formal, actual @ Type::Intersection(_)) => {
+                let when = self.when_assignable_with_polarity(formal, actual, polarity);
+                if self.add_type_mappings_from_constraint_set(when).is_ok() {
+                    self.pending.intersect(self.db, self.constraints, when);
                 }
-                if !found_matching_element && let Some(error) = first_error {
-                    return Err(error);
-                }
+                return Ok(());
             }
 
             (

@@ -1346,8 +1346,8 @@ def narrowed_via_truthiness(y: list[str]):
 
 ## Inferring typevars in intersections (actual type position, multiple positive types)
 
-When an actual intersection has multiple positive elements and a bounded typevar, inference can fail
-for some elements but succeed for others:
+When an actual intersection has multiple specializations of the same covariant generic class, we
+combine the type arguments before inferring a bounded typevar:
 
 ```py
 from typing import Sequence, TypeVar
@@ -1364,22 +1364,20 @@ T = TypeVar("T", bound=Base)
 def first(x: Sequence[T]) -> T:
     return x[0]
 
-# An intersection where both positive elements satisfy the bound.
+# Both positive elements satisfy the bound.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2]]) -> None:
-    reveal_type(first(x))  # revealed: Sub1 | Sub2
+    reveal_type(first(x))  # revealed: Sub1 & Sub2
 
-# An intersection with one positive element that satisfies the bound and one that doesn't.
+# An intersection is a subtype of the bound if one of its positive elements is a subtype of the
+# bound.
 def _(x: Intersection[Sequence[Sub1], Sequence[Unrelated1]]) -> None:
-    reveal_type(first(x))  # revealed: Sub1
+    reveal_type(first(x))  # revealed: Sub1 & Unrelated1
 
-# An intersection with two positive elements that satisfy the bound and one that doesn't.
+# Additional positive elements are preserved in the inferred type.
 def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> None:
-    reveal_type(first(x))  # revealed: Sub1 | Sub2
+    reveal_type(first(x))  # revealed: Sub1 & Sub2 & Unrelated1
 
-# An intersection with two positive elements, neither of which satisfies the bound. In this case,
-# only the error related to the first element is reported.
+# An intersection with two positive elements, neither of which produces a valid specialization.
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
-    # TODO: We only report the first error here, but we should report both.
-    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
 ```
