@@ -29,10 +29,10 @@ use crate::{
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
 
-/// Resolve an exact integer literal, accepting unions of equivalent integer-like literals.
+/// Return the integer value if `ty` describes exactly one integer.
 ///
-/// Synthesized protocols can describe a single runtime integer with types such as
-/// `Literal[1] | Literal[True]`. Type aliases are resolved before comparing the members.
+/// This treats equivalent literals such as `Literal[1] | Literal[True]` as the same runtime value
+/// and follows type aliases before comparing union members.
 fn exact_int_literal(db: &dyn Db, ty: Type<'_>) -> Option<i64> {
     match ty.resolve_type_alias(db) {
         Type::Union(union) => {
@@ -341,7 +341,7 @@ impl<'db> ProtocolInterface<'db> {
             })
     }
 
-    /// Return the finite indexed constraints described by this protocol's methods, if any.
+    /// Read the element types from a protocol that describes a fixed-length sequence.
     ///
     /// This recognizes protocols whose entire interface consists of a literal-returning `__len__`
     /// method and one indexed `__getitem__` overload per element:
@@ -355,8 +355,8 @@ impl<'db> ProtocolInterface<'db> {
     ///     def __getitem__(self, index: Literal[1], /) -> str: ...
     /// ```
     ///
-    /// The returned elements are ordered by index. Extra members, duplicate or missing indices,
-    /// and non-literal lengths make the protocol ineligible.
+    /// The result contains one element type per index, in index order. The protocol is rejected if
+    /// it has other members, an unknown length, or duplicate, missing, or out-of-range indices.
     pub(super) fn finite_indexed_constraint(self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
         let ProtocolMemberKind::Method(len_method) = self.member_by_name(db, "__len__")?.kind
         else {

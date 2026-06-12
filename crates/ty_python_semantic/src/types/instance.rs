@@ -838,10 +838,10 @@ impl<'db> ProtocolInstanceType<'db> {
         self.inner.interface(db)
     }
 
-    /// Return finite indexed constraints carried by a synthesized protocol.
+    /// Return the element types of a synthesized fixed-length sequence protocol.
     ///
-    /// Class-based protocols remain symbolic because tuple types include subclasses that can
-    /// override the indexed methods described by the protocol.
+    /// Protocols defined by a class return `None`. A tuple type can include subclasses that
+    /// override the protocol's indexing methods, so simplifying those protocols would be unsafe.
     pub(super) fn finite_indexed_constraint(self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
         let Protocol::Synthesized(protocol) = self.inner else {
             return None;
