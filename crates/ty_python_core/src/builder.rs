@@ -40,9 +40,11 @@ use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKeywordPredicateKind, ClassPatternKind,
+    ClassPatternPredicateKind, MappingPatternEntryPredicateKind, MappingPatternPredicateKind,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, SequencePatternPredicateKind, StarImportPlaceholderPredicate,
+    SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1941,32 +1943,56 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // this existing approximation because treating all class patterns with arguments
                 // as refutable caused a large ecosystem change. Follow-up work should determine
                 // irrefutability by analyzing the class's attributes and `__match_args__`.
-                PatternPredicateKind::Class(
-                    cls,
-                    if pattern
+                let kind = if pattern
+                    .arguments
+                    .patterns
+                    .iter()
+                    .all(ast::Pattern::is_irrefutable)
+                    && pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .all(|keyword| keyword.pattern.is_irrefutable())
+                {
+                    ClassPatternKind::Irrefutable
+                } else {
+                    ClassPatternKind::Refutable
+                };
+
+                PatternPredicateKind::Class(ClassPatternPredicateKind {
+                    class: cls,
+                    positional: pattern
                         .arguments
                         .patterns
                         .iter()
-                        .all(ast::Pattern::is_irrefutable)
-                        && pattern
-                            .arguments
-                            .keywords
-                            .iter()
-                            .all(|kw| kw.pattern.is_irrefutable())
-                    {
-                        ClassPatternKind::Irrefutable
-                    } else {
-                        ClassPatternKind::Refutable
-                    },
-                )
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
+                    keywords: pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| ClassPatternKeywordPredicateKind {
+                            attr: keyword.attr.id.clone(),
+                            pattern: self.predicate_kind(&keyword.pattern),
+                        })
+                        .collect(),
+                    kind,
+                })
             }
             ast::Pattern::MatchMapping(pattern) => {
                 // `case {}` and `case {**rest}` match every mapping, while keyed mapping
                 // patterns are refutable (`case {"x": _}` may fail for some mappings).
-                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
-                    ClassPatternKind::Irrefutable
-                } else {
-                    ClassPatternKind::Refutable
+                PatternPredicateKind::Mapping(MappingPatternPredicateKind {
+                    entries: pattern
+                        .keys
+                        .iter()
+                        .zip(&pattern.patterns)
+                        .map(|(key, pattern)| MappingPatternEntryPredicateKind {
+                            key: self.add_standalone_expression(key),
+                            pattern: self.predicate_kind(pattern),
+                        })
+                        .collect(),
+                    rest: pattern.rest.as_ref().map(|name| name.id.clone()),
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {

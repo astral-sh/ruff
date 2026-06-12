@@ -2301,7 +2301,30 @@ Source with applied edits:
         def my_func(event: Click):
             match event:
                 case Click(x, button=ab):
-                    x[: @Todo] = ab
+                    x[: str] = ab
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/builtins.pyi:LL:7
+           |
+        LL | class str(Sequence[str]):
+           |       ^^^
+           |
+        info: Source
+          --> main2.py:LL:17
+           |
+        LL |             x[: str] = ab
+           |                 ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: Inlay hint edits
+        --> main.py:1:1
+        8  | def my_func(event: Click):
+        9  |     match event:
+        10 |         case Click(x, button=ab):
+           -             x = ab
+        11 +             x: str = ab
         "#);
     }
 

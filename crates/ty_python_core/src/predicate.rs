@@ -183,14 +183,48 @@ impl<'db> SequencePatternPredicateKind<'db> {
     }
 }
 
+/// Structural details for a class pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternPredicateKind<'db> {
+    pub class: Expression<'db>,
+    pub positional: Box<[PatternPredicateKind<'db>]>,
+    pub keywords: Box<[ClassPatternKeywordPredicateKind<'db>]>,
+    pub kind: ClassPatternKind,
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternKeywordPredicateKind<'db> {
+    pub attr: Name,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
+/// Structural details for a mapping pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct MappingPatternPredicateKind<'db> {
+    pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
+    pub rest: Option<Name>,
+}
+
+impl MappingPatternPredicateKind<'_> {
+    pub fn is_irrefutable(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct MappingPatternEntryPredicateKind<'db> {
+    pub key: Expression<'db>,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>, ClassPatternKind),
-    Mapping(ClassPatternKind),
+    Class(ClassPatternPredicateKind<'db>),
+    Mapping(MappingPatternPredicateKind<'db>),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Star(Option<Name>),

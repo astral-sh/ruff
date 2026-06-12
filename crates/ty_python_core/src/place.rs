@@ -814,6 +814,24 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
                     places.extend(self.pattern_aliases_kind(pattern));
                 }
             }
+            PatternPredicateKind::Class(kind) => {
+                for pattern in &kind.positional {
+                    places.extend(self.pattern_aliases_kind(pattern));
+                }
+                for keyword in &kind.keywords {
+                    places.extend(self.pattern_aliases_kind(&keyword.pattern));
+                }
+            }
+            PatternPredicateKind::Mapping(kind) => {
+                for entry in &kind.entries {
+                    places.extend(self.pattern_aliases_kind(&entry.pattern));
+                }
+                if let Some(name) = &kind.rest
+                    && let Some(place) = self.places.symbol_id(name.as_str())
+                {
+                    places.insert(place.into());
+                }
+            }
             PatternPredicateKind::As(pattern, name) => {
                 if let Some(name) = name
                     && let Some(place) = self.places.symbol_id(name.as_str())

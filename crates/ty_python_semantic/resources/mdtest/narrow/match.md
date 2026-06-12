@@ -511,53 +511,197 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
             reveal_type(item)  # revealed: Never
 ```
 
-Bindings nested inside class and mapping patterns are not inferred yet. A surrounding `as` pattern
-is supported because it binds the matched subject itself, rather than a value extracted by the inner
-pattern.
+Class patterns pass the type of each extracted attribute to their nested patterns. The surrounding
+`as` pattern keeps the subject's original generic type or type variable.
 
 ```py
-from collections.abc import Mapping
-from typing import Generic, TypedDict, TypeVar
+from dataclasses import dataclass
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 
 class PatternBox(Generic[T]):
+    __match_args__ = ("value",)
     value: T
 
-def test_match_class_nested_capture_is_not_yet_inferred(
-    value: PatternBox[int],
-) -> None:
+def test_match_class_keyword_capture(value: PatternBox[T]) -> T:
     match value:
         case PatternBox(value=item) as whole:
-            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(whole)  # revealed: PatternBox[int]
+            reveal_type(item)  # revealed: T@test_match_class_keyword_capture
+            reveal_type(whole)  # revealed: PatternBox[T@test_match_class_keyword_capture]
+            return item
 
-def test_match_mapping_nested_capture_is_not_yet_inferred(
-    value: Mapping[str, int],
+@dataclass
+class DataclassBox(Generic[T]):
+    value: T
+
+def test_match_dataclass_positional_capture(dataclass_box: DataclassBox[T]) -> None:
+    match dataclass_box:
+        case DataclassBox(item):
+            reveal_type(item)  # revealed: T@test_match_dataclass_positional_capture
+```
+
+`__match_args__` is read from the pattern class and must identify literal attribute names. A
+metaclass member is not used by the runtime class pattern, while an explicit widened annotation does
+not tell us which attribute a positional pattern extracts.
+
+```py
+class MatchArgsMeta(type):
+    __match_args__ = ("value",)
+
+class MetaclassMatchArgs(metaclass=MatchArgsMeta):
+    value: int
+
+def test_metaclass_match_args_is_not_used(value: MetaclassMatchArgs) -> None:
+    match value:
+        case MetaclassMatchArgs(item):
+            reveal_type(item)  # revealed: Unknown
+
+class WidenedMatchArgs:
+    __match_args__: tuple[str, ...] = ("value",)
+    value: int
+
+def test_widened_match_args_does_not_select_an_attribute(value: WidenedMatchArgs) -> None:
+    match value:
+        case WidenedMatchArgs(item):
+            reveal_type(item)  # revealed: Unknown
+```
+
+Each union arm is checked against the complete class pattern before the extracted values are
+combined. This keeps a tag, its payload, and the whole-pattern alias correlated. The same rule
+applies through an `or` pattern.
+
+```py
+from typing import Generic, Literal, TypeVar
+
+TagT = TypeVar("TagT")
+PayloadT = TypeVar("PayloadT")
+
+class TaggedPayload(Generic[TagT, PayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: TagT
+    payload: PayloadT
+
+def test_match_class_capture_filters_union_arms(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str],
 ) -> None:
     match value:
-        case {"item": item} as whole:
-            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(whole)  # revealed: Mapping[str, int]
+        case TaggedPayload("int", item) as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: TaggedPayload[Literal["int"], int]
 
-class PatternPayload(TypedDict):
-    item: int
-
-def test_match_typed_dict_nested_capture_is_not_yet_inferred(
-    value: PatternPayload,
+def test_match_class_or_pattern_filters_union_arms(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool],
 ) -> None:
     match value:
-        case {"item": item} as whole:
-            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(whole)  # revealed: PatternPayload
+        case (TaggedPayload("int", item) | TaggedPayload("str", item)) as whole:
+            reveal_type(item)  # revealed: int | str
+            # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
+            reveal_type(whole)
 
-def test_match_mapping_rest_capture_is_not_yet_inferred(
-    value: Mapping[str, int],
+def test_match_builtin_match_self(
+    value: list[int] | dict[str, int] | int,
 ) -> None:
     match value:
-        case {**rest} as whole:
-            reveal_type(rest)  # revealed: @Todo(`match` pattern definition types)
-            reveal_type(whole)  # revealed: Mapping[str, int]
+        case list(contents):
+            reveal_type(contents)  # revealed: list[int]
+        case dict(contents):
+            reveal_type(contents)  # revealed: dict[str, int]
+        case int(contents):
+            reveal_type(contents)  # revealed: int
+```
+
+Mapping patterns use the mapping's key and value types. A successful keyed pattern can filter union
+arms, while `**rest` is always a new `dict` containing the unmatched items.
+
+```py
+from collections.abc import Mapping
+from typing import Literal, TypeVar
+
+MappingValueT = TypeVar("MappingValueT")
+
+def test_match_mapping_bindings(value: Mapping[str, MappingValueT]) -> MappingValueT:
+    match value:
+        case {"item": item, **rest} as whole:
+            reveal_type(item)  # revealed: MappingValueT@test_match_mapping_bindings
+            reveal_type(rest)  # revealed: dict[str, MappingValueT@test_match_mapping_bindings]
+            # revealed: Mapping[str, MappingValueT@test_match_mapping_bindings]
+            reveal_type(whole)
+            return item
+    raise ValueError
+
+def test_match_dict_bindings(value: dict[str, int]) -> None:
+    match value:
+        case {"item": item, **rest} as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(rest)  # revealed: dict[str, int]
+            reveal_type(whole)  # revealed: dict[str, int]
+
+def test_match_mapping_key_filters_union_arms(
+    value: dict[Literal["a"], int] | dict[Literal["b"], str],
+) -> None:
+    match value:
+        case {"a": item} as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: dict[Literal["a"], int]
+
+def test_match_mapping_nested_sequence(
+    value: Mapping[str, tuple[int, str]],
+) -> None:
+    match value:
+        case {"pair": [number, text]}:
+            reveal_type(number)  # revealed: int
+            reveal_type(text)  # revealed: str
+```
+
+For a `TypedDict`, a literal key uses the declared field type. Closed dictionaries can rule out
+missing keys, and tagged unions remain correlated through `or` patterns.
+
+```py
+from typing import Literal
+from typing_extensions import TypedDict
+
+class IntPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class StrPayload(TypedDict):
+    tag: Literal["str"]
+    value: str
+
+def test_match_typed_dict_capture_filters_union_arms(
+    value: IntPayload | StrPayload,
+) -> None:
+    match value:
+        case {"tag": "int", "value": item, **rest} as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(rest)  # revealed: dict[str, object]
+            reveal_type(whole)  # revealed: IntPayload
+
+class ClosedIntPayload(TypedDict, closed=True):
+    tag: Literal["int"]
+    value: int
+
+class ClosedStrPayload(TypedDict, closed=True):
+    tag: Literal["str"]
+    value: str
+
+class ClosedBoolPayload(TypedDict, closed=True):
+    tag: Literal["bool"]
+    value: bool
+
+def test_match_closed_typed_dict_rest(value: ClosedIntPayload) -> None:
+    match value:
+        case {"tag": "int", **rest}:
+            reveal_type(rest)  # revealed: dict[str, object]
+
+def test_match_typed_dict_or_pattern_filters_union_arms(
+    value: ClosedIntPayload | ClosedStrPayload | ClosedBoolPayload,
+) -> None:
+    match value:
+        case ({"tag": "int", "value": item} | {"tag": "str", "value": item}) as whole:
+            reveal_type(item)  # revealed: int | str
+            reveal_type(whole)  # revealed: ClosedIntPayload | ClosedStrPayload
 ```
 
 ## Sequence exhaustiveness
