@@ -13,7 +13,7 @@ class TextFile:
     def gen_error(self, line=None):
         if line is None:
             line = self.current_line
-        reveal_type(line)  # revealed: Unknown & ~None
+        reveal_type(line)  # revealed: (Unknown & ~None) | Divergent
 
     def readline(self, line: str | None, buildup_line: str):
         while True:
