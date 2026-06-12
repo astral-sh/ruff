@@ -1,72 +1,49 @@
 use crate::TestServerBuilder;
 use anyhow::Context;
-use lsp_types::{Position, Range};
+use lsp_types::{Position, Range, TextDocumentIdentifier};
 use ruff_db::system::SystemPath;
-use ty_server::ClientOptions;
-use ty_server::ProvideTypeResponse;
+use ty_server::{ClientOptions, ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse};
 
-fn assert_provide_type_snapshot(
-    file_content: &str,
-    request_range: Range,
-) -> anyhow::Result<ProvideTypeResponse> {
+#[test]
+fn provide_type() -> anyhow::Result<()> {
     let workspace_root = SystemPath::new("src");
     let file = SystemPath::new("src/foo.py");
+    let file_content = "\
+class A:
+    pass
+import sys
+A
+sys
+1.0
+";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, Some(ClientOptions::default()))?
         .with_file(file, file_content)?
-        .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
     server.open_text_document(file, file_content, 1);
-    server
-        .provide_type_request(file, request_range)
-        .context("Unable to request type")
-}
-
-#[test]
-fn provide_str_type() -> anyhow::Result<()> {
-    let provide_type_response = assert_provide_type_snapshot(
-        "\
-class C:
-    pass
-def foo() -> C:
-    return C()
-",
-        Range::new(Position::new(3, 11), Position::new(3, 14)),
-    )?;
-    insta::assert_json_snapshot!("provide_str_type", &provide_type_response);
-    Ok(())
-}
-
-#[test]
-fn provide_nested_class_type() -> anyhow::Result<()> {
-    let provide_type_response = assert_provide_type_snapshot(
-        "\
-class A:
-    class B:
-        pass
-
-b = A.B()
-b
-",
-        Range::new(Position::new(5, 0), Position::new(5, 1)),
-    )?;
-    insta::assert_json_snapshot!("provide_nested_class_type", &provide_type_response);
-    Ok(())
-}
-
-#[test]
-fn provide_class_type() -> anyhow::Result<()> {
-    let provide_type_response = assert_provide_type_snapshot(
-        "\
-class A:
-    pass
-A
-",
-        Range::new(Position::new(2, 0), Position::new(2, 1)),
-    )?;
-    insta::assert_json_snapshot!("provide_class_type", &provide_type_response);
+    let uri = server.file_uri(file);
+    let provide_type_response = server
+        .send_request_await::<ProvideTypeRequest>(ProvideTypeParams {
+            text_document: TextDocumentIdentifier { uri },
+            ranges: vec![
+                Range::new(Position::new(3, 0), Position::new(3, 1)),
+                Range::new(Position::new(4, 0), Position::new(4, 3)),
+                Range::new(Position::new(5, 0), Position::new(5, 3)),
+            ],
+        })
+        .context("Unable to request type")?;
+    assert_eq!(
+        provide_type_response,
+        ProvideTypeResponse {
+            types: vec![
+                Some("ty_extensions.TypeOf[foo.A]".to_string()),
+                None,
+                Some("builtins.float".to_string()),
+            ],
+        }
+    );
     Ok(())
 }

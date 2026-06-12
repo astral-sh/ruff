@@ -4,8 +4,11 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::{AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::types::Type;
-use ty_python_semantic::{DisplaySettings, HasType, SemanticModel};
+use ty_python_semantic::types::{
+    FullyQualifiedNameResolver, NameQualification, PrintTypeSettings, Type,
+    print_type_for_provide_type,
+};
+use ty_python_semantic::{HasType, SemanticModel};
 
 pub fn provide_types<I>(db: &dyn Db, file: File, ranges: I) -> Vec<Option<String>>
 where
@@ -13,6 +16,10 @@ where
 {
     let parsed = parsed_module(db, file).load(db);
     let model = SemanticModel::new(db, file);
+    let settings = PrintTypeSettings::default()
+        .with_qualification(NameQualification::FullyQualified)
+        .with_experimental_syntax(true);
+    let mut resolver = FullyQualifiedNameResolver;
 
     ranges
         .into_iter()
@@ -42,10 +49,7 @@ where
                 }
             };
 
-            Some(
-                ty.display_with(db, DisplaySettings::default().fully_qualified())
-                    .to_string(),
-            )
+            print_type_for_provide_type(db, ty, settings, &mut resolver).ok()
         })
         .collect()
 }
@@ -75,7 +79,6 @@ fn expression_type<'db>(model: &SemanticModel<'db>, node: AnyNodeRef<'_>) -> Opt
 mod tests {
     use crate::provide_type::provide_types;
 
-    use insta::assert_snapshot;
     use ruff_db::{
         files::{File, system_path_to_file},
         system::{DbWithTestSystem, DbWithWritableSystem, SystemPathBuf},
@@ -85,7 +88,7 @@ mod tests {
     use ty_project::ProjectMetadata;
 
     #[test]
-    fn provide_str_type() {
+    fn provide_instance_type() {
         let test = ProvideTypeTest::with_source(
             r#"
             class C:
@@ -95,19 +98,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"foo.C");
-    }
-
-    #[test]
-    fn provide_int_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            a = int(10)
-            <START>a<END>
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"builtins.int");
+        assert_eq!(test.provided_type(), "foo.C");
     }
 
     #[test]
@@ -118,12 +109,12 @@ mod tests {
                 class B:
                     pass
 
-            b = A.B()
-            <START>b<END>
+            value = A.B()
+            <START>value<END>
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"foo.A.B");
+        assert_eq!(test.provided_type(), "foo.A.B");
     }
 
     #[test]
@@ -131,114 +122,31 @@ mod tests {
         let test = ProvideTypeTest::with_source(
             r#"
             class A[T]:
-                i: T
-                def __init__(self, i: T):
-                    self.i = i
+                def __init__(self, value: T):
+                    self.value = value
 
-            class B:
-                pass
+            class B: ...
 
-            a = A(B())
-            <START>a<END>
+            value = A(B())
+            <START>value<END>
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"foo.A[foo.B]");
-    }
-
-    #[test]
-    fn provide_integer_literal_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            a = 1
-            <START>a<END>
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"typing.Literal[1]");
-    }
-
-    #[test]
-    fn provide_callable_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            def a() -> int:
-                return 1
-            <START>a<END>()
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"def foo.a() -> builtins.int");
-    }
-
-    #[test]
-    fn provide_function_with_default_parameter_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            def a(b, c=1) -> int:
-                return 1
-            <START>a<END>()
-            "#,
-        );
-
-        assert_snapshot!(
-            test.provided_type(),
-            @"def foo.a(b: Unknown, c: Unknown = 1) -> builtins.int"
-        );
+        assert_eq!(test.provided_type(), "foo.A[foo.B]");
     }
 
     #[test]
     fn provide_class_local_to_function_type() {
         let test = ProvideTypeTest::with_source(
             r#"
-            def a():
-                class A:
-                    pass
-                a = A()
-                <START>a<END>
+            def f():
+                class A: ...
+                value = A()
+                <START>value<END>
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"foo.a.A");
-    }
-
-    #[test]
-    fn provide_type_variable_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            class A[T1]:
-                def f[T2](self, t: T1 | T2):
-                    <START>t<END>
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"T1@foo.A | T2@foo.A.f");
-    }
-
-    #[test]
-    fn provide_class_type() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            class A:
-                pass
-            <START>A<END>
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
-    }
-
-    #[test]
-    fn provide_class_type_in_constructor_call() {
-        let test = ProvideTypeTest::with_source(
-            r#"
-            class A:
-                pass
-            <START>A<END>()
-            "#,
-        );
-
-        assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
+        assert_eq!(test.provided_type(), "foo.f.A");
     }
 
     #[test]
@@ -252,7 +160,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"builtins.OSError");
+        assert_eq!(test.provided_type(), "builtins.OSError");
     }
 
     #[test]
@@ -261,12 +169,15 @@ mod tests {
             r#"
             try:
                 print("Test")
-            except <START>IOError<END> as e:
+            except <START>IOError<END>:
                 pass
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"builtins.type[builtins.OSError]");
+        assert_eq!(
+            test.provided_type(),
+            "ty_extensions.TypeOf[builtins.OSError]"
+        );
     }
 
     #[test]
@@ -280,7 +191,121 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.provided_type(), @"builtins.type[foo.A]");
+        assert_eq!(test.provided_type(), "ty_extensions.TypeOf[foo.A]");
+    }
+
+    #[test]
+    fn provide_callable_type() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            def f() -> int:
+                return 1
+            <START>f<END>()
+            "#,
+        );
+
+        assert_eq!(test.provided_type(), "def foo.f() -> builtins.int: ...");
+    }
+
+    #[test]
+    fn provide_class_type_in_constructor_call() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            class A: ...
+            <START>A<END>()
+            "#,
+        );
+
+        assert_eq!(test.provided_type(), "ty_extensions.TypeOf[foo.A]");
+    }
+
+    #[test]
+    fn provide_type_applies_documented_normalizations() {
+        for (source, expected) in [
+            ("value = <START>1.0<END>", "builtins.float"),
+            (
+                "type Alias = int\nvalue = <START>Alias<END>",
+                "typing_extensions.TypeAliasType",
+            ),
+            (
+                "type Alias[T] = list[T]\nvalue = <START>Alias[int]<END>",
+                "types.GenericAlias",
+            ),
+            (
+                "type Alias = int\ndef f(value: Alias):\n    <START>value<END>",
+                "foo.Alias",
+            ),
+        ] {
+            let test = ProvideTypeTest::with_source(source);
+            assert_eq!(
+                provide_types(&test.db, test.file, [Some(test.range)])[0].as_deref(),
+                Some(expected),
+                "source: {source}"
+            );
+        }
+    }
+
+    #[test]
+    fn synthesized_protocol_intersection_constraints_are_omitted() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            class C: ...
+
+            def f(value: C):
+                if hasattr(value, "missing"):
+                    <START>value<END>
+            "#,
+        );
+
+        assert_eq!(test.provided_type(), "foo.C");
+    }
+
+    #[test]
+    fn synthesized_typed_dict_constraints_remain_unsupported() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            from typing import TypedDict
+
+            class Foo(TypedDict):
+                foo: int
+
+            class Bar(TypedDict):
+                bar: int
+
+            def f(value: Foo | Bar):
+                if "foo" in value:
+                    <START>value<END>
+            "#,
+        );
+
+        assert_eq!(
+            provide_types(&test.db, test.file, [Some(test.range)]),
+            [None]
+        );
+    }
+
+    #[test]
+    fn free_type_variables_include_their_qualified_binding_scope() {
+        let test = ProvideTypeTest::with_source(
+            r#"
+            class A[T1]:
+                def f[T2](self, value: T1 | T2):
+                    <START>value<END>
+            "#,
+        );
+
+        assert_eq!(test.provided_type(), "T1@foo.A | T2@foo.A.f");
+    }
+
+    #[test]
+    fn unsupported_type_returns_none() {
+        let test = ProvideTypeTest::with_source(
+            "from typing import Annotated\nvalue = <START>Annotated[int, 'metadata']<END>",
+        );
+        assert_eq!(
+            provide_types(&test.db, test.file, [Some(test.range)]),
+            [None]
+        );
     }
 
     struct ProvideTypeTest {
@@ -333,11 +358,12 @@ mod tests {
         }
 
         fn provided_type(&self) -> String {
-            match provide_types(&self.db, self.file, [Some(self.range)]).as_slice() {
-                [Some(ty)] => ty.clone(),
-                [None] => "None".to_string(),
-                other => format!("{other:#?}"),
-            }
+            let mut types = provide_types(&self.db, self.file, [Some(self.range)]);
+            assert_eq!(types.len(), 1);
+            types
+                .pop()
+                .flatten()
+                .expect("selected type should be printable")
         }
     }
 }

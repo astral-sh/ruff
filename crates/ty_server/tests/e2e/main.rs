@@ -80,10 +80,7 @@ use lsp_types::{
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
-use ty_server::{
-    ClientOptions, LogLevel, ProvideTypeParams, ProvideTypeRequest, ProvideTypeResponse, Server,
-    init_logging,
-};
+use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
 const RETRY_COUNT: usize = 5;
@@ -994,23 +991,6 @@ impl TestServer {
         };
         let id = self.send_request::<InlayHintRequest>(params);
         self.await_response::<InlayHintRequest>(&id)
-    }
-
-    /// Send a `types/provide-type` request
-    pub(crate) fn provide_type_request(
-        &mut self,
-        path: impl AsRef<SystemPath>,
-        range: Range,
-    ) -> Option<ProvideTypeResponse> {
-        let params = ProvideTypeParams {
-            text_document: TextDocumentIdentifier {
-                uri: self.file_uri(path),
-            },
-            ranges: vec![range],
-        };
-
-        let id = self.send_request::<ProvideTypeRequest>(params);
-        self.await_response::<ProvideTypeRequest>(&id)
     }
 
     /// Sends a `textDocument/completion` request for the document at the given URI and position.

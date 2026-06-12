@@ -9,7 +9,7 @@ use std::panic::{AssertUnwindSafe, UnwindSafe};
 
 mod diagnostics;
 mod notifications;
-pub mod requests;
+mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
@@ -142,7 +142,7 @@ pub(super) fn request(req: server::Request) -> Task {
                 BackgroundSchedule::Worker,
             )
         }
-        requests::ProvideTypeRequest::METHOD => background_document_request_task::<
+        requests::ProvideTypeRequestHandler::METHOD => background_document_request_task::<
             requests::ProvideTypeRequestHandler,
         >(req, BackgroundSchedule::Worker),
         lsp_types::ShutdownRequest::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
