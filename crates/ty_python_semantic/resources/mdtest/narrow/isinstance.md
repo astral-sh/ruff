@@ -739,9 +739,9 @@ def _(x: Invariant[int] | Covariant[str]):
         reveal_type(x)  # revealed: Covariant[str] & ~Top[Invariant[Unknown]]
 ```
 
-For mutable dictionary runtime checks, we include an open empty `TypedDict` alongside the ordinary
+For `isinstance(..., dict)` checks, we include an open empty `TypedDict` alongside the ordinary
 top-materialized dictionary constraint. Every `TypedDict` is a subtype of this empty schema. For
-`Mapping`, the extra arm simplifies away because `TypedDict` is already statically compatible:
+`Mapping`, the extra arm simplifies away because the empty `TypedDict` is already a subtype:
 
 ```py
 from collections.abc import Mapping, MutableMapping
@@ -775,7 +775,8 @@ def _(z: int | Movie):
         reveal_type(z)  # revealed: int
 ```
 
-When a gradual arm remains after narrowing, the open empty `TypedDict` fallback remains visible too:
+When a TypeVar arm cannot simplify after narrowing, the open empty `TypedDict` fallback remains
+visible too:
 
 ```py
 from typing import TypeVar
