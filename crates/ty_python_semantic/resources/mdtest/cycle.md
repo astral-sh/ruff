@@ -142,7 +142,7 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional: Unknown = ...) -> Unknown | Divergent
+        # revealed: (positional: Unknown = ...) -> Unknown | (positional=...) -> Divergent
         reveal_type(self.a)
 
         # revealed: (*, kw_only=...) -> Unknown | Divergent
