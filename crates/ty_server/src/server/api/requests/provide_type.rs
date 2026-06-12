@@ -13,17 +13,19 @@ use ty_project::ProjectDatabase;
 
 pub(crate) struct ProvideTypeRequestHandler;
 
-/// The `types/provide-type` request is sent from the client to the server to get types of expressions
-/// in a document.
-/// Each range in `ranges` represents a start and an end of an expression for which the type
-/// is requested.
+/// The `types/provide-type` request returns public type representations for expressions in a
+/// document. Each range in `ranges` identifies one expression.
 ///
-/// Each result is a complete, fully-qualified printing of the expression's type. Exact `float` and
-/// `complex` instances use their public classes, runtime PEP 695 alias objects use their canonical
-/// runtime class, and direct synthesized-protocol intersection constraints are omitted. No other
-/// type is widened, resolved, or omitted. The formal grammar and complete normalization contract
-/// are documented by `ty_python_semantic::types::print_type_for_provide_type`. A result is `null`
-/// when the range has no expression type or the type cannot be printed after applying those
+/// This is an endpoint-specific, deliberately lossy representation. It is not a serialization of
+/// ty's internal type model and should not be used as a general-purpose type display format. The
+/// result is a single-line, fully-qualified, Python-derived type expression intended for clients
+/// to parse. The syntax and normalization contract are documented by
+/// `ty_python_semantic::types::print_type_for_provide_type`.
+///
+/// In particular, exact `float` and `complex` instances use their public classes, runtime PEP 695
+/// alias objects use their canonical runtime class, and direct synthesized-protocol intersection
+/// constraints are omitted. No other type is widened, resolved, or omitted. A result is `null`
+/// when the range has no expression type or no supported representation remains after these
 /// normalizations.
 ///
 #[derive(Debug)]
@@ -49,7 +51,7 @@ pub struct ProvideTypeParams {
 #[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProvideTypeResponse {
-    /// Fully qualified printed types, one per input range.
+    /// Endpoint-specific public type representations, one per input range.
     pub types: Vec<Option<String>>,
 }
 
