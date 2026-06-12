@@ -2635,6 +2635,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             let actual_signature = &actual_callables.as_slice()[0].signatures(self.db).overloads[0];
+            let normalized_actual_signature = actual_signature.clone().with_parameters(
+                actual_signature
+                    .parameters()
+                    .clone()
+                    .normalize_starred_variadic_annotations(self.db),
+            );
+            let actual_signature = &normalized_actual_signature;
             if actual_signature
                 .parameters()
                 .iter()

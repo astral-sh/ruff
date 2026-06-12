@@ -280,6 +280,12 @@ def variadic2(*args: int) -> tuple[str, ...]:
 def keyword_only(*, x: int) -> tuple[int]:
     raise NotImplementedError
 
+def fixed_unpacked(*args: *tuple[int, str]) -> tuple[int, str]:
+    raise NotImplementedError
+
+def homogeneous_unpacked(*args: *tuple[bytes, ...]) -> tuple[bytes, ...]:
+    raise NotImplementedError
+
 class PositionalCallable:
     def __call__(self, x: int, y: str, /) -> tuple[int, str]:
         raise NotImplementedError
@@ -288,12 +294,22 @@ reveal_type(simple(positional_only))  # revealed: tuple[int, str]
 reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(simple(variadic1))  # revealed: tuple[int, ...]
+reveal_type(simple(fixed_unpacked))  # revealed: tuple[int, str]
+reveal_type(simple(homogeneous_unpacked))  # revealed: tuple[bytes, ...]
 reveal_type(simple(PositionalCallable()))  # revealed: tuple[int, str]
 
 # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: int) -> tuple[int, ...]`, found `def variadic2(*args: int) -> tuple[str, ...]`"
 reveal_type(simple(variadic2))  # revealed: tuple[int, ...]
 # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `() -> tuple[()]`, found `def keyword_only(*, x: int) -> tuple[int]`"
 reveal_type(simple(keyword_only))  # revealed: tuple[()]
+
+class Holder[*Ts]:
+    callback: Callable[[*Ts], None]
+
+def use_holder(holder: Holder[*tuple[*tuple[str, ...], bytes]]) -> None:
+    reveal_type(holder.callback)  # revealed: (*tuple[*tuple[str, ...], bytes]) -> None
+    holder.callback(b"end")
+    holder.callback("one", "two", b"end")
 ```
 
 An overloaded callable is accepted if any overload is compatible. The order of the overloads does

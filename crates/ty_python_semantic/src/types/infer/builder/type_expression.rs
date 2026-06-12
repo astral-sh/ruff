@@ -2659,7 +2659,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     previously_in_valid_unpack_context,
                 );
 
-                return Some(Parameters::new(self.db(), parameters));
+                return Some(
+                    Parameters::new(self.db(), parameters)
+                        .normalize_starred_variadic_annotations(self.db()),
+                );
             }
             ast::Expr::Subscript(subscript) => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());

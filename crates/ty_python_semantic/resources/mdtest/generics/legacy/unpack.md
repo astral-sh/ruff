@@ -74,6 +74,10 @@ def format_value(value: int, label: str, /) -> str:
 reveal_type(invoke(format_value, 1, "value"))  # revealed: str
 # error: [invalid-argument-type] "Argument to function `invoke` is incorrect: Expected `(Literal[1], /) -> str`, found `def format_value(value: int, label: str, /) -> str`"
 reveal_type(invoke(format_value, 1))  # revealed: str
+
+def fixed(x: int, y: str, /) -> None: ...
+
+fixed_callback: Callable[[Unpack[tuple[int, str]]], None] = fixed
 ```
 
 ## Type aliases

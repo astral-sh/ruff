@@ -448,6 +448,70 @@ def unpack_special_form(c: Callable[[int, Unpack[Ts]], int]):
     reveal_type(c)  # revealed: (int, /, *Ts@unpack_special_form) -> int
 ```
 
+Concrete tuple unpacks describe the corresponding positional parameter list, including tuples with
+an arbitrary-length middle portion.
+
+```py
+from typing import Any
+from typing_extensions import Callable, Unpack
+from ty_extensions import RegularCallableTypeOf, is_equivalent_to, static_assert
+
+def fixed(x: int, y: str, /) -> None: ...
+def fixed_star(*args: Unpack[tuple[int, str]]) -> None: ...
+
+fixed_from_parameters: Callable[[Unpack[tuple[int, str]]], None] = fixed
+fixed_from_starred: Callable[[int, str], None] = fixed_star
+
+def mixed_star(
+    *args: Unpack[tuple[int, Unpack[tuple[str, ...]], bytes]],
+) -> None: ...
+
+mixed_from_starred: Callable[
+    [Unpack[tuple[int, Unpack[tuple[str, ...]], bytes]]],
+    None,
+] = mixed_star
+mixed_without_middle: Callable[[int, bytes], None] = mixed_star
+mixed_with_middle: Callable[[int, str, str, bytes], None] = mixed_star
+
+def mixed_returns_str(
+    *args: Unpack[tuple[int, Unpack[tuple[str, ...]], bytes]],
+) -> str:
+    raise NotImplementedError
+
+invalid_return: Callable[
+    [Unpack[tuple[int, Unpack[tuple[str, ...]], bytes]]],
+    int,
+] = mixed_returns_str  # error: [invalid-assignment] "Object of type `def mixed_returns_str(*args: tuple[int, *tuple[str, ...], bytes]) -> str` is not assignable to `(*tuple[int, *tuple[str, ...], bytes]) -> int`"
+
+def call_mixed(
+    callback: Callable[[int, Unpack[tuple[str, ...]], bytes], None],
+) -> None:
+    callback(1, b"end")
+    callback(1, "one", "two", b"end")
+
+def call_mixed_splat(
+    callback: Callable[
+        [Unpack[tuple[int, Unpack[tuple[str, ...]], bytes]]],
+        None,
+    ],
+    arguments: tuple[int, Unpack[tuple[str, ...]], bytes],
+) -> None:
+    callback(*arguments)
+
+def gradual_starred(
+    *args: Unpack[tuple[Any, ...]],
+    **kwargs: Any,
+) -> None: ...
+def gradual_ordinary(*args: Any, **kwargs: Any) -> None: ...
+
+static_assert(
+    is_equivalent_to(
+        RegularCallableTypeOf[gradual_starred],
+        RegularCallableTypeOf[gradual_ordinary],
+    )
+)
+```
+
 ## Member lookup
 
 ```py
