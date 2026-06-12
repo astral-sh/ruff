@@ -2946,12 +2946,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal @ Type::NominalInstance(_), Type::TypedDict(_)) => {
-                let str_object_map = KnownClass::Mapping.to_specialized_instance(
+            (formal @ Type::NominalInstance(_), Type::TypedDict(typed_dict)) => {
+                let mapping = KnownClass::Mapping.to_specialized_instance(
                     self.db,
-                    &[KnownClass::Str.to_instance(self.db), Type::object()],
+                    &[typed_dict.key_type(self.db), typed_dict.value_type(self.db)],
                 );
-                return self.infer_map_impl(formal, str_object_map, polarity, seen);
+                return self.infer_map_impl(formal, mapping, polarity, seen);
             }
 
             (Type::Intersection(formal_intersection), _) => {
@@ -2979,28 +2979,44 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 //
                 // It's sufficient for one intersection element to satisfy the constraints here.
                 // They don't all have to.
+                let positives: Vec<_> = actual_intersection.iter_positive(self.db).collect();
                 let mut first_error = None;
-                let mut found_matching_element = false;
-                for positive in actual_intersection.iter_positive(self.db) {
-                    let result = self.infer_map_impl(formal, positive, polarity, seen);
-                    if let Err(err) = result {
-                        // TODO: `infer_map_impl` can have side effects even in the error case, so
-                        // to be fully correct here we'd need to snapshot `self.types` before each
-                        // call and roll it back if we get an error. The `Union` arm has the same
-                        // issue above.
-                        first_error.get_or_insert(err);
-                    } else {
-                        // The recursive call to `infer_map_impl` may succeed even if the actual
-                        // type is not assignable to the formal element.
-                        if !positive
-                            .when_assignable_to(self.db, formal, self.constraints, self.inferable)
-                            .is_never_satisfied(self.db)
-                        {
-                            found_matching_element = true;
+
+                for include_typed_dicts in [false, true] {
+                    let mut found_matching_element = false;
+                    for positive in positives.iter().copied().filter(|positive| {
+                        matches!(positive, Type::TypedDict(_)) == include_typed_dicts
+                    }) {
+                        let result = self.infer_map_impl(formal, positive, polarity, seen);
+                        if let Err(err) = result {
+                            // TODO: `infer_map_impl` can have side effects even in the error case,
+                            // so to be fully correct here we'd need to snapshot `self.types` before
+                            // each call and roll it back if we get an error. The `Union` arm has the
+                            // same issue above.
+                            first_error.get_or_insert(err);
+                        } else {
+                            // The recursive call to `infer_map_impl` may succeed even if the actual
+                            // type is not assignable to the formal element.
+                            if !positive
+                                .when_assignable_to(
+                                    self.db,
+                                    formal,
+                                    self.constraints,
+                                    self.inferable,
+                                )
+                                .is_never_satisfied(self.db)
+                            {
+                                found_matching_element = true;
+                            }
                         }
                     }
+
+                    if found_matching_element {
+                        return Ok(());
+                    }
                 }
-                if !found_matching_element && let Some(error) = first_error {
+
+                if let Some(error) = first_error {
                     return Err(error);
                 }
             }
