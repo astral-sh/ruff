@@ -10,7 +10,8 @@ any known rule will not suppress any type errors, and is probably a mistake.
 ## Examples
 
 ```py
-a = 20 / 0  # ty: ignore[division-by-zer]
+# error
+a = 20 / 1  # ty: ignore[division-by-zer]
 ```
 
 Use instead:

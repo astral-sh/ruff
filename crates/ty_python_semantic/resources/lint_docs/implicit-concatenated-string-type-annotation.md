@@ -8,14 +8,23 @@ Static analysis tools like ty can't analyze type annotations that use implicit c
 
 ## Examples
 
+<!-- fmt:off -->
+
 ```python
-def test(): -> "Literal[" "5" "]":
-    ...
+from typing import Literal
+
+def test() -> "Literal[" "5" "]":  # error
+    return 5
 ```
+
+<!-- fmt:on -->
 
 Use instead:
 
 ```python
-def test(): -> "Literal[5]":
-    ...
+from typing import Literal
+
+
+def test() -> "Literal[5]":
+    return 5
 ```

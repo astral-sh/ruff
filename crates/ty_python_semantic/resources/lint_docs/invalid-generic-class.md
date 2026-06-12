@@ -9,6 +9,11 @@ Many of these result in `TypeError` being raised at runtime if they are violated
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from typing_extensions import Generic, TypeVar
 

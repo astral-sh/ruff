@@ -14,7 +14,15 @@ that users can easily differentiate between the two cases.
 
 ## Example
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```python
+from typing import assert_type
+
+
 def _(x: int):
     assert_type(x, int)  # fine
     if x:

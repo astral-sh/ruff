@@ -17,6 +17,11 @@ anything, and when a method unexpectedly starts overriding a superclass member.
 
 ## Example
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from typing import override
 
@@ -27,7 +32,8 @@ class Parent:
 
 
 class Child(Parent):
-    def method(self) -> int:  # Error raised here when the rule is enabled
+    # when the rule is enabled
+    def method(self) -> int:  # error
         return 2
 
 

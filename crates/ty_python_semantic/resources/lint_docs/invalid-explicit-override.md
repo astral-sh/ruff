@@ -9,18 +9,23 @@ override a method from a superclass.
 
 ## Example
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from typing import override
 
 
 class A:
     @override
-    def foo(self): ...  # Error raised here
+    def foo(self): ...  # error
 
 
 class B(A):
     @override
-    def ffooo(self): ...  # Error raised here
+    def ffooo(self): ...  # error
 
 
 class C:

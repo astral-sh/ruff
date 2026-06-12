@@ -812,7 +812,7 @@ where
             return self.process_config_block(code);
         }
 
-        if lang == "ignore" {
+        if matches!(lang, "ignore" | "pycon") {
             return Ok(());
         }
 
@@ -1623,6 +1623,34 @@ mod tests {
             err.to_string(),
             "Cannot auto-generate file name for code block with language `json` in test `JSON test?`"
         );
+    }
+
+    #[test]
+    fn ignores_pycon_blocks() {
+        let source = dedent(
+            "
+            # Example
+
+            ```pycon
+            >>> 1 + 1
+            2
+            ```
+
+            ```py
+            x = 1
+            ```
+            ",
+        );
+
+        let mf = parse("file.md", &source).unwrap();
+        let [test] = &mf.tests().collect::<Vec<_>>()[..] else {
+            panic!("expected one test");
+        };
+        let [file] = test.files().collect::<Vec<_>>()[..] else {
+            panic!("expected one file");
+        };
+
+        assert_eq!(file.code, "x = 1");
     }
 
     #[test]

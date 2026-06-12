@@ -14,13 +14,18 @@ false positives it can produce.
 
 ## Examples
 
+`module.py`:
+
 ```python
-# module.py
 import datetime
 
 if datetime.date.today().weekday() != 6:
     a = 1
+```
 
-# main.py
-from module import a  # ImportError: cannot import name 'a' from 'module'
+`main.py`:
+
+```python
+# ImportError: cannot import name 'a' from 'module'
+from module import a  # error
 ```

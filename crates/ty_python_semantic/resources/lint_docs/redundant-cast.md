@@ -9,9 +9,13 @@ These casts have no effect and can be removed.
 ## Example
 
 ```python
+from typing import cast
+
+
 def f() -> int:
     return 10
 
 
-cast(int, f())  # Redundant
+# Redundant
+cast(int, f())  # error
 ```

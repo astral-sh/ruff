@@ -8,10 +8,18 @@ Deprecated items should no longer be used.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ```python
+import warnings
+
+
 @warnings.deprecated("use new_func instead")
 def old_func(): ...
 
 
-old_func()  # emits [deprecated] diagnostic
+old_func()  # error: [deprecated]
 ```

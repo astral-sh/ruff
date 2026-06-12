@@ -11,7 +11,14 @@ must be one of the constraints (see: [constraint rules]).
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ```python
+from typing import TypeVar
+
 T = TypeVar("T", bound=str, default=int)  # error: [invalid-type-variable-default]
 U = TypeVar("U", int, str, default=bytes)  # error: [invalid-type-variable-default]
 ```

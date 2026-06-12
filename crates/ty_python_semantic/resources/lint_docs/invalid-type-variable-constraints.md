@@ -9,25 +9,35 @@ A constrained type variable must have at least two constraints.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from typing import TypeVar
 
-T = TypeVar("T", str)  # invalid constrained TypeVar
-
 I = TypeVar("I", bound=int)
-U = TypeVar("U", list[I], int)  # invalid constrained TypeVar
+# constraint references `I`
+S = TypeVar("S", list[I], int)  # error
+
+
+# a constrained type variable needs at least two constraints
+def f[T: (int,)](): ...  # error
 ```
 
 Use instead:
 
 ```python
-T = TypeVar("T", str, int)  # valid constrained TypeVar
+from typing import TypeVar
+
+U = TypeVar("U", str, int)  # valid constrained TypeVar
 
 # or
 
 T = TypeVar("T", bound=str)  # valid bound TypeVar
 
-U = TypeVar("U", list[int], int)  # valid constrained Type
+V = TypeVar("V", list[int], int)  # valid constrained Type
 ```
 
 [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar

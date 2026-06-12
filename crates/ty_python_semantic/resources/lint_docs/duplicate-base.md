@@ -13,5 +13,5 @@ class A: ...
 
 
 # TypeError: duplicate base class
-class B(A, A): ...
+class B(A, A): ...  # error
 ```

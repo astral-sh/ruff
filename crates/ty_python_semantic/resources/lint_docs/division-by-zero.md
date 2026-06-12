@@ -14,5 +14,5 @@ false positives it can produce.
 ## Examples
 
 ```python
-5 / 0
+5 / 0  # error
 ```

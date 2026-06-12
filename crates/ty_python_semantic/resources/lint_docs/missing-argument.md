@@ -12,5 +12,6 @@ Failing to provide a required argument will raise a `TypeError` at runtime.
 def func(x: int): ...
 
 
-func()  # TypeError: func() missing 1 required positional argument: 'x'
+# TypeError: func() missing 1 required positional argument: 'x'
+func()  # error
 ```

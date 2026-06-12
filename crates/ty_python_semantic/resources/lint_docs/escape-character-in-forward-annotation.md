@@ -9,5 +9,5 @@ Static analysis tools like ty can't analyze type annotations that contain escape
 ## Example
 
 ```python
-def foo() -> "intt\b": ...
+def foo() -> "intt\b": ...  # error
 ```

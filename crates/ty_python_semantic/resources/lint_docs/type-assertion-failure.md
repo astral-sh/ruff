@@ -9,8 +9,17 @@ is not the same as the asserted type.
 
 ## Example
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```python
+from typing import assert_type
+
+
 def _(x: int):
     assert_type(x, int)  # fine
-    assert_type(x, str)  # error: Actual type does not match asserted type
+    # Actual type does not match asserted type
+    assert_type(x, str)  # error
 ```

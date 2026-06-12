@@ -11,7 +11,8 @@ Matching on invalid patterns will lead to a runtime error.
 ```python
 NotAClass = 42
 
-match x:
-    case NotAClass():  # TypeError at runtime: must be a class
+match object():
+    # TypeError at runtime: must be a class
+    case NotAClass():  # error
         ...
 ```

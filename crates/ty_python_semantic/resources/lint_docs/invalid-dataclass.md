@@ -24,13 +24,16 @@ Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
 from dataclasses import dataclass
 from typing import NamedTuple
 
+
 @dataclass(order=True, eq=False)  # error: [invalid-dataclass]
 class Ordered: ...
 
-@dataclass  # error: [invalid-dataclass]
-class Foo(NamedTuple):
+
+@dataclass
+class Foo(NamedTuple):  # error: [invalid-dataclass]
     x: int
 ```
 
-[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
 See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
+
+[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support

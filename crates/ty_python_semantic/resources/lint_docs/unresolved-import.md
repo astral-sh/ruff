@@ -10,5 +10,6 @@ at runtime.
 ## Examples
 
 ```python
-import foo  # ModuleNotFoundError: No module named 'foo'
+# ModuleNotFoundError: No module named 'foo'
+import foo  # error
 ```

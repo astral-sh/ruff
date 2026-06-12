@@ -10,6 +10,7 @@ included by mistake, and should be removed to avoid confusion.
 ## Examples
 
 ```py
+# error
 a = 20 / 2  # type: ignore
 ```
 

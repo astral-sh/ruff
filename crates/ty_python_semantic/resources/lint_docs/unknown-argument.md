@@ -9,8 +9,9 @@ Providing an unknown keyword argument will raise `TypeError` at runtime.
 ## Example
 
 ```python
-def f(x: int) -> int: ...
+def f(x: int) -> int:
+    return x
 
 
-f(x=1, y=2)  # Error raised here
+f(x=1, y=2)  # error
 ```

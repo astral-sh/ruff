@@ -20,5 +20,6 @@ class A:
         def __getitem__(self, v): ...
 
 
-A()[0]  # TypeError: 'A' object is not subscriptable
+# TypeError: 'A' object is not subscriptable
+A()[0]  # error
 ```

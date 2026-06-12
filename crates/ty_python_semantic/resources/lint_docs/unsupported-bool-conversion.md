@@ -13,14 +13,23 @@ using the object in a boolean context will fail at runtime.
 class NotBoolable:
     __bool__ = None
 
+    def __lt__(self, other: object) -> "NotBoolable":
+        return self
+
 
 b1 = NotBoolable()
 b2 = NotBoolable()
 
-if b1:  # exception raised here
+# exception raised here
+if b1:  # error
     pass
 
-b1 and b2  # exception raised here
-not b1  # exception raised here
-b1 < b2 < b1  # exception raised here
+# exception raised here
+b1 and b2  # error
+# exception raised here
+not b1  # error
+
+# A chained comparison converts the result of `b1 < b2` to bool.
+# exception raised here
+b1 < b2 < b1  # error
 ```

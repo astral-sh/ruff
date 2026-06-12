@@ -19,7 +19,8 @@ if it comes after a positional-or-keyword parameter, even if its name starts wit
 ## Example
 
 ```python
-def f(x, __y):  # Error: `__y` is not considered positional-only
+# `__y` is not considered positional-only
+def f(x, __y):  # error
     pass
 ```
 

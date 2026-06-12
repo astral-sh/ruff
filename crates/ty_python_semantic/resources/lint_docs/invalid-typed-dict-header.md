@@ -16,11 +16,14 @@ whether keys in the `TypedDict` are intended to be required or optional.
 from typing import TypedDict
 
 
-class Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]
+class Meta(type): ...
+
+
+class Foo(TypedDict, metaclass=Meta):  # error: [invalid-typed-dict-header]
     ...
 
 
-def f(x: dict):
-    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]
+def f(options: dict[str, object]):
+    class Bar(TypedDict, **options):  # error: [invalid-typed-dict-header]
         ...
 ```

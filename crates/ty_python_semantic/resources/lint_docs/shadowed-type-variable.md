@@ -9,13 +9,19 @@ Shadowing type variables makes the code confusing and is disallowed by the typin
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 class Outer[T]:
-    # Error: `T` is already used by `Outer`
-    class Inner[T]: ...
+    # `T` is already used by `Outer`
+    class Inner[T]: ...  # error
 
-    # Error: `T` is already used by `Outer`
-    def method[T](self, x: T) -> T: ...
+    # `T` is already used by `Outer`
+    def method[T](self, x: T) -> T:  # error
+        return x
 ```
 
 ## References

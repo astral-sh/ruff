@@ -14,5 +14,6 @@ runtime.
 class A: ...
 
 
-A() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'
+# TypeError: unsupported operand type(s) for +: 'A' and 'A'
+A() + A()  # error
 ```

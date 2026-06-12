@@ -13,7 +13,9 @@ to evaluate to `True` in a boolean context.
 ```python
 from ty_extensions import static_assert
 
-static_assert(1 + 1 == 3)  # error: evaluates to `False`
+# evaluates to `False`
+static_assert(1 + 1 == 3)  # error
 
-static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known truthiness
+# does not have a statically known truthiness
+static_assert(int(2.0 * 3.0) == 6)  # error
 ```

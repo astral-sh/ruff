@@ -11,6 +11,11 @@ that a normal generic class can.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from enum import Enum
 from typing import Generic, TypeVar

@@ -9,8 +9,9 @@ Providing multiple values for a single parameter will raise a `TypeError` at run
 ## Examples
 
 ```python
-def f(x: int) -> int: ...
+def f(x: int) -> int:
+    return x
 
 
-f(1, x=2)  # Error raised here
+f(1, x=2)  # error
 ```

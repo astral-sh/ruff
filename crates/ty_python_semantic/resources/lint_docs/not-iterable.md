@@ -9,6 +9,7 @@ Iterating over an object that is not iterable will raise a `TypeError` at runtim
 ## Examples
 
 ```python
-for i in 34:  # TypeError: 'int' object is not iterable
+# TypeError: 'int' object is not iterable
+for i in 34:  # error
     pass
 ```

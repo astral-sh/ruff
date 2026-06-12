@@ -16,7 +16,7 @@ class B(A): ...
 
 
 # TypeError: Cannot create a consistent method resolution order
-class C(A, B): ...
+class C(A, B): ...  # error
 ```
 
 [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order

@@ -20,12 +20,16 @@ class BaseProto(Protocol):
     # fine: a method definition using `def` is considered a declaration
     def method_member(self) -> int: ...
 
-    c = "some variable"  # error: no explicit declaration, leading to ambiguity
-    b = method_member  # error: no explicit declaration, leading to ambiguity
+    # no explicit declaration, leading to ambiguity
+    c = "some variable"  # error
+    # no explicit declaration, leading to ambiguity
+    b = method_member  # error
 
-    # this creates implicit assignments of `d` and `e` in the protocol class body.
+    # This creates implicit assignments of `d` and `e` in the protocol class body.
     # Were they really meant to be considered protocol members?
-    for d, e in enumerate(range(42)):  # error
+    # error: "`d` is not declared as a protocol member"
+    # error: "`e` is not declared as a protocol member"
+    for d, e in enumerate(range(42)):
         pass
 
 

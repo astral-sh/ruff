@@ -15,9 +15,10 @@ false positives it can produce.
 
 ```python
 class A:
-    if b:
+    if __name__ == "__main__":
         c = 0
 
 
-A.c  # AttributeError: type object 'A' has no attribute 'c'
+# AttributeError: type object 'A' has no attribute 'c'
+A.c  # error
 ```

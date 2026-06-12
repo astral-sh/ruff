@@ -14,8 +14,8 @@ effect and is likely a mistake.
 from typing import final
 
 
-# Error: @final is not allowed on non-method functions
-@final
+# @final is not allowed on non-method functions
+@final  # error
 def my_function() -> int:
     return 0
 ```

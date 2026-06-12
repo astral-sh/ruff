@@ -11,14 +11,15 @@ weaken a type checker's ability to accurately reason about your code.
 ## Examples
 
 ```python
+from typing import ClassVar
+
+
 class C:
     class_var: ClassVar[int] = 1
     instance_var: int
 
 
 C.class_var = 3  # okay
-C().class_var = 3  # error: Cannot assign to class variable
-
-C().instance_var = 3  # okay
-C.instance_var = 3  # error: Cannot assign to instance variable
+# Cannot assign to class variable
+C().class_var = 3  # error
 ```

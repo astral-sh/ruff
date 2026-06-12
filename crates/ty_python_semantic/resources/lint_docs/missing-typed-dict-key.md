@@ -18,7 +18,8 @@ class Person(TypedDict):
     age: int
 
 
-alice: Person = {"name": "Alice"}  # missing required key 'age'
+# missing required key 'age'
+alice: Person = {"name": "Alice"}  # error
 
 alice["age"]  # KeyError
 ```

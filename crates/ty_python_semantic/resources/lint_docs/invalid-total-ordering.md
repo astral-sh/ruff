@@ -14,8 +14,9 @@ ordering method. If none is defined, Python raises a `ValueError` at runtime.
 from functools import total_ordering
 
 
-@total_ordering
-class MyClass:  # Error: no ordering method defined
+# no ordering method defined
+@total_ordering  # error
+class MyClass:
     def __eq__(self, other: object) -> bool:
         return True
 ```

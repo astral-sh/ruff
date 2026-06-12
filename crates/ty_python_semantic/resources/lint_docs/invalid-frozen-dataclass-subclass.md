@@ -22,7 +22,7 @@ class Base:
 
 
 @dataclass(frozen=True)
-class Child(Base):  # Error raised here
+class Child(Base):  # error
     y: int
 
 
@@ -32,6 +32,6 @@ class FrozenBase:
 
 
 @dataclass
-class NonFrozenChild(FrozenBase):  # Error raised here
+class NonFrozenChild(FrozenBase):  # error
     y: int
 ```

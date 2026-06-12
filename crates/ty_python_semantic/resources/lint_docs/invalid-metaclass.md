@@ -11,11 +11,8 @@ as `type.__new__`.
 ## Example
 
 ```python
-def f(): ...
-
-
-# TypeError: f() takes 0 positional arguments but 3 were given
-class B(metaclass=f): ...
+# TypeError: 'int' object is not callable
+class B(metaclass=42): ...  # error
 ```
 
 ## References

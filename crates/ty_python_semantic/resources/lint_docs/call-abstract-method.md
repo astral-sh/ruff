@@ -36,5 +36,6 @@ class Foo(ABC):
     def method(cls) -> int: ...
 
 
-Foo.method()  # Error: cannot call abstract classmethod
+# cannot call abstract classmethod
+Foo.method()  # error
 ```

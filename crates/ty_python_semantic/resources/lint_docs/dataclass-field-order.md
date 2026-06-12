@@ -18,5 +18,6 @@ from dataclasses import dataclass
 @dataclass
 class Example:
     x: int = 1  # Field with default value
-    y: str  # Error: Required field after field with default
+    # Required field after field with default
+    y: str  # error
 ```
