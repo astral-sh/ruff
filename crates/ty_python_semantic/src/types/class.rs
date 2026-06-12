@@ -1633,13 +1633,22 @@ impl<'db> ClassType<'db> {
                 let class_literal = generic.origin(db);
                 let specialization = generic.specialization(db);
 
-                if let Some(readonly_projection) =
-                    Self::dict_top_readonly_projection(db, class_literal, specialization, name)
+                // Applying a top specialization to the invariant type variables in the typeshed
+                // return annotation would incorrectly produce `dict[Never, Never]`.
+                if name == "copy"
+                    && Self::is_top_dict_specialization(db, class_literal, specialization)
                 {
-                    let projected_member = readonly_projection.class_member(db, name, policy);
-                    if !projected_member.is_undefined() {
-                        return projected_member;
-                    }
+                    let instance_ty = Type::instance(db, self);
+                    let parameters = Parameters::new(
+                        db,
+                        [Parameter::positional_only(Some(Name::new_static("self")))
+                            .with_annotated_type(instance_ty)],
+                    );
+                    return Member::definitely_declared(Type::function_like_callable(
+                        db,
+                        Signature::new(parameters, instance_ty),
+                    ))
+                    .inner;
                 }
 
                 class_literal.class_member_inner(db, Some(specialization), name, policy)
@@ -1984,24 +1993,15 @@ impl<'db> ClassType<'db> {
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
-                let specialization = generic.specialization(db);
+                let specialization = Some(generic.specialization(db));
 
                 if class_literal.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
 
-                if let Some(readonly_projection) =
-                    Self::dict_top_readonly_projection(db, class_literal, specialization, name)
-                {
-                    let projected_member = readonly_projection.instance_member(db, name);
-                    if !projected_member.is_undefined() {
-                        return projected_member;
-                    }
-                }
-
                 class_literal
-                    .instance_member(db, Some(specialization), name)
-                    .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
+                    .instance_member(db, specialization, name)
+                    .map_type(|ty| ty.apply_optional_specialization(db, specialization))
             }
         }
     }
@@ -2027,26 +2027,6 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
         }
-    }
-
-    /// Top-materialized `dict`s can project read-only members through `Mapping`. Use `dict` itself
-    /// for its view methods so lookups preserve concrete observer types without also loosening
-    /// mutation APIs.
-    fn dict_top_readonly_projection(
-        db: &'db dyn Db,
-        class_literal: StaticClassLiteral<'db>,
-        specialization: Specialization<'db>,
-        name: &str,
-    ) -> Option<ClassType<'db>> {
-        if !Self::is_top_dict_specialization(db, class_literal, specialization) {
-            return None;
-        }
-
-        let projection = match name {
-            "copy" | "items" | "keys" | "values" => KnownClass::Dict,
-            _ => KnownClass::Mapping,
-        };
-        projection.to_specialized_class_type(db, specialization.types(db))
     }
 
     fn is_top_dict_specialization(

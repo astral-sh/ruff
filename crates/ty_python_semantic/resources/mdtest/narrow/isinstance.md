@@ -793,18 +793,18 @@ without exposing schema-unsafe mutation:
 
 ```py
 def takes_dict(value: dict[str, object]) -> None: ...
-def use_narrowed_dict(value: object, default: object) -> None:
-    if isinstance(value, dict) and isinstance(default, dict):
+def use_narrowed_dict(value: object, key: object) -> None:
+    if isinstance(value, dict):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
-        for key in value.keys() & default.keys():
-            reveal_type(key)  # revealed: Unknown | str
-            reveal_type(value[key])  # revealed: object
-            reveal_type(default[key])  # revealed: object
-            reveal_type(default.get(key))  # revealed: object
+        reveal_type(value.keys())  # revealed: dict_keys[object, object]
+        for item in value.keys():
+            reveal_type(item)  # revealed: object
+
+        reveal_type(value.get(key))  # revealed: object
 
         reveal_type(value.fromkeys(["a"], 1))  # revealed: dict[str, int]
         reveal_type(reversed(value))  # revealed: Iterator[object]
-        reveal_type(value.copy())  # revealed: dict[Unknown, Unknown] | <TypedDict with no items>
+        reveal_type(value.copy())  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
         value.clear()  # error: [unresolved-attribute]
         takes_dict(value)  # error: [invalid-argument-type]
 ```
@@ -867,7 +867,7 @@ ErrorInfo = PGresult | dict[int, bytes | None] | None
 def _(info: ErrorInfo):
     if isinstance(info, dict):
         reveal_type(info)  # revealed: (PGresult & Top[dict[Unknown, Unknown]]) | dict[int, bytes | None]
-        reveal_type(info.get(DiagnosticField.MESSAGE))  # revealed: Unknown | None | bytes
+        reveal_type(info.get(DiagnosticField.MESSAGE))  # revealed: object
     elif info:
         reveal_type(info)  # revealed: PGresult & ~Top[dict[Unknown, Unknown]] & ~AlwaysFalsy
         reveal_type(info.error_field(DiagnosticField.MESSAGE))  # revealed: bytes | None
@@ -1083,7 +1083,7 @@ def narrow_reversed_typeddict_union(x: ReversibleMovie | int) -> None:
 
 def narrow_reversed_object(x: object) -> None:
     if isinstance(x, dict):
-        reveal_type(reversed(x.keys()))  # revealed: Iterator[Unknown | str]
+        reveal_type(reversed(x.keys()))  # revealed: Iterator[object]
 ```
 
 ## Narrowing with named expressions (walrus operator)
