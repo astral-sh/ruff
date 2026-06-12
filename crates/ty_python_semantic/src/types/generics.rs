@@ -880,12 +880,18 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self.len(db) {
-            0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
-        }
+        self.specialize(
+            db,
+            self.variables(db)
+                .map(|typevar| {
+                    if typevar.is_paramspec(db) {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    } else {
+                        Type::unknown()
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {

@@ -789,6 +789,27 @@ def _(x: object):
         reveal_type(x.y)  # revealed: tuple[A, object]
 ```
 
+Concrete defaults are also ignored. A runtime class object does not retain the specialization used
+to construct an instance, so a check against the unspecialized class can match any specialization:
+
+```py
+class WithConcreteDefault[T = int]:
+    y: T
+
+def _(
+    x: object,
+    cls: type[WithConcreteDefault[int]],
+    y: WithConcreteDefault[str],
+):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[WithConcreteDefault[Unknown]]
+        reveal_type(x.y)  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[WithConcreteDefault[Unknown]]
+        reveal_type(x.y)  # revealed: object
+```
+
 ## Narrowing generic `classmethod`
 
 After an `isinstance(..., classmethod)` branch unwraps and replaces a generic `classmethod`, the
