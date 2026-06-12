@@ -739,8 +739,25 @@ class InvariantWithAny[T: int]:
 def _(x: object):
     if isinstance(x, InvariantWithAny):
         reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
+```
+
+The bound is also retained when the runtime class comes from a generic `type[]` value:
+
+```py
+def takes_exception(exc: BaseException) -> None: ...
+
+class InvariantException[T: BaseException]:
+    def get(self) -> T:
+        raise NotImplementedError
+    def put(self, value: T) -> None: ...
+
+def _(x: object, cls: type[InvariantException[ValueError]]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[InvariantException[Unknown]]
+        takes_exception(x.get())
+        x.put(BaseException())  # error: [invalid-argument-type]
 ```
 
 The same applies in contravariant positions: `Any` in a parameter type that isn't tied to the
