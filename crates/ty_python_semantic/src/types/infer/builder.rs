@@ -22,10 +22,11 @@ use ty_python_core::ast_ids::HasScopedUseId;
 use ty_python_core::statement::StatementInner;
 
 use super::{
-    DefinitionInference, DefinitionInferenceExtra, DefinitionTypes, ExpressionInference,
-    ExpressionInferenceExtra, FrozenMap, FrozenSet, FunctionDecoratorInference, InferenceRegion,
-    ScopeInference, ScopeInferenceExtra, infer_deferred_types, infer_definition_types,
-    infer_expression_types, infer_same_file_expression_type, infer_unpack_types,
+    DeferredAndUndecorated, DefinitionInference, DefinitionInferenceExtra, DefinitionTypes,
+    ExpressionInference, ExpressionInferenceExtra, FrozenMap, FrozenSet,
+    FunctionDecoratorInference, InferenceRegion, OtherDefinitionInferenceExtra, ScopeInference,
+    ScopeInferenceExtra, infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::place::{
@@ -453,28 +454,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(extra) = &inference.extra {
-            self.called_functions
-                .extend(extra.called_functions.iter().copied());
-            self.extend_cycle_recovery(extra.cycle_recovery);
-            self.context.extend(&extra.diagnostics);
-            self.deferred.extend(extra.deferred.iter().copied());
-            self.string_annotations
-                .extend(extra.string_annotations.iter().copied());
-            self.expected_types
-                .extend(extra.expected_types.iter().copied());
-            self.qualifiers.extend(extra.qualifiers.iter().copied());
-            self.type_expression_flags
-                .extend(extra.type_expression_flags.iter().copied());
+            match extra.as_ref() {
+                DefinitionInferenceExtra::Qualifiers(qualifiers) => {
+                    self.qualifiers.extend(qualifiers.iter().copied());
+                }
+                DefinitionInferenceExtra::Deferred(deferred) => {
+                    self.deferred.extend(deferred.iter().copied());
+                }
+                DefinitionInferenceExtra::Diagnostics(diagnostics) => {
+                    self.context.extend(diagnostics);
+                }
+                DefinitionInferenceExtra::DeferredAndUndecorated(extra) => {
+                    self.deferred.extend(extra.deferred.iter().copied());
+                }
+                DefinitionInferenceExtra::CalledFunctions(called_functions) => {
+                    self.called_functions
+                        .extend(called_functions.iter().copied());
+                }
+                DefinitionInferenceExtra::ExpectedTypes(expected_types) => {
+                    self.expected_types.extend(expected_types.iter().copied());
+                }
+                DefinitionInferenceExtra::StringAnnotations(string_annotations) => {
+                    self.string_annotations
+                        .extend(string_annotations.iter().copied());
+                }
+                DefinitionInferenceExtra::Undecorated(_)
+                | DefinitionInferenceExtra::DiscardsDictKeyAssignments => {}
+                DefinitionInferenceExtra::Other(extra) => {
+                    self.called_functions
+                        .extend(extra.called_functions.iter().copied());
+                    self.extend_cycle_recovery(extra.cycle_recovery);
+                    self.context.extend(&extra.diagnostics);
+                    self.deferred.extend(extra.deferred.iter().copied());
+                    self.string_annotations
+                        .extend(extra.string_annotations.iter().copied());
+                    self.expected_types
+                        .extend(extra.expected_types.iter().copied());
+                    self.qualifiers.extend(extra.qualifiers.iter().copied());
+                    self.type_expression_flags
+                        .extend(extra.type_expression_flags.iter().copied());
 
-            #[expect(
-                clippy::iter_over_hash_type,
-                reason = "constraints for distinct collection definitions are merged independently"
-            )]
-            for (collection_def, constraints) in &extra.collection_use_constraints {
-                self.collection_use_constraints
-                    .entry(*collection_def)
-                    .and_modify(|this| this.extend(constraints))
-                    .or_insert(constraints.clone());
+                    #[expect(
+                        clippy::iter_over_hash_type,
+                        reason = "constraints for distinct collection definitions are merged independently"
+                    )]
+                    for (collection_def, constraints) in &extra.collection_use_constraints {
+                        self.collection_use_constraints
+                            .entry(*collection_def)
+                            .and_modify(|this| this.extend(constraints))
+                            .or_insert(constraints.clone());
+                    }
+                }
             }
         }
     }
@@ -10762,20 +10792,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra = (!diagnostics.is_empty()
-            || !string_annotations.is_empty()
-            || !expected_types.is_empty()
-            || cycle_recovery.is_some()
-            || undecorated_type.is_some()
-            || !deferred.is_empty()
-            || !called_functions.is_empty()
-            || !qualifiers.is_empty()
-            || !type_expression_flags.is_empty()
-            || !collection_use_constraints.is_empty()
-            || discards_dict_key_assignments)
-            .then(|| {
+        let non_undecorated_extra_field_count = usize::from(!string_annotations.is_empty())
+            + usize::from(!expected_types.is_empty())
+            + usize::from(!collection_use_constraints.is_empty())
+            + usize::from(!called_functions.is_empty())
+            + usize::from(!type_expression_flags.is_empty())
+            + usize::from(cycle_recovery.is_some())
+            + usize::from(!deferred.is_empty())
+            + usize::from(!diagnostics.is_empty())
+            + usize::from(discards_dict_key_assignments)
+            + usize::from(!qualifiers.is_empty());
+
+        let extra = match (non_undecorated_extra_field_count, undecorated_type) {
+            (0, None) => None,
+            (1, None) if !qualifiers.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Qualifiers(FrozenMap::from(qualifiers)),
+            )),
+            (1, None) if !deferred.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Deferred(deferred.into_boxed_slice()),
+            )),
+            (1, None) if !diagnostics.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::Diagnostics(Box::new(diagnostics)),
+            )),
+            (1, None) if !called_functions.is_empty() => {
+                Some(Box::new(DefinitionInferenceExtra::CalledFunctions(
+                    called_functions
+                        .into_iter()
+                        .collect::<Vec<_>>()
+                        .into_boxed_slice(),
+                )))
+            }
+            (1, None) if !expected_types.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::ExpectedTypes(FrozenMap::from(expected_types)),
+            )),
+            (1, None) if !string_annotations.is_empty() => Some(Box::new(
+                DefinitionInferenceExtra::StringAnnotations(FrozenSet::from(string_annotations)),
+            )),
+            (1, None) if discards_dict_key_assignments => Some(Box::new(
+                DefinitionInferenceExtra::DiscardsDictKeyAssignments,
+            )),
+            (0, Some(undecorated_type)) => Some(Box::new(DefinitionInferenceExtra::Undecorated(
+                Box::new(undecorated_type),
+            ))),
+            (1, Some(undecorated_type)) if !deferred.is_empty() => {
+                Some(Box::new(DefinitionInferenceExtra::DeferredAndUndecorated(
+                    Box::new(DeferredAndUndecorated {
+                        deferred: deferred.into_boxed_slice(),
+                        undecorated_type,
+                    }),
+                )))
+            }
+            (_, undecorated_type) => {
                 collection_use_constraints.shrink_to_fit();
-                Box::new(DefinitionInferenceExtra {
+                let extra = OtherDefinitionInferenceExtra {
                     string_annotations: FrozenSet::from(string_annotations),
                     expected_types: FrozenMap::from(expected_types),
                     collection_use_constraints,
@@ -10790,8 +10859,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     undecorated_type,
                     discards_dict_key_assignments,
                     qualifiers: FrozenMap::from(qualifiers),
-                })
-            });
+                };
+                Some(Box::new(DefinitionInferenceExtra::Other(Box::new(extra))))
+            }
+        };
 
         if bindings.len() > 20 {
             tracing::debug!(
