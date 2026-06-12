@@ -1,0 +1,22 @@
+## What it does
+Checks for `assert_type()` calls where the actual type
+is an unspellable subtype of the asserted type.
+
+## Why is this bad?
+`assert_type()` is intended to ensure that the inferred type of a value
+is exactly the same as the asserted type. But in some situations, ty
+has nonstandard extensions to the type system that allow it to infer
+more precise types than can be expressed in user annotations. ty emits a
+different error code to `type-assertion-failure` in these situations so
+that users can easily differentiate between the two cases.
+
+## Example
+
+```python
+def _(x: int):
+    assert_type(x, int)  # fine
+    if x:
+        assert_type(x, int)  # error: [assert-type-unspellable-subtype]
+                             # the actual type is `int & ~AlwaysFalsy`,
+                             # which excludes types like `Literal[0]`
+```
