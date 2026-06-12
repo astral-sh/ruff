@@ -9,6 +9,7 @@ use super::google;
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
     ParsedLine, indentation, indented_container_end, is_docstring_type_expression, parsed_lines,
+    split_once_unbracketed_colon,
 };
 
 pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
@@ -119,8 +120,6 @@ fn section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> (us
     let first_item = first_body_item_index(lines, header);
 
     while let Some(line) = lines.get(body_end) {
-        let previous_body = &lines[header.body_start..body_end];
-
         if preformatted_blocks.is_active()
             && preformatted_blocks.consume_preformatted_line(line.text)
         {
@@ -139,7 +138,7 @@ fn section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> (us
         }
 
         if line.text.trim().is_empty() {
-            if !blank_line_continues_section(previous_body, &lines[body_end..], header) {
+            if !blank_line_continues_section(&lines[body_end..], header) {
                 break;
             }
 
@@ -158,7 +157,7 @@ fn section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> (us
         }
 
         if !line.text.trim().is_empty()
-            && !line_belongs_to_body(header, line, previous_body, &lines[body_end + 1..])
+            && !line_belongs_to_body(header, line, &lines[body_end + 1..])
         {
             break;
         }
@@ -215,11 +214,7 @@ fn first_body_item_index(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -
     None
 }
 
-fn blank_line_continues_section(
-    previous_lines: &[ParsedLine<'_>],
-    lines: &[ParsedLine<'_>],
-    header: NumpySectionHeader,
-) -> bool {
+fn blank_line_continues_section(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> bool {
     let Some((offset, non_blank_line)) = lines
         .iter()
         .enumerate()
@@ -232,13 +227,12 @@ fn blank_line_continues_section(
         return false;
     }
 
-    line_belongs_to_body(header, non_blank_line, previous_lines, &lines[offset + 1..])
+    line_belongs_to_body(header, non_blank_line, &lines[offset + 1..])
 }
 
 fn line_belongs_to_body(
     header: NumpySectionHeader,
     line: &ParsedLine<'_>,
-    previous_lines: &[ParsedLine<'_>],
     following_lines: &[ParsedLine<'_>],
 ) -> bool {
     let line_indent = indentation(line.text);
@@ -260,11 +254,9 @@ fn line_belongs_to_body(
         SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters => {
             parameter_item_starts(line, following_lines)
         }
-        SectionKind::Attributes => named_item_starts(line),
-        SectionKind::Returns | SectionKind::Yields => {
-            return_item_starts(line, previous_lines, following_lines)
-        }
-        SectionKind::Raises => raise_item_starts(line, following_lines),
+        SectionKind::Attributes => named_item_starts(line, following_lines),
+        SectionKind::Returns | SectionKind::Yields => return_item_starts(line, following_lines),
+        SectionKind::Raises => raise_item_starts(line),
     }
 }
 
@@ -294,7 +286,10 @@ fn underlined_section_indent(lines: &[ParsedLine<'_>], index: usize) -> Option<u
     let underline = lines.get(index + 1)?;
     let indent = indentation(line.text);
 
-    (indentation(underline.text) == indent && is_underline(underline.text)).then_some(indent)
+    (!line.text.trim().is_empty()
+        && indentation(underline.text) == indent
+        && is_underline(underline.text))
+    .then_some(indent)
 }
 
 fn section_kind(line: &str) -> Option<SectionKind> {
@@ -314,11 +309,6 @@ fn section_kind(line: &str) -> Option<SectionKind> {
 fn is_underline(line: &str) -> bool {
     let line = line.trim();
     line.len() >= 3 && line.chars().all(|char| char == '-')
-}
-
-fn named_item_starts(line: &ParsedLine<'_>) -> bool {
-    let trimmed = line.text.trim();
-    parse_type_separator(trimmed).is_some() || is_item_name(trimmed)
 }
 
 fn parameter_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
@@ -345,37 +335,36 @@ fn parameter_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_
     is_item_name(trimmed)
 }
 
+fn named_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
+    let trimmed = line.text.trim();
+    if let Some(separator) = parse_type_separator(trimmed) {
+        return !separator.requires_description_block
+            || has_indented_description(line, following_lines);
+    }
+
+    untyped_item_starts(trimmed, line, following_lines)
+}
+
 fn untyped_item_starts(
     trimmed: &str,
     line: &ParsedLine<'_>,
     following_lines: &[ParsedLine<'_>],
 ) -> bool {
-    is_item_name(trimmed)
-        && following_lines
-            .iter()
-            .find(|line| !line.text.trim().is_empty())
-            .is_some_and(|next| indentation(next.text) > indentation(line.text))
+    is_item_name(trimmed) && has_indented_description(line, following_lines)
 }
 
-fn return_item_starts(
-    line: &ParsedLine<'_>,
-    previous_lines: &[ParsedLine<'_>],
-    following_lines: &[ParsedLine<'_>],
-) -> bool {
+fn return_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
     let trimmed = line.text.trim();
-    parse_type_separator(trimmed).is_some()
-        || (!previous_lines
-            .iter()
-            .any(|line| !line.text.trim().is_empty())
-            && is_anonymous_return_type(trimmed))
-        || (is_anonymous_return_type(trimmed)
-            && following_lines
-                .iter()
-                .find(|line| !line.text.trim().is_empty())
-                .is_some_and(|next| indentation(next.text) > indentation(line.text)))
+    if let Some(separator) = parse_type_separator(trimmed) {
+        return !separator.requires_description_block
+            || has_indented_description(line, following_lines);
+    }
+
+    is_anonymous_return_type(trimmed)
 }
 
-fn is_anonymous_return_type(line: &str) -> bool {
+/// Returns whether `line` is a valid anonymous NumPy-style return type.
+pub(in crate::docstring) fn is_anonymous_return_type(line: &str) -> bool {
     !line.is_empty()
         && !line.ends_with('.')
         && !line.ends_with(':')
@@ -391,10 +380,8 @@ fn is_prose_return_type(line: &str) -> bool {
             .all(|char| char.is_ascii_alphanumeric() || matches!(char, '_' | '-' | '.' | ' '))
 }
 
-fn raise_item_starts(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
-    let trimmed = line.text.trim();
-    parse_raise_item(trimmed).is_some_and(|description| !description.is_empty())
-        || untyped_item_starts(trimmed, line, following_lines)
+fn raise_item_starts(line: &ParsedLine<'_>) -> bool {
+    parse_raise_item(line.text.trim()).is_some()
 }
 
 fn parse_raise_item(line: &str) -> Option<&str> {
@@ -530,7 +517,7 @@ pub(in crate::docstring) struct TypeSeparator<'a> {
 
 /// Parses a NumPy-style `name : type` separator.
 pub(in crate::docstring) fn parse_type_separator(line: &str) -> Option<TypeSeparator<'_>> {
-    let (name, ty) = line.split_once(':')?;
+    let (name, ty) = split_once_unbracketed_colon(line)?;
     let has_whitespace_before_colon = name.chars().last().is_some_and(char::is_whitespace);
     let has_whitespace_after_colon = ty.chars().next().is_some_and(char::is_whitespace);
     if !has_whitespace_before_colon && !has_whitespace_after_colon && !ty.is_empty() {
@@ -542,7 +529,6 @@ pub(in crate::docstring) fn parse_type_separator(line: &str) -> Option<TypeSepar
     if !is_item_name(name) {
         return None;
     }
-
     Some(TypeSeparator {
         name,
         ty,
@@ -550,7 +536,15 @@ pub(in crate::docstring) fn parse_type_separator(line: &str) -> Option<TypeSepar
     })
 }
 
-fn is_item_name(name: &str) -> bool {
+fn has_indented_description(line: &ParsedLine<'_>, following_lines: &[ParsedLine<'_>]) -> bool {
+    following_lines
+        .iter()
+        .find(|line| !line.text.trim().is_empty())
+        .is_some_and(|next| indentation(next.text) > indentation(line.text))
+}
+
+/// Returns whether `name` is a valid NumPy-style item name or comma-separated name list.
+pub(in crate::docstring) fn is_item_name(name: &str) -> bool {
     let mut has_lookup_name = false;
     let valid = name.split(',').all(|part| {
         let part = part.trim();

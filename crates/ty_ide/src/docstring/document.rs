@@ -1,7 +1,7 @@
 use indexmap::IndexMap;
 
 pub(in crate::docstring) mod google;
-mod numpy;
+pub(in crate::docstring) mod numpy;
 pub(super) mod preformatted;
 pub(super) mod rst;
 /// Syntax utilities shared by docstring format parsers and renderers.
