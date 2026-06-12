@@ -338,30 +338,8 @@ fn prepare_distributed_constraints<'db, 'c>(
     (pruned, deferred_quantification, mentioned_typevars)
 }
 
-fn mentioned_typevars_for_constraint_parts<'db>(
-    db: &'db dyn Db,
-    typevar: BoundTypeVarInstance<'db>,
-    lower: Option<Type<'db>>,
-    upper: Option<Type<'db>>,
-) -> InferableTypeVars<'db> {
-    let mut typevars = InferableTypeVars::mentioned_in_type(db, Type::TypeVar(typevar));
-    if let Some(lower) = lower {
-        typevars = typevars.merge(db, InferableTypeVars::mentioned_in_type(db, lower));
-    }
-    if let Some(upper) = upper {
-        typevars = typevars.merge(db, InferableTypeVars::mentioned_in_type(db, upper));
-    }
-    typevars
-}
-
-fn mentioned_typevars_for_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> InferableTypeVars<'db> {
-    InferableTypeVars::mentioned_in_type(db, ty)
-}
-
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
-/// arenas that hold its BDD. It also stores any deferred-quantification metadata that should be
-/// applied to the raw BDD before terminal semantic observation or solution extraction, plus the
-/// set of type variables mentioned by the raw BDD formula.
+/// arenas that hold its BDD.
 ///
 /// Owned constraint sets are immutable snapshots of a builder's arenas. They are used by
 /// Salsa-cached relation queries, and by the
@@ -456,12 +434,12 @@ impl<'db> OwnedConstraintSet<'db> {
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
-/// A `ConstraintSet` is a raw TDD formula plus a set of type variables whose existential
-/// quantification is deferred and a conservative set of type variables mentioned by the raw
-/// formula. Positive construction operations preserve the raw formula and merge metadata so later
-/// constraints can still mention deferred type variables. Public semantic observations and
-/// solution extraction first interpret the set as `∃ deferred_vars . raw_formula`; raw [`NodeId`]
-/// operations intentionally do not.
+/// A `ConstraintSet` is stored as a ternary decision diagram (TDD) over _individual constraints_,
+/// each of which provides a lower and/or upper bound for a typevar. In addition to the raw TDD, we
+/// also store a set of typevars that have we _lazily_ quantified over. We don't immediately
+/// perform the existential quantification, in case other clauses in the current specialization
+/// inference need to refer to them. Many operations (in particular, solution extraction) require
+/// "forcing" the quantification before they can be applied.
 ///
 /// The underlying representation tracks the order that individual constraints are added to the
 /// constraint set, which typically tracks when they appear in the underlying Python source. For
@@ -478,9 +456,9 @@ pub struct ConstraintSet<'db, 'c> {
     /// semantic observation.
     deferred_quantification: InferableTypeVars<'db>,
 
-    /// Type variables mentioned anywhere in the raw BDD formula. This is an overapproximation;
-    /// callers can use it to conservatively decide whether a deferred type variable might still be
-    /// constrained by another operand.
+    /// Type variables mentioned anywhere in the constraint set. This is an overapproximation; we
+    /// can use this to conservatively decide whether an operation will have an effect, allowing a
+    /// fast return path where we know it cannot.
     mentioned_typevars: InferableTypeVars<'db>,
 
     /// A reference to the builder that holds the storage for this constraint set's BDD
@@ -557,11 +535,21 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         lower: Option<Type<'db>>,
         upper: Option<Type<'db>>,
     ) -> Self {
+        let mut typevars = FxOrderSet::default();
+        typevars.insert(typevar.identity(db));
+        if let Some(lower) = lower {
+            let lower_typevars = InferableTypeVars::mentioned_in_type(db, lower);
+            typevars.extend(lower_typevars.iter(db));
+        }
+        if let Some(upper) = upper {
+            let upper_typevars = InferableTypeVars::mentioned_in_type(db, upper);
+            typevars.extend(upper_typevars.iter(db));
+        }
         Self::from_node_with_metadata(
             builder,
             Constraint::new_node_with_bounds(db, builder, typevar, lower, upper),
             InferableTypeVars::None,
-            mentioned_typevars_for_constraint_parts(db, typevar, lower, upper),
+            InferableTypeVars::from_typevars(db, typevars),
         )
     }
 
@@ -622,8 +610,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         let self_effective = self.apply_deferred_quantification(db, builder);
         let mentioned_typevars = self_effective
             .mentioned_typevars
-            .merge(db, mentioned_typevars_for_type(db, lhs))
-            .merge(db, mentioned_typevars_for_type(db, rhs));
+            .merge(db, InferableTypeVars::mentioned_in_type(db, lhs))
+            .merge(db, InferableTypeVars::mentioned_in_type(db, rhs));
         Self::from_node_with_metadata(
             builder,
             self_effective
@@ -807,19 +795,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     }
 
     pub(crate) fn with_deferred_quantification(
-        self,
+        mut self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
         deferred_quantification: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        Self::from_node_with_metadata(
-            builder,
-            self.node,
-            self.deferred_quantification
-                .merge(db, deferred_quantification),
-            self.mentioned_typevars,
-        )
+        self.deferred_quantification = self
+            .deferred_quantification
+            .merge(db, deferred_quantification);
+        self
     }
 
     fn quantify_unkept_deferred(
@@ -6716,6 +6701,13 @@ mod tests {
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
     }
 
+    fn create_typevar_set<'db>(
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> InferableTypeVars<'db> {
+        InferableTypeVars::from_typevars(db, FxOrderSet::from_iter([bound_typevar.identity(db)]))
+    }
+
     #[test]
     fn constraint_implications_are_cached() {
         let db = setup_db();
@@ -6986,8 +6978,7 @@ mod tests {
     fn deferred_quantification_applies_to_semantic_observations() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
-        let deferred_quantification =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let deferred_quantification = create_typevar_set(&db, t);
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
         let eager = ConstraintSet::from_node(
@@ -7016,10 +7007,8 @@ mod tests {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
-        let t_deferred =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
-        let u_deferred =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([u.identity(&db)]));
+        let t_deferred = create_typevar_set(&db, t);
+        let u_deferred = create_typevar_set(&db, u);
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, t_deferred);
@@ -7063,8 +7052,7 @@ mod tests {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
-        let t_deferred =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let t_deferred = create_typevar_set(&db, t);
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, t_deferred);
@@ -7108,8 +7096,7 @@ mod tests {
     fn deferred_quantification_negates_effective_formula() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
-        let deferred_quantification =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let deferred_quantification = create_typevar_set(&db, t);
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, deferred_quantification);
@@ -7153,8 +7140,7 @@ mod tests {
         let db = setup_db();
         let t = create_typevar(&db, "T");
         let u = create_typevar(&db, "U");
-        let t_inferable =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let t_inferable = create_typevar_set(&db, t);
         let builder = ConstraintSetBuilder::new();
         let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
             create_constraint(&db, &builder, u, KnownClass::Str)
@@ -7179,8 +7165,7 @@ mod tests {
     fn deferred_quantification_owned_round_trip() {
         let db = setup_db();
         let t = create_typevar(&db, "T");
-        let deferred_quantification =
-            InferableTypeVars::from_typevars(&db, FxOrderSet::from_iter([t.identity(&db)]));
+        let deferred_quantification = create_typevar_set(&db, t);
 
         let expected = FxHashSet::from_iter([t.identity(&db)]);
         let builder = ConstraintSetBuilder::new();

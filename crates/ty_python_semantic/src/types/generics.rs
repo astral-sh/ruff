@@ -247,8 +247,8 @@ pub(crate) fn typing_self<'db>(
 /// fresh generic-callable occurrence be inferable without making the surrounding source-level
 /// typevar inferable.
 ///
-/// TODO: This now also represents deferred existentially quantified type variables on constraint
-/// sets. Consider renaming it to a more general name, such as `InternedTypeVarSet`.
+/// TODO: This is now also used in other places where we need a salsa-interned set of typevars.
+/// Consider renaming it to a more general name, such as `InternedTypeVarSet`.
 #[derive(Clone, Copy, Debug, Hash, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 pub(crate) enum InferableTypeVars<'db> {
     None,
@@ -256,6 +256,95 @@ pub(crate) enum InferableTypeVars<'db> {
 }
 
 impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn from_typevars(
+        db: &'db dyn Db,
+        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        if typevars.is_empty() {
+            return InferableTypeVars::None;
+        }
+
+        typevars.shrink_to_fit();
+        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
+    }
+}
+
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct InferableTypeVarsInner<'db> {
+    #[returns(ref)]
+    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
+
+impl<'db> BoundTypeVarIdentity<'db> {
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
+        match inferable {
+            InferableTypeVars::None => false,
+            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
+        }
+    }
+}
+
+impl<'db> BoundTypeVarInstance<'db> {
+    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
+        self.identity(db).is_inferable(db, inferable)
+    }
+}
+
+impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn contains(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        match self {
+            InferableTypeVars::None => false,
+            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&bound_typevar),
+        }
+    }
+
+    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                self_inner.merge(db, other_inner)
+            }
+        }
+    }
+
+    pub(crate) fn difference(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => self,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                self_inner.difference(db, other_inner)
+            }
+        }
+    }
+
+    pub(crate) fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => InferableTypeVars::None,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                self_inner.intersection(db, other_inner)
+            }
+        }
+    }
+
+    // This is not an IntoIterator implementation because I have no desire to try to name the
+    // iterator type.
+    pub(crate) fn iter(
+        self,
+        db: &'db dyn Db,
+    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
+        match self {
+            InferableTypeVars::None => Either::Left(std::iter::empty()),
+            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
+        }
+    }
+
+    /// Finds all of the typevars that are mentioned anywhere in a type.
     pub(crate) fn mentioned_in_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
         #[derive(Default)]
         struct CollectMentionedTypevars<'db> {
@@ -295,94 +384,6 @@ impl<'db> InferableTypeVars<'db> {
         }
 
         mentioned_in_type_inner(db, ty, ())
-    }
-
-    pub(crate) fn from_typevars(
-        db: &'db dyn Db,
-        mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,
-    ) -> Self {
-        if typevars.is_empty() {
-            return InferableTypeVars::None;
-        }
-
-        typevars.shrink_to_fit();
-        Self::Some(InferableTypeVarsInner::new_internal(db, typevars))
-    }
-}
-
-#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct InferableTypeVarsInner<'db> {
-    #[returns(ref)]
-    inferable: FxOrderSet<BoundTypeVarIdentity<'db>>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for InferableTypeVarsInner<'_> {}
-
-impl<'db> BoundTypeVarIdentity<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        match inferable {
-            InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&self),
-        }
-    }
-}
-
-impl<'db> BoundTypeVarInstance<'db> {
-    pub(crate) fn is_inferable(self, db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> bool {
-        self.identity(db).is_inferable(db, inferable)
-    }
-}
-
-impl<'db> InferableTypeVars<'db> {
-    pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                self_inner.merge(db, other_inner)
-            }
-        }
-    }
-
-    // This is not an IntoIterator implementation because I have no desire to try to name the
-    // iterator type.
-    pub(crate) fn contains(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> bool {
-        match self {
-            InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&bound_typevar),
-        }
-    }
-
-    pub(crate) fn difference(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => self,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                self_inner.difference(db, other_inner)
-            }
-        }
-    }
-
-    pub(crate) fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => InferableTypeVars::None,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                self_inner.intersection(db, other_inner)
-            }
-        }
-    }
-
-    pub(crate) fn iter(
-        self,
-        db: &'db dyn Db,
-    ) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + 'db {
-        match self {
-            InferableTypeVars::None => Either::Left(std::iter::empty()),
-            InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
-        }
     }
 
     // Keep this around for debugging purposes
