@@ -304,11 +304,21 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 /// intentionally remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PatternSuccessTypes<'db> {
+    incoming_subject_ty: Type<'db>,
+    matched_subject_ty: Type<'db>,
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     missing_binding_ty: Type<'db>,
 }
 
 impl<'db> PatternSuccessTypes<'db> {
+    pub(crate) fn incoming_subject_type(&self) -> Type<'db> {
+        self.incoming_subject_ty
+    }
+
+    pub(crate) fn matched_subject_type(&self) -> Type<'db> {
+        self.matched_subject_ty
+    }
+
     /// Return the inferred binding type.
     ///
     /// A missing entry is `Never` when the whole pattern cannot match. Otherwise, it is `Unknown`
@@ -323,14 +333,22 @@ impl<'db> PatternSuccessTypes<'db> {
             .unwrap_or(self.missing_binding_ty)
     }
 
-    fn cycle_initial(missing_binding_ty: Type<'db>) -> Self {
+    fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
+            incoming_subject_ty: cycle_recovery,
+            matched_subject_ty: cycle_recovery,
             bindings: FrozenMap::default(),
-            missing_binding_ty,
+            missing_binding_ty: cycle_recovery,
         }
     }
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
+        self.incoming_subject_ty =
+            self.incoming_subject_ty
+                .cycle_normalized(db, previous.incoming_subject_ty, cycle);
+        self.matched_subject_ty =
+            self.matched_subject_ty
+                .cycle_normalized(db, previous.matched_subject_ty, cycle);
         for (place, ty) in &mut self.bindings {
             *ty = ty.cycle_normalized(db, previous.binding_type(*place), cycle);
         }
@@ -392,6 +410,8 @@ pub(crate) fn pattern_success_types<'db>(
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     PatternSuccessTypes {
+        incoming_subject_ty,
+        matched_subject_ty: result.matched_subject_ty,
         bindings: FrozenMap::from(result.bindings),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
@@ -1171,6 +1191,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
+        if is_positive
+            && PatternSuccessAnalyzer::requires_successful_subject_replacement(kind)
+            && let Some(subject) =
+                PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))
+        {
+            let analysis = pattern_success_types(self.db, pattern);
+            let narrowed = analysis.matched_subject_type();
+            if !narrowed.is_equivalent_to(self.db, analysis.incoming_subject_type()) {
+                return Some(NarrowingConstraints::from_iter([(
+                    self.expect_place(&subject),
+                    NarrowingConstraint::replacement(narrowed),
+                )]));
+            }
+        }
+
         self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
             .into_constraints()
     }
@@ -1204,6 +1239,24 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) {
         for (place, ty) in from {
             self.merge_binding(into, place, ty);
+        }
+    }
+
+    fn requires_successful_subject_replacement(pattern: &PatternPredicateKind<'db>) -> bool {
+        match pattern {
+            PatternPredicateKind::Class(kind) => !kind.is_argumentless(),
+            PatternPredicateKind::Mapping(kind) => !kind.entries.is_empty(),
+            PatternPredicateKind::Sequence(kind) => kind
+                .patterns
+                .iter()
+                .any(Self::requires_successful_subject_replacement),
+            PatternPredicateKind::Or(patterns) => patterns
+                .iter()
+                .any(Self::requires_successful_subject_replacement),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::requires_successful_subject_replacement(pattern)
+            }
+            _ => false,
         }
     }
 
