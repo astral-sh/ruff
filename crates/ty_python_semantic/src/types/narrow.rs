@@ -1020,11 +1020,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )
     }
 
-    /// Add replacement constraints for names bound by a successful pattern.
+    /// Record the types of names bound by a successful pattern.
     ///
-    /// Capture constraints are only produced for positive pattern predicates: a failed pattern
-    /// does not bind its captures. Nested captures are evaluated against the portion of the subject
-    /// that can satisfy their enclosing pattern.
+    /// Each nested pattern sees the part of the subject that reached it:
+    ///
+    /// ```python
+    /// def f(value: tuple[int, str, bool]) -> None:
+    ///     match value:
+    ///         case [first, *rest]:
+    ///             reveal_type(first)  # int
+    ///             reveal_type(rest)  # list[str | bool]
+    /// ```
+    ///
+    /// A failed pattern binds no names. For an `or` pattern, each later alternative sees only the
+    /// values not definitely matched by an earlier alternative.
     fn evaluate_match_pattern_aliases(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
@@ -1093,10 +1102,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Return the type a subject can have after successfully matching `pattern`.
+    /// Return the subject type after `pattern` succeeds.
     ///
-    /// This is used for `as` bindings and nested captures, preserving the original identity of
-    /// generic subjects where possible.
+    /// This type is used for `as` bindings and nested captures. A value pattern uses Python
+    /// equality, so it does not always narrow to the type of the value in the pattern:
+    ///
+    /// ```python
+    /// def f(target: int | str) -> None:
+    ///     match target:
+    ///         case 1 as item:
+    ///             reveal_type(item)  # int | str
+    /// ```
+    ///
+    /// The `str` arm remains because a `str` subclass can compare equal to `1`.
     fn match_pattern_subject_type(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
@@ -1134,8 +1152,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Narrow a class-pattern alias without replacing specialized union arms with the class's top
-    /// materialization.
+    /// Narrow a class-pattern binding while keeping the original type arguments and aliases.
+    ///
+    /// For example, `children` keeps the recursive element type from `Node` instead of becoming a
+    /// broad `list` type:
+    ///
+    /// ```python
+    /// from typing import TypeAlias
+    ///
+    /// Node: TypeAlias = int | list["Node"]
+    ///
+    /// def visit(node: Node) -> None:
+    ///     match node:
+    ///         case list() as children:
+    ///             for child in children:
+    ///                 visit(child)
+    /// ```
     fn match_class_pattern_subject_type(
         &self,
         class: Option<ClassLiteral<'db>>,
@@ -1198,10 +1230,19 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Infer each sequence capture from subject arms that can satisfy the complete pattern.
+    /// Return the type at each position of a successful sequence pattern.
     ///
-    /// Filtering the whole arm before combining element types preserves correlations such as the
-    /// first element of `tuple[Literal[1], int] | tuple[Literal[2], str]`.
+    /// Each union member is checked against the complete pattern before element types are combined.
+    /// This keeps related tuple elements together:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def f(value: tuple[Literal[1], int] | tuple[Literal[2], str]) -> None:
+    ///     match value:
+    ///         case [1, item]:
+    ///             reveal_type(item)  # int
+    /// ```
     fn match_sequence_pattern_element_types(
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1229,10 +1270,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Narrow a whole-sequence alias while retaining the identity of generic subjects.
+    /// Return the sequence type after the complete pattern succeeds.
     ///
-    /// For example, in `case [int()] as whole`, a `list[T]` subject remains tied to the original
-    /// `T`, intersected with the structural and element constraints established by the pattern.
+    /// When the subject is a type variable, keep that type variable and add any restrictions from
+    /// the pattern. This keeps the binding connected to the caller's type:
+    ///
+    /// ```python
+    /// from typing import TypeVar
+    ///
+    /// T = TypeVar("T", bound=tuple[object])
+    ///
+    /// def keep(value: T) -> T:
+    ///     match value:
+    ///         case [_] as whole:
+    ///             return whole
+    ///     raise ValueError
+    /// ```
     fn match_sequence_pattern_subject_type(
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1280,6 +1333,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )
     }
 
+    /// Check one subject union member against the complete sequence pattern.
+    ///
+    /// Return the narrowed sequence and its elements when the length and every element can match.
+    /// Return `None` when any part cannot match, so callers can discard the whole union member
+    /// before combining capture types.
     fn matching_sequence_pattern_arm(
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1312,7 +1370,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .then_some((narrowed_subject_ty, tuple))
     }
 
-    /// Return each original subject arm paired with the flattened arm used to test the pattern.
+    /// Pair each original subject type with the union members used to test the pattern.
+    ///
+    /// Type variables are expanded for matching, but the original type is kept so a successful
+    /// whole-sequence binding can still use that type variable.
     fn sequence_pattern_subject_arms(
         &self,
         subject_ty: Type<'db>,
