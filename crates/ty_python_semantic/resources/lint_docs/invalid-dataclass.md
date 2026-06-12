@@ -1,7 +1,9 @@
 ## What it does
+
 Checks for invalid applications of the `@dataclass` decorator.
 
 ## Why is this bad?
+
 Applying `@dataclass` with incompatible arguments raises an exception while creating the
 class:
 
@@ -12,11 +14,12 @@ Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
 `Enum`, or `Protocol` is also invalid:
 
 - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
-  instantiating the class.
+    instantiating the class.
 - `Enum` classes with `@dataclass` are [explicitly not supported].
 - `Protocol` classes define interfaces and cannot be instantiated.
 
 ## Examples
+
 ```python
 from dataclasses import dataclass
 from typing import NamedTuple

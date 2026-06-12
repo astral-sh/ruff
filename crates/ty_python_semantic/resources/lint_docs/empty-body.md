@@ -1,4 +1,5 @@
 ## What it does
+
 Detects functions with empty bodies that have a non-`None` return type annotation.
 
 The errors reported by this rule have the same motivation as the `invalid-return-type`
@@ -9,6 +10,7 @@ temporarily disable this rule on some or all of their codebase if they find it
 results in a large number of diagnostics.
 
 ## Why is this bad?
+
 A function with an empty body (containing only `...`, `pass`, or a docstring) will
 implicitly return `None` at runtime. Returning `None` when the return type is non-`None`
 is unsound, and will lead to ty inferring incorrect types elsewhere.
@@ -23,8 +25,10 @@ declarations rather than implementations:
 - Functions in `if TYPE_CHECKING` blocks
 
 ## Examples
+
 ```python
 def foo() -> int: ...  # error: [empty-body]
+
 
 def bar() -> str:
     """A function that does nothing."""

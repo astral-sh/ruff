@@ -1,23 +1,28 @@
 ## What it does
-Detects method overrides that violate the [Liskov Substitution Principle] ("LSP").
+
+Detects method overrides that violate the [Liskov Substitution Principle][liskov-substitution-principle] ("LSP").
 
 The LSP states that an instance of a subtype should be substitutable for an instance of its supertype.
 Applied to Python, this means:
+
 1. All argument combinations a superclass method accepts
-   must also be accepted by an overriding subclass method.
-2. The return type of an overriding subclass method must be a subtype
-   of the return type of the superclass method.
+    must also be accepted by an overriding subclass method.
+1. The return type of an overriding subclass method must be a subtype
+    of the return type of the superclass method.
 
 ## Why is this bad?
+
 Violating the Liskov Substitution Principle will lead to many of ty's assumptions and
 inferences being incorrect, which will mean that it will fail to catch many possible
 type errors in your code.
 
 ## Example
+
 ```python
 class Super:
     def method(self, x) -> int:
         return 42
+
 
 class Sub(Super):
     # Liskov violation: `str` is not a subtype of `int`,
@@ -25,20 +30,26 @@ class Sub(Super):
     def method(self, x) -> str:  # error: [invalid-override]
         return "foo"
 
+
 def accepts_super(s: Super) -> int:
     return s.method(x=42)
 
-accepts_super(Sub())  # The result of this call is a string, but ty will infer
-                      # it to be an `int` due to the violation of the Liskov Substitution Principle.
+
+# The result of this call is a string, but ty will infer it to be an `int`
+# due to the violation of the Liskov Substitution Principle.
+accepts_super(Sub())
+
 
 class Sub2(Super):
     # Liskov violation: the superclass method can be called with a `x=`
     # keyword argument, but the subclass method does not accept it.
     def method(self, y) -> int:  # error: [invalid-override]
-       return 42
+        return 42
 
-accepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'
-                       # ty cannot catch this error due to the violation of the Liskov Substitution Principle.
+
+# TypeError at runtime: method() got an unexpected keyword argument 'x'
+# ty cannot catch this error due to the violation of the Liskov Substitution Principle.
+accepts_super(Sub2())
 ```
 
 ## Common issues
@@ -86,5 +97,5 @@ Substitution Principle.
 
 Correct use of `@override` is enforced by ty's `invalid-explicit-override` rule.
 
-[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
+[liskov-substitution-principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle
 [override]: https://docs.python.org/3/library/typing.html#typing.override

@@ -1,4 +1,5 @@
 ## What it does
+
 Reports invalid runtime checks against `Protocol` classes.
 This includes explicit calls `isinstance()`/`issubclass()` against
 non-runtime-checkable protocols, `issubclass()` calls against protocols
@@ -6,27 +7,37 @@ that have non-method members, and implicit `isinstance()` checks against
 non-runtime-checkable protocols via pattern matching.
 
 ## Why is this bad?
+
 These calls (implicit or explicit) raise `TypeError` at runtime.
 
 ## Examples
+
 ```python
 from typing_extensions import Protocol, runtime_checkable
 
+
 class HasX(Protocol):
     x: int
+
 
 @runtime_checkable
 class HasY(Protocol):
     y: int
 
+
 def f(arg: object, arg2: type):
-    isinstance(arg, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
-    issubclass(arg2, HasX)  # error: [isinstance-against-protocol] (not runtime-checkable)
+    # not runtime-checkable
+    isinstance(arg, HasX)  # error: [isinstance-against-protocol]
+    # not runtime-checkable
+    issubclass(arg2, HasX)  # error: [isinstance-against-protocol]
+
 
 def g(arg: object):
     match arg:
-        case HasX():  # error: [isinstance-against-protocol] (not runtime-checkable)
+        # not runtime-checkable
+        case HasX():  # error: [isinstance-against-protocol]
             pass
+
 
 def h(arg2: type):
     isinstance(arg2, HasY)  # fine (runtime-checkable)
@@ -37,4 +48,5 @@ def h(arg2: type):
 ```
 
 ## References
+
 - [Typing documentation: `@runtime_checkable`](https://docs.python.org/3/library/typing.html#typing.runtime_checkable)

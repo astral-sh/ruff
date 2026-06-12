@@ -1,8 +1,10 @@
 ## What it does
+
 Checks for string-literal annotations where the string cannot be
 parsed as a Python expression.
 
 ## Why is this bad?
+
 Type annotations are expected to be Python expressions that
 describe the expected type of a variable, parameter, attribute or
 `return` statement.
@@ -18,6 +20,7 @@ literal as a normal Python expression.
 def foo() -> "intstance of C":
     return 42
 
+
 class C: ...
 ```
 
@@ -27,9 +30,11 @@ Use instead:
 def foo() -> "C":
     return 42
 
+
 class C: ...
 ```
 
 ## References
+
 - [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)
 - [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)

@@ -256,6 +256,7 @@ impl LintStatus {
 #[macro_export]
 macro_rules! declare_lint {
     (
+        $(#[expect($($expect:tt)*)])?
         $(#[doc = $doc:expr])+
         $vis: vis static $name: ident = {
             summary: $summary: literal,
@@ -264,6 +265,7 @@ macro_rules! declare_lint {
             $( $key:ident: $value:expr, )*
         }
     ) => {
+        $(#[expect($($expect)*)])?
         $( #[doc = $doc] )+
         #[expect(clippy::needless_update)]
         $vis static $name: $crate::lint::LintMetadata = $crate::lint::LintMetadata {

@@ -1,12 +1,15 @@
 ## What it does
+
 Checks for invalidly defined `NamedTuple` classes.
 
 ## Why is this bad?
+
 An invalidly defined `NamedTuple` class may lead to the type checker
 drawing incorrect conclusions. It may also lead to `TypeError`s or
 `AttributeError`s at runtime.
 
 ## Examples
+
 A class definition cannot combine `NamedTuple` with other base classes
 in multiple inheritance; doing so raises a `TypeError` at runtime. The sole
 exception to this rule is `Generic[]`, which can be used alongside `NamedTuple`

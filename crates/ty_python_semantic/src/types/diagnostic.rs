@@ -294,6 +294,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-dataclass.md")]
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
@@ -1206,6 +1207,7 @@ declare_lint! {
 }
 
 declare_lint! {
+    #[expect(clippy::doc_overindented_list_items)]
     #[doc = include_str!("../../resources/lint_docs/invalid-method-override.md")]
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",

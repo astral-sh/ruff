@@ -1,13 +1,15 @@
 ## What it does
+
 Checks for classes definitions which will fail at runtime due to
 "instance memory layout conflicts".
 
 This error is usually caused by attempting to combine multiple classes
-that define non-empty `__slots__` in a class's [Method Resolution Order]
+that define non-empty `__slots__` in a class's [Method Resolution Order][method-resolution-order]
 (MRO), or by attempting to combine multiple builtin classes in a class's
 MRO.
 
 ## Why is this bad?
+
 Inheriting from bases with conflicting instance memory layouts
 will lead to a `TypeError` at runtime.
 
@@ -25,8 +27,10 @@ allowed:
 class A:
     __slots__ = ("a", "b")
 
+
 class B:
     __slots__ = ("a", "b")  # Even if the values are the same
+
 
 # TypeError: multiple bases have instance lay-out conflict
 class C(A, B): ...
@@ -45,16 +49,22 @@ with empty `__slots__`, are always compatible:
 
 ```python
 class A: ...
+
+
 class B:
     __slots__ = ()
+
+
 class C:
     __slots__ = ("a", "b")
+
 
 # fine
 class D(A, B, C): ...
 ```
 
 ## Known problems
+
 Classes that have "dynamic" definitions of `__slots__` (definitions do not consist
 of string literals, or tuples of string literals) are not currently considered disjoint
 bases by ty.
@@ -68,7 +78,8 @@ only hard-codes a number of cases where it knows that a class will produce insta
 an atypical memory layout.
 
 ## Further reading
+
 - [CPython documentation: `__slots__`](https://docs.python.org/3/reference/datamodel.html#slots)
 - [CPython documentation: Method Resolution Order](https://docs.python.org/3/glossary.html#term-method-resolution-order)
 
-[Method Resolution Order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
+[method-resolution-order]: https://docs.python.org/3/glossary.html#term-method-resolution-order

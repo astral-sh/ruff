@@ -1,8 +1,10 @@
 ## What it does
+
 Checks for classes decorated with `@functools.total_ordering` that don't
 define any ordering method (`__lt__`, `__le__`, `__gt__`, or `__ge__`).
 
 ## Why is this bad?
+
 The `@total_ordering` decorator requires the class to define at least one
 ordering method. If none is defined, Python raises a `ValueError` at runtime.
 
@@ -10,6 +12,7 @@ ordering method. If none is defined, Python raises a `ValueError` at runtime.
 
 ```python
 from functools import total_ordering
+
 
 @total_ordering
 class MyClass:  # Error: no ordering method defined
@@ -21,6 +24,7 @@ Use instead:
 
 ```python
 from functools import total_ordering
+
 
 @total_ordering
 class MyClass:
