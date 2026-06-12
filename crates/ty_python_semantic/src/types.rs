@@ -5167,6 +5167,8 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        // Salsa query keys must be owned.
+        #[allow(clippy::needless_pass_by_value)]
         #[salsa::tracked]
         fn try_call_empty_dunder_with_policy<'db>(
             db: &'db dyn Db,
