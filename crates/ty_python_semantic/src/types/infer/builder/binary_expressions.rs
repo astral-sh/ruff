@@ -386,7 +386,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(rec)
             }
             (Type::Recursive(recursive), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                recursive.option_map(db, |unfolded| {
+                recursive.map(db, |unfolded| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,
@@ -399,7 +399,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }),
 
             (lhs, Type::Recursive(recursive), _) => visitor.visit((left_ty, op, right_ty), || {
-                recursive.option_map(db, |unfolded| {
+                recursive.map(db, |unfolded| {
                     self.infer_binary_expression_type_impl(
                         node,
                         emitted_division_by_zero_diagnostic,

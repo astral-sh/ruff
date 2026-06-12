@@ -65,6 +65,7 @@ use crate::types::{
     LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    recursive::{Foldable, RecursiveType},
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -2731,6 +2732,12 @@ impl<'db> Bindings<'db> {
         }
 
         self.evaluate_enum_property_calls(db, call_arguments);
+    }
+}
+
+impl<'db> Foldable<'db> for Bindings<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.fields_mapped(&mut |ty| ty.fold(db, rec))
     }
 }
 

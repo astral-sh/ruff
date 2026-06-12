@@ -7,6 +7,7 @@ use crate::types::call::{CallArguments, CallDunderError};
 use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::InferContext;
 use crate::types::cyclic::CycleDetector;
+use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
     DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
@@ -109,6 +110,16 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) op: ast::CmpOp,
     pub(crate) left_ty: Type<'db>,
     pub(crate) right_ty: Type<'db>,
+}
+
+impl<'db> Foldable<'db> for UnsupportedComparisonError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            op: self.op,
+            left_ty: self.left_ty.fold(db, rec),
+            right_ty: self.right_ty.fold(db, rec),
+        }
+    }
 }
 
 /// Infers the type of a binary comparison (e.g. 'left == right'). See
@@ -279,11 +290,15 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // Mirror the `Type::TypeAlias` arms for an opaque μ-binder: compare the one-step unfold,
         // keyed on the pre-unfold pair so the visitor breaks the recursion.
         (Type::Recursive(rec), right) => Some(visitor.visit((left, op, right), || {
-            rec.try_map(db, |unfolded| infer_binary_type_comparison(context, unfolded, op, right, range, visitor))
+            rec.map(db, |unfolded| {
+                infer_binary_type_comparison(context, unfolded, op, right, range, visitor)
+            })
         })),
 
         (left, Type::Recursive(rec)) => Some(visitor.visit((left, op, right), || {
-            rec.try_map(db, |unfolded| infer_binary_type_comparison(context, left, op, unfolded, range, visitor))
+            rec.map(db, |unfolded| {
+                infer_binary_type_comparison(context, left, op, unfolded, range, visitor)
+            })
         })),
 
         // `try_dunder` works for almost all `NewType`s, but not for `NewType`s of `float` and

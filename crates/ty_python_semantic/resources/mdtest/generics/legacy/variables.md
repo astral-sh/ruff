@@ -556,6 +556,49 @@ from typing import TypeVar
 T = TypeVar("T", invalid_keyword=True)
 ```
 
+### Decorated TypeVar class in stubs
+
+Projects sometimes vendor a `typing.pyi` stub. It defines `TypeVar` and decorates the class with
+`@final`. The decorator's signature is generic over `TypeVar` itself, so the class expression can
+include `Unknown` while the stub is being inferred. The direct `TypeVar(...)` assignment should
+still define a legacy type variable in that case.
+
+`/typeshed/stdlib/typing.pyi`:
+
+```pyi
+class Any: ...
+
+class _Final: ...
+
+class _SpecialForm(_Final): ...
+
+def final(f: _T) -> _T: ...
+
+@final
+class TypeVar:
+    def __new__(cls, name: str, *constraints: Any) -> object: ...
+
+Self: _SpecialForm
+Callable: _SpecialForm
+Protocol: _SpecialForm
+
+_T = TypeVar("_T")
+_F = TypeVar("_F", bound=Callable[..., Any])
+
+def overload(func: _F) -> _F: ...
+
+def identity(x: _T) -> _T: ...
+
+def make_self() -> Self: ...
+
+class SupportsIdentity(Protocol): ...
+
+@overload
+def overloaded(value: int) -> int: ...
+@overload
+def overloaded(value: str) -> str: ...
+```
+
 ### Forward references in stubs
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
