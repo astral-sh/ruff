@@ -11,7 +11,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
 
     use super::settings::{Convention, Settings};
     use crate::test::test_path;
@@ -93,6 +92,7 @@ mod tests {
     #[test_case(Rule::OverloadWithDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D.py"))]
     #[test_case(Rule::EscapeSequenceInDocstring, Path::new("D301.py"))]
+    #[test_case(Rule::PropertyDocstringStartsWithVerb, Path::new("D421.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D.py"))]
     #[test_case(Rule::TripleSingleQuotes, Path::new("D300.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -218,19 +218,6 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn d421() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("pydocstyle/D421.py"),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(Rule::PropertyDocstringStartsWithVerb)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
         Ok(())
     }
 

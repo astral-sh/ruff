@@ -260,7 +260,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::PropertyDocstringStartsWithVerb) {
-                pydocstyle::rules::property_docstring_verb(
+                pydocstyle::rules::property_docstring_starts_with_verb(
                     checker,
                     &docstring,
                     &checker.settings().pydocstyle,

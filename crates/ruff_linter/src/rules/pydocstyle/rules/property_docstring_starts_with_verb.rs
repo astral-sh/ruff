@@ -73,7 +73,7 @@ const DISALLOWED_VERBS: &[&str] = &[
 ];
 
 /// D421
-pub(crate) fn property_docstring_verb(
+pub(crate) fn property_docstring_starts_with_verb(
     checker: &Checker,
     docstring: &Docstring,
     settings: &Settings,
