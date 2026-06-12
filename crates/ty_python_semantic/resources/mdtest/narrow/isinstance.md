@@ -807,9 +807,8 @@ class CustomDict(dict[int, bytes]): ...
 
 def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
     if isinstance(value, dict):
-        # TODO: Simplify away the redundant `dict[Unknown, Unknown]` arm.
-        reveal_type(custom | value)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
-        reveal_type(value | custom)  # revealed: dict[int | Unknown, bytes | Unknown] | dict[Unknown, Unknown]
+        reveal_type(custom | value)  # revealed: Top[dict[Unknown, Unknown]]
+        reveal_type(value | custom)  # revealed: Top[dict[Unknown, Unknown]]
 
 class ReflectedDict(dict[str, object]):
     # error: [invalid-method-override]
@@ -835,7 +834,8 @@ It should also keep `dict` methods callable for concrete `dict` unions keyed by 
 
 ```py
 from enum import IntEnum
-from typing import Protocol
+from typing import Any, Protocol, TypeVar
+from ty_extensions import Top
 
 class DiagnosticField(IntEnum):
     MESSAGE = 77
@@ -844,6 +844,16 @@ class PGresult(Protocol):
     def error_field(self, fieldcode: int) -> bytes | None: ...
 
 ErrorInfo = PGresult | dict[int, bytes | None] | None
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+def project_dict(value: dict[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def infer_top_dict(value: Top[dict[Any, Any]]) -> None:
+    # error: [invalid-argument-type]
+    reveal_type(project_dict(value))  # revealed: tuple[object, object]
 
 def _(info: ErrorInfo):
     if isinstance(info, dict):
