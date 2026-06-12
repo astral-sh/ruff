@@ -1248,6 +1248,72 @@ reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 
 The following attributes are available on `NamedTuple` classes / instances:
 
+### `__match_args__`
+
+Python 3.10 added `__match_args__` to named tuples. It contains the field names in the order used by
+positional class patterns.
+
+#### Python 3.10
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+class ClassPoint(NamedTuple):
+    x: int
+    y: str
+
+FunctionalPoint = NamedTuple("FunctionalPoint", [("x", int), ("y", str)])
+CollectionPoint = namedtuple("CollectionPoint", ["x", "y"])
+
+field_names: list[str] = ["x", "y"]
+UnknownPoint = namedtuple("UnknownPoint", field_names)
+
+class UnknownPointChild(UnknownPoint):
+    pass
+
+reveal_type(ClassPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
+reveal_type(FunctionalPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
+reveal_type(CollectionPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
+reveal_type(UnknownPoint.__match_args__)  # revealed: tuple[str, ...]
+reveal_type(UnknownPointChild.__match_args__)  # revealed: tuple[str, ...]
+```
+
+The attribute is not generated when targeting an earlier Python version.
+
+#### Python 3.9
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from collections import namedtuple
+from typing import NamedTuple
+
+class ClassPoint(NamedTuple):
+    x: int
+    y: str
+
+FunctionalPoint = NamedTuple("FunctionalPoint", [("x", int), ("y", str)])
+CollectionPoint = namedtuple("CollectionPoint", ["x", "y"])
+
+# error: [unresolved-attribute]
+reveal_type(ClassPoint.__match_args__)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(FunctionalPoint.__match_args__)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(CollectionPoint.__match_args__)  # revealed: Unknown
+```
+
+### Other attributes
+
 ```py
 from typing import NamedTuple
 

@@ -62,8 +62,14 @@ pub(super) fn synthesize_namedtuple_class_member<'db>(
             );
             Some(Type::function_like_callable(db, signature))
         }
-        "_fields" => {
-            // _fields: tuple[Literal["field1"], Literal["field2"], ...]
+        "__match_args__" | "_fields" => {
+            if name == "__match_args__"
+                && Program::get(db).python_version(db) < PythonVersion::PY310
+            {
+                return None;
+            }
+
+            // Both attributes contain the field names in positional order.
             let field_types = fields.map(|field| Type::string_literal(db, &field.name));
             Some(Type::heterogeneous_tuple(db, field_types))
         }
@@ -377,6 +383,9 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                     let signature = Signature::new(Parameters::gradual_form(), instance_ty);
                     return Some(Type::function_like_callable(db, signature));
                 }
+                "__match_args__" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                    return Some(Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)));
+                }
                 // For other field-specific methods, fall through to NamedTupleFallback.
                 "_fields" | "_replace" | "__replace__" => {
                     return KnownClass::NamedTupleFallback
@@ -411,7 +420,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         // __replace__) don't need this mapping.
         if matches!(
             name,
-            "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
+            "__match_args__" | "__new__" | "_fields" | "_replace" | "__replace__" | "__slots__"
         ) {
             result
         } else {
