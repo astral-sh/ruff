@@ -66,9 +66,20 @@ def sequence_prefix_star_pattern_is_not_catch_all(paths: Sequence[str]) -> None:
         case [_first, _second, *_paths]:
             raise ValueError
 
-    # Exact sequence alternatives remain as negative protocol constraints.
-    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'>) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
+    # Exact sequence alternatives and the definitely matched tuple subset of the
+    # starred alternative remain as negative constraints.
+    # revealed: (Sequence[str] & ~<Protocol with members '__len__'> & ~<Protocol with members '__getitem__', '__len__'> & ~tuple[object, object, *tuple[object, ...]]) | str | (Sequence[str] & bytes) | (Sequence[str] & bytearray)
     reveal_type(paths)
+
+def normalize_version(
+    version: str | tuple[int, int] | tuple[int, int, int],
+) -> str:
+    match version:
+        case [major, minor, *_rest]:
+            return f"{major}.{minor}"
+
+    reveal_type(version)  # revealed: str
+    return version.strip()
 
 def exact_sequence_pattern_is_exhaustive(value: tuple[int, str]) -> int:
     match value:

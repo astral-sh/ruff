@@ -182,7 +182,6 @@ impl<'db> TupleType<'db> {
         TupleType::new(db, &TupleSpec::heterogeneous(types))
     }
 
-    #[cfg(test)]
     pub(crate) fn mixed(
         db: &'db dyn Db,
         prefix: impl IntoIterator<Item = Type<'db>>,
