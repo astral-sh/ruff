@@ -203,13 +203,17 @@ def g(attributes: Namespace):
     reveal_type(y.unknown)  # revealed: Unknown
 ```
 
-An empty `TypedDict` is also a valid dynamic namespace, but it has no known keys to extract:
+An empty `TypedDict` is also a valid dynamic namespace, but it has no known keys to extract. This
+includes a closed empty `TypedDict`: its inhabitants are empty dictionaries at runtime.
 
 ```py
 from typing import Protocol, TypedDict
 from ty_extensions import Intersection
 
 class EmptyTypedDict(TypedDict):
+    pass
+
+class ClosedEmptyTypedDict(TypedDict, closed=True):
     pass
 
 class Namespace(TypedDict):
@@ -225,6 +229,11 @@ def g(attributes: EmptyTypedDict):
     reveal_type(Y.unknown)  # revealed: Unknown
 
 def i(attributes: EmptyTypedDict | dict[str, object]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def closed(attributes: ClosedEmptyTypedDict):
     Y = type("Y", (), attributes)
 
     reveal_type(Y)  # revealed: <class 'Y'>
