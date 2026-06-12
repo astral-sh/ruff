@@ -1837,6 +1837,19 @@ def invalid_key_type() -> None:
     takes_x(**kwargs)  # error: [invalid-argument-type]
 ```
 
+The original dictionary value type describes possible extra items. Those items must be compatible
+with both unmatched named parameters and a keyword-variadic parameter:
+
+```py
+def extra_item_keyword_only(*, known: int, extra: str = "") -> None: ...
+def extra_item_keyword_variadic(*, known: int, **kwargs: str) -> None: ...
+def extra_item_checks() -> None:
+    kwargs: dict[str, int] = {"known": 1}
+
+    extra_item_keyword_only(**kwargs)  # error: [invalid-argument-type]
+    extra_item_keyword_variadic(**kwargs)  # error: [invalid-argument-type]
+```
+
 Each overload keeps its own keyword context. A non-matching overload must not widen the context used
 to infer a dictionary field for the matching overload:
 
