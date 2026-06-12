@@ -102,7 +102,9 @@ pub(super) fn diagnostic_to_json<'a>(
     // and the severity is displayed.
     if config.preview {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            name: NameOrCode::Name {
+                name: diagnostic.id().as_str(),
+            },
             severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
@@ -115,7 +117,9 @@ pub(super) fn diagnostic_to_json<'a>(
         }
     } else {
         JsonDiagnostic {
-            code: diagnostic.secondary_code_or_id(),
+            name: NameOrCode::Code {
+                code: diagnostic.secondary_code_or_id(),
+            },
             severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
@@ -226,7 +230,8 @@ impl Serialize for ExpandedEdits<'_> {
 #[derive(Serialize)]
 pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
-    code: &'a str,
+    #[serde(flatten)]
+    name: NameOrCode<'a>,
     severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
@@ -235,6 +240,13 @@ pub(crate) struct JsonDiagnostic<'a> {
     message: ConciseMessage<'a>,
     noqa_row: Option<OneIndexed>,
     url: Option<&'a str>,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum NameOrCode<'a> {
+    Name { name: &'a str },
+    Code { code: &'a str },
 }
 
 #[derive(Serialize)]
@@ -349,12 +361,12 @@ mod tests {
         [
           {
             "cell": null,
-            "code": "test-diagnostic",
             "end_location": null,
             "filename": null,
             "fix": null,
             "location": null,
             "message": "main diagnostic message",
+            "name": "test-diagnostic",
             "noqa_row": null,
             "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
