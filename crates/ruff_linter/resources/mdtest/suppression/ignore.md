@@ -695,6 +695,7 @@ This can still be useful if the comment itself has a diagnostic:
 ```py
 # TODO this comment has a todo # noqa: FIX002
 # TODO this comment has a todo # ruff:ignore[FIX002]
+a = 10
 ```
 
 ## `unused-noqa`
