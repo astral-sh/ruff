@@ -294,40 +294,11 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 impl<'db> InferableTypeVars<'db> {
-    pub(crate) fn contains(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> bool {
-        match self {
-            InferableTypeVars::None => false,
-            InferableTypeVars::Some(inner) => inner.inferable(db).contains(&bound_typevar),
-        }
-    }
-
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
                 self_inner.merge(db, other_inner)
-            }
-        }
-    }
-
-    pub(crate) fn difference(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => self,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                self_inner.difference(db, other_inner)
-            }
-        }
-    }
-
-    pub(crate) fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
-        match (self, other) {
-            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => InferableTypeVars::None,
-            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                self_inner.intersection(db, other_inner)
             }
         }
     }
@@ -342,48 +313,6 @@ impl<'db> InferableTypeVars<'db> {
             InferableTypeVars::None => Either::Left(std::iter::empty()),
             InferableTypeVars::Some(inner) => Either::Right(inner.inferable(db).iter().copied()),
         }
-    }
-
-    /// Finds all of the typevars that are mentioned anywhere in a type.
-    pub(crate) fn mentioned_in_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
-        #[derive(Default)]
-        struct CollectMentionedTypevars<'db> {
-            typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
-            recursion_guard: TypeCollector<'db>,
-        }
-
-        impl<'db> TypeVisitor<'db> for CollectMentionedTypevars<'db> {
-            fn should_visit_lazy_type_attributes(&self) -> bool {
-                false
-            }
-
-            fn visit_bound_type_var_type(
-                &self,
-                db: &'db dyn Db,
-                bound_typevar: BoundTypeVarInstance<'db>,
-            ) {
-                self.typevars
-                    .borrow_mut()
-                    .insert(bound_typevar.identity(db));
-            }
-
-            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-            }
-        }
-
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-        fn mentioned_in_type_inner<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            _: (),
-        ) -> InferableTypeVars<'db> {
-            let visitor = CollectMentionedTypevars::default();
-            visitor.visit_type(db, ty);
-            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
-        }
-
-        mentioned_in_type_inner(db, ty, ())
     }
 
     // Keep this around for debugging purposes
@@ -405,28 +334,6 @@ impl<'db> InferableTypeVarsInner<'db> {
         let mut merged = self.inferable(db) | other.inferable(db);
         merged.shrink_to_fit();
         InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, merged))
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn difference(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
-        let mut difference = self.inferable(db) - other.inferable(db);
-        if difference.is_empty() {
-            return InferableTypeVars::None;
-        }
-
-        difference.shrink_to_fit();
-        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, difference))
-    }
-
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn intersection(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
-        let mut intersection = self.inferable(db) & other.inferable(db);
-        if intersection.is_empty() {
-            return InferableTypeVars::None;
-        }
-
-        intersection.shrink_to_fit();
-        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, intersection))
     }
 }
 
