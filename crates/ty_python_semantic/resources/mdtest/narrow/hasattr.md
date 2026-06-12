@@ -70,13 +70,15 @@ class Movie(TypedDict):
 
 def _(movie: Movie):
     if not hasattr(movie, "clear"):
-        # TODO: Model runtime attribute-presence constraints separately from structural protocols.
+        # TODO: Should be `Never`. The TypedDict type interface does not include `clear`,
+        # but runtime inhabitants do have the attribute, so to get this right we need to model runtime
+        # attribute-presence constraints separately from structural protocols.
         reveal_type(movie)  # revealed: Movie & ~<Protocol with members 'clear'>
 
 def _(value: object):
     if type(value) is dict:
         if not hasattr(value, "clear"):
-            # TODO: Model runtime attribute-presence constraints separately from structural protocols.
+            # TODO: Should be `Never`.
             reveal_type(value)  # revealed: <TypedDict with no items> & ~<Protocol with members 'clear'>
 ```
 
