@@ -1289,6 +1289,19 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
+        if let TypeMapping::ApplySpecializationWithMaterialization {
+            specialization: ApplySpecialization::Specialization(specialization),
+            materialization_kind,
+        } = type_mapping
+            && self.generic_context(db) == specialization.generic_context(db)
+            && self == self.generic_context(db).identity_specialization(db)
+        {
+            // Preserve an enclosing generic specialization as a unit. Recursively mapping an
+            // identity specialization like `dict[_KT, _VT]` would flip the materialization of its
+            // invariant type variables, turning a top-materialized return type into a bottom one.
+            return specialization.with_materialization_kind(db, Some(*materialization_kind));
+        }
+
         let mut new_materialization_kind = self.materialization_kind(db);
         let types = self.map_types(db, |i, typevar, ty| {
             let tcx = TypeContext::new(tcx.get(i).copied());

@@ -1645,24 +1645,6 @@ impl<'db> ClassType<'db> {
                     .inner;
                 }
 
-                // Applying a top specialization to the invariant type variables in the typeshed
-                // return annotation would incorrectly produce `dict[Never, Never]`.
-                if name == "copy"
-                    && Self::is_top_dict_specialization(db, class_literal, specialization)
-                {
-                    let instance_ty = Type::instance(db, self);
-                    let parameters = Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))
-                            .with_annotated_type(instance_ty)],
-                    );
-                    return Member::definitely_declared(Type::function_like_callable(
-                        db,
-                        Signature::new(parameters, instance_ty),
-                    ))
-                    .inner;
-                }
-
                 class_literal.class_member_inner(db, Some(specialization), name, policy)
             }
         }

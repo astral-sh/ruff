@@ -873,15 +873,25 @@ class Invariant[T]:
         raise NotImplementedError
 
     def push(self, obj: T) -> None: ...
+    def copy(self) -> "Invariant[T]":
+        raise NotImplementedError
+
+    def replace(self, other: "Invariant[T]") -> None: ...
 
     attr: T
 
 def capybara(top: Top[Invariant[Any]], bottom: Bottom[Invariant[Any]]) -> None:
     reveal_type(top.get)  # revealed: bound method Top[Invariant[Any]].get() -> object
     reveal_type(top.push)  # revealed: bound method Top[Invariant[Any]].push(obj: Never) -> None
+    reveal_type(top.copy)  # revealed: bound method Top[Invariant[Any]].copy() -> Top[Invariant[Any]]
+    # revealed: bound method Top[Invariant[Any]].replace(other: Bottom[Invariant[Any]]) -> None
+    reveal_type(top.replace)
 
     reveal_type(bottom.get)  # revealed: bound method Bottom[Invariant[Any]].get() -> Never
     reveal_type(bottom.push)  # revealed: bound method Bottom[Invariant[Any]].push(obj: object) -> None
+    reveal_type(bottom.copy)  # revealed: bound method Bottom[Invariant[Any]].copy() -> Bottom[Invariant[Any]]
+    # revealed: bound method Bottom[Invariant[Any]].replace(other: Top[Invariant[Any]]) -> None
+    reveal_type(bottom.replace)
 
     reveal_type(top.attr)  # revealed: object
     reveal_type(bottom.attr)  # revealed: Never
