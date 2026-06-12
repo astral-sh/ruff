@@ -1,7 +1,9 @@
 ## What it does
+
 Checks for `@final` classes that have unimplemented abstract methods.
 
 ## Why is this bad?
+
 A class decorated with `@final` cannot be subclassed. If such a class has abstract
 methods that are not implemented, the class can never be properly instantiated, as
 the abstract methods can never be implemented (since subclassing is prohibited).
@@ -17,9 +19,11 @@ the intent for the class to be abstract is clear from the use of `@abstractmetho
 from abc import ABC, abstractmethod
 from typing import final
 
+
 class Base(ABC):
     @abstractmethod
     def method(self) -> int: ...
+
 
 @final
 class Derived(Base):  # Error: `Derived` does not implement `method`

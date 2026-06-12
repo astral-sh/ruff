@@ -4,8 +4,8 @@ Checks for parameters that appear to be attempting to use the legacy convention
 to specify that a parameter is positional-only, but do so incorrectly.
 
 The "legacy convention" for specifying positional-only parameters was
-specified in [PEP 484]. It states that parameters with names starting with
-`__` should be considered positional-only by type checkers. [PEP 570], introduced
+specified in [PEP 484][pep-484]. It states that parameters with names starting with
+`__` should be considered positional-only by type checkers. [PEP 570][pep-570], introduced
 in Python 3.8, added dedicated syntax for specifying positional-only parameters,
 rendering the legacy convention obsolete. However, some codebases may still
 use the legacy convention for compatibility with older Python versions.
@@ -42,5 +42,5 @@ def f(x, y, /):  # Python 3.8+ syntax
 - [Typing spec: positional-only parameters (legacy syntax)](https://typing.python.org/en/latest/spec/historical.html#pos-only-double-underscore)
 - [Python glossary: parameters](https://docs.python.org/3/glossary.html#term-parameter)
 
-[PEP 484]: https://peps.python.org/pep-0484/#positional-only-arguments
-[PEP 570]: https://peps.python.org/pep-0570/
+[pep-484]: https://peps.python.org/pep-0484/#positional-only-arguments
+[pep-570]: https://peps.python.org/pep-0570/

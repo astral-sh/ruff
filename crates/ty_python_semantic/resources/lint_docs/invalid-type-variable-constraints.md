@@ -12,22 +12,22 @@ A constrained type variable must have at least two constraints.
 ```python
 from typing import TypeVar
 
-T = TypeVar('T', str)  # invalid constrained TypeVar
+T = TypeVar("T", str)  # invalid constrained TypeVar
 
-I = TypeVar('I', bound=int)
-U = TypeVar('U', list[I], int)  # invalid constrained TypeVar
+I = TypeVar("I", bound=int)
+U = TypeVar("U", list[I], int)  # invalid constrained TypeVar
 ```
 
 Use instead:
 
 ```python
-T = TypeVar('T', str, int)  # valid constrained TypeVar
+T = TypeVar("T", str, int)  # valid constrained TypeVar
 
 # or
 
-T = TypeVar('T', bound=str)  # valid bound TypeVar
+T = TypeVar("T", bound=str)  # valid bound TypeVar
 
-U = TypeVar('U', list[int], int)  # valid constrained Type
+U = TypeVar("U", list[int], int)  # valid constrained Type
 ```
 
 [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar

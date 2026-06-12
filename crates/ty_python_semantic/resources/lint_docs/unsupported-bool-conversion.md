@@ -1,7 +1,9 @@
 ## What it does
+
 Checks for bool conversions where the object doesn't correctly implement `__bool__`.
 
 ## Why is this bad?
+
 If an exception is raised when you attempt to evaluate the truthiness of an object,
 using the object in a boolean context will fail at runtime.
 
@@ -10,6 +12,7 @@ using the object in a boolean context will fail at runtime.
 ```python
 class NotBoolable:
     __bool__ = None
+
 
 b1 = NotBoolable()
 b2 = NotBoolable()
