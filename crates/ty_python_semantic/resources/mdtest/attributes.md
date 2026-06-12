@@ -3099,7 +3099,7 @@ class Toggle:
             self.y = True
 
 # Literal[True] or undefined
-reveal_type(Toggle().x)  # revealed: Unknown | Literal[True]
+reveal_type(Toggle().x)  # revealed: Literal[True]
 reveal_type(Toggle().y)  # revealed: bool
 ```
 
