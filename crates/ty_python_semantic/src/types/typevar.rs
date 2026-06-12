@@ -26,6 +26,9 @@ use ty_python_core::{
     semantic_index,
 };
 
+mod return_callables;
+pub(crate) use return_callables::rebind_return_callables;
+
 impl<'db> Type<'db> {
     pub(crate) const fn is_type_var(self) -> bool {
         matches!(self, Type::TypeVar(_))

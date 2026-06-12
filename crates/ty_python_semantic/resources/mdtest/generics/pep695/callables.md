@@ -171,6 +171,52 @@ reveal_type(generic_context(decorator_factory()))
 reveal_type(decorator_factory()(1))
 ```
 
+Nested returned callables bind typevars on the innermost returned callable that covers all of their
+occurrences:
+
+```py
+from typing import Callable
+
+def nested_factory[T]() -> Callable[[], Callable[[T], T]]:
+    raise NotImplementedError
+
+# revealed: () -> ([T'return](T'return, /) -> T'return)
+reveal_type(nested_factory())
+# revealed: [T'return](T'return, /) -> T'return
+reveal_type(nested_factory()())
+# revealed: Literal[1]
+reveal_type(nested_factory()()(1))
+```
+
+Nested returned callables can still have distinct typevars rebound on multiple callable levels:
+
+```py
+from typing import Callable
+
+def curried_factory[A, B]() -> Callable[[A], Callable[[B], B]]:
+    raise NotImplementedError
+
+# revealed: [A'return](A'return, /) -> ([B'return](B'return, /) -> B'return)
+reveal_type(curried_factory())
+# revealed: [B'return](B'return, /) -> B'return
+reveal_type(curried_factory()(1))
+# revealed: Literal["x"]
+reveal_type(curried_factory()(1)("x"))
+```
+
+A callable nested inside a returned callable's parameter type is part of the surrounding callable's
+signature, so the surrounding callable binds the typevar:
+
+```py
+from typing import Callable
+
+def accepts_identity[T]() -> Callable[[Callable[[T], T]], int]:
+    raise NotImplementedError
+
+# revealed: [T'return]((T'return, /) -> T'return, /) -> int
+reveal_type(accepts_identity())
+```
+
 If the typevar also appears in a parameter, it is the function that is generic, and the returned
 `Callable` is not:
 
@@ -321,6 +367,148 @@ def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[
     return wrapper
 ```
 
+## Generic callable returned from a higher-order call
+
+When a generic callable flows through a higher-order call into the returned callable, the returned
+callable should remain generic instead of leaking the callee's type variables.
+
+```py
+from typing import Callable
+
+def higher[A, B](f: Callable[[A], B]) -> Callable[[A], B]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(higher(identity))
+# revealed: Literal[1]
+reveal_type(higher(identity)(1))
+# revealed: Literal["x"]
+reveal_type(higher(identity)("x"))
+```
+
+Returned callables nested in a higher-order call result use the same innermost-cover rule as
+signature-based returned callables.
+
+```py
+from typing import Callable
+
+def nested_higher[A, B](f: Callable[[A], B]) -> Callable[[], Callable[[A], B]]:
+    raise NotImplementedError
+
+def accepts_higher[A, B](f: Callable[[A], B]) -> Callable[[Callable[[A], B]], int]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+# revealed: () -> ([A'return](A'return, /) -> A'return)
+reveal_type(nested_higher(identity))
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(nested_higher(identity)())
+# revealed: Literal[1]
+reveal_type(nested_higher(identity)()(1))
+
+# revealed: [A'return]((A'return, /) -> A'return, /) -> int
+reveal_type(accepts_higher(identity))
+```
+
+Multiple returned callable occurrences can be used independently after rebinding.
+
+```py
+from typing import Callable
+
+def duplicated[A, B](f: Callable[[A], B]) -> tuple[Callable[[A], B], Callable[[A], B]]:
+    raise NotImplementedError
+
+def identity[T](x: T) -> T:
+    return x
+
+first, second = duplicated(identity)
+
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(first)
+# revealed: [A'return](A'return, /) -> A'return
+reveal_type(second)
+# revealed: Literal[1]
+reveal_type(first(1))
+# revealed: Literal["x"]
+reveal_type(second("x"))
+```
+
+Type variables from enclosing generic contexts should remain in that context instead of becoming
+returned-callable-local.
+
+```py
+from typing import Callable
+
+def identity[T](x: T) -> T:
+    return x
+
+def outer[T](value: T) -> None:
+    def make[U](f: Callable[[U], object]) -> Callable[[U], T]:
+        raise NotImplementedError
+
+    # TODO (optional): Could this be `(object, /) -> T@outer`? Passing `identity`
+    # generates `U@make ≤ T@identity ∧ T@identity ≤ object`, but the `object`-only
+    # upper bound is currently ignored when solving, so `U@make` falls back to `Unknown`.
+    # The important regression here is that `T@outer` is not rebound as callable-local.
+    # revealed: (Unknown, /) -> T@outer
+    reveal_type(make(identity))
+
+class Box[T]:
+    def method[A, B](self, f: Callable[[A], B]) -> Callable[[A], T]:
+        raise NotImplementedError
+
+    def test(self) -> None:
+        # revealed: [A'return](A'return, /) -> T@Box
+        reveal_type(self.method(identity))
+```
+
+## Returned callable typevars remain correlated with the surrounding return type
+
+If a typevar appears both inside and outside of a returned callable, the callable occurrence should
+not be split into an independent returned-callable typevar. The two positions are correlated by the
+source return type.
+
+```py
+from typing import Callable
+
+def identity[T](x: T) -> T:
+    return x
+
+def pair[X, Y](f: Callable[[X], Y]) -> tuple[Y, Callable[[X], Y]]:
+    raise NotImplementedError
+
+# revealed: tuple[X@pair, (X@pair, /) -> X@pair]
+reveal_type(pair(identity))
+```
+
+## Generic callable arguments do not hide real argument errors
+
+A generic callable argument should not hide errors from a specialization chosen by other arguments.
+
+```py
+from typing import Callable
+
+def identity[A](x: A) -> A:
+    return x
+
+def same[T](c: Callable[[T], T], x: list[T], y: list[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(same(identity, [1], ["x"]))  # revealed: int | str
+
+ints: list[int] = [1]
+strings: list[str] = ["x"]
+
+# error: [invalid-argument-type]
+# error: [invalid-argument-type]
+reveal_type(same(identity, ints, strings))  # revealed: int | str
+```
+
 ## Multiple occurrences of a higher-order generic callable
 
 If a generic callable is used more than once in a higher-order call, each occurrence should get its
@@ -338,23 +526,12 @@ def partial[A, B, C](c: Callable[[A, B], C], a: A) -> Callable[[B], C]:
 def drop[X, Y](x: X, y: Y) -> Y:
     return y
 
-# TODO: revealed: Literal["x"]
-# TODO: no errors
-# The deferred-quantification constraint set can now combine both arguments of the outer
-# `partial(partial, drop)` call: one from passing `partial` as `c`, and one from passing `drop` as
-# `a`. However, this exposes an existing inference gap that is independent of deferred
-# quantification: typevars from the generic actual callable (`drop`) can leak into the returned
-# callable instead of becoming generic to that returned callable.
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(partial(partial, drop)(1)("x"))  # revealed: Y@drop
-# TODO: revealed: Literal[1]
-# TODO: no errors
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-# error: [invalid-argument-type]
-reveal_type(partial(partial, drop)("x")(1))  # revealed: Y@drop
+# revealed: [X'return](X'return, /) -> ([Y'return](Y'return, /) -> Y'return)
+reveal_type(partial(partial, drop))
+# revealed: Literal["x"]
+reveal_type(partial(partial, drop)(1)("x"))
+# revealed: Literal[1]
+reveal_type(partial(partial, drop)("x")(1))
 ```
 
 ## SymPy one-import MRE scaffold (multi-file)
