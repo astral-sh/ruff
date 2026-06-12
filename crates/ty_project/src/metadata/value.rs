@@ -334,11 +334,14 @@ where
 
 /// A possibly relative path in a configuration file.
 ///
-/// Relative paths in configuration files or from CLI options
+/// Relative paths in configuration files, editor settings, or from CLI options
 /// require different anchoring:
 ///
 /// * CLI: The path is relative to the current working directory
 /// * Configuration file: The path is relative to the project's root.
+/// * Editor settings: The path is relative to the project's root. Editors spawn the
+///   language server with an arbitrary current working directory (e.g. the folder
+///   the editor was opened in), which has no meaning to the user's settings.
 #[derive(
     Debug,
     Clone,
@@ -395,8 +398,8 @@ impl RelativePathBuf {
     /// Resolves the absolute path for `self` based on its origin.
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
-            ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
+            ValueSource::File(_) | ValueSource::Editor => project_root,
+            ValueSource::Cli => system.current_directory(),
         };
 
         // Expand tildes and environment variables in the path (e.g. `~/.cache/foo`).
@@ -465,8 +468,8 @@ impl RelativeGlobPattern {
         kind: PortableGlobKind,
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
-            ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
+            ValueSource::File(_) | ValueSource::Editor => project_root,
+            ValueSource::Cli => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
@@ -490,7 +493,9 @@ mod tests {
 
     use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
 
-    use super::{RelativePathBuf, ValueSource};
+    use crate::glob::PortableGlobKind;
+
+    use super::{RelativeGlobPattern, RelativePathBuf, ValueSource};
 
     #[test]
     fn tilde_expansion_uses_system_env() {
@@ -556,5 +561,34 @@ mod tests {
         let resolved = path.absolute(SystemPath::new("/project"), &system);
 
         assert_eq!(resolved, SystemPathBuf::from("/test/home/config"));
+    }
+
+    #[test]
+    fn editor_source_resolves_relative_to_project_root() {
+        // The test system's current directory is `/`, which must not be used as the anchor:
+        // editor settings are workspace-scoped and the server's cwd is an arbitrary
+        // editor-dependent location.
+        let system = TestSystem::default();
+
+        let path = RelativePathBuf::new(".venv", ValueSource::Editor);
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/project/.venv"));
+    }
+
+    #[test]
+    fn editor_source_glob_resolves_relative_to_project_root() {
+        let system = TestSystem::default();
+
+        let pattern = RelativeGlobPattern::new("generated/**", ValueSource::Editor);
+        let resolved = pattern
+            .absolute(
+                SystemPath::new("/project"),
+                &system,
+                PortableGlobKind::Exclude,
+            )
+            .unwrap();
+
+        assert_eq!(resolved.absolute(), "/project/generated/**");
     }
 }

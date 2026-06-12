@@ -144,6 +144,79 @@ def foo() -> str:
     Ok(())
 }
 
+/// Relative paths in the `ty.configuration` setting (e.g. `environment.python`) must resolve
+/// against the workspace root, not the server's current working directory: editors usually
+/// spawn the language server with an arbitrary cwd (e.g. the folder the editor was opened in,
+/// like a monorepo root), which may not be the workspace folder.
+#[test]
+fn editor_relative_python_resolves_against_workspace_root() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("project");
+    let main = SystemPath::new("project/main.py");
+    let main_content = "import foo\n";
+
+    let python_home = "base/bin";
+    let base_python = if cfg!(target_os = "windows") {
+        "base/bin/python.exe"
+    } else {
+        "base/bin/python"
+    };
+    // Use a directory name that environment auto-discovery doesn't pick up (unlike `.venv`),
+    // so that resolving the import can only succeed through the `environment.python` setting.
+    let python = if cfg!(target_os = "windows") {
+        "project/my-venv/Scripts/python.exe"
+    } else {
+        "project/my-venv/bin/python"
+    };
+    let site_packages_foo = if cfg!(target_os = "windows") {
+        "project/my-venv/Lib/site-packages/foo.py"
+    } else {
+        "project/my-venv/lib/python3.13/site-packages/foo.py"
+    };
+
+    let builder = TestServerBuilder::new()?;
+    let python_home = builder.file_path(python_home);
+
+    let mut server = builder
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration: Some(
+                        Map::from_iter([("environment".to_string(), json!({"python": "my-venv"}))])
+                            .into(),
+                    ),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(main, main_content)?
+        .with_file(base_python, "")?
+        .with_file(python, "")?
+        .with_file(
+            "project/my-venv/pyvenv.cfg",
+            format!("version_info = 3.13.0\nhome = {python_home}\n"),
+        )?
+        .with_file(site_packages_foo, "")?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main, main_content, 1);
+    let diagnostics = server.document_diagnostic_request(main, None);
+
+    // `import foo` resolves from the configured environment's site-packages.
+    assert_json_snapshot!(diagnostics, @r#"
+    {
+      "items": [],
+      "kind": "full"
+    }
+    "#);
+
+    Ok(())
+}
+
 #[test]
 fn unsupported_editor_python_version() -> Result<()> {
     let _filter = filter_result_id();
