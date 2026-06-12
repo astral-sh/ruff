@@ -719,6 +719,12 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
             .elements(db)
             .iter()
             .any(|ty| could_compare_equal(db, left_ty, *ty)),
+        (Type::Recursive(rec), _) if !rec.is_non_contractive(db) => {
+            rec.map(db, |unfolded| could_compare_equal(db, unfolded, right_ty))
+        }
+        (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => {
+            rec.map(db, |unfolded| could_compare_equal(db, left_ty, unfolded))
+        }
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
             match (left.kind(), right.kind()) {
                 // Boolean literals and int literals are disjoint, and single valued, and yet
@@ -1031,6 +1037,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                Self::narrow_type_by_len(db, unfolded, is_positive)
+            }),
             Type::Intersection(intersection) => {
                 // For intersections, check if any positive element is narrowable.
                 let positive = intersection.positive(db);
@@ -1080,6 +1089,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let narrowed = match resolved {
             Type::Union(union) => union.map(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
+            }),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                Self::narrow_type_by_exact_len(db, unfolded, length, is_equality)
             }),
             Type::Intersection(intersection) => intersection.map_positive(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
@@ -1199,6 +1211,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty));
                 }
 
+                if let Type::Recursive(rec) = lhs_ty
+                    && !rec.is_non_contractive(db)
+                {
+                    return rec.map(db, |unfolded| can_narrow_to_rhs(db, unfolded, rhs_ty));
+                }
+
                 if let Some(alternatives) = finite_single_valued_union_alternatives(db, lhs_ty) {
                     return alternatives
                         .into_iter()
@@ -1223,6 +1241,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ) -> Type<'db> {
                 if let Type::Union(union) = ty {
                     return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
+                }
+
+                if let Type::Recursive(rec) = ty
+                    && !rec.is_non_contractive(db)
+                {
+                    return rec.map(db, |unfolded| {
+                        filter_to_cannot_be_equal(db, unfolded, rhs_ty)
+                    });
                 }
 
                 if let Some(alternatives) = finite_single_valued_union_alternatives(db, ty) {
@@ -2514,14 +2540,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         rhs_type: Type<'db>,
         is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
-        let Type::Union(union) = attribute_value_type.resolve_type_alias(self.db) else {
-            return None;
-        };
         if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
-        let narrowed = union.filter(self.db, |element| {
+        let resolved = attribute_value_type.resolve_type_alias(self.db);
+        let mut should_keep = |element: &Type<'db>| {
             nominal_attribute_type(self.db, *element, attribute_name).is_none_or(|attribute_type| {
                 if is_equality {
                     !is_supported_tag_literal(attribute_type)
@@ -2530,15 +2554,30 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     !attribute_type.is_subtype_of(self.db, rhs_type)
                 }
             })
-        });
+        };
+        let narrowed = narrow_attribute_union(self.db, resolved, &mut should_keep);
 
-        if narrowed == Type::Union(union) {
+        if narrowed == resolved {
             return None;
         }
 
         let attribute_value_place_expr = PlaceExpr::try_from_expr(attribute_value_expr)?;
         let place = self.expect_place(&attribute_value_place_expr);
         Some((place, NarrowingConstraint::replacement(narrowed)))
+    }
+}
+
+fn narrow_attribute_union<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    should_keep: &mut impl FnMut(&Type<'db>) -> bool,
+) -> Type<'db> {
+    match ty {
+        Type::Union(union) => union.filter(db, should_keep),
+        Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            narrow_attribute_union(db, unfolded, should_keep)
+        }),
+        _ => ty,
     }
 }
 
@@ -2556,6 +2595,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
         Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
+        Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+            rec.map(db, |unfolded| is_or_contains_typeddict(db, unfolded))
+        }
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2602,6 +2644,9 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
             .iter()
             .any(|element| typeddict_declares_key(db, *element, key)),
         Type::TypeAlias(alias) => typeddict_declares_key(db, alias.value_type(db), key),
+        Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+            rec.map(db, |unfolded| typeddict_declares_key(db, unfolded, key))
+        }
         _ => false,
     }
 }
@@ -2729,6 +2774,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::TypeAlias(alias) => {
             all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
+        Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            all_matching_typeddict_fields_have_literal_types(db, unfolded, field_name)
+        }),
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)
@@ -2743,7 +2791,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
                 })
         }
 
-        // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
+        // Only the variants above can pass `is_or_contains_typeddict`, and this function is
         // always guarded by that check.
         Type::Dynamic(_)
         | Type::Divergent(_)

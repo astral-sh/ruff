@@ -444,6 +444,12 @@ impl<'db> Type<'db> {
             (_, Type::NominalInstance(target)) if target.is_object() => true,
             (_, Type::Union(union)) => union.elements(db).contains(&self),
             (Type::Intersection(intersection), _) => intersection.positive(db).contains(&target),
+            (Type::Recursive(rec), _) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                unfolded.is_trivially_constraint_set_assignable_to(db, target)
+            }),
+            (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                self.is_trivially_constraint_set_assignable_to(db, unfolded)
+            }),
             _ => false,
         }
     }

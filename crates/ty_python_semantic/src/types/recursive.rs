@@ -164,6 +164,12 @@ impl<'db> Foldable<'db> for bool {
     }
 }
 
+impl<'db> Foldable<'db> for usize {
+    fn fold(self, _db: &'db dyn Db, _rec: RecursiveType<'db>) -> Self {
+        self
+    }
+}
+
 impl<'db> Foldable<'db> for PlaceAndQualifiers<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         self.map_type(|ty| rec.fold(db, ty))
@@ -278,7 +284,7 @@ impl<'db> RecursiveType<'db> {
     /// which substitutes the source type instead — used for display and for
     /// `IntersectionBuilder`'s distribution where re-finding the recursive name
     /// matters.
-    pub(crate) fn unfold(self, db: &'db dyn Db) -> Type<'db> {
+    fn unfold(self, db: &'db dyn Db) -> Type<'db> {
         let body = self.body(db);
         let replacement = self
             .origin(db)
@@ -296,7 +302,7 @@ impl<'db> RecursiveType<'db> {
     /// This is the final step of the `unfold -> operation -> fold` discipline.
     /// Without it, repeated operations can keep materializing copies of the
     /// recursive body instead of preserving the fixed-point shape.
-    pub(crate) fn fold(self, db: &'db dyn Db, unfold_operated: Type<'db>) -> Type<'db> {
+    fn fold(self, db: &'db dyn Db, unfold_operated: Type<'db>) -> Type<'db> {
         let marker = Type::divergent(self.binder_id(db));
         let normalization = RecursiveTypeNormalization::new(marker).preserve_top_level_recursive();
         unfold_operated

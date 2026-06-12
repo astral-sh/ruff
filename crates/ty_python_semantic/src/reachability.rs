@@ -193,6 +193,7 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use crate::types::recursive::{Foldable, RecursiveType};
 use crate::{
     Db,
     dunder_all::dunder_all_names,
@@ -221,6 +222,12 @@ use ty_python_core::{
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
 };
+
+impl<'db> Foldable<'db> for (ClassLiteral<'db>, FxHashSet<Name>) {
+    fn fold(self, _db: &'db dyn Db, _rec: RecursiveType<'db>) -> Self {
+        self
+    }
+}
 
 /// Narrow `subject_ty` by all preceding unguarded match patterns.
 ///
@@ -318,6 +325,9 @@ fn enum_literal_subject_names<'db>(
             for element in union.elements(db) {
                 add_enum_literal(db, &mut enum_class, &mut names, *element)?;
             }
+        }
+        Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+            return rec.map(db, |unfolded| enum_literal_subject_names(db, unfolded));
         }
         Type::TypeAlias(alias) => return enum_literal_subject_names(db, alias.value_type(db)),
         _ => return None,

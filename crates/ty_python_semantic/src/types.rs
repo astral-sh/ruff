@@ -1280,8 +1280,8 @@ impl<'db> Type<'db> {
 
     /// One-step unwrapping of a recursive type.
     /// Unlike `unfold`, this is not binder-preserving.
-    /// Use `unfold` when applying type operations like subscript/iteration to recursive types. The operated type is also a recursive type.
-    /// Use `unwrap_recursive` when walking types, such as relation checking. In the case of walking, the operated type must be a finite type.
+    /// Use `unfold` when applying (non-recursive) type operations like subscript/iteration to recursive types. The operated type is also a recursive type.
+    /// Use `unwrap_recursive` when walking types (recursively), such as relation checking. In the case of walking, the operated type must be a finite type.
     pub(crate) fn unwrap_recursive(self, db: &'db dyn Db) -> Self {
         match self {
             Type::Recursive(rec) => rec.body(db),
@@ -1607,6 +1607,9 @@ impl<'db> Type<'db> {
             Type::Dynamic(dynamic) => {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.is_specialized_generic(db))
+            }
             // Due to inheritance rules, enums cannot be generic.
             Type::LiteralValue(literal) if literal.is_enum() => false,
             // Once generic NewType is officially specified, handle it.
@@ -1642,6 +1645,9 @@ impl<'db> Type<'db> {
                 .positive(db)
                 .iter()
                 .any(|ty| ty.is_awaitable(db)),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.is_awaitable(db))
+            }
             _ => false,
         }
     }
@@ -1983,6 +1989,9 @@ impl<'db> Type<'db> {
     pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
         match self {
             Type::Union(union_type) => union_type.elements(db).len(),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.union_size(db))
+            }
             Type::Never => 0,
             _ => 1,
         }
@@ -2002,6 +2011,9 @@ impl<'db> Type<'db> {
                 .map(|element| element.intersection_size(db))
                 .max()
                 .unwrap_or(1),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.intersection_size(db))
+            }
             _ => 1,
         }
     }
@@ -2074,6 +2086,9 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|ty| ty.is_literal_or_union_of_literals(db)),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.is_literal_or_union_of_literals(db))
+            }
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::String(_)
                 | LiteralValueTypeKind::Bytes(_)
