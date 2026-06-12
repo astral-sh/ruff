@@ -215,6 +215,96 @@ def f[T: A](x: P[T, T], value: T) -> None:
 f(Bad(), B())
 ```
 
+Protocol inference should preserve gradual types in narrowed intersections:
+
+```py
+def _(x):
+    assert isinstance(x, list)
+    for _, item in enumerate(x):
+        reveal_type(item)  # revealed: Unknown
+```
+
+## Inferring typevars from actual intersections
+
+Generic inference should combine information from every positive intersection element:
+
+```py
+class Source[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+class ASource(Source[A]): ...
+class BSource(Source[B]): ...
+
+def element[T](x: Source[T]) -> T:
+    return x.get()
+
+def f(x: ASource) -> None:
+    if isinstance(x, BSource):
+        reveal_type(x)  # revealed: ASource & BSource
+        reveal_type(element(x))  # revealed: A & B
+```
+
+Generic protocol intersections still consider structural implementations that do not appear in an
+explicit implementation's MRO:
+
+```py
+from typing import Protocol
+
+class SourceProtocol[T](Protocol):
+    def get(self) -> T: ...
+
+class StructuralBSource:
+    def get(self) -> B:
+        return B()
+
+class ExplicitASource(SourceProtocol[A]): ...
+
+def takes_b_source(x: SourceProtocol[B]) -> None: ...
+def _(x: ExplicitASource) -> None:
+    if isinstance(x, StructuralBSource):
+        takes_b_source(x)
+```
+
+Intersection inference respects both generic variance and the polarity of nested comparisons:
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[ASource, BSource, object]) -> None:
+    reveal_type(element(x))  # revealed: A & B
+
+def _(x) -> None:
+    assert isinstance(x, ASource)
+    reveal_type(element(x))  # revealed: Unknown
+
+class Sink[T]:
+    def put(self, value: T) -> None: ...
+
+class ASink(Sink[A]): ...
+class BSink(Sink[B]): ...
+
+def sink_type[T](x: Sink[T]) -> T:
+    raise NotImplementedError
+
+def _(x: ASink) -> None:
+    if isinstance(x, BSink):
+        reveal_type(sink_type(x))  # revealed: A | B
+
+class C(A, B): ...
+
+def choose[T](x: T, sink: Sink[Source[T]]) -> T:
+    return x
+
+def _(
+    x: C,
+    sink: Sink[Intersection[Source[A], Source[B]]],
+) -> None:
+    reveal_type(choose(x, sink))  # revealed: C
+```
+
 ## Inferring tuple parameter types
 
 ```py
