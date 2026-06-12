@@ -792,7 +792,6 @@ pub(super) struct TypeRelationChecker<'a, 'c, 'db> {
 
 impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
     fn project_intersection_to_generic_target(
-        &self,
         db: &'db dyn Db,
         intersection: IntersectionType<'db>,
         target: Type<'db>,
@@ -800,9 +799,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         let Type::NominalInstance(target_instance) = target else {
             return None;
         };
-        let Some(target_alias) = target_instance.class(db).into_generic_alias() else {
-            return None;
-        };
+        let target_alias = target_instance.class(db).into_generic_alias()?;
         let target_origin = target_alias.origin(db);
         let mut merged: Option<Specialization<'db>> = None;
         let mut unmatched = Vec::new();
@@ -1805,7 +1802,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Intersection(intersection), _) => {
                 if self.relation.is_assignability()
                     && let Some((projected, unmatched)) =
-                        self.project_intersection_to_generic_target(db, intersection, target)
+                        Self::project_intersection_to_generic_target(db, intersection, target)
                 {
                     let projected = self.check_type_pair(db, projected, target);
                     return projected.or(db, self.constraints, || {
