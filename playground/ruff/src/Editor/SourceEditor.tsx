@@ -13,7 +13,7 @@ import {
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
 import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
-import { renderableSecondaryDiagnosticAnnotations, Theme } from "shared";
+import { secondaryAnnotationsWithMessages, Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
@@ -223,7 +223,7 @@ function diagnosticRelatedInformation(
   diagnostic: Diagnostic,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
+  const secondaryAnnotations = secondaryAnnotationsWithMessages(
     diagnostic.annotations,
   ).flatMap((annotation) =>
     diagnosticLocationRelatedInformation(

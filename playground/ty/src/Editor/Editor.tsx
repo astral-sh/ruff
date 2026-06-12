@@ -17,7 +17,7 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { renderableSecondaryDiagnosticAnnotations, Theme } from "shared";
+import { secondaryAnnotationsWithMessages, Theme } from "shared";
 import {
   Hint,
   Position as TyPosition,
@@ -984,7 +984,7 @@ class PlaygroundServer
   private diagnosticRelatedInformation(
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
-    const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
+    const secondaryAnnotations = secondaryAnnotationsWithMessages(
       diagnostic.annotations,
     ).flatMap((annotation) =>
       this.diagnosticAnnotationRelatedInformation(

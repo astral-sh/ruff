@@ -1,8 +1,10 @@
-import type { Diagnostic, DiagnosticLocation, SubDiagnostic } from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
 import {
-  DiagnosticLocationItem,
-  renderableSecondaryDiagnosticAnnotations,
+  type DiagnosticDetailInput,
+  createDiagnosticDetail,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
   Theme,
 } from "shared";
 import { useMemo } from "react";
@@ -78,7 +80,7 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
-        const secondaryAnnotations = renderableSecondaryDiagnosticAnnotations(
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
           diagnostic.annotations,
         );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
@@ -98,23 +100,23 @@ function Items({
                 Col {column}]
               </span>
             </button>
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
             {secondaryAnnotations.length > 0 ||
             diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
                 {secondaryAnnotations.map((annotation, index) => (
                   <li key={`annotation-${index}`}>
-                    <RuffDiagnosticLocationItem
-                      message={annotation.message}
-                      location={annotation.location}
-                      onGoTo={onGoTo}
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(annotation, onGoTo)}
                     />
                   </li>
                 ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
                   <li key={`sub-diagnostic-${index}`}>
-                    <SubDiagnosticItem
-                      subDiagnostic={subDiagnostic}
-                      onGoTo={onGoTo}
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(subDiagnostic, onGoTo)}
                     />
                   </li>
                 ))}
@@ -127,52 +129,19 @@ function Items({
   );
 }
 
-function RuffDiagnosticLocationItem({
-  prefix,
-  message,
-  location,
-  onGoTo,
-}: {
-  prefix?: string;
-  message: string;
-  location: DiagnosticLocation | null | undefined;
-  onGoTo(line: number, column: number): void;
-}) {
-  const start = location?.start_location;
-  const locationLabel =
-    location == null || start == null
-      ? undefined
-      : location.path === PLAYGROUND_FILE_PATH
-        ? `[Ln ${start.row}, Col ${start.column}]`
-        : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
+function toDisplayDiagnosticDetail(
+  item: DiagnosticDetailInput<DiagnosticLocation>,
+  onGoTo: (line: number, column: number) => void,
+) {
+  return createDiagnosticDetail(item, (location) => {
+    const { row, column } = location.start_location;
+    const isCurrentFile = location.path === PLAYGROUND_FILE_PATH;
 
-  return (
-    <DiagnosticLocationItem
-      prefix={prefix}
-      message={message}
-      locationLabel={locationLabel}
-      onGoTo={
-        location?.path === PLAYGROUND_FILE_PATH && start != null
-          ? () => onGoTo(start.row, start.column)
-          : undefined
-      }
-    />
-  );
-}
-
-function SubDiagnosticItem({
-  subDiagnostic,
-  onGoTo,
-}: {
-  subDiagnostic: SubDiagnostic;
-  onGoTo(line: number, column: number): void;
-}) {
-  return (
-    <RuffDiagnosticLocationItem
-      prefix={`${subDiagnostic.severity}: `}
-      message={subDiagnostic.message}
-      location={subDiagnostic.location}
-      onGoTo={onGoTo}
-    />
-  );
+    return {
+      line: row,
+      column,
+      displayPath: isCurrentFile ? undefined : location.path,
+      onGoTo: isCurrentFile ? () => onGoTo(row, column) : undefined,
+    };
+  });
 }
