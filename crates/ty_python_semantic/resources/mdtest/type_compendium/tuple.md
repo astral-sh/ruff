@@ -43,7 +43,7 @@ class LiskovUncompliantIterable(Iterable[int]):
 def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncompliantIterable):
     reveal_type(tuple(x))  # revealed: tuple[int, ...]
     reveal_type(tuple(y))  # revealed: tuple[str, ...]
-    reveal_type(tuple(z))  # revealed: tuple[Unknown, ...]
+    reveal_type(tuple(z))  # revealed: Never
 
     # This is correct as the only inhabitants of `list[Never]` can be empty lists
     reveal_type(tuple(aa))  # revealed: tuple[()]

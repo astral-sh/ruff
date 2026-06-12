@@ -1296,7 +1296,7 @@ from typing_extensions import Never
 
 def f(never: Never):
     for x in never:
-        reveal_type(x)  # revealed: Unknown
+        reveal_type(x)  # revealed: Never
 ```
 
 ## Iterating over literals

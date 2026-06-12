@@ -207,6 +207,20 @@ reveal_type(c)  # revealed: int
 reveal_type(d)  # revealed: Literal[2]
 ```
 
+### Recursive implicit attribute packing/unpacking
+
+```py
+class Foo:
+    def __init__(self):
+        self.value = (0, 0)
+
+    def foo(self):
+        x, y = self.value
+        self.value = (x, y)
+
+        reveal_type(self.value)  # revealed: tuple[int, int]
+```
+
 ## List
 
 ### Literal unpacking

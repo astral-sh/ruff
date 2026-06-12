@@ -1612,19 +1612,20 @@ pub(crate) enum TupleElement<T> {
 /// assigned to the starred target in `list`.
 pub(crate) struct TupleUnpacker<'db> {
     db: &'db dyn Db,
-    targets: Tuple<UnionBuilder<'db>>,
+    targets: Tuple<UnpackedTypeBuilder<'db>>,
 }
 
 impl<'db> TupleUnpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
-        let new_builders = |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db)).take(len);
+        let new_builders =
+            |len: usize| std::iter::repeat_with(|| UnpackedTypeBuilder::new(db)).take(len);
         let targets = match len {
             TupleLength::Fixed(len) => {
                 Tuple::Fixed(FixedLengthTuple::from_elements(new_builders(len)))
             }
             TupleLength::Variable(prefix, suffix) => VariableLengthTuple::mixed(
                 new_builders(prefix),
-                UnionBuilder::new(db),
+                UnpackedTypeBuilder::new(db),
                 new_builders(suffix),
             ),
         };
@@ -1675,7 +1676,37 @@ impl<'db> TupleUnpacker<'db> {
     }
 }
 
-impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
+struct UnpackedTypeBuilder<'db> {
+    db: &'db dyn Db,
+    union: UnionBuilder<'db>,
+    saw_never: bool,
+}
+
+impl<'db> UnpackedTypeBuilder<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            union: UnionBuilder::new(db),
+            saw_never: false,
+        }
+    }
+
+    fn add_in_place(&mut self, ty: Type<'db>) {
+        if ty.resolve_type_alias(self.db).is_never() {
+            self.saw_never = true;
+        }
+        self.union.add_in_place(ty);
+    }
+
+    fn try_build(self) -> Option<Type<'db>> {
+        let saw_never = self.saw_never;
+        self.union
+            .try_build()
+            .or_else(|| saw_never.then_some(Type::Never))
+    }
+}
+
+impl<'db> FixedLengthTuple<UnpackedTypeBuilder<'db>> {
     fn unpack_tuple(&mut self, values: &FixedLengthTuple<Type<'db>>) {
         // We have already verified above that the two tuples have the same length.
         for (target, value) in self.0.iter_mut().zip(values.iter_all_elements()) {
@@ -1684,7 +1715,7 @@ impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
     }
 }
 
-impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
+impl<'db> VariableLengthTuple<UnpackedTypeBuilder<'db>> {
     fn unpack_tuple(&mut self, db: &'db dyn Db, values: &VariableLengthTuple<Type<'db>>) {
         // We have already verified above that the two tuples have the same length.
         for (target, value) in
