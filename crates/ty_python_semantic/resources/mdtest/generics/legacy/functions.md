@@ -1379,5 +1379,15 @@ def _(x: Intersection[Sequence[Sub1], Sequence[Sub2], Sequence[Unrelated1]]) -> 
 
 # An intersection with two positive elements, neither of which produces a valid specialization.
 def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
+    # error: [invalid-argument-type] "Argument to function `first` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy upper bound `Base` of type variable `T`"
     reveal_type(first(x))  # revealed: Unknown
+
+Constrained = TypeVar("Constrained", Sub1, Sub2)
+
+def first_constrained(x: Sequence[Constrained]) -> Constrained:
+    return x[0]
+
+def _(x: Intersection[Sequence[Unrelated1], Sequence[Unrelated2]]) -> None:
+    # error: [invalid-argument-type] "Argument to function `first_constrained` is incorrect: Argument type `Unrelated1 & Unrelated2` does not satisfy constraints (`Sub1`, `Sub2`) of type variable `Constrained`"
+    reveal_type(first_constrained(x))  # revealed: Unknown
 ```

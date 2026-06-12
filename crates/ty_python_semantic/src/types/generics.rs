@@ -2608,6 +2608,30 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
+    fn specialization_error_from_failed_bounds(
+        db: &'db dyn Db,
+        path_bound: &PathBound<'db>,
+    ) -> Option<SpecializationError<'db>> {
+        let bound_typevar = path_bound.bound_typevar;
+        let argument = path_bound.lower?;
+        match bound_typevar.typevar(db).bound_or_constraints(db)? {
+            TypeVarBoundOrConstraints::UpperBound(_) => {
+                Some(SpecializationError::MismatchedBound {
+                    bound_typevar,
+                    argument,
+                })
+            }
+            TypeVarBoundOrConstraints::Constraints(_) if !path_bound.has_upper() => {
+                Some(SpecializationError::MismatchedConstraint {
+                    bound_typevar,
+                    argument,
+                })
+            }
+            // If both bounds are present, the upper bound might be what invalidated the path.
+            TypeVarBoundOrConstraints::Constraints(_) => None,
+        }
+    }
+
     /// Returns common protocol constraints for the `TypedDict` members of a union when every such
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
@@ -3244,9 +3268,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
             (formal, actual @ Type::Intersection(_)) => {
                 let when = self.when_assignable_with_polarity(formal, actual, polarity);
-                if self.add_type_mappings_from_constraint_set(when).is_ok() {
-                    self.pending.intersect(self.db, self.constraints, when);
-                }
+                self.infer_from_constraint_set(when)?;
                 return Ok(());
             }
 
