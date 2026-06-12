@@ -534,18 +534,10 @@ pub(crate) enum SolutionProjection<'db> {
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
-        Self::from_node_with_deferred_quantification(builder, node, InferableTypeVars::None)
-    }
-
-    fn from_node_with_deferred_quantification(
-        builder: &'c ConstraintSetBuilder<'db>,
-        node: NodeId,
-        deferred_quantification: InferableTypeVars<'db>,
-    ) -> Self {
         Self::from_node_with_metadata(
             builder,
             node,
-            deferred_quantification,
+            InferableTypeVars::None,
             InferableTypeVars::None,
         )
     }
@@ -891,9 +883,10 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         }
 
         let quantified = InferableTypeVars::from_typevars(db, quantified);
+        let mentioned_quantified = quantified.intersection(db, self.mentioned_typevars);
         Self::from_node_with_metadata(
             builder,
-            self.node.exists(db, builder, quantified.iter(db)),
+            self.node.exists(db, builder, mentioned_quantified.iter(db)),
             InferableTypeVars::from_typevars(db, kept),
             self.mentioned_typevars.difference(db, quantified),
         )
@@ -904,11 +897,14 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> NodeId {
-        if matches!(self.deferred_quantification, InferableTypeVars::None) {
+        let deferred_quantification = self
+            .deferred_quantification
+            .intersection(db, self.mentioned_typevars);
+        if matches!(deferred_quantification, InferableTypeVars::None) {
             return self.node;
         }
         self.node
-            .exists(db, builder, self.deferred_quantification.iter(db))
+            .exists(db, builder, deferred_quantification.iter(db))
     }
 
     pub(crate) fn path_bounds(
@@ -3045,36 +3041,6 @@ impl NodeId {
         }
     }
 
-    fn mentions_typevar<'db>(
-        self,
-        db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarIdentity<'db>,
-    ) -> bool {
-        let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
-            _ => false,
-        };
-        let mut mentioned = false;
-        self.for_each_unique_constraint(builder, &mut |constraint, _| {
-            if mentioned {
-                return;
-            }
-
-            let constraint = builder.constraint_data(constraint);
-            mentioned = constraint.typevar.identity(db) == bound_typevar
-                || constraint
-                    .bounds
-                    .lower
-                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                || constraint
-                    .bounds
-                    .upper
-                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar));
-        });
-        mentioned
-    }
-
     /// Invokes a closure for each unique BDD node that appears anywhere in a BDD.
     ///
     /// This treats the BDD as a DAG and does not revisit shared subgraphs. Use this when the
@@ -3891,12 +3857,6 @@ impl InteriorNode {
             Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
             _ => false,
         };
-        if !self.node().mentions_typevar(db, builder, bound_typevar) {
-            let mut storage = builder.storage.borrow_mut();
-            storage.exists_one_cache.insert(key, self.node());
-            return self.node();
-        }
-
         let mut path = self.path_assignments(builder);
         let result = self.abstract_one_inner(
             db,
@@ -7184,10 +7144,11 @@ mod tests {
         let builder = ConstraintSetBuilder::new();
         let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
             .with_deferred_quantification(&db, &builder, deferred_quantification);
-        let quantified_after_negation = ConstraintSet::from_node_with_deferred_quantification(
+        let quantified_after_negation = ConstraintSet::from_node_with_metadata(
             &builder,
             t_int.node.negate(&builder),
             deferred_quantification,
+            t_int.mentioned_typevars,
         );
 
         assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
@@ -7255,10 +7216,9 @@ mod tests {
         let expected = FxHashSet::from_iter([t.identity(&db)]);
         let builder = ConstraintSetBuilder::new();
         let owned = builder.into_owned(|builder| {
-            let t_int = create_constraint(&db, builder, t, KnownClass::Int);
-            ConstraintSet::from_node_with_deferred_quantification(
+            create_constraint(&db, builder, t, KnownClass::Int).with_deferred_quantification(
+                &db,
                 builder,
-                t_int.node,
                 deferred_quantification,
             )
         });

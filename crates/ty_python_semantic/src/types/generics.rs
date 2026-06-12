@@ -335,6 +335,22 @@ impl<'db> InferableTypeVars<'db> {
         }
     }
 
+    pub(crate) fn intersection(self, db: &'db dyn Db, other: Self) -> Self {
+        match (self, other) {
+            (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => InferableTypeVars::None,
+            (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
+                Self::from_typevars(
+                    db,
+                    self_inner
+                        .inferable(db)
+                        .intersection(other_inner.inferable(db))
+                        .copied()
+                        .collect(),
+                )
+            }
+        }
+    }
+
     pub(crate) fn iter(
         self,
         db: &'db dyn Db,
