@@ -68,10 +68,20 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         let rule = Rule::try_from(arm)?;
-        linter_to_rules
-            .entry(rule.linter.clone())
-            .or_default()
-            .insert(rule.code.value(), rule);
+        let rules = linter_to_rules.entry(rule.linter.clone()).or_default();
+        match rules.entry(rule.code.value()) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(rule);
+            }
+            std::collections::btree_map::Entry::Occupied(entry) => {
+                let mut error = Error::new_spanned(&rule.code, "duplicate rule code");
+                error.combine(Error::new_spanned(
+                    &entry.get().code,
+                    "rule code first defined here",
+                ));
+                return Err(error);
+            }
+        }
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
