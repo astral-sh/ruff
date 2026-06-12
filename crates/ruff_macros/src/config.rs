@@ -4,7 +4,7 @@ use syn::meta::ParseNestedMeta;
 use syn::spanned::Spanned;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Type, TypePath,
+    Fields, GenericArgument, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Type, TypePath,
 };
 
 use ruff_python_trivia::textwrap::dedent;
@@ -124,11 +124,18 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 arguments:
                     PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
             }) if type_ident == "Option" => {
-                let path = &args[0];
+                let mut args = args.iter();
+                let (Some(GenericArgument::Type(option_type)), None) = (args.next(), args.next())
+                else {
+                    return Err(syn::Error::new_spanned(
+                        &field.ty,
+                        "Expected `Option<T>` with exactly one type argument.",
+                    ));
+                };
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 
                 Ok(quote_spanned!(
-                    ident.span() => (visit.record_set(#kebab_name, ruff_options_metadata::OptionSet::of::<#path>()))
+                    ident.span() => (visit.record_set(#kebab_name, ruff_options_metadata::OptionSet::of::<#option_type>()))
                 ))
             }
             _ => Err(syn::Error::new(
