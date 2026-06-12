@@ -22,7 +22,7 @@ exit_code: 1
     {
       "code": {
         "url": "https://docs.astral.sh/ruff/rules/unused-import",
-        "value": "F401"
+        "value": "unused-import"
       },
       "location": {
         "path": "[TMP]/input.py",
@@ -57,7 +57,7 @@ exit_code: 1
     {
       "code": {
         "url": "https://docs.astral.sh/ruff/rules/undefined-name",
-        "value": "F821"
+        "value": "undefined-name"
       },
       "location": {
         "path": "[TMP]/input.py",

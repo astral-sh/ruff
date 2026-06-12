@@ -130,7 +130,8 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                rdjson::RdjsonRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
                 PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
