@@ -2,11 +2,12 @@ use crate::{
     Db,
     types::{
         AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext, TypeMapping,
+        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
+        recursive::{Foldable, RecursiveType},
         todo_type,
         tuple::{TupleSpec, TupleSpecBuilder},
     },
@@ -172,12 +173,10 @@ impl<'db> Type<'db> {
                             .ok()?;
                         let mut builder = TupleSpecBuilder::from(&*first_element_spec);
                         for element in elements_iter {
-                            builder = builder.union(
-                                db,
-                                &*element
-                                    .try_iterate_with_mode(db, EvaluationMode::Sync)
-                                    .ok()?,
-                            );
+                            let spec = element
+                                .try_iterate_with_mode(db, EvaluationMode::Sync)
+                                .ok()?;
+                            builder = builder.union(db, &spec);
                         }
                         Some(Cow::Owned(builder.build()))
                     } else {
@@ -224,7 +223,9 @@ impl<'db> Type<'db> {
                     }
 
                     // Flattening changed the type; recursively iterate the flattened result.
-                    flattened.try_iterate(db).ok()
+                    flattened
+                        .try_iterate_with_mode(db, EvaluationMode::Sync)
+                        .ok()
                 }
                 Type::EnumComplement(complement) => {
                     non_async_special_case(db, complement.remaining_literal_union(db))
@@ -344,27 +345,12 @@ impl<'db> Type<'db> {
             };
         }
 
-        // Iterate the recursive body with its α-marker as a gradual leaf, then
-        // rebind markers in the element type to this recursive type. This keeps
-        // `μα. α | tuple[...]` from recursively iterating the top-level `α`
-        // branch while still preserving recursive element structure.
         // A non-contractive `μα.α` carries no structure to iterate; unfolding it loops, so leave it
         // for `non_async_special_case` below (which yields `homogeneous(μα.α)`, like `Divergent`).
         if let Type::Recursive(rec) = self
             && !rec.is_non_contractive(db)
         {
-            let spec = rec.body(db).try_iterate_with_mode(db, mode)?;
-            let replacement = rec.origin(db).source_type().unwrap_or(Type::Recursive(rec));
-            let type_mapping = TypeMapping::ReplaceDivergent {
-                binder_id: rec.binder(db),
-                replacement,
-            };
-            return Ok(Cow::Owned(spec.into_owned().map_elements(|element| {
-                rec.fold(
-                    db,
-                    element.apply_type_mapping(db, &type_mapping, TypeContext::default()),
-                )
-            })));
+            return rec.map(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
         }
 
         if let Type::TypeAlias(alias) = self {
@@ -530,6 +516,55 @@ pub(super) enum IterationError<'db> {
 
     /// The asynchronous iterable has no `__aiter__` method.
     UnboundAiterError,
+}
+
+impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Cow::Owned(
+            self.into_owned()
+                .map_elements(|element| element.fold(db, rec)),
+        )
+    }
+}
+
+impl<'db> Foldable<'db> for IterationError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Self::IterCallError {
+                kind,
+                bindings,
+                mode,
+            } => Self::IterCallError {
+                kind,
+                bindings: bindings.fold(db, rec),
+                mode,
+            },
+            Self::IterReturnsInvalidIterator {
+                iterator,
+                dunder_error,
+                mode,
+            } => Self::IterReturnsInvalidIterator {
+                iterator: iterator.fold(db, rec),
+                dunder_error: dunder_error.fold(db, rec),
+                mode,
+            },
+            Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return,
+                unbound_on_iter,
+                dunder_getitem_error,
+            } => Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return: dunder_next_return.fold(db, rec),
+                unbound_on_iter: unbound_on_iter.fold(db, rec),
+                dunder_getitem_error: dunder_getitem_error.fold(db, rec),
+            },
+            Self::UnboundIterAndGetitemError {
+                dunder_getitem_error,
+            } => Self::UnboundIterAndGetitemError {
+                dunder_getitem_error: dunder_getitem_error.fold(db, rec),
+            },
+            Self::UnboundAiterError => Self::UnboundAiterError,
+        }
+    }
 }
 
 impl<'db> IterationError<'db> {

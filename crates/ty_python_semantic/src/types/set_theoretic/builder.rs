@@ -1052,12 +1052,10 @@ impl<'db> UnionBuilder<'db> {
                 .collect();
             if !divergent_ids.is_empty() {
                 types.retain(|ty| {
-                    !matches!(
-                        ty,
-                        Type::Recursive(recursive)
-                            if recursive.is_non_contractive(db)
-                                && divergent_ids.contains(&recursive.binder_id(db))
-                    )
+                    !matches!(ty, Type::Recursive(recursive)
+                        if divergent_ids
+                            .iter()
+                            .any(|id| recursive.is_non_contractive_for_marker(db, *id)))
                 });
             }
         }

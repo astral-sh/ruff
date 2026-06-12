@@ -313,6 +313,65 @@ fn recursive_cycle_normalization_treats_non_contractive_recursive_as_marker() {
 }
 
 #[test]
+fn chained_recursive_types_are_non_contractive() {
+    let db = setup_db();
+    let a = Id::from_bits(1);
+    let b = Id::from_bits(2);
+    let c = Id::from_bits(3);
+
+    let mu_b_a = Type::implicit_recursive(&db, b, Type::divergent(a));
+    let mu_a_mu_b_a = Type::implicit_recursive(&db, a, mu_b_a);
+    let Type::Recursive(recursive) = mu_a_mu_b_a else {
+        panic!("expected recursive type");
+    };
+    assert!(recursive.is_non_contractive(&db));
+    assert!(recursive.is_non_contractive_for_marker(&db, a));
+    assert!(!recursive.is_non_contractive_for_marker(&db, b));
+
+    let mu_c_b = Type::implicit_recursive(&db, c, Type::divergent(b));
+    let mu_b_mu_c_b = Type::implicit_recursive(&db, b, mu_c_b);
+    let mu_a_mu_b_mu_c_b = Type::implicit_recursive(&db, a, mu_b_mu_c_b);
+    let Type::Recursive(recursive) = mu_a_mu_b_mu_c_b else {
+        panic!("expected recursive type");
+    };
+    assert!(recursive.is_non_contractive(&db));
+    assert!(!recursive.is_non_contractive_for_marker(&db, a));
+    assert!(recursive.is_non_contractive_for_marker(&db, b));
+
+    let mu_a_b = Type::implicit_recursive(&db, a, Type::divergent(b));
+    let mu_b_mu_a_b = Type::implicit_recursive(&db, b, mu_a_b);
+    let mu_a_mu_b_mu_a_b = Type::implicit_recursive(&db, a, mu_b_mu_a_b);
+    let Type::Recursive(recursive) = mu_a_mu_b_mu_a_b else {
+        panic!("expected recursive type");
+    };
+    assert!(recursive.is_non_contractive(&db));
+    assert!(!recursive.is_non_contractive_for_marker(&db, a));
+    assert!(recursive.is_non_contractive_for_marker(&db, b));
+}
+
+#[test]
+fn recursive_types_with_constructors_are_contractive() {
+    let db = setup_db();
+    let a = Id::from_bits(1);
+    let b = Id::from_bits(2);
+
+    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(a)]);
+    let mu_a_list_a = Type::implicit_recursive(&db, a, list_a);
+    let Type::Recursive(recursive) = mu_a_list_a else {
+        panic!("expected recursive type");
+    };
+    assert!(!recursive.is_non_contractive(&db));
+
+    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(a)]);
+    let mu_b_list_a = Type::implicit_recursive(&db, b, list_a);
+    let mu_a_mu_b_list_a = Type::implicit_recursive(&db, a, mu_b_list_a);
+    let Type::Recursive(recursive) = mu_a_mu_b_list_a else {
+        panic!("expected recursive type");
+    };
+    assert!(!recursive.is_non_contractive(&db));
+}
+
+#[test]
 fn type_alias_variance() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();

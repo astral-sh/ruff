@@ -355,7 +355,7 @@ where
         }
 
         fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
-            self.visit_type(db, recursive.unfold(db));
+            recursive.map(db, |unfolded| self.visit_type(db, unfolded));
         }
     }
 

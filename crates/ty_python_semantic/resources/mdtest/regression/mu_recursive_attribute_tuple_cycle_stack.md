@@ -22,5 +22,5 @@ class Reader:
             cursor = 0
             self.pos = (chunk, cursor)
 
-        reveal_type(self.pos)  # revealed: Divergent
+        reveal_type(self.pos)  # revealed: Divergent | tuple[Divergent, Literal[0]] | tuple[Divergent, Divergent]
 ```

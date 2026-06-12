@@ -379,6 +379,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+            (Type::Recursive(recursive), Type::Recursive(other), _)
+                if recursive.is_non_contractive(db)
+                    && !other.is_non_contractive(db)
+                    && recursive.is_non_contractive_for_marker(db, other.binder_id(db)) =>
+            {
+                Some(Type::Recursive(other))
+            }
+            (Type::Recursive(other), Type::Recursive(recursive), _)
+                if recursive.is_non_contractive(db)
+                    && !other.is_non_contractive(db)
+                    && recursive.is_non_contractive_for_marker(db, other.binder_id(db)) =>
+            {
+                Some(Type::Recursive(other))
+            }
             (rec @ Type::Recursive(recursive), _, _) if recursive.is_non_contractive(db) => {
                 Some(rec)
             }
