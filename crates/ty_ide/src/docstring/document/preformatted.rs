@@ -1,6 +1,8 @@
 use ruff_python_trivia::leading_indentation;
 use ruff_text_size::TextSize;
 
+use super::syntax::indentation as visual_indentation;
+
 /// Represents a fenced Markdown code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::docstring) struct MarkdownFence<'a> {
@@ -44,7 +46,7 @@ impl<'a> MarkdownFence<'a> {
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(super) struct PreformattedBlockScanner<'a> {
     active_markdown_fence: Option<MarkdownFence<'a>>,
-    active_doctest_indent: Option<TextSize>,
+    active_doctest_indent: Option<usize>,
     rest_literal_blocks: RestLiteralBlockScanner,
 }
 
@@ -54,6 +56,16 @@ pub(super) struct PreformattedBlockScanner<'a> {
 const QUOTED_LITERAL_BLOCK_QUOTE_CHARACTERS: &str = r##"!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"##;
 
 impl<'a> PreformattedBlockScanner<'a> {
+    /// Returns whether the scanner is currently inside an accepted preformatted block.
+    pub(super) fn is_active(&self) -> bool {
+        self.active_markdown_fence.is_some()
+            || self.active_doctest_indent.is_some()
+            || matches!(
+                self.rest_literal_blocks.state,
+                RestLiteralBlockState::Active(_)
+            )
+    }
+
     /// Updates internal state to reflect the given line and returns whether or
     /// not the given line is contained within a preformatted block.
     pub(super) fn consume_preformatted_line(&mut self, line: &'a str) -> bool {
@@ -69,10 +81,10 @@ impl<'a> PreformattedBlockScanner<'a> {
         }
 
         if let Some(doctest_indent) = self.active_doctest_indent {
-            if line.trim_start_matches(' ').is_empty() {
+            if line.bytes().all(|byte| matches!(byte, b' ' | b'\t')) {
                 self.active_doctest_indent = None;
                 return true;
-            } else if indentation(line) < doctest_indent {
+            } else if visual_indentation(line) < doctest_indent {
                 self.active_doctest_indent = None;
             } else {
                 return true;
@@ -80,7 +92,7 @@ impl<'a> PreformattedBlockScanner<'a> {
         }
 
         if Self::line_starts_doctest(line) {
-            self.active_doctest_indent = Some(indentation(line));
+            self.active_doctest_indent = Some(visual_indentation(line));
             return true;
         }
 
