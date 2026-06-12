@@ -8,8 +8,9 @@
 //! - `Keyword Args` and `Keyword Arguments`
 //! - `Other Args`, `Other Arguments`, and `Other Parameters`
 //!
-//! It accepts comma-separated Python names with optional parenthesized types, preserves
-//! continuation text, and skips section-like text inside preformatted or container blocks.
+//! It accepts comma-separated Python names with optional parenthesized types, recovers common
+//! conjunction-separated names, preserves continuation text, and skips section-like text inside
+//! preformatted or container blocks.
 //! Supported section bodies are parsed into prose and named-item fragments; other known headings
 //! only delimit sections.
 //!
@@ -38,7 +39,7 @@ use super::SectionKind;
 use super::preformatted::PreformattedBlockScanner;
 use super::syntax::{
     ParsedLine, consume_quoted_string, container_block_end, indentation, parsed_lines,
-    split_once_at_top_level_colon, split_trailing_parenthetical,
+    split_once_at_top_level_colon, split_trailing_parenthetical, starts_with_markdown_list_item,
 };
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
@@ -50,14 +51,14 @@ pub(super) fn parameter_documentation(normalized_source: &str) -> IndexMap<Strin
     for section in sections(normalized_source) {
         let Section {
             kind,
-            body: SectionBody { fragments, .. },
+            body,
             range: _,
         } = section;
         if matches!(
             kind,
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters
         ) {
-            parameters.extend_fragments(fragments);
+            parameters.extend_fragments(body.into_fragments());
         }
     }
     parameters.into_inner()
@@ -79,32 +80,59 @@ pub(in crate::docstring) struct Section {
     body: SectionBody,
 }
 
+impl Section {
+    /// Returns the section kind.
+    pub(in crate::docstring) const fn kind(&self) -> SectionKind {
+        self.kind
+    }
+
+    /// Returns the section's source range.
+    pub(in crate::docstring) const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    /// Consumes this section and returns its fragments when it can be rendered structurally.
+    pub(in crate::docstring) fn into_renderable_fragments(self) -> Option<Vec<BodyFragment>> {
+        let SectionBody::Parsed {
+            fragments,
+            has_structural_ambiguity,
+        } = self.body
+        else {
+            return None;
+        };
+        (!has_structural_ambiguity).then_some(fragments)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct SectionBody {
-    fragments: Vec<BodyFragment>,
-    /// Whether the structured Markdown renderer can represent the body without changing its
-    /// meaning.
-    is_renderable: bool,
+enum SectionBody {
+    /// A body parsed into semantic fragments.
+    Parsed {
+        fragments: Vec<BodyFragment>,
+        /// Whether the body's structure is ambiguous.
+        has_structural_ambiguity: bool,
+    },
+    /// A body whose contents were not parsed.
+    Opaque,
 }
 
 impl SectionBody {
-    /// Creates a renderable body containing the description as a single prose fragment.
+    /// Creates an unambiguous body containing the description as a single prose fragment.
     fn from_prose(description: String) -> Self {
         let fragments = (!description.is_empty())
             .then_some(BodyFragment::Prose(description))
             .into_iter()
             .collect();
-        Self {
+        Self::Parsed {
             fragments,
-            is_renderable: true,
+            has_structural_ambiguity: false,
         }
     }
 
-    /// Creates an unrenderable body for a section whose contents remain opaque.
-    fn opaque() -> Self {
-        Self {
-            fragments: Vec::new(),
-            is_renderable: false,
+    fn into_fragments(self) -> Vec<BodyFragment> {
+        match self {
+            Self::Parsed { fragments, .. } => fragments,
+            Self::Opaque => Vec::new(),
         }
     }
 }
@@ -124,6 +152,15 @@ pub(in crate::docstring) struct Item {
     display_name: String,
     ty: Option<String>,
     description: String,
+}
+
+impl Item {
+    /// Consumes this item and returns its display parts.
+    pub(in crate::docstring) fn into_display_name_type_and_description(
+        self,
+    ) -> (String, Option<String>, String) {
+        (self.display_name, self.ty, self.description)
+    }
 }
 
 /// Splits a display name from a trailing parenthesized type.
@@ -177,6 +214,55 @@ fn is_parameter_name(name: &str) -> bool {
     is_identifier(identifier)
 }
 
+/// A parameter name that has been parsed into comma- and conjunction- separated parts.
+#[derive(Clone, Copy)]
+struct ParameterDisplayName<'a> {
+    comma_separated_names: &'a str,
+    final_name: Option<&'a str>,
+}
+
+impl<'a> ParameterDisplayName<'a> {
+    /// Parses comma-separated parameter names, optionally joined by a final conjunction.
+    ///
+    /// For example, `"stdin, stdout and stderr"` yields the three individual names.
+    fn parse(display_name: &'a str) -> Option<Self> {
+        let comma_separated = Self {
+            comma_separated_names: display_name,
+            final_name: None,
+        };
+        if comma_separated.names().all(is_parameter_name) {
+            return Some(comma_separated);
+        }
+
+        for conjunction in [" and ", " or "] {
+            let Some((comma_separated_names, final_name)) = display_name.rsplit_once(conjunction)
+            else {
+                continue;
+            };
+            let conjunction_separated = Self {
+                comma_separated_names,
+                final_name: Some(final_name),
+            };
+            if conjunction_separated.names().all(is_parameter_name) {
+                return Some(conjunction_separated);
+            }
+        }
+
+        None
+    }
+
+    fn names(self) -> impl Iterator<Item = &'a str> {
+        self.comma_separated_names
+            .split(',')
+            .chain(self.final_name)
+            .map(str::trim)
+    }
+
+    const fn is_conjunction_separated(self) -> bool {
+        self.final_name.is_some()
+    }
+}
+
 #[derive(Default)]
 struct Parameters(IndexMap<String, String>);
 
@@ -194,7 +280,10 @@ impl Parameters {
             if description.is_empty() {
                 continue;
             }
-            for name in display_name.split(',').map(str::trim) {
+            let Some(display_name) = ParameterDisplayName::parse(&display_name) else {
+                continue;
+            };
+            for name in display_name.names() {
                 self.0.insert(name.to_string(), description.clone());
             }
         }
@@ -357,13 +446,8 @@ impl<'a> SectionBuilder<'a> {
 
         // Third, classify a nonblank line and stop if it begins content outside
         // this section.
-        let also_parses_as_section_header = line_header.is_some()
-            && line
-                .text
-                .trim()
-                .chars()
-                .next()
-                .is_some_and(char::is_uppercase);
+        let also_parses_as_section_header =
+            line_header.is_some() && line.text.trim().starts_with(char::is_uppercase);
         let item_line = ItemLine::classify(
             self.section_header.kind,
             line,
@@ -570,11 +654,12 @@ impl<'a> BodyBuilder<'a> {
         match self {
             Self::ItemList(builder) => builder.finish(),
             Self::Prose(builder) => SectionBody::from_prose(builder.finish()),
-            Self::Opaque => SectionBody::opaque(),
+            Self::Opaque => SectionBody::Opaque,
         }
     }
 }
 
+#[derive(Default)]
 struct ItemListBuilder<'a> {
     fragments: Vec<BodyFragment>,
     current_item: Option<ItemBuilder<'a>>,
@@ -582,23 +667,8 @@ struct ItemListBuilder<'a> {
     leading_prose: DescriptionBuilder<'a>,
     /// Indentation established by the first renderable item.
     item_indent: Option<TextSize>,
-    /// Whether every line seen so far can be rendered faithfully as Markdown.
-    is_renderable: bool,
-}
-
-impl Default for ItemListBuilder<'_> {
-    /// Creates an empty builder that is renderable by default (meaning that we
-    /// must actually encounter an unrenderable line in order to prevent
-    /// rendering an item list as Markdown).
-    fn default() -> Self {
-        Self {
-            fragments: Vec::new(),
-            current_item: None,
-            leading_prose: DescriptionBuilder::default(),
-            item_indent: None,
-            is_renderable: true,
-        }
-    }
+    /// Whether the body's structure is ambiguous.
+    has_structural_ambiguity: bool,
 }
 
 impl<'a> ItemListBuilder<'a> {
@@ -621,21 +691,21 @@ impl<'a> ItemListBuilder<'a> {
             self.finish_current_item();
             self.current_item = Some(ItemBuilder::new(&item_header));
             self.item_indent.get_or_insert(line_indent);
-            self.is_renderable &=
-                !item_line.also_parses_as_section_header && !item_header.type_was_discarded;
+            self.has_structural_ambiguity |=
+                item_line.also_parses_as_section_header || item_header.has_structural_ambiguity;
             return;
         }
 
         if let Some(item_indent) = self.item_indent
             && !item_line.can_render_as_continuation(section_header.kind, line_indent, item_indent)
         {
-            self.is_renderable = false;
+            self.has_structural_ambiguity = true;
         }
 
         if let Some(item) = &mut self.current_item {
             item.description.push_continuation(line.text);
         } else {
-            self.is_renderable = false;
+            self.has_structural_ambiguity = true;
             self.leading_prose.push_line(line.text);
         }
     }
@@ -656,9 +726,9 @@ impl<'a> ItemListBuilder<'a> {
     fn finish(mut self) -> SectionBody {
         self.finish_leading_prose();
         self.finish_current_item();
-        SectionBody {
+        SectionBody::Parsed {
             fragments: self.fragments,
-            is_renderable: self.is_renderable,
+            has_structural_ambiguity: self.has_structural_ambiguity,
         }
     }
 }
@@ -703,7 +773,12 @@ impl<'a> DescriptionBuilder<'a> {
     }
 
     fn push_line(&mut self, line: &'a str) {
-        if self.inline.is_none() && self.continuation_lines.is_empty() {
+        // Keep a leading list item with the block so that its indentation establishes the baseline
+        // for nested items. Ordinary first lines use the allocation-free inline representation.
+        if self.inline.is_none()
+            && self.continuation_lines.is_empty()
+            && !starts_with_markdown_list_item(line.trim_start())
+        {
             self.inline = Some(line.trim());
         } else {
             self.push_continuation(line);
@@ -830,15 +905,19 @@ impl<'a> ItemLine<'a> {
             return Self::default();
         }
 
-        let (display_name, ty) = match kind {
+        let (display_name, ty, display_name_has_structural_ambiguity) = match kind {
             SectionKind::Parameters
             | SectionKind::KeywordArguments
             | SectionKind::OtherParameters => {
                 let (display_name, ty) = split_name_and_type(name);
-                if !is_parameter_display_name(display_name) {
+                let Some(parsed_display_name) = ParameterDisplayName::parse(display_name) else {
                     return Self::default();
-                }
-                (display_name, ty)
+                };
+                (
+                    display_name,
+                    ty,
+                    parsed_display_name.is_conjunction_separated(),
+                )
             }
             SectionKind::Attributes => {
                 let (display_name, ty) = split_name_and_type(name);
@@ -848,7 +927,7 @@ impl<'a> ItemLine<'a> {
                         ..Self::default()
                     };
                 }
-                (display_name, ty)
+                (display_name, ty, false)
             }
             SectionKind::Raises => {
                 if !is_dotted_identifier(name) {
@@ -857,7 +936,7 @@ impl<'a> ItemLine<'a> {
                         ..Self::default()
                     };
                 }
-                (name, None)
+                (name, None, false)
             }
             SectionKind::Returns | SectionKind::Yields => return Self::default(),
         };
@@ -883,7 +962,8 @@ impl<'a> ItemLine<'a> {
                 display_name,
                 ty,
                 inline_description,
-                type_was_discarded,
+                has_structural_ambiguity: type_was_discarded
+                    || display_name_has_structural_ambiguity,
             }),
             is_item_like_continuation: false,
             also_parses_as_section_header,
@@ -895,8 +975,8 @@ struct ItemHeader<'a> {
     display_name: &'a str,
     ty: Option<&'a str>,
     inline_description: &'a str,
-    /// Whether malformed type syntax was discarded when parsing this header.
-    type_was_discarded: bool,
+    /// Whether this header's noncanonical syntax makes its structure ambiguous.
+    has_structural_ambiguity: bool,
 }
 
 /// Splits at the field delimiter, skipping top-level colons in reST roles.
@@ -963,12 +1043,6 @@ fn consume_rest_prefix_role(cursor: &mut Cursor<'_>) -> bool {
 
     *cursor = role;
     true
-}
-
-fn is_parameter_display_name(display_name: &str) -> bool {
-    display_name
-        .split(',')
-        .all(|name| is_parameter_name(name.trim()))
 }
 
 fn is_attribute_display_name(display_name: &str) -> bool {
@@ -1067,6 +1141,27 @@ Args:
           │ Coordinates.
         y:
           │ Coordinates.
+        ");
+    }
+
+    #[test]
+    fn extracts_conjunction_separated_parameter_names() {
+        let raw = "\
+Args:
+    stdin, stdout and stderr: Standard streams.
+    encoding or errors: Text settings.";
+
+        assert_snapshot!(display_parameters(raw), @"
+        stdin:
+          │ Standard streams.
+        stdout:
+          │ Standard streams.
+        stderr:
+          │ Standard streams.
+        encoding:
+          │ Text settings.
+        errors:
+          │ Text settings.
         ");
     }
 
@@ -1648,7 +1743,13 @@ Returns:
 Methods:
     helper: Method documentation.";
         let sections = sections(raw)
-            .map(|section| (section.kind, section.body.fragments, &raw[section.range]))
+            .map(|section| {
+                (
+                    section.kind,
+                    section.body.into_fragments(),
+                    &raw[section.range],
+                )
+            })
             .collect::<Vec<_>>();
 
         assert_eq!(
