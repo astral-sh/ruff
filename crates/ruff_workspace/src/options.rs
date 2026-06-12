@@ -4406,10 +4406,33 @@ mod tests {
         nested: NestedOptions,
     }
 
+    #[expect(dead_code)]
+    #[derive(ruff_macros::OptionsMetadata)]
+    struct BareDeprecatedOptions {
+        /// A deprecated option.
+        #[deprecated]
+        #[option(default = "false", value_type = "bool", example = "value = true")]
+        value: Option<bool>,
+    }
+
     #[test]
     fn options_metadata_finds_flatten_in_repeated_serde_attributes() {
         let metadata = <FlattenedOptions as ruff_options_metadata::OptionsMetadata>::metadata();
         assert!(metadata.has("nested"));
+    }
+
+    #[test]
+    fn options_metadata_accepts_bare_deprecated_attribute() {
+        let metadata =
+            <BareDeprecatedOptions as ruff_options_metadata::OptionsMetadata>::metadata();
+        let deprecated = metadata
+            .find("value")
+            .and_then(ruff_options_metadata::OptionEntry::into_field)
+            .and_then(|field| field.deprecated)
+            .expect("field should be deprecated");
+
+        assert_eq!(deprecated.since, None);
+        assert_eq!(deprecated.message, None);
     }
 
     #[test]

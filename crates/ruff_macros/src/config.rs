@@ -319,6 +319,16 @@ fn parse_field_attributes(attribute: &Attribute) -> syn::Result<FieldAttributes>
 }
 
 fn parse_deprecated_attribute(attribute: &Attribute) -> syn::Result<DeprecatedAttribute> {
+    if matches!(&attribute.meta, Meta::Path(_)) {
+        return Ok(DeprecatedAttribute::default());
+    }
+    if !matches!(&attribute.meta, Meta::List(_)) {
+        return Err(syn::Error::new_spanned(
+            attribute,
+            "Expected `deprecated` or `deprecated(...)` attribute.",
+        ));
+    }
+
     let mut deprecated = DeprecatedAttribute::default();
     attribute.parse_nested_meta(|meta| {
         if meta.path.is_ident("note") {
