@@ -120,10 +120,7 @@ pub(in crate::docstring) fn is_backtick_run_escaped(text: &str, index: usize) ->
 /// at index 3.
 pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
     let marker = lines.get(index)?;
-    if !is_rest_directive_marker(marker.text)
-        && !is_field_list_marker(marker.text)
-        && !starts_with_markdown_list_item(marker.text.trim_start())
-    {
+    if !starts_container_block(marker.text) {
         return None;
     }
 
@@ -135,6 +132,13 @@ pub(super) fn container_block_end(lines: &[ParsedLine<'_>], index: usize) -> Opt
             })
             .unwrap_or(lines.len()),
     )
+}
+
+/// Returns whether `line` starts a block that owns its indented contents.
+pub(super) fn starts_container_block(line: &str) -> bool {
+    is_rest_directive_marker(line)
+        || is_field_list_marker(line)
+        || starts_with_markdown_list_item(line.trim_start())
 }
 
 fn is_rest_directive_marker(line: &str) -> bool {
