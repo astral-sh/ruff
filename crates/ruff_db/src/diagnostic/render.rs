@@ -247,6 +247,10 @@ impl<'a> ResolvedDiagnostic<'a> {
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
             )
+        } else if config.preview {
+            // In preview, Ruff shows both the severity and the human-readable name, so we don't
+            // need a colon.
+            diag.id().to_string()
         } else {
             diag.secondary_code_or_id().to_string()
         };

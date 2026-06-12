@@ -3826,7 +3826,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
     success: false
     exit_code: 1
     ----- stdout -----
-    error[F401][*]: `math` imported but unused
+    error[unused-import][*]: `math` imported but unused
      --> -:1:8
       |
     1 | import math
@@ -3892,24 +3892,24 @@ fn rule_panic_mixed_results_full() -> Result<()> {
     success: false
     exit_code: 2
     ----- stdout -----
-    error[RUF900]: Hey this is a stable test rule.
+    error[stable-test-rule]: Hey this is a stable test rule.
     --> normal.py:1:1
 
-    error[RUF901][*]: Hey this is a stable test rule with a safe fix.
+    error[stable-test-rule-safe-fix][*]: Hey this is a stable test rule with a safe fix.
     --> normal.py:1:1
     1 + # fix from stable-test-rule-safe-fix
     2 | import os
 
-    error[RUF902]: Hey this is a stable test rule with an unsafe fix.
+    error[stable-test-rule-unsafe-fix]: Hey this is a stable test rule with an unsafe fix.
     --> normal.py:1:1
 
-    error[RUF903]: Hey this is a stable test rule with a display only fix.
+    error[stable-test-rule-display-only-fix]: Hey this is a stable test rule with a display only fix.
     --> normal.py:1:1
 
-    error[RUF911]: Hey this is a preview test rule.
+    error[preview-test-rule]: Hey this is a preview test rule.
     --> normal.py:1:1
 
-    error[RUF950]: Hey this is a test rule that was redirected from another.
+    error[redirected-to-test-rule]: Hey this is a test rule that was redirected from another.
     --> normal.py:1:1
 
     error[panic]: Panicked at <location> when checking `[TMP]/panic.py`: `This is a fake panic for testing.`
