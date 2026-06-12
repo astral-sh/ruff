@@ -1,11 +1,6 @@
-pub(super) mod rst;
+use indexmap::IndexMap;
 
-/// Represents documentation for a single parameter parsed from a docstring.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct ParameterDocumentation {
-    pub(super) name: String,
-    pub(super) description: String,
-}
+pub(super) mod rst;
 
 /// Encapsulates the set of docstring formats for which we support the following
 /// features:
@@ -25,7 +20,7 @@ impl Formats {
     }
 
     /// Returns docs for all parameters recognized in a parsed docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
+    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
         self.rst.parameter_documentation()
     }
 }

@@ -80,9 +80,7 @@ impl Docstring {
         param_docs.extend(extract_numpy_style_params(&self.0));
 
         // reST/Sphinx-style docstrings
-        for parameter in Formats::parse(&self.0).parameter_documentation() {
-            param_docs.insert(parameter.name, parameter.description);
-        }
+        param_docs.extend(Formats::parse(&self.0).parameter_documentation());
 
         param_docs
     }
