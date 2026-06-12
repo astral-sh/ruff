@@ -5,6 +5,7 @@ use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKi
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
+use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
     SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
@@ -238,6 +239,19 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
             exact_sequence_pattern_type(db, element_types.into_iter())
         }
     } else {
-        Type::Never
+        let Some((prefix, suffix)) = kind.split_around_star() else {
+            return Type::Never;
+        };
+
+        Type::tuple(TupleType::mixed(
+            db,
+            prefix
+                .iter()
+                .map(|pattern| definite_match_pattern_type(db, pattern)),
+            Type::object(),
+            suffix
+                .iter()
+                .map(|pattern| definite_match_pattern_type(db, pattern)),
+        ))
     }
 }
