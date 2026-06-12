@@ -1215,12 +1215,12 @@ impl<'db> Type<'db> {
 
     fn is_top_level_cycle_marker(self, db: &'db dyn Db, div: Type<'db>) -> bool {
         self.same_divergent_marker(div)
-            || match (self, div) {
-                (Type::Recursive(recursive), Type::Divergent(divergent)) => {
-                    recursive.is_non_contractive_for_marker(db, divergent.id())
-                }
-                _ => false,
-            }
+            || matches!(
+                self,
+                Type::Recursive(recursive)
+                    if recursive.is_non_contractive(db)
+                        && Type::divergent(recursive.binder_id(db)).same_divergent_marker(div)
+            )
     }
 
     pub(crate) fn contains_recursive_type(self, db: &'db dyn Db) -> bool {

@@ -305,73 +305,15 @@ impl<'db> RecursiveType<'db> {
         f(self.unfold(db)).fold(db, self)
     }
 
-    /// Whether this μ-binder is *non-contractive*: following its body through
-    /// only μ-binders reaches a binder marker from that same chain, with no
-    /// type constructor around the recursive position.
+    /// Whether this μ-binder is *non-contractive*: its body is the bare α-binder marker itself
+    /// (`μα. α`), with no constructor around the recursive position.
     ///
-    /// Unfolding such a type makes no progress (`μα.α → μα.α`,
-    /// `μα.μβ.α → μα.μβ.α`, etc.), so structural operations that recurse on the
-    /// one-step unfold (subscript, iteration) must not unfold it. They treat it
-    /// as a gradual leaf instead, exactly as they would a bare `Divergent`.
-    /// This only arises as a not-yet-converged cycle provisional; a converged,
+    /// Unfolding such a type makes no progress (`μα.α → μα.α`), so structural operations that
+    /// recurse on the one-step unfold (e.g. subscript, iteration) must not unfold it — they treat it
+    /// as a gradual leaf (returning the marker itself) instead, exactly as they would a bare
+    /// `Divergent`. This only arises as a not-yet-converged cycle provisional; a converged,
     /// structureless cycle is resolved away rather than wrapped.
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
-        self.non_contractive_marker(db).is_some()
-    }
-
-    pub(crate) fn is_non_contractive_for_marker(self, db: &'db dyn Db, marker: salsa::Id) -> bool {
-        self.non_contractive_marker(db) == Some(marker)
-    }
-
-    fn non_contractive_marker(self, db: &'db dyn Db) -> Option<salsa::Id> {
-        fn non_contractive_marker_impl<'db>(
-            db: &'db dyn Db,
-            ty: Type<'db>,
-            binders: &mut Vec<salsa::Id>,
-            recursive_types: &mut Vec<RecursiveType<'db>>,
-        ) -> Option<salsa::Id> {
-            match ty {
-                Type::Divergent(divergent) if binders.contains(&divergent.id()) => {
-                    Some(divergent.id())
-                }
-                Type::Recursive(recursive) => {
-                    if recursive_types.contains(&recursive) {
-                        return Some(recursive.binder_id(db));
-                    }
-
-                    recursive_types.push(recursive);
-
-                    let binder_id = recursive.binder_id(db);
-                    let pushed = if binders.contains(&binder_id) {
-                        false
-                    } else {
-                        binders.push(binder_id);
-                        true
-                    };
-
-                    let marker = non_contractive_marker_impl(
-                        db,
-                        recursive.body(db),
-                        binders,
-                        recursive_types,
-                    );
-
-                    if pushed {
-                        binders.pop();
-                    }
-                    recursive_types.pop();
-
-                    marker
-                }
-                _ => None,
-            }
-        }
-
-        non_contractive_marker_impl(
-            db,
-            self.body(db),
-            &mut vec![self.binder_id(db)],
-            &mut vec![self],
-        )
+        self.body(db) == Type::divergent(self.binder_id(db))
     }
 }
