@@ -637,6 +637,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     /// Returns whether this constraint set always holds
     pub(crate) fn is_always_satisfied(self, db: &'db dyn Db) -> bool {
         self.apply_deferred_quantification(db, self.builder)
+            .node
             .is_always_satisfied(db, self.builder)
     }
 
@@ -653,14 +654,15 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         // TODO: Preserve quantifier structure through negation-like operations instead of forcing
         // deferred quantification before checking the implication.
-        let mentioned_typevars = self
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        let mentioned_typevars = self_effective
             .mentioned_typevars
-            .difference(db, self.deferred_quantification)
             .merge(db, mentioned_typevars_for_type(db, lhs))
             .merge(db, mentioned_typevars_for_type(db, rhs));
         Self::from_node_with_metadata(
             builder,
-            self.apply_deferred_quantification(db, builder)
+            self_effective
+                .node
                 .implies_subtype_of(db, builder, lhs, rhs),
             InferableTypeVars::None,
             mentioned_typevars,
@@ -689,6 +691,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
     ) -> bool {
         self.verify_builder(builder);
         self.apply_deferred_quantification(db, builder)
+            .node
             .satisfied_by_all_typevars(db, builder, inferable)
     }
 
@@ -737,13 +740,12 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self.verify_builder(builder);
         // TODO: Preserve quantifier structure through negation instead of forcing deferred
         // quantification before negating.
+        let self_effective = self.apply_deferred_quantification(db, builder);
         Self::from_node_with_metadata(
             builder,
-            self.apply_deferred_quantification(db, builder)
-                .negate(builder),
+            self_effective.node.negate(builder),
             InferableTypeVars::None,
-            self.mentioned_typevars
-                .difference(db, self.deferred_quantification),
+            self_effective.mentioned_typevars,
         )
     }
 
@@ -824,19 +826,16 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         other.verify_builder(builder);
         // TODO: Preserve quantifier structure through equivalence instead of forcing deferred
         // quantification before the negation-like operation.
-        let mentioned_typevars = self
+        let self_effective = self.apply_deferred_quantification(db, builder);
+        let other_effective = other.apply_deferred_quantification(db, builder);
+        let mentioned_typevars = self_effective
             .mentioned_typevars
-            .difference(db, self.deferred_quantification)
-            .merge(
-                db,
-                other
-                    .mentioned_typevars
-                    .difference(db, other.deferred_quantification),
-            );
+            .merge(db, other_effective.mentioned_typevars);
         Self::from_node_with_metadata(
             builder,
-            self.apply_deferred_quantification(db, builder)
-                .iff_with_offset(builder, other.apply_deferred_quantification(db, builder)),
+            self_effective
+                .node
+                .iff_with_offset(builder, other_effective.node),
             InferableTypeVars::None,
             mentioned_typevars,
         )
@@ -892,19 +891,36 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Applies any deferred existential quantification and returns the effective constraint set.
     fn apply_deferred_quantification(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-    ) -> NodeId {
+    ) -> Self {
+        if matches!(self.deferred_quantification, InferableTypeVars::None) {
+            return self;
+        }
+
         let deferred_quantification = self
             .deferred_quantification
             .intersection(db, self.mentioned_typevars);
         if matches!(deferred_quantification, InferableTypeVars::None) {
-            return self.node;
+            return Self::from_node_with_metadata(
+                builder,
+                self.node,
+                InferableTypeVars::None,
+                self.mentioned_typevars,
+            );
         }
-        self.node
-            .exists(db, builder, deferred_quantification.iter(db))
+
+        Self::from_node_with_metadata(
+            builder,
+            self.node
+                .exists(db, builder, deferred_quantification.iter(db)),
+            InferableTypeVars::None,
+            self.mentioned_typevars
+                .difference(db, deferred_quantification),
+        )
     }
 
     pub(crate) fn path_bounds(
@@ -914,11 +930,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         projection: SolutionProjection<'db>,
     ) -> PathBounds<'db> {
         self.verify_builder(builder);
-        let node = self.apply_deferred_quantification(db, builder);
+        let set = self.apply_deferred_quantification(db, builder);
         let node = match projection {
-            SolutionProjection::AllTypeVars => node,
+            SolutionProjection::AllTypeVars => set.node,
             SolutionProjection::InferableOnly(inferable) => {
-                node.remove_noninferable(db, builder, inferable)
+                set.node.remove_noninferable(db, builder, inferable)
             }
         };
         PathBounds::compute(db, builder, node)
