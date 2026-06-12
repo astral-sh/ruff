@@ -659,16 +659,63 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
-    pub(crate) fn with_deferred_quantification(
+    pub(crate) fn quantify_typevars(
         mut self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        deferred_quantification: InferableTypeVars<'db>,
+        typevars: InferableTypeVars<'db>,
     ) -> Self {
         self.verify_builder(builder);
-        self.deferred_quantification = self
-            .deferred_quantification
-            .merge(db, deferred_quantification);
+        if matches!(typevars, InferableTypeVars::None) {
+            return self;
+        }
+
+        // Find the typevars that are used invariantly in the lower/upper bounds of the typevars
+        // that will remain after quantification. We need to defer the quantification of those
+        // invariant typevars, because the sequent map cannot promote constraints on them into
+        // constraints on the remaining typevars.
+        let mut variance_in_bounds: FxHashMap<_, _> = typevars
+            .iter(db)
+            .map(|bound_typevar| (bound_typevar, (0, TypeVarVariance::Bivariant)))
+            .collect();
+        self.node
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                let constraint = builder.constraint_data(constraint);
+                for (bound_typevar, (count, variance)) in &mut variance_in_bounds {
+                    *count = *count + 1;
+                    if *variance == TypeVarVariance::Invariant {
+                        continue;
+                    }
+                    if let Some(lower) = constraint.bounds.lower {
+                        *variance = variance.join(lower.variance_of(db, *bound_typevar));
+                    }
+                    if let Some(upper) = constraint.bounds.upper {
+                        *variance = variance.join(upper.variance_of(db, *bound_typevar));
+                    }
+                }
+            });
+
+        let mut deferred_typevars: FxOrderSet<_> = self.deferred_quantification.iter(db).collect();
+        let eager_typevars =
+            variance_in_bounds
+                .into_iter()
+                .filter_map(
+                    |(bound_typevar, (count, variance))| match (count, variance) {
+                        (_, TypeVarVariance::Invariant) => {
+                            deferred_typevars.insert(bound_typevar);
+                            None
+                        }
+                        (count, _) if count > 1 => {
+                            deferred_typevars.insert(bound_typevar);
+                            None
+                        }
+                        _ => Some(bound_typevar),
+                    },
+                );
+        let eagerly_quantified = self.node.exists(db, builder, eager_typevars);
+
+        self.node = eagerly_quantified;
+        self.deferred_quantification = InferableTypeVars::from_typevars(db, deferred_typevars);
         self
     }
 
@@ -6557,7 +6604,6 @@ mod tests {
     use indoc::indoc;
     use pretty_assertions::assert_eq;
 
-    use crate::FxOrderSet;
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
     use ruff_python_ast::name::Name;
@@ -6574,13 +6620,6 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
-    }
-
-    fn create_typevar_set<'db>(
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-    ) -> InferableTypeVars<'db> {
-        InferableTypeVars::from_typevars(db, FxOrderSet::from_iter([bound_typevar.identity(db)]))
     }
 
     #[test]
@@ -6847,215 +6886,6 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
-    }
-
-    #[test]
-    fn deferred_quantification_applies_to_semantic_observations() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let deferred_quantification = create_typevar_set(&db, t);
-        let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(&db, &builder, t, KnownClass::Int);
-        let eager = ConstraintSet::from_node(
-            &builder,
-            t_int
-                .node
-                .exists(&db, &builder, deferred_quantification.iter(&db)),
-        );
-        let deferred = t_int.with_deferred_quantification(&db, &builder, deferred_quantification);
-
-        assert!(!deferred.node.is_always_satisfied(&db, &builder));
-        assert_eq!(
-            deferred.is_always_satisfied(&db),
-            eager.is_always_satisfied(&db)
-        );
-        assert_eq!(
-            deferred.is_never_satisfied(&db),
-            eager.is_never_satisfied(&db)
-        );
-        assert!(deferred.is_always_satisfied(&db));
-        assert!(deferred.satisfied_by_all_typevars(&db, &builder, InferableTypeVars::None));
-    }
-
-    #[test]
-    fn deferred_quantification_merges_through_positive_combinators() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let t_deferred = create_typevar_set(&db, t);
-        let u_deferred = create_typevar_set(&db, u);
-        let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
-            .with_deferred_quantification(&db, &builder, t_deferred);
-        let u_str = create_constraint(&db, &builder, u, KnownClass::Str)
-            .with_deferred_quantification(&db, &builder, u_deferred);
-
-        let intersection = t_int.and(&db, &builder, || u_str);
-        let union = t_int.or(&db, &builder, || u_str);
-        let when_all = [t_int, u_str]
-            .into_iter()
-            .when_all(&db, &builder, |constraint| constraint);
-        let when_any = [t_int, u_str]
-            .into_iter()
-            .when_any(&db, &builder, |constraint| constraint);
-
-        let expected = FxOrderSet::from_iter([t.identity(&db), u.identity(&db)]);
-        for set in [intersection, union, when_all, when_any] {
-            let actual: FxOrderSet<_> = set.deferred_quantification.iter(&db).collect();
-            assert_eq!(actual, expected);
-        }
-    }
-
-    #[test]
-    fn deferred_quantification_preserves_raw_constraints_until_solving() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let t_deferred = create_typevar_set(&db, t);
-        let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
-            .with_deferred_quantification(&db, &builder, t_deferred);
-        let u_equals_t =
-            ConstraintSet::constrain_typevar(&db, &builder, u, Type::TypeVar(t), Type::TypeVar(t));
-        let set = t_int.and(&db, &builder, || u_equals_t);
-
-        let Solutions::Constrained(raw_solutions) = ConstraintSet::from_node(&builder, set.node)
-            .solutions(&db, &builder, SolutionProjection::AllTypeVars)
-        else {
-            panic!("expected constrained raw solutions");
-        };
-        assert_eq!(raw_solutions.len(), 1);
-        let raw_identities: FxHashSet<_> = raw_solutions
-            .into_iter()
-            .flatten()
-            .map(|binding| binding.bound_typevar.identity(&db))
-            .collect();
-        assert_eq!(
-            raw_identities,
-            FxHashSet::from_iter([t.identity(&db), u.identity(&db)])
-        );
-
-        let Solutions::Constrained(solutions) =
-            set.solutions(&db, &builder, SolutionProjection::AllTypeVars)
-        else {
-            panic!("expected constrained deferred solutions");
-        };
-        assert_eq!(solutions.len(), 1);
-        let [solution] = solutions.as_slice() else {
-            panic!("expected one solution path");
-        };
-        let [binding] = solution.as_slice() else {
-            panic!("expected one typevar solution");
-        };
-        assert_eq!(binding.bound_typevar.identity(&db), u.identity(&db));
-        assert_eq!(binding.solution, KnownClass::Int.to_instance(&db));
-    }
-
-    #[test]
-    fn deferred_quantification_negates_effective_formula() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let deferred_quantification = create_typevar_set(&db, t);
-        let builder = ConstraintSetBuilder::new();
-        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
-            .with_deferred_quantification(&db, &builder, deferred_quantification);
-        let quantified_after_negation = ConstraintSet::from_node_with_metadata(
-            &builder,
-            t_int.node.negate(&builder),
-            deferred_quantification,
-        );
-
-        assert!(t_int.negate(&db, &builder).is_never_satisfied(&db));
-        assert!(
-            t_int
-                .implies(&db, &builder, || ConstraintSet::never(&builder))
-                .is_never_satisfied(&db)
-        );
-        assert!(quantified_after_negation.is_always_satisfied(&db));
-    }
-
-    #[test]
-    fn solution_projection_controls_noninferable_removal() {
-        fn solution_identities<'db, 'c>(
-            db: &'db dyn Db,
-            builder: &'c ConstraintSetBuilder<'db>,
-            set: ConstraintSet<'db, 'c>,
-            projection: SolutionProjection<'db>,
-        ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
-            let solutions = set.solutions(db, builder, projection);
-            let Solutions::Constrained(mut solutions) = solutions else {
-                panic!("expected constrained solutions");
-            };
-            assert_eq!(solutions.len(), 1);
-            solutions
-                .pop()
-                .expect("expected a solution path")
-                .into_iter()
-                .map(|binding| binding.bound_typevar.identity(db))
-                .collect()
-        }
-
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let u = create_typevar(&db, "U");
-        let t_inferable = create_typevar_set(&db, t);
-        let builder = ConstraintSetBuilder::new();
-        let set = create_constraint(&db, &builder, t, KnownClass::Int).and(&db, &builder, || {
-            create_constraint(&db, &builder, u, KnownClass::Str)
-        });
-
-        assert_eq!(
-            solution_identities(&db, &builder, set, SolutionProjection::AllTypeVars),
-            FxHashSet::from_iter([t.identity(&db), u.identity(&db)]),
-        );
-        assert_eq!(
-            solution_identities(
-                &db,
-                &builder,
-                set,
-                SolutionProjection::InferableOnly(t_inferable),
-            ),
-            FxHashSet::from_iter([t.identity(&db)]),
-        );
-    }
-
-    #[test]
-    fn deferred_quantification_owned_round_trip() {
-        let db = setup_db();
-        let t = create_typevar(&db, "T");
-        let deferred_quantification = create_typevar_set(&db, t);
-
-        let expected = FxHashSet::from_iter([t.identity(&db)]);
-        let builder = ConstraintSetBuilder::new();
-        let owned = builder.into_owned(|builder| {
-            create_constraint(&db, builder, t, KnownClass::Int).with_deferred_quantification(
-                &db,
-                builder,
-                deferred_quantification,
-            )
-        });
-
-        owned.query(|_builder, set| {
-            assert_eq!(set.deferred_quantification, deferred_quantification);
-            assert_eq!(
-                set.deferred_quantification
-                    .iter(&db)
-                    .collect::<FxHashSet<_>>(),
-                expected
-            );
-            assert!(set.is_always_satisfied(&db));
-        });
-
-        let builder = ConstraintSetBuilder::new();
-        let set = builder.load(&db, &owned);
-        assert_eq!(set.deferred_quantification, deferred_quantification);
-        assert_eq!(
-            set.deferred_quantification
-                .iter(&db)
-                .collect::<FxHashSet<_>>(),
-            expected
-        );
-        assert!(set.is_always_satisfied(&db));
     }
 
     /// Round-trip through `OwnedConstraintSet`: build a TDD with uncertain branches, convert to

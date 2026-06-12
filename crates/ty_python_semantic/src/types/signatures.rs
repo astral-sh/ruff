@@ -1815,7 +1815,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // before final semantic observation or solution extraction. Record that quantification on
         // the returned constraint set so later positive constraint construction can still refer to
         // the freshened callable typevars.
-        when.with_deferred_quantification(db, self.constraints, signature_inferable)
+        when.quantify_typevars(db, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(
