@@ -256,6 +256,47 @@ pub(crate) enum InferableTypeVars<'db> {
 }
 
 impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn mentioned_in_type(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        #[derive(Default)]
+        struct CollectMentionedTypevars<'db> {
+            typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for CollectMentionedTypevars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.typevars
+                    .borrow_mut()
+                    .insert(bound_typevar.identity(db));
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+        fn mentioned_in_type_inner<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            _: (),
+        ) -> InferableTypeVars<'db> {
+            let visitor = CollectMentionedTypevars::default();
+            visitor.visit_type(db, ty);
+            InferableTypeVars::from_typevars(db, visitor.typevars.into_inner())
+        }
+
+        mentioned_in_type_inner(db, ty, ())
+    }
+
     pub(crate) fn from_typevars(
         db: &'db dyn Db,
         mut typevars: FxOrderSet<BoundTypeVarIdentity<'db>>,

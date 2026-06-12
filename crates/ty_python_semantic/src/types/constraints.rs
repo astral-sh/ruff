@@ -344,53 +344,18 @@ fn mentioned_typevars_for_constraint_parts<'db>(
     lower: Option<Type<'db>>,
     upper: Option<Type<'db>>,
 ) -> InferableTypeVars<'db> {
-    let mut typevars = mentioned_typevars_in_type(db, Type::TypeVar(typevar));
+    let mut typevars = InferableTypeVars::mentioned_in_type(db, Type::TypeVar(typevar));
     if let Some(lower) = lower {
-        typevars.extend(mentioned_typevars_in_type(db, lower));
+        typevars = typevars.merge(db, InferableTypeVars::mentioned_in_type(db, lower));
     }
     if let Some(upper) = upper {
-        typevars.extend(mentioned_typevars_in_type(db, upper));
+        typevars = typevars.merge(db, InferableTypeVars::mentioned_in_type(db, upper));
     }
-    InferableTypeVars::from_typevars(db, typevars)
+    typevars
 }
 
 fn mentioned_typevars_for_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> InferableTypeVars<'db> {
-    InferableTypeVars::from_typevars(db, mentioned_typevars_in_type(db, ty))
-}
-
-fn mentioned_typevars_in_type<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> FxOrderSet<BoundTypeVarIdentity<'db>> {
-    #[derive(Default)]
-    struct CollectMentionedTypevars<'db> {
-        typevars: RefCell<FxOrderSet<BoundTypeVarIdentity<'db>>>,
-        recursion_guard: TypeCollector<'db>,
-    }
-
-    impl<'db> TypeVisitor<'db> for CollectMentionedTypevars<'db> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_bound_type_var_type(
-            &self,
-            db: &'db dyn Db,
-            bound_typevar: BoundTypeVarInstance<'db>,
-        ) {
-            self.typevars
-                .borrow_mut()
-                .insert(bound_typevar.identity(db));
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
-        }
-    }
-
-    let visitor = CollectMentionedTypevars::default();
-    visitor.visit_type(db, ty);
-    visitor.typevars.into_inner()
+    InferableTypeVars::mentioned_in_type(db, ty)
 }
 
 /// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
