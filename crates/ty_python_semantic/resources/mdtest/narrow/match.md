@@ -417,10 +417,6 @@ def test_match_class_alias_preserves_recursive_containers(
 class Number(IntEnum):
     ONE = 1
 
-class RecursiveNumber(IntEnum):
-    _value_: "RecursiveNumber"
-    ONE = 1
-
 def test_match_capture_preserves_int_enum_equal_arm(
     value: tuple[Literal[1], int],
 ) -> str:
@@ -430,38 +426,6 @@ def test_match_capture_preserves_int_enum_equal_arm(
             return item  # error: [invalid-return-type]
         case _:
             return ""
-
-def test_match_capture_preserves_recursive_int_enum_arm(
-    value: tuple[Literal[1], int],
-) -> str:
-    match value:
-        case [RecursiveNumber.ONE, item]:
-            reveal_type(item)  # revealed: int
-            return item  # error: [invalid-return-type]
-        case _:
-            return ""
-
-def test_match_capture_int_enum_correlation_todo(
-    value: tuple[Literal[1], int] | tuple[Literal[2], str],
-) -> None:
-    match value:
-        case [Number.ONE, item]:
-            # TODO: Narrow this to `int` by comparing known `IntEnum` member values.
-            reveal_type(item)  # revealed: int | str
-
-class CustomNeEnum(Enum):
-    A = 1
-    B = 2
-
-    def __ne__(self, other: object) -> Literal[True]:
-        return True
-
-def test_match_capture_enum_custom_ne_todo() -> None:
-    value = (CustomNeEnum.B, "actual")
-    match value:
-        case [CustomNeEnum.A, item]:
-            # TODO: Preserve enum-member identity when equality is overridden.
-            reveal_type(item)  # revealed: Literal["actual"]
 
 class AlwaysEqualEnum(Enum):
     A = 1
@@ -475,43 +439,6 @@ def test_match_capture_preserves_custom_equal_enum_arm() -> int:
     match value:
         case [AlwaysEqualEnum.A, item]:
             reveal_type(item)  # revealed: Literal["actual"]
-            return item  # error: [invalid-return-type]
-        case _:
-            return 0
-
-class AlwaysEqualTuple(tuple[int, ...]):
-    def __eq__(self, other: object) -> Literal[True]:
-        return True
-
-class InheritedAlwaysEqualTuple(AlwaysEqualTuple):
-    pass
-
-def test_match_alias_preserves_custom_equal_tuple_subclass(
-    value: InheritedAlwaysEqualTuple | bytes,
-) -> bytes:
-    match value:
-        case 1 as item:
-            return item  # error: [invalid-return-type]
-        case _:
-            return b""
-
-class AlwaysEqualMeta(type):
-    def __eq__(cls, other: object) -> Literal[True]:
-        return True
-
-class EqualA(metaclass=AlwaysEqualMeta):
-    pass
-
-class EqualB(metaclass=AlwaysEqualMeta):
-    pass
-
-class EqualConstants:
-    A = EqualA
-
-def test_match_capture_preserves_custom_equal_class_arm() -> int:
-    value = (EqualB, "actual")
-    match value:
-        case [EqualConstants.A, item]:
             return item  # error: [invalid-return-type]
         case _:
             return 0
@@ -541,17 +468,8 @@ class CustomNeMeta(type):
 class CustomNeA(metaclass=CustomNeMeta):
     pass
 
-class CustomNeB(metaclass=CustomNeMeta):
-    pass
-
 class CustomNeConstants:
     A = CustomNeA
-
-def test_match_capture_ignores_custom_ne() -> None:
-    value = (CustomNeB, "actual")
-    match value:
-        case [CustomNeConstants.A, item]:
-            reveal_type(item)  # revealed: Never
 
 def test_match_alias_ignores_custom_ne(flag: bool) -> str:
     value = CustomNeA if flag else "fallback"
@@ -875,31 +793,6 @@ def match_tuple_expression_guard_rebinding(
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
-```
-
-## Sequence patterns with `StrEnum`
-
-```toml
-[environment]
-python-version = "3.11"
-```
-
-```py
-from enum import StrEnum
-from typing import Literal
-
-class Word(StrEnum):
-    ONE = "one"
-
-def test_match_capture_preserves_str_enum_equal_arm(
-    value: tuple[Literal["one"], str],
-) -> int:
-    match value:
-        case [Word.ONE, item]:
-            reveal_type(item)  # revealed: str
-            return item  # error: [invalid-return-type]
-        case _:
-            return 0
 ```
 
 ## Value patterns

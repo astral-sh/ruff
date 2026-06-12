@@ -1237,26 +1237,6 @@ impl<'db> Type<'db> {
         !(check_dunder("__eq__", true) && check_dunder("__ne__", false))
     }
 
-    /// Return true if equality is not guaranteed to be reflexive for this type.
-    fn equality_may_not_be_reflexive(self, db: &'db dyn Db) -> bool {
-        if matches!(self, Type::LiteralValue(literal) if !literal.is_enum()) {
-            return false;
-        }
-
-        !matches!(
-            self.try_call_dunder_with_policy(
-                db,
-                "__eq__",
-                &mut CallArguments::positional([Type::unknown()]),
-                TypeContext::default(),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK
-                    | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
-            ),
-            Err(CallDunderError::MethodNotAvailable)
-        )
-    }
-
     pub fn is_notimplemented(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NotImplementedType)
     }
