@@ -638,6 +638,25 @@ def custom_eq(value: AlwaysEqual) -> None:
             reveal_type(value)  # revealed: AlwaysEqual
         case _:
             reveal_type(value)  # revealed: AlwaysEqual
+
+class NeverEqualMeta(type):
+    def __eq__(cls, other: object) -> Literal[False]:
+        return False
+
+class NeverEqualValue(metaclass=NeverEqualMeta):
+    pass
+
+class Constants:
+    VALUE = NeverEqualValue
+
+def non_reflexive_value_pattern_does_not_narrow_fallback(
+    value: tuple[type[NeverEqualValue]],
+) -> None:
+    match value:
+        case [Constants.VALUE]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: tuple[type[NeverEqualValue]]
 ```
 
 ## Value patterns with guard
