@@ -1377,7 +1377,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
                 }
-                Type::unknown()
+                Type::Never
             }
             Type::SpecialForm(special_form) => {
                 self.infer_parameterized_special_form_type_expression(subscript, special_form)
