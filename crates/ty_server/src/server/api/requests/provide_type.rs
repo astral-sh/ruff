@@ -18,12 +18,13 @@ pub(crate) struct ProvideTypeRequestHandler;
 /// Each range in `ranges` represents a start and an end of an expression for which the type
 /// is requested.
 ///
-/// A fully qualified name of a type is returned for each `range`.
-/// Everything that can be fully qualified should be fully qualified, including class and function
-/// names, function types, and type parameters
-/// This name follows the format of Python type annotations, except in some cases in which it's easier
-/// to represent them differently. For example, callables are represented
-/// as `def mod.f(x: builtins.str) -> builtins.int`
+/// Each result is a complete, fully-qualified printing of the expression's type. Exact `float` and
+/// `complex` instances use their public classes, runtime PEP 695 alias objects use their canonical
+/// runtime class, and direct synthesized-protocol intersection constraints are omitted. No other
+/// type is widened, resolved, or omitted. The formal grammar and complete normalization contract
+/// are documented by `ty_python_semantic::types::print_type_for_provide_type`. A result is `null`
+/// when the range has no expression type or the type cannot be printed after applying those
+/// normalizations.
 ///
 #[derive(Debug)]
 pub enum ProvideTypeRequest {}
@@ -45,10 +46,10 @@ pub struct ProvideTypeParams {
     pub ranges: Vec<Range>,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Eq, PartialEq, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProvideTypeResponse {
-    /// Fully qualified names of the types, one per input range
+    /// Fully qualified printed types, one per input range.
     pub types: Vec<Option<String>>,
 }
 
@@ -71,14 +72,13 @@ impl BackgroundDocumentRequestHandler for ProvideTypeRequestHandler {
             return Ok(None);
         };
 
-        let uri = Self::document_uri(&params);
         let types = provide_types(
             db,
             file,
             params
                 .ranges
                 .iter()
-                .map(|range| range.to_text_range(db, file, &uri, snapshot.encoding())),
+                .map(|range| range.to_text_range(db, file, snapshot.uri(), snapshot.encoding())),
         );
 
         Ok(Some(ProvideTypeResponse { types }))
