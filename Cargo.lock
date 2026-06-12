@@ -3276,6 +3276,7 @@ dependencies = [
  "regex",
  "ruff_python_trivia",
  "syn",
+ "synstructure",
 ]
 
 [[package]]

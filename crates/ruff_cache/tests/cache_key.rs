@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
@@ -87,6 +88,39 @@ fn unnamed_field_struct() {
     unnamed_fields.hash(&mut hash);
 
     assert_eq!(hash.finish(), key.finish());
+}
+
+#[test]
+fn generic_struct() {
+    #[derive(CacheKey)]
+    struct Generic<T>(T);
+
+    let mut key = CacheKeyHasher::new();
+    Generic("Hello").cache_key(&mut key);
+}
+
+#[test]
+fn generic_field_with_additional_bounds() {
+    #[derive(CacheKey)]
+    struct GenericMap<K, V>(HashMap<K, V>);
+
+    let mut key = CacheKeyHasher::new();
+    GenericMap(HashMap::from([(1, "Hello")])).cache_key(&mut key);
+}
+
+#[test]
+fn ignored_generic_field_does_not_require_cache_key() {
+    struct NotCacheKey;
+
+    #[derive(CacheKey)]
+    struct Generic<T> {
+        #[cache_key(ignore)]
+        #[expect(dead_code)]
+        value: T,
+    }
+
+    let mut key = CacheKeyHasher::new();
+    Generic { value: NotCacheKey }.cache_key(&mut key);
 }
 
 #[derive(CacheKey, Hash)]
