@@ -4,10 +4,9 @@ use ruff_text_size::TextRange;
 
 use super::SectionKind;
 use super::preformatted::PreformattedBlockScanner;
-use super::rst::is_field_list_marker;
 use super::syntax::{
-    ParsedLine, indentation, parse_parenthesized_type, parsed_lines, split_once_unbracketed_colon,
-    starts_with_markdown_list_item,
+    ParsedLine, indentation, indented_container_end, parse_parenthesized_type, parsed_lines,
+    split_once_unbracketed_colon,
 };
 
 /// Returns parameter documentation from recognized Google-style parameter sections.
@@ -47,7 +46,7 @@ pub(in crate::docstring) fn visit_sections<'a>(
             index = section_end;
             continue;
         }
-        if let Some(block_end) = indented_non_google_block_end(&lines, index) {
+        if let Some(block_end) = indented_container_end(&lines, index) {
             index = block_end;
             continue;
         }
@@ -80,7 +79,10 @@ pub(in crate::docstring) fn is_parameter_name(name: &str) -> bool {
     is_identifier(identifier)
 }
 
-fn non_google_underlined_section_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
+pub(in crate::docstring) fn non_google_underlined_section_end(
+    lines: &[ParsedLine<'_>],
+    index: usize,
+) -> Option<usize> {
     let header_indent = non_google_underlined_section_indent(lines, index)?;
 
     let mut section_end = index + 2;
@@ -126,37 +128,6 @@ fn non_google_underlined_section_indent(lines: &[ParsedLine<'_>], index: usize) 
             .chars()
             .all(|character| matches!(character, '-' | '=')))
     .then_some(header_indent)
-}
-
-fn indented_non_google_block_end(lines: &[ParsedLine<'_>], index: usize) -> Option<usize> {
-    let marker = lines.get(index)?;
-    if !is_rest_directive_marker(marker.text)
-        && !is_field_list_marker(marker.text)
-        && !starts_with_markdown_list_item(marker.text.trim_start())
-    {
-        return None;
-    }
-
-    let marker_indent = indentation(marker.text);
-    Some(
-        lines[index + 1..]
-            .iter()
-            .position(|line| {
-                !line.text.trim().is_empty() && indentation(line.text) <= marker_indent
-            })
-            .map_or(lines.len(), |offset| index + 1 + offset),
-    )
-}
-
-fn is_rest_directive_marker(line: &str) -> bool {
-    let Some(directive) = line.trim_start().strip_prefix(".. ") else {
-        return false;
-    };
-    let Some((name, _)) = directive.split_once("::") else {
-        return false;
-    };
-
-    !name.is_empty() && !name.chars().any(char::is_whitespace)
 }
 
 fn google_section_body_end(
@@ -424,6 +395,15 @@ fn parse_google_section_like_header(
     })
 }
 
+/// Returns the end of a recognized Google-style section, including unsupported containers.
+pub(in crate::docstring) fn section_like_end(
+    lines: &[ParsedLine<'_>],
+    index: usize,
+) -> Option<usize> {
+    let header = parse_google_section_like_header(lines, index)?;
+    Some(google_section_body_end(lines, header).0)
+}
+
 fn google_section_kind(line: &str) -> Option<GoogleSectionHeaderKind> {
     let name = line.trim().strip_suffix(':')?.trim();
     google_section_kind_from_name(name)
@@ -475,6 +455,27 @@ fn is_inline_google_section_header(line: &str) -> bool {
 /// Returns whether `line` is a recognized Google-style section header.
 pub(in crate::docstring) fn is_section_like_header(line: &str) -> bool {
     google_section_kind(line).is_some() || is_inline_google_section_header(line)
+}
+
+/// Returns whether `line` can start the body of the named Google-style section.
+pub(in crate::docstring) fn section_body_starts_with_item(name: &str, line: &str) -> bool {
+    let Some(kind) = google_section_kind_from_name(name) else {
+        return false;
+    };
+    let line = line.trim();
+
+    match kind {
+        GoogleSectionHeaderKind::Supported(
+            SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
+        ) => parse_google_parameter(line).is_some(),
+        GoogleSectionHeaderKind::Supported(SectionKind::Attributes | SectionKind::Raises) => {
+            split_once_unbracketed_colon(line).is_some_and(|(name, _)| !name.trim().is_empty())
+        }
+        GoogleSectionHeaderKind::Supported(SectionKind::Returns | SectionKind::Yields) => {
+            !line.is_empty()
+        }
+        GoogleSectionHeaderKind::Unsupported => !line.is_empty(),
+    }
 }
 
 /// Returns whether `name` ends with a conventional exception-class suffix.
@@ -675,7 +676,7 @@ Args:
             let raw = format!(
                 "Args:\n    {name}: Capitalized parameter.\n    following: Following parameter."
             );
-            let parameters = super::super::parameter_documentation(&raw, IndexMap::default());
+            let parameters = super::super::parameter_documentation(&raw);
 
             assert_eq!(parameters.len(), 2, "{raw}");
             assert_eq!(parameters[name], "Capitalized parameter.", "{raw}");
@@ -840,7 +841,7 @@ Summary.
     Args:
         value: Parameter documentation.",
         ] {
-            let parameters = super::super::parameter_documentation(raw, IndexMap::default());
+            let parameters = super::super::parameter_documentation(raw);
             assert_parameters(raw, &parameters, &[("value", "Parameter documentation.")]);
         }
     }

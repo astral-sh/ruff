@@ -10,19 +10,10 @@ mod document;
 mod markdown;
 
 use indexmap::IndexMap;
-use regex::Regex;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation};
 use ruff_source_file::UniversalNewlines;
-use std::sync::LazyLock;
 
 use crate::MarkupKind;
-
-static NUMPY_SECTION_REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(?i)^\s*Parameters\s*$").expect("NumPy section regex should be valid")
-});
-
-static NUMPY_UNDERLINE_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"^\s*-+\s*$").expect("NumPy underline regex should be valid"));
 
 /// A docstring which hasn't yet been interpreted or rendered
 ///
@@ -58,7 +49,7 @@ impl Docstring {
     /// Extract parameter documentation from popular docstring formats.
     /// Returns a map of parameter names to their documentation.
     pub fn parameter_documentation(&self) -> IndexMap<String, String> {
-        document::parameter_documentation(&self.0, extract_numpy_style_params(&self.0))
+        document::parameter_documentation(&self.0)
     }
 }
 
@@ -153,183 +144,6 @@ fn documentation_trim(docs: &str) -> String {
     }
 
     output
-}
-
-/// Calculate the indentation level of a line.
-///
-/// Based on python's expandtabs (where tabs are considered 8 spaces).
-fn get_indentation_level(line: &str) -> usize {
-    leading_indentation(line)
-        .chars()
-        .map(|s| if s == '\t' { 8 } else { 1 })
-        .sum()
-}
-
-/// Extract parameter documentation from NumPy-style docstrings.
-fn extract_numpy_style_params(docstring: &str) -> IndexMap<String, String> {
-    let mut param_docs = IndexMap::new();
-
-    let mut lines = docstring
-        .universal_newlines()
-        .map(|line| line.as_str())
-        .peekable();
-    let mut in_params_section = false;
-    let mut found_underline = false;
-    let mut current_param: Option<String> = None;
-    let mut current_doc = String::new();
-    let mut base_param_indent: Option<usize> = None;
-    let mut base_content_indent: Option<usize> = None;
-
-    while let Some(line) = lines.next() {
-        if NUMPY_SECTION_REGEX.is_match(line) {
-            // Check if the next line is an underline
-            if let Some(next_line) = lines.peek() {
-                if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
-                    in_params_section = true;
-                    found_underline = false;
-                    base_param_indent = None;
-                    base_content_indent = None;
-                    continue;
-                }
-            }
-        }
-
-        if in_params_section && !found_underline {
-            if NUMPY_UNDERLINE_REGEX.is_match(line) {
-                found_underline = true;
-                continue;
-            }
-        }
-
-        if in_params_section && found_underline {
-            let current_indent = get_indentation_level(line);
-            let trimmed = line.trim();
-
-            // Skip empty lines
-            if trimmed.is_empty() {
-                continue;
-            }
-
-            // Check if we hit another section
-            if current_indent == 0 {
-                if let Some(next_line) = lines.peek() {
-                    if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
-                        // This is another section
-                        if let Some(param_name) = current_param.take() {
-                            param_docs.insert(param_name, current_doc.trim().to_string());
-                            current_doc.clear();
-                        }
-                        in_params_section = false;
-                        continue;
-                    }
-                }
-            }
-
-            // Determine if this could be a parameter line
-            let could_be_param = if let Some(base_indent) = base_param_indent {
-                // We've seen parameters before - check if this matches the expected parameter indentation
-                current_indent == base_indent
-            } else {
-                // First potential parameter - check if it has reasonable indentation and content
-                current_indent > 0
-                    && (trimmed.contains(':')
-                        || trimmed.chars().all(|c| c.is_alphanumeric() || c == '_'))
-            };
-
-            if could_be_param {
-                // Check if this could be a section header by looking at the next line
-                if let Some(next_line) = lines.peek() {
-                    if NUMPY_UNDERLINE_REGEX.is_match(next_line) {
-                        // This is a section header, not a parameter
-                        if let Some(param_name) = current_param.take() {
-                            param_docs.insert(param_name, current_doc.trim().to_string());
-                            current_doc.clear();
-                        }
-                        in_params_section = false;
-                        continue;
-                    }
-                }
-
-                // Set base indentation levels on first parameter
-                if base_param_indent.is_none() {
-                    base_param_indent = Some(current_indent);
-                }
-
-                // Handle parameter with type annotation (param : type)
-                if trimmed.contains(':') {
-                    // Save previous parameter if exists
-                    if let Some(param_name) = current_param.take() {
-                        param_docs.insert(param_name, current_doc.trim().to_string());
-                        current_doc.clear();
-                    }
-
-                    // Extract parameter name and description
-                    let parts: Vec<&str> = trimmed.splitn(2, ':').collect();
-                    if parts.len() == 2 {
-                        let param_name = parts[0].trim();
-
-                        // Extract just the parameter name (before any type info)
-                        let param_name = param_name.split_whitespace().next().unwrap_or(param_name);
-                        current_param = Some(param_name.to_string());
-                        current_doc.clear(); // Description comes on following lines, not on this line
-                    }
-                } else {
-                    // Handle parameter without type annotation
-                    // Save previous parameter if exists
-                    if let Some(param_name) = current_param.take() {
-                        param_docs.insert(param_name, current_doc.trim().to_string());
-                        current_doc.clear();
-                    }
-
-                    // This line is the parameter name
-                    current_param = Some(trimmed.to_string());
-                    current_doc.clear();
-                }
-            } else if current_param.is_some() {
-                // Determine if this is content for the current parameter
-                let is_content = if let Some(base_content) = base_content_indent {
-                    // We've seen content before - check if this matches expected content indentation
-                    current_indent >= base_content
-                } else {
-                    // First potential content line - should be more indented than parameter
-                    if let Some(base_param) = base_param_indent {
-                        current_indent > base_param
-                    } else {
-                        // Fallback: any indented content
-                        current_indent > 0
-                    }
-                };
-
-                if is_content {
-                    // Set base content indentation on first content line
-                    if base_content_indent.is_none() {
-                        base_content_indent = Some(current_indent);
-                    }
-
-                    // This is a continuation of the current parameter documentation
-                    if !current_doc.is_empty() {
-                        current_doc.push('\n');
-                    }
-                    current_doc.push_str(trimmed);
-                } else {
-                    // This line doesn't match our expected indentation patterns
-                    // Save current parameter and stop processing
-                    if let Some(param_name) = current_param.take() {
-                        param_docs.insert(param_name, current_doc.trim().to_string());
-                        current_doc.clear();
-                    }
-                    in_params_section = false;
-                }
-            }
-        }
-    }
-
-    // Don't forget the last parameter
-    if let Some(param_name) = current_param {
-        param_docs.insert(param_name, current_doc.trim().to_string());
-    }
-
-    param_docs
 }
 
 #[cfg(test)]
@@ -1633,72 +1447,448 @@ Args:
         ----------
         param1 : str
             The first parameter description
-        param2 : int
-            The second parameter description
-            This is a continuation of param2 description.
+        param2, param4 : int
+            The shared parameter description
+
+            This is a second paragraph.
+            This is a continuation of the shared description.
         param3
             A parameter without type annotation
+        *args : object
+            Extra positional arguments
+        **kwargs : object
+            Extra keyword arguments
+        options.mode : str
+            Nested field documentation
+        π : int
+            A Unicode parameter
+        a1, a2, ... : sequence of array_like
+            Arrays to combine
+        \*escaped_args : object
+            Escaped positional arguments
+        \**escaped_kwargs : object
+            Escaped keyword arguments
+        override_repr: callable, optional
+            Replacement representation function
+        formats, names :
+        undocumented
+        copy : bool
+            Whether to copy the input
+
+        Other Parameters
+        ----------------
+        kw_only : str, optional
+            A less commonly used keyword-only parameter
+
+        Other Params
+        ------------
+        alias_only : int
+            Parameter under the abbreviated heading
 
         Returns
         -------
         str
             The return value description
+
+        Yields
+        ------
+        int
+            The next value
         "#;
 
         let docstring = Docstring::new(docstring.to_owned());
         let param_docs = docstring.parameter_documentation();
 
-        assert_eq!(param_docs.len(), 3);
+        assert_eq!(param_docs.len(), 16);
         assert_eq!(
             param_docs.get("param1").expect("param1 should exist"),
             "The first parameter description"
         );
         assert_eq!(
             param_docs.get("param2").expect("param2 should exist"),
-            "The second parameter description\nThis is a continuation of param2 description."
+            "The shared parameter description\n\nThis is a second paragraph.\nThis is a continuation of the shared description."
+        );
+        assert_eq!(
+            param_docs.get("param4").expect("param4 should exist"),
+            "The shared parameter description\n\nThis is a second paragraph.\nThis is a continuation of the shared description."
         );
         assert_eq!(
             param_docs.get("param3").expect("param3 should exist"),
             "A parameter without type annotation"
         );
+        assert_eq!(
+            param_docs.get("*args").expect("*args should exist"),
+            "Extra positional arguments"
+        );
+        assert_eq!(
+            param_docs.get("**kwargs").expect("**kwargs should exist"),
+            "Extra keyword arguments"
+        );
+        assert!(!param_docs.contains_key("options"));
+        assert_eq!(
+            param_docs
+                .get("options.mode")
+                .expect("options.mode should exist"),
+            "Nested field documentation"
+        );
+        assert_eq!(
+            param_docs.get("π").expect("π should exist"),
+            "A Unicode parameter"
+        );
+        assert_eq!(
+            param_docs.get("a1").expect("a1 should exist"),
+            "Arrays to combine"
+        );
+        assert_eq!(
+            param_docs.get("a2").expect("a2 should exist"),
+            "Arrays to combine"
+        );
+        assert_eq!(
+            param_docs
+                .get("*escaped_args")
+                .expect("*escaped_args should exist"),
+            "Escaped positional arguments"
+        );
+        assert_eq!(
+            param_docs
+                .get("**escaped_kwargs")
+                .expect("**escaped_kwargs should exist"),
+            "Escaped keyword arguments"
+        );
+        assert_eq!(
+            param_docs
+                .get("override_repr")
+                .expect("override_repr should exist"),
+            "Replacement representation function"
+        );
+        assert_eq!(
+            param_docs.get("copy").expect("copy should exist"),
+            "Whether to copy the input"
+        );
+        assert_eq!(
+            param_docs.get("kw_only").expect("kw_only should exist"),
+            "A less commonly used keyword-only parameter"
+        );
+        assert_eq!(
+            param_docs
+                .get("alias_only")
+                .expect("alias_only should exist"),
+            "Parameter under the abbreviated heading"
+        );
 
-        assert_snapshot!(docstring.render_plaintext(), @"
+        assert_snapshot!(docstring.render_plaintext(), @r"
         This is a function description.
 
         Parameters
         ----------
         param1 : str
             The first parameter description
-        param2 : int
-            The second parameter description
-            This is a continuation of param2 description.
+        param2, param4 : int
+            The shared parameter description
+
+            This is a second paragraph.
+            This is a continuation of the shared description.
         param3
             A parameter without type annotation
+        *args : object
+            Extra positional arguments
+        **kwargs : object
+            Extra keyword arguments
+        options.mode : str
+            Nested field documentation
+        π : int
+            A Unicode parameter
+        a1, a2, ... : sequence of array_like
+            Arrays to combine
+        \*escaped_args : object
+            Escaped positional arguments
+        \**escaped_kwargs : object
+            Escaped keyword arguments
+        override_repr: callable, optional
+            Replacement representation function
+        formats, names :
+        undocumented
+        copy : bool
+            Whether to copy the input
+
+        Other Parameters
+        ----------------
+        kw_only : str, optional
+            A less commonly used keyword-only parameter
+
+        Other Params
+        ------------
+        alias_only : int
+            Parameter under the abbreviated heading
 
         Returns
         -------
         str
             The return value description
+
+        Yields
+        ------
+        int
+            The next value
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @"
+        assert_snapshot!(docstring.render_markdown(), @r"
         This is a function description.<HB>
         <HB>
         Parameters<HB>
         ----------<HB>
         param1 : str<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        param2, param4 : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The shared parameter description<HB>
+        <HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a second paragraph.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of the shared description.<HB>
         param3<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        *args : object<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Extra positional arguments<HB>
+        **kwargs : object<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Extra keyword arguments<HB>
+        options.mode : str<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Nested field documentation<HB>
+        π : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;A Unicode parameter<HB>
+        a1, a2, ... : sequence of array\_like<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Arrays to combine<HB>
+        \*escaped\_args : object<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Escaped positional arguments<HB>
+        \**escaped\_kwargs : object<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Escaped keyword arguments<HB>
+        override\_repr: callable, optional<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Replacement representation function<HB>
+        formats, names :<HB>
+        undocumented<HB>
+        copy : bool<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Whether to copy the input<HB>
+        <HB>
+        Other Parameters<HB>
+        ----------------<HB>
+        kw\_only : str, optional<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;A less commonly used keyword-only parameter<HB>
+        <HB>
+        Other Params<HB>
+        ------------<HB>
+        alias\_only : int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Parameter under the abbreviated heading<HB>
         <HB>
         Returns<HB>
         -------<HB>
         str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        &nbsp;&nbsp;&nbsp;&nbsp;The return value description<HB>
+        <HB>
+        Yields<HB>
+        ------<HB>
+        int<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;The next value
         ");
+
+        let docstring = Docstring::new(
+            r#"
+        Parameters
+        ----------
+        value : str
+            First documentation.
+        value : str
+            Replacement documentation.
+        "#
+            .to_owned(),
+        );
+
+        assert_eq!(
+            docstring.parameter_documentation()["value"],
+            "Replacement documentation."
+        );
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_accepts_compact_separators() {
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+matrix: scipy.sparse array
+    Sparse adjacency matrix.
+args:
+    Additional arguments.
+*values:
+    Additional values.
+Note: deprecated
+
+Returns
+-------
+bool
+    Whether processing succeeded."
+                .to_owned(),
+        );
+
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 3);
+        assert_eq!(
+            parameter_documentation["matrix"],
+            "Sparse adjacency matrix."
+        );
+        assert_eq!(parameter_documentation["args"], "Additional arguments.");
+        assert_eq!(parameter_documentation["*values"], "Additional values.");
+        assert!(!parameter_documentation.contains_key("Note"));
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_continues_after_undocumented_compact_items() {
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+G: Graph
+beta : float
+    Useful documentation."
+                .to_owned(),
+        );
+
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 1);
+        assert_eq!(parameter_documentation["beta"], "Useful documentation.");
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_skips_leading_section_prose() {
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+Either x or y must be provided.
+
+beta : float
+    Useful documentation."
+                .to_owned(),
+        );
+
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 1);
+        assert_eq!(parameter_documentation["beta"], "Useful documentation.");
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_ignores_items_nested_in_section_preambles() {
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+Choose one of the following.
+    nested : int
+        Example-only text.
+beta : float
+    Useful documentation."
+                .to_owned(),
+        );
+
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 1);
+        assert_eq!(parameter_documentation["beta"], "Useful documentation.");
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_ignores_sections_in_containers() {
+        for raw in [
+            "\
+Summary.
+
+- Example data:
+    Parameters
+    ----------
+    nested : int
+        Not parameter documentation.",
+            "\
+Summary.
+
+Examples:
+    Parameters
+    ----------
+    nested : int
+        Not parameter documentation.",
+        ] {
+            assert!(
+                Docstring::new(raw.to_owned())
+                    .parameter_documentation()
+                    .is_empty(),
+                "{raw}"
+            );
+        }
+
+        let docstring = Docstring::new(
+            "\
+:param value: Example input.
+
+    Parameters
+    ----------
+    nested : int
+        Not parameter documentation.
+:param other: Other input."
+                .to_owned(),
+        );
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 2);
+        assert!(parameter_documentation.contains_key("value"));
+        assert!(parameter_documentation.contains_key("other"));
+        assert!(!parameter_documentation.contains_key("nested"));
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_ignores_sections_nested_in_underlined_containers() {
+        let docstring = Docstring::new(
+            "\
+Examples
+--------
+    Parameters
+    ----------
+    nested : int
+        Not parameter documentation.
+
+Notes
+-----
+More details.
+
+Parameters
+----------
+value : int
+    Parameter documentation."
+                .to_owned(),
+        );
+
+        let parameter_documentation = docstring.parameter_documentation();
+        assert_eq!(parameter_documentation.len(), 1);
+        assert_eq!(parameter_documentation["value"], "Parameter documentation.");
+        assert!(!parameter_documentation.contains_key("nested"));
+    }
+
+    #[test]
+    fn numpy_parameter_documentation_accepts_shifted_top_level_sections() {
+        let docstring = Docstring::new(
+            "\
+A decoded newline follows:
+This line starts at column zero.
+
+    Parameters
+    ----------
+    shifted : int
+        Documentation in a shifted section.
+
+    Returns
+    -------
+    bool
+        Result."
+                .to_owned(),
+        );
+
+        assert_eq!(
+            docstring.parameter_documentation()["shifted"],
+            "Documentation in a shifted section."
+        );
     }
 
     #[test]
