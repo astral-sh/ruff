@@ -628,7 +628,7 @@ Nested `disable` and `file-ignore` comments are also invalid and don't suppress 
 following line:
 
 ```py
-# error: [invalid-suppression-comment]
+# snapshot: invalid-suppression-comment
 # explanation # ruff:disable[F401]
 # error: [unused-import]
 import os
@@ -637,6 +637,23 @@ import os
 # explanation # ruff:file-ignore[F401]
 # error: [unused-import]
 import sys
+```
+
+```snapshot
+error[RUF103]: Invalid suppression comment: trailing comments are only supported for ruff:ignore suppressions
+ --> src/mdtest_snippet.py:2:15
+  |
+2 | # explanation # ruff:disable[F401]
+  |               ^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove suppression comment
+1 | # snapshot: invalid-suppression-comment
+  - # explanation # ruff:disable[F401]
+2 + # explanation
+3 | # error: [unused-import]
+4 | import os
+5 |
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 Similarly, a nested `enable` is invalid and doesn't re-enable a disabled rule:
