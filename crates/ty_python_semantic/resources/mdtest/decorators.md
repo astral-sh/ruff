@@ -595,6 +595,8 @@ class DeprecatedThenUnannotated: ...
 DeprecatedThenUnannotated()  # error: [deprecated] "use OtherClass"
 ```
 
+## Preserving the original class object
+
 If a class decorator returns the original class object, we preserve the class binding so it can
 still be used in annotations and as a base class:
 
@@ -649,6 +651,8 @@ class DerivedFactoryPreservedClass(FactoryPreservedClass):
     value: FactoryPreservedClass
 ```
 
+## Intersection-returning class decorators
+
 Class decorators can return intersections that expose attributes added to the decorated class
 object:
 
@@ -674,6 +678,8 @@ class UserSchema:
 
 reveal_type(UserSchema.resource.fetch())  # revealed: str
 ```
+
+## Metadata decorators above intersection-returning decorators
 
 Metadata decorators stacked above an intersection-returning class decorator still apply to the
 original class object, while preserving the extra intersection members:
@@ -703,6 +709,8 @@ class RegisteredDataclass:
 reveal_type(RegisteredDataclass.resource.fetch())  # revealed: str
 reveal_type(RegisteredDataclass(1))  # revealed: RegisteredDataclass
 ```
+
+## Class-preserving decorators above intersection-returning decorators
 
 Class-preserving decorators stacked above an intersection-returning class decorator preserve the
 existing intersection members:

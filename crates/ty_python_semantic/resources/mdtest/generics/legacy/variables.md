@@ -26,6 +26,8 @@ reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
+### Type variable name as a keyword argument
+
 The typevar name can also be provided as a keyword argument:
 
 ```py
@@ -43,7 +45,7 @@ reveal_type(T.__name__)  # revealed: Literal["T"]
 ```py
 from typing import TypeVar
 
-T = TypeVar("T")
+TypingT = TypeVar("TypingT")
 # error: [invalid-legacy-type-variable]
 U: TypeVar = TypeVar("U")
 
@@ -374,7 +376,7 @@ The upper bound must be a valid type expression:
 from typing import TypedDict
 
 # error: [invalid-type-form]
-T = TypeVar("T", bound=TypedDict)
+InvalidBoundT = TypeVar("InvalidBoundT", bound=TypedDict)
 ```
 
 ### Type variables with constraints
@@ -391,9 +393,13 @@ S = TypeVar("S")
 reveal_type(S.__constraints__)  # revealed: tuple[()]
 ```
 
+### Constraints are not simplified
+
 Constraints are not simplified relative to each other, even if one is a subtype of the other:
 
 ```py
+from typing import TypeVar
+
 T = TypeVar("T", int, bool)
 reveal_type(T.__constraints__)  # revealed: tuple[int, bool]
 
@@ -660,9 +666,13 @@ def bound(f: T):
     reveal_type(f())  # revealed: int
 ```
 
+## Constrained callability
+
 Same with a constrained typevar, as long as all constraints are callable:
 
 ```py
+from typing import Callable, TypeVar
+
 T = TypeVar("T", Callable[[], int], Callable[[], str])
 
 def constrained(f: T):
@@ -727,6 +737,8 @@ class Foo(Generic[S]):
     T = TypeVar("T", bound=S)
 ```
 
+### Recursive bounds
+
 However, they are lazily evaluated and can cyclically refer to their own type:
 
 ```py
@@ -740,6 +752,8 @@ class G(Generic[T]):
 # error: [missing-type-argument]
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
 ```
+
+### Invalid specialization in a recursive bound
 
 An invalid specialization in a recursive bound doesn't cause a panic:
 
