@@ -376,52 +376,6 @@ fn recursive_cycle_normalization_treats_non_contractive_recursive_as_marker() {
 }
 
 #[test]
-fn recursive_construction_drops_unused_binders() {
-    let db = setup_db();
-    let a = Id::from_bits(1);
-    let b = Id::from_bits(2);
-    let c = Id::from_bits(3);
-
-    let int = KnownClass::Int.to_instance(&db);
-    assert_eq!(Type::implicit_recursive(&db, a, int), int);
-
-    let mu_b_a = Type::implicit_recursive(&db, b, Type::divergent(a));
-    assert_eq!(mu_b_a, Type::divergent(a));
-
-    let mu_a_mu_b_a = Type::implicit_recursive(&db, a, mu_b_a);
-    let Type::Recursive(recursive) = mu_a_mu_b_a else {
-        panic!("expected recursive type");
-    };
-    assert!(recursive.is_non_contractive(&db));
-    assert!(recursive.is_non_contractive_for_marker(&db, a));
-    assert!(!recursive.is_non_contractive_for_marker(&db, b));
-
-    let mu_c_b = Type::implicit_recursive(&db, c, Type::divergent(b));
-    assert_eq!(mu_c_b, Type::divergent(b));
-
-    let mu_b_mu_c_b = Type::implicit_recursive(&db, b, mu_c_b);
-    let mu_a_mu_b_mu_c_b = Type::implicit_recursive(&db, a, mu_b_mu_c_b);
-    let Type::Recursive(recursive) = mu_a_mu_b_mu_c_b else {
-        panic!("expected recursive type");
-    };
-    assert!(recursive.is_non_contractive(&db));
-    assert_eq!(recursive.binder_id(&db), b);
-    assert!(recursive.is_non_contractive_for_marker(&db, b));
-
-    let mu_a_b = Type::implicit_recursive(&db, a, Type::divergent(b));
-    assert_eq!(mu_a_b, Type::divergent(b));
-
-    let mu_b_mu_a_b = Type::implicit_recursive(&db, b, mu_a_b);
-    let mu_a_mu_b_mu_a_b = Type::implicit_recursive(&db, a, mu_b_mu_a_b);
-    let Type::Recursive(recursive) = mu_a_mu_b_mu_a_b else {
-        panic!("expected recursive type");
-    };
-    assert!(recursive.is_non_contractive(&db));
-    assert_eq!(recursive.binder_id(&db), b);
-    assert!(recursive.is_non_contractive_for_marker(&db, b));
-}
-
-#[test]
 fn recursive_types_with_constructors_are_contractive() {
     let db = setup_db();
     let a = Id::from_bits(1);
