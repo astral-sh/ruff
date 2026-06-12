@@ -229,24 +229,15 @@ pub(crate) fn definite_sequence_pattern_type<'db>(
     }
 
     if let Some((prefix, suffix)) = kind.split_around_star() {
-        let prefix_types: Vec<_> = prefix
-            .iter()
-            .map(|pattern| definite_match_pattern_type(db, pattern))
-            .collect();
-        let suffix_types: Vec<_> = suffix
-            .iter()
-            .map(|pattern| definite_match_pattern_type(db, pattern))
-            .collect();
-
-        if prefix_types.iter().chain(&suffix_types).any(Type::is_never) {
-            return Type::Never;
-        }
-
         return Type::tuple(TupleType::mixed(
             db,
-            prefix_types,
+            prefix
+                .iter()
+                .map(|pattern| definite_match_pattern_type(db, pattern)),
             Type::object(),
-            suffix_types,
+            suffix
+                .iter()
+                .map(|pattern| definite_match_pattern_type(db, pattern)),
         ));
     }
 

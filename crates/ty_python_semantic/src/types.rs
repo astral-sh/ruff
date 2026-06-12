@@ -1239,14 +1239,10 @@ impl<'db> Type<'db> {
 
     /// Return true if equality is not guaranteed to be reflexive for this type.
     fn equality_may_not_be_reflexive(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::LiteralValue(literal) if !literal.is_enum() => false,
-            _ => self.has_custom_eq(db),
+        if matches!(self, Type::LiteralValue(literal) if !literal.is_enum()) {
+            return false;
         }
-    }
 
-    /// Return true if this type defines a custom `__eq__` method.
-    fn has_custom_eq(&self, db: &'db dyn Db) -> bool {
         !matches!(
             self.try_call_dunder_with_policy(
                 db,

@@ -758,7 +758,7 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
 
     if [left_ty, right_ty].into_iter().any(|ty| {
         if ty.as_enum_literal().is_some() || ty.is_enum(db) {
-            ty.has_custom_eq(db)
+            ty.equality_may_not_be_reflexive(db)
         } else if let Some(instance) = ty.as_nominal_instance()
             && instance.tuple_spec(db).is_some()
             && instance.known_class(db) != Some(KnownClass::Tuple)
@@ -1075,25 +1075,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         pattern: PatternPredicate<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
+        let kind = pattern.kind(self.db);
+        let subject = pattern.subject(self.db);
         let constraints = self
-            .evaluate_pattern_predicate_kind(
-                pattern.kind(self.db),
-                pattern.subject(self.db),
-                is_positive,
-            )
+            .evaluate_pattern_predicate_kind(kind, subject, is_positive)
             .into_constraints();
-        let alias_constraints = is_positive
-            .then(|| {
-                let subject_ty = infer_same_file_expression_type(
-                    self.db,
-                    pattern.subject(self.db),
-                    TypeContext::default(),
-                );
-                let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
-                self.evaluate_match_pattern_aliases(pattern.kind(self.db), subject_ty)
-            })
-            .flatten();
-        Self::merge_optional_constraints_and(constraints, alias_constraints)
+        if !is_positive {
+            return constraints;
+        }
+
+        let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
+        let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
+        Self::merge_optional_constraints_and(
+            constraints,
+            self.evaluate_match_pattern_aliases(kind, subject_ty),
+        )
     }
 
     /// Add replacement constraints for names bound by a successful pattern.
@@ -1199,14 +1195,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 if let Type::Union(union) = subject_ty {
-                    UnionType::from_elements(
-                        self.db,
-                        union
-                            .elements(self.db)
-                            .iter()
-                            .copied()
-                            .map(narrow_subject_ty),
-                    )
+                    union.map(self.db, |element| narrow_subject_ty(*element))
                 } else {
                     narrow_subject_ty(subject_ty)
                 }
@@ -1251,31 +1240,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 alias.value_type(self.db),
                 true,
             ),
-            Type::Union(union) => UnionType::from_elements(
-                self.db,
-                union.elements(self.db).iter().copied().map(|element| {
-                    self.match_class_pattern_subject_type(class, class_ty, element, true)
-                }),
-            ),
+            Type::Union(union) => union.map(self.db, |element| {
+                self.match_class_pattern_subject_type(class, class_ty, *element, true)
+            }),
             Type::Intersection(intersection) => {
                 let filter_nominal_arms = filter_nominal_arms
                     || intersection
                         .positive(self.db)
                         .iter()
                         .any(|positive| matches!(positive, Type::TypeAlias(_) | Type::Union(_)));
-                let mut builder = IntersectionBuilder::new(self.db);
-                for positive in intersection.positive(self.db) {
-                    builder = builder.add_positive(self.match_class_pattern_subject_type(
+                intersection.map_positive(self.db, |positive| {
+                    self.match_class_pattern_subject_type(
                         class,
                         class_ty,
                         *positive,
                         filter_nominal_arms,
-                    ));
-                }
-                for negative in intersection.negative(self.db) {
-                    builder = builder.add_negative(*negative);
-                }
-                builder.build()
+                    )
+                })
             }
             Type::NominalInstance(instance) if filter_nominal_arms => {
                 let Some(class) = class else {
