@@ -491,6 +491,55 @@ def test_match_class_alias_preserves_recursive_containers(
                 test_match_class_alias_preserves_recursive_containers(item)
 ```
 
+Bindings nested inside class and mapping patterns are not inferred yet. A surrounding `as` pattern
+is supported because it binds the matched subject itself, rather than a value extracted by the inner
+pattern.
+
+```py
+from collections.abc import Mapping
+from typing import Generic, TypedDict, TypeVar
+
+T = TypeVar("T")
+
+class PatternBox(Generic[T]):
+    value: T
+
+def test_match_class_nested_capture_is_not_yet_inferred(
+    value: PatternBox[int],
+) -> None:
+    match value:
+        case PatternBox(value=item) as whole:
+            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(whole)  # revealed: PatternBox[int]
+
+def test_match_mapping_nested_capture_is_not_yet_inferred(
+    value: Mapping[str, int],
+) -> None:
+    match value:
+        case {"item": item} as whole:
+            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(whole)  # revealed: Mapping[str, int]
+
+class PatternPayload(TypedDict):
+    item: int
+
+def test_match_typed_dict_nested_capture_is_not_yet_inferred(
+    value: PatternPayload,
+) -> None:
+    match value:
+        case {"item": item} as whole:
+            reveal_type(item)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(whole)  # revealed: PatternPayload
+
+def test_match_mapping_rest_capture_is_not_yet_inferred(
+    value: Mapping[str, int],
+) -> None:
+    match value:
+        case {**rest} as whole:
+            reveal_type(rest)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(whole)  # revealed: Mapping[str, int]
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
