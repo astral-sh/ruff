@@ -1,10 +1,12 @@
-use proc_macro2::{TokenStream, TokenTree};
+use proc_macro2::TokenStream;
 use quote::{quote, quote_spanned};
 use syn::meta::ParseNestedMeta;
+use syn::punctuated::Punctuated;
 use syn::spanned::Spanned;
 use syn::{
     AngleBracketedGenericArguments, Attribute, Data, DataStruct, DeriveInput, ExprLit, Field,
-    Fields, GenericArgument, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Type, TypePath,
+    Fields, GenericArgument, Lit, LitStr, Meta, Path, PathArguments, PathSegment, Token, Type,
+    TypePath,
 };
 
 use ruff_python_trivia::textwrap::dedent;
@@ -38,25 +40,13 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
                     .any(|attr| attr.path().is_ident("option_group"))
                 {
                     output.push(handle_option_group(field)?);
-                } else if let Some(serde) = field
-                    .attrs
-                    .iter()
-                    .find(|attr| attr.path().is_ident("serde"))
-                {
+                } else if has_serde_flatten(field)? {
                     // If a field has the `serde(flatten)` attribute, flatten the options into the parent
-                    // by calling `Type::record` instead of `visitor.visit_set`
-                    if let (Type::Path(ty), Meta::List(list)) = (&field.ty, &serde.meta) {
-                        for token in list.tokens.clone() {
-                            if let TokenTree::Ident(ident) = token {
-                                if ident == "flatten" {
-                                    output.push(quote_spanned!(
-                                        ty.span() => (<#ty>::record(visit))
-                                    ));
-
-                                    break;
-                                }
-                            }
-                        }
+                    // by calling `Type::record` instead of `visitor.visit_set`.
+                    if let Type::Path(ty) = &field.ty {
+                        output.push(quote_spanned!(
+                            ty.span() => (<#ty as ruff_options_metadata::OptionsMetadata>::record(visit))
+                        ));
                     }
                 }
             }
@@ -103,6 +93,25 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
             "Can only derive ConfigurationOptions from structs with named fields.",
         )),
     }
+}
+
+fn has_serde_flatten(field: &Field) -> syn::Result<bool> {
+    for attribute in field
+        .attrs
+        .iter()
+        .filter(|attribute| attribute.path().is_ident("serde"))
+    {
+        let metadata =
+            attribute.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
+        if metadata
+            .iter()
+            .any(|meta| matches!(meta, Meta::Path(path) if path.is_ident("flatten")))
+        {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
 }
 
 /// For a field with type `Option<Foobar>` where `Foobar` itself is a struct

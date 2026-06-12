@@ -4390,6 +4390,28 @@ mod tests {
     };
     use ruff_python_ast::name::Name;
 
+    #[expect(dead_code)]
+    #[derive(Default, ruff_macros::OptionsMetadata, serde::Deserialize)]
+    struct NestedOptions {
+        /// A nested option.
+        #[option(default = "false", value_type = "bool", example = "nested = true")]
+        nested: Option<bool>,
+    }
+
+    #[expect(dead_code)]
+    #[derive(ruff_macros::OptionsMetadata, serde::Deserialize)]
+    struct FlattenedOptions {
+        #[serde(default)]
+        #[serde(flatten)]
+        nested: NestedOptions,
+    }
+
+    #[test]
+    fn options_metadata_finds_flatten_in_repeated_serde_attributes() {
+        let metadata = <FlattenedOptions as ruff_options_metadata::OptionsMetadata>::metadata();
+        assert!(metadata.has("nested"));
+    }
+
     #[test]
     fn flake8_self_options() {
         let default_settings = flake8_self::settings::Settings::default();
