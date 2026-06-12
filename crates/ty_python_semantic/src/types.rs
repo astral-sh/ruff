@@ -1014,6 +1014,17 @@ struct GeneratorTypes<'db> {
     return_ty: Option<Type<'db>>,
 }
 
+/// The cached result of an argument-free dunder call.
+///
+/// `Bindings` isn't Salsa-updateable, so the tracked field is always replaced when the query
+/// re-executes instead of being compared with its previous value.
+#[salsa::tracked]
+struct EmptyDunderCallResult<'db> {
+    #[tracked]
+    #[no_eq]
+    result: Result<Bindings<'db>, CallDunderError<'db>>,
+}
+
 fn object_type_form(db: &dyn Db) -> Type<'_> {
     TypeFormType::from_type_expression(db, Type::object())
 }
@@ -5149,6 +5160,40 @@ impl<'db> Type<'db> {
     /// Note that `NO_INSTANCE_FALLBACK` is always added to the policy, since implicit calls to
     /// dunder methods never access instance members.
     fn try_call_dunder_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        argument_types: &mut CallArguments<'_, 'db>,
+        tcx: TypeContext<'db>,
+        policy: MemberLookupPolicy,
+    ) -> Result<Bindings<'db>, CallDunderError<'db>> {
+        #[salsa::tracked]
+        fn try_call_empty_dunder_with_policy<'db>(
+            db: &'db dyn Db,
+            this: Type<'db>,
+            name: Name,
+            policy: MemberLookupPolicy,
+        ) -> EmptyDunderCallResult<'db> {
+            EmptyDunderCallResult::new(
+                db,
+                this.try_call_dunder_with_policy_impl(
+                    db,
+                    name.as_str(),
+                    &mut CallArguments::none(),
+                    TypeContext::default(),
+                    policy,
+                ),
+            )
+        }
+
+        if argument_types.len() == 0 && tcx == TypeContext::default() {
+            return try_call_empty_dunder_with_policy(db, self, name.into(), policy).result(db);
+        }
+
+        self.try_call_dunder_with_policy_impl(db, name, argument_types, tcx, policy)
+    }
+
+    fn try_call_dunder_with_policy_impl(
         self,
         db: &'db dyn Db,
         name: &str,
