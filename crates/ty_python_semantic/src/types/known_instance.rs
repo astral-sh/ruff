@@ -4,10 +4,10 @@ use ruff_python_ast::name::Name;
 use crate::{
     Db, DisplaySettings,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
-        InferenceFlags, InvalidTypeExpressionError, KnownClass, PromotionKind, PromotionMode,
-        StringLiteralType, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarNonce,
-        TypeVarVariance, UnionBuilder,
+        ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, CallableType,
+        ClassType, GenericContext, InferenceFlags, InvalidTypeExpressionError, KnownClass,
+        PromotionKind, PromotionMode, StringLiteralType, Type, TypeAliasType, TypeContext,
+        TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -204,7 +204,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         match self {
             KnownInstanceType::TypeAliasType(type_alias) => {
                 type_alias.raw_value_type(db).variance_of(db, typevar)
