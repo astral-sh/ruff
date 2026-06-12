@@ -716,7 +716,7 @@ fn synthesize_typed_dict_merge<'db>(
             .with_annotated_type(first_overload_value_ty),
     ];
 
-    let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]> =
+    let mut overloads: smallvec::SmallVec<[Signature<'db>; 4]> =
         smallvec::smallvec![Signature::new(
             Parameters::new(db, first_overload_parameters,),
             instance_ty,
