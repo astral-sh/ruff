@@ -1100,7 +1100,7 @@ impl<'db> FunctionType<'db> {
         // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
         // function literal; doing so can re-enter recursive `TypeOf` evaluation.
         let literal = self.literal(db);
-        let (updated_signature, updated_implementation_signature) = if matches!(
+        let (updated_signature, updated_implementation_signature, signatures_unchanged) = if matches!(
             type_mapping,
             TypeMapping::ApplySpecialization(
                 ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
@@ -1110,32 +1110,41 @@ impl<'db> FunctionType<'db> {
                 ..
             }
         ) {
+            let signature = self.updated_signature(db);
+            let implementation_signature = self.updated_implementation_signature(db);
+            let updated_signature = signature
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let updated_implementation_signature = implementation_signature
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let signatures_unchanged = updated_signature.as_ref() == signature
+                && updated_implementation_signature.as_ref() == implementation_signature;
+
             (
-                self.updated_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                }),
-                self.updated_implementation_signature(db).map(|signature| {
-                    signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                }),
+                updated_signature,
+                updated_implementation_signature,
+                signatures_unchanged,
             )
         } else {
+            let signature = self.signature(db);
+            let implementation_signature = literal
+                .has_separate_implementation(db)
+                .then(|| self.last_definition_signature(db));
+            let updated_signature =
+                signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+            let updated_implementation_signature = implementation_signature
+                .as_ref()
+                .map(|signature| signature.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            let signatures_unchanged = updated_signature == *signature
+                && updated_implementation_signature.as_ref() == implementation_signature;
+
             (
-                Some(
-                    self.signature(db)
-                        .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                ),
-                literal.has_separate_implementation(db).then(|| {
-                    self.last_definition_signature(db).apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )
-                }),
+                Some(updated_signature),
+                updated_implementation_signature,
+                signatures_unchanged,
             )
         };
 
-        if updated_signature.is_none() && updated_implementation_signature.is_none() {
+        if signatures_unchanged {
             self
         } else {
             Self::new(
@@ -2644,11 +2653,46 @@ pub(super) fn report_revealed_type<'db>(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use ruff_db::system::DbWithWritableSystem as _;
     use strum::IntoEnumIterator;
 
     use super::*;
-    use crate::db::tests::setup_db;
-    use crate::place::known_module_symbol;
+    use crate::db::tests::{TestDb, setup_db};
+    use crate::place::{global_symbol, known_module_symbol};
+
+    fn get_function<'db>(db: &'db TestDb, file: &'static str, name: &str) -> FunctionType<'db> {
+        let module = ruff_db::files::system_path_to_file(db, file).unwrap();
+        global_symbol(db, module, name)
+            .place
+            .expect_type()
+            .expect_function_literal()
+    }
+
+    #[test]
+    fn no_op_type_mapping_preserves_function() {
+        let mut db = setup_db();
+        db.write_dedented(
+            "/src/a.py",
+            "
+            from typing import Any, overload
+
+            @overload
+            def unchanged(value: int) -> str: ...
+            @overload
+            def unchanged(value: str) -> int: ...
+            def unchanged(value: int | str) -> int | str: ...
+
+            def changed(value: Any) -> Any: ...
+            ",
+        )
+        .unwrap();
+
+        let unchanged = Type::FunctionLiteral(get_function(&db, "/src/a.py", "unchanged"));
+        assert_eq!(unchanged.top_materialization(&db), unchanged);
+
+        let changed = Type::FunctionLiteral(get_function(&db, "/src/a.py", "changed"));
+        assert_ne!(changed.top_materialization(&db), changed);
+    }
 
     #[test]
     fn known_function_roundtrip_from_str() {

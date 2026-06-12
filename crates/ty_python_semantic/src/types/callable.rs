@@ -587,13 +587,14 @@ impl<'db> CallableType<'db> {
             return replacements.get(&self).copied().unwrap_or(self);
         }
 
-        CallableType::new(
-            db,
-            self.signatures(db)
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.kind(db),
-            self.provenance(db),
-        )
+        let original_signatures = self.signatures(db);
+        let signatures =
+            original_signatures.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+        if signatures == *original_signatures {
+            self
+        } else {
+            CallableType::new(db, signatures, self.kind(db), self.provenance(db))
+        }
     }
 
     pub(super) fn find_legacy_typevars_impl(
