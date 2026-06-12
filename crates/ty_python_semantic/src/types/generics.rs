@@ -3174,14 +3174,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                             .variables(self.db);
                         let formal_specialization =
                             formal_alias.specialization(self.db).types(self.db);
-                        let base_specialization = base_alias.specialization(self.db).types(self.db);
+                        let base_specialization = base_alias.specialization(self.db);
+                        let materialization_kind =
+                            base_specialization.materialization_kind(self.db);
+                        let materialization_visitor = ApplyTypeMappingVisitor::default();
                         for (typevar, formal_ty, base_ty) in itertools::izip!(
                             generic_context,
                             formal_specialization,
-                            base_specialization
+                            base_specialization.types(self.db)
                         ) {
                             let variance = typevar.variance_with_polarity(self.db, polarity);
-                            self.infer_map_impl(*formal_ty, *base_ty, variance, seen)?;
+                            let base_ty = materialization_kind.map_or(*base_ty, |kind| {
+                                base_ty.materialize(self.db, kind, &materialization_visitor)
+                            });
+                            self.infer_map_impl(*formal_ty, base_ty, variance, seen)?;
                         }
                         return Ok(());
                     }
