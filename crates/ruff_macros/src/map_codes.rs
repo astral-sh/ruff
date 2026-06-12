@@ -4,8 +4,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Attribute, Error, Expr, ExprCall, ExprMatch, Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
-    parenthesized, parse::Parse, spanned::Spanned,
+    Arm, Attribute, Error, Expr, ExprCall, ExprLit, ExprMatch, Ident, ItemFn, Lit, LitStr, Pat,
+    Path, Stmt, spanned::Spanned,
 };
 
 use crate::{
@@ -67,7 +67,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             break;
         }
 
-        let rule = syn::parse::<Rule>(arm.into_token_stream().into())?;
+        let rule = Rule::try_from(arm)?;
         linter_to_rules
             .entry(rule.linter.clone())
             .or_default()
@@ -485,25 +485,70 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     }
 }
 
-impl Parse for Rule {
+impl TryFrom<&Arm> for Rule {
+    type Error = syn::Error;
+
     /// Parses a match arm such as `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let attrs = Attribute::parse_outer(input)?;
-        let pat_tuple;
-        parenthesized!(pat_tuple in input);
-        let linter: Ident = pat_tuple.parse()?;
-        let _: Token!(,) = pat_tuple.parse()?;
-        let code: LitStr = pat_tuple.parse()?;
-        let _: Token!(=>) = input.parse()?;
-        let rule_path: Path = input.parse()?;
-        let _: Token!(,) = input.parse()?;
-        let rule_name = rule_path.segments.last().unwrap().ident.clone();
-        Ok(Rule {
-            name: rule_name,
-            linter,
-            code,
-            path: rule_path,
+    fn try_from(arm: &Arm) -> syn::Result<Self> {
+        let Arm {
             attrs,
+            pat,
+            guard,
+            body,
+            ..
+        } = arm;
+
+        if let Some((if_token, _)) = guard {
+            return Err(Error::new(
+                if_token.span,
+                "rule match arms cannot have guards",
+            ));
+        }
+
+        let Pat::Tuple(tuple) = pat else {
+            return Err(Error::new_spanned(
+                pat,
+                "expected rule pattern to be `(Linter, \"CODE\")`",
+            ));
+        };
+        let mut elements = tuple.elems.iter();
+        let (Some(linter), Some(code), None) = (elements.next(), elements.next(), elements.next())
+        else {
+            return Err(Error::new_spanned(
+                tuple,
+                "expected rule pattern to be `(Linter, \"CODE\")`",
+            ));
+        };
+
+        let Pat::Ident(linter) = linter else {
+            return Err(Error::new_spanned(linter, "expected a linter name"));
+        };
+        if linter.by_ref.is_some() || linter.mutability.is_some() || linter.subpat.is_some() {
+            return Err(Error::new_spanned(linter, "expected a linter name"));
+        }
+        let linter = linter.ident.clone();
+
+        let Pat::Lit(ExprLit {
+            lit: Lit::Str(code),
+            ..
+        }) = code
+        else {
+            return Err(Error::new_spanned(code, "expected a string rule code"));
+        };
+
+        let Expr::Path(rule_path) = body.as_ref() else {
+            return Err(Error::new_spanned(body, "expected a rule path"));
+        };
+        let Some(rule_name) = rule_path.path.segments.last() else {
+            return Err(Error::new_spanned(rule_path, "expected a rule path"));
+        };
+
+        Ok(Rule {
+            name: rule_name.ident.clone(),
+            linter,
+            code: code.clone(),
+            path: rule_path.path.clone(),
+            attrs: attrs.clone(),
         })
     }
 }
