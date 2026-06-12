@@ -164,6 +164,12 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(ProtocolInterface::with_methods(db, methods)),
         ))
     }
+
+    pub(super) fn protocol_from_interface(interface: ProtocolInterface<'db>) -> Self {
+        Self::ProtocolInstance(ProtocolInstanceType::synthesized(
+            SynthesizedProtocolType::new(interface),
+        ))
+    }
 }
 
 /// A type representing the set of runtime objects which are instances of a certain nominal class.

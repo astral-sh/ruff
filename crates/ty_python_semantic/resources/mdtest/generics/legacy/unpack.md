@@ -42,6 +42,13 @@ def collect(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
 
 reveal_type(collect())  # revealed: tuple[()]
 reveal_type(collect(1, "a"))  # revealed: tuple[Literal[1], Literal["a"]]
+
+def splatted(
+    fixed: tuple[int, str],
+    homogeneous: tuple[bytes, ...],
+) -> None:
+    reveal_type(collect(*fixed))  # revealed: tuple[int, str]
+    reveal_type(collect(*homogeneous))  # revealed: tuple[bytes, ...]
 ```
 
 ## Callable parameters
