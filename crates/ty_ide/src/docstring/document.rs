@@ -18,8 +18,8 @@ pub(super) fn parameter_documentation(
     parameters
 }
 
-/// Parameter sections shared by supported docstring formats.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// Canonical docstring sections shared by supported formats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, strum_macros::EnumIter)]
 pub(in crate::docstring) enum SectionKind {
     /// Function or method parameters.
     Parameters,
@@ -27,4 +27,27 @@ pub(in crate::docstring) enum SectionKind {
     KeywordArguments,
     /// Less commonly used parameters listed separately from the main parameter section.
     OtherParameters,
+    /// Class or module attributes.
+    Attributes,
+    /// A returned value.
+    Returns,
+    /// A yielded value.
+    Yields,
+    /// Exceptions raised by a callable.
+    Raises,
+}
+
+impl SectionKind {
+    /// Returns the canonical display heading for this section.
+    pub(super) const fn heading(self) -> &'static str {
+        match self {
+            SectionKind::Parameters => "Parameters",
+            SectionKind::KeywordArguments => "Keyword Arguments",
+            SectionKind::OtherParameters => "Other Parameters",
+            SectionKind::Attributes => "Attributes",
+            SectionKind::Returns => "Returns",
+            SectionKind::Yields => "Yields",
+            SectionKind::Raises => "Raises",
+        }
+    }
 }

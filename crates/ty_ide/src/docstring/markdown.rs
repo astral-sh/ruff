@@ -1,15 +1,13 @@
 mod general;
 mod structured;
 
-use super::DocstringFragment;
+use super::{DocstringFragment, documentation_trim};
 
-/// Render Markdown for a source docstring.
-///
-/// `source` must have already undergone PEP-257 trimming and universal newline
-/// normalization (typically via `docstring::documentation_trim`).
-pub(super) fn render(source: &str) -> String {
+/// Renders Markdown for a decoded source docstring.
+pub(super) fn render(raw: &str) -> String {
+    let source = documentation_trim(raw);
     let mut output = String::new();
-    structured::render_into(&mut output, source);
+    structured::render_into(&mut output, raw, &source);
     output
 }
 

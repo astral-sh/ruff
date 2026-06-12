@@ -818,7 +818,7 @@ Summary.
 
     fn render_docstring(raw: &str) -> String {
         let mut output = String::new();
-        render_into(&mut output, raw);
+        render_into(&mut output, raw, raw);
         output
     }
 

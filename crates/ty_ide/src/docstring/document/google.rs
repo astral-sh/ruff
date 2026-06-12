@@ -23,7 +23,7 @@ pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
     parameters
 }
 
-/// Visits recognized Google-style parameter sections in source order.
+/// Visits recognized Google-style sections in source order.
 pub(in crate::docstring) fn visit_sections<'a>(
     raw: &'a str,
     mut visit: impl FnMut(SectionKind, TextRange, TextSize, &[ParsedLine<'a>]),
@@ -62,7 +62,7 @@ pub(in crate::docstring) fn visit_sections<'a>(
 }
 
 /// Returns whether `name` is a valid Python parameter name, including variadic prefixes.
-fn is_parameter_name(name: &str) -> bool {
+pub(in crate::docstring) fn is_parameter_name(name: &str) -> bool {
     let identifier = name
         .strip_prefix("**")
         .or_else(|| name.strip_prefix('*'))
@@ -137,6 +137,17 @@ fn blank_line_continues_section(
         if parse_section_header(lines, offset).is_some() || is_inline_section_header(next.text) {
             return false;
         }
+        // Returns and yields have no item syntax that distinguishes an aligned body from prose
+        // following an empty section.
+        if next.raw_indent <= header.indent
+            && item_indent.is_none()
+            && matches!(
+                header.kind,
+                HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields)
+            )
+        {
+            return false;
+        }
     }
 
     // A blank line separates prose aligned with parameter items from the section body.
@@ -172,9 +183,8 @@ fn section_header_ends_body(
         return !prefer_item;
     }
 
-    parse_section_header(lines, index).is_some_and(|next| {
-        next.structural_indent <= header.structural_indent && !prefer_item
-    })
+    parse_section_header(lines, index)
+        .is_some_and(|next| next.structural_indent <= header.structural_indent && !prefer_item)
 }
 
 /// Returns whether `line` belongs to `header` under Google-style indentation rules.
@@ -206,15 +216,28 @@ fn prefer_item_over_section_header(
     line: ParsedLine<'_>,
     item_indent: Option<TextSize>,
 ) -> bool {
+    let has_named_items = matches!(
+        header.kind,
+        HeaderKind::Structured(
+            SectionKind::Parameters
+                | SectionKind::KeywordArguments
+                | SectionKind::OtherParameters
+                | SectionKind::Attributes
+                | SectionKind::Raises
+        )
+    );
     item_indent.is_none_or(|indent| indent == line.raw_indent)
         && section_item_indent(header, line).is_some()
-        && (line.raw_indent > header.indent
+        && ((has_named_items && line.raw_indent > header.indent)
             || line
                 .text
                 .trim()
                 .chars()
                 .next()
-                .is_some_and(char::is_lowercase))
+                .is_some_and(char::is_lowercase)
+            || (matches!(header.kind, HeaderKind::Structured(SectionKind::Raises))
+                && split_once_unbracketed_colon(line.text.trim())
+                    .is_some_and(|(name, _)| has_exception_name_suffix(name.trim()))))
 }
 
 /// Returns the indentation of an item recognized in the current section.
@@ -224,6 +247,10 @@ fn section_item_indent(header: SectionHeader, line: ParsedLine<'_>) -> Option<Te
         HeaderKind::Structured(
             SectionKind::Parameters | SectionKind::KeywordArguments | SectionKind::OtherParameters,
         ) => parse_parameter(trimmed).is_some(),
+        HeaderKind::Structured(SectionKind::Attributes | SectionKind::Raises) => {
+            split_once_unbracketed_colon(trimmed).is_some_and(|(name, _)| !name.trim().is_empty())
+        }
+        HeaderKind::Structured(SectionKind::Returns | SectionKind::Yields) => !trimmed.is_empty(),
         HeaderKind::Container => false,
     };
     is_item.then_some(line.raw_indent)
@@ -262,8 +289,11 @@ fn section_kind_from_name(name: &str) -> Option<HeaderKind> {
         "other args" | "other arguments" | "other parameters" => {
             HeaderKind::Structured(SectionKind::OtherParameters)
         }
-        "attributes" | "return" | "returns" | "yield" | "yields" | "raise" | "raises"
-        | "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
+        "attributes" => HeaderKind::Structured(SectionKind::Attributes),
+        "return" | "returns" => HeaderKind::Structured(SectionKind::Returns),
+        "yield" | "yields" => HeaderKind::Structured(SectionKind::Yields),
+        "raise" | "raises" => HeaderKind::Structured(SectionKind::Raises),
+        "attention" | "caution" | "danger" | "error" | "example" | "examples" | "hint"
         | "important" | "methods" | "note" | "notes" | "references" | "see also" | "tip"
         | "todo" | "todos" | "warning" | "warnings" | "warns" => HeaderKind::Container,
         _ => return None,
@@ -281,6 +311,18 @@ fn is_inline_section_header(line: &str) -> bool {
         && !description.starts_with(':')
         && name.chars().next().is_some_and(char::is_uppercase)
         && section_kind_from_name(name).is_some()
+}
+
+/// Returns whether `line` is a recognized Google-style section header.
+pub(in crate::docstring) fn is_section_like_header(line: &str) -> bool {
+    section_kind(line).is_some() || is_inline_section_header(line)
+}
+
+/// Returns whether `name` ends with a conventional exception-class suffix.
+pub(in crate::docstring) fn has_exception_name_suffix(name: &str) -> bool {
+    ["Error", "Exception", "Warning"]
+        .iter()
+        .any(|suffix| name.ends_with(suffix))
 }
 
 /// Parses a parameter item into its display name and description.
@@ -347,6 +389,11 @@ fn insert_parameter_documentation(
 
 fn google_parameter_names(display_name: &str) -> impl Iterator<Item = &str> {
     display_name.split(',').map(str::trim)
+}
+
+/// Returns whether every component of `name` is a Python identifier.
+pub(in crate::docstring) fn is_dotted_identifier(name: &str) -> bool {
+    !name.is_empty() && name.split('.').all(is_identifier)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -579,7 +626,7 @@ mod tests {
     }
 
     #[test]
-    fn visits_parameter_sections_with_metadata() {
+    fn visits_structured_sections_with_final_metadata() {
         let raw = "    Args:\r\n        value: Documentation.\r\nKeyword Args:\r\n    option: Optional.\r\nOther Parameters:\r\n    other: Other.\r\nReturns:\r\n    bool: Result.";
         let mut sections = Vec::new();
         visit_sections(raw, |kind, range, header_indent, body| {
@@ -611,6 +658,12 @@ mod tests {
                     "Other Parameters:\r\n    other: Other.",
                     TextSize::new(0),
                     vec!["    other: Other."],
+                ),
+                (
+                    SectionKind::Returns,
+                    "Returns:\r\n    bool: Result.",
+                    TextSize::new(0),
+                    vec!["    bool: Result."],
                 ),
             ]
         );
