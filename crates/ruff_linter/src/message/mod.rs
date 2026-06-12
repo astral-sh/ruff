@@ -217,7 +217,7 @@ pub fn render_diagnostics(
                 .map_err(std::io::Error::other)?;
         }
         Err(RuffOutputFormat::Sarif) => {
-            SarifEmitter
+            SarifEmitter::new(&config)
                 .emit(writer, diagnostics, context)
                 .map_err(std::io::Error::other)?;
         }
