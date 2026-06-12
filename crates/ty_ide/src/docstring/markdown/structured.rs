@@ -6,6 +6,7 @@ use strum_macros::EnumIter;
 
 use super::general;
 use crate::docstring::document::preformatted::MarkdownFence;
+use crate::docstring::document::syntax::starts_with_markdown_list_item;
 
 mod rst;
 
@@ -306,45 +307,9 @@ fn render_markdown_section<'a>(
     rendered_field
 }
 
-fn starts_with_markdown_list_item(line: &str) -> bool {
-    starts_with_unordered_markdown_list_item(line) || starts_with_ordered_markdown_list_item(line)
-}
-
 fn line_starts_markdown_block_content(line: &str, at_description_start: bool) -> bool {
     MarkdownFence::find(line).is_some()
         || (at_description_start && starts_with_markdown_list_item(line))
-}
-
-/// Returns whether `line` begins with `-`, `+`, or `*` followed by whitespace.
-fn starts_with_unordered_markdown_list_item(line: &str) -> bool {
-    matches!(line.as_bytes(), [b'-' | b'+' | b'*', b' ' | b'\t', ..])
-}
-
-/// Returns whether `line` begins with one to nine ASCII digits followed by
-/// `.` or `)`, then whitespace.
-///
-/// `CommonMark` limits ordered-list markers to nine digits to avoid integer
-/// overflow in browsers: <https://spec.commonmark.org/0.31.2/#list-items>.
-fn starts_with_ordered_markdown_list_item(line: &str) -> bool {
-    let bytes = line.as_bytes();
-    let mut digit_count = 0;
-
-    for byte in bytes {
-        if digit_count < 9 && byte.is_ascii_digit() {
-            digit_count += 1;
-            continue;
-        }
-
-        if digit_count > 0 && matches!(*byte, b'.' | b')') {
-            return bytes
-                .get(digit_count + 1)
-                .is_some_and(|byte| matches!(*byte, b' ' | b'\t'));
-        }
-
-        return false;
-    }
-
-    false
 }
 
 /// Returns the byte offset where `description` first needs block-style rendering.
