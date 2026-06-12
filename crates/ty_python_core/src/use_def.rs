@@ -240,7 +240,7 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
-use std::ops::{Index, Range};
+use std::ops::Index;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -417,35 +417,33 @@ impl PlaceStateInterner {
 ///
 /// The builder needs a `SmallVec` and an optional unbound constraint while constructing each
 /// binding state. Neither is needed after the semantic index is built, so the retained map stores
-/// ranges into one contiguous array instead.
+/// cumulative end offsets into one contiguous array instead.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct RetainedBindings {
-    ranges: FrozenIndexVec<InternedBindingsId, Range<u32>>,
+    ends: FrozenIndexVec<InternedBindingsId, u32>,
     live_bindings: Box<[LiveBinding]>,
 }
 
 struct RetainedBindingsBuilder {
-    ranges: IndexVec<InternedBindingsId, Range<u32>>,
+    ends: IndexVec<InternedBindingsId, u32>,
     live_bindings: Vec<LiveBinding>,
 }
 
 impl RetainedBindingsBuilder {
     fn with_capacity(bindings: usize) -> Self {
         Self {
-            ranges: IndexVec::with_capacity(bindings),
+            ends: IndexVec::with_capacity(bindings),
             live_bindings: Vec::with_capacity(bindings),
         }
     }
 
     fn push(&mut self, bindings: &Bindings) -> InternedBindingsId {
         // Definition IDs are also 32-bit and a single scope cannot practically approach this
-        // limit. Keeping offsets at the same width halves the retained range size.
-        let start = u32::try_from(self.live_bindings.len())
-            .expect("Expected live-bindings length to fit into a u32");
+        // limit. Keeping one cumulative end offset per state halves the retained range metadata.
         self.live_bindings.extend_from_slice(bindings.as_slice());
         let end = u32::try_from(self.live_bindings.len())
             .expect("Expected live-bindings length to fit into a u32");
-        self.ranges.push(start..end)
+        self.ends.push(end)
     }
 
     fn finish(
@@ -458,7 +456,7 @@ impl RetainedBindingsBuilder {
             narrowing_constraints.mark_used(binding.narrowing_constraint());
         }
         RetainedBindings {
-            ranges: self.ranges.into(),
+            ends: self.ends.into(),
             live_bindings: self.live_bindings.into_boxed_slice(),
         }
     }
@@ -468,7 +466,12 @@ impl Index<InternedBindingsId> for RetainedBindings {
     type Output = [LiveBinding];
 
     fn index(&self, index: InternedBindingsId) -> &Self::Output {
-        let Range { start, end } = self.ranges[index];
+        let end = self.ends[index];
+        let start = if index.index() == 0 {
+            0
+        } else {
+            self.ends[InternedBindingsId::new(index.index() - 1)]
+        };
         &self.live_bindings[start as usize..end as usize]
     }
 }
