@@ -7,7 +7,7 @@ use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModule, parsed_module};
 use ruff_index::{FrozenIndexVec, IndexSlice};
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
@@ -302,6 +302,13 @@ impl<'db> DefinitionsByNode<'db> {
 /// The place tables and use-def maps for all scopes in a file.
 #[derive(Debug, Update, get_size2::GetSize)]
 pub struct SemanticIndex<'db> {
+    /// The parsed-module handle used to build this index.
+    ///
+    /// Keeping the handle here lets queries that require both the semantic index and the AST avoid
+    /// a second `parsed_module` query. Clearing the handle still drops the shared AST payload.
+    #[get_size(ignore)]
+    parsed_module: ParsedModule,
+
     /// List of all place tables in this file, indexed by scope.
     place_tables: FrozenIndexVec<FileScopeId, Arc<PlaceTable>>,
 
@@ -372,6 +379,11 @@ pub struct NarrowingAliasPredicate<'db> {
 }
 
 impl<'db> SemanticIndex<'db> {
+    /// Returns the parsed-module handle used to build this index.
+    pub fn parsed_module(&self) -> ParsedModule {
+        self.parsed_module.clone()
+    }
+
     /// Returns the place table for a specific scope.
     ///
     /// Use the Salsa cached [`place_table()`] query if you only need the
@@ -1082,7 +1094,9 @@ impl HasTrackedScope for ast::Identifier {}
 
 #[cfg(test)]
 mod tests {
-    use ruff_db::{files::system_path_to_file, parsed::ParsedModuleRef};
+    use ruff_db::{
+        files::system_path_to_file, parsed::ParsedModuleRef, system::DbWithWritableSystem as _,
+    };
     use ruff_python_ast as ast;
     use ruff_text_size::{Ranged, TextRange};
 
@@ -1138,6 +1152,53 @@ mod tests {
             .symbols()
             .map(|expr| expr.name().to_string())
             .collect()
+    }
+
+    fn first_assigned_name(module: &ParsedModuleRef) -> &str {
+        let ast::Stmt::Assign(assign) = &module.syntax().body[0] else {
+            panic!("expected an assignment");
+        };
+        let ast::Expr::Name(name) = &assign.targets[0] else {
+            panic!("expected a name target");
+        };
+        name.id.as_str()
+    }
+
+    #[test]
+    fn semantic_index_parsed_module_is_invalidated_by_source_edit() -> anyhow::Result<()> {
+        let TestCase { mut db, file } = test_case("x = 1");
+        let path = file
+            .path(&db)
+            .as_system_path()
+            .expect("test file should have a system path")
+            .to_path_buf();
+
+        let before = semantic_index(&db, file).parsed_module();
+        assert_eq!(first_assigned_name(&before.load(&db)), "x");
+
+        db.write_file(path, "y = 2")?;
+
+        let after = semantic_index(&db, file).parsed_module();
+        assert_ne!(before, after);
+        assert_eq!(first_assigned_name(&after.load(&db)), "y");
+
+        Ok(())
+    }
+
+    #[test]
+    fn semantic_index_parsed_module_reloads_after_clear() {
+        let TestCase { db, file } = test_case("x = 1");
+
+        let parsed = semantic_index(&db, file).parsed_module();
+        let before_clear = parsed.load(&db);
+        parsed.clear();
+        drop(parsed);
+
+        let retained = semantic_index(&db, file).parsed_module();
+        let after_clear = retained.load(&db);
+
+        assert!(!std::ptr::eq(before_clear.syntax(), after_clear.syntax()));
+        assert_eq!(first_assigned_name(&after_clear), "x");
     }
 
     #[test]

@@ -185,9 +185,8 @@ pub fn check_file(db: &dyn Db, file: File) -> Result<Box<[Diagnostic]>, Diagnost
         .to_diagnostic());
     }
 
-    let parsed = parsed_module(db, file);
-
-    let parsed_ref = parsed.load(db);
+    let index = semantic_index(db, file);
+    let parsed_ref = index.parsed_module().load(db);
     diagnostics.extend(
         parsed_ref
             .errors()

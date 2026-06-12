@@ -110,15 +110,14 @@ pub(crate) fn infer_definition_types<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
     let _span = tracing::trace_span!(
         "infer_definition_types",
         range = ?definition.kind(db).target_range(&module),
         ?file
     )
     .entered();
-
-    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
         .finish_definition(definition)
@@ -160,8 +159,8 @@ pub(crate) fn function_known_decorators<'db>(
     definition: Definition<'db>,
 ) -> FunctionDecoratorInference<'db> {
     let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
 
     TypeInferenceBuilder::new(
         db,
@@ -245,7 +244,8 @@ pub(crate) fn infer_deferred_types<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
     let _span = tracing::trace_span!(
         "infer_deferred_types",
         definition = ?definition.as_id(),
@@ -253,8 +253,6 @@ pub(crate) fn infer_deferred_types<'db>(
         ?file
     )
     .entered();
-
-    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
         .finish_definition(definition)
@@ -318,11 +316,10 @@ pub(crate) fn infer_scope_types_impl<'db>(
     let file = scope.file(db);
     let _span = tracing::trace_span!("infer_scope_types", scope=?scope.as_id(), ?file).entered();
 
-    let module = parsed_module(db, file).load(db);
-
     // Using the index here is fine because the code below depends on the AST anyway.
     // The isolation of the query is by the return inferred types.
     let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Scope(scope, tcx), index, &module).finish_scope()
 }
@@ -354,7 +351,8 @@ pub(super) fn infer_expression_types_impl<'db>(
     let (expression, tcx) = input.into_inner(db);
 
     let file = expression.file(db);
-    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
     let _span = tracing::trace_span!(
         "infer_expression_types",
         expression = ?expression.as_id(),
@@ -362,8 +360,6 @@ pub(super) fn infer_expression_types_impl<'db>(
         ?file
     )
     .entered();
-
-    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(
         db,
@@ -465,7 +461,8 @@ fn infer_statement_types_impl<'db>(
     statement: StatementInner<'db>,
 ) -> StatementInferenceInner<'db> {
     let file = statement.file(db);
-    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+    let module = index.parsed_module().load(db);
     let _span = tracing::trace_span!(
         "infer_statement_types",
         statement = ?statement.as_id(),
@@ -473,8 +470,6 @@ fn infer_statement_types_impl<'db>(
         ?file
     )
     .entered();
-
-    let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Statement(statement), index, &module)
         .finish_statement()
