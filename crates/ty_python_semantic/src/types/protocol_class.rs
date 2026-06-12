@@ -12,7 +12,7 @@ use crate::types::{TypeContext, UpcastPolicy};
 use crate::{
     Db, FxOrderSet,
     place::{
-        DefinedPlace, Definedness, Place, PlaceAndQualifiers, place_from_bindings,
+        DefinedPlace, Definedness, Place, PlaceAndQualifiers, Provenance, place_from_bindings,
         place_from_declarations,
     },
     types::{
@@ -324,7 +324,8 @@ impl<'db> ProtocolInterface<'db> {
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         self.member_by_name(db, name)
             .map(|member| PlaceAndQualifiers {
-                place: Place::bound(member.ty()),
+                place: Place::bound(member.ty())
+                    .with_provenance(Provenance::from_definition(member.definition())),
                 qualifiers: member.qualifiers(),
             })
             .unwrap_or_else(|| Type::object().member(db, name))
@@ -1061,6 +1062,10 @@ fn cached_protocol_interface<'db>(
             }
         }
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "direct members have unique names and the final map is ordered"
+        )]
         for (symbol_id, (ty, qualifiers, definition, bound_on_class)) in direct_members {
             let name = place_table.symbol(symbol_id).name();
             if excluded_from_proto_members(name) {

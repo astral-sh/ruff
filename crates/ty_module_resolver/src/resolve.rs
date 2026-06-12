@@ -1815,7 +1815,7 @@ mod tests {
         assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(expected_foo_path))
+            path_to_module(&db, &FilePath::from(expected_foo_path))
         );
     }
 
@@ -1841,7 +1841,7 @@ mod tests {
         assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(expected_foo_path))
+            path_to_module(&db, &FilePath::from(expected_foo_path))
         );
     }
 
@@ -1873,7 +1873,7 @@ mod tests {
         assert_eq!(&expected_foo_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(expected_foo_path))
+            path_to_module(&db, &FilePath::from(expected_foo_path))
         );
     }
 
@@ -1950,7 +1950,7 @@ mod tests {
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &FilePath::System(expected_functools_path))
+            path_to_module(&db, &FilePath::from(expected_functools_path))
         );
     }
 
@@ -2141,7 +2141,7 @@ mod tests {
 
         assert_eq!(
             Some(functools_module),
-            path_to_module(&db, &FilePath::System(src.join("functools.py")))
+            path_to_module(&db, &FilePath::from(src.join("functools.py")))
         );
     }
 
@@ -2179,14 +2179,11 @@ mod tests {
 
         assert_eq!(
             Some(&foo_module),
-            path_to_module(&db, &FilePath::System(foo_path)).as_ref()
+            path_to_module(&db, &FilePath::from(foo_path)).as_ref()
         );
 
         // Resolving by directory doesn't resolve to the init file.
-        assert_eq!(
-            None,
-            path_to_module(&db, &FilePath::System(src.join("foo")))
-        );
+        assert_eq!(None, path_to_module(&db, &FilePath::from(src.join("foo"))));
     }
 
     #[test]
@@ -2208,11 +2205,11 @@ mod tests {
 
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo_init_path))
+            path_to_module(&db, &FilePath::from(foo_init_path))
         );
         assert_eq!(
             None,
-            path_to_module(&db, &FilePath::System(src.join("foo.py")))
+            path_to_module(&db, &FilePath::from(src.join("foo.py")))
         );
     }
 
@@ -2230,10 +2227,10 @@ mod tests {
         assert_eq!(&src, foo.search_path(&db).unwrap());
         assert_eq!(&foo_stub, foo.file(&db).unwrap().path(&db));
 
-        assert_eq!(Some(foo), path_to_module(&db, &FilePath::System(foo_stub)));
+        assert_eq!(Some(foo), path_to_module(&db, &FilePath::from(foo_stub)));
         assert_eq!(
             Some(foo_real),
-            path_to_module(&db, &FilePath::System(src.join("foo.py")))
+            path_to_module(&db, &FilePath::from(src.join("foo.py")))
         );
         assert!(foo_real != foo);
     }
@@ -2257,7 +2254,7 @@ mod tests {
 
         assert_eq!(
             Some(baz_module),
-            path_to_module(&db, &FilePath::System(baz_path))
+            path_to_module(&db, &FilePath::from(baz_path))
         );
     }
 
@@ -2281,12 +2278,12 @@ mod tests {
         assert_eq!(&foo_src_path, foo_module.file(&db).unwrap().path(&db));
         assert_eq!(
             Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo_src_path))
+            path_to_module(&db, &FilePath::from(foo_src_path))
         );
 
         assert_eq!(
             None,
-            path_to_module(&db, &FilePath::System(site_packages.join("foo.py")))
+            path_to_module(&db, &FilePath::from(site_packages.join("foo.py")))
         );
     }
 
@@ -2352,14 +2349,8 @@ mod tests {
 
         assert_ne!(&foo_module, &bar_module);
 
-        assert_eq!(
-            Some(foo_module),
-            path_to_module(&db, &FilePath::System(foo))
-        );
-        assert_eq!(
-            Some(bar_module),
-            path_to_module(&db, &FilePath::System(bar))
-        );
+        assert_eq!(Some(foo_module), path_to_module(&db, &FilePath::from(foo)));
+        assert_eq!(Some(bar_module), path_to_module(&db, &FilePath::from(bar)));
 
         Ok(())
     }
@@ -2726,7 +2717,7 @@ not_a_directory
         );
         assert_eq!(
             spam_module.file(&db).unwrap().path(&db),
-            &FilePath::System(site_packages.join("spam/spam.py"))
+            &FilePath::from(site_packages.join("spam/spam.py"))
         );
     }
 
@@ -2812,7 +2803,7 @@ not_a_directory
         let src_path = SystemPathBuf::from("/x/src");
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
-            &FilePath::System(src_path.join("foo.py"))
+            &FilePath::from(src_path.join("foo.py"))
         );
 
         db.memory_file_system()
@@ -2979,7 +2970,7 @@ not_a_directory
         .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
-        let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
+        let foo_module_file = File::new(&db, FilePath::from(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();
         assert_eq!(module.search_path(&db).unwrap(), &site_packages);
     }

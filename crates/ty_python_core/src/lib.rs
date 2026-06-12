@@ -263,8 +263,8 @@ pub enum EnclosingSnapshotResult<'map, 'db> {
 
 #[derive(Debug, PartialEq, Eq, Update, get_size2::GetSize)]
 struct DefinitionsByNode<'db> {
-    single: FxHashMap<DefinitionNodeKey, Definition<'db>>,
-    non_single: FxHashMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
+    single: FrozenMap<DefinitionNodeKey, Definition<'db>>,
+    non_single: FrozenMap<DefinitionNodeKey, Box<[Definition<'db>]>>,
 }
 
 impl<'db> DefinitionsByNode<'db> {
@@ -273,6 +273,10 @@ impl<'db> DefinitionsByNode<'db> {
         let mut non_single = FxHashMap::default();
         single.reserve(definitions_by_node.len());
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "each node is independently partitioned by definition count"
+        )]
         for (key, definitions) in definitions_by_node {
             if definitions.len() == 1 {
                 single.insert(key, definitions[0]);
@@ -281,10 +285,10 @@ impl<'db> DefinitionsByNode<'db> {
             }
         }
 
-        single.shrink_to_fit();
-        non_single.shrink_to_fit();
-
-        Self { single, non_single }
+        Self {
+            single: FrozenMap::from(single),
+            non_single: FrozenMap::from(non_single),
+        }
     }
 
     fn get(&self, key: DefinitionNodeKey) -> Option<&[Definition<'db>]> {

@@ -272,6 +272,7 @@ class CodeType:
             co_exceptiontable: bytes = ...,
         ) -> Self:
             """Return a copy of the code object with new values for the specified fields."""
+
     else:
         def replace(
             self,
@@ -294,6 +295,7 @@ class CodeType:
             co_linetable: bytes = ...,
         ) -> Self:
             """Return a copy of the code object with new values for the specified fields."""
+
     if sys.version_info >= (3, 13):
         __replace__ = replace
         """The same as replace()."""
@@ -445,12 +447,15 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     @property
     def gi_yieldfrom(self) -> Iterator[_YieldT_co] | None:
         """object being iterated by yield from, or None"""
+
     if sys.version_info >= (3, 11):
         @property
         def gi_suspended(self) -> bool: ...
     if sys.version_info >= (3, 15):
         @property
-        def gi_state(self) -> Literal["GEN_CREATED", "GEN_SUSPENDED", "GEN_RUNNING", "GEN_CLOSED"]: ...
+        def gi_state(self) -> Literal["GEN_CREATED", "GEN_SUSPENDED", "GEN_RUNNING", "GEN_CLOSED"]:
+            """state of the generator"""
+
     __name__: str
     """name of the generator"""
 
@@ -508,7 +513,8 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
         def ag_suspended(self) -> bool: ...
     if sys.version_info >= (3, 15):
         @property
-        def ag_state(self) -> Literal["AGEN_CREATED", "AGEN_SUSPENDED", "AGEN_RUNNING", "AGEN_CLOSED"]: ...
+        def ag_state(self) -> Literal["AGEN_CREATED", "AGEN_SUSPENDED", "AGEN_RUNNING", "AGEN_CLOSED"]:
+            """state of the async generator"""
 
     def __aiter__(self) -> Self:
         """Return an awaitable, that resolves in asynchronous iterator."""
@@ -568,7 +574,8 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
         def cr_suspended(self) -> bool: ...
     if sys.version_info >= (3, 15):
         @property
-        def cr_state(self) -> Literal["CORO_CREATED", "CORO_SUSPENDED", "CORO_RUNNING", "CORO_CLOSED"]: ...
+        def cr_state(self) -> Literal["CORO_CREATED", "CORO_SUSPENDED", "CORO_RUNNING", "CORO_CLOSED"]:
+            """state of the coroutine"""
 
     def close(self) -> None:
         """close() -> raise GeneratorExit inside coroutine."""
@@ -623,6 +630,7 @@ class MethodType:
     def __new__(cls, func: Callable[..., Any], instance: object, /) -> Self: ...
     def __call__(self, *args: Any, **kwargs: Any) -> Any:
         """Call self as a function."""
+
     if sys.version_info >= (3, 13):
         def __get__(self, instance: object, owner: type | None = None, /) -> Self:
             """Return an attribute of instance, which is of type owner."""
@@ -738,15 +746,18 @@ class FrameType:
     @property
     def f_lasti(self) -> int:
         """Return the index of the last attempted instruction in the frame."""
+
     # see discussion in #6769: f_lineno *can* sometimes be None,
     # but you should probably file a bug report with CPython if you encounter it being None in the wild.
     # An `int | None` annotation here causes too many false-positive errors, so applying `int | Any`.
     @property
     def f_lineno(self) -> int | MaybeNone:
         """Return the current line number in the frame."""
+
     if sys.version_info >= (3, 15):
         @property
-        def f_locals(self) -> FrameLocalsProxyType | dict[str, Any]: ...
+        def f_locals(self) -> FrameLocalsProxyType | dict[str, Any]:
+            """Return the mapping used by the frame to look up local variables."""
     else:
         @property
         def f_locals(self) -> dict[str, Any]:
@@ -761,6 +772,7 @@ class FrameType:
 
     def clear(self) -> None:
         """Clear all references held by the frame."""
+
     if sys.version_info >= (3, 14):
         @property
         def f_generator(self) -> GeneratorType[Any, Any, Any] | CoroutineType[Any, Any, Any] | None:
@@ -769,12 +781,26 @@ class FrameType:
 if sys.version_info >= (3, 15):
     @final
     class FrameLocalsProxyType(MutableMapping[str, Any]):
+        """Create a write-through view of the locals dictionary for a frame.
+
+        frame
+          the frame object to wrap.
+        """
+
         def __new__(cls, frame: FrameType, /) -> Self: ...
         def __getitem__(self, key: str, /) -> Any: ...
-        def __setitem__(self, key: str, value: Any, /) -> None: ...
-        def __delitem__(self, key: str, /) -> None: ...
-        def __iter__(self) -> Iterator[str]: ...
-        def __len__(self) -> int: ...
+        def __setitem__(self, key: str, value: Any, /) -> None:
+            """Set self[key] to value."""
+
+        def __delitem__(self, key: str, /) -> None:
+            """Delete self[key]."""
+
+        def __iter__(self) -> Iterator[str]:
+            """Implement iter(self)."""
+
+        def __len__(self) -> int:
+            """Return len(self)."""
+
         def __contains__(self, key: object, /) -> bool: ...
         def __reversed__(self) -> Iterator[str]: ...
         def copy(self) -> dict[str, Any]: ...
@@ -784,9 +810,17 @@ if sys.version_info >= (3, 15):
 
     @final
     class LazyImportType:
+        """Represents a lazy import that will be resolved on first use.
+
+        Instances of this object accessed from the global scope will be
+        automatically imported based upon their name and then replaced with
+        the imported value.
+        """
+
         @property
         def __name__(self) -> str: ...
-        def resolve(self) -> Any: ...
+        def resolve(self) -> Any:
+            """resolves the lazy import and returns the actual object"""
 
 @final
 class GetSetDescriptorType:
@@ -874,18 +908,19 @@ if sys.version_info >= (3, 12):
 class DynamicClassAttribute(property):
     """Route attribute access on a class to __getattr__.
 
-    This is a descriptor, used to define attributes that act differently when
-    accessed through an instance and through a class.  Instance access remains
-    normal, but access to an attribute through a class will be routed to the
-    class's __getattr__ method; this is done by raising AttributeError.
+    This is a descriptor, used to define attributes that act differently
+    when accessed through an instance and through a class.  Instance access
+    remains normal, but access to an attribute through a class will be
+    routed to the class's __getattr__ method; this is done by raising
+    AttributeError.
 
-    This allows one to have properties active on an instance, and have virtual
-    attributes on the class with the same name.  (Enum used this between Python
-    versions 3.4 - 3.9 .)
+    This allows one to have properties active on an instance, and have
+    virtual attributes on the class with the same name.  (Enum used this
+    between Python versions 3.4 - 3.9 .)
 
-    Subclass from this to use a different method of accessing virtual attributes
-    and still be treated properly by the inspect module. (Enum uses this since
-    Python 3.10 .)
+    Subclass from this to use a different method of accessing virtual
+    attributes and still be treated properly by the inspect module.  (Enum
+    uses this since Python 3.10 .)
 
     """
 
@@ -952,6 +987,7 @@ class GenericAlias:
 
     def __ror__(self, value: Any, /) -> UnionType:
         """Return value|self."""
+
     # GenericAlias delegates attr access to `__origin__`
     def __getattr__(self, name: str) -> Any: ...
 
@@ -982,6 +1018,7 @@ class UnionType:
     @property
     def __parameters__(self) -> tuple[Any, ...]:
         """Type variables in the types.UnionType."""
+
     # `(int | str) | Literal["foo"]` returns a generic alias to an instance of `_SpecialForm` (`Union`).
     # Normally we'd express this using the return type of `_SpecialForm.__ror__`,
     # but because `UnionType.__or__` accepts `Any`, type checkers will use

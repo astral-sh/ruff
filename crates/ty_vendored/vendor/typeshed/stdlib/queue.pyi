@@ -82,6 +82,7 @@ class Queue(Generic[_T]):
         Only get an item if one is immediately available. Otherwise
         raise the Empty exception.
         """
+
     if sys.version_info >= (3, 13):
         def shutdown(self, immediate: bool = False) -> None:
             """Shut-down the queue, making queue gets and puts raise ShutDown.

@@ -856,6 +856,7 @@ struct ConstraintSetStorage<'db> {
 
     single_sequent_cache: FxHashMap<ConstraintId, SequentMap>,
     pair_sequent_cache: FxHashMap<(ConstraintId, ConstraintId), SequentMap>,
+    constraint_set_subtype_cache: FxHashMap<(Type<'db>, Type<'db>), bool>,
 }
 
 impl<'db> ConstraintSetBuilder<'db> {
@@ -1085,6 +1086,25 @@ impl<'db> ConstraintSetBuilder<'db> {
         self.storage
             .borrow_mut()
             .constraint_implication_cache
+            .insert(key, result);
+        result
+    }
+
+    fn cached_is_constraint_set_subtype_of(
+        &self,
+        db: &'db dyn Db,
+        source: Type<'db>,
+        target: Type<'db>,
+    ) -> bool {
+        let key = (source, target);
+        if let Some(result) = self.storage.borrow().constraint_set_subtype_cache.get(&key) {
+            return *result;
+        }
+
+        let result = source.is_constraint_set_subtype_of(db, target);
+        self.storage
+            .borrow_mut()
+            .constraint_set_subtype_cache
             .insert(key, result);
         result
     }
@@ -2563,6 +2583,10 @@ impl NodeId {
                 .is_always_satisfied(db, builder)
         };
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "all type variables must pass the check regardless of order"
+        )]
         for typevar in typevars {
             if typevar.is_inferable(db, inferable) {
                 // If the typevar is in inferable position, we need to verify that some valid
@@ -5129,6 +5153,9 @@ impl SequentMap {
         let bound_typevar = bound_constraint_data.typevar;
         let constrained_constraint_data = builder.constraint_data(constrained_constraint);
         let constrained_typevar = constrained_constraint_data.typevar;
+
+        // Transitive pivots require subtyping; classes with dynamic bases can be assignable to
+        // unrelated types without being subtypes.
         let (new_lower, new_upper) = match (
             constrained_constraint_data.bounds.lower,
             constrained_constraint_data.bounds.upper,
@@ -5168,12 +5195,11 @@ impl SequentMap {
             (constrained_lower, Some(constrained_upper), Some(bound_lower), _)
                 if !constrained_upper.is_never()
                     && !constrained_upper.is_object()
-                    && constrained_upper
-                        .top_materialization(db)
-                        .is_constraint_set_assignable_to(
-                            db,
-                            bound_lower.bottom_materialization(db),
-                        ) =>
+                    && builder.cached_is_constraint_set_subtype_of(
+                        db,
+                        constrained_upper.top_materialization(db),
+                        bound_lower.bottom_materialization(db),
+                    ) =>
             {
                 (constrained_lower, Some(Type::TypeVar(bound_typevar)))
             }
@@ -5182,12 +5208,11 @@ impl SequentMap {
             (Some(constrained_lower), constrained_upper, _, Some(bound_upper))
                 if !constrained_lower.is_never()
                     && !constrained_lower.is_object()
-                    && bound_upper
-                        .top_materialization(db)
-                        .is_constraint_set_assignable_to(
-                            db,
-                            constrained_lower.bottom_materialization(db),
-                        ) =>
+                    && builder.cached_is_constraint_set_subtype_of(
+                        db,
+                        bound_upper.top_materialization(db),
+                        constrained_lower.bottom_materialization(db),
+                    ) =>
             {
                 (Some(Type::TypeVar(bound_typevar)), constrained_upper)
             }
@@ -5283,6 +5308,21 @@ impl SequentMap {
         left_constraint: ConstraintId,
         right_constraint: ConstraintId,
     ) {
+        // Keep this precheck aligned with `variance_of`, which visits lazy types.
+        let has_typevar_bound = |bounds: ConstraintBounds<'db>| {
+            bounds
+                .lower
+                .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
+                || bounds
+                    .upper
+                    .is_some_and(|bound| any_over_type(db, bound, true, Type::is_type_var))
+        };
+        if !has_typevar_bound(builder.constraint_data(left_constraint).bounds)
+            && !has_typevar_bound(builder.constraint_data(right_constraint).bounds)
+        {
+            return;
+        }
+
         let mut try_tightening =
             |bound_constraint: ConstraintId, constrained_constraint: ConstraintId| {
                 let bound_data = builder.constraint_data(bound_constraint);
@@ -5823,6 +5863,10 @@ impl SequentMap {
                     }
                 };
 
+                #[expect(
+                    clippy::iter_over_hash_type,
+                    reason = "this debug-only formatter has no stable ordering contract"
+                )]
                 for (ante1, ante2) in &self.map.pair_impossibilities {
                     maybe_write_prefix(f)?;
                     write!(
@@ -6102,6 +6146,10 @@ impl PathAssignments {
 
         self.discover_constraint(db, builder, assignment.constraint());
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any matching tautology yields the same conflict result"
+        )]
         for ante in &self.map.single_tautologies {
             if self.assignment_holds(ante.when_false()) {
                 // The sequent map says (ante1) is always true, and the current path asserts that
@@ -6121,6 +6169,10 @@ impl PathAssignments {
             }
         }
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any matching impossibility yields the same conflict result"
+        )]
         for (ante1, ante2) in &self.map.pair_impossibilities {
             if self.assignment_holds(ante1.when_true()) && self.assignment_holds(ante2.when_true())
             {

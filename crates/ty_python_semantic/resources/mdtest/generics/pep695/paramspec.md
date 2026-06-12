@@ -1001,6 +1001,43 @@ reveal_type(decorated_factory(1))  # revealed: int
 reveal_type(decorated_factory(y="x"))  # revealed: str
 ```
 
+A callable protocol can also describe a transparent decorator returned by a factory. Stacked
+decorators of this form preserve overload signatures independently.
+
+```py
+from typing import Callable, Literal, ParamSpec, Protocol, TypeVar, overload
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+class IdentityFunction(Protocol):
+    def __call__(self, func: Callable[P, R], /) -> Callable[P, R]: ...
+
+def deprecate_streaming_parameter() -> IdentityFunction:
+    raise NotImplementedError
+
+def forward_old_opt_flags() -> IdentityFunction:
+    raise NotImplementedError
+
+class DataFrame: ...
+class InProcessQuery: ...
+
+class LazyFrame:
+    @overload
+    def collect(self, *, background: Literal[True]) -> InProcessQuery: ...
+    @overload
+    def collect(self, *, background: Literal[False] = False) -> DataFrame: ...
+    @deprecate_streaming_parameter()
+    @forward_old_opt_flags()
+    def collect(self, *, background: bool = False) -> DataFrame | InProcessQuery:
+        raise NotImplementedError
+
+lazy_frame = LazyFrame()
+reveal_type(lazy_frame.collect())  # revealed: DataFrame
+reveal_type(lazy_frame.collect(background=False))  # revealed: DataFrame
+reveal_type(lazy_frame.collect(background=True))  # revealed: InProcessQuery
+```
+
 ### Overloads
 
 #### Return type filtering

@@ -32,6 +32,7 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
+tempfile = { workspace = true }
 
 [lints]
 workspace = true

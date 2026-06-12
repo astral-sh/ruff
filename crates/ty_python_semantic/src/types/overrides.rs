@@ -73,6 +73,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
 
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each class member is checked independently"
+    )]
     for member in own_class_members {
         check_class_declaration(
             context,

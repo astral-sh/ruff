@@ -198,6 +198,90 @@ def _(target: FooSub | str):
     reveal_type(y)  # revealed: Literal[1, 3, 4]
 ```
 
+### Dynamic class
+
+A dynamically typed class pattern is not known to match every subject, so later cases remain
+reachable.
+
+```py
+from typing import Any
+
+DynamicClass: Any = int
+
+def _(target: int | str):
+    match target:
+        case DynamicClass():
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### Subclass-of type
+
+A class pattern whose class expression has type `type[Base]` is not guaranteed to match a `Base`
+subject. `PatternClass` can evaluate to any subclass of `Base`, and a `Base` instance need not be an
+instance of that subclass. The `PatternClass` arm must therefore not be considered guaranteed to
+match, and the fallback arm remains reachable.
+
+```py
+class Base: ...
+class Derived(Base): ...
+
+PatternClass: type[Base] = Derived
+
+def _(target: Base):
+    match target:
+        case PatternClass():
+            reveal_type(target)  # revealed: Base
+            y = 1
+        case _:
+            reveal_type(target)  # revealed: Base
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+```
+
+### `collections.abc.Callable`
+
+```py
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2]
+
+def _(subj: None) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1]
+
+def _(subj: int | abc.Callable[..., str]) -> None:
+    y = 1
+
+    match subj:
+        case abc.Callable():
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[2, 3]
+```
+
 ### With arguments
 
 ```py

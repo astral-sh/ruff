@@ -245,7 +245,14 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
     newtype: NewType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, newtype.base(db).instance_type(db));
+    let base = if visitor.should_visit_lazy_type_attributes() {
+        Some(newtype.base(db))
+    } else {
+        newtype.eager_base(db)
+    };
+    if let Some(base) = base {
+        visitor.visit_type(db, base.instance_type(db));
+    }
 }
 
 /// `typing.NewType` typically wraps a class type, but it can also wrap another newtype.

@@ -47,6 +47,7 @@ class Base:
 
         This calls the method _eq().
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     @abstractmethod
     def _eq(self, other: Base) -> bool:

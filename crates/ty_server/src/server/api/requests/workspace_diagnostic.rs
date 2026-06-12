@@ -484,6 +484,10 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "workspace diagnostic reports are independently identified by URI"
+        )]
         for (key, (previous_uri, previous_result_id)) in self.previous_result_ids {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self

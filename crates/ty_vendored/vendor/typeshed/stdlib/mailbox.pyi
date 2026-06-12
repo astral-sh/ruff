@@ -185,6 +185,7 @@ class Mailbox(Generic[_MessageT_co]):
     @abstractmethod
     def close(self) -> None:
         """Flush and close the mailbox."""
+
     # Undocumented, called by subclasses to parse added messages.
     def _dump_message(self, message: _MessageData, target: SupportsWrite[bytes], mangle_from_: bool = False) -> None:
         """Dump message contents to target file."""
@@ -221,6 +222,7 @@ class Maildir(Mailbox[MaildirMessage]):
 
     def get_file(self, key: str) -> _ProxyFile:
         """Return a file-like representation or raise a KeyError."""
+
     if sys.version_info >= (3, 13):
         def get_info(self, key: str) -> str:
             """Get the keyed message's "info" as a string."""

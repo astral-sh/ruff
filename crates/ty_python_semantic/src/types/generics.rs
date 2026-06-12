@@ -18,9 +18,7 @@ use crate::types::infer::original_class_type;
 use crate::types::relation::{
     DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
 };
-use crate::types::signatures::{
-    CallableSignature, Parameters, ReturnCallableTypeVarScope, SignatureRelationVisitor,
-};
+use crate::types::signatures::{CallableSignature, Parameters, SignatureRelationVisitor};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::type_alias::{walk_manual_pep_695_type_alias, walk_pep_695_type_alias};
 use crate::types::typevar::{
@@ -123,21 +121,21 @@ pub(crate) fn bind_typevar<'db>(
     // Walk ancestor scopes, tracking whether we've crossed a class scope boundary.
     // Class-scoped type variables are not visible from inner class scopes.
     let mut crossed_class_scope = false;
-    for (_, ancestor_scope) in index.ancestor_scopes(containing_scope) {
+    for (ancestor_scope_id, ancestor_scope) in index.ancestor_scopes(containing_scope) {
         let is_class_scope = ancestor_scope.kind().is_class();
-        let generic_context = match ancestor_scope.node() {
-            NodeWithScopeKind::FunctionTypeParameters(function) => {
+        if let NodeWithScopeKind::FunctionTypeParameters(function) = ancestor_scope.node() {
+            // PEP 695 type parameters are defined in the function's type-parameter scope.
+            // Check that directly instead of reconstructing the function's signature.
+            if typevar
+                .definition(db)
+                .is_some_and(|definition| definition.file_scope(db) == ancestor_scope_id)
+            {
                 let definition = index.expect_single_definition(function);
-                infer_definition_types(db, definition)
-                    .function_type(definition)
-                    .and_then(|function_type| {
-                        function_type
-                            .last_definition_raw_signature(db, ReturnCallableTypeVarScope::Lexical)
-                            .generic_context
-                    })
+                return Some(typevar.with_binding_context(db, definition));
             }
-            node => GenericContext::of_node(db, node, index),
-        };
+            continue;
+        }
+        let generic_context = GenericContext::of_node(db, ancestor_scope.node(), index);
         // If we've already crossed a class boundary, skip class-scoped generic contexts.
         // This prevents inner classes from accessing type parameters of outer classes.
         if (!is_class_scope || !crossed_class_scope)
@@ -1124,6 +1122,36 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> Specialization<'db> {
+    /// Maps the specialization's types, returning [`Cow::Borrowed`] without allocating if every
+    /// type is unchanged and [`Cow::Owned`] otherwise.
+    fn map_types(
+        self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(usize, BoundTypeVarInstance<'db>, Type<'db>) -> Type<'db>,
+    ) -> Cow<'db, [Type<'db>]> {
+        let types = self.types(db);
+        let mut mapped_types: Option<Vec<Type<'db>>> = None;
+
+        for (index, (typevar, ty)) in self
+            .generic_context(db)
+            .variables(db)
+            .zip(types.iter().copied())
+            .enumerate()
+        {
+            let mapped_ty = map(index, typevar, ty);
+            if let Some(mapped_types) = &mut mapped_types {
+                mapped_types.push(mapped_ty);
+            } else if mapped_ty != ty {
+                let mut changed_types = Vec::with_capacity(types.len());
+                changed_types.extend_from_slice(&types[..index]);
+                changed_types.push(mapped_ty);
+                mapped_types = Some(changed_types);
+            }
+        }
+
+        mapped_types.map_or(Cow::Borrowed(types), Cow::Owned)
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1229,32 +1257,34 @@ impl<'db> Specialization<'db> {
             return self.materialize_impl(db, *materialization_kind, visitor);
         }
 
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .zip(self.generic_context(db).variables(db))
-            .enumerate()
-            .map(|(i, (ty, typevar))| {
-                let tcx = TypeContext::new(tcx.get(i).copied());
-                if typevar.variance(db).is_covariant() {
-                    ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                } else {
-                    ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
-                }
-            })
-            .collect();
+        let types = self.map_types(db, |i, typevar, ty| {
+            let tcx = TypeContext::new(tcx.get(i).copied());
+            if typevar.variance(db).is_covariant() {
+                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+            } else {
+                ty.apply_type_mapping_impl(db, &type_mapping.flip(), tcx, visitor)
+            }
+        });
 
-        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+        let original_tuple_inner = self.tuple_inner(db);
+        let tuple_inner = original_tuple_inner.and_then(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
 
-        Specialization::new(
-            db,
-            self.generic_context(db),
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        )
+        // Keep this check in sync with every field that can be transformed above.
+        let specialization_unchanged =
+            matches!(&types, Cow::Borrowed(_)) && tuple_inner == original_tuple_inner;
+        if specialization_unchanged {
+            self
+        } else {
+            Specialization::new(
+                db,
+                self.generic_context(db),
+                types,
+                self.materialization_kind(db),
+                tuple_inner,
+            )
+        }
     }
 
     /// Applies an optional specialization to this specialization.
@@ -1343,39 +1373,31 @@ impl<'db> Specialization<'db> {
             return self;
         }
         let mut has_dynamic_invariant_typevar = false;
-        let types: Box<[_]> = self
-            .generic_context(db)
-            .variables(db)
-            .zip(self.types(db))
-            .map(|(bound_typevar, vartype)| {
-                match specialization_variance(db, bound_typevar) {
-                    TypeVarVariance::Bivariant => {
-                        // With bivariance, all specializations are subtypes of each other,
-                        // so any materialization is acceptable.
-                        vartype.materialize(db, MaterializationKind::Top, visitor)
-                    }
-                    TypeVarVariance::Covariant => {
-                        vartype.materialize(db, materialization_kind, visitor)
-                    }
-                    TypeVarVariance::Contravariant => {
-                        vartype.materialize(db, materialization_kind.flip(), visitor)
-                    }
-                    TypeVarVariance::Invariant => {
-                        let top_materialization =
-                            vartype.materialize(db, MaterializationKind::Top, visitor);
-                        if !visitor.is_equivalent_to_materialization(
-                            db,
-                            *vartype,
-                            top_materialization,
-                        ) {
-                            has_dynamic_invariant_typevar = true;
-                        }
-                        *vartype
-                    }
+        let types = self.map_types(db, |_, bound_typevar, vartype| {
+            match specialization_variance(db, bound_typevar) {
+                TypeVarVariance::Bivariant => {
+                    // With bivariance, all specializations are subtypes of each other,
+                    // so any materialization is acceptable.
+                    vartype.materialize(db, MaterializationKind::Top, visitor)
                 }
-            })
-            .collect();
-        let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
+                TypeVarVariance::Covariant => {
+                    vartype.materialize(db, materialization_kind, visitor)
+                }
+                TypeVarVariance::Contravariant => {
+                    vartype.materialize(db, materialization_kind.flip(), visitor)
+                }
+                TypeVarVariance::Invariant => {
+                    let top_materialization =
+                        vartype.materialize(db, MaterializationKind::Top, visitor);
+                    if !visitor.is_equivalent_to_materialization(db, vartype, top_materialization) {
+                        has_dynamic_invariant_typevar = true;
+                    }
+                    vartype
+                }
+            }
+        });
+        let original_tuple_inner = self.tuple_inner(db);
+        let tuple_inner = original_tuple_inner.and_then(|tuple| {
             // Tuples are immutable, so tuple element types are always in covariant position.
             tuple.apply_type_mapping_impl(
                 db,
@@ -1389,13 +1411,21 @@ impl<'db> Specialization<'db> {
         } else {
             None
         };
-        Specialization::new(
-            db,
-            self.generic_context(db),
-            types,
-            new_materialization_kind,
-            tuple_inner,
-        )
+        // Keep this check in sync with every field that can be transformed above.
+        let specialization_unchanged = matches!(&types, Cow::Borrowed(_))
+            && tuple_inner == original_tuple_inner
+            && new_materialization_kind == self.materialization_kind(db);
+        if specialization_unchanged {
+            self
+        } else {
+            Specialization::new(
+                db,
+                self.generic_context(db),
+                types,
+                new_materialization_kind,
+                tuple_inner,
+            )
+        }
     }
 
     pub(crate) fn is_disjoint_from<'c>(
@@ -1563,28 +1593,22 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 MaterializationKind::Bottom,
             ),
             // And A <~ B (assignability) is Bottom[A] <: Top[B]
-            (
-                None,
-                Some(target_mat),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                MaterializationKind::Bottom,
-                target_type,
-                target_mat,
-            ),
-            (
-                Some(source_mat),
-                None,
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
-            ) => self.check_subtyping_in_invariant_position(
-                db,
-                source_type,
-                source_mat,
-                target_type,
-                MaterializationKind::Top,
-            ),
+            (None, Some(target_mat), TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    MaterializationKind::Bottom,
+                    target_type,
+                    target_mat,
+                ),
+            (Some(source_mat), None, TypeRelation::Assignability) => self
+                .check_subtyping_in_invariant_position(
+                    db,
+                    source_type,
+                    source_mat,
+                    target_type,
+                    MaterializationKind::Top,
+                ),
         }
     }
 

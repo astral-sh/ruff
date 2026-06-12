@@ -359,6 +359,7 @@ if sys.platform != "win32":
                 @deprecated("Deprecated since Python 3.12; removed in Python 3.14.")
                 def set_child_watcher(self, watcher: AbstractChildWatcher | None) -> None:
                     """Set the watcher for child processes."""
+
             else:
                 def get_child_watcher(self) -> AbstractChildWatcher:
                     """Get the watcher for child processes.

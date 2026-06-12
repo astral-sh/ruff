@@ -198,14 +198,30 @@ At runtime, `collections.abc.Callable` is supported in `match` statement class p
 ### `collections.abc.Callable`
 
 ```py
-import collections.abc
+from collections import abc
 
-def _(subj: int | collections.abc.Callable[..., str]) -> None:
+def _(subj: None | abc.Callable[..., str]) -> None:
     match subj:
-        # TODO: Should be valid.
-        # error: [invalid-match-pattern] "`<special-form 'collections.abc.Callable'>` cannot be used in a class pattern because it is not a type"
-        case collections.abc.Callable(): ...
-        case _: ...
+        case abc.Callable():
+            reveal_type(subj)  # revealed: (...) -> str
+        case _:
+            reveal_type(subj)  # revealed: None
+
+def _(subj: tuple[abc.Callable[..., int]] | tuple[None]) -> None:
+    match subj:
+        case [abc.Callable()]:
+            reveal_type(subj[0])  # revealed: (...) -> int
+```
+
+`collections.abc.Callable` has no `__match_args__`, so it does not accept positional subpatterns:
+
+```py
+from collections import abc
+
+def _(subj: abc.Callable[..., str]) -> None:
+    match subj:
+        # error: [invalid-match-pattern] "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got 1"
+        case abc.Callable(x): ...
 ```
 
 ### `typing.Callable`
@@ -213,7 +229,7 @@ def _(subj: int | collections.abc.Callable[..., str]) -> None:
 ```py
 import typing
 
-def _(subj: int | typing.Callable[..., str]) -> None:
+def _(subj: None | typing.Callable[..., str]) -> None:
     match subj:
         # error: [invalid-match-pattern] "`<special-form 'typing.Callable'>` cannot be used in a class pattern because it is not a type"
         case typing.Callable(): ...

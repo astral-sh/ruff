@@ -2,10 +2,10 @@ use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
 use ruff_python_trivia::leading_indentation;
-use ruff_source_file::{UniversalNewlineIterator, UniversalNewlines};
-use ruff_text_size::TextSize;
+use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
+use ruff_text_size::{TextRange, TextSize};
 
-use super::markdown;
+use super::super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
 pub(super) struct Docstring {
@@ -20,7 +20,7 @@ impl Docstring {
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
+    pub(super) fn parameter_documentation(&self) -> Vec<super::ParameterDocumentation> {
         let mut parameters = Vec::new();
 
         for field_list in &self.field_lists {
@@ -38,7 +38,7 @@ impl Docstring {
                     continue;
                 }
 
-                parameters.push(ParameterDocumentation {
+                parameters.push(super::ParameterDocumentation {
                     name: lookup_name.clone(),
                     description: description.clone(),
                 });
@@ -64,15 +64,33 @@ impl<'a> Lines<'a> {
     }
 
     /// Returns the next line without advancing the cursor.
-    fn peek(&mut self) -> Option<(usize, &'a str)> {
+    fn peek(&mut self) -> Option<DocstringLine<'a>> {
         let (index, line) = self.inner.peek()?;
-        Some((*index, line.as_str()))
+        Some(DocstringLine::new(*index, line))
     }
 
     /// Advances the cursor and returns the next line.
-    fn next(&mut self) -> Option<(usize, &'a str)> {
+    fn next(&mut self) -> Option<DocstringLine<'a>> {
         let (index, line) = self.inner.next()?;
-        Some((index, line.as_str()))
+        Some(DocstringLine::new(index, &line))
+    }
+}
+
+/// A docstring line with its source position.
+#[derive(Debug, Clone)]
+struct DocstringLine<'a> {
+    index: usize,
+    text: &'a str,
+    range: TextRange,
+}
+
+impl<'a> DocstringLine<'a> {
+    fn new(index: usize, line: &SourceLine<'a>) -> Self {
+        Self {
+            index,
+            text: line.as_str(),
+            range: line.range(),
+        }
     }
 }
 
@@ -83,6 +101,7 @@ impl<'a> Lines<'a> {
 struct FieldList {
     start_line: usize,
     end_line: usize,
+    range: TextRange,
     indent: TextSize,
     fields: Vec<Field>,
 }
@@ -94,14 +113,14 @@ impl FieldList {
         let mut preformatted_blocks = PreformattedBlockScanner::default();
         let mut lines = Lines::new(raw);
 
-        while let Some((_, line)) = lines.peek() {
-            if preformatted_blocks.consume_preformatted_line(line) {
+        while let Some(line) = lines.peek() {
+            if preformatted_blocks.consume_preformatted_line(line.text) {
                 lines.next();
                 continue;
             }
 
             let Some(field_list) = Self::parse(&mut lines) else {
-                preformatted_blocks.observe_non_field_line(line);
+                preformatted_blocks.observe_non_preformatted_line(line.text);
                 lines.next();
                 continue;
             };
@@ -114,49 +133,55 @@ impl FieldList {
 
     /// Attempt to parse a single field list from the given lines of a docstring.
     fn parse(lines: &mut Lines<'_>) -> Option<Self> {
-        let (start_line, line) = lines.peek()?;
-        let header = FieldHeader::parse(line)?;
+        let line = lines.peek()?;
+        let start_line = line.index;
+        let range_start = line.range.start();
+        let header = FieldHeader::parse(line.text)?;
         lines.next();
 
         let field_list_indent = header.indent;
         let mut fields = Vec::new();
         let mut current = FieldBuilder::new(header);
         let mut end_line = start_line + 1;
+        let mut range_end = line.range.end();
 
-        while let Some((line_index, line)) = lines.peek() {
-            if line.trim().is_empty() {
+        while let Some(line) = lines.peek() {
+            if line.text.trim().is_empty() {
                 // Blank lines continue the field list only before another field or a continuation.
 
                 if !Self::blank_line_continues_field_list(lines, field_list_indent) {
                     break;
                 }
 
-                current.lines.push(line);
+                current.lines.push(line.text);
                 lines.next();
-                end_line = line_index + 1;
+                end_line = line.index + 1;
+                range_end = line.range.end();
                 continue;
             }
 
-            if let Some(header) = FieldHeader::at_indent(line, field_list_indent) {
+            if let Some(header) = FieldHeader::at_indent(line.text, field_list_indent) {
                 // Same-indent field header starts the next field in this list.
 
                 let previous = std::mem::replace(&mut current, FieldBuilder::new(header));
                 fields.push(previous.finish());
                 lines.next();
-                end_line = line_index + 1;
+                end_line = line.index + 1;
+                range_end = line.range.end();
                 continue;
             }
 
-            if FieldHeader::indentation(line) <= field_list_indent {
+            if FieldHeader::indentation(line.text) <= field_list_indent {
                 // Same- or less-indented content ends this field list.
                 break;
             }
 
             // More-indented non-blank lines continue the current field body
             // (and hence also the current field list).
-            current.lines.push(line);
+            current.lines.push(line.text);
             lines.next();
-            end_line = line_index + 1;
+            end_line = line.index + 1;
+            range_end = line.range.end();
         }
 
         // Finalize the last field.
@@ -165,6 +190,7 @@ impl FieldList {
         Some(Self {
             start_line,
             end_line,
+            range: TextRange::new(range_start, range_end),
             indent: field_list_indent,
             fields,
         })
@@ -198,238 +224,19 @@ impl FieldList {
     /// ```
     fn blank_line_continues_field_list(lines: &Lines<'_>, indent: TextSize) -> bool {
         let mut next = lines.clone();
-        while let Some((_, line)) = next.peek()
-            && line.trim().is_empty()
+        while let Some(line) = next.peek()
+            && line.text.trim().is_empty()
         {
             next.next();
         }
 
-        let Some((_, non_blank_line)) = next.peek() else {
+        let Some(non_blank_line) = next.peek() else {
             return false;
         };
 
-        FieldHeader::indentation(non_blank_line) > indent
-            || FieldHeader::at_indent(non_blank_line, indent).is_some()
+        FieldHeader::indentation(non_blank_line.text) > indent
+            || FieldHeader::at_indent(non_blank_line.text, indent).is_some()
     }
-}
-
-/// Recognizes preformatted blocks that may occur within a docstring (e.g. a markdown fence).
-#[derive(Debug, Default, Clone, PartialEq, Eq)]
-struct PreformattedBlockScanner<'a> {
-    active_markdown_fence: Option<markdown::MarkdownFence<'a>>,
-    active_doctest: bool,
-    preformatted_block_state: PreformattedBlockState,
-}
-
-/// The set of characters that can each be used to denote a block quote.
-///
-/// <https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#quoted-literal-blocks>
-const QUOTED_LITERAL_BLOCK_QUOTE_CHARACTERS: &str = r##"!"#$%&'()*+,-./:;<=>?@[\]^_`{|}~"##;
-
-impl<'a> PreformattedBlockScanner<'a> {
-    /// Updates internal state to reflect the given line and returns whether or
-    /// not the given line is contained within a preformatted block.
-    fn consume_preformatted_line(&mut self, line: &'a str) -> bool {
-        if let Some(fence) = self.active_markdown_fence {
-            if fence.is_closed_by(line) {
-                self.active_markdown_fence = None;
-            }
-            return true;
-        }
-
-        if self.is_within_preformatted_block(line) {
-            return true;
-        }
-
-        let trimmed = line.trim_start_matches(' ');
-        if self.active_doctest {
-            if trimmed.is_empty() {
-                self.active_doctest = false;
-            }
-            return true;
-        }
-
-        if trimmed.starts_with(">>>") {
-            self.active_doctest = true;
-            return true;
-        }
-
-        if let Some(fence) = markdown::MarkdownFence::find(line) {
-            self.active_markdown_fence = Some(fence);
-            return true;
-        }
-
-        false
-    }
-
-    /// Whether or not the given line is specifically within a preformatted block
-    /// introduced by reST syntax.
-    fn is_within_preformatted_block(&mut self, line: &str) -> bool {
-        let current_indent = FieldHeader::indentation(line);
-        let line_is_empty = line.trim_start().is_empty();
-
-        match self.preformatted_block_state {
-            PreformattedBlockState::Active(PreformattedBlockKind::Indented { marker_indent }) => {
-                if !line_is_empty && current_indent <= marker_indent {
-                    // We've reached the de-dent that marks the end of the preformatted block.
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
-                    false
-                } else {
-                    true
-                }
-            }
-            PreformattedBlockState::Active(PreformattedBlockKind::QuotedLiteral {
-                indent,
-                quote,
-            }) => {
-                if line_is_empty {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
-                    false
-                } else if Self::quote_character(line, indent) == Some(quote) {
-                    true
-                } else {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
-                    false
-                }
-            }
-            PreformattedBlockState::Pending {
-                marker_indent,
-                allows_quoted_literal_block,
-            } if !line_is_empty => {
-                if current_indent > marker_indent {
-                    // We just entered a new preformatted block.
-                    self.preformatted_block_state =
-                        PreformattedBlockState::Active(PreformattedBlockKind::Indented {
-                            marker_indent,
-                        });
-                    true
-                } else if allows_quoted_literal_block
-                    && let Some(quote) = Self::quote_character(line, marker_indent)
-                {
-                    self.preformatted_block_state =
-                        PreformattedBlockState::Active(PreformattedBlockKind::QuotedLiteral {
-                            indent: marker_indent,
-                            quote,
-                        });
-                    true
-                } else {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
-                    false
-                }
-            }
-            PreformattedBlockState::Pending { .. } | PreformattedBlockState::Inactive => false,
-        }
-    }
-
-    /// Updates internal state that allows us to detect preformatted blocks introduced by reST
-    /// syntax.
-    fn observe_non_field_line(&mut self, line: &str) {
-        if matches!(
-            self.preformatted_block_state,
-            PreformattedBlockState::Inactive
-        ) && Self::starts_preformatted_block(line.trim_start())
-        {
-            self.preformatted_block_state = PreformattedBlockState::Pending {
-                marker_indent: FieldHeader::indentation(line),
-                allows_quoted_literal_block: Self::allows_quoted_literal_block(line.trim_start()),
-            };
-        }
-    }
-
-    /// Whether or not the given line marks the start of a preformatted block.
-    fn starts_preformatted_block(line: &str) -> bool {
-        let Some(marker) = Self::preformatted_block_marker(line) else {
-            return false;
-        };
-
-        !matches!(
-            marker,
-            PreformattedBlockMarker::Directive(
-                "attention"
-                    | "caution"
-                    | "danger"
-                    | "error"
-                    | "hint"
-                    | "important"
-                    | "note"
-                    | "tip"
-                    | "warning"
-                    | "admonition"
-                    | "seealso"
-                    | "versionadded"
-                    | "version-added"
-                    | "versionchanged"
-                    | "version-changed"
-                    | "version-deprecated"
-                    | "deprecated"
-                    | "version-removed"
-                    | "versionremoved"
-            )
-        )
-    }
-
-    /// Tries to identify a marker that introduces a preformatted block.
-    fn preformatted_block_marker(line: &str) -> Option<PreformattedBlockMarker<'_>> {
-        let marker = if let Some(marker) = line.strip_suffix("::") {
-            marker
-        } else {
-            let (before_language, _language) = line.rsplit_once(' ')?;
-            before_language.trim_end().strip_suffix("::")?
-        };
-
-        if let Some(directive) = marker.strip_prefix(".. ") {
-            Some(PreformattedBlockMarker::Directive(directive))
-        } else {
-            Some(PreformattedBlockMarker::Paragraph)
-        }
-    }
-
-    /// Whether or not a particular preformatted block can contain an unindented quoted literal block.
-    fn allows_quoted_literal_block(line: &str) -> bool {
-        line.ends_with("::")
-            && matches!(
-                Self::preformatted_block_marker(line),
-                Some(PreformattedBlockMarker::Paragraph)
-            )
-    }
-
-    /// Returns the quote character for a quoted literal block line.
-    fn quote_character(line: &str, indent: TextSize) -> Option<char> {
-        if FieldHeader::indentation(line) != indent {
-            return None;
-        }
-
-        let quote = line.get(indent.to_usize()..)?.chars().next()?;
-        QUOTED_LITERAL_BLOCK_QUOTE_CHARACTERS
-            .contains(quote)
-            .then_some(quote)
-    }
-}
-
-/// Identifies the syntax that introduced a potential preformatted block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockMarker<'a> {
-    Paragraph,
-    Directive(&'a str),
-}
-
-/// Tracks the state of a preformatted block introduced by reST syntax.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockState {
-    #[default]
-    Inactive,
-    Pending {
-        marker_indent: TextSize,
-        allows_quoted_literal_block: bool,
-    },
-    Active(PreformattedBlockKind),
-}
-
-/// Tracks the type of an active preformatted block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockKind {
-    Indented { marker_indent: TextSize },
-    QuotedLiteral { indent: TextSize, quote: char },
 }
 
 /// Constructs new instances of the model for a reST field.
@@ -463,10 +270,33 @@ impl<'a> FieldBuilder<'a> {
                 ty,
             } => Field::Parameter {
                 display_name: display_name.to_compact_string(),
-                lookup_name: lookup_name.to_compact_string(),
+                lookup_name: lookup_name.to_string(),
                 ty: ty.map(|ty| ty.to_compact_string()),
                 description: body,
             },
+            FieldKind::ParameterType { lookup_name } => Field::ParameterType {
+                lookup_name: lookup_name.to_compact_string(),
+                ty: body,
+            },
+            FieldKind::Attribute { name, ty } => Field::Attribute {
+                name: name.to_compact_string(),
+                ty: ty.map(|ty| ty.to_compact_string()),
+                description: body,
+            },
+            FieldKind::AttributeType { name } => Field::AttributeType {
+                name: name.to_compact_string(),
+                ty: body,
+            },
+            FieldKind::Returns { name } => Field::Returns {
+                name: name.map(|name| name.to_compact_string()),
+                description: body,
+            },
+            FieldKind::ReturnType => Field::ReturnType { ty: body },
+            FieldKind::Raises { exception } => Field::Raises {
+                exception: exception.map(|exception| exception.to_compact_string()),
+                description: body,
+            },
+            FieldKind::Metadata => Field::Metadata,
             FieldKind::Unknown { name, argument } => Field::Unknown {
                 name: name.to_compact_string(),
                 argument: argument.to_compact_string(),
@@ -609,6 +439,24 @@ enum FieldKind<'a> {
         lookup_name: &'a str,
         ty: Option<&'a str>,
     },
+    ParameterType {
+        lookup_name: &'a str,
+    },
+    Attribute {
+        name: &'a str,
+        ty: Option<&'a str>,
+    },
+    AttributeType {
+        name: &'a str,
+    },
+    Returns {
+        name: Option<&'a str>,
+    },
+    ReturnType,
+    Raises {
+        exception: Option<&'a str>,
+    },
+    Metadata,
     Unknown {
         name: &'a str,
         argument: &'a str,
@@ -616,7 +464,7 @@ enum FieldKind<'a> {
 }
 
 impl<'a> FieldKind<'a> {
-    /// Categorizes a parsed field as a supported parameter field or an unknown field.
+    /// Categorizes a parsed field as a supported field or an unknown field.
     fn parse(name: &'a str, argument: &'a str) -> Self {
         match name {
             "param" | "parameter" | "arg" | "argument" | "key" | "keyword" | "kwarg"
@@ -627,6 +475,33 @@ impl<'a> FieldKind<'a> {
                     ty,
                 })
                 .unwrap_or(Self::Unknown { name, argument }),
+            "type" | "paramtype" => Self::parse_parameter_name(argument)
+                .map(|name| Self::ParameterType {
+                    lookup_name: name.lookup,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "var" | "ivar" | "cvar" => Self::parse_attribute_argument(argument)
+                .map(|(ty, attribute_name)| Self::Attribute {
+                    name: attribute_name,
+                    ty,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "vartype" => Self::parse_attribute_name(argument)
+                .map(|attribute_name| Self::AttributeType {
+                    name: attribute_name,
+                })
+                .unwrap_or(Self::Unknown { name, argument }),
+            "return" | "returns" => Self::Returns {
+                name: Self::parse_parameter_name(argument).map(|name| name.lookup),
+            },
+            "rtype" => Self::ReturnType,
+            "raises" | "raise" | "except" | "exception" => {
+                let exception = argument.trim();
+                Self::Raises {
+                    exception: (!exception.is_empty()).then_some(exception),
+                }
+            }
+            "meta" => Self::Metadata,
             _ => Self::Unknown { name, argument },
         }
     }
@@ -639,12 +514,12 @@ impl<'a> FieldKind<'a> {
             return None;
         }
 
-        let (ty, name) = Self::split_parameter_type_and_name(argument);
+        let (ty, name) = Self::split_type_and_name(argument);
         Some((ty, Self::parse_parameter_name(name)?))
     }
 
-    /// Splits up a field argument into an optional parameter type and a parameter name.
-    fn split_parameter_type_and_name(argument: &'a str) -> (Option<&'a str>, &'a str) {
+    /// Splits up a field argument into an optional type and name.
+    fn split_type_and_name(argument: &'a str) -> (Option<&'a str>, &'a str) {
         for (index, char) in argument.char_indices().rev() {
             if char.is_whitespace() {
                 let ty = argument[..index].trim();
@@ -654,6 +529,21 @@ impl<'a> FieldKind<'a> {
         }
 
         (None, argument)
+    }
+
+    fn parse_attribute_argument(argument: &'a str) -> Option<(Option<&'a str>, &'a str)> {
+        let argument = argument.trim();
+        if argument.is_empty() {
+            return None;
+        }
+
+        let (ty, name) = Self::split_type_and_name(argument);
+        Some((ty, Self::parse_attribute_name(name)?))
+    }
+
+    fn parse_attribute_name(name: &'a str) -> Option<&'a str> {
+        let name = name.trim();
+        (!name.is_empty()).then_some(name)
     }
 
     /// Normalizes a parameter name into display and lookup identifiers.
@@ -669,21 +559,40 @@ impl<'a> FieldKind<'a> {
 enum Field {
     Parameter {
         display_name: CompactString,
-        lookup_name: CompactString,
+        lookup_name: String,
         ty: Option<CompactString>,
         description: String,
     },
+    ParameterType {
+        lookup_name: CompactString,
+        ty: String,
+    },
+    Attribute {
+        name: CompactString,
+        ty: Option<CompactString>,
+        description: String,
+    },
+    AttributeType {
+        name: CompactString,
+        ty: String,
+    },
+    Returns {
+        name: Option<CompactString>,
+        description: String,
+    },
+    ReturnType {
+        ty: String,
+    },
+    Raises {
+        exception: Option<CompactString>,
+        description: String,
+    },
+    Metadata,
     Unknown {
         name: CompactString,
         argument: CompactString,
         body: String,
     },
-}
-
-/// Parameter documentation extracted from a reST field list.
-pub(super) struct ParameterDocumentation {
-    pub(super) name: CompactString,
-    pub(super) description: String,
 }
 
 /// Container for the display name (shown to the user) and the lookup name
@@ -699,9 +608,11 @@ struct ParameterName<'a> {
 
 #[cfg(test)]
 mod tests {
+    use std::iter::repeat_n;
+
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::Docstring;
+    use super::{Docstring, FieldList, Lines};
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -809,15 +720,25 @@ mod tests {
 
     #[test]
     fn parser_preserves_supported_and_unknown_fields() {
-        let parsed = Docstring::parse(
-            "\
+        let docstring = "\
 :param tuple[str, ...] *args: Extra positional arguments.
+:type args: tuple[str, ...]
+:var dict[str, int] cache: Cached values.
+:vartype cache: dict[str, int]
+:returns result: Return description.
+:rtype: str
+:raises ValueError: Error description.
 :meta private:
-:unknown with argument: Unknown description.",
-        );
+:unknown with argument: Unknown description.";
+        let parsed = Docstring::parse(docstring);
 
         assert_eq!(parsed.field_lists[0].start_line, 0);
-        assert_eq!(parsed.field_lists[0].end_line, 3);
+        assert_eq!(parsed.field_lists[0].end_line, 9);
+        assert_eq!(
+            &docstring[parsed.field_lists[0].range.start().to_usize()
+                ..parsed.field_lists[0].range.end().to_usize()],
+            docstring
+        );
         assert_debug_snapshot!(&parsed.field_lists[0].fields, @r#"
         [
             Parameter {
@@ -828,11 +749,37 @@ mod tests {
                 ),
                 description: "Extra positional arguments.",
             },
-            Unknown {
-                name: "meta",
-                argument: "private",
-                body: "",
+            ParameterType {
+                lookup_name: "args",
+                ty: "tuple[str, ...]",
             },
+            Attribute {
+                name: "cache",
+                ty: Some(
+                    "dict[str, int]",
+                ),
+                description: "Cached values.",
+            },
+            AttributeType {
+                name: "cache",
+                ty: "dict[str, int]",
+            },
+            Returns {
+                name: Some(
+                    "result",
+                ),
+                description: "Return description.",
+            },
+            ReturnType {
+                ty: "str",
+            },
+            Raises {
+                exception: Some(
+                    "ValueError",
+                ),
+                description: "Error description.",
+            },
+            Metadata,
             Unknown {
                 name: "unknown",
                 argument: "with argument",
@@ -840,6 +787,45 @@ mod tests {
             },
         ]
         "#);
+    }
+
+    #[test]
+    fn parser_records_field_list_ranges() {
+        let docstring = "\
+Intro paragraph.
+
+:param first: First parameter.
+
+Intervening prose.
+
+:param second: Second parameter.
+    Continued.
+";
+        let parsed = Docstring::parse(docstring);
+
+        assert_eq!(parsed.field_lists.len(), 2);
+
+        let first = &parsed.field_lists[0];
+        assert_eq!(first.start_line, 2);
+        assert_eq!(first.end_line, 3);
+
+        let second = &parsed.field_lists[1];
+        assert_eq!(second.start_line, 6);
+        assert_eq!(second.end_line, 8);
+
+        assert_snapshot!(field_list_ranges(docstring, &parsed.field_lists), @r"
+        | Intro paragraph.
+        |
+        | :param first: First parameter.
+        | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        |
+        | Intervening prose.
+        |
+        | :param second: Second parameter.
+        | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        |     Continued.
+        | ^^^^^^^^^^^^^^
+        ");
     }
 
     #[test]
@@ -1002,6 +988,39 @@ Section::
                     rendered.push_str("  ");
                     rendered.push_str(line);
                 }
+            }
+        }
+
+        rendered
+    }
+
+    fn field_list_ranges(docstring: &str, field_lists: &[FieldList]) -> String {
+        let mut lines = Lines::new(docstring);
+        let mut rendered = String::new();
+
+        while let Some(line) = lines.next() {
+            if !rendered.is_empty() {
+                rendered.push('\n');
+            }
+
+            rendered.push('|');
+            if !line.text.is_empty() {
+                rendered.push(' ');
+                rendered.push_str(line.text);
+            }
+
+            if let Some(intersection) = field_lists
+                .iter()
+                .filter_map(|field_list| line.range.intersect(field_list.range))
+                .find(|intersection| !intersection.is_empty())
+            {
+                let start = intersection.start().to_usize() - line.range.start().to_usize();
+                let end = intersection.end().to_usize() - line.range.start().to_usize();
+
+                rendered.push('\n');
+                rendered.push_str("| ");
+                rendered.extend(repeat_n(' ', start));
+                rendered.extend(repeat_n('^', end - start));
             }
         }
 

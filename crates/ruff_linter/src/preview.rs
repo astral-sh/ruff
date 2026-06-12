@@ -367,3 +367,8 @@ pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
 pub(crate) const fn is_pep604_future_annotations_fix_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/25614
+pub const fn is_human_readable_names_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}

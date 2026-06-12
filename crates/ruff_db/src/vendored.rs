@@ -4,8 +4,8 @@ use std::fmt::{self, Debug};
 use std::io::{self, Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use zip::result::ZipResult;
-use zip::write::FileOptions;
+use zip::result::{ZipError, ZipResult};
+use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipArchive, ZipWriter, read::ZipFile};
 
 pub use self::path::{VendoredPath, VendoredPathBuf};
@@ -57,16 +57,16 @@ impl VendoredFileSystem {
     pub fn exists(&self, path: impl AsRef<VendoredPath>) -> bool {
         fn exists(fs: &VendoredFileSystem, path: &VendoredPath) -> bool {
             let normalized = NormalizedVendoredPath::from(path);
-            let mut archive = fs.lock_archive();
+            let archive = fs.lock_archive();
 
             // Must probe the zipfile twice, as "stdlib" and "stdlib/" are considered
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            archive.lookup_path(&normalized).is_ok()
+            archive.index_for_path(&normalized).is_some()
                 || archive
-                    .lookup_path(&normalized.with_trailing_slash())
-                    .is_ok()
+                    .index_for_path(&normalized.with_trailing_slash())
+                    .is_some()
         }
 
         exists(self, path.as_ref())
@@ -81,11 +81,10 @@ impl VendoredFileSystem {
             // different paths in a zip file, but we want to abstract over that difference here
             // so that paths relative to the `VendoredFileSystem`
             // work the same as other paths in Ruff.
-            if let Ok(zip_file) = archive.lookup_path(&normalized) {
-                return Ok(Metadata::from_zip_file(zip_file));
+            if let Ok(metadata) = archive.metadata_for_path(&normalized) {
+                return Ok(metadata);
             }
-            let zip_file = archive.lookup_path(&normalized.with_trailing_slash())?;
-            Ok(Metadata::from_zip_file(zip_file))
+            archive.metadata_for_path(&normalized.with_trailing_slash())
         }
 
         metadata(self, path.as_ref())
@@ -232,7 +231,7 @@ impl Default for VendoredFileSystem {
         let mut cursor = io::Cursor::new(&mut bytes);
 
         {
-            let mut writer = ZipWriter::new(&mut cursor);
+            let writer = ZipWriter::new(&mut cursor);
             writer.finish().unwrap();
         }
 
@@ -256,8 +255,8 @@ struct ZipFileDebugInfo {
     kind: FileType,
 }
 
-impl<'a> From<ZipFile<'a>> for ZipFileDebugInfo {
-    fn from(value: ZipFile<'a>) -> Self {
+impl<'a, R: Read> From<ZipFile<'a, R>> for ZipFileDebugInfo {
+    fn from(value: ZipFile<'a, R>) -> Self {
         Self {
             crc32_hash: value.crc32(),
             compressed_size: value.compressed_size(),
@@ -305,7 +304,7 @@ pub struct Metadata {
 }
 
 impl Metadata {
-    fn from_zip_file(zip_file: ZipFile) -> Self {
+    fn from_zip_file<R: Read>(zip_file: ZipFile<'_, R>) -> Self {
         let kind = if zip_file.is_dir() {
             FileType::Directory
         } else {
@@ -360,8 +359,20 @@ impl VendoredZipArchive {
         Ok(Self(ZipArchive::new(io::Cursor::new(data))?))
     }
 
-    fn lookup_path(&mut self, path: &NormalizedVendoredPath) -> Result<ZipFile<'_>> {
+    fn index_for_path(&self, path: &NormalizedVendoredPath) -> Option<usize> {
+        self.0.index_for_name(path.as_str())
+    }
+
+    fn lookup_path(
+        &mut self,
+        path: &NormalizedVendoredPath,
+    ) -> Result<ZipFile<'_, io::Cursor<Cow<'static, [u8]>>>> {
         Ok(self.0.by_name(path.as_str())?)
+    }
+
+    fn metadata_for_path(&mut self, path: &NormalizedVendoredPath) -> Result<Metadata> {
+        let index = self.index_for_path(path).ok_or(ZipError::FileNotFound)?;
+        Ok(Metadata::from_zip_file(self.0.by_index_raw(index)?))
     }
 
     fn len(&self) -> usize {
@@ -477,14 +488,14 @@ impl VendoredFileSystemBuilder {
             .add_directory(path.as_ref().as_str(), self.options())
     }
 
-    pub fn finish(mut self) -> Result<VendoredFileSystem> {
+    pub fn finish(self) -> Result<VendoredFileSystem> {
         let buffer = self.writer.finish()?;
 
         VendoredFileSystem::new(buffer.into_inner())
     }
 
-    fn options(&self) -> FileOptions {
-        FileOptions::default()
+    fn options(&self) -> SimpleFileOptions {
+        SimpleFileOptions::default()
             .compression_method(self.compression_method)
             .unix_permissions(0o644)
     }

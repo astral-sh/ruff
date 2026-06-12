@@ -720,9 +720,18 @@ impl<'db> OverloadLiteral<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
+    overloaded: bool,
 }
 
 impl<'db> FunctionLiteral<'db> {
+    pub(super) fn new(db: &'db dyn Db, last_definition: OverloadLiteral<'db>) -> Self {
+        Self {
+            last_definition,
+            overloaded: last_definition.is_overload(db)
+                || last_definition.previous_overload(db).is_some(),
+        }
+    }
+
     fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         // All of the overloads of a function literal should have the same name.
         self.last_definition.name(db)
@@ -792,6 +801,10 @@ impl<'db> FunctionLiteral<'db> {
             };
 
             (overloads.into_boxed_slice(), implementation)
+        }
+
+        if !self.overloaded {
+            return (&[], Some(self.last_definition));
         }
 
         let (overloads, implementation) =
@@ -938,6 +951,23 @@ impl<'db> FunctionLiteral<'db> {
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )
     }
+}
+
+/// ## Warning
+///
+/// This uses the semantic index to find the definition of the function. This means that if the
+/// calling query is not in the same file as this function is defined in, then this will create
+/// a cross-module dependency directly on the full AST which will lead to cache
+/// over-invalidation. Cross-module callers should use the tracked
+/// [`FunctionType::last_definition_raw_signature`] query instead.
+pub(super) fn same_module_uncached_raw_signature<'db>(
+    db: &'db dyn Db,
+    function: FunctionType<'db>,
+    return_callable_typevar_scope: ReturnCallableTypeVarScope,
+) -> Signature<'db> {
+    function
+        .literal(db)
+        .last_definition_raw_signature(db, return_callable_typevar_scope)
 }
 
 /// Indicates whether a method is explicitly or implicitly abstract.
@@ -1124,10 +1154,12 @@ impl<'db> FunctionType<'db> {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
         let literal = self.literal(db);
-        let last_definition = literal
-            .last_definition
-            .with_dataclass_transformer_params(db, params);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition: literal
+                .last_definition
+                .with_dataclass_transformer_params(db, params),
+            ..literal
+        };
         Self::new(db, literal, None)
     }
 
@@ -1139,8 +1171,10 @@ impl<'db> FunctionType<'db> {
         // A decorator only applies to the specific overload that it is attached to, not to all
         // previous overloads.
         let literal = self.literal(db);
-        let last_definition = literal.last_definition.with_deprecated(db, deprecated);
-        let literal = FunctionLiteral { last_definition };
+        let literal = FunctionLiteral {
+            last_definition: literal.last_definition.with_deprecated(db, deprecated),
+            ..literal
+        };
         Self::new(db, literal, self.updated_signatures(db).cloned())
     }
 
@@ -1982,10 +2016,6 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
-    /// `contextlib.asynccontextmanager`
-    #[strum(serialize = "asynccontextmanager")]
-    AsyncContextManager,
-
     /// `dataclasses.dataclass`
     Dataclass,
     /// `dataclasses.field`
@@ -2106,9 +2136,6 @@ impl KnownFunction {
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
             }
-            Self::AsyncContextManager => {
-                matches!(module, KnownModule::Contextlib)
-            }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
@@ -2188,11 +2215,12 @@ impl KnownFunction {
                 let [Some(actual_ty), Some(asserted_ty)] = parameter_types else {
                     return;
                 };
-                if actual_ty.is_equivalent_to(db, *asserted_ty) {
+                let asserted_ty = asserted_ty.project_type_form(db);
+                if actual_ty.is_equivalent_to(db, asserted_ty) {
                     return;
                 }
                 let diagnostic =
-                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, *asserted_ty) {
+                    if actual_ty.is_spellable(db) || !actual_ty.is_subtype_of(db, asserted_ty) {
                         &TYPE_ASSERTION_FAILURE
                     } else {
                         &ASSERT_TYPE_UNSPELLABLE_SUBTYPE
@@ -2213,7 +2241,7 @@ impl KnownFunction {
                         .message(format_args!("Inferred type is `{}`", actual_ty.display(db))),
                     );
 
-                    if actual_ty.is_subtype_of(db, *asserted_ty) {
+                    if actual_ty.is_subtype_of(db, asserted_ty) {
                         diagnostic.info(format_args!(
                             "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
                             asserted_type = asserted_ty.display(db),
@@ -2328,12 +2356,13 @@ impl KnownFunction {
                 let [Some(casted_type), Some(source_type)] = parameter_types else {
                     return;
                 };
+                let casted_type = casted_type.project_type_form(db);
                 let contains_unknown_or_todo = |ty: Type<'_>| {
                     ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
                 };
-                if source_type.is_equivalent_to(db, *casted_type)
+                if source_type.is_equivalent_to(db, casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
-                    && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, casted_type, true, contains_unknown_or_todo)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();
@@ -2637,8 +2666,6 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
-
-                KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 

@@ -116,6 +116,13 @@ class _NetlocResultMixinBytes(_NetlocResultMixinBase[bytes], _ResultMixinBytes):
 # branches in namedtuple bodies.
 if sys.version_info >= (3, 15):
     class _DefragResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+        """
+        DefragResult(url, fragment)
+
+        A 2-tuple that contains the url without fragment identifier and the fragment
+        identifier as a separate argument.
+        """
+
         url: _ResultStrT
         fragment: _ResultComponentT
         # Ignore needed due to mypy#21453.
@@ -135,6 +142,13 @@ else:
 
 if sys.version_info >= (3, 15):
     class _SplitResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+        """
+        SplitResult(scheme, netloc, path, query, fragment)
+
+        A 5-tuple that contains the different components of a URL. Similar to
+        ParseResult, but does not split params.
+        """
+
         scheme: _ResultComponentT
         netloc: _ResultComponentT
         path: _ResultStrT
@@ -160,6 +174,12 @@ else:
 
 if sys.version_info >= (3, 15):
     class _ParseResultBase(NamedTuple, Generic[_ResultStrT, _ResultComponentT]):
+        """
+        ParseResult(scheme, netloc, path, params, query, fragment)
+
+        A 6-tuple that contains components of a parsed URL.
+        """
+
         scheme: _ResultComponentT
         netloc: _ResultComponentT
         path: _ResultStrT
@@ -375,13 +395,19 @@ def urldefrag(url: str) -> DefragResult:
 
     Returns a tuple of the defragmented URL and the fragment.  If
     the URL contained no fragments, the second element is the
-    empty string.
+    empty string or None if missing_as_none is True.
     """
 @overload
 def urldefrag(url: bytes | bytearray | None) -> DefragResultBytes: ...
 if sys.version_info >= (3, 15):
     @overload
-    def urldefrag(url: str, *, missing_as_none: Literal[True]) -> DefragResult[str | None]: ...
+    def urldefrag(url: str, *, missing_as_none: Literal[True]) -> DefragResult[str | None]:
+        """Removes any existing fragment from URL.
+
+        Returns a tuple of the defragmented URL and the fragment.  If
+        the URL contained no fragments, the second element is the
+        empty string or None if missing_as_none is True.
+        """
     @overload
     def urldefrag(url: str, *, missing_as_none: Literal[False] = False) -> DefragResult[str]: ...
     @overload
@@ -471,7 +497,28 @@ if sys.version_info >= (3, 15):
     @overload
     def urlparse(
         url: str, scheme: str = "", allow_fragments: bool = True, *, missing_as_none: Literal[True]
-    ) -> ParseResult[str | None]: ...
+    ) -> ParseResult[str | None]:
+        """Parse a URL into 6 components:
+        <scheme>://<netloc>/<path>;<params>?<query>#<fragment>
+
+        The result is a named 6-tuple with fields corresponding to the
+        above. It is either a ParseResult or ParseResultBytes object,
+        depending on the type of the url parameter.
+
+        The username, password, hostname, and port sub-components of netloc
+        can also be accessed as attributes of the returned object.
+
+        The scheme argument provides the default value of the scheme
+        component when no scheme is found in url.
+
+        If allow_fragments is False, no attempt is made to separate the
+        fragment component from the previous component, which can be either
+        path or query.
+
+        Note that % escapes are not expanded.
+
+        urlsplit() should generally be used instead of urlparse().
+        """
     @overload
     def urlparse(
         url: str, scheme: str = "", allow_fragments: bool = True, *, missing_as_none: Literal[False] = False
@@ -577,7 +624,26 @@ if sys.version_info >= (3, 15):
     @overload
     def urlsplit(
         url: str, scheme: str = "", allow_fragments: bool = True, *, missing_as_none: Literal[True]
-    ) -> SplitResult[str | None]: ...
+    ) -> SplitResult[str | None]:
+        """Parse a URL into 5 components:
+        <scheme>://<netloc>/<path>?<query>#<fragment>
+
+        The result is a named 5-tuple with fields corresponding to the
+        above. It is either a SplitResult or SplitResultBytes object,
+        depending on the type of the url parameter.
+
+        The username, password, hostname, and port sub-components of netloc
+        can also be accessed as attributes of the returned object.
+
+        The scheme argument provides the default value of the scheme
+        component when no scheme is found in url.
+
+        If allow_fragments is False, no attempt is made to separate the
+        fragment component from the previous component, which can be either
+        path or query.
+
+        Note that % escapes are not expanded.
+        """
     @overload
     def urlsplit(
         url: str, scheme: str = "", allow_fragments: bool = True, *, missing_as_none: Literal[False] = False
@@ -610,7 +676,14 @@ if sys.version_info >= (3, 15):
 if sys.version_info >= (3, 15):
     # Requires an iterable of length 6
     @overload
-    def urlunparse(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]: ...  # type: ignore[overload-overlap]
+    def urlunparse(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]:  # type: ignore[overload-overlap]
+        """Put a parsed URL back together again.  This may result in a
+        slightly different, but equivalent URL, if the URL that was parsed
+        originally had redundant delimiters, e.g. a ? with an empty query
+        (the draft states that these are equivalent) and keep_empty is false
+        or components is the result of the urlparse() call with
+        missing_as_none=False.
+        """
     @overload
     def urlunparse(components: Iterable[AnyStr | None], *, keep_empty: bool = ...) -> AnyStr: ...
 else:
@@ -628,7 +701,15 @@ else:
 if sys.version_info >= (3, 15):
     # Requires an iterable of length 5
     @overload
-    def urlunsplit(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]: ...  # type: ignore[overload-overlap]
+    def urlunsplit(components: Iterable[None], *, keep_empty: bool = ...) -> Literal[b""]:  # type: ignore[overload-overlap]
+        """Combine the elements of a tuple as returned by urlsplit() into a
+        complete URL as a string. The data argument can be any five-item iterable.
+        This may result in a slightly different, but equivalent URL, if the URL that
+        was parsed originally had unnecessary delimiters (for example, a ? with an
+        empty query; the RFC states that these are equivalent) and keep_empty
+        is false or components is the result of the urlsplit() call with
+        missing_as_none=False.
+        """
     @overload
     def urlunsplit(components: Iterable[AnyStr | None], *, keep_empty: bool = ...) -> AnyStr: ...
 else:

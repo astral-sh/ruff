@@ -393,6 +393,8 @@ error[invalid-generic-class]: Variance of type variable `T_co` is incompatible w
 help: Type variable `T_co` is declared as covariant, but base class `Contravariant` requires it to be contravariant
 ```
 
+## Inferred variance
+
 Legacy type variables with inferred variance are validated according to their uses, rather than as
 if they had an explicit invariant declaration.
 

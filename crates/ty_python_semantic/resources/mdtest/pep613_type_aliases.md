@@ -238,6 +238,13 @@ MyAlias4: TypeAlias = Callable[Concatenate[dict[str, T], ...], list[U]]
 
 def _(c: MyAlias4[int, str]):
     reveal_type(c)  # revealed: (dict[str, int], /, *args: Any, **kwargs: Any) -> list[str]
+```
+
+## Explicit aliases using `TypeAliasType`
+
+```py
+from typing import TypeAlias, TypeVar
+from typing_extensions import Callable, Concatenate, TypeAliasType
 
 T = TypeVar("T")
 
