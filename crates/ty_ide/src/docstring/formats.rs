@@ -41,4 +41,9 @@ impl Formats {
     pub(super) fn rst(&self) -> &rst::Docstring {
         &self.rst
     }
+
+    /// Returns the outcome of parsing the reStructuredText format.
+    pub(super) fn rst(&self) -> &rst::Docstring {
+        &self.rst
+    }
 }
