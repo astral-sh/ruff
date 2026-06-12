@@ -72,15 +72,16 @@ impl FromStr for RuleSelector {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         // **Changes should be reflected in `parse_no_redirect` as well**
-        if let Ok(rule) = Rule::from_name(s) {
-            return Ok(Self::Name(rule));
-        }
 
         match s {
             "ALL" => Ok(Self::All),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
+                if let Ok(rule) = Rule::from_name(s) {
+                    return Ok(Self::Name(rule));
+                }
+
                 let (s, redirected_from) = match get_redirect(s) {
                     Some((from, target)) => (target, Some(from)),
                     None => (s, None),
@@ -207,7 +208,7 @@ impl RuleSelector {
         if !selector_enabled && let RuleSelector::Name(rule) = self {
             crate::warn_user_once_by_message!(
                 "Selection `{}` has no effect because preview is not enabled.",
-                rule.name().as_str()
+                rule.name(),
             );
         }
 
@@ -397,15 +398,15 @@ impl RuleSelector {
     /// Parse [`RuleSelector`] from a string; but do not follow redirects.
     pub fn parse_no_redirect(s: &str) -> Result<Self, ParseError> {
         // **Changes should be reflected in `from_str` as well**
-        if let Ok(rule) = Rule::from_name(s) {
-            return Ok(Self::Name(rule));
-        }
-
         match s {
             "ALL" => Ok(Self::All),
             "C" => Ok(Self::C),
             "T" => Ok(Self::T),
             _ => {
+                if let Ok(rule) = Rule::from_name(s) {
+                    return Ok(Self::Name(rule));
+                }
+
                 let (linter, code) =
                     Linter::parse_code(s).ok_or_else(|| ParseError::Unknown(s.to_string()))?;
 
