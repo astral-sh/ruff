@@ -9,7 +9,7 @@ use crate::noqa::{Codes, NoqaDirectives};
 use crate::preview::is_file_level_invalid_rule_code_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::{AlwaysFixableViolation, Edit, Fix};
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum InvalidRuleCodeKind {
@@ -62,9 +62,7 @@ pub(crate) struct InvalidRuleCode {
     pub(crate) whole_comment: bool,
 }
 
-impl Violation for InvalidRuleCode {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for InvalidRuleCode {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -74,12 +72,12 @@ impl Violation for InvalidRuleCode {
         )
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some(if self.whole_comment {
+    fn fix_title(&self) -> String {
+        if self.whole_comment {
             format!("Remove the {} comment", self.kind.as_str())
         } else {
             format!("Remove the rule code `{}`", self.rule_code)
-        })
+        }
     }
 }
 

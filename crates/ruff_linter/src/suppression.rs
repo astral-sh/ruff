@@ -346,6 +346,67 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        fn process_pending_diagnostics(
+            key: Option<TextRange>,
+            grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
+            context: &LintContext,
+            locator: &Locator,
+        ) -> bool {
+            let Some((group_key, group)) = grouped_diagnostic else {
+                return false;
+            };
+
+            if key.is_some_and(|key| key == *group_key) {
+                return false;
+            }
+
+            if group.any_invalid() {
+                if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &group.invalid_codes,
+                    true,
+                    InvalidRuleCode {
+                        rule_code: group.invalid_codes.iter().join(", "),
+                        kind: InvalidRuleCodeKind::Suppression,
+                        whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
+                    },
+                ) {
+                    if group.has_unknown_code {
+                        diagnostic.help(
+                            "Add non-Ruff rule codes to the `lint.external` configuration option",
+                        );
+                    }
+                    if group.has_stable_rule_name {
+                        diagnostic.help("Enable `lint.preview` to use rule names");
+                    }
+                }
+            }
+
+            if group.any_unused() {
+                let mut codes = group.disabled_codes.clone();
+                codes.extend(group.unused_codes.clone());
+                Suppressions::report_suppression_codes(
+                    context,
+                    locator,
+                    group.suppression,
+                    &codes,
+                    false,
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            disabled: &group.disabled_codes,
+                            duplicated: &group.duplicated_codes,
+                            unmatched: &group.unused_codes,
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                );
+            }
+
+            true
+        }
+
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
 
@@ -353,12 +414,8 @@ impl Suppressions {
             let first_comment = suppression.comments.first();
             let key = first_comment.range;
 
-            if self.process_pending_diagnostics(
-                Some(key),
-                grouped_diagnostic.as_ref(),
-                context,
-                locator,
-            ) {
+            if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
+            {
                 grouped_diagnostic = None;
             }
 
@@ -411,7 +468,7 @@ impl Suppressions {
             }
         }
 
-        self.process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
+        process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
@@ -443,69 +500,7 @@ impl Suppressions {
         }
     }
 
-    fn process_pending_diagnostics(
-        &self,
-        key: Option<TextRange>,
-        grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
-        context: &LintContext,
-        locator: &Locator,
-    ) -> bool {
-        let Some((group_key, group)) = grouped_diagnostic else {
-            return false;
-        };
-
-        if key.is_some_and(|key| key == *group_key) {
-            return false;
-        }
-
-        if group.any_invalid()
-            && let Some(mut diagnostic) = self.report_suppression_codes(
-                context,
-                locator,
-                group.suppression,
-                &group.invalid_codes,
-                true,
-                InvalidRuleCode {
-                    rule_code: group.invalid_codes.iter().join(", "),
-                    kind: InvalidRuleCodeKind::Suppression,
-                    whole_comment: group.suppression.codes().len() == group.invalid_codes.len(),
-                },
-            )
-        {
-            if group.has_unknown_code {
-                diagnostic
-                    .help("Add non-Ruff rule codes to the `lint.external` configuration option");
-            }
-            if group.has_stable_rule_name {
-                diagnostic.help("Enable `lint.preview` to use rule names");
-            }
-        }
-
-        if group.any_unused() {
-            let mut codes = group.disabled_codes.clone();
-            codes.extend(group.unused_codes.clone());
-            self.report_suppression_codes(
-                context,
-                locator,
-                group.suppression,
-                &codes,
-                false,
-                UnusedNOQA {
-                    codes: Some(UnusedCodes {
-                        disabled: &group.disabled_codes,
-                        duplicated: &group.duplicated_codes,
-                        unmatched: &group.unused_codes,
-                    }),
-                    kind: UnusedNOQAKind::Suppression,
-                },
-            );
-        }
-
-        true
-    }
-
     fn report_suppression_codes<'a, 'b, T: Violation>(
-        &self,
         context: &'a LintContext<'b>,
         locator: &Locator,
         suppression: &Suppression,
@@ -518,7 +513,7 @@ impl Suppressions {
         }
 
         let first_comment = suppression.comments.first();
-        let (range, edit) = self.edit_suppression_comment(
+        let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
             first_comment,
             remove_codes,
@@ -536,7 +531,7 @@ impl Suppressions {
         let mut diagnostic = context.report_custom_diagnostic(kind, range);
 
         let fix = if let Some(second_comment) = suppression.comments.second() {
-            let (second_range, second_edit) = self.edit_suppression_comment(
+            let (second_range, second_edit) = Suppressions::delete_codes_or_comment(
                 locator,
                 second_comment,
                 remove_codes,
@@ -560,8 +555,7 @@ impl Suppressions {
         Some(diagnostic)
     }
 
-    fn edit_suppression_comment(
-        &self,
+    fn delete_codes_or_comment(
         locator: &Locator<'_>,
         comment: &SuppressionComment,
         remove_codes: &[&str],
@@ -611,7 +605,6 @@ impl Suppressions {
                 Edit::range_replacement(remaining, code_range)
             }
         };
-
         (range, edit)
     }
 }
@@ -1088,16 +1081,11 @@ pub(crate) enum ParseErrorKind {
 struct ParseError {
     kind: ParseErrorKind,
     range: TextRange,
-    token_range: TextRange,
 }
 
 impl ParseError {
-    fn new(kind: ParseErrorKind, range: TextRange, token_range: TextRange) -> Self {
-        Self {
-            kind,
-            range,
-            token_range,
-        }
+    fn new(kind: ParseErrorKind, range: TextRange) -> Self {
+        Self { kind, range }
     }
 }
 
@@ -1130,7 +1118,6 @@ impl<'src> SuppressionParser<'src> {
                 Err(ParseError::new(
                     kind,
                     TextRange::new(comment_start, self.offset()),
-                    self.range,
                 ))
             }
         }
@@ -2549,7 +2536,6 @@ def foo():
             ParseError {
                 kind: NotASuppression,
                 range: 0..13,
-                token_range: 0..13,
             },
         )
         ",
@@ -2565,7 +2551,6 @@ def foo():
             ParseError {
                 kind: UnknownAction,
                 range: 0..15,
-                token_range: 0..15,
             },
         )
         ",
@@ -2581,7 +2566,6 @@ def foo():
             ParseError {
                 kind: MissingCodes,
                 range: 0..15,
-                token_range: 0..15,
             },
         )
         ",
@@ -2597,7 +2581,6 @@ def foo():
             ParseError {
                 kind: MissingCodes,
                 range: 0..17,
-                token_range: 0..17,
             },
         )
         ",
@@ -2613,7 +2596,6 @@ def foo():
             ParseError {
                 kind: MissingBracket,
                 range: 0..19,
-                token_range: 0..19,
             },
         )
         ",
@@ -2629,7 +2611,6 @@ def foo():
             ParseError {
                 kind: MissingComma,
                 range: 0..24,
-                token_range: 0..24,
             },
         )
         ",

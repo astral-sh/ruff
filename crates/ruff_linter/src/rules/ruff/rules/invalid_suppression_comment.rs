@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::AlwaysFixableViolation;
 use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
-use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for invalid suppression comments
@@ -30,9 +30,7 @@ pub(crate) struct InvalidSuppressionComment {
     pub(crate) kind: InvalidSuppressionCommentKind,
 }
 
-impl Violation for InvalidSuppressionComment {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for InvalidSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         let msg = match self.kind {
@@ -53,8 +51,8 @@ impl Violation for InvalidSuppressionComment {
         format!("Invalid suppression comment: {msg}")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Remove suppression comment".to_string())
+    fn fix_title(&self) -> String {
+        "Remove suppression comment".to_string()
     }
 }
 

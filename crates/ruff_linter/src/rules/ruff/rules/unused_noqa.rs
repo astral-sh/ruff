@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::{FixAvailability, Violation};
+use crate::AlwaysFixableViolation;
 
 #[derive(Debug, PartialEq, Eq, Default)]
 pub(crate) struct UnusedCodes<'a> {
@@ -87,9 +87,7 @@ pub(crate) struct UnusedNOQA<'a> {
     pub kind: UnusedNOQAKind,
 }
 
-impl Violation for UnusedNOQA<'_> {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl AlwaysFixableViolation for UnusedNOQA<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         match &self.codes {
@@ -139,7 +137,7 @@ impl Violation for UnusedNOQA<'_> {
         }
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some(format!("Remove unused {}", self.kind.as_str()))
+    fn fix_title(&self) -> String {
+        format!("Remove unused {}", self.kind.as_str())
     }
 }
