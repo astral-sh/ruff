@@ -2823,7 +2823,9 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Some(Place::bound(self).into()),
-            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy)),
+            Type::Recursive(rec) => rec.map(db, |unfolded| {
+                unfolded.find_name_in_mro_with_policy(db, name, policy)
+            }),
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
             }
@@ -3743,7 +3745,9 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
                 Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(this).into(),
-                Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)),
+                Type::Recursive(rec) => rec.map(db, |unfolded| {
+                    unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                }),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
