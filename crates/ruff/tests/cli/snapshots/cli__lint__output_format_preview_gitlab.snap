@@ -19,8 +19,8 @@ exit_code: 1
 ----- stdout -----
 [
   {
-    "check_name": "F401",
-    "description": "F401: `os` imported but unused",
+    "check_name": "unused-import",
+    "description": "unused-import: `os` imported but unused",
     "severity": "major",
     "fingerprint": "4dbad37161e65c72",
     "location": {
@@ -38,8 +38,8 @@ exit_code: 1
     }
   },
   {
-    "check_name": "F821",
-    "description": "F821: Undefined name `y`",
+    "check_name": "undefined-name",
+    "description": "undefined-name: Undefined name `y`",
     "severity": "major",
     "fingerprint": "7af59862a085230",
     "location": {
