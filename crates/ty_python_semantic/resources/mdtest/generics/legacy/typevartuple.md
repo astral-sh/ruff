@@ -96,23 +96,6 @@ from typing import TypeVarTuple
 Ts = TypeVarTuple("Ts", bound=int)
 ```
 
-#### `typing_extensions.TypeVarTuple`
-
-`typing_extensions.TypeVarTuple` exposes the `bound` parameter on older Python versions. ty
-recognizes the backport but does not yet support the parameter.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing_extensions import TypeVarTuple
-
-# error: [invalid-legacy-type-variable] "The `bound` argument for `TypeVarTuple` is not supported"
-Ts = TypeVarTuple("Ts", bound=int)
-```
-
 ### Variance
 
 Legacy `TypeVarTuple` accepts `covariant` and `contravariant` arguments. A `TypeVarTuple` with no
@@ -212,23 +195,6 @@ AmbiguousContravariant = TypeVarTuple("AmbiguousContravariant", contravariant=co
 AmbiguousInferVariance = TypeVarTuple("AmbiguousInferVariance", infer_variance=cond())
 # error: [invalid-legacy-type-variable]
 CovariantAndInferred = TypeVarTuple("CovariantAndInferred", covariant=True, infer_variance=True)
-```
-
-#### `typing_extensions.TypeVarTuple`
-
-`typing_extensions.TypeVarTuple` backports the variance parameters to older Python versions.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing_extensions import TypeVarTuple
-
-Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
-Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
-Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
 ```
 
 ## Generic Classes
