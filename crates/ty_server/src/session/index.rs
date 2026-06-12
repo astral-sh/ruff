@@ -31,6 +31,13 @@ impl Index {
         })
     }
 
+    pub(super) fn file_documents(&self) -> impl Iterator<Item = &Document> + '_ {
+        self.documents.values().filter(|document| match document {
+            Document::Text(text_document) => text_document.notebook().is_none(),
+            Document::Notebook(_) => true,
+        })
+    }
+
     pub(crate) fn document_handle(
         &self,
         uri: &lsp_types::Uri,
