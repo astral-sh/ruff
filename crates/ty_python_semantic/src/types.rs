@@ -86,7 +86,7 @@ use crate::types::mro::{MroIterator, StaticMroError};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraints};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::recursive::RecursiveOrigin;
-use crate::types::recursive::RecursiveType;
+use crate::types::recursive::{Foldable, RecursiveType};
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::walk_signature;
 use crate::types::special_form::TypeQualifier;
@@ -1053,6 +1053,12 @@ impl<'db> GeneratorTypes<'db> {
             send_ty: self.send_ty.map(&f),
             return_ty: self.return_ty.map(&f),
         }
+    }
+}
+
+impl<'db> Foldable<'db> for GeneratorTypes<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map_types(|ty| ty.fold(db, rec))
     }
 }
 
@@ -2994,11 +3000,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Some(Place::bound(self).into()),
-            Type::Recursive(rec) => rec
-                .unfold(db)
-                .find_name_in_mro_with_policy(db, name, policy)
-                .map(|place| place.map_type(|ty| rec.fold(db, ty))),
-
+            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.find_name_in_mro_with_policy(db, name, policy)),
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
             }
@@ -3305,11 +3307,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
-            Type::Recursive(rec) => rec
-                .unfold(db)
-                .instance_member(db, name)
-                .map_type(|ty| rec.fold(db, ty)),
-
+            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.instance_member(db, name)),
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
                 newtype.concrete_base_type(db).instance_member(db, name)
@@ -3959,10 +3957,7 @@ impl<'db> Type<'db> {
 
                 Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
                 Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(this).into(),
-                Type::Recursive(rec) => rec
-                    .unfold(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver)
-                    .map_type(|ty| rec.fold(db, ty)),
+                Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4883,10 +4878,7 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if rec.is_non_contractive(db) => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
-            Type::Recursive(rec) => rec
-                .unfold(db)
-                .bindings(db)
-                .fields_mapped(&mut |ty| rec.fold(db, ty)),
+            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.bindings(db)),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5986,11 +5978,9 @@ impl<'db> Type<'db> {
                     return_ty: return_builder.map(IntersectionBuilder::build),
                 })
             }
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => Some(
-                rec.unfold(db)
-                    .generator_types(db)?
-                    .map_types(|ty| rec.fold(db, ty)),
-            ),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => {
+                rec.map(db, |unfolded| unfolded.generator_types(db))
+            }
             ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
                 Some(GeneratorTypes {
                     yield_ty: Some(ty),
@@ -6265,7 +6255,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
 
             Type::Recursive(rec) if rec.is_non_contractive(db) => Ok(*self),
-            Type::Recursive(rec) => rec.try_map(db, |unfolded| {
+            Type::Recursive(rec) => rec.map(db, |unfolded| {
                 unfolded.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
             }),
 
@@ -8321,6 +8311,19 @@ impl<'db> InvalidTypeExpressionError<'db> {
     }
 }
 
+impl<'db> Foldable<'db> for InvalidTypeExpressionError<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Self {
+            invalid_expressions: self
+                .invalid_expressions
+                .into_iter()
+                .map(|error| error.fold(db, rec))
+                .collect(),
+            fallback_type: self.fallback_type.fold(db, rec),
+        }
+    }
+}
+
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 enum InvalidTypeExpression<'db> {
@@ -8569,6 +8572,32 @@ impl<'db> InvalidTypeExpression<'db> {
             diagnostic.info(" - as the first argument to `Callable`");
             diagnostic.info(" - as a type argument for a `ParamSpec` parameter");
         }
+    }
+}
+
+impl<'db> Foldable<'db> for InvalidTypeExpression<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            InvalidTypeExpression::InvalidType(ty, scope) => {
+                InvalidTypeExpression::InvalidType(ty.fold(db, rec), scope)
+            }
+            other => other,
+        }
+    }
+}
+
+/// Whether a given type originates from value expression inference or type expression inference.
+/// For example, the symbol `int` would be inferred as `<class 'int'>` in value expression context,
+/// and as `int` (i.e. an instance of the class `int`) in type expression context.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub enum InferredAs {
+    ValueExpression,
+    TypeExpression,
+}
+
+impl InferredAs {
+    pub const fn type_expression(self) -> bool {
+        matches!(self, InferredAs::TypeExpression)
     }
 }
 

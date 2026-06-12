@@ -18,6 +18,7 @@
 //! bound.
 
 use crate::Db;
+use crate::place::PlaceAndQualifiers;
 use crate::types::visitor;
 use crate::types::{
     ApplyTypeMappingVisitor, RecursiveTypeNormalization, Type, TypeAliasType, TypeContext,
@@ -143,6 +144,63 @@ impl<'db> RecursiveOrigin<'db> {
     }
 }
 
+pub(crate) trait Foldable<'db>: Sized {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self;
+}
+
+impl<'db> Foldable<'db> for Type<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        rec.fold(db, self)
+    }
+}
+
+impl<'db> Foldable<'db> for () {
+    fn fold(self, _db: &'db dyn Db, _rec: RecursiveType<'db>) -> Self {}
+}
+
+impl<'db> Foldable<'db> for bool {
+    fn fold(self, _db: &'db dyn Db, _rec: RecursiveType<'db>) -> Self {
+        self
+    }
+}
+
+impl<'db> Foldable<'db> for PlaceAndQualifiers<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map_type(|ty| rec.fold(db, ty))
+    }
+}
+
+impl<'db, F: Foldable<'db>> Foldable<'db> for Option<F> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map(|inner| inner.fold(db, rec))
+    }
+}
+
+impl<'db, F: Foldable<'db>> Foldable<'db> for Box<F> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        Box::new((*self).fold(db, rec))
+    }
+}
+
+impl<'db, F: Foldable<'db>> Foldable<'db> for Box<[F]> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.into_vec()
+            .into_iter()
+            .map(|inner| inner.fold(db, rec))
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    }
+}
+
+impl<'db, T: Foldable<'db>, E: Foldable<'db>> Foldable<'db> for Result<T, E> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        match self {
+            Ok(ok) => Ok(ok.fold(db, rec)),
+            Err(err) => Err(err.fold(db, rec)),
+        }
+    }
+}
+
 /// An explicit μ-binder. Represents `μα. body` where `α` is the
 /// `Type::Divergent(self.binder_id(db).into_id())` marker occurring inside `body`.
 ///
@@ -239,30 +297,12 @@ impl<'db> RecursiveType<'db> {
     }
 
     /// Apply a type operation to one unfolded layer, then fold the result.
-    pub(crate) fn map(
+    pub(crate) fn map<F: Foldable<'db>>(
         self,
         db: &'db dyn Db,
-        mut f: impl FnMut(Type<'db>) -> Type<'db>,
-    ) -> Type<'db> {
-        self.fold(db, f(self.unfold(db)))
-    }
-
-    /// Fallible version of [`map`][Self::map].
-    pub(crate) fn try_map<E>(
-        self,
-        db: &'db dyn Db,
-        mut f: impl FnMut(Type<'db>) -> Result<Type<'db>, E>,
-    ) -> Result<Type<'db>, E> {
-        Ok(self.fold(db, f(self.unfold(db))?))
-    }
-
-    /// Optional version of [`map`][Self::map].
-    pub(crate) fn option_map(
-        self,
-        db: &'db dyn Db,
-        mut f: impl FnMut(Type<'db>) -> Option<Type<'db>>,
-    ) -> Option<Type<'db>> {
-        Some(self.fold(db, f(self.unfold(db))?))
+        f: impl FnOnce(Type<'db>) -> F,
+    ) -> F {
+        f(self.unfold(db)).fold(db, self)
     }
 
     /// Whether this μ-binder is *non-contractive*: its body is the bare α-binder marker itself

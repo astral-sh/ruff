@@ -273,7 +273,7 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::Recursive(rec) => {
-                self.extend_with_type(db, rec.unfold(db));
+                rec.map(db, |unfolded| self.extend_with_type(db, unfolded));
             }
 
             Type::Dynamic(_)

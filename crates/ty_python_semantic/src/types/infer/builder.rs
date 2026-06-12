@@ -2803,14 +2803,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => self
-                .validate_attribute_assignment(
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded|
+                self.validate_attribute_assignment(
                     target,
-                    rec.unfold(db),
+                    unfolded,
                     attribute,
                     infer_value_ty,
                     emit_diagnostics,
-                ),
+                )
+            ),
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -3462,8 +3463,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 emit_diagnostics,
             ),
 
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => self
-                .validate_attribute_deletion(target, rec.unfold(db), attribute, emit_diagnostics),
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| self
+                .validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
