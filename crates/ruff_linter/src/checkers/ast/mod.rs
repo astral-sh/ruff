@@ -3706,14 +3706,6 @@ impl DiagnosticGuard<'_, '_> {
             .set_fix(fix.with_applicability(applicability));
     }
 
-    /// Set the [`Fix`] used to fix the diagnostic, if one is provided.
-    #[inline]
-    pub(crate) fn set_optional_fix(&mut self, fix: Option<Fix>) {
-        if let Some(fix) = fix {
-            self.set_fix(fix);
-        }
-    }
-
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
     #[inline]

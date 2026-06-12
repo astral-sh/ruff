@@ -2,12 +2,12 @@ use compact_str::CompactString;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
-use rustc_hash::{FxHashMap, FxHashSet};
-use std::cell::{Cell, OnceCell};
+use rustc_hash::FxHashSet;
+use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -76,6 +76,11 @@ impl SuppressionComment {
     /// Return the suppressed codes as strings
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
+    }
+
+    /// Return whether the comment is nested within a wider comment token.
+    fn is_nested(&self) -> bool {
+        self.token_range != self.range
     }
 }
 
@@ -169,11 +174,6 @@ impl SuppressionComments {
             SuppressionComments::DisableEnable(_, comment) => Some(comment),
         }
     }
-
-    /// Return an iterator over all of the [`SuppressionComment`]s in `self`.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &SuppressionComment> {
-        std::iter::once(self.first()).chain(self.second())
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -209,18 +209,6 @@ pub struct Suppressions {
     errors: Vec<ParseError>,
 
     preview: PreviewMode,
-
-    /// A mapping of all comment token ranges for valid and invalid suppression comments to the
-    /// latest comment start in that token.
-    ///
-    /// For example:
-    ///
-    /// ```py
-    /// # this comment token # ruff:ignore[range-one] # ruff:ignore[range-two]
-    /// ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ key
-    ///                                               - value
-    /// ```
-    token_ranges: OnceCell<FxHashMap<TextRange, TextSize>>,
 }
 
 #[derive(Debug)]
@@ -271,39 +259,6 @@ impl Suppressions {
     ) -> Suppressions {
         let builder = SuppressionsBuilder::new(source, settings);
         builder.load_from_tokens(tokens, indexer)
-    }
-
-    fn new(
-        valid: Vec<Suppression>,
-        invalid: Vec<InvalidSuppression>,
-        errors: Vec<ParseError>,
-        preview: PreviewMode,
-    ) -> Self {
-        Self {
-            valid,
-            invalid,
-            errors,
-            preview,
-            token_ranges: OnceCell::new(),
-        }
-    }
-
-    fn token_ranges(&self) -> &FxHashMap<TextRange, TextSize> {
-        self.token_ranges.get_or_init(|| {
-            let mut token_ranges = FxHashMap::default();
-            for comment in self
-                .valid
-                .iter()
-                .flat_map(|suppression| suppression.comments.iter())
-                .chain(self.invalid.iter().map(|invalid| &invalid.comment))
-            {
-                let latest = token_ranges
-                    .entry(comment.token_range)
-                    .or_insert(comment.range.start());
-                *latest = std::cmp::max(*latest, comment.range.start());
-            }
-            token_ranges
-        })
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -460,32 +415,30 @@ impl Suppressions {
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
-                let mut diagnostic = context.report_diagnostic(
-                    InvalidSuppressionComment {
-                        kind: InvalidSuppressionCommentKind::Error(error.kind),
-                    },
-                    error.range,
-                );
-                if !self.has_later_suppression(error.range, error.token_range) {
-                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
-                }
+                context
+                    .report_diagnostic(
+                        InvalidSuppressionComment {
+                            kind: InvalidSuppressionCommentKind::Error(error.kind),
+                        },
+                        error.range,
+                    )
+                    .set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
             }
         }
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for invalid in &self.invalid {
-                let mut diagnostic = context.report_diagnostic(
-                    InvalidSuppressionComment {
-                        kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
-                    },
-                    invalid.comment.range,
-                );
-                if !self.has_later_suppression(invalid.comment.range, invalid.comment.token_range) {
-                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(
+                context
+                    .report_diagnostic(
+                        InvalidSuppressionComment {
+                            kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
+                        },
+                        invalid.comment.range,
+                    )
+                    .set_fix(Fix::unsafe_edit(delete_comment(
                         invalid.comment.range,
                         locator,
                     )));
-                }
             }
         }
     }
@@ -572,6 +525,14 @@ impl Suppressions {
             highlight_only_code,
         );
 
+        // It's unsafe to remove an entire nested comment but okay to remove a subset of its codes.
+        let applicability =
+            if first_comment.is_nested() && edit.range().contains_range(first_comment.range) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
         let mut diagnostic = context.report_custom_diagnostic(kind, range);
 
         let fix = if let Some(second_comment) = suppression.comments.second() {
@@ -582,12 +543,19 @@ impl Suppressions {
                 highlight_only_code,
             );
             diagnostic.secondary_annotation("", second_range);
-            edit.zip(second_edit)
-                .map(|(edit, second_edit)| Fix::safe_edits(edit, [second_edit]))
+            let applicability = if applicability.is_unsafe()
+                || second_comment.is_nested()
+                    && second_edit.range().contains_range(second_comment.range)
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            Fix::applicable_edits(edit, [second_edit], applicability)
         } else {
-            edit.map(Fix::safe_edit)
+            Fix::applicable_edit(edit, applicability)
         };
-        diagnostic.set_optional_fix(fix);
+        diagnostic.set_fix(fix);
 
         Some(diagnostic)
     }
@@ -598,7 +566,7 @@ impl Suppressions {
         comment: &SuppressionComment,
         remove_codes: &[&str],
         highlight_only_code: bool,
-    ) -> (TextRange, Option<Edit>) {
+    ) -> (TextRange, Edit) {
         let mut range = comment.range;
         let edit = if let [code] = comment.codes.as_slice() {
             if highlight_only_code {
@@ -644,25 +612,7 @@ impl Suppressions {
             }
         };
 
-        // Suppress the fix for cases where deleting one suppression comment could activate a later
-        // one within the same comment token.
-        let edit = if edit.is_deletion()
-            && edit.range().contains_range(comment.range)
-            && self.has_later_suppression(comment.range, comment.token_range)
-        {
-            None
-        } else {
-            Some(edit)
-        };
-
         (range, edit)
-    }
-
-    /// Check whether another suppression occurs later in the same comment token.
-    fn has_later_suppression(&self, range: TextRange, token_range: TextRange) -> bool {
-        self.token_ranges()
-            .get(&token_range)
-            .is_some_and(|latest| *latest > range.start())
     }
 }
 
@@ -816,7 +766,12 @@ impl<'a> SuppressionsBuilder<'a> {
                 ))
         });
 
-        Suppressions::new(self.valid, self.invalid, errors, self.settings.preview)
+        Suppressions {
+            valid: self.valid,
+            invalid: self.invalid,
+            errors,
+            preview: self.settings.preview,
+        }
     }
 
     /// Handles a single-comment suppression like `ruff:ignore` or `ruff:file-ignore` and returns

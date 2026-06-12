@@ -279,6 +279,7 @@ help: Remove unused suppression
 22 | # ruff:enable[F401]
 23 | # ruff:disable[E501]
 24 | import os  # ruff:ignore[F401]
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 and cases where the `disable` and `ignore` suppress different codes:
@@ -706,9 +707,9 @@ preview = true
 select = ["E501", "F821", "RUF10"]
 ```
 
-`RUF100` should omit a fix when deleting a leading suppression would change the placement semantics
-of a later suppression. The `file-ignore` is initially invalid here, but removing the unused
-`ignore` would make it valid, so the fix is suppressed:
+`RUF100` should have an unsafe fix when deleting a leading suppression would change the placement
+semantics of a later suppression. The `file-ignore` is initially invalid here, but removing the
+unused `ignore` would make it valid, so the fix is unsafe:
 
 ```py
 # snapshot: unused-noqa
@@ -726,6 +727,14 @@ error[RUF100]: Unused suppression (unused: `E501`)
   | ^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove unused suppression
+1 | # snapshot: unused-noqa
+2 | # error: [invalid-suppression-comment]
+  - # ruff:ignore[E501] # ruff:file-ignore[F821]
+3 + # ruff:file-ignore[F821]
+4 | # error: [undefined-name]
+5 | undefined_name
+6 | # snapshot: unused-noqa
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 A later valid suppression also needs to be considered because removing the preceding comment can
@@ -734,12 +743,35 @@ a trailing comment on the `disable` comment to an own-line `ignore` comment, whi
 suppressing the `F821` diagnostic:
 
 ```py
-# error: [unused-noqa] "E501"
+# snapshot: unused-noqa
 # error: [unused-noqa] "F821"
 # ruff:disable[E501] # ruff:ignore[F821]
 # error: [undefined-name]
 undefined_name
 # ruff:enable[E501]
+```
+
+```snapshot
+error[RUF100]: Unused suppression (unused: `E501`)
+  --> src/mdtest_snippet.py:8:1
+   |
+ 8 | # ruff:disable[E501] # ruff:ignore[F821]
+   | ^^^^^^^^^^^^^^^^^^^^^
+ 9 | # error: [undefined-name]
+10 | undefined_name
+11 | # ruff:enable[E501]
+   | -------------------
+   |
+help: Remove unused suppression
+5  | undefined_name
+6  | # snapshot: unused-noqa
+7  | # error: [unused-noqa] "F821"
+   - # ruff:disable[E501] # ruff:ignore[F821]
+8  + # ruff:ignore[F821]
+9  | # error: [undefined-name]
+10 | undefined_name
+   - # ruff:enable[E501]
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## `unused-noqa` paired fix
@@ -750,8 +782,7 @@ preview = true
 select = ["E501", "RUF10", "FIX002"]
 ```
 
-Deleting either half of a `disable`/`enable` pair should omit the entire fix if it would promote a
-later suppression:
+Deleting either half of a `disable`/`enable` pair should make the fix unsafe if in a nested context:
 
 ```py
 # snapshot: unused-noqa
@@ -771,6 +802,12 @@ error[RUF100]: Unused suppression (unused: `E501`)
   | --------------------
   |
 help: Remove unused suppression
+1 | # snapshot: unused-noqa
+  - # ruff:disable[E501]
+2 | value = 1
+  - # ruff:enable[E501] # TODO # ruff:ignore[FIX002]
+3 + # TODO # ruff:ignore[FIX002]
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## `unused-noqa` partial fix
@@ -782,7 +819,7 @@ select = ["E501", "F401", "F821", "RUF10"]
 ```
 
 Removing a code from a multi-code suppression doesn't promote the later suppression, so the fix is
-still available:
+still safe:
 
 ```py
 # snapshot: unused-noqa
@@ -814,7 +851,7 @@ preview = true
 select = ["F821", "RUF10"]
 ```
 
-`RUF102` should also omit a fix that would promote a later suppression:
+The `RUF102` fix should also be unsafe when it would promote a later suppression:
 
 ```py
 # snapshot: invalid-rule-code
@@ -833,6 +870,13 @@ error[RUF102]: Invalid rule code in suppression: XYZ
   |
 help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
+1 | # snapshot: invalid-rule-code
+2 | # error: [invalid-suppression-comment]
+  - # ruff:ignore[XYZ] # ruff:file-ignore[F821]
+3 + # ruff:file-ignore[F821]
+4 | # error: [undefined-name]
+5 | undefined_name
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## `invalid-suppression-comment`
@@ -862,6 +906,15 @@ error[RUF103]: Invalid suppression comment: trailing comments are only supported
   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Remove suppression comment
+1 | def f():
+2 |     # snapshot: invalid-suppression-comment
+3 |     # error: [unused-noqa]
+  -     # explanation # ruff:file-ignore[F401] # ruff:ignore[F401]
+4 +     # explanation # ruff:ignore[F401]
+5 |     # error: [unused-import]
+6 |     import os
+7 | # snapshot: invalid-suppression-comment
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 And parse errors:
@@ -882,6 +935,14 @@ error[RUF103]: Invalid suppression comment: missing suppression codes like `[E50
   |               ^^^^^^^^^^^^^^
   |
 help: Remove suppression comment
+6  |     import os
+7  | # snapshot: invalid-suppression-comment
+8  | # error: [unused-noqa]
+   - # explanation # ruff:ignore # ruff:ignore[F821]
+9  + # explanation # ruff:ignore[F821]
+10 | # error: [undefined-name]
+11 | undefined_name
+note: This is an unsafe fix and may change runtime behavior
 ```
 
 ## Invalid nested comments
@@ -960,6 +1021,9 @@ Fixes for unused nested suppressions should preserve the surrounding comment fra
 ```py
 # snapshot: unused-noqa
 value = 1  # before # ruff:ignore[F401] # after
+
+# snapshot: unused-noqa
+value = 1  # before # ruff:ignore[F401]
 ```
 
 ```snapshot
@@ -973,4 +1037,23 @@ help: Remove unused suppression
 1 | # snapshot: unused-noqa
   - value = 1  # before # ruff:ignore[F401] # after
 2 + value = 1  # before # after
+3 |
+4 | # snapshot: unused-noqa
+5 | value = 1  # before # ruff:ignore[F401]
+note: This is an unsafe fix and may change runtime behavior
+
+
+error[RUF100]: Unused suppression (non-enabled: `F401`)
+ --> src/mdtest_snippet.py:5:21
+  |
+5 | value = 1  # before # ruff:ignore[F401]
+  |                     ^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unused suppression
+2 | value = 1  # before # ruff:ignore[F401] # after
+3 |
+4 | # snapshot: unused-noqa
+  - value = 1  # before # ruff:ignore[F401]
+5 + value = 1  # before
+note: This is an unsafe fix and may change runtime behavior
 ```
