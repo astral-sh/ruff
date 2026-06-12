@@ -799,16 +799,15 @@ method is called directly:
 ```py
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
-        # TODO: Simplify the distributed runtime-dict arms to `dict[Unknown, Unknown]`.
-        reveal_type(left | right)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        reveal_type(left | right)  # revealed: dict[Unknown, Unknown]
         reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
 
 class CustomDict(dict[int, bytes]): ...
 
 def merge_custom_dict_with_narrowed_dict(custom: CustomDict, value: object) -> None:
     if isinstance(value, dict):
-        reveal_type(custom | value)  # revealed: Top[dict[Unknown, Unknown]]
-        reveal_type(value | custom)  # revealed: Top[dict[Unknown, Unknown]]
+        reveal_type(custom | value)  # revealed: dict[Unknown, Unknown]
+        reveal_type(value | custom)  # revealed: dict[Unknown, Unknown]
 
 class ReflectedDict(dict[str, object]):
     # error: [invalid-method-override]
