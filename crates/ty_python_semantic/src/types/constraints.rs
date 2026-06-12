@@ -363,13 +363,6 @@ pub struct ConstraintSet<'db, 'c> {
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum SolutionProjection<'db> {
-    #[cfg_attr(not(test), expect(dead_code))]
-    AllTypeVars,
-    InferableOnly(InferableTypeVars<'db>),
-}
-
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: NodeId) -> Self {
         Self::from_node_with_metadata(builder, node, InferableTypeVars::None)
@@ -741,16 +734,11 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        projection: SolutionProjection<'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> PathBounds<'db> {
         self.verify_builder(builder);
         let set = self.apply_deferred_quantification(db, builder);
-        let node = match projection {
-            SolutionProjection::AllTypeVars => set.node,
-            SolutionProjection::InferableOnly(inferable) => {
-                set.node.remove_noninferable(db, builder, inferable)
-            }
-        };
+        let node = set.node.remove_noninferable(db, builder, inferable);
         PathBounds::compute(db, builder, node)
     }
 
@@ -767,23 +755,23 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        projection: SolutionProjection<'db>,
+        inferable: InferableTypeVars<'db>,
     ) -> Solutions<'db> {
-        self.path_bounds(db, builder, projection).solve(db, builder)
+        self.path_bounds(db, builder, inferable).solve(db, builder)
     }
 
     pub(crate) fn solutions_with(
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        projection: SolutionProjection<'db>,
+        inferable: InferableTypeVars<'db>,
         choose: impl FnMut(
             BoundTypeVarInstance<'db>,
             TypeVarVariance,
             ConstraintBounds<'db>,
         ) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
-        self.path_bounds(db, builder, projection).solve_with(choose)
+        self.path_bounds(db, builder, inferable).solve_with(choose)
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -3252,9 +3240,7 @@ impl<'db> Type<'db> {
             inferable: InferableTypeVars<'db>,
         ) -> PathBounds<'db> {
             let when = source.when_constraint_set_assignable_to_owned(db, target);
-            when.query(|builder, when| {
-                when.path_bounds(db, builder, SolutionProjection::InferableOnly(inferable))
-            })
+            when.query(|builder, when| when.path_bounds(db, builder, inferable))
         }
 
         assignable_solutions_impl(db, self, target, inferable)

@@ -12,7 +12,7 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
     ConstraintBounds, ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-    PathBounds, SolutionProjection, Solutions,
+    PathBounds, Solutions,
 };
 use crate::types::infer::original_class_type;
 use crate::types::relation::{
@@ -1970,7 +1970,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let solutions = match self.pending.solutions_with(
             self.db,
             self.constraints,
-            SolutionProjection::InferableOnly(self.inferable),
+            self.inferable,
             |typevar, _variance, bounds| {
                 if let Some(ty) = choose(typevar, Some(bounds)) {
                     return Ok(Some(ty));
@@ -2300,11 +2300,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         &mut self,
         set: ConstraintSet<'db, 'c>,
     ) -> Result<(), ()> {
-        let solutions = match set.solutions(
-            self.db,
-            self.constraints,
-            SolutionProjection::InferableOnly(self.inferable),
-        ) {
+        let solutions = match set.solutions(self.db, self.constraints, self.inferable) {
             Solutions::Unsatisfiable => return Err(()),
             Solutions::Unconstrained => return Ok(()),
             Solutions::Constrained(solutions) => solutions,
