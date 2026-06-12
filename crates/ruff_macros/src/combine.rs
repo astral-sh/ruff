@@ -3,7 +3,12 @@ use syn::spanned::Spanned;
 use syn::{Data, DataStruct, DeriveInput};
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data, .. } = input;
+    let DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    } = input;
 
     match data {
         Data::Struct(DataStruct { fields, .. }) => {
@@ -17,9 +22,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 })
                 .collect();
 
+            let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
             Ok(quote! {
                 #[automatically_derived]
-                impl ty_combine::Combine for #ident {
+                impl #impl_generics ty_combine::Combine for #ident #ty_generics #where_clause {
                     #[allow(deprecated)]
                     fn combine_with(&mut self, other: Self) {
                         #(

@@ -14,6 +14,7 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
         ident,
         data,
         attrs: struct_attributes,
+        generics,
         ..
     } = input;
 
@@ -84,9 +85,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<TokenStream> {
                 ))
             };
 
+            let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
             Ok(quote! {
                 #[automatically_derived]
-                impl ruff_options_metadata::OptionsMetadata for #ident {
+                impl #impl_generics ruff_options_metadata::OptionsMetadata for #ident #ty_generics #where_clause {
                     fn record(visit: &mut dyn ruff_options_metadata::Visit) {
                         #(#output);*
                     }

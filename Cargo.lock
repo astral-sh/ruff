@@ -4523,6 +4523,7 @@ version = "0.0.0"
 dependencies = [
  "ordermap",
  "ruff_db",
+ "ruff_macros",
  "ruff_python_ast",
 ]
 
