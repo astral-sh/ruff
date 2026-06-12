@@ -13,6 +13,11 @@ fn field_lists(raw: &str) -> Vec<FieldList> {
     FieldList::parse_all(raw)
 }
 
+/// Returns whether `line` starts a reST field-list item.
+pub(in crate::docstring) fn is_field_list_marker(line: &str) -> bool {
+    FieldHeader::parse_list_member(line).is_some()
+}
+
 /// Returns top-level field lists that begin at a reST block boundary.
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
