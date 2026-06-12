@@ -1,5 +1,6 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ty_python_core::Truthiness;
 use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKind};
 
 use crate::Db;
@@ -8,7 +9,8 @@ use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
     CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
-    SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
+    SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
+    infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -173,10 +175,10 @@ pub(crate) fn definite_match_pattern_type<'db>(
         PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(db, *singleton),
         PatternPredicateKind::Value(value) => {
             let ty = infer_same_file_expression_type(db, *value, TypeContext::default());
-            // Only return the type if it's single-valued. For non-single-valued types
-            // (like `str`), we can't definitively exclude any specific type from
-            // subsequent patterns because the pattern could match any value of that type.
-            if ty.is_single_valued(db) {
+            // Only return the type if it's single-valued and guaranteed to match itself.
+            // Otherwise, we can't definitively exclude it from subsequent patterns.
+            if ty.is_single_valued(db) && equality_truthiness(db, ty, ty) == Truthiness::AlwaysTrue
+            {
                 ty
             } else {
                 Type::Never
