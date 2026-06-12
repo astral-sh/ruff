@@ -4,17 +4,18 @@ use super::super::document::preformatted::MarkdownFence;
 
 /// Applies whole-docstring Markdown escaping and code-fence handling.
 ///
-/// This function assumes the input has had its whitespace normalized by `documentation_trim`,
-/// so leading whitespace is always a space, and newlines are always `\n`.
+/// This function assumes the input has had its whitespace normalized by
+/// `docstring::documentation_trim`, so leading whitespace is always a space,
+/// and newlines are always `\n`.
 ///
 /// The general approach here is:
 ///
-/// * Preserve the docstring verbatim by default, ensuring indent/linewraps are preserved
+/// * Encode line indentation and breaks so that the rendered output mirrors the source layout
 /// * Escape problematic things where necessary (bare `__dunder__` => `\_\_dunder\_\_`)
 /// * Introduce code fences where appropriate
 ///
-/// The first rule is significant in ensuring various docstring idioms render clearly.
-/// In particular ensuring things like this are faithfully rendered:
+/// The first rule is significant in ensuring various docstring idioms render
+/// clearly e.g.:
 ///
 /// ```text
 /// param1 -- a good parameter
@@ -22,8 +23,7 @@ use super::super::document::preformatted::MarkdownFence;
 ///           with longer docs
 /// ```
 ///
-/// If we didn't go out of our way to preserve the indentation and line-breaks, markdown would
-/// constantly render inputs like that into abominations like:
+/// Without that encoding, Markdown would render inputs like that into abominations like:
 ///
 /// ```html
 /// <p>
@@ -34,7 +34,32 @@ use super::super::document::preformatted::MarkdownFence;
 /// with longer docs
 /// </code>
 /// ```
-pub(super) fn render(docstring: &str) -> String {
+pub(super) fn render_into(output: &mut String, docstring: &str) {
+    render_with_indentation_mode(output, docstring, LeadingIndentation::DisplayOnly);
+}
+
+/// Renders an extracted docstring fragment with ordinary spaces for indentation.
+///
+/// Unlike [`render_into`], this emits leading indentation outside code blocks as ordinary spaces,
+/// allowing Markdown to interpret it as block syntax such as nested lists.
+pub(super) fn render_fragment_into(output: &mut String, fragment: &str) {
+    render_with_indentation_mode(output, fragment, LeadingIndentation::MarkdownSyntax);
+}
+
+/// How to emit leading indentation outside recognized code blocks.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum LeadingIndentation {
+    /// Emit `&nbsp;` so that indentation affects display without activating Markdown syntax.
+    DisplayOnly,
+    /// Emit ordinary spaces that Markdown can interpret as block syntax.
+    MarkdownSyntax,
+}
+
+fn render_with_indentation_mode(
+    output: &mut String,
+    docstring: &str,
+    leading_indentation: LeadingIndentation,
+) {
     // Here lies a monumemnt to robust parsing and escaping:
     // a codefence with SO MANY backticks that surely no one will ever accidentally
     // break out of it, even if they're writing python documentation about markdown
@@ -45,7 +70,6 @@ pub(super) fn render(docstring: &str) -> String {
     // While rendering this we should make note of all the `singletick` locations
     // and (possibly in a higher up piece of logic) try to resolve the names for
     // cross-linking. (Similar to `TypeDetails` in the type formatting code.)
-    let mut output = String::new();
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
@@ -240,8 +264,8 @@ pub(super) fn render(docstring: &str) -> String {
         // We could subtract the block_indent here but in practice it's uglier
         // TODO: should we not do this if the `line.is_empty()`? When would it matter?
         for _ in 0..line_indent {
-            // If we're not in a codeblock use non-breaking spaces to preserve the indent
-            if !in_any_code {
+            // Outside code blocks, emit indentation according to the selected mode.
+            if !in_any_code && matches!(leading_indentation, LeadingIndentation::DisplayOnly) {
                 // TODO: would the raw unicode codepoint be handled *better* or *worse*
                 // by various IDEs? VS Code handles this approach well, at least.
                 output.push_str("&nbsp;");
@@ -344,6 +368,4 @@ pub(super) fn render(docstring: &str) -> String {
             output.push_str(FENCE);
         }
     }
-
-    output
 }
