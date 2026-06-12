@@ -57,7 +57,10 @@ fn assert_file_diagnostics(db: &TestDb, filename: &str, expected: &[&str]) {
 
 #[test]
 fn compact_definition_types_omit_owner() -> anyhow::Result<()> {
-    assert!(std::mem::size_of::<DefinitionTypes>() <= 6 * std::mem::size_of::<usize>());
+    assert!(
+        std::mem::size_of::<DefinitionTypes>()
+            <= std::mem::size_of::<TypeAndQualifiers>() + std::mem::size_of::<usize>()
+    );
 
     let mut db = setup_db();
     db.write_dedented(
