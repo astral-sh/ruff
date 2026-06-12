@@ -1,3 +1,5 @@
+use std::ops::Range;
+
 use indexmap::IndexMap;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -5,15 +7,23 @@ use super::SectionKind;
 use crate::docstring::parsing::{ParsedLine, indentation, parsed_lines};
 use crate::docstring::preformatted::PreformattedBlockScanner;
 
-pub(in crate::docstring) struct Docstring {
+pub(in crate::docstring) struct Docstring<'a> {
+    sections: Vec<Section<'a>>,
     parameters: IndexMap<String, String>,
 }
 
-impl Docstring {
-    pub(in crate::docstring) fn parse(raw: &str) -> Self {
+impl<'a> Docstring<'a> {
+    pub(in crate::docstring) fn parse(raw: &'a str) -> Self {
         let sections = parse_sections(raw);
         let parameters = parameter_documentation(&sections);
-        Self { parameters }
+        Self {
+            sections,
+            parameters,
+        }
+    }
+
+    pub(in crate::docstring) fn sections(&self) -> &[Section<'a>] {
+        &self.sections
     }
 
     pub(in crate::docstring) fn parameter_documentation(&self) -> IndexMap<String, String> {
@@ -24,7 +34,26 @@ impl Docstring {
 pub(in crate::docstring) struct Section<'a> {
     kind: SectionKind,
     indent: usize,
+    range: Range<usize>,
     body: Vec<ParsedLine<'a>>,
+}
+
+impl<'a> Section<'a> {
+    pub(in crate::docstring) fn kind(&self) -> SectionKind {
+        self.kind
+    }
+
+    pub(in crate::docstring) fn indent(&self) -> usize {
+        self.indent
+    }
+
+    pub(in crate::docstring) fn range(&self) -> Range<usize> {
+        self.range.clone()
+    }
+
+    pub(in crate::docstring) fn body(&self) -> &[ParsedLine<'a>] {
+        &self.body
+    }
 }
 
 fn parse_sections(raw: &str) -> Vec<Section<'_>> {
@@ -49,10 +78,11 @@ fn parse_sections(raw: &str) -> Vec<Section<'_>> {
             continue;
         }
 
-        let body_end = numpy_section_body_end(&lines, header);
+        let (body_end, range_end) = numpy_section_body_end(&lines, header);
         sections.push(Section {
             kind: header.kind,
             indent: header.indent,
+            range: header.range_start..range_end,
             body: lines[header.body_start..body_end].to_vec(),
         });
         index = body_end;
@@ -61,8 +91,9 @@ fn parse_sections(raw: &str) -> Vec<Section<'_>> {
     sections
 }
 
-fn numpy_section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> usize {
+fn numpy_section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) -> (usize, usize) {
     let mut body_end = header.body_start;
+    let mut range_end = header.range_end;
     let mut body_preformatted_blocks = PreformattedBlockScanner::default();
 
     while let Some(line) = lines.get(body_end) {
@@ -77,6 +108,7 @@ fn numpy_section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) 
         if body_preformatted_blocks.is_active()
             && body_preformatted_blocks.consume_preformatted_line(line.text)
         {
+            range_end = line.end;
             body_end += 1;
             continue;
         }
@@ -96,10 +128,11 @@ fn numpy_section_body_end(lines: &[ParsedLine<'_>], header: NumpySectionHeader) 
         if !body_preformatted_blocks.consume_preformatted_line(line.text) {
             body_preformatted_blocks.observe_non_preformatted_line(line.text);
         }
+        range_end = line.end;
         body_end += 1;
     }
 
-    body_end
+    (body_end, range_end)
 }
 
 fn numpy_blank_line_continues_section(
@@ -153,6 +186,8 @@ struct NumpySectionHeader {
     kind: SectionKind,
     indent: usize,
     body_start: usize,
+    range_start: usize,
+    range_end: usize,
 }
 
 fn parse_numpy_section_header(
@@ -171,6 +206,8 @@ fn parse_numpy_section_header(
         kind,
         indent,
         body_start: index + 2,
+        range_start: line.start,
+        range_end: underline.end,
     })
 }
 
