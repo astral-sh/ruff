@@ -1023,10 +1023,63 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
         let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
-        Self::merge_optional_constraints_and(
+        let constraints = Self::merge_optional_constraints_and(
             constraints,
             self.evaluate_match_pattern_bindings(kind, subject_ty),
+        );
+        Self::merge_optional_constraints_and(
+            constraints,
+            self.evaluate_structural_pattern_subject(kind, subject, subject_ty),
         )
+    }
+
+    fn evaluate_structural_pattern_subject(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject: Expression<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let narrowed = match pattern {
+            PatternPredicateKind::Class(kind)
+                if matches!(kind.kind, ClassPatternKind::Refutable) =>
+            {
+                self.match_class_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Mapping(kind) if !kind.entries.is_empty() => {
+                self.match_mapping_pattern_subject_type(kind, subject_ty)
+            }
+            PatternPredicateKind::Or(patterns)
+                if patterns.iter().any(Self::contains_class_or_mapping_pattern) =>
+            {
+                self.match_pattern_subject_type(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                return self.evaluate_structural_pattern_subject(pattern, subject, subject_ty);
+            }
+            _ => return None,
+        };
+        if narrowed.is_equivalent_to(self.db, subject_ty) {
+            return None;
+        }
+
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        Some(NarrowingConstraints::from_iter([(
+            self.expect_place(&subject),
+            NarrowingConstraint::replacement(narrowed),
+        )]))
+    }
+
+    fn contains_class_or_mapping_pattern(pattern: &PatternPredicateKind<'db>) -> bool {
+        match pattern {
+            PatternPredicateKind::Class(_) | PatternPredicateKind::Mapping(_) => true,
+            PatternPredicateKind::Or(patterns) => {
+                patterns.iter().any(Self::contains_class_or_mapping_pattern)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::contains_class_or_mapping_pattern(pattern)
+            }
+            _ => false,
+        }
     }
 
     /// Record the types of names bound by a successful pattern.

@@ -737,6 +737,72 @@ def test_match_typed_dict_or_pattern_filters_union_arms(
             reveal_type(whole)  # revealed: ClosedIntPayload | ClosedStrPayload
 ```
 
+## Direct subject narrowing
+
+The same structural analysis can narrow the original match subject, even when the pattern does not
+bind an alias for the whole value. Nested class and mapping patterns can rule out union arms, and
+the result is preserved through an `or` pattern. This analysis does not yet narrow expressions used
+to construct tuple or dictionary display subjects.
+
+```py
+from typing import Generic, Literal, TypeVar
+from typing_extensions import TypedDict
+
+TagT = TypeVar("TagT")
+PayloadT = TypeVar("PayloadT")
+
+class TaggedPayload(Generic[TagT, PayloadT]):
+    __match_args__ = ("tag", "payload")
+    tag: TagT
+    payload: PayloadT
+
+def test_match_class_narrows_subject(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str],
+) -> None:
+    match value:
+        case TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
+
+def test_match_class_or_pattern_narrows_subject(
+    value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool],
+) -> None:
+    match value:
+        case TaggedPayload("int", _) | TaggedPayload("str", _):
+            # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
+            reveal_type(value)
+
+class IntPayload(TypedDict):
+    tag: Literal["int"]
+    value: int
+
+class StrPayload(TypedDict):
+    tag: Literal["str"]
+    value: str
+
+def test_match_mapping_narrows_subject(value: IntPayload | StrPayload) -> None:
+    match value:
+        case {"tag": "int"}:
+            reveal_type(value)  # revealed: IntPayload
+
+def test_match_mapping_does_not_narrow_tuple_display_element(
+    value: IntPayload | StrPayload,
+) -> None:
+    match (value,):
+        case ({"tag": "int"},):
+            # TODO: This should reveal `IntPayload`. Structural mapping analysis is not yet
+            # applied to expressions used to construct tuple display subjects.
+            reveal_type(value)  # revealed: IntPayload | StrPayload
+
+def test_match_mapping_does_not_narrow_dictionary_display_element(
+    value: IntPayload | StrPayload,
+) -> None:
+    match {"payload": value}:
+        case {"payload": {"tag": "int"}}:
+            # TODO: This should reveal `IntPayload`. Dictionary display subjects do not yet
+            # retain the correspondence between their values and mapping patterns.
+            reveal_type(value)  # revealed: IntPayload | StrPayload
+```
+
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
