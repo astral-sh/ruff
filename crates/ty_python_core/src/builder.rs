@@ -22,8 +22,8 @@ use smallvec::SmallVec;
 use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::HasTrackedScope;
-use crate::ast_ids::AstIdsBuilder;
 use crate::ast_ids::node_key::ExpressionNodeKey;
+use crate::ast_ids::{AstIdsBuilder, ScopedUseId};
 use crate::ast_node_ref::AstNodeRef;
 use crate::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
@@ -42,7 +42,7 @@ use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, 
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate,
+    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1811,7 +1811,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::IsNonTerminalCall(_)
+                    PredicateNode::SubjectElementPattern(_)
+                    | PredicateNode::IsNonTerminalCall(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -2005,6 +2006,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         pattern: &ast::Pattern,
+        sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
         is_catchall: bool,
@@ -2050,8 +2052,29 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // predicates are still created normally for proper control flow tracking.
         let predicate_id = if is_catchall {
             ScopedPredicateId::ALWAYS_TRUE
-        } else {
+        } else if sequence_subject_targets.is_empty() {
             self.record_narrowing_constraint(predicate)
+        } else {
+            let predicate_id = self.add_predicate(predicate);
+            for &(place, use_id, target) in sequence_subject_targets {
+                let subject_element_id =
+                    self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::SubjectElementPattern(
+                            SubjectElementPatternPredicate {
+                                pattern: pattern_predicate,
+                                target,
+                            },
+                        ),
+                        is_positive: true,
+                    }));
+                self.current_use_def_map_mut()
+                    .record_narrowing_constraint_for_bindings_at_use(
+                        subject_element_id,
+                        place,
+                        use_id,
+                    );
+            }
+            predicate_id
         };
         (predicate, predicate_id, pattern_predicate)
     }
@@ -3380,6 +3403,37 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     return;
                 }
 
+                // A match subject is evaluated once. Retain the bindings read by each place so
+                // that case predicates constrain those values rather than later rebindings.
+                let places = self.current_place_table();
+                let ast_ids = self.current_ast_ids();
+                let mut sequence_subject_targets =
+                    SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
+                let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
+                    ast::Expr::List(list) => list.elts.iter().collect(),
+                    ast::Expr::Tuple(tuple) => tuple.elts.iter().collect(),
+                    _ => Vec::new(),
+                };
+                while let Some(element) = subject_elements.pop() {
+                    match element {
+                        ast::Expr::List(list) => subject_elements.extend(&list.elts),
+                        ast::Expr::Tuple(tuple) => subject_elements.extend(&tuple.elts),
+                        _ => {
+                            let Some(target) = PlaceExpr::try_from_expr(element)
+                                .and_then(|place| places.place_id((&place).into()))
+                                .zip(ast_ids.try_use_id(element))
+                            else {
+                                continue;
+                            };
+                            sequence_subject_targets.push((
+                                target.0,
+                                target.1,
+                                ExpressionNodeKey::from(element),
+                            ));
+                        }
+                    }
+                }
+
                 let mut no_case_matched = self.flow_snapshot();
 
                 let has_catchall = cases
@@ -3402,6 +3456,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         .add_pattern_narrowing_constraint(
                             subject_expr,
                             &case.pattern,
+                            &sequence_subject_targets,
                             case.guard.as_deref(),
                             previous_pattern,
                             is_catchall,
