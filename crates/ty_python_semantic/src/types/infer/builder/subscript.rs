@@ -378,10 +378,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         previously_in_unpack_type_argument,
                     );
 
-                    return if matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    ) || inner_ty.exact_tuple_instance_spec(db).is_some()
+                    return if super::is_typevartuple_type_or_instance(db, inner_ty)
+                        || inner_ty.exact_tuple_instance_spec(db).is_some()
                     {
                         inner_ty
                     } else {

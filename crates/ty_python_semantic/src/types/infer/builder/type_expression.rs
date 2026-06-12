@@ -2360,10 +2360,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Preserve valid unpack targets so that `Unpack[...]` follows the same
                 // argument-binding path as an equivalent starred annotation.
                 if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
-                    || matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                    )
+                    || super::is_typevartuple_type_or_instance(self.db(), inner_ty)
                 {
                     inner_ty
                 } else {

@@ -15,24 +15,24 @@ def foo[*Ts](*args: *Ts) -> None:
     reveal_type(args)  # revealed: tuple[*Ts@foo]
 ```
 
-## Variance inference
+## Variance
 
-PEP 695 type variable tuples infer variance from how the class uses them.
+PEP 695 type variable tuples are always invariant, regardless of how the class uses them.
 
 ```py
-class CovariantArray[*Ts]:
+class ReturnOnlyArray[*Ts]:
     def get(self) -> tuple[*Ts]:
         raise NotImplementedError
 
-covariant_ok: CovariantArray[object] = CovariantArray[int]()
-covariant_error: CovariantArray[int] = CovariantArray[object]()  # error: [invalid-assignment]
+return_only_out: ReturnOnlyArray[object] = ReturnOnlyArray[int]()  # error: [invalid-assignment]
+return_only_in: ReturnOnlyArray[int] = ReturnOnlyArray[object]()  # error: [invalid-assignment]
 
-class ContravariantArray[*Ts]:
+class ParameterOnlyArray[*Ts]:
     def set(self, value: tuple[*Ts]) -> None:
         raise NotImplementedError
 
-contravariant_ok: ContravariantArray[int] = ContravariantArray[object]()
-contravariant_error: ContravariantArray[object] = ContravariantArray[int]()  # error: [invalid-assignment]
+parameter_only_out: ParameterOnlyArray[object] = ParameterOnlyArray[int]()  # error: [invalid-assignment]
+parameter_only_in: ParameterOnlyArray[int] = ParameterOnlyArray[object]()  # error: [invalid-assignment]
 
 class InvariantArray[*Ts]:
     values: tuple[*Ts]
@@ -606,11 +606,11 @@ reveal_type(add_letters(Array[B, D]()))  # revealed: Array[A, B, D, C]
 reveal_type(add_letter_a(Array[B, C]()))  # revealed: Array[A, B, C]
 
 reveal_type(del_letter_a(Array[A, B]()))  # revealed: Array[B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_a` is incorrect: Expected `Array[A, C]`, found `Array[B, C]`"
 reveal_type(del_letter_a(Array[B, C]()))  # revealed: Array[C]
 
 reveal_type(del_letter_c(Array[A, B, C]()))  # revealed: Array[A, B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_c` is incorrect: Expected `Array[A, C]`, found `Array[A, B]`"
 reveal_type(del_letter_c(Array[A, B]()))  # revealed: Array[A]
 
 reveal_type(generic(A(), Array[B, D]()))  # revealed: Array[A, B, D]

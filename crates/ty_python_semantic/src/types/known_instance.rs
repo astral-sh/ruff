@@ -6,7 +6,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarKind, TypeVarNonce, TypeVarVariance,
+        UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -267,6 +268,11 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedProtocol(_) | Self::SubscriptedGeneric(_) => KnownClass::SpecialForm,
             Self::TypeVar(typevar_instance) if typevar_instance.is_paramspec(db) => {
                 KnownClass::ParamSpec
+            }
+            Self::TypeVar(typevar_instance)
+                if typevar_instance.kind(db) == TypeVarKind::ExtensionsTypeVarTuple =>
+            {
+                KnownClass::ExtensionsTypeVarTuple
             }
             Self::TypeVar(typevar_instance) if typevar_instance.is_typevartuple(db) => {
                 KnownClass::TypeVarTuple

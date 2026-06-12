@@ -895,7 +895,9 @@ impl<'db> GenericContext<'db> {
             db,
             self.variables(db)
                 .map(|typevar| match typevar.kind(db) {
-                    TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    TypeVarKind::TypeVarTuple
+                    | TypeVarKind::ExtensionsTypeVarTuple
+                    | TypeVarKind::Pep695TypeVarTuple => {
                         Type::homogeneous_tuple(db, Type::unknown())
                     }
                     TypeVarKind::ParamSpec | TypeVarKind::Pep695ParamSpec => {
@@ -1043,9 +1045,9 @@ impl<'db> GenericContext<'db> {
         let mut expanded = Vec::with_capacity(types.len());
         for typevar in variables.clone() {
             expanded.push(match typevar.kind(db) {
-                TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
-                    Type::homogeneous_tuple(db, Type::unknown())
-                }
+                TypeVarKind::TypeVarTuple
+                | TypeVarKind::ExtensionsTypeVarTuple
+                | TypeVarKind::Pep695TypeVarTuple => Type::homogeneous_tuple(db, Type::unknown()),
                 TypeVarKind::ParamSpec | TypeVarKind::Pep695ParamSpec => {
                     Type::paramspec_value_callable(db, Parameters::unknown())
                 }
@@ -2211,7 +2213,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // https://github.com/astral-sh/ty/issues/1778
                         // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
                     }
-                    TypeVarKind::TypeVarTuple | TypeVarKind::Pep695TypeVarTuple => {
+                    TypeVarKind::TypeVarTuple
+                    | TypeVarKind::ExtensionsTypeVarTuple
+                    | TypeVarKind::Pep695TypeVarTuple => {
                         // Repeated uses of a `TypeVarTuple` must have the same length, but the typing
                         // spec leaves the exact inference behavior unspecified. Preserve identical
                         // candidates, merge equal-length fixed candidates element-wise, retain an

@@ -359,6 +359,9 @@ from typing import Generic, TypeVar, TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
 
+OtherTs = TypeVarTuple("OtherTs")
+CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])
+
 # error: [invalid-legacy-type-variable] "The default value for `TypeVarTuple` must be an unpacked tuple type or another TypeVarTuple"
 InvalidDefault = TypeVarTuple("InvalidDefault", default=tuple[int, str])
 
@@ -392,6 +395,8 @@ from typing import Generic
 from typing_extensions import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+reveal_type(Ts.__default__)  # revealed: tuple[int, str]
+reveal_type(Ts.has_default())  # revealed: bool
 
 class WithBackportedDefault(Generic[*Ts]):
     attr: tuple[*Ts]
