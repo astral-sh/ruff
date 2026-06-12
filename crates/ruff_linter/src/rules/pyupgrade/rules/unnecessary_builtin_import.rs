@@ -10,11 +10,14 @@ use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{AlwaysFixableViolation, Fix};
 
 /// ## What it does
-/// Checks for unnecessary imports of builtins.
+/// Checks for imports from Python 2 compatibility modules that are
+/// unnecessary on Python 3.
 ///
 /// ## Why is this bad?
-/// Builtins are always available. Importing them is unnecessary and should be
-/// removed to avoid confusion.
+/// The `builtins`, `io`, and `six.moves` modules expose Python 3-compatible
+/// builtins for code that supports both Python 2 and Python 3. When running
+/// on Python 3 only, importing these names is unnecessary; they can be used
+/// directly instead.
 ///
 /// ## Example
 /// ```python
@@ -51,15 +54,15 @@ impl AlwaysFixableViolation for UnnecessaryBuiltinImport {
         let UnnecessaryBuiltinImport { names } = self;
         if names.len() == 1 {
             let import = &names[0];
-            format!("Unnecessary builtin import: `{import}`")
+            format!("Unnecessary Python 2 compatibility import: `{import}`")
         } else {
             let imports = names.iter().map(|name| format!("`{name}`")).join(", ");
-            format!("Unnecessary builtin imports: {imports}")
+            format!("Unnecessary Python 2 compatibility imports: {imports}")
         }
     }
 
     fn fix_title(&self) -> String {
-        "Remove unnecessary builtin import".to_string()
+        "Remove unnecessary Python 2 compatibility import".to_string()
     }
 }
 
