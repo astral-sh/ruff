@@ -325,7 +325,7 @@ fn dependency_dunder_call_change() -> anyhow::Result<()> {
     let mut db = setup_db();
 
     db.write_files([
-        ("/src/a.py", "from foo import C\nx = next(iter(C()))"),
+        ("/src/a.py", "from foo import C\nx = [*C()]"),
         (
             "/src/foo.py",
             "class C:\n    def __iter__(self) -> 'C': ...\n    def __next__(self) -> int: ...",
@@ -335,7 +335,7 @@ fn dependency_dunder_call_change() -> anyhow::Result<()> {
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "int");
+    assert_eq!(x_ty.display(&db).to_string(), "list[int]");
 
     db.write_file(
         "/src/foo.py",
@@ -345,7 +345,7 @@ fn dependency_dunder_call_change() -> anyhow::Result<()> {
     let a = system_path_to_file(&db, "/src/a.py").unwrap();
     let x_ty = global_symbol(&db, a, "x").place.expect_type();
 
-    assert_eq!(x_ty.display(&db).to_string(), "str");
+    assert_eq!(x_ty.display(&db).to_string(), "list[str]");
 
     Ok(())
 }
