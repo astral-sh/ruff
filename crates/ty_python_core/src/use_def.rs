@@ -1941,6 +1941,13 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_symbol_definitions.shrink_to_fit();
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        // Keep default entries while building so they remain barriers between non-contiguous
+        // ranges with the same metadata. Once construction is complete, absence represents the
+        // default of reachable code outside a `TYPE_CHECKING` block.
+        self.range_reachability.retain(|(_, info)| {
+            info.reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
+                || info.in_type_checking_block
+        });
         self.range_reachability.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
@@ -2192,5 +2199,40 @@ impl<'db> UseDefMapBuilder<'db> {
 
         interned_ids_by_snapshot.shrink_to_fit();
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_text_size::TextRange;
+
+    use super::UseDefMapBuilder;
+    use crate::reachability_constraints::ScopedReachabilityConstraintId;
+
+    #[test]
+    fn omits_default_range_reachability_without_merging_across_it() {
+        let mut builder = UseDefMapBuilder::new(false);
+
+        builder.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+        builder.record_range_reachability(TextRange::new(0.into(), 1.into()), false);
+        builder.reachability = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+        builder.record_range_reachability(TextRange::new(1.into(), 2.into()), false);
+        builder.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
+        builder.record_range_reachability(TextRange::new(2.into(), 3.into()), false);
+
+        let map = builder.finish();
+        assert_eq!(
+            map.range_reachability().collect::<Vec<_>>(),
+            [
+                (
+                    TextRange::new(0.into(), 1.into()),
+                    ScopedReachabilityConstraintId::ALWAYS_FALSE,
+                ),
+                (
+                    TextRange::new(2.into(), 3.into()),
+                    ScopedReachabilityConstraintId::ALWAYS_FALSE,
+                ),
+            ]
+        );
     }
 }
