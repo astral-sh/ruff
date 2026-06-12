@@ -192,6 +192,14 @@ impl<'db, F: Foldable<'db>> Foldable<'db> for Box<[F]> {
     }
 }
 
+impl<'db, F: Foldable<'db>> Foldable<'db> for Vec<F> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.into_iter()
+            .map(|inner| inner.fold(db, rec))
+            .collect::<Vec<_>>()
+    }
+}
+
 impl<'db, T: Foldable<'db>, E: Foldable<'db>> Foldable<'db> for Result<T, E> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         match self {
