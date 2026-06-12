@@ -115,6 +115,8 @@ reveal_type(iterable)  # revealed: list[int]
 bad_list: list[str] = [1]  # error: [invalid-assignment]
 bad_dict: dict[str, int] = {"a": "bad"}  # error: [invalid-assignment]
 
+bad_nested_list: list[list[list[str]]] = [[[1]]]  # error: [invalid-assignment]
+
 # error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
 bad_unpack: dict[str, int] = {**42}
 

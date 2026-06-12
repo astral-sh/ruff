@@ -7062,6 +7062,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .iter()
                 .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
 
+        let mut pre_inferred_elt_tys = None;
+
         // Avoid projecting and solving a constraint set when contextual inference has already
         // provided the complete specialization and every literal element is compatible with it.
         if !has_dict_unpack
@@ -7086,12 +7088,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             // The slow path below adds the contextual specialization as an invariant mapping,
             // then discards every element constraint that is already assignable to its context.
-            // Probe that case speculatively so that a failed probe can fall back without changing
-            // diagnostics or inferred expression types.
-            let mut speculative_builder = self.speculate();
+            // Infer the elements once here and retain their types so that a failed fast-path check
+            // does not recursively re-infer nested collection literals on the slow path.
+            let mut inferred_elts = Vec::with_capacity(elts.len());
             let mut compatible = true;
 
-            'elements: for elts in elts {
+            for elts in elts {
+                let mut inferred_elt_tys = [None; N];
                 for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
                 {
                     let Some(elt) = elt else { continue };
@@ -7100,21 +7103,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     } else {
                         elt_tcx
                     };
-                    let inferred_elt_ty = infer_elt_expression(
-                        &mut speculative_builder,
-                        (i, elt, TypeContext::new(Some(elt_tcx))),
-                    );
+                    let inferred_elt_ty =
+                        infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
+                    inferred_elt_tys[i] = Some(inferred_elt_ty);
 
                     if !inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
                         compatible = false;
-                        break 'elements;
                     }
                 }
+                inferred_elts.push(inferred_elt_tys);
             }
 
             if compatible {
-                self.extend(speculative_builder);
-
                 let class_type = collection_alias.origin(self.db()).apply_specialization(
                     self.db(),
                     |generic_context| {
@@ -7124,6 +7124,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 );
                 return Type::from(class_type).to_instance(self.db());
             }
+
+            pre_inferred_elt_tys = Some(inferred_elts);
         }
 
         // Create a set of constraints to infer a precise type for `T`.
@@ -7216,7 +7218,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for elts in elts {
+        for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
@@ -7285,8 +7287,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
-                let inferred_elt_ty =
-                    infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
+                let inferred_elt_ty = pre_inferred_elt_tys
+                    .as_ref()
+                    .and_then(|inferred_elts| inferred_elts[elts_index][i])
+                    .unwrap_or_else(|| {
+                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                    });
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
