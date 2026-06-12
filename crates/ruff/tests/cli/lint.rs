@@ -3678,6 +3678,56 @@ match 42:  # invalid-syntax
     Ok(())
 }
 
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("json")]
+#[test_case::test_case("json-lines")]
+#[test_case::test_case("junit")]
+#[test_case::test_case("grouped")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+#[test_case::test_case("pylint")]
+#[test_case::test_case("rdjson")]
+#[test_case::test_case("azure")]
+#[test_case::test_case("sarif")]
+fn output_format_preview(output_format: &str) -> Result<()> {
+    const CONTENT: &str = "\
+import os  # F401
+x = y      # F821
+match 42:  # invalid-syntax
+    case _: ...
+";
+
+    let fixture = CliTest::with_settings(|_project_dir, mut settings| {
+        // JSON double escapes backslashes
+        settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
+
+        settings
+    })?;
+
+    fixture.write_file("input.py", CONTENT)?;
+
+    let snapshot = format!("output_format_preview_{output_format}");
+
+    assert_cmd_snapshot!(
+        snapshot,
+        fixture.command().args([
+            "check",
+            "--no-cache",
+            "--output-format",
+            output_format,
+            "--select",
+            "F401,F821",
+            "--target-version",
+            "py39",
+            "--preview",
+            "input.py",
+        ])
+    );
+
+    Ok(())
+}
+
 #[test_case::test_case("concise"; "concise_show_fixes")]
 #[test_case::test_case("full"; "full_show_fixes")]
 #[test_case::test_case("grouped"; "grouped_show_fixes")]
