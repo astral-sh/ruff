@@ -1,4 +1,5 @@
 use crate::place::Place;
+use crate::types::class::StaticClassShape;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
     SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
@@ -15,7 +16,7 @@ use crate::types::{
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, helpers::any_over_expr};
 use ty_module_resolver::{KnownModule, file_to_module};
-use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
+use ty_python_core::{attribute_scopes, definition::Definition, scope::NodeWithScopeRef};
 
 impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_class_body(&mut self, class: &ast::StmtClassDef) {
@@ -132,6 +133,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .arguments
             .as_deref()
             .is_some_and(|arguments| arguments.find_keyword("metaclass").is_some());
+        let has_implicit_attributes = attribute_scopes(db, body_scope).any(|function_scope_id| {
+            self.index
+                .place_table(function_scope_id)
+                .members()
+                .any(|member| member.as_instance_attribute().is_some())
+        });
         let infer_original_class_ty = |deprecated,
                                        type_check_only,
                                        dataclass_params,
@@ -158,7 +165,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     !class_node.decorator_list.is_empty(),
                     class_node.type_params.is_some(),
                     has_explicit_bases,
-                    has_explicit_metaclass,
+                    StaticClassShape {
+                        has_explicit_metaclass,
+                        has_implicit_attributes,
+                    },
                 )),
             }
         };

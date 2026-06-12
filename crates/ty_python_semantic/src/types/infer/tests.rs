@@ -478,6 +478,65 @@ fn dependency_implicit_instance_attribute() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test]
+fn dependency_added_implicit_instance_attribute() -> anyhow::Result<()> {
+    let mut db = setup_db();
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class C:
+            def f(self):
+                pass
+        "#,
+    )?;
+    db.write_dedented(
+        "/src/main.py",
+        r#"
+        from mod import C
+        x = C().attr
+        "#,
+    )?;
+
+    let file_main = system_path_to_file(&db, "/src/main.py").unwrap();
+    assert!(
+        global_symbol(&db, file_main, "x")
+            .place
+            .expect_type()
+            .is_unknown()
+    );
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class C:
+            def f(self):
+                self.attr = 1
+        "#,
+    )?;
+
+    let attr_ty = global_symbol(&db, file_main, "x").place.expect_type();
+    assert_eq!(attr_ty.display(&db).to_string(), "int");
+
+    db.write_dedented(
+        "/src/mod.py",
+        r#"
+        class C:
+            def f(self):
+                pass
+        "#,
+    )?;
+
+    assert!(
+        global_symbol(&db, file_main, "x")
+            .place
+            .expect_type()
+            .is_unknown()
+    );
+
+    Ok(())
+}
+
 /// This test verifies that changing a class's declaration in a non-meaningful way (e.g. by adding a comment)
 /// doesn't trigger type inference for expressions that depend on the class's members.
 #[test]
