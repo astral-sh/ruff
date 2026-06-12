@@ -406,6 +406,67 @@ jobs:
       - name: "Run doctests"
         run: cargo test --doc --profile profiling --all-features
 
+  # Temporary cold/rebuild comparison for https://github.com/astral-sh/ruff/pull/25632.
+  compare-codegen-units:
+    name: "codegen units (${{ matrix.profile }}, ${{ matrix.codegen_units }}, trial ${{ matrix.trial }})"
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 25632 }}
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [dev, profiling]
+        codegen_units: [16, 256]
+        trial: [1, 2, 3]
+    runs-on: ${{ matrix.profile == 'dev' && 'depot-ubuntu-22.04-16' || 'depot-ubuntu-22.04-32' }}
+    timeout-minutes: 20
+    env:
+      CARGO_PROFILE_DEV_CODEGEN_UNITS: ${{ matrix.codegen_units }}
+      CARGO_PROFILE_TEST_CODEGEN_UNITS: ${{ matrix.codegen_units }}
+      CARGO_PROFILE_PROFILING_CODEGEN_UNITS: ${{ matrix.codegen_units }}
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+      CARGO_PROFILE_PROFILING_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - name: "Install mold"
+        uses: rui314/setup-mold@9c9c13bf4c3f1adef0cc596abc155580bcb04444 # v1
+      - name: "Cold dev/test compile"
+        if: ${{ matrix.profile == 'dev' }}
+        run: |
+          /usr/bin/time \
+            -f "cold dev/test: elapsed=%e user=%U system=%S max-rss=%M" \
+            cargo test --workspace --all-features --locked --no-run
+      - name: "Dev/test rebuild after ty_python_semantic change"
+        if: ${{ matrix.profile == 'dev' }}
+        run: |
+          touch crates/ty_python_semantic/src/types.rs
+          /usr/bin/time \
+            -f "dev/test rebuild: elapsed=%e user=%U system=%S max-rss=%M" \
+            cargo test --workspace --all-features --locked --no-run
+      - name: "Cold profiling build"
+        if: ${{ matrix.profile == 'profiling' }}
+        run: |
+          /usr/bin/time \
+            -f "cold profiling: elapsed=%e user=%U system=%S max-rss=%M" \
+            cargo build --package ty --profile profiling --locked
+      - name: "Profiling rebuild after ty_python_semantic change"
+        if: ${{ matrix.profile == 'profiling' }}
+        run: |
+          touch crates/ty_python_semantic/src/types.rs
+          /usr/bin/time \
+            -f "profiling rebuild: elapsed=%e user=%U system=%S max-rss=%M" \
+            cargo build --package ty --profile profiling --locked
+      - name: "Run ty three times"
+        if: ${{ matrix.profile == 'profiling' }}
+        run: |
+          for run in 1 2 3; do
+            /usr/bin/time \
+              -f "ty run ${run}: elapsed=%e user=%U system=%S max-rss=%M" \
+              target/profiling/ty check --exit-zero --project=./scripts > /dev/null
+          done
+
   cargo-test-other:
     strategy:
       matrix:
