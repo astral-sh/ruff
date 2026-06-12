@@ -4834,6 +4834,7 @@ arm introduced by `isinstance(value, dict)` must not enable tagged-union narrowi
 def preserve_structural_top(value: object) -> None:
     if isinstance(value, dict):
         reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        # error: [invalid-argument-type]
         if value["tag"] == "foo":
             reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
 ```

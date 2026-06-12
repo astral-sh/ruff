@@ -444,7 +444,7 @@ fn synthesize_typed_dict_get<'db>(
                     Parameter::positional_only(Some(Name::new_static("self")))
                         .with_annotated_type(instance_ty),
                     Parameter::positional_only(Some(Name::new_static("key")))
-                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                        .with_annotated_type(Type::object()),
                 ],
             ),
             UnionType::from_two_elements(db, fallback_value_ty, Type::none(db)),
@@ -460,7 +460,7 @@ fn synthesize_typed_dict_get<'db>(
                 Parameter::positional_only(Some(Name::new_static("self")))
                     .with_annotated_type(instance_ty),
                 Parameter::positional_only(Some(Name::new_static("key")))
-                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                    .with_annotated_type(Type::object()),
                 Parameter::positional_only(Some(Name::new_static("default")))
                     .with_annotated_type(Type::TypeVar(t_default)),
             ];
