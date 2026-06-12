@@ -765,11 +765,11 @@ visible too:
 ```py
 from typing import TypeVar
 
-T = TypeVar("T")
+TDict = TypeVar("TDict")
 
-def _(value: Movie | T):
+def _(value: Movie | TDict):
     if isinstance(value, dict):
-        reveal_type(value)  # revealed: Movie | (T@_ & Top[dict[Unknown, Unknown]]) | (T@_ & <TypedDict with no items>)
+        reveal_type(value)  # revealed: Movie | (TDict@_ & Top[dict[Unknown, Unknown]]) | (TDict@_ & <TypedDict with no items>)
 ```
 
 The empty `TypedDict` arm has a read-only mapping surface. It preserves common dictionary operations
