@@ -456,14 +456,14 @@ impl<'db> Type<'db> {
         match (self, target) {
             (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
             (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => {
-                self.materialized_divergent_fallback().is_none()
-                    && union.elements(db).contains(&self)
-            }
-            (Type::Intersection(intersection), _) => {
-                target.materialized_divergent_fallback().is_none()
-                    && intersection.positive(db).contains(&target)
-            }
+            (_, Type::Union(union)) => union.elements(db).contains(&self),
+            (Type::Intersection(intersection), _) => intersection.positive(db).contains(&target),
+            (Type::Recursive(rec), _) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                unfolded.is_trivially_constraint_set_assignable_to(db, target)
+            }),
+            (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+                self.is_trivially_constraint_set_assignable_to(db, unfolded)
+            }),
             _ => false,
         }
     }
