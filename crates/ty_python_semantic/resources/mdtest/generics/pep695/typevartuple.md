@@ -154,7 +154,19 @@ class WithDefault[*Ts = *tuple[int, str]]:
     attr: tuple[*Ts]
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
+reveal_type(WithDefault[()]().attr)  # revealed: tuple[()]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+
+class PrefixWithDefault[T, *Ts = *tuple[int, str]]:
+    attr: tuple[T, *Ts]
+
+reveal_type(PrefixWithDefault[bool]().attr)  # revealed: tuple[bool, int, str]
+reveal_type(PrefixWithDefault[bool, *tuple[()]]().attr)  # revealed: tuple[bool]
+
+class DependentDefault[T, *Ts = *tuple[T]]:
+    attr: tuple[T, *Ts]
+
+reveal_type(DependentDefault[bytes]().attr)  # revealed: tuple[bytes, bytes]
 ```
 
 ### Assignment checks
@@ -728,11 +740,21 @@ def _(a1: Headered, a2: Headered[*tuple[Any, ...]]) -> None:
 ```py
 type First[*Ts, T] = tuple[*Ts, T]
 type Second[T, *Ts] = tuple[T, *Ts]
+type Middle[T, *Ts, U] = tuple[T, *Ts, U]
+type PrefixTwo[T, U, *Ts] = tuple[T, U, *Ts]
+type SuffixTwo[*Ts, T, U] = tuple[*Ts, T, U]
 
 reveal_type(First[*tuple[int, ...]])  # revealed: <type alias 'First[*tuple[int, ...], int]'>
 reveal_type(First[*tuple[int, ...], str])  # revealed: <type alias 'First[*tuple[int, ...], str]'>
 reveal_type(Second[*tuple[int, ...]])  # revealed: <type alias 'Second[int, *tuple[int, ...]]'>
 reveal_type(Second[str, *tuple[int, ...]])  # revealed: <type alias 'Second[str, *tuple[int, ...]]'>
+reveal_type(Middle[*tuple[int, ...]])  # revealed: <type alias 'Middle[int, *tuple[int, ...], int]'>
+reveal_type(Middle[*tuple[int, ...], str])  # revealed: <type alias 'Middle[int, *tuple[int, ...], str]'>
+reveal_type(Middle[str, *tuple[int, ...]])  # revealed: <type alias 'Middle[str, *tuple[int, ...], int]'>
+reveal_type(PrefixTwo[*tuple[int, ...]])  # revealed: <type alias 'PrefixTwo[int, int, *tuple[int, ...]]'>
+reveal_type(PrefixTwo[*tuple[int, ...], str])  # revealed: <type alias 'PrefixTwo[int, int, *tuple[*tuple[int, ...], str]]'>
+reveal_type(SuffixTwo[*tuple[int, ...]])  # revealed: <type alias 'SuffixTwo[*tuple[int, ...], int, int]'>
+reveal_type(SuffixTwo[*tuple[int, ...], str])  # revealed: <type alias 'SuffixTwo[*tuple[int, ...], int, str]'>
 ```
 
 ### Variadic substitutions
