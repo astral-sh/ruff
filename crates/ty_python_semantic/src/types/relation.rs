@@ -1186,24 +1186,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `Type::Recursive` records the pair on the relation visitor,
             // unfolds one step, and dispatches structurally.
-            (Type::Recursive(_), _) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(
-                        db,
-                        source.unwrap_recursive(db),
-                        target,
-                    )
-                })
-            }
-            (_, Type::Recursive(_)) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(
-                        db,
-                        source,
-                        target.unwrap_recursive(db),
-                    )
-                })
-            }
+            (Type::Recursive(_), _) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source.unwrap_recursive(db), target)
+            }),
+            (_, Type::Recursive(_)) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target.unwrap_recursive(db))
+            }),
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source_alias.value_type(db), target)
@@ -2655,16 +2643,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.check_divergent_type_pair(db, left, right)
             }
 
-            (Type::Recursive(_), _) => {
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left.unwrap_recursive(db), right)
-                })
-            }
-            (_, Type::Recursive(_)) => {
-                self.with_recursion_guard(left, right, || {
-                    self.check_type_pair(db, left, right.unwrap_recursive(db))
-                })
-            }
+            (Type::Recursive(_), _) => self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, left.unwrap_recursive(db), right)
+            }),
+            (_, Type::Recursive(_)) => self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, left, right.unwrap_recursive(db))
+            }),
 
             (Type::TypeAlias(alias), _) => {
                 let left_alias_ty = alias.value_type(db);
