@@ -793,17 +793,14 @@ def use_narrowed_dict(value: object, key: object) -> None:
         takes_dict(value)  # error: [invalid-argument-type]
 ```
 
-Non-mutating dictionary operators remain valid after runtime narrowing. Directly calling the dunder
-currently reports an error because the ordinary `dict` arm does not accept the empty `TypedDict`
-arm:
+Non-mutating dictionary operators remain valid after runtime narrowing, including when the dunder
+method is called directly:
 
 ```py
 def merge_narrowed_dicts(left: object, right: object) -> None:
     if isinstance(left, dict) and isinstance(right, dict):
         # TODO: Simplify the distributed runtime-dict arms to `dict[Unknown, Unknown]`.
-        reveal_type(left | right)  # revealed: dict[Unknown, Unknown] | <TypedDict with no items>
-        # TODO: The runtime-dict union should be accepted by `dict.__or__`.
-        # error: [invalid-argument-type]
+        reveal_type(left | right)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
         reveal_type(left.__or__(right))  # revealed: dict[Unknown, Unknown]
 
 class CustomDict(dict[int, bytes]): ...
