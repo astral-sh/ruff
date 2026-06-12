@@ -109,7 +109,7 @@ use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -200,18 +200,18 @@ where
         // threading deferred quantification through `tree_fold` so both are combined in the same
         // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
         // regression.
-        let mut deferred_quantification = InferableTypeVars::None;
+        let mut deferred_quantification = FxOrderSet::default();
         let node = NodeId::distributed_or(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                deferred_quantification =
-                    deferred_quantification.merge(db, constraint.deferred_quantification);
+                deferred_quantification.extend(constraint.deferred_quantification.iter(db));
                 constraint.node
             }),
         );
+        let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
         ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
     }
 
@@ -226,18 +226,18 @@ where
         // threading deferred quantification through `tree_fold` so both are combined in the same
         // logarithmic shape. That extra complexity is not worth it without a demonstrated perf
         // regression.
-        let mut deferred_quantification = InferableTypeVars::None;
+        let mut deferred_quantification = FxOrderSet::default();
         let node = NodeId::distributed_and(
             db,
             builder,
             self.map(|element| {
                 let constraint = f(element);
                 constraint.verify_builder(builder);
-                deferred_quantification =
-                    deferred_quantification.merge(db, constraint.deferred_quantification);
+                deferred_quantification.extend(constraint.deferred_quantification.iter(db));
                 constraint.node
             }),
         );
+        let deferred_quantification = InferableTypeVars::from_typevars(db, deferred_quantification);
         ConstraintSet::from_node_with_metadata(builder, node, deferred_quantification)
     }
 }
