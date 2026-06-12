@@ -796,31 +796,27 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         intersection: IntersectionType<'db>,
         target: Type<'db>,
     ) -> Option<(Type<'db>, Vec<Type<'db>>)> {
-        let Type::NominalInstance(target_instance) = target else {
-            return None;
-        };
-        let target_alias = target_instance.class(db).into_generic_alias()?;
-        let target_origin = target_alias.origin(db);
+        let target_origin = target
+            .as_nominal_instance()?
+            .class(db)
+            .into_generic_alias()?
+            .origin(db);
         let mut merged: Option<Specialization<'db>> = None;
         let mut unmatched = Vec::new();
 
         for positive in intersection.iter_positive(db) {
-            let positive_instance = match positive {
-                Type::NominalInstance(positive) => positive,
-                Type::ProtocolInstance(positive) => {
-                    let Some(positive) = positive.to_nominal_instance() else {
-                        unmatched.push(Type::ProtocolInstance(positive));
-                        continue;
-                    };
-                    positive
-                }
-                _ => {
-                    unmatched.push(positive);
-                    continue;
-                }
+            let positive_class = match positive {
+                Type::NominalInstance(instance) => Some(instance.class(db)),
+                Type::ProtocolInstance(protocol) => protocol
+                    .to_nominal_instance()
+                    .map(|instance| instance.class(db)),
+                _ => None,
             };
-            let specialization = positive_instance
-                .class(db)
+            let Some(positive_class) = positive_class else {
+                unmatched.push(positive);
+                continue;
+            };
+            let specialization = positive_class
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
                 .filter_map(ClassType::into_generic_alias)
@@ -1807,8 +1803,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     let projected = self.check_type_pair(db, projected, target);
                     return projected.or(db, self.constraints, || {
                         unmatched
-                            .iter()
-                            .copied()
+                            .into_iter()
                             .when_any(db, self.constraints, |positive| {
                                 self.check_type_pair(db, positive, target)
                             })

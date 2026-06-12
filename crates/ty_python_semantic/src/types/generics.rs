@@ -2685,30 +2685,6 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         }
     }
 
-    fn specialization_error_from_failed_bounds(
-        db: &'db dyn Db,
-        path_bound: &PathBound<'db>,
-    ) -> Option<SpecializationError<'db>> {
-        let bound_typevar = path_bound.bound_typevar;
-        let argument = path_bound.lower?;
-        match bound_typevar.typevar(db).bound_or_constraints(db)? {
-            TypeVarBoundOrConstraints::UpperBound(_) => {
-                Some(SpecializationError::MismatchedBound {
-                    bound_typevar,
-                    argument,
-                })
-            }
-            TypeVarBoundOrConstraints::Constraints(_) if !path_bound.has_upper() => {
-                Some(SpecializationError::MismatchedConstraint {
-                    bound_typevar,
-                    argument,
-                })
-            }
-            // If both bounds are present, the upper bound might be what invalidated the path.
-            TypeVarBoundOrConstraints::Constraints(_) => None,
-        }
-    }
-
     /// Returns common protocol constraints for a union containing only `TypedDict`s when every
     /// member has the same constraints as their shared `Mapping[str, object]` fallback.
     fn common_typed_dict_protocol_constraints(
@@ -2872,24 +2848,18 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         actual: Type<'db>,
         polarity: TypeVarVariance,
     ) -> ConstraintSet<'db, 'c> {
+        let when_assignable = |source: Type<'db>, target: Type<'db>| {
+            self.constraints.load(
+                self.db,
+                &source.when_constraint_set_assignable_to_owned(self.db, target),
+            )
+        };
         match polarity {
-            TypeVarVariance::Covariant => self.constraints.load(
-                self.db,
-                &actual.when_constraint_set_assignable_to_owned(self.db, formal),
-            ),
-            TypeVarVariance::Contravariant => self.constraints.load(
-                self.db,
-                &formal.when_constraint_set_assignable_to_owned(self.db, actual),
-            ),
+            TypeVarVariance::Covariant => when_assignable(actual, formal),
+            TypeVarVariance::Contravariant => when_assignable(formal, actual),
             TypeVarVariance::Invariant => {
-                let covariant = self.constraints.load(
-                    self.db,
-                    &actual.when_constraint_set_assignable_to_owned(self.db, formal),
-                );
-                let contravariant = self.constraints.load(
-                    self.db,
-                    &formal.when_constraint_set_assignable_to_owned(self.db, actual),
-                );
+                let covariant = when_assignable(actual, formal);
+                let contravariant = when_assignable(formal, actual);
                 covariant.and(self.db, self.constraints, || contravariant)
             }
             TypeVarVariance::Bivariant => ConstraintSet::from_bool(self.constraints, true),
