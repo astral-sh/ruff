@@ -59,6 +59,29 @@ def _(obj: WithSpam):
         reveal_type(obj)  # revealed: Never
 ```
 
+Runtime dictionary methods remain present after an exact-class narrowing, even when they are hidden
+from direct access on the unknown `TypedDict` schema arm:
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(movie: Movie):
+    if not hasattr(movie, "clear"):
+        # TODO: Should be `Never`. The TypedDict type interface does not include `clear`,
+        # but runtime inhabitants do have the attribute, so to get this right we need to model runtime
+        # attribute-presence constraints separately from structural protocols.
+        reveal_type(movie)  # revealed: Movie & ~<Protocol with members 'clear'>
+
+def _(value: object):
+    if type(value) is dict:
+        if not hasattr(value, "clear"):
+            # TODO: Should be `Never`.
+            reveal_type(value)  # revealed: <TypedDict with no items> & ~<Protocol with members 'clear'>
+```
+
 When a class may or may not have a `spam` attribute, `hasattr` narrowing can provide evidence that
 the attribute exists. Here, no `possibly-missing-attribute` error is emitted in the `if` branch:
 

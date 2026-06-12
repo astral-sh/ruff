@@ -98,6 +98,7 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
+use class::open_empty_typed_dict_member;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
@@ -1824,6 +1825,10 @@ impl<'db> Type<'db> {
         Self::TypedDict(TypedDictType::new(defining_class.into()))
     }
 
+    pub(crate) fn open_empty_typed_dict(db: &'db dyn Db) -> Self {
+        Self::TypedDict(TypedDictType::open_empty(db))
+    }
+
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
         // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
@@ -2758,6 +2763,10 @@ impl<'db> Type<'db> {
                             "`Type::find_name_in_mro()` should return `Some()` when called on a meta-type",
                         )
                 }
+            }
+
+            Type::TypedDict(typed_dict) if typed_dict == TypedDictType::open_empty(db) => {
+                open_empty_typed_dict_member(db, policy, name.as_str())
             }
 
             Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => self
@@ -5907,15 +5916,22 @@ impl<'db> Type<'db> {
     /// instances of `dict` at runtime.
     #[must_use]
     pub(crate) fn dunder_class(self, db: &'db dyn Db) -> Type<'db> {
-        if self.is_typed_dict() {
-            return KnownClass::Dict
+        match self {
+            Type::TypedDict(_) => KnownClass::Dict
                 .to_specialized_class_type(db, &[KnownClass::Str.to_instance(db), Type::object()])
                 .map(Type::from)
                 // Guard against user-customized typesheds with a broken `dict` class
-                .unwrap_or_else(Type::unknown);
+                .unwrap_or_else(Type::unknown),
+            Type::Union(union) => union.map(db, |element| element.dunder_class(db)),
+            Type::Intersection(intersection) => IntersectionType::from_elements(
+                db,
+                intersection
+                    .positive_elements_or_object(db)
+                    .map(|element| element.dunder_class(db)),
+            ),
+            Type::TypeAlias(alias) => alias.value_type(db).dunder_class(db),
+            _ => self.to_meta_type(db),
         }
-
-        self.to_meta_type(db)
     }
 
     #[must_use]

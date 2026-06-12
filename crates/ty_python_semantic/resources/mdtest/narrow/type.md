@@ -53,6 +53,34 @@ def _(x: A | B, y: A | C):
         reveal_type(y)  # revealed: A | C
 ```
 
+## `type(x) is dict` with `TypedDict`
+
+Every `TypedDict` inhabitant has an exact runtime type of `dict`, even though a `TypedDict` is not
+statically assignable to `dict`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def _(x: Movie | int):
+    if type(x) is dict:
+        reveal_type(x)  # revealed: Movie
+    else:
+        reveal_type(x)  # revealed: int
+
+type MovieAlias = Movie
+
+def aliased(x: MovieAlias):
+    reveal_type(x.__class__)  # revealed: <class 'dict[str, object]'>
+```
+
 ## `type(x) is C` in chained comparisons
 
 ```py

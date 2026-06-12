@@ -1393,8 +1393,11 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_char('<')?;
                 f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
                     .write_str("TypedDict")?;
-                f.write_str(" with items ")?;
                 let items = synthesized.items(self.db);
+                if items.is_empty() {
+                    return f.write_str(" with no items>");
+                }
+                f.write_str(" with items ")?;
                 for (i, name) in items.keys().enumerate() {
                     let is_last = i == items.len() - 1;
                     write!(f, "'{name}'")?;

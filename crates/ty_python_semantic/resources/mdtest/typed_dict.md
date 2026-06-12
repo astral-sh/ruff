@@ -1422,6 +1422,60 @@ static_assert(not is_assignable_to(Robot, Person))
 static_assert(not is_assignable_to(Person, Robot))
 ```
 
+An open empty `TypedDict` is the structural top type of all `TypedDict`s. A declared empty
+`TypedDict` still has a known empty set of allowed keys, so it retains ordinary `TypedDict` key
+diagnostics and mutation methods:
+
+```py
+from collections.abc import Mapping
+from typing import TypeVar
+from typing_extensions import ReadOnly
+from ty_extensions import Intersection
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class EmptyTypedDict(TypedDict):
+    pass
+
+class Movie(TypedDict):
+    title: str
+
+class Year(TypedDict):
+    year: int
+
+class ReadOnlyExtras(TypedDict, extra_items=ReadOnly[int]):
+    pass
+
+static_assert(is_subtype_of(Movie, EmptyTypedDict))
+static_assert(is_subtype_of(Year, EmptyTypedDict))
+static_assert(not is_subtype_of(dict[str, object], EmptyTypedDict))
+
+def project(value: Mapping[K, V]) -> tuple[K, V]:
+    raise NotImplementedError
+
+def use_empty_typed_dict(dst: EmptyTypedDict, src: Year, other: dict[int, bytes]) -> None:
+    # A declared empty TypedDict still has a known empty set of allowed keys.
+    # error: [invalid-key]
+    reveal_type(dst["unknown"])  # revealed: Unknown
+    reveal_type(project(dst))  # revealed: tuple[str, object]
+    reveal_type(iter(dst))  # revealed: Iterator[str]
+    reveal_type(dst | src)  # revealed: EmptyTypedDict
+    # TODO: Support dictionary merges between `TypedDict` and ordinary `dict` instances.
+    # error: [unsupported-operator]
+    reveal_type(dst | other)  # revealed: Unknown
+    # error: [unsupported-operator]
+    reveal_type(other | dst)  # revealed: Unknown
+    dst.update(src)
+    dst |= src
+
+def preserve_mapping_intersection(value: Intersection[Movie, Mapping[str, str]]) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, str]
+
+def preserve_extra_item_value_type(value: ReadOnlyExtras) -> None:
+    reveal_type(project(value))  # revealed: tuple[str, int]
+```
+
 In order for one `TypedDict` `B` to be assignable to another `TypedDict` `A`, all required keys in
 `A`'s schema must be required in `B`'s schema. If a key is not-required and also mutable in `A`,
 then it must be not-required in `B` (because `A` allows the caller to `del` that key). These rules
@@ -2363,6 +2417,28 @@ class StrX(TypedDict):
 def _(u: IntX | StrX) -> None:
     # error: [invalid-argument-type]
     reveal_type(u.setdefault("x", 1))  # revealed: int | str
+```
+
+## `reversed()` on Python 3.7
+
+`TypedDict` should not be treated as reversible before dictionaries gained `__reversed__` in Python
+3.8.
+
+```toml
+[environment]
+python-version = "3.7"
+```
+
+```py
+from typing_extensions import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+def _(movie: Movie) -> None:
+    # error: [no-matching-overload]
+    reveal_type(reversed(movie))  # revealed: Iterator[Unknown]
 ```
 
 ## Unlike normal classes
@@ -4681,29 +4757,41 @@ static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnl
 ## Disjointness with other types
 
 ```py
-from typing import TypedDict, Mapping
+from collections.abc import MutableMapping
+from typing import Mapping, TypedDict
+from typing_extensions import Never
 from ty_extensions import static_assert, is_disjoint_from
+
+class EmptyTypedDict(TypedDict):
+    pass
 
 class TD(TypedDict):
     x: int
 
 class RegularNonTD: ...
+class DictSubclass(dict[str, object]): ...
 
 static_assert(not is_disjoint_from(TD, object))
 static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+static_assert(not is_disjoint_from(TD, MutableMapping[str, object]))
+static_assert(not is_disjoint_from(EmptyTypedDict, dict[str | int, object]))
+static_assert(is_disjoint_from(EmptyTypedDict, DictSubclass))
 static_assert(is_disjoint_from(TD, Mapping[int, object]))
 static_assert(is_disjoint_from(TD, RegularNonTD))
-
-# TODO: We approximate disjointness with other types `T` by asking whether `dict[str, Any]` is
-# assignable to `T`. That covers common cases like the ones above, but does it have some false
-# negatives with `dict` types. A `TypedDict` is almost never assignable to a `dict` (or vice versa),
-# even when all of the `TypedDict`'s field types match the `dict`'s value type (and are mutable).
-# The problem is that the `TypedDict` could have been assigned to from *another* `TypedDict` with
-# additional fields, and we don't usually know anything about the types or mutability of those. On
-# the other hand, the assignment to `dict` can be allowed if the `TypedDict` has mutable
-# `extra_items` of a compatible type. See: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-with-dict
-static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-error]
+static_assert(not is_disjoint_from(TD, dict[str, int]))
+# TODO: Use required TypedDict fields to prove disjointness from incompatible dictionary values.
 static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
+
+class TwoRequiredFields(TypedDict):
+    first: int
+    second: str
+
+class OptionalTD(TypedDict, total=False):
+    x: int
+
+# TODO: Consider all required fields when proving disjointness from a dictionary value type.
+static_assert(is_disjoint_from(TwoRequiredFields, dict[str, int]))  # error: [static-assert-error]
+static_assert(not is_disjoint_from(OptionalTD, dict[Never, Never]))
 ```
 
 ## Narrowing tagged unions of `TypedDict`s
@@ -4743,6 +4831,18 @@ def _(u: Foo | Bar):
     else:
         reveal_type(tag)  # revealed: Literal[42]
         reveal_type(u)  # revealed: Bar
+```
+
+An open empty `TypedDict` does not provide a known tag schema. In particular, the anonymous empty
+arm introduced by `isinstance(value, dict)` must not enable tagged-union narrowing:
+
+```py
+def preserve_structural_top(value: object) -> None:
+    if isinstance(value, dict):
+        reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
+        # error: [invalid-argument-type]
+        if value["tag"] == "foo":
+            reveal_type(value)  # revealed: Top[dict[Unknown, Unknown]] | <TypedDict with no items>
 ```
 
 We can descend into intersections to discover `TypedDict` types that need narrowing:
@@ -4837,6 +4937,39 @@ def _(x: Intersection[StrTagTD, Any]):
         reveal_type(x)  # revealed: StrTagTD & Any
     else:
         reveal_type(x)  # revealed: StrTagTD & Any
+```
+
+Type variables can also contain `TypedDict` types through their bounds or constraints. We must
+inspect those schemas before narrowing; a non-literal tag can compare equal at runtime even when its
+type is disjoint from the comparison literal:
+
+```py
+from typing import TypeVar
+from typing_extensions import ReadOnly
+
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class GenericArm(TypedDict, extra_items=ReadOnly[AlwaysEqual]): ...
+
+class OtherGenericArm(TypedDict):
+    tag: AlwaysEqual
+
+BoundArm = TypeVar("BoundArm", bound=GenericArm)
+ConstrainedArm = TypeVar("ConstrainedArm", GenericArm, OtherGenericArm)
+
+def bounded(value: Foo | BoundArm) -> None:
+    if value["tag"] == "foo":
+        reveal_type(value)  # revealed: Foo | BoundArm@bounded
+    else:
+        reveal_type(value)  # revealed: BoundArm@bounded & ~<TypedDict with items 'tag'>
+
+def constrained(value: Foo | ConstrainedArm) -> None:
+    if value["tag"] == "foo":
+        reveal_type(value)  # revealed: Foo | ConstrainedArm@constrained
+    else:
+        reveal_type(value)  # revealed: ConstrainedArm@constrained & ~<TypedDict with items 'tag'>
 ```
 
 We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:

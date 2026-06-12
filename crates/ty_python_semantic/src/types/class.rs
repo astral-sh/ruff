@@ -12,10 +12,13 @@ pub(super) use self::named_tuple::{
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
 };
-pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
+use self::typed_dict::synthesize_typed_dict_merge;
+pub(super) use self::typed_dict::{
+    DynamicTypedDictAnchor, DynamicTypedDictLiteral, open_empty_typed_dict_member,
+};
 use super::{
-    BoundTypeVarInstance, MemberLookupPolicy, MroIterator, SpecialFormType, SubclassOfType, Type,
-    TypeQualifiers, class_base::ClassBase, function::FunctionType,
+    BoundTypeVarInstance, MaterializationKind, MemberLookupPolicy, MroIterator, SpecialFormType,
+    SubclassOfType, Type, TypeQualifiers, class_base::ClassBase, function::FunctionType,
 };
 use super::{TypeVarVariance, display};
 use crate::place::{DefinedPlace, Provenance, TypeOrigin};
@@ -1459,12 +1462,23 @@ impl<'db> ClassType<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(class) => class.class_member(db, name, policy),
-            Self::Generic(generic) => generic.origin(db).class_member_inner(
-                db,
-                Some(generic.specialization(db)),
-                name,
-                policy,
-            ),
+            Self::Generic(generic) => {
+                let class_literal = generic.origin(db);
+                let specialization = generic.specialization(db);
+
+                if matches!(name, "__or__" | "__ror__")
+                    && Self::is_top_dict_specialization(db, class_literal, specialization)
+                {
+                    return Member::definitely_declared(synthesize_typed_dict_merge(
+                        db,
+                        Type::instance(db, self),
+                        name,
+                    ))
+                    .inner;
+                }
+
+                class_literal.class_member_inner(db, Some(specialization), name, policy)
+            }
         }
     }
 
@@ -1847,6 +1861,16 @@ impl<'db> ClassType<'db> {
                 | ClassLiteral::DynamicEnum(_),
             ) => None,
         }
+    }
+
+    fn is_top_dict_specialization(
+        db: &'db dyn Db,
+        class_literal: StaticClassLiteral<'db>,
+        specialization: Specialization<'db>,
+    ) -> bool {
+        specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+            && specialization.types(db).iter().all(Type::is_unknown)
+            && class_literal.known(db) == Some(KnownClass::Dict)
     }
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on

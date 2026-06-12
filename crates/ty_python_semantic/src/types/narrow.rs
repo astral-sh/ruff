@@ -258,7 +258,7 @@ impl ClassInfoConstraintFunction {
     ) -> Option<Type<'db>> {
         let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
-                Type::instance(db, class.top_materialization(db))
+                runtime_instance_constraint_for_class_literal(db, class)
             }
             ClassInfoConstraintFunction::IsSubclass => {
                 SubclassOfType::from(db, class.top_materialization(db))
@@ -414,6 +414,46 @@ impl ClassInfoConstraintFunction {
     }
 }
 
+/// Return the constraint imposed by an `isinstance()`-style runtime check against `class`.
+///
+/// `TypedDict` instances are runtime dictionaries, even though they are not statically assignable
+/// to mutable dictionary types. `Mapping` does not need an explicit open empty `TypedDict` arm
+/// because `TypedDict` is already statically assignable to it.
+pub(crate) fn runtime_instance_constraint_for_class_literal<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+) -> Type<'db> {
+    let constraint = Type::instance(db, class.top_materialization(db));
+    if class.is_known(db, KnownClass::Dict) || class.is_known(db, KnownClass::MutableMapping) {
+        UnionType::from_two_elements(db, constraint, Type::open_empty_typed_dict(db))
+    } else {
+        constraint
+    }
+}
+
+fn exact_class_narrowing_constraint<'db>(
+    db: &'db dyn Db,
+    class: ClassLiteral<'db>,
+    is_positive: bool,
+) -> Option<Type<'db>> {
+    let instance = Type::instance(db, class.top_materialization(db));
+    if is_positive {
+        Some(if class.is_known(db, KnownClass::Dict) {
+            runtime_instance_constraint_for_class_literal(db, class)
+        } else {
+            instance
+        })
+    } else if class.is_final(db) {
+        Some(instance.negate(db))
+    } else if class.is_known(db, KnownClass::Dict) {
+        // `dict` subclasses can fail an exact-class check, but `TypedDict` instances cannot:
+        // every `TypedDict` inhabitant has an exact runtime type of `dict`.
+        Some(Type::open_empty_typed_dict(db).negate(db))
+    } else {
+        None
+    }
+}
+
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 struct Conjunctions<'db> {
     conjuncts: SmallVec<[Type<'db>; 2]>,
@@ -439,12 +479,8 @@ impl<'db> Conjunctions<'db> {
         self
     }
 
-    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
-        }
-
-        let mut intersection = IntersectionBuilder::new(db);
+    fn evaluate_constraint_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
+        let mut intersection = IntersectionBuilder::new(db).add_positive(base_ty);
         for conjunct in self.conjuncts {
             intersection = intersection.add_positive(conjunct);
         }
@@ -559,17 +595,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
-    /// Evaluate the type this effectively constrains to
-    ///
-    /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+    /// Apply the constraint to a base type.
+    pub(crate) fn narrow_base_type(self, db: &'db dyn Db, base_ty: Type<'db>) -> Type<'db> {
         let mut union = UnionBuilder::new(db);
-        for conjunctions in self
-            .replacement_disjuncts
-            .into_iter()
-            .chain(self.intersection_disjuncts)
-        {
-            union = union.add(conjunctions.evaluate_constraint_type(db));
+        for conjunctions in self.replacement_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, Type::object()));
+        }
+        for conjunctions in self.intersection_disjuncts {
+            union = union.add(conjunctions.evaluate_constraint_type(db, base_ty));
         }
         union.build()
     }
@@ -1806,18 +1839,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(is_positive) = is_positive
                     && let Some(target) = PlaceExpr::try_from_expr(target_expr)
                     && let Some(other_class) = find_underlying_class(self.db, other)
-                    // `else`-branch narrowing for `if type(x) is Y` can only be done
-                    // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.db))
+                    && let Some(constraint) =
+                        exact_class_narrowing_constraint(self.db, other_class, is_positive)
                 {
                     let place = self.expect_place(&target);
-                    constraints.insert(
-                        place,
-                        NarrowingConstraint::intersection(
-                            Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !is_positive),
-                        ),
-                    );
+                    constraints.insert(place, NarrowingConstraint::intersection(constraint));
                 }
             }
 
@@ -1946,15 +1972,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let function = function.into_classinfo_constraint_function()?;
 
-                let class_info_ty = inference.expression_type(second_arg);
-
                 function
-                    .generate_constraint(self.db, class_info_ty, is_positive)
-                    .map(|constraint| {
+                    .generate_constraint(
+                        self.db,
+                        inference.expression_type(second_arg),
+                        is_positive,
+                    )
+                    .map(|classinfo| {
                         NarrowingConstraints::from_iter([(
                             place,
                             NarrowingConstraint::intersection(
-                                constraint.negate_if(self.db, !is_positive),
+                                classinfo.negate_if(self.db, !is_positive),
                             ),
                         )])
                     })
@@ -2049,7 +2077,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {
-                Type::instance(self.db, class.top_materialization(self.db))
+                runtime_instance_constraint_for_class_literal(self.db, class)
                     .negate_if(self.db, !is_positive)
             }
             Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
@@ -2117,7 +2145,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Class(cls, _) => {
                 match infer_same_file_expression_type(self.db, *cls, TypeContext::default()) {
                     Type::ClassLiteral(class) => {
-                        Type::instance(self.db, class.top_materialization(self.db))
+                        runtime_instance_constraint_for_class_literal(self.db, class)
                     }
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         callable_pattern_type(self.db)
@@ -2537,51 +2565,54 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 }
 
-// Return true if the given type is a `TypedDict` or a union or intersection that includes at least
-// one `TypedDict` (even if other types are also present), or a type alias to such a type.
-fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::TypedDict(_) => true,
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|intersection_element_ty| is_or_contains_typeddict(db, *intersection_element_ty)),
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
-        Type::TypeAlias(alias) => is_or_contains_typeddict(db, alias.value_type(db)),
-
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::EnumComplement(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::TypeForm(_)
-        | Type::NewTypeInstance(_) => false,
+/// Return whether this type contains any `TypedDict`s and, if so, whether they all satisfy
+/// `predicate`.
+fn contained_typeddicts_satisfy<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    predicate: &impl Fn(TypedDictType<'db>) -> bool,
+) -> Option<bool> {
+    fn all<'db>(
+        db: &'db dyn Db,
+        types: impl IntoIterator<Item = Type<'db>>,
+        predicate: &impl Fn(TypedDictType<'db>) -> bool,
+    ) -> Option<bool> {
+        let mut found = false;
+        for ty in types {
+            if let Some(satisfies) = contained_typeddicts_satisfy(db, ty, predicate) {
+                found = true;
+                if !satisfies {
+                    return Some(false);
+                }
+            }
+        }
+        found.then_some(true)
     }
+
+    match ty {
+        Type::TypedDict(typed_dict) => Some(predicate(typed_dict)),
+        Type::Intersection(intersection) => {
+            all(db, intersection.positive(db).iter().copied(), predicate)
+        }
+        Type::Union(union) => all(db, union.elements(db).iter().copied(), predicate),
+        Type::TypeAlias(alias) => contained_typeddicts_satisfy(db, alias.value_type(db), predicate),
+        Type::TypeVar(type_var) => match type_var.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                contained_typeddicts_satisfy(db, bound, predicate)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                all(db, constraints.elements(db).iter().copied(), predicate)
+            }
+            None => None,
+        },
+        _ => None,
+    }
+}
+
+// Return true if the given type is a `TypedDict`, or contains one in a union, intersection, type
+// alias, or type variable bound/constraint.
+fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    contained_typeddicts_satisfy(db, ty, &|_| true).is_some()
 }
 
 fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
@@ -2693,87 +2724,20 @@ fn nominal_attribute_type<'db>(
     }
 }
 
-// Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal
-// type, or a union in which all elements that are `TypedDict`s have a supported tag literal type
-// for that field, or an intersection in which all positive elements that are `TypedDict`s have a
-// supported tag literal type for that field, or a type alias to such a type.
+// Return true if the given type is a `TypedDict` whose `field_name` item has a supported tag
+// literal type, or a union, intersection, type alias, or type variable bound/constraint in which all
+// elements that are `TypedDict`s have a supported tag literal type for that field.
 fn all_matching_typeddict_fields_have_literal_types<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     field_name: &str,
 ) -> bool {
-    let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
-        // There's no matching field to check if `.get()` returns `None`.
-        typeddict
-            .items(db)
-            .get(field_name)
+    contained_typeddicts_satisfy(db, ty, &|typed_dict| {
+        typed_dict
+            .item(db, field_name)
             .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
-    };
-
-    match ty {
-        Type::TypedDict(td) => matching_field_is_literal(&td),
-        Type::Union(union) => union.elements(db).iter().all(|union_member_ty| {
-            !is_or_contains_typeddict(db, *union_member_ty)
-                || all_matching_typeddict_fields_have_literal_types(
-                    db,
-                    *union_member_ty,
-                    field_name,
-                )
-        }),
-        Type::TypeAlias(alias) => {
-            all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
-        }
-        Type::Intersection(intersection) => {
-            intersection
-                .positive(db)
-                .iter()
-                .all(|intersection_member_ty| {
-                    !is_or_contains_typeddict(db, *intersection_member_ty)
-                        || all_matching_typeddict_fields_have_literal_types(
-                            db,
-                            *intersection_member_ty,
-                            field_name,
-                        )
-                })
-        }
-
-        // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
-        // always guarded by that check.
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::EnumComplement(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::TypeForm(_)
-        | Type::NewTypeInstance(_) => {
-            unreachable!(
-                "invalid type {} in all_matching_typeddict_fields_have_literal_types",
-                ty.display(db)
-            )
-        }
-    }
+    })
+    .unwrap_or(true)
 }
 
 /// Check if any tuple in the union has an out-of-bounds index.

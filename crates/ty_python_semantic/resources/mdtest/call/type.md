@@ -203,6 +203,77 @@ def g(attributes: Namespace):
     reveal_type(y.unknown)  # revealed: Unknown
 ```
 
+An empty `TypedDict` is also a valid dynamic namespace, but it has no known keys to extract. This
+includes a closed empty `TypedDict`: its inhabitants are empty dictionaries at runtime.
+
+```py
+from typing import Protocol, TypedDict
+from ty_extensions import Intersection
+
+class EmptyTypedDict(TypedDict):
+    pass
+
+class ClosedEmptyTypedDict(TypedDict, closed=True):
+    pass
+
+class Namespace(TypedDict):
+    z: int
+
+class HasClear(Protocol):
+    def clear(self) -> None: ...
+
+def g(attributes: EmptyTypedDict):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.unknown)  # revealed: Unknown
+
+def i(attributes: EmptyTypedDict | dict[str, object]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def closed(attributes: ClosedEmptyTypedDict):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def j(attributes: Intersection[EmptyTypedDict, HasClear]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+
+def k(attributes: Intersection[Namespace, HasClear]):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.z)  # revealed: int
+    reveal_type(Y().z)  # revealed: int
+```
+
+## PEP 695 alias namespaces
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import TypedDict
+
+class Namespace(TypedDict):
+    z: int
+
+type NamespaceAlias = Namespace
+
+def f(attributes: NamespaceAlias):
+    Y = type("Y", (), attributes)
+
+    reveal_type(Y)  # revealed: <class 'Y'>
+    reveal_type(Y.z)  # revealed: int
+    reveal_type(Y().z)  # revealed: int
+```
+
 ## Closed TypedDicts (PEP-728)
 
 TODO: We don't support the PEP-728 `closed=True` keyword argument to `TypedDict` yet. When we do, a
