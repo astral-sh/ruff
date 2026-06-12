@@ -6948,7 +6948,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation
+            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
+                && matches!(tcx, Type::NominalInstance(_))
+                && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
+                && specialization.generic_context(self.db()) == generic_context
+                && generic_context.variables(self.db()).all(|typevar| {
+                    !typevar.is_paramspec(self.db())
+                        && typevar
+                            .typevar(self.db())
+                            .bound_or_constraints(self.db())
+                            .is_none()
+                })
+            {
+                // For an instance of the collection class itself, the identity specialization
+                // maps directly to the contextual specialization. Avoid constructing and solving
+                // a general assignability constraint set for this common case.
+                for (typevar, inferred_ty) in generic_context
+                    .variables(self.db())
+                    .zip(specialization.types(self.db()))
+                {
+                    let inferred_ty = inferred_ty
+                        .filter_union(self.db(), |ty| {
+                            !ty.as_typevar()
+                                .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
+                        })
+                        .filter_union(self.db(), |ty| !ty.has_unspecialized_type_var(self.db()));
+                    if inferred_ty.has_unspecialized_type_var(self.db()) {
+                        continue;
+                    }
+
+                    let identity = typevar.identity(self.db());
+                    elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
+                    elt_tcx_variance.insert(identity, typevar.variance(self.db()));
+                }
+            } else if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
             {
                 let db = self.db();
