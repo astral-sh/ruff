@@ -1,11 +1,9 @@
 use indexmap::IndexMap;
 use strum_macros::EnumIter;
 
-/// Google-style docstring parsing.
-mod google;
+pub(super) mod google;
 pub(super) mod preformatted;
 pub(super) mod rst;
-/// Syntax utilities shared by docstring format parsers and renderers.
 pub(in crate::docstring) mod syntax;
 
 /// Returns docs for all parameters recognized in the given docstring.
