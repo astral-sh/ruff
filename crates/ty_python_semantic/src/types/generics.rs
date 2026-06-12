@@ -293,15 +293,12 @@ impl<'db> BoundTypeVarInstance<'db> {
     }
 }
 
-#[salsa::tracked]
 impl<'db> InferableTypeVars<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn merge(self, db: &'db dyn Db, other: Self) -> Self {
         match (self, other) {
             (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                let merged = self_inner.inferable(db) | other_inner.inferable(db);
-                Self::Some(InferableTypeVarsInner::new_internal(db, merged))
+                self_inner.merge(db, other_inner)
             }
         }
     }
@@ -323,14 +320,7 @@ impl<'db> InferableTypeVars<'db> {
         match (self, other) {
             (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => self,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                Self::from_typevars(
-                    db,
-                    self_inner
-                        .inferable(db)
-                        .difference(other_inner.inferable(db))
-                        .copied()
-                        .collect(),
-                )
+                self_inner.difference(db, other_inner)
             }
         }
     }
@@ -339,14 +329,7 @@ impl<'db> InferableTypeVars<'db> {
         match (self, other) {
             (InferableTypeVars::None, _) | (_, InferableTypeVars::None) => InferableTypeVars::None,
             (InferableTypeVars::Some(self_inner), InferableTypeVars::Some(other_inner)) => {
-                Self::from_typevars(
-                    db,
-                    self_inner
-                        .inferable(db)
-                        .intersection(other_inner.inferable(db))
-                        .copied()
-                        .collect(),
-                )
+                self_inner.intersection(db, other_inner)
             }
         }
     }
@@ -370,6 +353,38 @@ impl<'db> InferableTypeVars<'db> {
                 .map(|identity| identity.display(db))
                 .format(", ")
         )
+    }
+}
+
+#[salsa::tracked]
+impl<'db> InferableTypeVarsInner<'db> {
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn merge(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
+        let mut merged = self.inferable(db) | other.inferable(db);
+        merged.shrink_to_fit();
+        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, merged))
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn difference(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
+        let mut difference = self.inferable(db) - other.inferable(db);
+        if difference.is_empty() {
+            return InferableTypeVars::None;
+        }
+
+        difference.shrink_to_fit();
+        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, difference))
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn intersection(self, db: &'db dyn Db, other: Self) -> InferableTypeVars<'db> {
+        let mut intersection = self.inferable(db) & other.inferable(db);
+        if intersection.is_empty() {
+            return InferableTypeVars::None;
+        }
+
+        intersection.shrink_to_fit();
+        InferableTypeVars::Some(InferableTypeVarsInner::new_internal(db, intersection))
     }
 }
 
