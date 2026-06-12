@@ -68,6 +68,12 @@ use ty_python_core::{
 ///
 /// This does not in itself represent a type, but can be transformed into a [`ClassType`] that
 /// does. (For generic classes, this requires specializing its generic context.)
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+pub struct StaticClassShape {
+    pub(crate) has_explicit_metaclass: bool,
+    pub(crate) has_implicit_attributes: bool,
+}
+
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct StaticClassLiteral<'db> {
     /// Name of the class at definition
@@ -98,8 +104,7 @@ pub struct StaticClassLiteral<'db> {
     /// Whether this class has any explicit base classes.
     pub(crate) has_explicit_bases: bool,
 
-    /// Whether this class has an explicit `metaclass` keyword argument.
-    pub(crate) has_explicit_metaclass: bool,
+    pub(crate) shape: StaticClassShape,
 }
 
 // The Salsa heap is tracked separately.
@@ -107,6 +112,14 @@ impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
+    pub(crate) fn has_explicit_metaclass(self, db: &'db dyn Db) -> bool {
+        self.shape(db).has_explicit_metaclass
+    }
+
+    fn has_implicit_attributes(self, db: &'db dyn Db) -> bool {
+        self.shape(db).has_implicit_attributes
+    }
+
     /// Return `true` if this class represents `known_class`
     pub(crate) fn is_known(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
         self.known(db) == Some(known_class)
@@ -168,7 +181,7 @@ impl<'db> StaticClassLiteral<'db> {
             self.has_decorators(db),
             self.has_type_params(db),
             self.has_explicit_bases(db),
-            self.has_explicit_metaclass(db),
+            self.shape(db),
         )
     }
 
@@ -1198,7 +1211,7 @@ impl<'db> StaticClassLiteral<'db> {
                 return Member::definitely_declared(synthesized_member);
             }
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
-            return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
+            return self.implicit_attribute(db, name, MethodDecorator::ClassMethod);
         }
 
         // For dataclass-like classes, `KW_ONLY` sentinel fields are not real
@@ -2145,14 +2158,20 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Tries to find declarations/bindings of an attribute named `name` that are only
     /// "implicitly" defined (`self.x = …`, `cls.x = …`) in a method of the class that
-    /// corresponds to `class_body_scope`. The `target_method_decorator` parameter is
-    /// used to skip methods that do not have the expected decorator.
+    /// The `target_method_decorator` parameter is used to skip methods that do not have the
+    /// expected decorator.
     fn implicit_attribute(
+        self,
         db: &'db dyn Db,
-        class_body_scope: ScopeId<'db>,
         name: &str,
         target_method_decorator: MethodDecorator,
     ) -> Member<'db> {
+        if !self.has_implicit_attributes(db) {
+            return Member::unbound();
+        }
+
+        let class_body_scope = self.body_scope(db);
+
         // Collect names in a tracked query so unrelated edits can preserve dependent member
         // lookups, and avoid retaining query entries for names that no method can define.
         if implicit_attribute_names(db, class_body_scope)
@@ -2544,7 +2563,8 @@ impl<'db> StaticClassLiteral<'db> {
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
-                        if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                        if self
+                            .implicit_attribute(db, name, MethodDecorator::None)
                             .is_undefined()
                         {
                             return Member::unbound();
@@ -2569,8 +2589,7 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+                        let implicit = self.implicit_attribute(db, name, MethodDecorator::None);
                         if let Place::Defined(DefinedPlace {
                             ty: implicit_ty,
                             provenance: implicit_provenance,
@@ -2643,14 +2662,10 @@ impl<'db> StaticClassLiteral<'db> {
                                 ty: implicit_ty,
                                 provenance: implicit_provenance,
                                 ..
-                            }) = Self::implicit_attribute(
-                                db,
-                                body_scope,
-                                name,
-                                MethodDecorator::None,
-                            )
-                            .inner
-                            .place
+                            }) = self
+                                .implicit_attribute(db, name, MethodDecorator::None)
+                                .inner
+                                .place
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
@@ -2682,14 +2697,14 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    self.implicit_attribute(db, name, MethodDecorator::None)
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            self.implicit_attribute(db, name, MethodDecorator::None)
         }
     }
 
