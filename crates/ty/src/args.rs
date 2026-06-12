@@ -90,6 +90,7 @@ pub(crate) struct CheckCommand {
         long,
         env = EnvVars::TY_UV_METADATA,
         hide = true,
+        conflicts_with_all = ["project", "python", "python_version"],
         value_parser = clap::builder::BoolishValueParser::new()
     )]
     pub(crate) uv_metadata: bool,

@@ -22,10 +22,6 @@ pub struct UvWorkspace {
 
 impl UvWorkspace {
     pub fn discover(path: &SystemPath, system: &dyn System) -> Option<Self> {
-        if !matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true")) {
-            return None;
-        }
-
         let uv = system
             .env_var(EnvVars::UV)
             .unwrap_or_else(|_| "uv".to_string());
@@ -33,7 +29,7 @@ impl UvWorkspace {
         let output = match Command::new(uv)
             .arg("workspace")
             .arg("metadata")
-            .arg("--dry-run")
+            .arg("--sync")
             .current_dir(path.as_std_path())
             .output()
         {
@@ -97,6 +93,8 @@ impl UvWorkspace {
             .map(|environment| existing_directory(environment.root, "environment root", system))
             .transpose()?;
 
+        // Workspace members may be nested. Select the deepest member containing `path`, which is
+        // the package the user is currently operating in.
         let member = metadata
             .members
             .into_iter()

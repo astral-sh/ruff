@@ -111,6 +111,7 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
 
     ----- stderr -----
     "#);
+    assert!(case.root().join(".venv").is_dir());
 
     Ok(())
 }
@@ -146,33 +147,6 @@ fn explicit_project_disables_uv_workspace_discovery() -> anyhow::Result<()> {
         .arg(".");
 
     assert_cmd_snapshot!(command, @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
-fn explicit_project_uses_environment_from_uv_metadata() -> anyhow::Result<()> {
-    let case = workspace_case()?;
-    let environment = case.root().join("uv-venv");
-    case.write_file("packages/member/member.py", "import dependency")?;
-    case.write_file(site_packages_path("uv-venv", "dependency.py"), "")?;
-
-    let mut command = case.command();
-    command
-        .current_dir(case.root().join("packages/member"))
-        .env("UV", case.root().join("missing-uv"))
-        .env("TY_UV_METADATA", "1")
-        .arg("--project")
-        .arg(".");
-
-    assert_cmd_snapshot!(command.pass_stdin(workspace_metadata_with_environment(&case, &environment)), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -424,28 +398,72 @@ fn uses_python_environment_from_uv_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn python_argument_overrides_uv_metadata_environment() -> anyhow::Result<()> {
+fn uv_metadata_conflicts_with_project() -> anyhow::Result<()> {
     let case = workspace_case()?;
-    let environment = case.root().join("uv-venv");
-    case.write_file("packages/member/member.py", "import dependency")?;
-    case.write_file(site_packages_path("uv-venv", "other.py"), "")?;
-    case.write_file(site_packages_path("explicit-venv", "dependency.py"), "")?;
+    let mut command = case.command();
+    command.env("TY_UV_METADATA", "1").arg("--project").arg(".");
 
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument '--project <PROJECT>' cannot be used with '--uv-metadata'
+
+    Usage: ty check --project <PROJECT> [PATH]...
+
+    For more information, try '--help'.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn uv_metadata_conflicts_with_python() -> anyhow::Result<()> {
+    let case = workspace_case()?;
     let mut command = case.command();
     command
-        .current_dir(case.root().join("packages/member"))
-        .env("UV", case.root().join("missing-uv"))
-        .env("TY_UV_METADATA", "1")
+        .arg("--uv-metadata")
         .arg("--python")
         .arg(case.root().join("explicit-venv"));
 
-    assert_cmd_snapshot!(command.pass_stdin(workspace_metadata_with_environment(&case, &environment)), @"
-    success: true
-    exit_code: 0
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 2
     ----- stdout -----
-    All checks passed!
 
     ----- stderr -----
+    error: the argument '--uv-metadata' cannot be used with '--python <PATH>'
+
+    Usage: ty check [OPTIONS] [PATH]...
+
+    For more information, try '--help'.
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn uv_metadata_conflicts_with_python_version() -> anyhow::Result<()> {
+    let case = workspace_case()?;
+    let mut command = case.command();
+    command
+        .env("TY_UV_METADATA", "1")
+        .arg("--python-version")
+        .arg("3.12");
+
+    assert_cmd_snapshot!(command, @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: the argument '--python-version <VERSION>' cannot be used with '--uv-metadata'
+
+    Usage: ty check --python-version <VERSION> [PATH]...
+
+    For more information, try '--help'.
     ");
 
     Ok(())

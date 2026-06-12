@@ -7,6 +7,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_static::EnvVars;
 
 use crate::Db;
 use crate::metadata::options::ProjectOptionsOverrides;
@@ -156,7 +157,12 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        let uv_workspace = uv::UvWorkspace::discover(path, system);
+        let uv_workspace = if matches!(system.env_var(EnvVars::TY_UV).as_deref(), Ok("1" | "true"))
+        {
+            uv::UvWorkspace::discover(path, system)
+        } else {
+            None
+        };
         Self::discover_with_uv_workspace(path, system, uv_workspace)
     }
 
