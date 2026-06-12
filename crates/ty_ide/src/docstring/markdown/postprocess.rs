@@ -46,6 +46,7 @@ pub(super) fn render(docstring: &str) -> String {
     // and (possibly in a higher up piece of logic) try to resolve the names for
     // cross-linking. (Similar to `TypeDetails` in the type formatting code.)
     let mut output = String::new();
+    let mut inline = inline::Renderer::default();
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
@@ -59,17 +60,20 @@ pub(super) fn render(docstring: &str) -> String {
         let trimmed_source_line = line.trim_start_matches(' ');
         let mut rendered_line = trimmed_source_line;
         let line_indent = line.len() - trimmed_source_line.len();
+        let mut line_prefix = String::new();
+        let mut source_line_prefix = String::new();
 
         // First thing's first, add a newline to start the new line
         if !first_line {
             // If we're not in a codeblock, add trailing space to the line to authentically wrap it
             // (Lines ending with two spaces tell markdown to preserve a linebreak)
             if !in_any_code {
-                output.push_str("  ");
+                line_prefix.push_str("  ");
             }
             // Only push newlines if we're not scanning for a real line
             if starting_literal.is_none() {
-                output.push('\n');
+                line_prefix.push('\n');
+                source_line_prefix.push('\n');
             }
         }
         first_line = false;
@@ -78,6 +82,10 @@ pub(super) fn render(docstring: &str) -> String {
         // TODO: we should remove all the trailing blank lines
         // (Just pop all trailing `\n` from `output`?)
         if in_literal && line_indent < block_indent && !rendered_line.is_empty() {
+            inline.flush_pending_as_plain(&mut output);
+            output.push_str(&line_prefix);
+            line_prefix.clear();
+            source_line_prefix.clear();
             in_literal = false;
             in_any_code = false;
             block_indent = 0;
@@ -90,6 +98,10 @@ pub(super) fn render(docstring: &str) -> String {
         if let Some(literal) = starting_literal
             && !rendered_line.is_empty()
         {
+            inline.flush_pending_as_plain(&mut output);
+            output.push_str(&line_prefix);
+            line_prefix.clear();
+            source_line_prefix.clear();
             starting_literal = None;
             in_literal = true;
             in_any_code = true;
@@ -102,6 +114,10 @@ pub(super) fn render(docstring: &str) -> String {
 
         // If we're not in a codeblock and we see something that signals a doctest, start one
         if !in_any_code && rendered_line.starts_with(">>>") {
+            inline.flush_pending_as_plain(&mut output);
+            output.push_str(&line_prefix);
+            line_prefix.clear();
+            source_line_prefix.clear();
             block_indent = line_indent;
             in_doctest = true;
             in_any_code = true;
@@ -112,6 +128,7 @@ pub(super) fn render(docstring: &str) -> String {
 
         // If we're not in a codeblock and we see a markdown codefence, start one
         if !in_any_code && let Some(fence) = super::MarkdownFence::find(trimmed_source_line) {
+            inline.flush_pending_as_plain(&mut output);
             // Unlike other blocks we don't need to emit fences because it's already markdown
             block_indent = line_indent;
             in_any_code = true;
@@ -130,16 +147,19 @@ pub(super) fn render(docstring: &str) -> String {
             //
             // We "make this work" by stripping the indent on the fences but preserving the
             // full indent of the lines between the fences
+            output.push_str(&line_prefix);
             output.push_str(rendered_line);
             continue;
         // If we're in a markdown code fence and this line seems to terminate it, end the block
         } else if let Some(fence) = in_markdown_with_fence
             && fence.is_closed_by(rendered_line)
         {
+            inline.flush_pending_as_plain(&mut output);
             in_any_code = false;
             block_indent = 0;
             in_markdown_with_fence = None;
             // Render the line without its indent and move on.
+            output.push_str(&line_prefix);
             output.push_str(rendered_line);
             continue;
         }
@@ -244,15 +264,26 @@ pub(super) fn render(docstring: &str) -> String {
             if !in_any_code {
                 // TODO: would the raw unicode codepoint be handled *better* or *worse*
                 // by various IDEs? VS Code handles this approach well, at least.
-                output.push_str("&nbsp;");
+                line_prefix.push_str("&nbsp;");
+                source_line_prefix.push(' ');
             } else {
-                output.push(' ');
+                line_prefix.push(' ');
+                source_line_prefix.push(' ');
             }
         }
 
         if !in_any_code {
-            inline::render_line(&mut output, rendered_line);
+            inline.render_line(
+                &mut output,
+                inline::Line {
+                    markdown_prefix: &line_prefix,
+                    source_prefix: &source_line_prefix,
+                    text: rendered_line,
+                },
+            );
         } else if rendered_line.is_empty() {
+            inline.flush_pending_as_plain(&mut output);
+            output.push_str(&line_prefix);
             if in_doctest {
                 // This is the end of a doctest
                 block_indent = 0;
@@ -261,10 +292,13 @@ pub(super) fn render(docstring: &str) -> String {
                 output.push_str(FENCE);
             }
         } else {
+            inline.flush_pending_as_plain(&mut output);
+            output.push_str(&line_prefix);
             // Print the line verbatim, it's in code
             output.push_str(rendered_line);
         }
     }
+    inline.flush_pending_as_plain(&mut output);
     // Flush codeblock
     if in_any_code {
         output.push('\n');
