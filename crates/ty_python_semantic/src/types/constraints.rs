@@ -901,25 +901,13 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
             return self;
         }
 
-        let deferred_quantification = self
-            .deferred_quantification
-            .intersection(db, self.mentioned_typevars);
-        if matches!(deferred_quantification, InferableTypeVars::None) {
-            return Self::from_node_with_metadata(
-                builder,
-                self.node,
-                InferableTypeVars::None,
-                self.mentioned_typevars,
-            );
-        }
-
         Self::from_node_with_metadata(
             builder,
             self.node
-                .exists(db, builder, deferred_quantification.iter(db)),
+                .exists(db, builder, self.deferred_quantification.iter(db)),
             InferableTypeVars::None,
             self.mentioned_typevars
-                .difference(db, deferred_quantification),
+                .difference(db, self.deferred_quantification),
         )
     }
 
