@@ -297,22 +297,16 @@ impl<'src> StringParser<'src> {
             value.push_str(before);
 
             // Add the escaped character to the string.
-            match &self.source.as_bytes()[self.cursor - 1] {
+            match self.source.as_bytes()[self.cursor - 1] {
                 // If there are any curly braces inside a `F/TStringMiddle` token,
                 // then they were escaped (i.e. `{{` or `}}`). This means that
                 // the raw source contains a doubled brace, but the literal value only
                 // contains one brace.
-                b'{' => {
-                    if self.peek_byte() == Some(b'{') {
+                brace @ (b'{' | b'}') => {
+                    if self.peek_byte() == Some(brace) {
                         self.next_byte();
                     }
-                    value.push('{');
-                }
-                b'}' => {
-                    if self.peek_byte() == Some(b'}') {
-                        self.next_byte();
-                    }
-                    value.push('}');
+                    value.push(char::from(brace));
                 }
                 // We can encounter a `\` as the last character in a `F/TStringMiddle`
                 // token which is valid in this context. For example,
@@ -387,7 +381,7 @@ impl<'src> StringParser<'src> {
         if self.flags.is_raw_string() {
             // For raw strings, no escaping is necessary.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().to_vec().into_boxed_slice(),
+                value: self.source.as_bytes().into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,
@@ -397,7 +391,7 @@ impl<'src> StringParser<'src> {
         let Some(mut escape) = memchr::memchr(b'\\', self.source.as_bytes()) else {
             // If the string doesn't contain any escape sequences, return the owned string.
             return Ok(StringType::Bytes(ast::BytesLiteral {
-                value: self.source.as_bytes().to_vec().into_boxed_slice(),
+                value: self.source.as_bytes().into(),
                 range: self.range,
                 flags: self.flags.into(),
                 node_index: AtomicNodeIndex::NONE,

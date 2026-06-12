@@ -393,8 +393,7 @@ impl<'src> Parser<'src> {
     }
 
     fn bump_name(&mut self) -> Name {
-        let range = self.current_token_range();
-        let text = self.src_text(range);
+        let text = self.current_token_text();
         let name = if !self.tokens.current_flags().is_non_ascii_name() {
             Name::new(text)
         } else {
@@ -449,18 +448,11 @@ impl<'src> Parser<'src> {
         value
     }
 
-    fn bump_interpolated_string_middle_value(&mut self, kind: TokenKind) -> &'src str {
-        let value = self.current_token_text();
-        self.bump(kind);
-        value
-    }
-
     fn bump_ipython_escape_command(
         &mut self,
         context: IpyEscapeContext,
     ) -> (Box<str>, IpyEscapeKind) {
-        let range = self.current_token_range();
-        let (value, kind) = self.cook_ipython_escape_command_value(range, context);
+        let (value, kind) = self.cook_ipython_escape_command_value(context);
         self.bump(TokenKind::IpyEscapeCommand);
         (value, kind)
     }
@@ -471,23 +463,19 @@ impl<'src> Parser<'src> {
 
     fn cook_ipython_escape_command_value(
         &self,
-        range: TextRange,
         context: IpyEscapeContext,
     ) -> (Box<str>, IpyEscapeKind) {
-        let raw = self.src_text(range);
+        let raw = self.current_token_text();
         let initial_kind = if context.is_logical_line_start()
             && let Ok(kind) = IpyEscapeKind::try_from([
                 raw.as_bytes()[0] as char,
                 raw[1..].chars().next().unwrap_or('\0'),
-            ])
-            && kind.as_str().len() == 2
-        {
+            ]) {
             kind
         } else {
             IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
         };
 
-        let mut kind = initial_kind;
         let mut value = String::new();
         let mut chars = raw[initial_kind.as_str().len()..].chars().peekable();
         while let Some(c) = chars.next() {
@@ -504,14 +492,12 @@ impl<'src> Parser<'src> {
                         question_count += 1;
                     }
 
+                    // At logical-line start, IPython treats one or two terminal `?` after a
+                    // nonempty help or magic command as the command kind. Strict `foo?` syntax
+                    // is parsed separately.
+                    // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
                     if !context.is_logical_line_start()
-                        || !matches!(
-                            initial_kind,
-                            IpyEscapeKind::Magic
-                                | IpyEscapeKind::Magic2
-                                | IpyEscapeKind::Help
-                                | IpyEscapeKind::Help2
-                        )
+                        || !(initial_kind.is_magic() || initial_kind.is_help())
                         || question_count > 2
                         || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(chars.peek(), None | Some('\n' | '\r'))
@@ -523,24 +509,29 @@ impl<'src> Parser<'src> {
                         continue;
                     }
 
-                    kind = if question_count == 1 {
+                    let kind = if question_count == 1 {
                         IpyEscapeKind::Help
                     } else {
                         IpyEscapeKind::Help2
                     };
 
+                    // A help suffix replaces a leading help prefix, but takes precedence over a
+                    // magic prefix, which remains part of the value (`%foo?` becomes help for
+                    // `%foo`).
                     if initial_kind.is_help() {
                         value = value.trim_start_matches([' ', '?']).to_string();
-                    } else if initial_kind.is_magic() {
+                    } else {
                         value.insert_str(0, initial_kind.as_str());
                     }
+
+                    return (value.into_boxed_str(), kind);
                 }
                 '\n' | '\r' => break,
                 c => value.push(c),
             }
         }
 
-        (value.into_boxed_str(), kind)
+        (value.into_boxed_str(), initial_kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.

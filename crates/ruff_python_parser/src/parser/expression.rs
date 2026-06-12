@@ -1718,7 +1718,8 @@ impl<'src> Parser<'src> {
                     ),
                     tok if tok == middle_token_kind => {
                         let range = parser.current_token_range();
-                        let value = parser.bump_interpolated_string_middle_value(middle_token_kind);
+                        let value = parser.current_token_text();
+                        parser.bump(middle_token_kind);
                         InterpolatedStringElement::Literal(
                             parse_interpolated_string_literal_element(value, flags, range)
                                 .unwrap_or_else(|lex_error| {

@@ -10,9 +10,9 @@ use std::cmp::Ordering;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
 
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
 use ruff_python_ast::token::{TokenFlags, TokenKind};
-use ruff_python_ast::{IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
@@ -424,13 +424,9 @@ impl<'src> Lexer<'src> {
                 self.lex_ipython_escape_command()
             }
 
-            c @ ('%' | '!' | '?' | '/' | ';' | ',')
+            '%' | '!' | '?' | '/' | ';' | ','
                 if self.mode == Mode::Ipython && self.state.is_new_logical_line() =>
             {
-                if IpyEscapeKind::try_from([c, self.cursor.first()]).is_ok() {
-                    self.cursor.bump();
-                }
-
                 self.lex_ipython_escape_command()
             }
 
@@ -669,13 +665,12 @@ impl<'src> Lexer<'src> {
 
         if !is_ascii {
             self.current_flags |= TokenFlags::NON_ASCII_NAME;
+            return TokenKind::Name;
         }
 
         let text = self.token_text();
 
-        // Short circuit for names that are longer than any known keyword.
-        // It helps Rust to predict that the Name::new call in the keyword match's default branch
-        // is guaranteed to fit into a stack allocated (inline) Name.
+        // No Python keyword is longer than eight bytes.
         if text.len() > 8 {
             return TokenKind::Name;
         }
@@ -1109,31 +1104,22 @@ impl<'src> Lexer<'src> {
             _ => is_float,
         };
 
-        if is_float {
-            // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                TokenKind::Complex
-            } else {
-                TokenKind::Float
-            }
+        if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
+            TokenKind::Complex
+        } else if is_float {
+            TokenKind::Float
+        } else if start_is_zero && integer_part.has_nonzero_digit {
+            // Leading zeros in decimal integer literals are not permitted.
+            self.push_error(LexicalError::new(
+                LexicalErrorType::OtherError(
+                    "Invalid decimal integer literal"
+                        .to_string()
+                        .into_boxed_str(),
+                ),
+                self.token_range(),
+            ))
         } else {
-            // Parse trailing 'j':
-            if self.cursor.eat_if(|c| matches!(c, 'j' | 'J')).is_some() {
-                TokenKind::Complex
-            } else {
-                if start_is_zero && integer_part.has_nonzero_digit {
-                    // Leading zeros in decimal integer literals are not permitted.
-                    return self.push_error(LexicalError::new(
-                        LexicalErrorType::OtherError(
-                            "Invalid decimal integer literal"
-                                .to_string()
-                                .into_boxed_str(),
-                        ),
-                        self.token_range(),
-                    ));
-                }
-                TokenKind::Int
-            }
+            TokenKind::Int
         }
     }
 
@@ -1175,27 +1161,11 @@ impl<'src> Lexer<'src> {
         loop {
             match self.cursor.first() {
                 '\\' => {
-                    // Only skip the line continuation if it is followed by a newline
-                    // otherwise it is a normal backslash which is part of the magic command:
-                    //
-                    //        Skip this backslash
-                    //        v
-                    //   !pwd \
-                    //      && ls -a | sed 's/^/\\    /'
-                    //                          ^^
-                    //                          Don't skip these backslashes
-                    if self.cursor.second() == '\r' {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        self.cursor.eat_char('\n');
-                        continue;
-                    } else if self.cursor.second() == '\n' {
-                        self.cursor.bump();
-                        self.cursor.bump();
-                        continue;
-                    }
-
+                    // Consume an escaped newline so it doesn't terminate the command. A normal
+                    // backslash is consumed by itself and remains part of the token range.
                     self.cursor.bump();
+                    self.cursor.eat_char('\r');
+                    self.cursor.eat_char('\n');
                 }
                 '\n' | '\r' | EOF_CHAR => return TokenKind::IpyEscapeCommand,
                 _ => {
