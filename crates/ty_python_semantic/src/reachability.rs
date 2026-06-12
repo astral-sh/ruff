@@ -1162,6 +1162,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             .negate_if(!predicate.is_positive)
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
+        PredicateNode::SubjectElementPattern(subject_element) => {
+            analyze_pattern_predicate(db, subject_element.pattern)
+        }
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
@@ -1314,6 +1317,9 @@ impl<'db> ReachabilityEvaluationCache<'db> {
                 callable.scope(db)
             }
             PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::SubjectElementPattern(subject_element) => {
+                subject_element.pattern.scope(db)
+            }
             PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
         };
 

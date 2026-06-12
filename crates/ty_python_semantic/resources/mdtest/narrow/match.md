@@ -176,6 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from typing import final
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -297,6 +298,13 @@ class TupleSubjectA2(TupleSubjectA): ...
 class TupleSubjectB: ...
 class TupleSubjectB1(TupleSubjectB): ...
 class TupleSubjectB2(TupleSubjectB): ...
+class ReboundTupleSubject: ...
+
+@final
+class ReboundTupleSubject1(ReboundTupleSubject): ...
+
+@final
+class ReboundTupleSubject2(ReboundTupleSubject): ...
 
 def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
     match a, b:
@@ -316,6 +324,12 @@ def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
         case [TupleSubjectA1(), TupleSubjectB1()]:
             reveal_type(a)  # revealed: TupleSubjectA1
             reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_rebound_subject(a: ReboundTupleSubject) -> None:
+    match a, (a := ReboundTupleSubject2()), a:
+        case [ReboundTupleSubject1(), ReboundTupleSubject2(), ReboundTupleSubject2()]:
+            reveal_type(a)  # revealed: ReboundTupleSubject2
+            1 + "x"  # error: [unsupported-operator]
 
 class SequenceSubjectContainer:
     a: TupleSubjectA
@@ -341,7 +355,7 @@ def match_nested_sequence_or_impossible_alternative(
 def match_mapping_expression_subject(value: object) -> None:
     match [{"value": value}]:
         case [{"value": int()}]:
-            # TODO: Project mapping-pattern constraints through dictionary displays.
+            # TODO: Propagate mapping-pattern constraints through dictionary displays.
             reveal_type(value)  # revealed: object
 
 def match_starred_list_expression_subject(
@@ -350,7 +364,8 @@ def match_starred_list_expression_subject(
 ) -> None:
     match [a, *values]:
         case [TupleSubjectA1()]:
-            # The starred display has variable runtime length, so it is not projected yet.
+            # The starred display has variable runtime length, so its constraints are not
+            # propagated yet.
             reveal_type(a)  # revealed: TupleSubjectA
 
 def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
@@ -428,7 +443,7 @@ def match_tuple_expression_guard_rebinding(
         case [TupleSubjectA1(), TupleSubjectB1()] if (a := TupleSubjectA2()) and flag:
             pass
         case [TupleSubjectA1(), TupleSubjectB1()]:
-            # Projection only constrains the subject-time binding, not the guard assignment.
+            # The pattern only constrains the subject-time binding, not the guard assignment.
             reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
             reveal_type(b)  # revealed: TupleSubjectB1
 
