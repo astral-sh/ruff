@@ -430,7 +430,7 @@ impl<'db> StaticClassLiteral<'db> {
             let specialization = if self.known(db) == Some(KnownClass::Tuple) {
                 generic_context.default_specialization(db, self.known(db))
             } else {
-                generic_context.unknown_specialization(db)
+                generic_context.bounded_unknown_specialization(db)
             };
             specialization.materialize_impl(
                 db,

@@ -665,6 +665,19 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
+The upper bound is retained for bounded covariant type parameters:
+
+```py
+class BoundedCovariant[T: BaseException]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[BaseException]
+        reveal_type(x.get())  # revealed: BaseException
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
@@ -776,6 +789,54 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+Bounds from generic standard-library classes are also retained. This prevents the top
+materialization from violating the class's own method bounds.
+
+```py
+import sys
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager
+from io import TextIOWrapper
+
+def takes_group(group: BaseExceptionGroup[BaseException]) -> None: ...
+def exception_group(exc: BaseException) -> None:
+    if isinstance(exc, BaseExceptionGroup):
+        reveal_type(exc)  # revealed: BaseExceptionGroup[BaseException]
+        takes_group(exc)
+
+def text_wrapper() -> None:
+    if isinstance(sys.stdout, TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+async def async_context_manager(
+    ctx: AbstractAsyncContextManager[None] | AsyncIterator[None],
+) -> None:
+    if isinstance(ctx, AbstractAsyncContextManager):
+        # revealed: AbstractAsyncContextManager[None, bool | None] | (AsyncIterator[None] & AbstractAsyncContextManager[object, bool | None])
+        reveal_type(ctx)
+        await ctx.__aenter__()
+```
+
+When an iterable arm survives earlier narrowing, its element type remains available while narrowing
+each element. The initial check must still retain the possible overlap between an arbitrary iterable
+and a differently specialized `memoryview`.
+
+```py
+from collections.abc import Iterable
+
+type Data = str | bytes | bytearray | memoryview[int]
+
+def send(data: bytes | bytearray | memoryview[int]) -> None: ...
+def send_message(message: Data | Iterable[Data]) -> None:
+    if isinstance(message, (bytes, bytearray, memoryview)):
+        # error: [invalid-argument-type]
+        send(message)
+    elif isinstance(message, Iterable):
+        for chunk in message:
+            if isinstance(chunk, (bytes, bytearray, memoryview)):
+                send(chunk)
 ```
 
 ## Narrowing generic defaults in Python 3.13

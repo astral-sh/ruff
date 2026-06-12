@@ -894,6 +894,37 @@ impl<'db> GenericContext<'db> {
         )
     }
 
+    /// Returns an unknown specialization that preserves the bounds of variant type variables.
+    ///
+    /// Invariant variables remain `Unknown` because their range is represented by the enclosing
+    /// `Top[]` materialization.
+    pub(crate) fn bounded_unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        self.specialize_from_types_recursive(
+            db,
+            self.variables(db)
+                .map(|typevar| {
+                    if typevar.is_paramspec(db) {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    } else if matches!(
+                        specialization_variance(db, typevar),
+                        TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+                    ) {
+                        IntersectionType::from_two_elements(
+                            db,
+                            Type::unknown(),
+                            typevar
+                                .typevar(db)
+                                .require_bound_or_constraints(db)
+                                .as_type(db),
+                        )
+                    } else {
+                        Type::unknown()
+                    }
+                })
+                .collect(),
+        )
+    }
+
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {
         let other_variables = other.variables_inner(db);
         self.variables(db)
