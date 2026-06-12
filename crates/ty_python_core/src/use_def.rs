@@ -1394,14 +1394,14 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        let constraint = self.reachability_constraints.add_atom(predicate);
+        let constraint = self.narrowing_constraints.add_atom(predicate);
         for &(place, use_id) in targets {
             let state = match place {
                 ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
                 ScopedPlaceId::Member(member) => &mut self.member_states[member],
             };
             state.record_narrowing_constraint_for_bindings_at_use(
-                &mut self.reachability_constraints,
+                &mut self.narrowing_constraints,
                 constraint,
                 &self.bindings_by_use[use_id],
             );

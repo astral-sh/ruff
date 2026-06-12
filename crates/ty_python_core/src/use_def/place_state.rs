@@ -520,7 +520,7 @@ impl PlaceState {
     /// Add the given constraint to live bindings that were also present at an earlier use.
     pub(super) fn record_narrowing_constraint_for_bindings_at_use(
         &mut self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
         bindings_at_use: &Bindings,
     ) {
@@ -529,7 +529,7 @@ impl PlaceState {
                 .iter()
                 .any(|binding_at_use| binding_at_use.binding() == binding.binding())
             {
-                binding.narrowing_constraint = reachability_constraints
+                binding.narrowing_constraint = narrowing_constraints
                     .add_and_constraint(binding.narrowing_constraint, constraint);
             }
         }
