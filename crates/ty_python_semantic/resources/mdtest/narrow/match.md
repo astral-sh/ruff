@@ -176,7 +176,6 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
-from typing import final
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -292,161 +291,6 @@ def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
             # intersection above.
             reveal_type(subj[1])  # revealed: int | str
 
-class TupleSubjectA: ...
-class TupleSubjectA1(TupleSubjectA): ...
-class TupleSubjectA2(TupleSubjectA): ...
-class TupleSubjectB: ...
-class TupleSubjectB1(TupleSubjectB): ...
-class TupleSubjectB2(TupleSubjectB): ...
-class ReboundTupleSubject: ...
-
-@final
-class ReboundTupleSubject1(ReboundTupleSubject): ...
-
-@final
-class ReboundTupleSubject2(ReboundTupleSubject): ...
-
-def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
-    match a, b:
-        case [TupleSubjectA1(), TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-            reveal_type(b)  # revealed: TupleSubjectB1
-        case _:
-            # Failing the first pattern does not tell us which element failed to match.
-            reveal_type(a)  # revealed: TupleSubjectA
-            reveal_type(b)  # revealed: TupleSubjectB
-
-    reveal_type(a)  # revealed: TupleSubjectA
-    reveal_type(b)  # revealed: TupleSubjectB
-
-def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
-    match [a, b]:
-        case [TupleSubjectA1(), TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-            reveal_type(b)  # revealed: TupleSubjectB1
-
-def match_tuple_expression_rebound_subject(a: ReboundTupleSubject) -> None:
-    match a, (a := ReboundTupleSubject2()), a:
-        case [ReboundTupleSubject1(), ReboundTupleSubject2(), ReboundTupleSubject2()]:
-            reveal_type(a)  # revealed: ReboundTupleSubject2
-            1 + "x"  # error: [unsupported-operator]
-
-class SequenceSubjectContainer:
-    a: TupleSubjectA
-
-def match_nested_sequence_expression_subject(
-    container: SequenceSubjectContainer,
-    values: list[TupleSubjectB],
-) -> None:
-    match [[container.a], values[0], object()]:
-        case [[TupleSubjectA1()], TupleSubjectB1(), _]:
-            reveal_type(container.a)  # revealed: TupleSubjectA1
-            reveal_type(values[0])  # revealed: TupleSubjectB1
-
-def match_nested_sequence_or_impossible_alternative(
-    a: TupleSubjectA,
-    x: object,
-    y: object,
-) -> None:
-    match [a, [x, y]]:
-        case [TupleSubjectA1(), [_]] | [TupleSubjectA2(), [_, _]]:
-            reveal_type(a)  # revealed: TupleSubjectA2
-
-def match_mapping_expression_subject(value: object) -> None:
-    match [{"value": value}]:
-        case [{"value": int()}]:
-            # TODO: Propagate mapping-pattern constraints through dictionary displays.
-            reveal_type(value)  # revealed: object
-
-def match_starred_list_expression_subject(
-    a: TupleSubjectA,
-    values: list[object],
-) -> None:
-    match [a, *values]:
-        case [TupleSubjectA1()]:
-            # The starred display has variable runtime length, so its constraints are not
-            # propagated yet.
-            reveal_type(a)  # revealed: TupleSubjectA
-
-def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
-    match a, b:
-        case [TupleSubjectA2(), TupleSubjectB2()]:
-            pass
-        case [TupleSubjectA1(), TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-            reveal_type(b)  # revealed: TupleSubjectB1
-
-def match_tuple_expression_or_pattern(a: TupleSubjectA, b: TupleSubjectB) -> None:
-    match a, b:
-        case [TupleSubjectA1(), TupleSubjectB1()] | [*_]:
-            # The second alternative does not constrain either tuple element.
-            reveal_type(a)  # revealed: TupleSubjectA
-            reveal_type(b)  # revealed: TupleSubjectB
-
-def match_tuple_expression_constrained_or_pattern(
-    a: TupleSubjectA,
-    b: TupleSubjectB,
-) -> None:
-    match a, b:
-        case [TupleSubjectA1(), TupleSubjectB1()] | [TupleSubjectA2(), TupleSubjectB2()]:
-            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
-            reveal_type(b)  # revealed: TupleSubjectB1 | TupleSubjectB2
-
-def match_tuple_expression_or_impossible_alternative(
-    a: TupleSubjectA,
-    b: TupleSubjectB,
-) -> None:
-    match a, b:
-        case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA2
-            reveal_type(b)  # revealed: TupleSubjectB1
-
-def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
-    match a, a:
-        case [TupleSubjectA1(), TupleSubjectA()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-
-def match_tuple_expression_starred_pattern(
-    a: TupleSubjectA,
-    middle: object,
-    b: TupleSubjectB,
-) -> None:
-    match a, middle, b:
-        case [TupleSubjectA1(), *_, TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-            reveal_type(middle)  # revealed: object
-            reveal_type(b)  # revealed: TupleSubjectB1
-
-def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> None:
-    if flag:
-        a: TupleSubjectA = TupleSubjectA1()
-    else:
-        a = TupleSubjectA2()
-
-    match a, b:
-        case [TupleSubjectA1(), TupleSubjectB1()]:
-            reveal_type(a)  # revealed: TupleSubjectA1
-            reveal_type(b)  # revealed: TupleSubjectB1
-
-def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
-    match a, b:
-        case [TupleSubjectA1(), a]:
-            # The pattern binding has replaced the subject-time binding of `a`.
-            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
-
-def match_tuple_expression_guard_rebinding(
-    a: TupleSubjectA,
-    b: TupleSubjectB,
-    flag: bool,
-) -> None:
-    match a, b:
-        case [TupleSubjectA1(), TupleSubjectB1()] if (a := TupleSubjectA2()) and flag:
-            pass
-        case [TupleSubjectA1(), TupleSubjectB1()]:
-            # The pattern only constrains the subject-time binding, not the guard assignment.
-            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
-            reveal_type(b)  # revealed: TupleSubjectB1
-
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
         case int(value):
@@ -497,6 +341,194 @@ def test_match_value_sequence(value: object) -> None:
             # Value patterns use equality, so matching `1` does not prove that
             # the element is an `int`.
             reveal_type(value[0])  # revealed: object
+```
+
+## Sequence display subjects
+
+A tuple or list display has no place of its own to narrow. A successful sequence pattern instead
+narrows the corresponding narrowable elements. If a multi-element pattern fails, we do not know
+which element failed to match.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+
+def match_tuple_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+        case _:
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+    reveal_type(a)  # revealed: TupleSubjectA
+    reveal_type(b)  # revealed: TupleSubjectB
+
+def match_list_expression_subject(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match [a, b]:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Nested sequence display subjects
+
+Element narrowing recurses through nested tuple and list displays. Attributes and subscripts are
+narrowed when they occupy a fixed position. Dictionary displays and starred subject elements do not
+yet have a fixed element-to-pattern correspondence.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+
+class SequenceSubjectContainer:
+    a: TupleSubjectA
+
+def match_nested_sequence_expression_subject(
+    container: SequenceSubjectContainer,
+    values: list[TupleSubjectB],
+) -> None:
+    match [[container.a], values[0], object()]:
+        case [[TupleSubjectA1()], TupleSubjectB1(), _]:
+            reveal_type(container.a)  # revealed: TupleSubjectA1
+            reveal_type(values[0])  # revealed: TupleSubjectB1
+
+def match_mapping_expression_subject(value: object) -> None:
+    match [{"value": value}]:
+        case [{"value": int()}]:
+            reveal_type(value)  # revealed: object
+
+def match_starred_list_expression_subject(
+    a: TupleSubjectA,
+    values: list[object],
+) -> None:
+    match [a, *values]:
+        case [TupleSubjectA1()]:
+            reveal_type(a)  # revealed: TupleSubjectA
+```
+
+## Sequence pattern forms for display subjects
+
+Element narrowing respects later cases, OR patterns, impossible alternatives, repeated subject
+expressions, and starred sequence patterns.
+
+```py
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectA2(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+class TupleSubjectB2(TupleSubjectB): ...
+
+def match_tuple_expression_later_case(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA2(), TupleSubjectB2()]:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_or_pattern(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [*_]:
+            # The second alternative does not constrain either tuple element.
+            reveal_type(a)  # revealed: TupleSubjectA
+            reveal_type(b)  # revealed: TupleSubjectB
+
+def match_tuple_expression_constrained_or_pattern(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] | [TupleSubjectA2(), TupleSubjectB2()]:
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1 | TupleSubjectB2
+
+def match_tuple_expression_or_impossible_alternative(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1()] | [TupleSubjectA2(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_repeated_tuple_expression_subject(a: TupleSubjectA) -> None:
+    match a, a:
+        case [TupleSubjectA1(), TupleSubjectA()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+
+def match_tuple_expression_starred_pattern(
+    a: TupleSubjectA,
+    middle: object,
+    b: TupleSubjectB,
+) -> None:
+    match a, middle, b:
+        case [TupleSubjectA1(), *_, TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(middle)  # revealed: object
+            reveal_type(b)  # revealed: TupleSubjectB1
+```
+
+## Subject-time bindings in display subjects
+
+Each element constraint applies to the binding read while that subject element was evaluated. It
+does not constrain a binding introduced by a later subject element, pattern capture, or guard.
+
+```py
+from typing import final
+
+class TupleSubjectA: ...
+class TupleSubjectA1(TupleSubjectA): ...
+class TupleSubjectA2(TupleSubjectA): ...
+class TupleSubjectB: ...
+class TupleSubjectB1(TupleSubjectB): ...
+class ReboundTupleSubject: ...
+
+@final
+class ReboundTupleSubject1(ReboundTupleSubject): ...
+
+@final
+class ReboundTupleSubject2(ReboundTupleSubject): ...
+
+def match_tuple_expression_rebound_subject(a: ReboundTupleSubject) -> None:
+    match a, (a := ReboundTupleSubject2()), a:
+        case [ReboundTupleSubject1(), ReboundTupleSubject2(), ReboundTupleSubject2()]:
+            reveal_type(a)  # revealed: ReboundTupleSubject2
+            1 + "x"  # error: [unsupported-operator]
+
+def match_tuple_expression_multiple_bindings(flag: bool, b: TupleSubjectB) -> None:
+    if flag:
+        a: TupleSubjectA = TupleSubjectA1()
+    else:
+        a = TupleSubjectA2()
+
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1
+            reveal_type(b)  # revealed: TupleSubjectB1
+
+def match_tuple_expression_subject_capture(a: TupleSubjectA, b: TupleSubjectB) -> None:
+    match a, b:
+        case [TupleSubjectA1(), a]:
+            reveal_type(a)  # revealed: @Todo(`match` pattern definition types)
+
+def match_tuple_expression_guard_rebinding(
+    a: TupleSubjectA,
+    b: TupleSubjectB,
+    flag: bool,
+) -> None:
+    match a, b:
+        case [TupleSubjectA1(), TupleSubjectB1()] if (a := TupleSubjectA2()) and flag:
+            pass
+        case [TupleSubjectA1(), TupleSubjectB1()]:
+            reveal_type(a)  # revealed: TupleSubjectA1 | TupleSubjectA2
+            reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
 ## Value patterns
