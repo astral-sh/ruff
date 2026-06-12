@@ -1490,6 +1490,10 @@ impl DisplayDiagnosticConfig {
         }
     }
 
+    pub fn preview_enabled(&self) -> bool {
+        self.preview
+    }
+
     /// Whether to hide a diagnostic's severity or not.
     pub fn hide_severity(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
