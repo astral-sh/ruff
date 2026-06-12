@@ -33,18 +33,18 @@ impl<'db> SubclassOfType<'db> {
     /// and all possible subclasses of that class object/dynamic type.
     ///
     /// This method does not always return a [`Type::SubclassOf`] variant.
-    /// If the class object is known to be a final class,
-    /// this method will return a [`Type::ClassLiteral`] variant; this is a more precise type.
+    /// If the class object is known to be a final, non-generic class, this method will return a
+    /// [`Type::ClassLiteral`] variant; this is a more precise type. Generic final classes retain
+    /// the [`Type::SubclassOf`] variant so that runtime class objects remain distinguishable from
+    /// generic alias expressions, which cannot be used with `isinstance` or `issubclass`.
     /// If the class object is `builtins.object`, `Type::NominalInstance(<builtins.type>)`
     /// will be returned; this is no more precise, but it is exactly equivalent to `type[object]`.
     ///
-    /// The eager normalization here means that we do not need to worry elsewhere about distinguishing
-    /// between `@final` classes and other classes when dealing with [`Type::SubclassOf`] variants.
     pub(crate) fn from(db: &'db dyn Db, subclass_of: impl Into<SubclassOfInner<'db>>) -> Type<'db> {
         let subclass_of = subclass_of.into();
         match subclass_of {
             SubclassOfInner::Class(class) => {
-                if class.is_final(db) {
+                if class.is_final(db) && !matches!(class, ClassType::Generic(_)) {
                     Type::from(class)
                 } else if class.is_object(db) {
                     Self::subclass_of_object(db)

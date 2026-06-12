@@ -468,6 +468,32 @@ def _(x: object, cls: type[Invariant[int]], y: Invariant[str]):
         reveal_type(x.get())  # revealed: object
 ```
 
+The same applies to final generic classes. Their `type[]` types still describe runtime class
+objects, even though they cannot have subclasses:
+
+```py
+from typing import final
+
+@final
+class FinalInvariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+def _(x: object, cls: type[FinalInvariant[int]], y: FinalInvariant[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[FinalInvariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[FinalInvariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    # A direct generic alias is still not a valid `classinfo` argument.
+    if isinstance(x, FinalInvariant[int]):
+        reveal_type(x)  # revealed: object
+```
+
 Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
 
 ```py
