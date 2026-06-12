@@ -14,17 +14,23 @@ Creating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDic
 
 ```python
 from typing import TypedDict
+from typing_extensions import NotRequired
 
 
 class Person(TypedDict):
-    name: str
-    age: int
+    name: NotRequired[str]
+    age: NotRequired[int]
 
 
 alice = Person(name="Alice", age=30)
-alice["height"]  # KeyError: 'height'
+# KeyError: 'height'
+alice["height"]  # error
 
-bob: Person = {"nickname": "Bob", "age": 30}  # typo!
+# typo!
+# error
+bob: Person = {"nickname": "Bob", "age": 30}
 
-carol = Person(name="Carol", aeg=25)  # typo!
+# typo!
+# error
+carol = Person(name="Carol", aeg=25)
 ```

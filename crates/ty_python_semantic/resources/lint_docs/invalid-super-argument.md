@@ -27,10 +27,13 @@ class B(A): ...
 
 super(A, B())  # it's okay! `A` satisfies `isinstance(B(), A)`
 
-super(A(), B())  # error: `A()` is not a class
+# `A()` is not a class
+super(A(), B())  # error
 
-super(B, A())  # error: `A()` does not satisfy `isinstance(A(), B)`
-super(B, A)  # error: `A` does not satisfy `issubclass(A, B)`
+# `A()` does not satisfy `isinstance(A(), B)`
+super(B, A())  # error
+# `A` does not satisfy `issubclass(A, B)`
+super(B, A)  # error
 ```
 
 ## References

@@ -9,7 +9,8 @@ A syntactically incorrect ignore comment is probably a mistake and is useless.
 ## Examples
 
 ```py
-a = 20 / 0  # type: ignoree
+# error
+a = 20 / 1  # type: ignoree
 ```
 
 Use instead:

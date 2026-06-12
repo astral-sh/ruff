@@ -11,6 +11,6 @@ Such a statement will raise `TypeError` at runtime.
 
 ```python
 # TypeError: 'int' object does not support the context manager protocol
-with 1:
+with 1:  # error
     print(2)
 ```

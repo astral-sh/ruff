@@ -11,5 +11,5 @@ weakens a type checker's ability to accurately reason about your code.
 ## Examples
 
 ```python
-def f(a: int = ""): ...
+def f(a: int = ""): ...  # error
 ```

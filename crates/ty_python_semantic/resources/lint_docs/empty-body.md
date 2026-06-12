@@ -30,7 +30,7 @@ declarations rather than implementations:
 def foo() -> int: ...  # error: [empty-body]
 
 
-def bar() -> str:
+def bar() -> str:  # error: [empty-body]
     """A function that does nothing."""
-    pass  # error: [empty-body]
+    pass
 ```

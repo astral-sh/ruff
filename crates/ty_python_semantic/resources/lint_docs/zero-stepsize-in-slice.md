@@ -9,6 +9,11 @@ A slice with a step size of zero will raise a `ValueError` at runtime.
 ## Examples
 
 ```python
-l = list(range(10))
-l[1:10:0]  # ValueError: slice step cannot be zero
+values = list(range(10))
+# ValueError: slice step cannot be zero
+values[1:10:0]
+
+tuple_values = (1, 2, 3)
+# ValueError: slice step cannot be zero
+tuple_values[1:10:0]  # error
 ```

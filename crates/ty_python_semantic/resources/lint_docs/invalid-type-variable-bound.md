@@ -8,10 +8,19 @@ The bound of a type variable must be a concrete type.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
-T = TypeVar("T", bound=list["T"])  # error: [invalid-type-variable-bound]
+from typing import TypeVar
+
+# error: [invalid-type-variable-bound]
+RecursiveT = TypeVar("RecursiveT", bound=list["RecursiveT"])
 U = TypeVar("U")
-T = TypeVar("T", bound=U)  # error: [invalid-type-variable-bound]
+# error: [invalid-type-variable-bound]
+BoundT = TypeVar("BoundT", bound=U)
 
 
 def f[T: list[T]](): ...  # error: [invalid-type-variable-bound]

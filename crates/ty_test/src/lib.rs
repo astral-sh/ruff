@@ -1,6 +1,7 @@
 use crate::config::{Log, MarkdownTestConfig, SystemKind};
 use anyhow::{anyhow, bail};
 use camino::Utf8Path;
+pub use mdtest::RunOptions;
 use mdtest::matcher::{self, Failure};
 use mdtest::parser::{self};
 use mdtest::{
@@ -44,8 +45,14 @@ pub fn run(
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
+    options: RunOptions,
 ) -> anyhow::Result<()> {
     let mut db = db::Db::setup();
+    let fixture_paths = FixturePaths {
+        absolute: absolute_fixture_path,
+        relative: relative_fixture_path,
+        snapshots: snapshot_path,
+    };
 
     let suite =
         parse(short_title, source).map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
@@ -60,26 +67,37 @@ pub fn run(
         |test, assertion, output_format| {
             run_test(
                 &mut db,
-                absolute_fixture_path,
-                relative_fixture_path,
-                snapshot_path,
+                fixture_paths,
                 test,
                 assertion,
                 output_format,
+                options,
             )
         },
     )
 }
 
+#[derive(Clone, Copy)]
+struct FixturePaths<'a> {
+    absolute: &'a Utf8Path,
+    relative: &'a Utf8Path,
+    snapshots: &'a Utf8Path,
+}
+
 fn run_test(
     db: &mut db::Db,
-    absolute_fixture_path: &Utf8Path,
-    relative_fixture_path: &Utf8Path,
-    snapshot_path: &Utf8Path,
+    fixture_paths: FixturePaths<'_>,
     test: &parser::MarkdownTest<'_, '_, MarkdownTestConfig>,
     assertion: &mut String,
     output_format: OutputFormat,
+    options: RunOptions,
 ) -> Result<(TestOutcome, Vec<MarkdownEdit>), Failures> {
+    let FixturePaths {
+        absolute: absolute_fixture_path,
+        relative: relative_fixture_path,
+        snapshots: snapshot_path,
+    } = fixture_paths;
+
     let _tracing = test.configuration().log.as_ref().and_then(|log| match log {
         Log::Bool(enabled) => enabled.then(setup_logging),
         Log::Filter(filter) => setup_logging_with_filter(filter),
@@ -300,7 +318,7 @@ fn run_test(
 
     Program::init_or_update(db, settings);
     db.update_analysis_options(configuration.analysis.as_ref());
-    db.update_mdtest_rule_selection(configuration.rules.as_ref());
+    db.update_mdtest_rule_selection(configuration.rules.as_ref(), options.default_error_rule);
     db.set_verbosity(test.configuration().verbose());
 
     let mut all_diagnostics = vec![];
@@ -330,8 +348,8 @@ fn run_test(
                 }
             };
 
-            let failure = match matcher::match_file(db, test_file.file, &diagnostics).and_then(
-                |inline_diagnostics| {
+            let failure = match matcher::match_file(db, test_file.file, &diagnostics, options)
+                .and_then(|inline_diagnostics| {
                     mdtest::validate_inline_snapshot(
                         db,
                         "ty",
@@ -339,8 +357,7 @@ fn run_test(
                         &inline_diagnostics,
                         &mut markdown_edits,
                     )
-                },
-            ) {
+                }) {
                 Ok(()) => None,
                 Err(line_failures) => Some(FileFailures {
                     backtick_offsets: test_file.to_code_block_backtick_offsets(),

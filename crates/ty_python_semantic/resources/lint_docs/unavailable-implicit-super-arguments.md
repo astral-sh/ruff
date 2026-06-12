@@ -11,21 +11,26 @@ If either of these is missing, the call will fail at runtime with a `RuntimeErro
 ## Examples
 
 ```python
-super()  # error: no enclosing class or function found
+# no enclosing class or function found
+super()  # error
 
 
 def func():
-    super()  # error: no enclosing class or first argument exists
+    # no enclosing class or first argument exists
+    super()  # error
 
 
 class A:
-    f = super()  # error: no enclosing function to provide the first argument
+    # no enclosing function to provide the first argument
+    f = super()  # error
 
     def method(self):
         def nested():
-            super()  # error: first argument does not exist in this nested function
+            # first argument does not exist in this nested function
+            super()  # error
 
-        lambda: super()  # error: first argument does not exist in this lambda
+        # first argument does not exist in this lambda
+        lambda: super()  # error
 
         # argument is not available in generator expression
         (super() for _ in range(10))  # error

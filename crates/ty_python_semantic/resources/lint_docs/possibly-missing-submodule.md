@@ -13,5 +13,6 @@ of `a` to include `from . import b`. Without one of those, `a.b` is an `Attribut
 ```python
 import html
 
-html.parser  # AttributeError: module 'html' has no attribute 'parser'
+# AttributeError: module 'html' has no attribute 'parser'
+html.parser  # error
 ```

@@ -26,6 +26,7 @@ class Base(ABC):
 
 
 @final
-class Derived(Base):  # Error: `Derived` does not implement `method`
+# `Derived` does not implement `method`
+class Derived(Base):  # error
     pass
 ```

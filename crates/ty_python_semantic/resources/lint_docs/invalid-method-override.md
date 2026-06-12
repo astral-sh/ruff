@@ -27,7 +27,7 @@ class Super:
 class Sub(Super):
     # Liskov violation: `str` is not a subtype of `int`,
     # but the supertype method promises to return an `int`.
-    def method(self, x) -> str:  # error: [invalid-override]
+    def method(self, x) -> str:  # error: [invalid-method-override]
         return "foo"
 
 
@@ -43,7 +43,7 @@ accepts_super(Sub())
 class Sub2(Super):
     # Liskov violation: the superclass method can be called with a `x=`
     # keyword argument, but the subclass method does not accept it.
-    def method(self, y) -> int:  # error: [invalid-override]
+    def method(self, y) -> int:  # error: [invalid-method-override]
         return 42
 
 

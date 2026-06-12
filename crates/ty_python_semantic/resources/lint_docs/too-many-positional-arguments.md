@@ -12,5 +12,5 @@ Passing too many positional arguments will raise `TypeError` at runtime.
 def f(): ...
 
 
-f("foo")  # Error raised here
+f("foo")  # error
 ```

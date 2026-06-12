@@ -11,5 +11,6 @@ Using an out of bounds index will raise an `IndexError` at runtime.
 
 ```python
 t = (0, 1, 2)
-t[3]  # IndexError: tuple index out of range
+# IndexError: tuple index out of range
+t[3]  # error
 ```

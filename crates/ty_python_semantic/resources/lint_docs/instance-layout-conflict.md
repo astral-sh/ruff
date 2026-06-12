@@ -33,7 +33,7 @@ class B:
 
 
 # TypeError: multiple bases have instance lay-out conflict
-class C(A, B): ...
+class C(A, B): ...  # error
 ```
 
 An instance layout conflict can also be caused by attempting to use
@@ -41,7 +41,8 @@ multiple inheritance with two builtin classes, due to the way that these
 classes are implemented in a CPython C extension:
 
 ```python
-class A(int, float): ...  # TypeError: multiple bases have instance lay-out conflict
+# TypeError: multiple bases have instance lay-out conflict
+class A(int, float): ...  # error
 ```
 
 Note that pure-Python classes with no `__slots__`, or pure-Python classes

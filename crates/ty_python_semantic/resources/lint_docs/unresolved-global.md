@@ -11,9 +11,12 @@ explicit definitions or declarations.
 
 ## Example
 
+### Assigning without a global-scope declaration
+
 ```python
 def f():
-    global x  # unresolved global
+    # unresolved global
+    global x  # error
     x = 42
 
 
@@ -21,7 +24,9 @@ def g():
     print(x)  # unresolved reference
 ```
 
-Use instead:
+### Use instead
+
+#### Declare the global
 
 ```python
 x: int
@@ -36,7 +41,7 @@ def g():
     print(x)
 ```
 
-Or:
+#### Initialize the global
 
 ```python
 x: int | None = None

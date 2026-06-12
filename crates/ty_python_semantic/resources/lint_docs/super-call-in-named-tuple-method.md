@@ -16,7 +16,8 @@ class F(NamedTuple):
     x: int
 
     def method(self):
-        super()  # error: super() is not supported in methods of NamedTuple classes
+        # super() is not supported in methods of NamedTuple classes
+        super()  # error
 ```
 
 ## References

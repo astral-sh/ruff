@@ -12,11 +12,13 @@ There are several requirements that you must follow when creating a `NewType`.
 from typing import NewType
 
 
-def get_name() -> str: ...
+def get_name() -> str:
+    return "name"
 
 
 Foo = NewType("Foo", int)  # okay
 # The first argument to `NewType` must be a string literal
 Bar = NewType(get_name(), int)  # error
-Baz = NewType("Baz", int | str)  # error: invalid base for `typing.NewType`
+# invalid base for `typing.NewType`
+Baz = NewType("Baz", int | str)  # error
 ```

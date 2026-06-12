@@ -14,7 +14,7 @@ application of `final` and will not prevent subclassing.
 from typing import final
 
 # Incorrect: type checkers will not prevent subclassing
-MyClass = final(type("MyClass", (), {}))
+MyClass = final(type("MyClass", (), {}))  # error
 
 
 # Correct: use `final` as a decorator

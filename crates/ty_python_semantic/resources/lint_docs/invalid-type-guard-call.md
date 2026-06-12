@@ -12,6 +12,11 @@ expressions are invalid as narrowing targets.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ```python
 from typing import TypeIs
 
@@ -20,7 +25,9 @@ def is_int(value: object = object()) -> TypeIs[int]:
     return isinstance(value, int)
 
 
-is_int()  # Error: no positional narrowing target
+# no positional narrowing target
+is_int()  # error
 
-is_int(value=1)  # Error: narrowing target passed by keyword
+# narrowing target passed by keyword
+is_int(value=1)  # error
 ```

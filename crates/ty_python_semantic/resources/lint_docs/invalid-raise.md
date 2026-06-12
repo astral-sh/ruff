@@ -10,20 +10,32 @@ permitted. Violating these rules results in a `TypeError` at runtime.
 ## Examples
 
 ```python
+def something():
+    raise NameError
+
+
 def f():
     try:
         something()
     except NameError:
+        # error: "Cannot raise object of type"
+        # error: "Cannot use object of type"
         raise "oops!" from f
 
 
 def g():
+    # error: "Cannot raise `NotImplemented`"
+    # error: "Cannot use object of type"
     raise NotImplemented from 42
 ```
 
 Use instead:
 
 ```python
+def something():
+    raise NameError
+
+
 def f():
     try:
         something()

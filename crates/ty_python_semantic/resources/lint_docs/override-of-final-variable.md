@@ -19,5 +19,5 @@ class A:
 
 
 class B(A):
-    X = 2  # Error raised here
+    X = 2  # error
 ```

@@ -16,5 +16,5 @@ from typing import final
 class A: ...
 
 
-class B(A): ...  # Error raised here
+class B(A): ...  # error
 ```

@@ -35,6 +35,13 @@ mod diagnostic;
 pub mod matcher;
 pub mod parser;
 
+/// Options that customize how an mdtest suite is run.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RunOptions {
+    /// The rule expected by an otherwise unqualified `# error` assertion.
+    pub default_error_rule: Option<&'static str>,
+}
+
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.

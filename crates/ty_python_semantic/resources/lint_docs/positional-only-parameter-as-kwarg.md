@@ -9,8 +9,9 @@ Providing a positional-only parameter as a keyword argument will raise `TypeErro
 ## Example
 
 ```python
-def f(x: int, /) -> int: ...
+def f(x: int, /) -> int:
+    return x
 
 
-f(x=1)  # Error raised here
+f(x=1)  # error
 ```

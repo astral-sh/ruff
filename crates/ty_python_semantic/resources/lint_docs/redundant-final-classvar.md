@@ -17,6 +17,8 @@ from typing import ClassVar, Final
 
 
 class C:
-    x: ClassVar[Final[int]] = 1  # redundant
-    y: Final[ClassVar[int]] = 1  # redundant
+    # redundant
+    x: ClassVar[Final[int]] = 1  # error
+    # redundant
+    y: Final[ClassVar[int]] = 1  # error
 ```

@@ -14,6 +14,6 @@ be `True`. If annotated, it must be annotated as a type that can accept `bool` v
 ## Examples
 
 ```python
-TYPE_CHECKING: str
-TYPE_CHECKING = ""
+TYPE_CHECKING: str  # error
+TYPE_CHECKING = ""  # error
 ```

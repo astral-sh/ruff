@@ -20,7 +20,7 @@ from dataclasses import dataclass, KW_ONLY
 
 # Crash at runtime
 @dataclass
-class A:
+class A:  # error
     b: int
     _1: KW_ONLY
     c: str

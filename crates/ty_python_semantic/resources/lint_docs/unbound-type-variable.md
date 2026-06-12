@@ -15,11 +15,13 @@ from typing import TypeVar, Generic
 T = TypeVar("T")
 S = TypeVar("S")
 
-x: T  # error: unbound type variable in module scope
+# unbound type variable in module scope
+x: T  # error
 
 
 class C(Generic[T]):
-    x: list[S] = []  # error: S is not in this class's generic context
+    # S is not in this class's generic context
+    x: list[S] = []  # error
 ```
 
 ## References

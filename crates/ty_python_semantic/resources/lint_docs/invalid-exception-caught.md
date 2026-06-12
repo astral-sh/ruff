@@ -9,17 +9,23 @@ Catching classes that do not inherit from `BaseException` will raise a `TypeErro
 ## Example
 
 ```python
+def might_raise() -> None: ...
+
+
 try:
-    1 / 0
-except 1:
+    might_raise()
+except 1:  # error
     ...
 ```
 
 Use instead:
 
 ```python
+def might_raise() -> None: ...
+
+
 try:
-    1 / 0
+    might_raise()
 except ZeroDivisionError:
     ...
 ```

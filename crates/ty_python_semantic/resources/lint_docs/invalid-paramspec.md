@@ -12,7 +12,8 @@ There are several requirements that you must follow when creating a `ParamSpec`.
 from typing import ParamSpec
 
 P1 = ParamSpec("P1")  # okay
-P2 = ParamSpec()  # error: ParamSpec requires a name
+# ParamSpec requires a name
+P2 = ParamSpec()  # error
 ```
 
 ## References

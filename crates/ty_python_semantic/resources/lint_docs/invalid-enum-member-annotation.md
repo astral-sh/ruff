@@ -20,7 +20,8 @@ from enum import Enum
 
 class Pet(Enum):
     CAT = 1  # OK
-    DOG: int = 2  # Error: enum members should not be annotated
+    # enum members should not be annotated
+    DOG: int = 2  # error
 ```
 
 Use instead:

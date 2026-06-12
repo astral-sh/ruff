@@ -9,9 +9,14 @@ to have a type alias whose expansion can only result in itself, and is therefore
 
 ## Examples
 
-```python
-type Itself = Itself
+```toml
+[environment]
+python-version = "3.12"
+```
 
-type A = B
-type B = A
+```python
+type Itself = Itself  # error
+
+type A = B  # error
+type B = A  # error
 ```

@@ -12,16 +12,32 @@ Extra parameters/arguments are allowed but do not affect narrowing.
 
 ## Examples
 
+```toml
+[environment]
+python-version = "3.13"
+```
+
 ```python
 from typing import TypeIs
 
 
-def f() -> TypeIs[int]: ...  # Error, no parameter
-def f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed
-def f(*args: object) -> TypeIs[int]: ...  # Error, expect variadic arguments
+# no parameter
+def f() -> TypeIs[int]:  # error
+    return True
+
+
+# no positional arguments allowed
+def f(*, v: object) -> TypeIs[int]:  # error
+    return True
+
+
+# expected variadic arguments
+def f(*args: object) -> TypeIs[int]:  # error
+    return True
 
 
 class C:
-    # Error, only positional argument expected is `self`
-    def f(self) -> TypeIs[int]: ...
+    # only positional argument is `self`
+    def f(self) -> TypeIs[int]:  # error
+        return True
 ```

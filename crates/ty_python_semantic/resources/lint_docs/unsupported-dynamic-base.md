@@ -21,6 +21,9 @@ and may be noisy on codebases that use `type()` in highly dynamic ways.
 ## Examples
 
 ```python
+class Base: ...
+
+
 def factory(base: type[Base]) -> type:
     # `base` has type `type[Base]`, not `type[Base]` itself
     return type("Dynamic", (base,), {})  # error: [unsupported-dynamic-base]

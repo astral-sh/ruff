@@ -9,5 +9,6 @@ Using an undefined variable will raise a `NameError` at runtime.
 ## Example
 
 ```python
-print(x)  # NameError: name 'x' is not defined
+# NameError: name 'x' is not defined
+print(x)  # error
 ```

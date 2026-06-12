@@ -18,6 +18,7 @@ async def fetch_data() -> str:
 
 
 async def main() -> None:
-    fetch_data()  # Warning: coroutine is not awaited
+    # Warning: coroutine is not awaited
+    fetch_data()  # error
     await fetch_data()  # OK
 ```

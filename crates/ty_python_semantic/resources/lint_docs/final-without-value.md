@@ -14,9 +14,9 @@ occur in the same scope. In a class body, the assignment may occur in `__init__`
 ```python
 from typing import Final
 
-# Error: `Final` symbol without a value
-MY_CONSTANT: Final[int]
+# `Final` symbol without a value
+MY_CONSTANT: Final[int]  # error
 
 # OK: `Final` symbol with a value
-MY_CONSTANT: Final[int] = 1
+INITIALIZED_CONSTANT: Final[int] = 1
 ```

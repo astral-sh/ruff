@@ -19,8 +19,8 @@ from dataclasses import dataclass
 from typing import NamedTuple
 
 
-@dataclass  # error: [invalid-dataclass]
-class Foo(NamedTuple):
+@dataclass
+class Foo(NamedTuple):  # error: [invalid-dataclass]
     x: int
 ```
 

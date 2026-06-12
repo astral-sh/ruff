@@ -13,8 +13,8 @@ In some cases, they might raise errors at runtime.
 ```python
 from typing import Annotated
 
-a: type[1]  # `1` is not a type
-b: Annotated[int]  # `Annotated` expects at least two arguments
+# `Annotated` expects at least two arguments
+b: Annotated[int]  # error
 ```
 
 [type expressions]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

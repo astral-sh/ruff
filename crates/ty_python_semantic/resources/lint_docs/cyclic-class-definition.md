@@ -12,12 +12,11 @@ inherits from itself.
 
 ## Examples
 
-```python
-# foo.pyi
-class A(B): ...
+`foo.pyi`:
 
-
-class B(A): ...
+```pyi
+class A(B): ...  # error
+class B(A): ...  # error
 ```
 
 [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order

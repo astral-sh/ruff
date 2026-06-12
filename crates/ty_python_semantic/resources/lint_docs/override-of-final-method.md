@@ -19,5 +19,5 @@ class A:
 
 
 class B(A):
-    def foo(self): ...  # Error raised here
+    def foo(self): ...  # error
 ```

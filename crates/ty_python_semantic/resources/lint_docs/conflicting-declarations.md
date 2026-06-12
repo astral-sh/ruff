@@ -11,10 +11,10 @@ other code that relies on these variables.
 ## Examples
 
 ```python
-if b:
+if __name__ == "__main__":
     a: int
 else:
     a: str
 
-a = 1
+a = 1  # error
 ```

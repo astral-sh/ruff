@@ -10,5 +10,5 @@ Calling a non-callable object will raise a `TypeError` at runtime.
 
 ```python
 # TypeError: 'int' object is not callable
-4()
+4()  # error
 ```

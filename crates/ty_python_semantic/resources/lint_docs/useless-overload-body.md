@@ -11,18 +11,25 @@ a misunderstanding of how the `@overload` decorator works.
 
 ## Example
 
+```toml
+[environment]
+python-version = "3.11"
+```
+
 ```py
 from typing import overload
 
 
 @overload
 def foo(x: int) -> int:
-    return x + 1  # will never be executed
+    # will never be executed
+    return x + 1  # error
 
 
 @overload
 def foo(x: str) -> str:
-    return "Oh no, got a string"  # will never be executed
+    # will never be executed
+    return "Oh no, got a string"  # error
 
 
 def foo(x: int | str) -> int | str:

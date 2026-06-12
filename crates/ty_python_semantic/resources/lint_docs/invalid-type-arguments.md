@@ -13,6 +13,11 @@ interface.
 
 Using legacy type variables:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```python
 from typing import Generic, TypeVar
 
@@ -26,8 +31,10 @@ class Foo1(Generic[T1]): ...
 class Foo2(Generic[T2]): ...
 
 
-Foo1[bytes]  # error: bytes does not satisfy T1's constraints
-Foo2[str]  # error: str does not satisfy T2's bound
+# bytes does not satisfy T1's constraints
+Foo1[bytes]  # error
+# str does not satisfy T2's bound
+Foo2[str]  # error
 ```
 
 Using PEP 695 type variables:
@@ -39,6 +46,8 @@ class Foo[T]: ...
 class Bar[T, U]: ...
 
 
-Foo[int, str]  # error: too many arguments
-Bar[int]  # error: too few arguments
+# too many arguments
+Foo[int, str]  # error
+# too few arguments
+Bar[int]  # error
 ```

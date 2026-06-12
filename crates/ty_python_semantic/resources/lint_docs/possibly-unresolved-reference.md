@@ -17,5 +17,6 @@ false positives it can produce.
 for i in range(0):
     x = i
 
-print(x)  # NameError: name 'x' is not defined
+# NameError: name 'x' is not defined
+print(x)  # error
 ```

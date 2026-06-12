@@ -18,5 +18,5 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class A:
-    def __setattr__(self, name: str, value: object) -> None: ...
+    def __setattr__(self, name: str, value: object) -> None: ...  # error
 ```

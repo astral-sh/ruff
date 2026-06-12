@@ -10,10 +10,14 @@ at runtime.
 ## Examples
 
 ```python
+from typing import overload
+
+
 @overload
 def func(x: int): ...
 @overload
 def func(x: bool): ...
+def func(x: int | bool): ...
 
 
 func("string")  # error: [no-matching-overload]

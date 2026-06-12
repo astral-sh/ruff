@@ -17,7 +17,7 @@ literal as a normal Python expression.
 ## Example
 
 ```python
-def foo() -> "intstance of C":
+def foo() -> "intstance of C":  # error
     return 42
 
 
@@ -28,7 +28,7 @@ Use instead:
 
 ```python
 def foo() -> "C":
-    return 42
+    return C()
 
 
 class C: ...

@@ -12,7 +12,7 @@ weaken a type checker's ability to accurately reason about your code.
 
 ```python
 a = 1
-a: str
+a: str  # error
 ```
 
 [assignable to]: https://typing.python.org/en/latest/spec/glossary.html#term-assignable
