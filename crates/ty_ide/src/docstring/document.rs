@@ -5,7 +5,7 @@ use strum_macros::EnumIter;
 use self::syntax::{indentation, starts_with_markdown_list_item};
 
 pub(super) mod google;
-mod numpy;
+pub(super) mod numpy;
 pub(super) mod preformatted;
 pub(super) mod rst;
 pub(in crate::docstring) mod syntax;
