@@ -6,7 +6,10 @@ use strum::IntoEnumIterator;
 use super::general;
 use crate::docstring::document::SectionKind;
 use crate::docstring::document::preformatted::MarkdownFence;
+use crate::docstring::document::syntax::starts_with_markdown_list_item;
 
+mod body;
+mod google;
 mod rst;
 
 /// Renders a docstring as Markdown.
@@ -14,7 +17,9 @@ mod rst;
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
 pub(super) fn render_into(output: &mut String, source: &str) {
-    render_sections_into(output, source, rst::structured_sections(source));
+    let mut sections = rst::structured_sections(source);
+    sections.extend(google::structured_sections(source));
+    render_sections_into(output, source, sections);
 }
 
 /// Renders a docstring from non-overlapping structured sections and general source fragments.
@@ -280,45 +285,9 @@ fn render_markdown_section<'a>(
     rendered_field
 }
 
-fn starts_with_markdown_list_item(line: &str) -> bool {
-    starts_with_unordered_markdown_list_item(line) || starts_with_ordered_markdown_list_item(line)
-}
-
 fn line_starts_markdown_block_content(line: &str, at_description_start: bool) -> bool {
     MarkdownFence::find(line).is_some()
         || (at_description_start && starts_with_markdown_list_item(line))
-}
-
-/// Returns whether `line` begins with `-`, `+`, or `*` followed by whitespace.
-fn starts_with_unordered_markdown_list_item(line: &str) -> bool {
-    matches!(line.as_bytes(), [b'-' | b'+' | b'*', b' ' | b'\t', ..])
-}
-
-/// Returns whether `line` begins with one to nine ASCII digits followed by
-/// `.` or `)`, then whitespace.
-///
-/// `CommonMark` limits ordered-list markers to nine digits to avoid integer
-/// overflow in browsers: <https://spec.commonmark.org/0.31.2/#list-items>.
-fn starts_with_ordered_markdown_list_item(line: &str) -> bool {
-    let bytes = line.as_bytes();
-    let mut digit_count = 0;
-
-    for byte in bytes {
-        if digit_count < 9 && byte.is_ascii_digit() {
-            digit_count += 1;
-            continue;
-        }
-
-        if digit_count > 0 && matches!(*byte, b'.' | b')') {
-            return bytes
-                .get(digit_count + 1)
-                .is_some_and(|byte| matches!(*byte, b' ' | b'\t'));
-        }
-
-        return false;
-    }
-
-    false
 }
 
 /// Returns the byte offset where `description` first needs block-style rendering.
@@ -440,7 +409,7 @@ mod tests {
     use insta::{Settings, assert_snapshot};
     use ruff_text_size::{TextRange, TextSize};
 
-    use super::{Section, SectionItem, SectionKind, render_sections_into};
+    use super::{Section, SectionItem, SectionKind, render_into, render_sections_into};
 
     #[test]
     fn sections_render_in_canonical_order() {
@@ -679,6 +648,673 @@ mod tests {
     }
 
     #[test]
+    fn google_sections_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+Args:
+    value (str): The value.
+        More detail.
+    *items: Extra items.
+
+Keyword Args:
+    optional (int): Optional value.
+
+Returns:
+    bool: Whether validation passed.
+
+Yields:
+    int: Next value.
+";
+        let rendered = render_docstring(docstring);
+
+        assert_snapshot!(rendered, @r"
+        Summary.
+
+        ## Parameters
+        **value**: `str`  
+        The value.  
+        More detail.
+
+        **\*items**  
+        Extra items.
+
+        ## Keyword Arguments
+        **optional**: `int`  
+        Optional value.
+
+        ## Returns
+        `bool`  
+        Whether validation passed.
+
+        ## Yields
+        `int`  
+        Next value.
+        ");
+
+        let docstring = "\
+Args:
+    x, y: Coordinates.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Parameters
+        **x, y**  
+        Coordinates.
+        ");
+
+        let docstring = "\
+Keyword Arguments:
+    retries: Retry count.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Keyword Arguments
+        **retries**  
+        Retry count.
+        ");
+
+        let docstring = "\
+Args:
+    value: The value.
+Additional details.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Parameters
+        **value**  
+        The value.
+
+        Additional details.
+        ");
+
+        let docstring = "\
+Args:
+    value: The value.
+Methods:
+    work: Does work.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Parameters
+        **value**  
+        The value.
+
+        Methods:  
+        &nbsp;&nbsp;&nbsp;&nbsp;work: Does work.
+        ");
+
+        let docstring = "\
+Returns:
+    bool: Whether validation passed.
+Additional details.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        `bool`  
+        Whether validation passed.
+
+        Additional details.
+        ");
+
+        let docstring = "\
+Returns:
+    str | None: Optional value.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        `str | None`  
+        Optional value.
+        ");
+
+        let docstring = "\
+Returns:
+    One of the known values: foo or bar.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        One of the known values: foo or bar.
+        ");
+
+        let docstring = "\
+Returns:
+    True if it succeeded.
+    False otherwise.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        True if it succeeded.  
+        False otherwise.
+        ");
+
+        let docstring = "\
+Yields:
+    The next item.
+    Nothing when exhausted.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Yields
+        The next item.  
+        Nothing when exhausted.
+        ");
+
+        let docstring = "\
+Returns:
+    str:Path/to/file.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        `str`  
+        Path/to/file.
+        ");
+
+        let docstring = "\
+Returns:
+    Path:foo@bar.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        `Path`  
+        foo@bar.
+        ");
+
+        let docstring = "\
+Returns:
+    https://example.com/path
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        https://example.com/path
+        ");
+
+        let docstring = "\
+Yields:
+    :obj:`list` of :obj:`str`: Result chunks.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Yields
+        `` :obj:`list` of :obj:`str` ``  
+        Result chunks.
+        ");
+
+        let docstring = "\
+Returns:
+    str: Example output.
+        ```python
+        Args:
+            value: still code.
+        Returns:
+            still code.
+        ```
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Returns
+        `str`  
+        Example output.
+
+        ```python
+        Args:
+            value: still code.
+        Returns:
+            still code.
+        ```
+        ");
+
+        let docstring = "\
+Yields:
+    int: Example output.
+        Example::
+            Args:
+                still code.
+            Yields:
+                still code.
+";
+        assert_snapshot!(render_docstring(docstring), @"
+        ## Yields
+        `int`  
+        Example output.  
+        Example:
+
+        ```````````python
+            Args:
+                still code.
+            Yields:
+                still code.
+        ```````````
+        ");
+    }
+
+    #[test]
+    fn other_parameter_sections_render_markdown_sections() {
+        let docstring = "\
+Other Parameters:
+    timeout (float): Maximum wait in seconds.
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Other Parameters\n**timeout**: `float`  \nMaximum wait in seconds."
+        );
+    }
+
+    #[test]
+    fn lowercase_parameter_names_that_resemble_sections_render() {
+        let docstring = "\
+Args:
+    error:
+        Error callback.
+    returns:
+        Whether to return the result.
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Parameters\n**error**  \nError callback.\n\n\
+             **returns**  \nWhether to return the result."
+        );
+    }
+
+    #[test]
+    fn google_item_continuation_paragraphs_use_common_indent() {
+        let docstring = "\
+Args:
+    value: First paragraph.
+
+        Second paragraph.
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Parameters\n**value**  \nFirst paragraph.\n\nSecond paragraph."
+        );
+    }
+
+    #[test]
+    fn google_parameter_uri_and_path_continuations_stay_raw() {
+        for continuation in ["https://example.com/api", "C:\\temp\\result.txt"] {
+            let docstring = format!(
+                "Args:\n    endpoint: Service endpoint, for example:\n    {continuation}\n"
+            );
+
+            assert_eq!(render_docstring(&docstring), render_general(&docstring));
+        }
+    }
+
+    #[test]
+    fn google_existing_code_spans_in_types_are_not_nested() {
+        for (docstring, expected) in [
+            (
+                "Args:\n    signature (``bytes``): Signature bytes.\n",
+                "## Parameters\n**signature**: `bytes`  \nSignature bytes.",
+            ),
+            (
+                "Returns:\n    `str`: The result.\n",
+                "## Returns\n`str`  \nThe result.",
+            ),
+        ] {
+            assert_eq!(render_docstring(docstring), expected);
+        }
+    }
+
+    #[test]
+    fn google_return_colons_inside_code_spans_are_not_fields() {
+        for (docstring, expected) in [
+            ("Returns:\n    `key: value`\n", "## Returns\n`key: value`"),
+            ("Yields:\n    ``key: value``\n", "## Yields\n``key: value``"),
+            (
+                "Returns:\n    `dict[str, int]`: Mapping.\n",
+                "## Returns\n`dict[str, int]`  \nMapping.",
+            ),
+        ] {
+            assert_eq!(render_docstring(docstring), expected);
+        }
+    }
+
+    #[test]
+    fn google_multiple_return_entries_stay_raw() {
+        for heading in ["Returns", "Yields"] {
+            let docstring = format!("{heading}:\n    int: Count.\n    str: Name.\n");
+
+            assert_eq!(render_docstring(&docstring), render_general(&docstring));
+        }
+    }
+
+    #[test]
+    fn google_empty_return_sections_do_not_claim_following_prose() {
+        for heading in ["Returns", "Yields"] {
+            let docstring = format!("Summary.\n\n{heading}:\n\nAfter.\n");
+
+            assert_eq!(render_docstring(&docstring), render_general(&docstring));
+        }
+    }
+
+    #[test]
+    fn google_conventional_spaced_return_types_render() {
+        for (docstring, expected) in [
+            (
+                "Returns:\n    list of int: A new list.\n",
+                "## Returns\n`list of int`  \nA new list.",
+            ),
+            (
+                "Yields:\n    int or float: The next number.\n",
+                "## Yields\n`int or float`  \nThe next number.",
+            ),
+            (
+                "Returns:\n    tuple(int, int): A pair.\n",
+                "## Returns\n`tuple(int, int)`  \nA pair.",
+            ),
+        ] {
+            assert_eq!(render_docstring(docstring), expected);
+        }
+    }
+
+    #[test]
+    fn google_return_prose_with_commas_is_not_a_type() {
+        let docstring = "\
+Returns:
+    (count, results) tuples where:
+    count is the number of matches.
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\n(count, results) tuples where:  \ncount is the number of matches."
+        );
+
+        let docstring = "Returns:\n    mapping of user IDs: Preserved as prose.\n";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\nmapping of user IDs: Preserved as prose."
+        );
+    }
+
+    #[test]
+    fn google_return_prose_with_inline_markdown_is_not_a_type() {
+        for description in [
+            "A `Result` object: When successful.",
+            "A [Result] object: When successful.",
+        ] {
+            let docstring = format!("Returns:\n    {description}\n");
+
+            assert_eq!(
+                render_docstring(&docstring),
+                format!("## Returns\n{description}")
+            );
+        }
+    }
+
+    #[test]
+    fn google_return_prose_with_parenthetical_is_not_a_type() {
+        let docstring = "Returns:\n    The result (if any): Additional context.\n";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\nThe result (if any): Additional context."
+        );
+    }
+
+    #[test]
+    fn google_return_lowercase_labels_remain_descriptions() {
+        let docstring = "\
+Returns:
+    A mapping. For example:
+    example:
+        {\"key\": \"value\"}
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\nA mapping. For example:  \nexample:  \n    {\"key\": \"value\"}"
+        );
+    }
+
+    #[test]
+    fn google_return_bare_literals_are_not_types() {
+        for description in ["42: int.", "200: Success"] {
+            let docstring = format!("Returns:\n    {description}\n");
+
+            assert_eq!(
+                render_docstring(&docstring),
+                format!("## Returns\n{description}")
+            );
+        }
+    }
+
+    #[test]
+    fn google_return_windows_paths_remain_intact() {
+        let docstring = "Returns:\n    C:\\temp\\result.txt\n";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\nC:\\temp\\result.txt"
+        );
+    }
+
+    #[test]
+    fn google_return_opaque_uris_remain_intact() {
+        for uri in ["mailto:user@example.com", "urn:isbn:9780141036144"] {
+            let docstring = format!("Returns:\n    {uri}\n");
+
+            assert_eq!(render_docstring(&docstring), format!("## Returns\n{uri}"));
+        }
+    }
+
+    #[test]
+    fn google_return_preformatted_first_lines_render() {
+        let docstring = "\
+Returns:
+    ```text
+    Args:
+    ```
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\n```text\nArgs:\n```"
+        );
+
+        let docstring = "\
+Returns:
+    ```text:example
+    value
+    ```
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Returns\n```text:example\nvalue\n```"
+        );
+
+        let docstring = "\
+Yields:
+    ~~~text:example
+    value
+    ~~~
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Yields\n~~~text:example\nvalue\n~~~"
+        );
+
+        let docstring = "\
+Yields:
+    >>> print(\"Returns:\")
+    Returns:
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Yields\n```````````python\n>>> print(\"Returns:\")\nReturns:\n```````````"
+        );
+    }
+
+    #[test]
+    fn google_raises_section_like_exception_names_render() {
+        let docstring = "\
+Raises:
+    Warning:
+        Emitted for legacy input.
+    Error:
+        Raised for a generic failure.
+";
+
+        assert_eq!(
+            render_docstring(docstring),
+            "## Raises\n`Warning`  \nEmitted for legacy input.\n\n\
+             `Error`  \nRaised for a generic failure."
+        );
+    }
+
+    #[test]
+    fn google_headers_nested_in_non_google_containers_stay_raw() {
+        for docstring in [
+            "\
+Examples
+--------
+Args:
+    nested: Example output.
+",
+            "\
+.. note::
+    Args:
+        nested: Note content.
+",
+            "\
+- Example:
+    Args:
+        nested: List content.
+",
+        ] {
+            assert_eq!(render_docstring(docstring), render_general(docstring));
+        }
+
+        let rst_field = "\
+:param value: Example input.
+    Args:
+        nested: Field content.
+:param other: Other input.
+";
+        assert_eq!(
+            render_docstring(rst_field),
+            "## Parameters\n**value**  \nExample input.  \nArgs:  \n    nested: Field content.\n\n\
+             **other**  \nOther input."
+        );
+    }
+
+    #[test]
+    fn unsupported_google_sections_stay_raw() {
+        for docstring in [
+            "\
+Summary.
+
+Args:
+    Inputs are normalized first.
+    value: The value.
+",
+            "\
+Summary.
+
+Examples:
+    Args:
+        value: demo input.
+",
+            "\
+Examples:
+Args:
+    value: demo input.
+Returns:
+    str: demo output.
+",
+            "\
+Summary.
+
+Returns:
+    bool: Whether validation passed.
+
+    Examples:
+        Use it.
+",
+            "\
+Summary.
+
+Yields:
+    int: Next value.
+
+    Examples:
+        Use it.
+",
+            "\
+Summary.
+
+Args:
+    Inputs are normalized first.
+    Args:
+        value: demo input.
+",
+            "\
+Summary.
+
+Args:
+    value: The value.
+
+    Examples:
+        Use it.
+",
+            "\
+Summary.
+
+Args:
+    value: The value.
+    Examples: Try it.
+",
+            "\
+Summary.
+
+Returns:
+    Examples:
+        Use it.
+",
+            "\
+Summary.
+
+Raises:
+    ValueError: If invalid.
+
+    Examples:
+        Use it.
+",
+            "\
+Summary.
+
+Args:
+    value: Example.
+        ```python
+
+Args:
+    nested = 1
+        ```
+",
+        ] {
+            assert_eq!(render_docstring(docstring), render_general(docstring));
+        }
+    }
+
+    #[test]
+    fn google_return_literal_block_first_lines_preserve_literal_rendering() {
+        for heading in ["Returns", "Yields"] {
+            for marker in ["Result::", "list[str]::"] {
+                let docstring = format!("{heading}:\n    {marker}\n\n        value = 1\n");
+
+                assert_eq!(
+                    render_docstring(&docstring),
+                    format!(
+                        "## {heading}\n{}:\n\n```````````python\nvalue = 1\n```````````",
+                        marker.trim_end_matches(':')
+                    )
+                );
+            }
+        }
+    }
+
+    #[test]
     fn following_prose_is_rendered_outside_a_parameter_doctest() {
         let rendered = render_parameter_docstring(">>> value\n1", "After.");
 
@@ -820,6 +1456,18 @@ mod tests {
     fn render_markdown(section: &Section) -> String {
         let mut output = String::new();
         section.render_markdown(&mut output);
+        output
+    }
+
+    fn render_docstring(raw: &str) -> String {
+        let mut output = String::new();
+        render_into(&mut output, raw);
+        output
+    }
+
+    fn render_general(raw: &str) -> String {
+        let mut output = String::new();
+        crate::docstring::markdown::general::render_into(&mut output, raw);
         output
     }
 

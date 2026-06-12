@@ -1,6 +1,6 @@
 use indexmap::IndexMap;
 
-mod google;
+pub(in crate::docstring) mod google;
 pub(super) mod preformatted;
 pub(super) mod rst;
 /// Syntax utilities shared by docstring format parsers and renderers.
