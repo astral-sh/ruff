@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
