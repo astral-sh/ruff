@@ -677,7 +677,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             identity,
             None,
-            None, // explicit_variance
+            Some(TypeVarVariance::Invariant),
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
         )));
         self.add_declaration_with_binding(
@@ -995,7 +995,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             target_name.clone(),
             Some(definition),
-            TypeVarKind::TypeVarTuple,
+            if is_typing_extensions {
+                TypeVarKind::ExtensionsTypeVarTuple
+            } else {
+                TypeVarKind::TypeVarTuple
+            },
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, variance, default,

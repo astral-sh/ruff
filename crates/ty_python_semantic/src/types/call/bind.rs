@@ -4688,6 +4688,11 @@ struct ArgumentTypeChecker<'a, 'db> {
     /// TODO: Once specialization inference fully owns generic argument validation, this field can
     /// be removed.
     constraint_set_errors: Vec<bool>,
+
+    /// Argument indices where legacy inference deliberately deferred a callable relation involving
+    /// a `TypeVarTuple`. The fallback specialization is not gradual in callable arity, so checking
+    /// it again would produce a false-positive diagnostic.
+    deferred_typevartuple_callable_relations: Vec<bool>,
 }
 
 /// Result of checking only the key type of a keyword-unpack argument.
@@ -4759,6 +4764,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
             constraint_set_errors: vec![false; arguments.len()],
+            deferred_typevartuple_callable_relations: vec![false; arguments.len()],
         }
     }
 
@@ -5095,17 +5101,67 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .collect::<Vec<_>>();
         let mut starred_typevartuple_arguments = starred_typevartuple_declared_types
             .iter()
-            .map(|declared_type| declared_type.map(|_| Vec::new()))
+            .map(|declared_type| {
+                declared_type.map(|_| TupleSpecBuilder::with_capacity(self.arguments.len()))
+            })
             .collect::<Vec<_>>();
         if starred_typevartuple_arguments.iter().any(Option::is_some) {
-            for (argument_index, _, _, argument_types) in self.enumerate_argument_types() {
+            for (argument_index, _, argument, argument_types) in self.enumerate_argument_types() {
+                let mut variadic_parameters = FxHashSet::default();
+                let matched_parameters = &self.argument_matches[argument_index].parameters;
                 for matched_parameter in self.argument_matches[argument_index].iter() {
                     let parameter_index = matched_parameter.index;
-                    if let Some(typevartuple_arguments) =
-                        &mut starred_typevartuple_arguments[parameter_index]
-                    {
-                        typevartuple_arguments
-                            .push(argument_types.get_default().unwrap_or(Type::unknown()));
+                    let typevartuple_arguments =
+                        &mut starred_typevartuple_arguments[parameter_index];
+                    let Some(builder) = typevartuple_arguments.as_mut() else {
+                        continue;
+                    };
+
+                    if matches!(argument, Argument::Variadic) {
+                        let Some(tuple) = argument_types
+                            .get_default()
+                            .and_then(|ty| ty.exact_tuple_instance_spec(self.db))
+                        else {
+                            *typevartuple_arguments = None;
+                            continue;
+                        };
+                        let only_matches_this_parameter = matched_parameters
+                            .iter()
+                            .all(|matched| matched.index == parameter_index);
+                        if !only_matches_this_parameter {
+                            if matches!(tuple.as_ref(), TupleSpec::Variable(_)) {
+                                // Splitting an arbitrary-length tuple between fixed parameters and
+                                // a `TypeVarTuple` is ambiguous. Leave the pack unmapped.
+                                *typevartuple_arguments = None;
+                            } else if let Some(argument_type) = matched_parameter.argument_type {
+                                builder.push(argument_type);
+                            }
+                            continue;
+                        }
+
+                        // A fixed splat can match the same variadic parameter multiple times. Append
+                        // its complete tuple specification once instead of appending the tuple
+                        // container for every matched element.
+                        if !variadic_parameters.insert(parameter_index) {
+                            continue;
+                        }
+                        if matches!(builder, TupleSpecBuilder::Variable { .. })
+                            && matches!(tuple.as_ref(), TupleSpec::Variable(_))
+                        {
+                            // Concatenating multiple arbitrary-length tuple specs loses their
+                            // ordering. Leave the pack unmapped so it receives the gradual fallback.
+                            *typevartuple_arguments = None;
+                            continue;
+                        }
+                        *builder = std::mem::replace(
+                            builder,
+                            TupleSpecBuilder::with_capacity(self.arguments.len()),
+                        )
+                        .concat(self.db, &tuple);
+                    } else {
+                        builder.push(matched_parameter.argument_type.unwrap_or_else(|| {
+                            argument_types.get_default().unwrap_or(Type::unknown())
+                        }));
                     }
                 }
             }
@@ -5120,7 +5176,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             else {
                 continue;
             };
-            let argument_type = Type::heterogeneous_tuple(self.db, argument_types.iter().copied());
+            let argument_type =
+                Type::tuple(TupleType::new(self.db, &argument_types.clone().build()));
             let specialization_result = builder.infer(*declared_type, argument_type);
 
             if let Err(error) = specialization_result {
@@ -5136,7 +5193,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         {
             for matched_parameter in self.argument_matches[argument_index].iter() {
                 let parameter_index = matched_parameter.index;
-                if starred_typevartuple_arguments[parameter_index].is_some() {
+                if starred_typevartuple_declared_types[parameter_index].is_some() {
                     continue;
                 }
                 if self.is_gradual_variadic_parameter(parameter_index) {
@@ -5149,6 +5206,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     declared_type,
                     matched_parameter.argument_type.unwrap_or(argument_type),
                 );
+                if builder.take_deferred_typevartuple_callable_relation() {
+                    self.deferred_typevartuple_callable_relations[argument_index] = true;
+                }
 
                 if let Err(error) = specialization_result {
                     specialization_errors.push(BindingError::SpecializationError {
@@ -5203,6 +5263,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         //
         // TODO: handle starred annotations, e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...]]`
         if !self.constraint_set_errors[argument_index]
+            && !self.deferred_typevartuple_callable_relations[argument_index]
             && !parameter.has_starred_annotation()
             && argument_type
                 .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)

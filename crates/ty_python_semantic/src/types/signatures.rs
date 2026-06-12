@@ -30,7 +30,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::tuple::Tuple;
+use crate::types::tuple::{Tuple, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
@@ -1799,6 +1799,21 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             target
         };
 
+        // A starred tuple annotation is lowered to ordinary parameters when its tuple shape has
+        // an exact Python signature representation. Mixed tuples and unresolved TypeVarTuples
+        // retain their starred form; compare those parameter lists gradually for now while still
+        // checking the callable's return type.
+        let normalized_source = source
+            .parameters
+            .normalized_for_callable_relation(db)
+            .map(|parameters| source.clone().with_parameters(parameters));
+        let source = normalized_source.as_ref().unwrap_or(source);
+        let normalized_target = target
+            .parameters
+            .normalized_for_callable_relation(db)
+            .map(|parameters| target.clone().with_parameters(parameters));
+        let target = normalized_target.as_ref().unwrap_or(target);
+
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
@@ -2267,16 +2282,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
-                    let source_parameters = source
-                        .parameters
-                        .clone()
-                        .expand_starred_variadic_annotations(db);
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: source_parameters.iter(),
+                        source_iter: source.parameters.iter(),
                         target_iter: target_prefix_params.iter(),
                     };
 
@@ -3678,7 +3689,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts(value, self.data.kind).expand_starred_variadic_annotations(db)
+        Self::from_parts(value, self.data.kind).normalize_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -3747,8 +3758,9 @@ impl<'db> Parameters<'db> {
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
     }
 
-    /// Expands an unpacked `*args` annotation into its logical callable parameters.
-    fn expand_starred_variadic_annotations(self, db: &'db dyn Db) -> Self {
+    /// Normalizes an unpacked `*args` annotation into its logical callable parameters when that
+    /// parameter list has an exact Python signature representation.
+    pub(super) fn normalize_starred_variadic_annotations(self, db: &'db dyn Db) -> Self {
         if !self
             .data
             .value
@@ -3758,14 +3770,15 @@ impl<'db> Parameters<'db> {
             return self;
         }
 
-        let mut expanded = false;
+        let mut normalized = false;
         let mut parameters = Vec::with_capacity(self.data.value.len());
-        for parameter in &self.data.value {
+        let mut index = 0;
+        while let Some(parameter) = self.data.value.get(index) {
             if parameter.is_variadic()
                 && parameter.has_starred_annotation()
                 && let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db)
             {
-                expanded = true;
+                normalized = true;
                 match tuple.as_ref() {
                     Tuple::Fixed(tuple) => {
                         parameters.extend(
@@ -3773,37 +3786,78 @@ impl<'db> Parameters<'db> {
                                 .iter_all_elements()
                                 .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
                         );
+                        index += 1;
                     }
                     Tuple::Variable(variable) => {
-                        parameters.extend(
-                            variable
-                                .iter_prefix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
-                        let name = parameter
-                            .name()
-                            .cloned()
-                            .unwrap_or_else(|| Name::new_static("args"));
-                        parameters.push(
-                            Parameter::variadic(name).with_annotated_type(variable.variable()),
-                        );
-                        parameters.extend(
-                            variable
-                                .iter_suffix_elements()
-                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
-                        );
+                        let following_positional_end = self.data.value[index + 1..]
+                            .iter()
+                            .take_while(|parameter| parameter.is_positional())
+                            .count()
+                            + index
+                            + 1;
+
+                        if variable.suffix_elements().is_empty()
+                            && following_positional_end == index + 1
+                        {
+                            parameters.extend(variable.iter_prefix_elements().map(|ty| {
+                                Parameter::positional_only(None).with_annotated_type(ty)
+                            }));
+                            let name = parameter
+                                .name()
+                                .cloned()
+                                .unwrap_or_else(|| Name::new_static("args"));
+                            parameters.push(
+                                Parameter::variadic(name).with_annotated_type(variable.variable()),
+                            );
+                            index += 1;
+                        } else {
+                            let mut combined = TupleSpecBuilder::from(tuple.as_ref());
+                            for following in &self.data.value[index + 1..following_positional_end] {
+                                combined.push(following.annotated_type());
+                            }
+                            let combined = combined.build();
+                            parameters.push(
+                                parameter
+                                    .clone()
+                                    .with_annotated_type(Type::tuple(TupleType::new(
+                                        db, &combined,
+                                    ))),
+                            );
+                            index = following_positional_end;
+                        }
                     }
                 }
             } else {
                 parameters.push(parameter.clone());
+                index += 1;
             }
         }
 
-        if expanded {
+        if normalized {
             Self::new(db, parameters)
         } else {
             self
         }
+    }
+
+    fn normalized_for_callable_relation(&self, db: &'db dyn Db) -> Option<Self> {
+        if !self
+            .data
+            .value
+            .iter()
+            .any(|parameter| parameter.is_variadic() && parameter.has_starred_annotation())
+        {
+            return None;
+        }
+
+        let normalized = self.clone().normalize_starred_variadic_annotations(db);
+        Some(
+            normalized
+                .iter()
+                .any(Parameter::has_starred_annotation)
+                .then(Parameters::gradual_form)
+                .unwrap_or(normalized),
+        )
     }
 
     /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.

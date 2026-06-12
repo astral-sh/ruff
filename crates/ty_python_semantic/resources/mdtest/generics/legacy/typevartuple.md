@@ -96,23 +96,6 @@ from typing import TypeVarTuple
 Ts = TypeVarTuple("Ts", bound=int)
 ```
 
-#### `typing_extensions.TypeVarTuple`
-
-`typing_extensions.TypeVarTuple` exposes the `bound` parameter on older Python versions. ty
-recognizes the backport but does not yet support the parameter.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing_extensions import TypeVarTuple
-
-# error: [invalid-legacy-type-variable] "The `bound` argument for `TypeVarTuple` is not supported"
-Ts = TypeVarTuple("Ts", bound=int)
-```
-
 ### Variance
 
 Legacy `TypeVarTuple` accepts `covariant` and `contravariant` arguments. A `TypeVarTuple` with no
@@ -212,23 +195,6 @@ AmbiguousContravariant = TypeVarTuple("AmbiguousContravariant", contravariant=co
 AmbiguousInferVariance = TypeVarTuple("AmbiguousInferVariance", infer_variance=cond())
 # error: [invalid-legacy-type-variable]
 CovariantAndInferred = TypeVarTuple("CovariantAndInferred", covariant=True, infer_variance=True)
-```
-
-#### `typing_extensions.TypeVarTuple`
-
-`typing_extensions.TypeVarTuple` backports the variance parameters to older Python versions.
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-```py
-from typing_extensions import TypeVarTuple
-
-Ts_Co = TypeVarTuple("Ts_Co", covariant=True)
-Ts_Contra = TypeVarTuple("Ts_Contra", contravariant=True)
-Ts_Inferred = TypeVarTuple("Ts_Inferred", infer_variance=True)
 ```
 
 ## Generic Classes
@@ -355,9 +321,12 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import Generic, TypeVarTuple, Unpack
+from typing import Generic, TypeVar, TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+
+OtherTs = TypeVarTuple("OtherTs")
+CopiedTs = TypeVarTuple("CopiedTs", default=Unpack[OtherTs])
 
 # error: [invalid-legacy-type-variable] "The default value for `TypeVarTuple` must be an unpacked tuple type or another TypeVarTuple"
 InvalidDefault = TypeVarTuple("InvalidDefault", default=tuple[int, str])
@@ -366,7 +335,16 @@ class WithDefault(Generic[*Ts]):
     attr: tuple[*Ts]
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
+reveal_type(WithDefault[()]().attr)  # revealed: tuple[()]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+
+T = TypeVar("T")
+
+class PrefixWithDefault(Generic[T, *Ts]):
+    attr: tuple[T, *Ts]
+
+reveal_type(PrefixWithDefault[bool]().attr)  # revealed: tuple[bool, int, str]
+reveal_type(PrefixWithDefault[bool, *tuple[()]]().attr)  # revealed: tuple[bool]
 ```
 
 ### Backported default type arguments
@@ -383,6 +361,8 @@ from typing import Generic
 from typing_extensions import TypeVarTuple, Unpack
 
 Ts = TypeVarTuple("Ts", default=Unpack[tuple[int, str]])
+reveal_type(Ts.__default__)  # revealed: tuple[int, str]
+reveal_type(Ts.has_default())  # revealed: bool
 
 class WithBackportedDefault(Generic[*Ts]):
     attr: tuple[*Ts]
@@ -467,21 +447,39 @@ def _(a1: Alias, a2: Alias[*tuple[Any, ...]]) -> None:
 from typing import TypeVar, TypeVarTuple
 
 T = TypeVar("T")
+U = TypeVar("U")
 Ts = TypeVarTuple("Ts")
 
 First = tuple[*Ts, T]
 Second = tuple[T, *Ts]
+Middle = tuple[T, *Ts, U]
+PrefixTwo = tuple[T, U, *Ts]
+SuffixTwo = tuple[*Ts, T, U]
 
 def _(
     f1: First[*tuple[int, ...]],
     f2: First[*tuple[int, ...], str],
     s1: Second[*tuple[int, ...]],
     s2: Second[str, *tuple[int, ...]],
+    m1: Middle[*tuple[int, ...]],
+    m2: Middle[*tuple[int, ...], str],
+    m3: Middle[str, *tuple[int, ...]],
+    p1: PrefixTwo[*tuple[int, ...]],
+    p2: PrefixTwo[*tuple[int, ...], str],
+    s3: SuffixTwo[*tuple[int, ...]],
+    s4: SuffixTwo[*tuple[int, ...], str],
 ):
     reveal_type(f1)  # revealed: tuple[*tuple[int, ...], int]
     reveal_type(f2)  # revealed: tuple[*tuple[int, ...], str]
     reveal_type(s1)  # revealed: tuple[int, *tuple[int, ...]]
     reveal_type(s2)  # revealed: tuple[str, *tuple[int, ...]]
+    reveal_type(m1)  # revealed: tuple[int, *tuple[int, ...], int]
+    reveal_type(m2)  # revealed: tuple[int, *tuple[int, ...], str]
+    reveal_type(m3)  # revealed: tuple[str, *tuple[int, ...], int]
+    reveal_type(p1)  # revealed: tuple[int, int, *tuple[int, ...]]
+    reveal_type(p2)  # revealed: tuple[int, int, *tuple[int, ...], str]
+    reveal_type(s3)  # revealed: tuple[*tuple[int, ...], int, int]
+    reveal_type(s4)  # revealed: tuple[*tuple[int, ...], int, str]
 ```
 
 ### Variadic substitutions

@@ -568,6 +568,23 @@ reveal_type(only_variadic)  # revealed: (...) -> None
 def unpack_variadic(*args: *tuple[int, *tuple[str, ...]], **kwargs: int) -> None: ...
 
 reveal_type(unpack_variadic)  # revealed: (*args: str, **kwargs: int) -> None
+
+def returning_decorator[**P, R](
+    func: Callable[Concatenate[int, P], R],
+) -> Callable[P, R]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        return func(0, *args, **kwargs)
+    return wrapper
+
+@returning_decorator
+def mixed_unpack(
+    *args: *tuple[int, *tuple[str, ...], bytes],
+    **kwargs: int,
+) -> str:
+    return ""
+
+reveal_type(mixed_unpack(b"end"))  # revealed: str
+reveal_type(mixed_unpack("one", "two", b"end", key=1))  # revealed: str
 ```
 
 ## `Concatenate` with `ParamSpec` in generic function calls

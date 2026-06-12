@@ -312,6 +312,17 @@ impl<'db> ProtocolInterface<'db> {
         self.inner(db).contains_key(name)
     }
 
+    pub(super) fn without_member(self, db: &'db dyn Db, excluded: &str) -> Self {
+        Self::new(
+            db,
+            self.inner(db)
+                .iter()
+                .filter(|(name, _)| name.as_str() != excluded)
+                .map(|(name, data)| (name.clone(), data.clone()))
+                .collect::<BTreeMap<_, _>>(),
+        )
+    }
+
     /// Returns the `__call__` method's callable type if this protocol has a `__call__` method member.
     pub(super) fn call_method(self, db: &'db dyn Db) -> Option<CallableType<'db>> {
         self.member_by_name(db, "__call__")

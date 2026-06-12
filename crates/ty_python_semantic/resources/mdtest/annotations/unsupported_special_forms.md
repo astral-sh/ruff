@@ -96,7 +96,7 @@ def allowed(
     reveal_type(tuple_fixed)  # revealed: tuple[int, str, bytes]
     reveal_type(tuple_variadic)  # revealed: tuple[int, *tuple[str, ...], bytes]
     reveal_type(callable_typevartuple)  # revealed: (int, /, *Ts@allowed) -> None
-    reveal_type(callable_tuple)  # revealed: (*tuple[int, str]) -> None
+    reveal_type(callable_tuple)  # revealed: (int, str, /) -> None
     reveal_type(pair)  # revealed: Pair[int, str]
     reveal_type(quoted_pair_argument)  # revealed: Pair[int, str]
     reveal_type(quoted_tuple)  # revealed: tuple[int, str, bytes]

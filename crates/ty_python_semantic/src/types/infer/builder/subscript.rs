@@ -378,10 +378,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         previously_in_unpack_type_argument,
                     );
 
-                    return if matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(db)
-                    ) || inner_ty.exact_tuple_instance_spec(db).is_some()
+                    return if super::is_typevartuple_type_or_instance(db, inner_ty)
+                        || inner_ty.exact_tuple_instance_spec(db).is_some()
                     {
                         inner_ty
                     } else {
@@ -600,6 +598,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let typevartuple_index = typevars
             .iter()
             .position(|typevar| typevar.is_typevartuple(db));
+        let mut typevartuple_argument_was_supplied =
+            typevartuple_index == Some(0) && type_arguments.is_empty();
 
         let mut expanded_type_arguments = Vec::with_capacity(type_arguments.len());
 
@@ -621,6 +621,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 typevars.get(expanded_type_arguments.len()).copied()
             };
+            if typevar.is_some_and(|typevar| typevar.is_typevartuple(db)) {
+                typevartuple_argument_was_supplied = true;
+            }
             if exactly_one_paramspec || typevar.is_some_and(|typevar| typevar.is_paramspec(db)) {
                 expanded_type_arguments.push(TypeArgument {
                     node: expr,
@@ -694,8 +697,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        let mut typevartuple_uses_default = false;
         let expanded_type_arguments = if let Some(typevartuple_index) = typevartuple_index {
             let suffix_len = typevars_len - typevartuple_index - 1;
+
+            // A single homogeneous arbitrary-length tuple can be split across fixed type
+            // variables on both sides of the TypeVarTuple. Insert virtual element arguments next
+            // to the unpack so the normal prefix/middle/suffix partition sees the unpack exactly
+            // once in the middle and an element for every otherwise-missing fixed slot.
+            let splittable_unbounded = expanded_type_arguments
+                .iter()
+                .enumerate()
+                .filter_map(|(index, type_argument)| {
+                    let provided_type = type_argument.ty?;
+                    let flags = self.type_expression_flags(type_argument.node);
+                    if !flags.contains(TypeExpressionFlags::UNPACK)
+                        || flags.contains(TypeExpressionFlags::INVALID_UNPACK)
+                    {
+                        return None;
+                    }
+                    let tuple = provided_type.exact_tuple_instance_spec(db)?;
+                    let Tuple::Variable(variable) = tuple.as_ref() else {
+                        return None;
+                    };
+                    if !variable.prefix_elements().is_empty()
+                        || !variable.suffix_elements().is_empty()
+                        || matches!(
+                            variable.variable(),
+                            Type::TypeVar(typevar) if typevar.is_typevartuple(db)
+                        )
+                    {
+                        return None;
+                    }
+                    Some((index, *type_argument, variable.variable()))
+                })
+                .collect::<Vec<_>>();
+            if let [(unbounded_index, unbounded_argument, element_type)] =
+                splittable_unbounded.as_slice()
+            {
+                let prefix_fill = typevartuple_index.saturating_sub(*unbounded_index);
+                expanded_type_arguments.splice(
+                    *unbounded_index..*unbounded_index,
+                    (0..prefix_fill).map(|_| TypeArgument {
+                        ty: Some(*element_type),
+                        ..*unbounded_argument
+                    }),
+                );
+
+                let unbounded_index = *unbounded_index + prefix_fill;
+                let available_suffix = expanded_type_arguments.len() - unbounded_index - 1;
+                let suffix_fill = suffix_len.saturating_sub(available_suffix);
+                let suffix_insertion_index = unbounded_index + 1;
+                expanded_type_arguments.splice(
+                    suffix_insertion_index..suffix_insertion_index,
+                    (0..suffix_fill).map(|_| TypeArgument {
+                        ty: Some(*element_type),
+                        ..*unbounded_argument
+                    }),
+                );
+            }
+
             let typevartuple_end = expanded_type_arguments
                 .len()
                 .saturating_sub(suffix_len)
@@ -723,6 +784,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 {
                     tuple_builder = tuple_builder.concat(db, &tuple);
+                    typevartuple_argument_was_supplied = true;
                     packed.push(TypeArgument {
                         ty: Some(variable.variable()),
                         ..*type_argument
@@ -758,6 +820,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let typevartuple_start = expanded_type_arguments.len().min(typevartuple_index);
+            if typevartuple_end > typevartuple_start {
+                typevartuple_argument_was_supplied = true;
+            }
             for type_argument in &expanded_type_arguments
                 [typevartuple_start..expanded_type_arguments.len().min(typevartuple_end)]
             {
@@ -809,6 +874,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     {
                         tuple_builder = tuple_builder.concat(db, &tuple);
+                        typevartuple_argument_was_supplied = true;
                         packed_suffix.push(TypeArgument {
                             ty: Some(variable.variable()),
                             ..*type_argument
@@ -844,7 +910,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if expanded_type_arguments.len() >= typevartuple_index {
+            if packed.len() == typevartuple_index {
+                typevartuple_uses_default = !typevartuple_argument_was_supplied
+                    && typevars[typevartuple_index].default_type(db).is_some();
                 packed.push(TypeArgument {
                     node: expanded_type_arguments
                         .get(typevartuple_index)
@@ -879,6 +947,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 EitherOrBoth::Both(typevar, type_argument) => {
                     if typevar.default_type(db).is_some() {
                         typevar_with_defaults += 1;
+                    }
+                    if typevartuple_index == Some(index) && typevartuple_uses_default {
+                        specialization_types.push(None);
+                        continue;
                     }
 
                     let provided_type = if typevar.is_paramspec(db) {

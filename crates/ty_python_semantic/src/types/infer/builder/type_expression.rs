@@ -2360,10 +2360,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Preserve valid unpack targets so that `Unpack[...]` follows the same
                 // argument-binding path as an equivalent starred annotation.
                 if inner_ty.exact_tuple_instance_spec(self.db()).is_some()
-                    || matches!(
-                        inner_ty,
-                        Type::TypeVar(typevar) if typevar.is_typevartuple(self.db())
-                    )
+                    || super::is_typevartuple_type_or_instance(self.db(), inner_ty)
                 {
                     inner_ty
                 } else {
@@ -2659,7 +2656,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     previously_in_valid_unpack_context,
                 );
 
-                return Some(Parameters::new(self.db(), parameters));
+                return Some(
+                    Parameters::new(self.db(), parameters)
+                        .normalize_starred_variadic_annotations(self.db()),
+                );
             }
             ast::Expr::Subscript(subscript) => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());

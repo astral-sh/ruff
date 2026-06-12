@@ -15,24 +15,24 @@ def foo[*Ts](*args: *Ts) -> None:
     reveal_type(args)  # revealed: tuple[*Ts@foo]
 ```
 
-## Variance inference
+## Variance
 
-PEP 695 type variable tuples infer variance from how the class uses them.
+PEP 695 type variable tuples are always invariant, regardless of how the class uses them.
 
 ```py
-class CovariantArray[*Ts]:
+class ReturnOnlyArray[*Ts]:
     def get(self) -> tuple[*Ts]:
         raise NotImplementedError
 
-covariant_ok: CovariantArray[object] = CovariantArray[int]()
-covariant_error: CovariantArray[int] = CovariantArray[object]()  # error: [invalid-assignment]
+return_only_out: ReturnOnlyArray[object] = ReturnOnlyArray[int]()  # error: [invalid-assignment]
+return_only_in: ReturnOnlyArray[int] = ReturnOnlyArray[object]()  # error: [invalid-assignment]
 
-class ContravariantArray[*Ts]:
+class ParameterOnlyArray[*Ts]:
     def set(self, value: tuple[*Ts]) -> None:
         raise NotImplementedError
 
-contravariant_ok: ContravariantArray[int] = ContravariantArray[object]()
-contravariant_error: ContravariantArray[object] = ContravariantArray[int]()  # error: [invalid-assignment]
+parameter_only_out: ParameterOnlyArray[object] = ParameterOnlyArray[int]()  # error: [invalid-assignment]
+parameter_only_in: ParameterOnlyArray[int] = ParameterOnlyArray[object]()  # error: [invalid-assignment]
 
 class InvariantArray[*Ts]:
     values: tuple[*Ts]
@@ -154,7 +154,19 @@ class WithDefault[*Ts = *tuple[int, str]]:
     attr: tuple[*Ts]
 
 reveal_type(WithDefault().attr)  # revealed: tuple[int, str]
+reveal_type(WithDefault[()]().attr)  # revealed: tuple[()]
 reveal_type(WithDefault[bool, bytes]().attr)  # revealed: tuple[bool, bytes]
+
+class PrefixWithDefault[T, *Ts = *tuple[int, str]]:
+    attr: tuple[T, *Ts]
+
+reveal_type(PrefixWithDefault[bool]().attr)  # revealed: tuple[bool, int, str]
+reveal_type(PrefixWithDefault[bool, *tuple[()]]().attr)  # revealed: tuple[bool]
+
+class DependentDefault[T, *Ts = *tuple[T]]:
+    attr: tuple[T, *Ts]
+
+reveal_type(DependentDefault[bytes]().attr)  # revealed: tuple[bytes, bytes]
 ```
 
 ### Assignment checks
@@ -208,6 +220,13 @@ def f(i: int, s: str, b: bool) -> None:
     reveal_type(with_prefix(i, (s, b)))  # revealed: tuple[int, str, bool]
     reveal_type(with_suffix((i, s), b))  # revealed: tuple[int, str, bool]
     reveal_type(with_both((i, s, b)))  # revealed: tuple[str]
+
+def variable_tuples(
+    homogeneous: tuple[bytes, ...],
+    mixed: tuple[int, *tuple[str, ...], bytes],
+) -> None:
+    reveal_type(simple(homogeneous))  # revealed: tuple[bytes, ...]
+    simple(mixed)
 ```
 
 ### Starred variadic parameters
@@ -233,6 +252,15 @@ def f(i: int, s: str, b: bool) -> None:
     reveal_type(kw_only(i, s, kw=b))  # revealed: tuple[int, str, bool]
     # error: [missing-argument] "No argument provided for required parameter `kw` of function `kw_only`"
     reveal_type(kw_only(i, s, b))  # revealed: tuple[int, str, bool, Unknown]
+
+def splatted(
+    fixed: tuple[int, str],
+    homogeneous: tuple[bytes, ...],
+) -> None:
+    reveal_type(simple(*fixed))  # revealed: tuple[int, str]
+    reveal_type(simple(*homogeneous))  # revealed: tuple[bytes, ...]
+    reveal_type(with_prefix(*fixed))  # revealed: tuple[int, str]
+    with_prefix(*homogeneous)
 ```
 
 ### Callable parameters
@@ -264,15 +292,88 @@ def variadic2(*args: int) -> tuple[str, ...]:
 def keyword_only(*, x: int) -> tuple[int]:
     raise NotImplementedError
 
+def fixed_unpacked(*args: *tuple[int, str]) -> tuple[int, str]:
+    raise NotImplementedError
+
+def homogeneous_unpacked(*args: *tuple[bytes, ...]) -> tuple[bytes, ...]:
+    raise NotImplementedError
+
+class PositionalCallable:
+    def __call__(self, x: int, y: str, /) -> tuple[int, str]:
+        raise NotImplementedError
+
 reveal_type(simple(positional_only))  # revealed: tuple[int, str]
 reveal_type(simple(standard))  # revealed: tuple[int, str]
 reveal_type(simple(positional_variadic))  # revealed: tuple[int, *tuple[str, ...]]
 reveal_type(simple(variadic1))  # revealed: tuple[int, ...]
+reveal_type(simple(fixed_unpacked))  # revealed: tuple[int, str]
+reveal_type(simple(homogeneous_unpacked))  # revealed: tuple[bytes, ...]
+reveal_type(simple(PositionalCallable()))  # revealed: tuple[int, str]
 
 # error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: int) -> tuple[int, ...]`, found `def variadic2(*args: int) -> tuple[str, ...]`"
 reveal_type(simple(variadic2))  # revealed: tuple[int, ...]
-# error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `(*args: Unknown) -> tuple[Unknown, ...]`, found `def keyword_only(*, x: int) -> tuple[int]`"
-reveal_type(simple(keyword_only))  # revealed: tuple[Unknown, ...]
+# error: [invalid-argument-type] "Argument to function `simple` is incorrect: Expected `() -> tuple[()]`, found `def keyword_only(*, x: int) -> tuple[int]`"
+reveal_type(simple(keyword_only))  # revealed: tuple[()]
+
+class Holder[*Ts]:
+    callback: Callable[[*Ts], None]
+
+def use_holder(holder: Holder[*tuple[*tuple[str, ...], bytes]]) -> None:
+    reveal_type(holder.callback)  # revealed: (*tuple[*tuple[str, ...], bytes]) -> None
+    holder.callback(b"end")
+    holder.callback("one", "two", b"end")
+```
+
+An overloaded callable is accepted if any overload is compatible. The order of the overloads does
+not affect whether the callable is accepted.
+
+```py
+from typing import Any, Callable, overload
+
+def accepts_integer_callback[*Ts](callback: Callable[[*Ts], int]) -> None:
+    pass
+
+@overload
+def overloaded(value: str, /) -> str: ...
+@overload
+def overloaded(value: int, scale: float, /) -> int: ...
+def overloaded(*args: Any) -> Any:
+    raise NotImplementedError
+
+@overload
+def overloaded_reversed(value: int, scale: float, /) -> int: ...
+@overload
+def overloaded_reversed(value: str, /) -> str: ...
+def overloaded_reversed(*args: Any) -> Any:
+    raise NotImplementedError
+
+accepts_integer_callback(overloaded)
+accepts_integer_callback(overloaded_reversed)
+
+def choose[*Ts](
+    callback: Callable[[*Ts], int],
+    arguments: tuple[*Ts],
+) -> tuple[*Ts]:
+    raise NotImplementedError
+
+@overload
+def integer_overloads(value: str, /) -> int: ...
+@overload
+def integer_overloads(value: int, scale: float, /) -> int: ...
+def integer_overloads(*args: Any) -> int:
+    raise NotImplementedError
+
+@overload
+def integer_overloads_reversed(value: int, scale: float, /) -> int: ...
+@overload
+def integer_overloads_reversed(value: str, /) -> int: ...
+def integer_overloads_reversed(*args: Any) -> int:
+    raise NotImplementedError
+
+choose(integer_overloads, (1, 1.0))
+choose(integer_overloads, ("x",))
+choose(integer_overloads_reversed, (1, 1.0))
+choose(integer_overloads_reversed, ("x",))
 ```
 
 This usage pattern is similar to how `ParamSpec` can be used to accept a callable and its arguments
@@ -335,12 +436,16 @@ def infer_positional[*Ts](callback: Callable[[*Ts], None]) -> tuple[*Ts]:
 def optional_keyword_only(x: int, y: str, *, debug: bool = False) -> None: ...
 def extra_keywords(x: int, y: str, **kwargs: object) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def optional_keyword_only(x: int, y: str, *, debug: bool = False) -> None`"
-reveal_type(infer_positional(optional_keyword_only))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_positional` is incorrect: Expected `(*args: Unknown) -> None`, found `def extra_keywords(x: int, y: str, **kwargs: object) -> None`"
-reveal_type(infer_positional(extra_keywords))  # revealed: tuple[Unknown, ...]
+infer_positional(optional_keyword_only)
+infer_positional(extra_keywords)
+
+def infer_return[*Ts, R](callback: Callable[[*Ts], R]) -> R:
+    raise NotImplementedError
+
+def returns_str(x: int, *, debug: bool = False) -> str:
+    return ""
+
+reveal_type(infer_return(returns_str))  # revealed: str
 ```
 
 ### Callable protocol inference with keyword-only parameters
@@ -362,18 +467,29 @@ def positional_only_with_keyword(x: int, y: str, /, *, flag: bool) -> None: ...
 def positional_or_keyword(x: int, y: str, flag: bool) -> None: ...
 def keyword_catch_all(x: int, y: str, **kwargs: object) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_only` is incorrect: Expected `KeywordOnlyCallback[*tuple[Unknown, ...]]`, found `def explicit_keyword_only(x: int, y: str, *, flag: bool) -> None`"
-reveal_type(infer_keyword_only(explicit_keyword_only))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_only` is incorrect: Expected `KeywordOnlyCallback[*tuple[Unknown, ...]]`, found `def positional_only_with_keyword(x: int, y: str, /, *, flag: bool) -> None`"
-reveal_type(infer_keyword_only(positional_only_with_keyword))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_only` is incorrect: Expected `KeywordOnlyCallback[*tuple[Unknown, ...]]`, found `def positional_or_keyword(x: int, y: str, flag: bool) -> None`"
-reveal_type(infer_keyword_only(positional_or_keyword))  # revealed: tuple[Unknown, ...]
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_only` is incorrect: Expected `KeywordOnlyCallback[*tuple[Unknown, ...]]`, found `def keyword_catch_all(x: int, y: str, **kwargs: object) -> None`"
-reveal_type(infer_keyword_only(keyword_catch_all))  # revealed: tuple[Unknown, ...]
+class KeywordOnlyCallable:
+    def __call__(self, x: int, y: str, *, flag: bool) -> None: ...
+
+infer_keyword_only(explicit_keyword_only)
+infer_keyword_only(positional_only_with_keyword)
+infer_keyword_only(positional_or_keyword)
+infer_keyword_only(keyword_catch_all)
+infer_keyword_only(KeywordOnlyCallable())
+
+class ValuedCallback[T, *Ts](Protocol):
+    value: T
+
+    def __call__(self, *args: *Ts) -> None: ...
+
+def infer_value[T, *Ts](callback: ValuedCallback[T, *Ts]) -> T:
+    raise NotImplementedError
+
+class ValuedCallable:
+    value: int = 0
+
+    def __call__(self) -> None: ...
+
+reveal_type(infer_value(ValuedCallable()))  # revealed: int
 
 class OptionalKeywordCallback[*Ts](Protocol):
     def __call__(self, *args: *Ts, flag: bool = False) -> None: ...
@@ -383,9 +499,7 @@ def infer_optional_keyword[*Ts](callback: OptionalKeywordCallback[*Ts]) -> tuple
 
 def optional_keyword_callback(x: int, y: str, *, flag: bool = False) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_optional_keyword` is incorrect: Expected `OptionalKeywordCallback[*tuple[Unknown, ...]]`, found `def optional_keyword_callback(x: int, y: str, *, flag: bool = False) -> None`"
-reveal_type(infer_optional_keyword(optional_keyword_callback))  # revealed: tuple[Unknown, ...]
+infer_optional_keyword(optional_keyword_callback)
 
 class PrefixedKeywordCallback[*Ts](Protocol):
     def __call__(self, prefix: bytes, *args: *Ts, flag: bool) -> None: ...
@@ -396,9 +510,7 @@ def infer_prefixed[*Ts](callback: PrefixedKeywordCallback[*Ts]) -> tuple[*Ts]:
 def prefixed(prefix: bytes, x: int, y: str, *, flag: bool) -> None: ...
 def prefixed_variadic(prefix: bytes, *args: str, flag: bool) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_prefixed` is incorrect: Expected `PrefixedKeywordCallback[*tuple[Unknown, ...]]`, found `def prefixed(prefix: bytes, x: int, y: str, *, flag: bool) -> None`"
-reveal_type(infer_prefixed(prefixed))  # revealed: tuple[Unknown, ...]
+infer_prefixed(prefixed)
 
 # An open-ended positional parameter can be inferred in an otherwise mixed signature.
 reveal_type(infer_prefixed(prefixed_variadic))  # revealed: tuple[str, ...]
@@ -420,9 +532,7 @@ def infer_keyword_variadic[*Ts](callback: KeywordVariadicCallback[*Ts]) -> tuple
 
 def keyword_variadic(x: int, y: str, **kwargs: int) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_variadic` is incorrect: Expected `KeywordVariadicCallback[*tuple[Unknown, ...]]`, found `def keyword_variadic(x: int, y: str, **kwargs: int) -> None`"
-reveal_type(infer_keyword_variadic(keyword_variadic))  # revealed: tuple[Unknown, ...]
+infer_keyword_variadic(keyword_variadic)
 
 class KeywordOnlyAndVariadicCallback[*Ts](Protocol):
     def __call__(self, *args: *Ts, flag: bool, **kwargs: int) -> None: ...
@@ -434,9 +544,7 @@ def infer_keyword_only_and_variadic[*Ts](
 
 def keyword_only_and_variadic(x: int, y: str, *, flag: bool, **kwargs: int) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_keyword_only_and_variadic` is incorrect: Expected `KeywordOnlyAndVariadicCallback[*tuple[Unknown, ...]]`, found `def keyword_only_and_variadic(x: int, y: str, *, flag: bool, **kwargs: int) -> None`"
-reveal_type(infer_keyword_only_and_variadic(keyword_only_and_variadic))  # revealed: tuple[Unknown, ...]
+infer_keyword_only_and_variadic(keyword_only_and_variadic)
 
 class MultipleKeywordCallback[*Ts](Protocol):
     def __call__(self, *args: *Ts, first: int, second: str) -> None: ...
@@ -446,9 +554,7 @@ def infer_multiple_keywords[*Ts](callback: MultipleKeywordCallback[*Ts]) -> tupl
 
 def multiple_keyword_catch_all(x: int, y: str, **kwargs: object) -> None: ...
 
-# TODO: Should reveal `tuple[int, str]`.
-# error: [invalid-argument-type] "Argument to function `infer_multiple_keywords` is incorrect: Expected `MultipleKeywordCallback[*tuple[Unknown, ...]]`, found `def multiple_keyword_catch_all(x: int, y: str, **kwargs: object) -> None`"
-reveal_type(infer_multiple_keywords(multiple_keyword_catch_all))  # revealed: tuple[Unknown, ...]
+infer_multiple_keywords(multiple_keyword_catch_all)
 ```
 
 ### Length-sensitive inference
@@ -464,6 +570,10 @@ def f(i: int, s: str, b: bool) -> None:
     reveal_type(foo((i, s), (b, i)))  # revealed: tuple[int, str | int]
     # error: [invalid-argument-type] "Argument to function `foo` is incorrect: Expected `tuple[int]`, found `tuple[str, bool]`"
     reveal_type(foo((i,), (s, b)))  # revealed: tuple[int]
+
+def variable_and_fixed(variable: tuple[int, ...], fixed: tuple[int]) -> None:
+    foo(variable, fixed)
+    foo(fixed, variable)
 ```
 
 ## Type concatenation
@@ -496,11 +606,11 @@ reveal_type(add_letters(Array[B, D]()))  # revealed: Array[A, B, D, C]
 reveal_type(add_letter_a(Array[B, C]()))  # revealed: Array[A, B, C]
 
 reveal_type(del_letter_a(Array[A, B]()))  # revealed: Array[B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_a` is incorrect: Expected `Array[A, C]`, found `Array[B, C]`"
 reveal_type(del_letter_a(Array[B, C]()))  # revealed: Array[C]
 
 reveal_type(del_letter_c(Array[A, B, C]()))  # revealed: Array[A, B]
-# TODO: error: [invalid-argument-type]
+# error: [invalid-argument-type] "Argument to function `del_letter_c` is incorrect: Expected `Array[A, C]`, found `Array[A, B]`"
 reveal_type(del_letter_c(Array[A, B]()))  # revealed: Array[A]
 
 reveal_type(generic(A(), Array[B, D]()))  # revealed: Array[A, B, D]
@@ -544,15 +654,9 @@ def f(
     suffix: tuple[*tuple[str, ...], bytes],
     mixed: tuple[int, *tuple[str, ...], bytes],
 ) -> None:
-    # TODO: Should reveal `tuple[int, *tuple[str, ...]]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[int, ...]`, found `tuple[int, *tuple[str, ...]]`"
-    reveal_type(preserve(prefix))  # revealed: tuple[int, ...]
-    # TODO: Should reveal `tuple[*tuple[str, ...], bytes]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[str, ...]`, found `tuple[*tuple[str, ...], bytes]`"
-    reveal_type(preserve(suffix))  # revealed: tuple[str, ...]
-    # TODO: Should reveal `tuple[int, *tuple[str, ...], bytes]`.
-    # error: [invalid-argument-type] "Argument to function `preserve` is incorrect: Expected `tuple[int, ...]`, found `tuple[int, *tuple[str, ...], bytes]`"
-    reveal_type(preserve(mixed))  # revealed: tuple[int, ...]
+    reveal_type(preserve(prefix))  # revealed: tuple[int, *tuple[str, ...]]
+    reveal_type(preserve(suffix))  # revealed: tuple[*tuple[str, ...], bytes]
+    reveal_type(preserve(mixed))  # revealed: tuple[int, *tuple[str, ...], bytes]
 ```
 
 A tuple containing an unpacked tuple can precisely describe heterogeneous positional arguments,
@@ -636,11 +740,21 @@ def _(a1: Headered, a2: Headered[*tuple[Any, ...]]) -> None:
 ```py
 type First[*Ts, T] = tuple[*Ts, T]
 type Second[T, *Ts] = tuple[T, *Ts]
+type Middle[T, *Ts, U] = tuple[T, *Ts, U]
+type PrefixTwo[T, U, *Ts] = tuple[T, U, *Ts]
+type SuffixTwo[*Ts, T, U] = tuple[*Ts, T, U]
 
 reveal_type(First[*tuple[int, ...]])  # revealed: <type alias 'First[*tuple[int, ...], int]'>
 reveal_type(First[*tuple[int, ...], str])  # revealed: <type alias 'First[*tuple[int, ...], str]'>
 reveal_type(Second[*tuple[int, ...]])  # revealed: <type alias 'Second[int, *tuple[int, ...]]'>
 reveal_type(Second[str, *tuple[int, ...]])  # revealed: <type alias 'Second[str, *tuple[int, ...]]'>
+reveal_type(Middle[*tuple[int, ...]])  # revealed: <type alias 'Middle[int, *tuple[int, ...], int]'>
+reveal_type(Middle[*tuple[int, ...], str])  # revealed: <type alias 'Middle[int, *tuple[int, ...], str]'>
+reveal_type(Middle[str, *tuple[int, ...]])  # revealed: <type alias 'Middle[str, *tuple[int, ...], int]'>
+reveal_type(PrefixTwo[*tuple[int, ...]])  # revealed: <type alias 'PrefixTwo[int, int, *tuple[int, ...]]'>
+reveal_type(PrefixTwo[*tuple[int, ...], str])  # revealed: <type alias 'PrefixTwo[int, int, *tuple[*tuple[int, ...], str]]'>
+reveal_type(SuffixTwo[*tuple[int, ...]])  # revealed: <type alias 'SuffixTwo[*tuple[int, ...], int, int]'>
+reveal_type(SuffixTwo[*tuple[int, ...], str])  # revealed: <type alias 'SuffixTwo[*tuple[int, ...], int, str]'>
 ```
 
 ### Variadic substitutions

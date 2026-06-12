@@ -129,6 +129,7 @@ fn check_legacy_typevar_defaults<'db>(
                 | TypeVarKind::Pep613Alias
                 | TypeVarKind::ParamSpec
                 | TypeVarKind::TypeVarTuple
+                | TypeVarKind::ExtensionsTypeVarTuple
         ) {
             continue;
         }
@@ -257,6 +258,7 @@ fn check_legacy_typevar_ordering<'db>(
                 | TypeVarKind::Pep613Alias
                 | TypeVarKind::ParamSpec
                 | TypeVarKind::TypeVarTuple
+                | TypeVarKind::ExtensionsTypeVarTuple
         ) {
             continue;
         }
