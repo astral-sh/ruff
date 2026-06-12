@@ -62,9 +62,28 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
-    for arm in arms {
+    let Some((wildcard, rule_arms)) = arms.split_last() else {
+        return Err(Error::new(
+            func.block.span(),
+            "expected a final wildcard match arm",
+        ));
+    };
+    if !matches!(wildcard.pat, Pat::Wild(_)) {
+        return Err(Error::new_spanned(
+            wildcard,
+            "expected the final match arm to be a wildcard",
+        ));
+    }
+    if let Some((if_token, _)) = &wildcard.guard {
+        return Err(Error::new(
+            if_token.span,
+            "the final wildcard match arm cannot have a guard",
+        ));
+    }
+
+    for arm in rule_arms {
         if matches!(arm.pat, Pat::Wild(..)) {
-            break;
+            return Err(Error::new_spanned(arm, "wildcard match arm must be last"));
         }
 
         let rule = Rule::try_from(arm)?;
