@@ -228,7 +228,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
-    let rule_to_code = generate_rule_to_code(&linter_to_rules);
+    let rule_to_code = generate_rule_to_code(&linter_to_rules)?;
     output.extend(rule_to_code);
 
     output.extend(generate_iter_impl(&linter_to_rules, &linter_idents));
@@ -267,7 +267,9 @@ fn rules_by_prefix(
 /// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
 /// different codes). We haven't actually activated this functionality yet, but some work was
 /// done to support it, so the logic exists here.
-fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
+fn generate_rule_to_code(
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
+) -> syn::Result<TokenStream> {
     let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
@@ -286,39 +288,35 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     let mut rule_noqa_code_match_arms = quote!();
 
     // Keep the proc-macro output stable so unchanged code can be reused incrementally.
-    for (rule, codes) in rule_to_codes
+    for (rule_path, codes) in rule_to_codes
         .into_iter()
         .sorted_by_key(|(rule, _)| rule.to_token_stream().to_string())
     {
-        let rule_name = rule.segments.last().unwrap();
-        assert_eq!(
-            codes.len(),
-            1,
-            "
-{} is mapped to multiple codes.
-
-The mapping of multiple codes to one rule has been disabled due to UX concerns (it would
-be confusing if violations were reported under a different code than the code you selected).
-
-We firstly want to allow rules to be selected by their names (and report them by name),
-and before we can do that we have to rename all our rules to match our naming convention
-(see CONTRIBUTING.md) because after that change every rule rename will be a breaking change.
-
-See also https://github.com/astral-sh/ruff/issues/2186.
-",
-            rule_name.ident
-        );
+        let rule = match codes.as_slice() {
+            [rule] => *rule,
+            [first, second, ..] => {
+                let mut error =
+                    Error::new_spanned(&second.path, "rule is mapped to more than one code");
+                error.combine(Error::new_spanned(&first.path, "rule first mapped here"));
+                return Err(error);
+            }
+            [] => {
+                return Err(Error::new_spanned(
+                    rule_path,
+                    "rule must be mapped to a code",
+                ));
+            }
+        };
+        let Some(rule_name) = rule_path.segments.last() else {
+            return Err(Error::new_spanned(rule_path, "expected a rule path"));
+        };
 
         let Rule {
             linter,
             code,
             attrs,
             ..
-        } = codes
-            .iter()
-            .sorted_by_key(|data| data.linter == "Pylint")
-            .next()
-            .unwrap();
+        } = rule;
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
@@ -361,7 +359,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             }
         }
     };
-    rule_to_code
+    Ok(rule_to_code)
 }
 
 /// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
