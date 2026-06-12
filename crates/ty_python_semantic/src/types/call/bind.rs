@@ -2745,7 +2745,10 @@ impl<'db> Bindings<'db> {
                                 // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
                                 // `__iter__ = None`, for example). That would be badly written Python code, but we still
                                 // need to be able to handle it without crashing.
-                                let return_type = if let Type::Union(union) = argument {
+                                let return_type = if argument.resolve_type_alias(db).is_never() {
+                                    // A tuple with `Never` as an element is equal to `Never`
+                                    Type::Never
+                                } else if let Type::Union(union) = argument {
                                     union.map(db, |element| {
                                         Type::tuple(TupleType::new(db, &element.iterate(db)))
                                     })

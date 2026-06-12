@@ -149,12 +149,7 @@ impl<'db> Type<'db> {
                     _ => None
                 }
                 Type::Never => {
-                    // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
-                    // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
-                    // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
-                    // TODO: Consider removing this special case, and instead hide the indexing
-                    // diagnostic in unreachable code.
-                    Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+                    Some(Cow::Owned(TupleSpec::homogeneous(Type::Never)))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, alias.value_type(db)),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
