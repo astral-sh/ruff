@@ -7,12 +7,12 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `for` loops that can be replaced by a making a copy of a list.
+/// Checks for `for` loops that append each item from an iterable to a list
+/// without modification.
 ///
 /// ## Why is this bad?
-/// When creating a copy of an existing list using a for-loop, prefer
-/// `list` or `list.copy` instead. Making a direct copy is more readable and
-/// more performant.
+/// When creating a list from an iterable using a for-loop, prefer `list`
+/// instead. Building the list directly is more readable and more performant.
 ///
 /// Using the below as an example, the `list`-based copy is ~2x faster on
 /// Python 3.11.
@@ -41,7 +41,7 @@ pub(crate) struct ManualListCopy;
 impl Violation for ManualListCopy {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Use `list` or `list.copy` to create a copy of a list".to_string()
+        "Use `list` to create a list from an iterable".to_string()
     }
 }
 
