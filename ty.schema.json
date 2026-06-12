@@ -311,7 +311,7 @@
       ]
     },
     "RelativePathBuf": {
-      "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.",
+      "description": "A possibly relative path in a configuration file.\n\nRelative paths in configuration files, editor settings, or from CLI options\nrequire different anchoring:\n\n* CLI: The path is relative to the current working directory\n* Configuration file: The path is relative to the project's root.\n* Editor settings: The path is relative to the project's root. Editors spawn the\n  language server with an arbitrary current working directory (e.g. the folder\n  the editor was opened in), which has no meaning to the user's settings.",
       "allOf": [
         {
           "$ref": "#/definitions/SystemPathBuf"
