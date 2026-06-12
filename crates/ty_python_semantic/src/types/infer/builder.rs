@@ -6947,7 +6947,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
                 FxHashMap::default();
 
-            if let Some(tcx) = tcx.annotation
+            if let Some(tcx) = tcx.annotation.map(|tcx| tcx.resolve_type_alias(self.db()))
+                && matches!(tcx, Type::NominalInstance(_))
+                && let Some(specialization) = tcx.known_specialization(self.db(), collection_class)
+                && specialization.generic_context(self.db()) == generic_context
+                && generic_context.variables(self.db()).all(|typevar| {
+                    !typevar.is_paramspec(self.db())
+                        && typevar
+                            .typevar(self.db())
+                            .bound_or_constraints(self.db())
+                            .is_none()
+                })
+            {
+                // For an instance of the collection class itself, the identity specialization
+                // maps directly to the contextual specialization. Avoid constructing and solving
+                // a general assignability constraint set for this common case.
+                for (typevar, inferred_ty) in generic_context
+                    .variables(self.db())
+                    .zip(specialization.types(self.db()))
+                {
+                    let inferred_ty = inferred_ty
+                        .filter_union(self.db(), |ty| {
+                            !ty.as_typevar()
+                                .is_some_and(|tv| tv.is_inferable(self.db(), inferable))
+                        })
+                        .filter_union(self.db(), |ty| !ty.has_unspecialized_type_var(self.db()));
+                    if inferred_ty.has_unspecialized_type_var(self.db()) {
+                        continue;
+                    }
+
+                    let identity = typevar.identity(self.db());
+                    elt_tcx_constraints.insert(identity, UnionAccumulator::new(inferred_ty));
+                    elt_tcx_variance.insert(identity, typevar.variance(self.db()));
+                }
+            } else if let Some(tcx) = tcx.annotation
                 && tcx.class_specialization(self.db()).is_some()
             {
                 let db = self.db();
@@ -7020,9 +7053,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (elt_tcx_constraints, elt_tcx_variance)
         };
 
+        // Dictionary unpacking always contributes constraints on the inferred key and value types,
+        // even when the unpacked mapping is assignable to the context. Keep it on the general path
+        // so gradual types such as `Any` are preserved.
+        let has_dict_unpack = collection_class == KnownClass::Dict
+            && elts
+                .iter()
+                .any(|elts| matches!(elts.as_slice(), [None, Some(_)]));
+
+        let mut pre_inferred_elt_tys = None;
+
         // Avoid projecting and solving a constraint set when contextual inference has already
-        // provided the complete specialization for an empty collection literal.
-        if elts.is_empty()
+        // provided the complete specialization and every literal element is compatible with it.
+        if !has_dict_unpack
             && tcx.annotation.is_some()
             && let Some(specialization) = generic_context
                 .variables(self.db())
@@ -7042,14 +7085,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 })
                 .collect::<Option<Vec<_>>>()
         {
-            let class_type = collection_alias.origin(self.db()).apply_specialization(
-                self.db(),
-                |generic_context| {
-                    generic_context
-                        .specialize_recursive(self.db(), specialization.into_iter().map(Some))
-                },
-            );
-            return Type::from(class_type).to_instance(self.db());
+            // The slow path below adds the contextual specialization as an invariant mapping,
+            // then discards every element constraint that is already assignable to its context.
+            // Infer the elements once here and retain their types so that a failed fast-path check
+            // does not recursively re-infer nested collection literals on the slow path.
+            let mut inferred_elts = Vec::with_capacity(elts.len());
+            let mut compatible = true;
+
+            for elts in elts {
+                let mut inferred_elt_tys = [None; N];
+                for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
+                {
+                    let Some(elt) = elt else { continue };
+                    let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                        Type::homogeneous_tuple(self.db(), elt_tcx)
+                    } else {
+                        elt_tcx
+                    };
+                    let inferred_elt_ty =
+                        infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
+                    inferred_elt_tys[i] = Some(inferred_elt_ty);
+
+                    if !inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                        compatible = false;
+                    }
+                }
+                inferred_elts.push(inferred_elt_tys);
+            }
+
+            if compatible {
+                let class_type = collection_alias.origin(self.db()).apply_specialization(
+                    self.db(),
+                    |generic_context| {
+                        generic_context
+                            .specialize_recursive(self.db(), specialization.into_iter().map(Some))
+                    },
+                );
+                return Type::from(class_type).to_instance(self.db());
+            }
+
+            pre_inferred_elt_tys = Some(inferred_elts);
         }
 
         // Create a set of constraints to infer a precise type for `T`.
@@ -7142,7 +7217,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        for elts in elts {
+        for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
                 let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
@@ -7211,8 +7286,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     });
 
-                let inferred_elt_ty =
-                    infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
+                let inferred_elt_ty = pre_inferred_elt_tys
+                    .as_ref()
+                    .and_then(|inferred_elts| inferred_elts[elts_index][i])
+                    .unwrap_or_else(|| {
+                        infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)))
+                    });
 
                 // Simplify the inference based on a non-covariant declared type.
                 if let Some(elt_tcx) =
