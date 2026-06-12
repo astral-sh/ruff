@@ -1261,7 +1261,13 @@ impl<'db> Type<'db> {
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
-        Self::Recursive(RecursiveType::build(db, binder_id, origin, body))
+        let marker = Type::divergent(binder_id);
+        if RecursiveTypeNormalization::new(marker).contains_marker(db, body) {
+            Self::Recursive(RecursiveType::build(db, binder_id, origin, body))
+        } else {
+            // μa. T => T (if T doesn't contain a)
+            body
+        }
     }
 
     pub(crate) fn implicit_recursive(
@@ -1364,6 +1370,27 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
+    fn is_signature_cycle_body_for_cycle_recovery(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Callable(_)
+            | Type::PropertyInstance(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_) => true,
+            Type::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderGet(_)
+                | KnownBoundMethodType::FunctionTypeDunderCall(_)
+                | KnownBoundMethodType::PropertyDunderGet(_)
+                | KnownBoundMethodType::PropertyDunderSet(_)
+                | KnownBoundMethodType::PropertyDunderDelete(_),
+            ) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| element.is_signature_cycle_body_for_cycle_recovery(db)),
+            _ => false,
+        }
+    }
+
     /// Recover from a Salsa cycle by keeping fixed-point iteration monotonic and folding
     /// converged recursive structure into `Type::Recursive`.
     pub(crate) fn cycle_normalized(
@@ -1429,6 +1456,20 @@ impl<'db> Type<'db> {
             .fold(cycle_head_body(recovered), |ty, id| {
                 let marker = Type::divergent(id);
                 let normalization = RecursiveTypeNormalization::new(marker);
+                // Signature recovery keeps `Divergent` inside signatures instead of folding it
+                // into value-level recursive structure. If another head from the same Salsa cycle
+                // was already wrapped, look through that provisional wrapper for the current head.
+                let ty = match ty {
+                    Type::Recursive(rec)
+                        if rec.binder_id(db) != id
+                            && head_ids.iter().any(|head_id| *head_id == rec.binder_id(db))
+                            && rec.body(db).is_signature_cycle_body_for_cycle_recovery(db)
+                            && normalization.contains_marker(db, rec.body(db)) =>
+                    {
+                        rec.body(db)
+                    }
+                    _ => ty,
+                };
                 let normalized = ty
                     .recursive_type_normalized_impl(db, normalization)
                     .unwrap_or(marker);
