@@ -1098,6 +1098,8 @@ impl<'db> DefinitionTypes<'db> {
     }
 }
 
+/// Compact representations for common combinations of extra definition inference data.
+/// `Other` stores uncommon combinations that require multiple fields.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
 enum DefinitionInferenceExtra<'db> {
     /// Type qualifiers are the only extra data for most annotated definitions.
@@ -1110,6 +1112,7 @@ enum DefinitionInferenceExtra<'db> {
 
     Undecorated(Box<Type<'db>>),
 
+    /// Deferred definitions and the undecorated type are a common two-field combination.
     DeferredAndUndecorated(Box<DeferredAndUndecorated<'db>>),
 
     CalledFunctions(Box<[FunctionType<'db>]>),
