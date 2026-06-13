@@ -29,6 +29,26 @@ use crate::{
 };
 use ty_python_core::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map};
 
+/// Return the integer value if `ty` describes exactly one integer.
+///
+/// This treats equivalent literals such as `Literal[1] | Literal[True]` as the same runtime value
+/// and follows type aliases before comparing union members.
+fn exact_int_literal(db: &dyn Db, ty: Type<'_>) -> Option<i64> {
+    match ty.resolve_type_alias(db) {
+        Type::Union(union) => {
+            let elements = union.elements(db);
+            let first = elements
+                .iter()
+                .find_map(|element| element.resolve_type_alias(db).as_int_literal())?;
+            elements
+                .iter()
+                .all(|element| element.resolve_type_alias(db).as_int_like_literal() == Some(first))
+                .then_some(first)
+        }
+        ty => ty.as_int_literal(),
+    }
+}
+
 impl<'db> StaticClassLiteral<'db> {
     /// Returns `Some` if this is a protocol class, `None` otherwise.
     pub(super) fn into_protocol_class(self, db: &'db dyn Db) -> Option<ProtocolClass<'db>> {
@@ -319,6 +339,74 @@ impl<'db> ProtocolInterface<'db> {
                 ProtocolMemberKind::Method(callable) => Some(callable),
                 _ => None,
             })
+    }
+
+    /// Read the element types from a protocol that describes a fixed-length sequence.
+    ///
+    /// This recognizes protocols whose entire interface consists of a literal-returning `__len__`
+    /// method and one indexed `__getitem__` overload per element:
+    ///
+    /// ```python
+    /// class Pair(Protocol):
+    ///     def __len__(self, /) -> Literal[2]: ...
+    ///     @overload
+    ///     def __getitem__(self, index: Literal[0], /) -> int: ...
+    ///     @overload
+    ///     def __getitem__(self, index: Literal[1], /) -> str: ...
+    /// ```
+    ///
+    /// The result contains one element type per index, in index order. The protocol is rejected if
+    /// it has other members, an unknown length, or duplicate, missing, or out-of-range indices.
+    pub(super) fn finite_indexed_constraint(self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
+        let ProtocolMemberKind::Method(len_method) = self.member_by_name(db, "__len__")?.kind
+        else {
+            return None;
+        };
+        let [len_signature] = len_method.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let [self_parameter] = len_signature.parameters().as_slice() else {
+            return None;
+        };
+        if !self_parameter.is_positional_only() {
+            return None;
+        }
+
+        let length = usize::try_from(exact_int_literal(db, len_signature.return_ty)?).ok()?;
+        if length == 0 {
+            return (self.member_count(db) == 1).then_some(Box::default());
+        }
+        if self.member_count(db) != 2 {
+            return None;
+        }
+
+        let ProtocolMemberKind::Method(getitem_method) =
+            self.member_by_name(db, "__getitem__")?.kind
+        else {
+            return None;
+        };
+        let mut elements = BTreeMap::new();
+        for signature in getitem_method.signatures(db) {
+            let [self_parameter, index_parameter] = signature.parameters().as_slice() else {
+                return None;
+            };
+            if !self_parameter.is_positional_only()
+                || !index_parameter.is_positional_only()
+                || index_parameter.default_type().is_some()
+            {
+                return None;
+            }
+            let index =
+                usize::try_from(exact_int_literal(db, index_parameter.annotated_type())?).ok()?;
+            if index >= length || elements.insert(index, signature.return_ty).is_some() {
+                return None;
+            }
+        }
+
+        if elements.len() != length {
+            return None;
+        }
+        Some(elements.into_values().collect())
     }
 
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

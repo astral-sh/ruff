@@ -176,6 +176,7 @@ def test_match_refutable(x: dict[Any, Any] | int) -> None:
 
 ```py
 from collections.abc import Sequence
+from typing import NamedTuple
 from typing_extensions import assert_never
 
 def test_match_star(x: Sequence[int] | int) -> None:
@@ -273,23 +274,16 @@ def test_match_prefix_star_known_sequence(value: Sequence[int | str]) -> None:
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
     match subj:
         case x, str():
-            # TODO: This should simplify to `tuple[int | str, str]`.
-            # revealed: tuple[int | str, int | str] & <Protocol with members '__getitem__', '__len__'>
-            reveal_type(subj)
+            reveal_type(subj)  # revealed: tuple[int | str, str]
             reveal_type(subj[0])  # revealed: int | str
             reveal_type(subj[1])  # revealed: str
             first, second = subj
             reveal_type(first)  # revealed: int | str
-            # TODO: This should reveal `str`.
-            reveal_type(second)  # revealed: int | str
+            reveal_type(second)  # revealed: str
         case y:
-            # TODO: This should simplify to `tuple[int | str, int]`.
-            # revealed: tuple[int | str, int | str] & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(subj)
+            reveal_type(subj)  # revealed: tuple[int | str, int]
             reveal_type(subj[0])  # revealed: int | str
-            # TODO: This should reveal `int` once we simplify the negative
-            # intersection above.
-            reveal_type(subj[1])  # revealed: int | str
+            reveal_type(subj[1])  # revealed: int
 
 def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) -> int:
     match value:
@@ -300,17 +294,33 @@ def test_match_exact_tuple_sequence_is_exhaustive(value: int | tuple[int, int]) 
         case _:
             assert_never(value)
 
-def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:  # error: [invalid-return-type]
+def test_match_exact_tuple_element_union_is_exhaustive(x: tuple[int | str]) -> int:
     match x:
         case [int()]:
             return 42
         case [str()]:
             return 42
         case _:
-            # TODO: The previous cases are exhaustive, so this should simplify
-            # to `tuple[Never]`, and therefore `Never`.
-            # revealed: tuple[int | str] & ~<Protocol with members '__getitem__', '__len__'> & ~<Protocol with members '__getitem__', '__len__'>
-            reveal_type(x)
+            assert_never(x)
+
+def test_match_exact_tuple_multiple_negative_constraints(
+    value: tuple[int | str, int | str],
+) -> None:
+    match value:
+        case [int(), str()]:
+            pass
+        case _:
+            # revealed: tuple[str, int | str] | tuple[int | str, int]
+            reveal_type(value)
+
+def test_match_exact_tuple_multiple_negative_constraints_assignability(
+    value: tuple[int | str, int | str],
+) -> tuple[str, int | str] | tuple[int | str, int]:
+    match value:
+        case [int(), str()]:
+            raise ValueError
+        case _:
+            return value
 
 def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
     match value:
@@ -318,6 +328,18 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             pass
         case _:
             # revealed: list[int] & ~<Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+
+class Pair(NamedTuple):
+    left: int | str
+    right: int | str
+
+def test_match_exact_tuple_sequence_subclass(value: Pair) -> None:
+    match value:
+        case _, str():
+            pass
+        case _:
+            # revealed: Pair & ~<Protocol with members '__getitem__', '__len__'>
             reveal_type(value)
 
 def normalize_nested_record(value: object) -> tuple[None, int, int] | None:

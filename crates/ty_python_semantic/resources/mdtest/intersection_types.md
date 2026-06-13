@@ -670,6 +670,55 @@ def _(
     reveal_type(i8)  # revealed: Never
 ```
 
+### Finite indexed protocol constraints
+
+Tuple simplification only uses synthesized finite indexed protocols, such as those created for exact
+sequence patterns. Class-based protocols remain symbolic because tuple types include instances of
+subclasses that can override `__len__` and `__getitem__`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol, overload
+from typing_extensions import Literal
+from ty_extensions import Intersection, Not
+
+class ObjectStrPair(Protocol):
+    def __len__(self, /) -> Literal[2]: ...
+    @overload
+    def __getitem__(self, index: Literal[0], /) -> object: ...
+    @overload
+    def __getitem__(self, index: Literal[1], /) -> str: ...
+
+class IntPair(Protocol):
+    def __len__(self, /) -> Literal[2]: ...
+    @overload
+    def __getitem__(self, index: Literal[0], /) -> int: ...
+    @overload
+    def __getitem__(self, index: Literal[1], /) -> int: ...
+
+class TwoInts(tuple[int, ...]):
+    def __len__(self, /) -> Literal[2]:
+        return 2
+
+def _(
+    positive: Intersection[tuple[int | str, int | str], ObjectStrPair],
+    reversed_positive: Intersection[ObjectStrPair, tuple[int | str, int | str]],
+    negative: Intersection[tuple[int | str, int | str], Not[ObjectStrPair]],
+) -> None:
+    reveal_type(positive)  # revealed: tuple[int | str, int | str] & ObjectStrPair
+    reveal_type(reversed_positive)  # revealed: ObjectStrPair & tuple[int | str, int | str]
+    reveal_type(negative)  # revealed: tuple[int | str, int | str] & ~ObjectStrPair
+
+def accepts_int_pair(value: Intersection[tuple[int, ...], IntPair]) -> None:
+    reveal_type(value)  # revealed: tuple[int, ...] & IntPair
+
+accepts_int_pair(TwoInts((1, 2)))
+```
+
 ### Simplifications of `bool`, `AlwaysTruthy` and `AlwaysFalsy`
 
 In general, intersections with `AlwaysTruthy` and `AlwaysFalsy` cannot be simplified. Naively, you

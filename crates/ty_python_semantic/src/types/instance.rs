@@ -837,6 +837,17 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
+
+    /// Return the element types of a synthesized fixed-length sequence protocol.
+    ///
+    /// Protocols defined by a class return `None`. A tuple type can include subclasses that
+    /// override the protocol's indexing methods, so simplifying those protocols would be unsafe.
+    pub(super) fn finite_indexed_constraint(self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
+        let Protocol::Synthesized(protocol) = self.inner else {
+            return None;
+        };
+        protocol.interface().finite_indexed_constraint(db)
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
