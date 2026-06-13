@@ -220,6 +220,10 @@ impl<'db> TypeVarInstance<'db> {
         self.kind(db).is_paramspec()
     }
 
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
+    }
+
     pub(crate) fn upper_bound(self, db: &'db dyn Db) -> Option<Type<'db>> {
         if let Some(TypeVarBoundOrConstraints::UpperBound(ty)) = self.bound_or_constraints(db) {
             Some(ty)
@@ -550,10 +554,7 @@ impl<'db> TypeVarInstance<'db> {
                         )
                     }),
                 Type::Dynamic(dynamic) => match dynamic {
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple => Parameters::todo(),
+                    DynamicType::Todo(_) => Parameters::todo(),
                     DynamicType::Any
                     | DynamicType::Unknown
                     | DynamicType::UnknownGeneric(_)
@@ -605,6 +606,11 @@ impl<'db> TypeVarInstance<'db> {
                 let default_ty =
                     definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
                 convert_type_to_paramspec_value(db, default_ty)
+            }
+            // PEP 695 TypeVarTuple
+            DefinitionKind::TypeVarTuple(typevartuple) => {
+                let typevartuple_node = typevartuple.node(&module);
+                definition_expression_type(db, definition, typevartuple_node.default.as_ref()?)
             }
             _ => return None,
         };
@@ -862,6 +868,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     pub(crate) fn is_paramspec(self, db: &'db dyn Db) -> bool {
         self.kind(db).is_paramspec()
+    }
+
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        self.kind(db).is_typevartuple()
     }
 
     /// Returns a new bound typevar instance with the given `ParamSpec` attribute set.
@@ -1243,6 +1253,10 @@ pub enum TypeVarKind {
     ParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
+    /// `Ts = TypeVarTuple("Ts")`
+    TypeVarTuple,
+    /// `def foo[*Ts]() -> None: ...`
+    Pep695TypeVarTuple,
     /// `Alias: typing.TypeAlias = T`
     Pep613Alias,
 }
@@ -1250,6 +1264,10 @@ pub enum TypeVarKind {
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
         matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+    }
+
+    pub(super) const fn is_typevartuple(self) -> bool {
+        matches!(self, Self::TypeVarTuple | Self::Pep695TypeVarTuple)
     }
 }
 

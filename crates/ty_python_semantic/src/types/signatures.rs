@@ -30,6 +30,7 @@ use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
+use crate::types::tuple::Tuple;
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
 use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
@@ -2266,12 +2267,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // self: callable without ParamSpec
                 // other: `Concatenate[<prefix_params>, P]`
                 (None, Some((target_prefix_params, target_bound_typevar))) => {
+                    let source_parameters = source
+                        .parameters
+                        .clone()
+                        .expand_starred_variadic_annotations(db);
                     // Loop over self parameters and target_prefix_params in a similar manner to the
                     // above loop
                     let mut parameters = ParametersZip {
                         current_source: None,
                         current_target: None,
-                        source_iter: source.parameters.iter(),
+                        source_iter: source_parameters.iter(),
                         target_iter: target_prefix_params.iter(),
                     };
 
@@ -3673,7 +3678,7 @@ impl<'db> Parameters<'db> {
             .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
             .collect();
 
-        Self::from_parts(value, self.data.kind)
+        Self::from_parts(value, self.data.kind).expand_starred_variadic_annotations(db)
     }
     pub(crate) fn len(&self) -> usize {
         self.data.value.len()
@@ -3740,6 +3745,65 @@ impl<'db> Parameters<'db> {
         self.iter()
             .enumerate()
             .rfind(|(_, parameter)| parameter.is_keyword_variadic())
+    }
+
+    /// Expands an unpacked `*args` annotation into its logical callable parameters.
+    fn expand_starred_variadic_annotations(self, db: &'db dyn Db) -> Self {
+        if !self
+            .data
+            .value
+            .iter()
+            .any(|parameter| parameter.is_variadic() && parameter.has_starred_annotation())
+        {
+            return self;
+        }
+
+        let mut expanded = false;
+        let mut parameters = Vec::with_capacity(self.data.value.len());
+        for parameter in &self.data.value {
+            if parameter.is_variadic()
+                && parameter.has_starred_annotation()
+                && let Some(tuple) = parameter.annotated_type().exact_tuple_instance_spec(db)
+            {
+                expanded = true;
+                match tuple.as_ref() {
+                    Tuple::Fixed(tuple) => {
+                        parameters.extend(
+                            tuple
+                                .iter_all_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                    Tuple::Variable(variable) => {
+                        parameters.extend(
+                            variable
+                                .iter_prefix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                        let name = parameter
+                            .name()
+                            .cloned()
+                            .unwrap_or_else(|| Name::new_static("args"));
+                        parameters.push(
+                            Parameter::variadic(name).with_annotated_type(variable.variable()),
+                        );
+                        parameters.extend(
+                            variable
+                                .iter_suffix_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
+                        );
+                    }
+                }
+            } else {
+                parameters.push(parameter.clone());
+            }
+        }
+
+        if expanded {
+            Self::new(db, parameters)
+        } else {
+            self
+        }
     }
 
     /// Expands adjacent `P.args`/`P.kwargs` placeholders into their mapped parameters.
@@ -3927,6 +3991,11 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn with_starred_annotation(mut self) -> Self {
+        self.annotation_kind = ParameterAnnotationKind::Starred;
+        self
+    }
+
     pub(crate) fn with_default_type(mut self, default: Type<'db>) -> Self {
         match &mut self.kind {
             ParameterKind::PositionalOnly { default_type, .. }
@@ -4076,28 +4145,29 @@ impl<'db> Parameter<'db> {
         let index = semantic_index(db, function_definition.file(db));
         let definition = Some(index.expect_single_definition(parameter));
 
-        let (annotated_type, inferred_annotation, has_starred_annotation) =
+        let (annotated_type, inferred_annotation, annotation_flags, has_starred_annotation) =
             if let Some(annotation) = parameter.annotation() {
                 (
                     function_signature_expression_type(db, function_definition, annotation),
                     false,
+                    function_signature_type_expression_flags(db, function_definition, annotation),
                     annotation.is_starred_expr(),
                 )
             } else {
-                (Type::unknown(), true, false)
+                (Type::unknown(), true, TypeExpressionFlags::empty(), false)
             };
+        let has_unpacked_variadic_annotation = matches!(&kind, ParameterKind::Variadic { .. })
+            && annotation_flags.contains(TypeExpressionFlags::UNPACK);
         let is_unpacked_typed_dict_kwargs = matches!(&kind, ParameterKind::KeywordVariadic { .. })
-            && parameter.annotation().is_some_and(|annotation| {
-                extract_unpacked_typed_dict_keys_from_kwargs_annotation(
-                    db,
-                    annotated_type,
-                    function_signature_type_expression_flags(db, function_definition, annotation),
-                )
-                .is_some()
-            });
+            && extract_unpacked_typed_dict_keys_from_kwargs_annotation(
+                db,
+                annotated_type,
+                annotation_flags,
+            )
+            .is_some();
         let annotation_kind = if is_unpacked_typed_dict_kwargs {
             ParameterAnnotationKind::UnpackedTypedDictKwargs
-        } else if has_starred_annotation {
+        } else if has_starred_annotation || has_unpacked_variadic_annotation {
             ParameterAnnotationKind::Starred
         } else {
             ParameterAnnotationKind::Normal
@@ -4181,8 +4251,9 @@ impl<'db> Parameter<'db> {
         self.definition
     }
 
-    /// Return `true` if this parameter has a starred annotation,
-    /// e.g. `*args: *Ts` or `*args: *tuple[int, *tuple[str, ...], bytes]`
+    /// Return `true` if this parameter has an unpacked variadic annotation,
+    /// e.g. `*args: *Ts`, `*args: Unpack[Ts]`, or
+    /// `*args: *tuple[int, *tuple[str, ...], bytes]`.
     pub(crate) fn has_starred_annotation(&self) -> bool {
         matches!(self.annotation_kind, ParameterAnnotationKind::Starred)
     }
