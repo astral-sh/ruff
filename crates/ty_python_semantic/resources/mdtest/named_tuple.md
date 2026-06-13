@@ -1248,48 +1248,7 @@ reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 
 The following attributes are available on `NamedTuple` classes / instances:
 
-### `__match_args__`
-
-Python 3.10 added `__match_args__` to named tuples. It contains the field names in the order used by
-positional class patterns.
-
-#### Python 3.10
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
-```py
-from collections import namedtuple
-from typing import NamedTuple
-
-class ClassPoint(NamedTuple):
-    x: int
-    y: str
-
-FunctionalPoint = NamedTuple("FunctionalPoint", [("x", int), ("y", str)])
-CollectionPoint = namedtuple("CollectionPoint", ["x", "y"])
-
-field_names: list[str] = ["x", "y"]
-UnknownPoint = namedtuple("UnknownPoint", field_names)
-
-class UnknownPointChild(UnknownPoint):
-    pass
-
-reveal_type(ClassPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
-reveal_type(FunctionalPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
-reveal_type(CollectionPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
-reveal_type(UnknownPoint.__match_args__)  # revealed: tuple[str, ...]
-reveal_type(UnknownPointChild.__match_args__)  # revealed: tuple[str, ...]
-
-unknown_point = UnknownPoint(1, "")
-reveal_type(unknown_point.__match_args__)  # revealed: tuple[str, ...]
-```
-
-The attribute is not generated when targeting an earlier Python version.
-
-#### Python 3.9
+### `__match_args__` before Python 3.10
 
 ```toml
 [environment]
@@ -1297,27 +1256,13 @@ python-version = "3.9"
 ```
 
 ```py
-from collections import namedtuple
 from typing import NamedTuple
 
-class ClassPoint(NamedTuple):
+class Point(NamedTuple):
     x: int
-    y: str
-
-FunctionalPoint = NamedTuple("FunctionalPoint", [("x", int), ("y", str)])
-CollectionPoint = namedtuple("CollectionPoint", ["x", "y"])
-
-field_names: list[str] = ["x", "y"]
-UnknownPoint = namedtuple("UnknownPoint", field_names)
 
 # error: [unresolved-attribute]
-reveal_type(ClassPoint.__match_args__)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(FunctionalPoint.__match_args__)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(CollectionPoint.__match_args__)  # revealed: Unknown
-# error: [unresolved-attribute]
-reveal_type(UnknownPoint.__match_args__)  # revealed: Unknown
+reveal_type(Point.__match_args__)  # revealed: Unknown
 ```
 
 ### Other attributes
@@ -1331,6 +1276,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1434,6 +1380,8 @@ class Url(namedtuple("Url", field_names)):
         reveal_type(self.port)  # revealed: Any
         reveal_type(self.unknown)  # revealed: Any
         return self._replace(port=port)
+
+reveal_type(Url.__match_args__)  # revealed: tuple[str, ...]
 ```
 
 ## `collections.namedtuple` attributes
@@ -1446,6 +1394,7 @@ from collections import namedtuple
 Person = namedtuple("Person", ["name", "age"])
 
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]

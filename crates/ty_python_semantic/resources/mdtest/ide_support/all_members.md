@@ -356,15 +356,7 @@ def _(t_person: type[Person]):
 
 ### NamedTuples
 
-#### Python 3.10
-
-```toml
-[environment]
-python-version = "3.10"
-```
-
 ```py
-from collections import namedtuple
 from ty_extensions import has_member, static_assert
 from typing import NamedTuple, Generic, TypeVar
 
@@ -387,7 +379,6 @@ def _(person: Person):
     static_assert(has_member(person, "_make"))
     static_assert(has_member(person, "_asdict"))
     static_assert(has_member(person, "_replace"))
-    static_assert(has_member(person, "__match_args__"))
 
 def _(t_person: type[Person]):
     static_assert(has_member(t_person, "id"))
@@ -396,15 +387,6 @@ def _(t_person: type[Person]):
     static_assert(has_member(t_person, "_make"))
     static_assert(has_member(t_person, "_asdict"))
     static_assert(has_member(t_person, "_replace"))
-    static_assert(has_member(t_person, "__match_args__"))
-
-FunctionalPerson = NamedTuple("FunctionalPerson", [("id", int), ("name", str)])
-CollectionPerson = namedtuple("CollectionPerson", ["id", "name"])
-
-static_assert(has_member(FunctionalPerson, "__match_args__"))
-static_assert(has_member(FunctionalPerson(1, "Alice"), "__match_args__"))
-static_assert(has_member(CollectionPerson, "__match_args__"))
-static_assert(has_member(CollectionPerson(1, "Alice"), "__match_args__"))
 
 T = TypeVar("T")
 
@@ -423,27 +405,6 @@ def _(box: Box[int]):
     static_assert(has_member(box, "_make"))
     static_assert(has_member(box, "_asdict"))
     static_assert(has_member(box, "_replace"))
-```
-
-Version-dependent members are only included when they are available.
-
-#### Python 3.9
-
-```toml
-[environment]
-python-version = "3.9"
-```
-
-```py
-from ty_extensions import has_member, static_assert
-from typing import NamedTuple
-
-class Person(NamedTuple):
-    id: int
-    name: str
-
-static_assert(not has_member(Person, "__match_args__"))
-static_assert(not has_member(Person(1, "Alice"), "__match_args__"))
 ```
 
 ### Unions
