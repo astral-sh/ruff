@@ -3276,6 +3276,7 @@ dependencies = [
  "regex",
  "ruff_python_trivia",
  "syn",
+ "synstructure",
 ]
 
 [[package]]
@@ -3337,6 +3338,7 @@ dependencies = [
 name = "ruff_options_metadata"
 version = "0.0.0"
 dependencies = [
+ "ruff_macros",
  "serde",
 ]
 
@@ -4523,6 +4525,7 @@ version = "0.0.0"
 dependencies = [
  "ordermap",
  "ruff_db",
+ "ruff_macros",
  "ruff_python_ast",
 ]
 

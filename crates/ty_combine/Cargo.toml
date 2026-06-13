@@ -18,5 +18,8 @@ ruff_python_ast = { workspace = true }
 
 ordermap = { workspace = true }
 
+[dev-dependencies]
+ruff_macros = { workspace = true }
+
 [lints]
 workspace = true

@@ -2,7 +2,12 @@ use quote::{quote, quote_spanned};
 use syn::{Data, DataStruct, DeriveInput, Field, Fields, Path, PathSegment, Type, TypePath};
 
 pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenStream> {
-    let DeriveInput { ident, data, .. } = input;
+    let DeriveInput {
+        ident,
+        data,
+        generics,
+        ..
+    } = input;
 
     match data {
         Data::Struct(DataStruct {
@@ -15,9 +20,11 @@ pub(crate) fn derive_impl(input: DeriveInput) -> syn::Result<proc_macro2::TokenS
                 .map(handle_field)
                 .collect::<Result<Vec<_>, _>>()?;
 
+            let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
             Ok(quote! {
                 #[automatically_derived]
-                impl crate::configuration::CombinePluginOptions for #ident {
+                impl #impl_generics crate::configuration::CombinePluginOptions for #ident #ty_generics #where_clause {
                     fn combine(self, other: Self) -> Self {
                         #[expect(deprecated)]
                         Self {

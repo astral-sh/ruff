@@ -4,8 +4,8 @@ use itertools::Itertools;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Attribute, Error, Expr, ExprCall, ExprMatch, Ident, ItemFn, LitStr, Pat, Path, Stmt, Token,
-    parenthesized, parse::Parse, spanned::Spanned,
+    Arm, Attribute, Error, Expr, ExprCall, ExprLit, ExprMatch, Ident, ItemFn, Lit, LitStr, Pat,
+    Path, Stmt, spanned::Spanned,
 };
 
 use crate::{
@@ -62,16 +62,45 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     // `(Rule::UnaryPrefixIncrement, RuleGroup::Stable, vec![])`).
     let mut linter_to_rules: BTreeMap<Ident, BTreeMap<String, Rule>> = BTreeMap::new();
 
-    for arm in arms {
+    let Some((wildcard, rule_arms)) = arms.split_last() else {
+        return Err(Error::new(
+            func.block.span(),
+            "expected a final wildcard match arm",
+        ));
+    };
+    if !matches!(wildcard.pat, Pat::Wild(_)) {
+        return Err(Error::new_spanned(
+            wildcard,
+            "expected the final match arm to be a wildcard",
+        ));
+    }
+    if let Some((if_token, _)) = &wildcard.guard {
+        return Err(Error::new(
+            if_token.span,
+            "the final wildcard match arm cannot have a guard",
+        ));
+    }
+
+    for arm in rule_arms {
         if matches!(arm.pat, Pat::Wild(..)) {
-            break;
+            return Err(Error::new_spanned(arm, "wildcard match arm must be last"));
         }
 
-        let rule = syn::parse::<Rule>(arm.into_token_stream().into())?;
-        linter_to_rules
-            .entry(rule.linter.clone())
-            .or_default()
-            .insert(rule.code.value(), rule);
+        let rule = Rule::try_from(arm)?;
+        let rules = linter_to_rules.entry(rule.linter.clone()).or_default();
+        match rules.entry(rule.code.value()) {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(rule);
+            }
+            std::collections::btree_map::Entry::Occupied(entry) => {
+                let mut error = Error::new_spanned(&rule.code, "duplicate rule code");
+                error.combine(Error::new_spanned(
+                    &entry.get().code,
+                    "rule code first defined here",
+                ));
+                return Err(error);
+            }
+        }
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
@@ -199,7 +228,7 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
     });
 
-    let rule_to_code = generate_rule_to_code(&linter_to_rules);
+    let rule_to_code = generate_rule_to_code(&linter_to_rules)?;
     output.extend(rule_to_code);
 
     output.extend(generate_iter_impl(&linter_to_rules, &linter_idents));
@@ -238,7 +267,9 @@ fn rules_by_prefix(
 /// to multiple codes (e.g., if it existed in multiple linters, like Pylint and Flake8, under
 /// different codes). We haven't actually activated this functionality yet, but some work was
 /// done to support it, so the logic exists here.
-fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
+fn generate_rule_to_code(
+    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
+) -> syn::Result<TokenStream> {
     let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
@@ -257,39 +288,35 @@ fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule
     let mut rule_noqa_code_match_arms = quote!();
 
     // Keep the proc-macro output stable so unchanged code can be reused incrementally.
-    for (rule, codes) in rule_to_codes
+    for (rule_path, codes) in rule_to_codes
         .into_iter()
         .sorted_by_key(|(rule, _)| rule.to_token_stream().to_string())
     {
-        let rule_name = rule.segments.last().unwrap();
-        assert_eq!(
-            codes.len(),
-            1,
-            "
-{} is mapped to multiple codes.
-
-The mapping of multiple codes to one rule has been disabled due to UX concerns (it would
-be confusing if violations were reported under a different code than the code you selected).
-
-We firstly want to allow rules to be selected by their names (and report them by name),
-and before we can do that we have to rename all our rules to match our naming convention
-(see CONTRIBUTING.md) because after that change every rule rename will be a breaking change.
-
-See also https://github.com/astral-sh/ruff/issues/2186.
-",
-            rule_name.ident
-        );
+        let rule = match codes.as_slice() {
+            [rule] => *rule,
+            [first, second, ..] => {
+                let mut error =
+                    Error::new_spanned(&second.path, "rule is mapped to more than one code");
+                error.combine(Error::new_spanned(&first.path, "rule first mapped here"));
+                return Err(error);
+            }
+            [] => {
+                return Err(Error::new_spanned(
+                    rule_path,
+                    "rule must be mapped to a code",
+                ));
+            }
+        };
+        let Some(rule_name) = rule_path.segments.last() else {
+            return Err(Error::new_spanned(rule_path, "expected a rule path"));
+        };
 
         let Rule {
             linter,
             code,
             attrs,
             ..
-        } = codes
-            .iter()
-            .sorted_by_key(|data| data.linter == "Pylint")
-            .next()
-            .unwrap();
+        } = rule;
 
         rule_noqa_code_match_arms.extend(quote! {
             #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
@@ -332,7 +359,7 @@ See also https://github.com/astral-sh/ruff/issues/2186.
             }
         }
     };
-    rule_to_code
+    Ok(rule_to_code)
 }
 
 /// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
@@ -485,25 +512,70 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     }
 }
 
-impl Parse for Rule {
+impl TryFrom<&Arm> for Rule {
+    type Error = syn::Error;
+
     /// Parses a match arm such as `(Pycodestyle, "E112") => rules::pycodestyle::rules::logical_lines::NoIndentedBlock,`
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let attrs = Attribute::parse_outer(input)?;
-        let pat_tuple;
-        parenthesized!(pat_tuple in input);
-        let linter: Ident = pat_tuple.parse()?;
-        let _: Token!(,) = pat_tuple.parse()?;
-        let code: LitStr = pat_tuple.parse()?;
-        let _: Token!(=>) = input.parse()?;
-        let rule_path: Path = input.parse()?;
-        let _: Token!(,) = input.parse()?;
-        let rule_name = rule_path.segments.last().unwrap().ident.clone();
-        Ok(Rule {
-            name: rule_name,
-            linter,
-            code,
-            path: rule_path,
+    fn try_from(arm: &Arm) -> syn::Result<Self> {
+        let Arm {
             attrs,
+            pat,
+            guard,
+            body,
+            ..
+        } = arm;
+
+        if let Some((if_token, _)) = guard {
+            return Err(Error::new(
+                if_token.span,
+                "rule match arms cannot have guards",
+            ));
+        }
+
+        let Pat::Tuple(tuple) = pat else {
+            return Err(Error::new_spanned(
+                pat,
+                "expected rule pattern to be `(Linter, \"CODE\")`",
+            ));
+        };
+        let mut elements = tuple.elems.iter();
+        let (Some(linter), Some(code), None) = (elements.next(), elements.next(), elements.next())
+        else {
+            return Err(Error::new_spanned(
+                tuple,
+                "expected rule pattern to be `(Linter, \"CODE\")`",
+            ));
+        };
+
+        let Pat::Ident(linter) = linter else {
+            return Err(Error::new_spanned(linter, "expected a linter name"));
+        };
+        if linter.by_ref.is_some() || linter.mutability.is_some() || linter.subpat.is_some() {
+            return Err(Error::new_spanned(linter, "expected a linter name"));
+        }
+        let linter = linter.ident.clone();
+
+        let Pat::Lit(ExprLit {
+            lit: Lit::Str(code),
+            ..
+        }) = code
+        else {
+            return Err(Error::new_spanned(code, "expected a string rule code"));
+        };
+
+        let Expr::Path(rule_path) = body.as_ref() else {
+            return Err(Error::new_spanned(body, "expected a rule path"));
+        };
+        let Some(rule_name) = rule_path.path.segments.last() else {
+            return Err(Error::new_spanned(rule_path, "expected a rule path"));
+        };
+
+        Ok(Rule {
+            name: rule_name.ident.clone(),
+            linter,
+            code: code.clone(),
+            path: rule_path.path.clone(),
+            attrs: attrs.clone(),
         })
     }
 }

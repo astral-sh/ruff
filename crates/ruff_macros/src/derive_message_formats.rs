@@ -1,52 +1,48 @@
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote, quote_spanned};
+use quote::quote;
+use syn::parse::{Parse, ParseStream};
 use syn::spanned::Spanned;
 use syn::token::{Dot, Paren};
-use syn::{Block, Expr, ExprLit, ExprMethodCall, ItemFn, Lit, Stmt};
+use syn::{Block, Error, Expr, ExprLit, ExprMethodCall, ItemFn, Lit, LitStr, Stmt, Token};
 
-pub(crate) fn derive_message_formats(func: &ItemFn) -> TokenStream {
+pub(crate) fn derive_message_formats(func: &ItemFn) -> syn::Result<TokenStream> {
     let mut strings = quote!();
 
-    if let Err(err) = parse_block(&func.block, &mut strings) {
-        return err;
-    }
+    parse_block(&func.block, &mut strings)?;
 
-    quote! {
+    Ok(quote! {
         #func
         fn message_formats() -> &'static [&'static str] {
             &[#strings]
         }
-    }
+    })
 }
 
-fn parse_block(block: &Block, strings: &mut TokenStream) -> Result<(), TokenStream> {
+fn parse_block(block: &Block, strings: &mut TokenStream) -> syn::Result<()> {
     let Some(Stmt::Expr(last, _)) = block.stmts.last() else {
-        panic!("expected last statement in block to be an expression")
+        return Err(Error::new_spanned(
+            block,
+            "expected block to end in an expression",
+        ));
     };
     parse_expr(last, strings)?;
     Ok(())
 }
 
-fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream> {
+fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> syn::Result<()> {
     match expr {
         Expr::Macro(mac) if mac.mac.path.is_ident("format") => {
-            let mut tokens = mac.mac.tokens.to_token_stream().into_iter();
-            let Some(first_token) = tokens.next() else {
-                return Err(
-                    quote_spanned!(expr.span() => compile_error!("expected `format!` to have an argument")),
-                );
-            };
+            let arguments = mac.mac.parse_body::<FormatArguments>()?;
             // do not throw an error if the `format!` argument contains a formatting argument
 
-            if !first_token.to_string().contains('{') {
-                // comma and string
-                if tokens.next().is_none() || tokens.next().is_none() {
-                    return Err(
-                        quote_spanned!(expr.span() => compile_error!("prefer `String::to_string` over `format!` without arguments")),
-                    );
-                }
+            if !arguments.format.value().contains('{') && !arguments.has_arguments {
+                return Err(Error::new(
+                    expr.span(),
+                    "prefer `String::to_string` over `format!` without arguments",
+                ));
             }
-            strings.extend(quote! {#first_token,});
+            let format = arguments.format;
+            strings.extend(quote! {#format,});
             Ok(())
         }
         Expr::Block(block) => parse_block(&block.block, strings),
@@ -77,9 +73,10 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
                     ..
                 }) = **receiver
                 else {
-                    return Err(
-                        quote_spanned!(expr.span() => compile_error!("expected `String::to_string` method on str literal")),
-                    );
+                    return Err(Error::new(
+                        expr.span(),
+                        "expected `String::to_string` method on str literal",
+                    ));
                 };
 
                 let str_token = literal_string.token();
@@ -87,9 +84,10 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
                 strings.extend(quote! {#str_token,});
                 Ok(())
             }
-            _ => Err(
-                quote_spanned!(expr.span() => compile_error!("expected `String::to_string` method on str literal")),
-            ),
+            _ => Err(Error::new(
+                expr.span(),
+                "expected `String::to_string` method on str literal",
+            )),
         },
         Expr::Match(block) => {
             for arm in &block.arms {
@@ -97,9 +95,33 @@ fn parse_expr(expr: &Expr, strings: &mut TokenStream) -> Result<(), TokenStream>
             }
             Ok(())
         }
-        _ => Err(quote_spanned!(
-            expr.span() =>
-            compile_error!("expected last expression to be a `format!` macro, a static String or a match block")
+        _ => Err(Error::new(
+            expr.span(),
+            "expected last expression to be a `format!` macro, a static String or a match block",
         )),
+    }
+}
+
+struct FormatArguments {
+    format: LitStr,
+    has_arguments: bool,
+}
+
+impl Parse for FormatArguments {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let format = input.parse()?;
+        let has_arguments = if input.is_empty() {
+            false
+        } else {
+            input.parse::<Token![,]>()?;
+            let has_arguments = !input.is_empty();
+            input.parse::<TokenStream>()?;
+            has_arguments
+        };
+
+        Ok(Self {
+            format,
+            has_arguments,
+        })
     }
 }
