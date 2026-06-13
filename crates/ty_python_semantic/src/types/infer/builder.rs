@@ -39,7 +39,9 @@ use crate::place::{
 };
 use crate::reachability::{ReachabilityEvaluationCache, evaluate_reachability_with_cache};
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
-use crate::types::call::bind::MatchingOverloadIndex;
+use crate::types::call::bind::{
+    ArgumentTypeContextInput, MatchingOverloadIndex, field_converter_types,
+};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::class::{ClassLiteral, CodeGeneratorKind, MethodDecorator};
@@ -85,6 +87,7 @@ use crate::types::infer::{
     TypeExpressionFlags, infer_statement_types, nearest_enclosing_class,
     nearest_enclosing_function, original_class_type,
 };
+use crate::types::known_instance::FieldDefaultKind;
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
@@ -106,7 +109,7 @@ use crate::types::{
     UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
     infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
 };
-use crate::{AnalysisSettings, Db, FxIndexSet, Program};
+use crate::{AnalysisSettings, Db, DisplaySettings, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
 use ty_python_core::definition::{
     AnnotatedAssignmentDefinitionKind, AssignmentDefinitionKind, ComprehensionDefinitionKind,
@@ -158,6 +161,11 @@ enum DeclaredAndInferredType<'db> {
         declared_ty: TypeAndQualifiers<'db>,
         inferred_ty: Type<'db>,
     },
+    /// Store the inferred type as the binding after a dedicated compatibility check.
+    SkipAssignabilityCheck {
+        declared_ty: TypeAndQualifiers<'db>,
+        inferred_ty: Type<'db>,
+    },
 }
 
 impl<'db> DeclaredAndInferredType<'db> {
@@ -168,12 +176,6 @@ impl<'db> DeclaredAndInferredType<'db> {
             TypeQualifiers::empty(),
         ))
     }
-}
-
-fn should_preserve_inferred_binding_type(ty: Type<'_>) -> bool {
-    // Dataclass field specifiers carry metadata in the inferred RHS type; replacing it with the
-    // declared field type would lose settings like `init=False`.
-    matches!(ty, Type::KnownInstance(KnownInstanceType::Field(_)))
 }
 
 /// We currently store one dataclass field-specifiers inline, because that covers standard
@@ -1511,6 +1513,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeclaredAndInferredType::MightBeDifferent {
                 declared_ty,
                 inferred_ty,
+            }
+            | DeclaredAndInferredType::SkipAssignabilityCheck {
+                declared_ty,
+                inferred_ty,
             } => {
                 let file_scope_id = self.scope().file_scope_id(self.db());
                 if file_scope_id.is_global() {
@@ -1541,13 +1547,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let declared_type = declared_ty.inner_type();
-                if inferred_ty.is_assignable_to(self.db(), declared_type) {
-                    if !should_preserve_inferred_binding_type(inferred_ty)
-                        // TODO We currently can't distinguish here between "no declared type" and
-                        // "declared types is `Unknown` (e.g. due to a bad annotation, missing
-                        // import, etc.)". Ideally we would still prefer `Unknown` declared type,
-                        // but use inferred type if there is no declared type.
-                        && !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
+                if matches!(
+                    declared_and_inferred_ty,
+                    DeclaredAndInferredType::SkipAssignabilityCheck { .. }
+                ) {
+                    (declared_ty, inferred_ty)
+                } else if inferred_ty.is_assignable_to(self.db(), declared_type) {
+                    // TODO We currently can't distinguish here between "no declared type" and
+                    // "declared types is `Unknown` (e.g. due to a bad annotation, missing
+                    // import, etc.)". Ideally we would still prefer `Unknown` declared type,
+                    // but use inferred type if there is no declared type.
+                    if !matches!(declared_type, Type::Dynamic(DynamicType::Unknown))
                         && declared_type.is_assignable_to(self.db(), inferred_ty)
                     {
                         (declared_ty, declared_type)
@@ -1584,6 +1594,118 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             &DeclaredAndInferredType::are_the_same_type(Type::unknown()),
         );
+    }
+
+    fn report_invalid_dataclass_field_assignment<T: Ranged>(
+        &self,
+        value: T,
+        annotation: &ast::Expr,
+        declared_ty: Type<'db>,
+        provided_ty: Type<'db>,
+    ) {
+        let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, value) else {
+            return;
+        };
+
+        let display_settings =
+            DisplaySettings::from_possibly_ambiguous_types(self.db(), [declared_ty, provided_ty]);
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Object of type `{}` is not assignable to `{}`",
+            provided_ty.display_with(self.db(), display_settings.clone()),
+            declared_ty.display_with(self.db(), display_settings),
+        ));
+        diagnostic.annotate(self.context.secondary(annotation).message("Declared type"));
+        diagnostic.set_primary_message(format_args!(
+            "Incompatible value of type `{}`",
+            provided_ty.display(self.db()),
+        ));
+        let concise_message = diagnostic.primary_message().to_string();
+        diagnostic.set_concise_message(concise_message);
+
+        diagnostic::note_numbers_module_not_supported(
+            self.db(),
+            &mut diagnostic,
+            declared_ty,
+            provided_ty,
+        );
+        diagnostic::add_invariant_generic_hints(
+            self.db(),
+            &mut diagnostic,
+            declared_ty,
+            provided_ty,
+        );
+    }
+
+    fn validate_dataclass_field_specifier_assignment(
+        &mut self,
+        call: &ast::ExprCall,
+        annotation: &ast::Expr,
+        field: crate::types::known_instance::FieldInstance<'db>,
+        declared_ty: Type<'db>,
+    ) {
+        // A converter's output must fit the declared field type. A default must fit the
+        // converter's input type, or the declared field type when there is no converter.
+        if let Some((_, converter_output_ty)) = field.converter(self.db())
+            && !converter_output_ty.has_dynamic(self.db())
+            && !converter_output_ty.is_assignable_to(self.db(), declared_ty)
+        {
+            self.report_invalid_dataclass_field_assignment(
+                call,
+                annotation,
+                declared_ty,
+                converter_output_ty,
+            );
+        }
+
+        let Some(default) = field.default(self.db()) else {
+            return;
+        };
+
+        let default_expr = call
+            .arguments
+            .iter_source_order()
+            .nth(default.argument_index)
+            .map(ArgOrKeyword::value);
+        // Some dataclass-transform libraries use `...` as a required-field sentinel.
+        let is_stdlib_field = matches!(
+            self.expression_type(&call.func),
+            Type::FunctionLiteral(function) if function.known(self.db()) == Some(KnownFunction::Field)
+        );
+        if default.kind == FieldDefaultKind::Value
+            && !is_stdlib_field
+            && default_expr.is_some_and(ast::Expr::is_ellipsis_literal_expr)
+        {
+            return;
+        }
+
+        let default_target_ty = field
+            .converter(self.db())
+            .map(|(converter_input_ty, _)| converter_input_ty)
+            .unwrap_or(declared_ty);
+
+        let default_ty = default.ty;
+        if default.argument_has_type_error
+            || default_ty.has_dynamic(self.db())
+            || default_ty.is_assignable_to(self.db(), default_target_ty)
+        {
+            return;
+        }
+
+        if let Some(default_expr) = default_expr {
+            self.report_invalid_dataclass_field_assignment(
+                default_expr,
+                annotation,
+                default_target_ty,
+                default_ty,
+            );
+        } else {
+            self.report_invalid_dataclass_field_assignment(
+                call,
+                annotation,
+                default_target_ty,
+                default_ty,
+            );
+        }
     }
 
     fn record_return_type(&mut self, ty: Type<'db>, range: TextRange) {
@@ -4837,13 +4959,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
+                let declared_and_inferred_ty = if let ast::Expr::Call(call) = value
+                    && let Type::KnownInstance(KnownInstanceType::Field(field)) = inferred_ty
+                {
+                    self.validate_dataclass_field_specifier_assignment(
+                        call,
+                        annotation,
+                        field,
+                        declared.inner_type(),
+                    );
+                    DeclaredAndInferredType::SkipAssignabilityCheck {
+                        declared_ty: declared,
+                        inferred_ty,
+                    }
+                } else {
+                    DeclaredAndInferredType::MightBeDifferent {
+                        declared_ty: declared,
+                        inferred_ty,
+                    }
+                };
+
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,
-                    &DeclaredAndInferredType::MightBeDifferent {
-                        declared_ty: declared,
-                        inferred_ty,
-                    },
+                    &declared_and_inferred_ty,
                 );
             }
 
@@ -5707,6 +5846,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             add_overloads_from_binding(&mut overloads_with_binding, binding);
         });
 
+        let field_default_target_ty = call_expression_tcx.annotation.and_then(|declared_ty| {
+            overloads_with_binding
+                .iter()
+                .all(|(overload, _)| {
+                    self.dataclass_field_specifiers
+                        .contains(&overload.callable_type)
+                })
+                .then(|| {
+                    ast_arguments
+                        .clone()
+                        .find_map(|argument| match argument {
+                            ast::ArgOrKeyword::Keyword(ast::Keyword {
+                                arg: Some(name),
+                                value,
+                                ..
+                            }) if name == "converter" => {
+                                let mut speculative = self.speculate();
+                                Some(speculative.infer_expression(value, TypeContext::default()))
+                            }
+                            _ => None,
+                        })
+                        .and_then(|converter_ty| {
+                            field_converter_types(self.db(), converter_ty)
+                                .map(|(converter_input_ty, _)| converter_input_ty)
+                        })
+                        .unwrap_or(declared_ty)
+                })
+        });
+
         // A keyword argument matched to `**P.kwargs` can appear before the keyword argument that
         // binds `P`, e.g. `wrapper(TagSet=[...], func=put_object)`. Seed those binder argument
         // types first so the normal ParamSpec context path below is not source-order dependent.
@@ -5748,17 +5916,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if ast_argument.is_variadic() {
                 continue;
             }
-            let ast_argument = ast_argument.value();
+            let source_argument = ast_argument;
+            let ast_argument = source_argument.value();
 
             let parameter_tcx = |overload: &'bindings Binding<'db>,
                                  binding: &CallableBinding<'db>| {
+                let parameter_type_override = field_default_target_ty.and_then(|target_ty| {
+                    let kind = match source_argument {
+                        ArgOrKeyword::Keyword(ast::Keyword {
+                            arg: Some(name), ..
+                        }) => FieldDefaultKind::from_parameter_name(name),
+                        ArgOrKeyword::Arg(_) => overload
+                            .parameter_name_for_call_argument(
+                                binding.bound_type.is_some(),
+                                argument_index,
+                            )
+                            .and_then(|name| FieldDefaultKind::from_parameter_name(name.as_str())),
+                        ArgOrKeyword::Keyword(ast::Keyword { arg: None, .. }) => None,
+                    }?;
+
+                    Some(match kind {
+                        FieldDefaultKind::Value => target_ty,
+                        FieldDefaultKind::Factory => Type::Callable(CallableType::single(
+                            db,
+                            Signature::new(Parameters::empty(), target_ty),
+                        )),
+                    })
+                });
+
                 overload.argument_type_context(
                     db,
                     &constraints,
                     binding,
                     arguments_types,
                     argument_index,
-                    call_expression_tcx,
+                    ArgumentTypeContextInput::new(call_expression_tcx, parameter_type_override),
                 )
             };
 

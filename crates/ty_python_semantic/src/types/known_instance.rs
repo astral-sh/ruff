@@ -457,13 +457,38 @@ pub struct DeprecatedInstance<'db> {
     pub(crate) message: Option<StringLiteralType<'db>>,
 }
 
+/// How a dataclass field default was supplied.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum FieldDefaultKind {
+    Value,
+    Factory,
+}
+
+impl FieldDefaultKind {
+    pub(crate) fn from_parameter_name(name: &str) -> Option<Self> {
+        match name {
+            "default" => Some(Self::Value),
+            "default_factory" | "factory" => Some(Self::Factory),
+            _ => None,
+        }
+    }
+}
+
+/// The inferred default and its source in a field-specifier call.
+#[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct FieldDefault<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) kind: FieldDefaultKind,
+    pub(crate) argument_index: usize,
+    pub(crate) argument_has_type_error: bool,
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
-/// `dataclasses.field()`.
+/// `dataclasses.field()` or a custom dataclass-transform field specifier.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct FieldInstance<'db> {
-    /// The type of the default value for this field. This is derived from the `default` or
-    /// `default_factory` arguments to `dataclasses.field()`.
-    pub default_type: Option<Type<'db>>,
+    /// The default supplied using `default`, `default_factory`, or `factory`, if any.
+    pub default: Option<FieldDefault<'db>>,
 
     /// Whether this field is part of the `__init__` signature, or not.
     pub init: bool,
@@ -484,19 +509,28 @@ pub struct FieldInstance<'db> {
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
+    pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.default(db).map(|default| default.ty)
+    }
+
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let default_type = match self.default_type(db) {
-            Some(default) if nested => Some(default.recursive_type_normalized_impl(db, div, true)?),
-            Some(default) => Some(
-                default
+        let default = match self.default(db) {
+            Some(default) if nested => Some(FieldDefault {
+                ty: default.ty.recursive_type_normalized_impl(db, div, true)?,
+                ..default
+            }),
+            Some(default) => Some(FieldDefault {
+                ty: default
+                    .ty
                     .recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div),
-            ),
+                ..default
+            }),
             None => None,
         };
         let converter = match self.converter(db) {
@@ -516,7 +550,7 @@ impl<'db> FieldInstance<'db> {
         };
         Some(FieldInstance::new(
             db,
-            default_type,
+            default,
             self.init(db),
             self.kw_only(db),
             self.alias(db),
