@@ -7,11 +7,11 @@
 
 use std::cmp::Ordering;
 
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{PythonVersion, name::Name};
 use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, NameKind,
+    Db, NameKind, Program,
     place::{
         DefinedPlace, Place, PlaceWithDefinition, imported_symbol, place_from_bindings,
         place_from_declarations,
@@ -568,6 +568,12 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
                 } else {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
+                }
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    self.members.insert(Member {
+                        name: Name::new_static("__match_args__"),
+                        ty: Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
+                    });
                 }
             }
             Some(CodeGeneratorKind::TypedDict) => {}
