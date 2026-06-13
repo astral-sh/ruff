@@ -55,7 +55,10 @@ use crate::types::signatures::{
     PartialSignatureApplication,
 };
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
-use crate::types::typed_dict::{TypedDictOpenness, extract_unpacked_typed_dict_from_value_type};
+use crate::types::typed_dict::{
+    TypedDictOpenness, extract_unpacked_typed_dict_from_value_type,
+    synthesized_typed_dict_type_from_fields,
+};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
@@ -5252,14 +5255,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     argument,
                     paramspec_component_start,
                 ),
-                Argument::Keywords => self.check_keyword_variadic_argument_type(
-                    constraints,
-                    argument_index,
-                    adjusted_argument_index,
-                    // Splatted arguments are inferred without type context.
-                    argument_types.get_default().unwrap_or(Type::unknown()),
-                    paramspec_component_start,
-                ),
+                Argument::Keywords => {
+                    let contextualized = self.contextualized_keyword_variadic_argument_type(
+                        argument_index,
+                        argument_types,
+                    );
+                    self.check_keyword_variadic_argument_type(
+                        constraints,
+                        argument_index,
+                        adjusted_argument_index,
+                        argument_types,
+                        contextualized,
+                        paramspec_component_start,
+                    );
+                }
                 _ => {
                     // If the argument isn't splatted, just check its type directly.
                     for matched_parameter in self.argument_matches[argument_index].iter() {
@@ -5284,6 +5293,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 }
             }
         }
+    }
+
+    /// Return the `**kwargs` type inferred for this overload's matched keyword fields.
+    fn contextualized_keyword_variadic_argument_type(
+        &self,
+        argument_index: usize,
+        argument_types: &CallArgumentTypes<'db>,
+    ) -> Option<Type<'db>> {
+        synthesized_typed_dict_type_from_fields(
+            self.db,
+            self.argument_matches[argument_index]
+                .keyword_parameter_types(self.signature.parameters()),
+            TypedDictOpenness::Closed,
+        )
+        .and_then(|context_ty| argument_types.get_inferred_for_declared_type(context_ty))
     }
 
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the forwarded arguments.
@@ -5435,17 +5459,89 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
-        argument_type: Type<'db>,
+        argument_types: &CallArgumentTypes<'db>,
+        contextualized: Option<Type<'db>>,
         paramspec_component_start: Option<usize>,
     ) {
-        if extract_unpacked_typed_dict_from_value_type(self.db, argument_type).is_some() {
-            self.check_variadic_argument_type(
-                constraints,
-                argument_index,
-                adjusted_argument_index,
-                Argument::Keywords,
-                paramspec_component_start,
-            );
+        let argument_type = contextualized
+            .or_else(|| argument_types.get_default())
+            .unwrap_or(Type::unknown());
+
+        if let Some(unpacked) = extract_unpacked_typed_dict_from_value_type(self.db, argument_type)
+        {
+            if contextualized.is_none() {
+                self.check_variadic_argument_type(
+                    constraints,
+                    argument_index,
+                    adjusted_argument_index,
+                    Argument::Keywords,
+                    paramspec_component_start,
+                );
+                return;
+            }
+
+            let matched_parameters = &self.argument_matches[argument_index].parameters;
+            let keyword_variadic = matched_parameters
+                .iter()
+                .copied()
+                .find(|matched_parameter| {
+                    self.signature.parameters()[matched_parameter.index].is_keyword_variadic()
+                });
+
+            for (name, unpacked_key) in &unpacked.keys {
+                let matched_parameter = matched_parameters
+                    .iter()
+                    .copied()
+                    .find(|matched_parameter| {
+                        let parameter = &self.signature.parameters()[matched_parameter.index];
+                        !parameter.is_keyword_variadic() && parameter.keyword_name() == Some(name)
+                    })
+                    .or(keyword_variadic);
+
+                let Some(matched_parameter) = matched_parameter else {
+                    continue;
+                };
+                if paramspec_component_start.is_some_and(|start| matched_parameter.index >= start) {
+                    continue;
+                }
+
+                self.check_argument_type(
+                    constraints,
+                    argument_index,
+                    adjusted_argument_index,
+                    Argument::Keywords,
+                    unpacked_key.value_ty,
+                    matched_parameter,
+                );
+            }
+
+            if let Some(extra_items) = unpacked.openness.explicit_extra_items() {
+                for matched_parameter in matched_parameters.iter().copied() {
+                    if paramspec_component_start
+                        .is_some_and(|start| matched_parameter.index >= start)
+                    {
+                        continue;
+                    }
+
+                    let parameter = &self.signature.parameters()[matched_parameter.index];
+                    if parameter
+                        .keyword_name()
+                        .is_some_and(|name| unpacked.keys.contains_key(name))
+                    {
+                        continue;
+                    }
+
+                    self.check_argument_type(
+                        constraints,
+                        argument_index,
+                        adjusted_argument_index,
+                        Argument::Keywords,
+                        extra_items.declared_ty,
+                        matched_parameter,
+                    );
+                }
+            }
+
             return;
         }
 
@@ -5556,6 +5652,23 @@ impl<'db> MatchedArgument<'db> {
     /// Returns an iterator over the matched parameters.
     fn iter(&self) -> impl Iterator<Item = MatchedParameter<'db>> + '_ {
         self.parameters.iter().copied()
+    }
+
+    /// Returns the names and types of matched non-variadic keyword parameters.
+    pub(crate) fn keyword_parameter_types<'a>(
+        &'a self,
+        parameters: &'a Parameters<'db>,
+    ) -> impl Iterator<Item = (Name, Type<'db>)> + 'a {
+        self.parameters.iter().filter_map(move |matched_parameter| {
+            let parameter = &parameters[matched_parameter.index];
+            if parameter.is_keyword_variadic() {
+                None
+            } else {
+                parameter
+                    .keyword_name()
+                    .map(|name| (name.clone(), parameter.annotated_type()))
+            }
+        })
     }
 }
 
