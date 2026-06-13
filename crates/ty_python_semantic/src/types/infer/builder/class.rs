@@ -491,7 +491,7 @@ fn class_decorator_preserves_class_binding<'db>(
         Type::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_class(db)
-            .is_some_and(|class| class == original_literal.default_specialization(db)),
+            .is_some_and(|class| class.class_literal(db) == original_literal),
         Type::Divergent(_) => true,
         Type::Union(union) => union
             .elements(db)
@@ -500,9 +500,13 @@ fn class_decorator_preserves_class_binding<'db>(
         Type::TypeAlias(alias) => {
             class_decorator_preserves_class_binding(db, original_class, alias.value_type(db))
         }
-        _ => SubclassOfType::try_from_type(db, original_class).is_some_and(|original_meta_type| {
+        _ => {
+            let original_meta_type = SubclassOfType::from_class_without_final_normalization(
+                db,
+                original_literal.unknown_specialization(db),
+            );
             decorated_class.is_equivalent_to(db, original_meta_type)
-        }),
+        }
     }
 }
 

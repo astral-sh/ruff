@@ -6066,6 +6066,11 @@ impl<'db> Type<'db> {
                 let ty = match class.known(db) {
                     Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
                     Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    // Lazy TypeVar bounds may be part of generic-class cycles; avoid forcing
+                    // class defaults while still keeping the bound usable as a generic class.
+                    _ if inference_flags.contains(InferenceFlags::IN_LAZY_TYPEVAR_BOUND) => {
+                        Type::instance(db, class.unknown_specialization(db))
+                    }
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)

@@ -16,7 +16,7 @@ use crate::{
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
         TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, binding_type, definition_expression_type,
-        infer::infer_definition_type_expression,
+        infer::{infer_definition_lazy_typevar_bound_expression, infer_definition_type_expression},
         tuple::Tuple,
         variance::VarianceInferable,
         visitor::{self, TypeCollector, TypeVisitor, walk_type_with_recursion_guard},
@@ -269,6 +269,10 @@ impl<'db> TypeVarInstance<'db> {
         self.default_type_impl(db, &visitor)
     }
 
+    pub(crate) fn has_default_type(self, db: &'db dyn Db) -> bool {
+        self._default(db).is_some()
+    }
+
     fn default_type_impl(
         self,
         db: &'db dyn Db,
@@ -452,7 +456,7 @@ impl<'db> TypeVarInstance<'db> {
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("bound")?.value;
-                infer_definition_type_expression(db, definition, expr)
+                infer_definition_lazy_typevar_bound_expression(db, definition, expr)
             }
             _ => return None,
         };
@@ -1161,6 +1165,10 @@ impl<'db> BoundTypeVarInstance<'db> {
         bound_typevar_default_type(db, self)
     }
 
+    pub(crate) fn has_default_type(self, db: &'db dyn Db) -> bool {
+        self.typevar(db).has_default_type(db)
+    }
+
     fn materialize_impl(
         self,
         db: &'db dyn Db,
@@ -1417,7 +1425,7 @@ impl<'db> BoundTypeVarIdentity<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|_, _, _| None,
+    cycle_initial=|db, id, _| Some(Type::implicit_recursive(db, id, Type::divergent(id))),
     cycle_fn=bound_typevar_default_type_cycle_recover,
     heap_size=ruff_memory_usage::heap_size
 )]
@@ -1437,13 +1445,17 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
     _bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    match (previous_default, default) {
+        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, Some(*prev), cycle)),
+        (None, Some(default)) => Some(default.cycle_normalized(db, None, cycle)),
+        (_, None) => None,
+    }
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.

@@ -11051,6 +11051,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ty
     }
 
+    pub(super) fn finish_lazy_typevar_bound_expression(
+        mut self,
+        expression: &'ast ast::Expr,
+    ) -> Type<'db> {
+        self.context.inference_flags |= InferenceFlags::IN_LAZY_TYPEVAR_BOUND;
+        self.finish_type_expression(expression)
+    }
+
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
 

@@ -59,6 +59,23 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Construct `type[T]` without checking whether `T` is final.
+    ///
+    /// Use this only for recovery-sensitive comparisons that do not need the more precise
+    /// final-class representation from [`Self::from`].
+    pub(crate) fn from_class_without_final_normalization(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+    ) -> Type<'db> {
+        if class.is_object(db) {
+            Self::subclass_of_object(db)
+        } else {
+            Type::SubclassOf(Self {
+                subclass_of: SubclassOfInner::Class(class),
+            })
+        }
+    }
+
     /// Given the class object `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
         let subclass_of = match ty {

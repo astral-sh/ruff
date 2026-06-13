@@ -269,14 +269,40 @@ pub(crate) fn infer_definition_type_expression<'db>(
     definition: Definition<'db>,
     expression: &ast::Expr,
 ) -> Type<'db> {
+    infer_definition_type_expression_impl(db, definition, expression, false)
+}
+
+/// Infer a lazy TypeVar bound expression that belongs to a definition.
+///
+/// Lazy TypeVar bounds may be part of generic-class cycles; this uses a type-expression context
+/// that does not force unrelated generic defaults while the TypeVar query is recovering.
+pub(crate) fn infer_definition_lazy_typevar_bound_expression<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    infer_definition_type_expression_impl(db, definition, expression, true)
+}
+
+fn infer_definition_type_expression_impl<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+    is_lazy_typevar_bound: bool,
+) -> Type<'db> {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
     let file_scope = index.expression_scope_id(expression);
     let scope = file_scope.to_scope_id(db, file);
     if scope == definition.scope(db) {
-        TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module)
-            .finish_type_expression(expression)
+        let builder =
+            TypeInferenceBuilder::new(db, InferenceRegion::Deferred(definition), index, &module);
+        if is_lazy_typevar_bound {
+            builder.finish_lazy_typevar_bound_expression(expression)
+        } else {
+            builder.finish_type_expression(expression)
+        }
     } else {
         infer_complete_scope_types(db, scope).expression_type(expression)
     }
@@ -1748,6 +1774,9 @@ bitflags::bitflags! {
 
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
+
+        /// Whether the visitor is currently evaluating a lazy TypeVar bound.
+        const IN_LAZY_TYPEVAR_BOUND = 1 << 11;
 
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
