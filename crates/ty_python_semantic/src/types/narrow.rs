@@ -881,28 +881,6 @@ fn merge_constraints_or<'db>(
     }
 }
 
-// Dynamic class expressions have no class information for subject-aware analysis. Preserve the
-// existing negative narrowing only when every argument is syntactically irrefutable.
-fn pattern_is_syntactically_irrefutable(pattern: &PatternPredicateKind<'_>) -> bool {
-    match pattern {
-        PatternPredicateKind::As(None, _) => true,
-        PatternPredicateKind::As(Some(pattern), _) => pattern_is_syntactically_irrefutable(pattern),
-        PatternPredicateKind::Or(patterns) => {
-            patterns.iter().any(pattern_is_syntactically_irrefutable)
-        }
-        _ => false,
-    }
-}
-
-fn class_pattern_arguments_are_syntactically_irrefutable(
-    kind: &ClassPatternPredicateKind<'_>,
-) -> bool {
-    kind.positional
-        .iter()
-        .chain(kind.keywords.iter().map(|keyword| &keyword.pattern))
-        .all(pattern_is_syntactically_irrefutable)
-}
-
 fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
     ty == Type::Never || ty.is_single_valued(db)
@@ -2813,8 +2791,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             if let dynamic @ Type::Dynamic(_) = class_type {
                 if !matches!(
                     pattern,
-                    PatternPredicateKind::Class(kind)
-                        if class_pattern_arguments_are_syntactically_irrefutable(kind)
+                    PatternPredicateKind::Class(kind) if kind.is_argumentless()
                 ) {
                     return None;
                 }

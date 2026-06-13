@@ -237,6 +237,22 @@ def _(target: int):
         case _:
             reveal_type(target)  # revealed: int
             target.missing  # error: [unresolved-attribute]
+
+def dynamic_attribute_wildcard_preserves_fallthrough(target: int) -> None:
+    match target:
+        case DynamicClass(real=_):
+            pass
+        case _:
+            reveal_type(target)  # revealed: int
+            target.missing  # error: [unresolved-attribute]
+
+def dynamic_attribute_capture_preserves_fallthrough(target: int) -> None:
+    match target:
+        case DynamicClass(real=item):
+            reveal_type(item)  # revealed: int
+        case _:
+            reveal_type(target)  # revealed: int
+            target.missing  # error: [unresolved-attribute]
 ```
 
 ### Subclass-of type
