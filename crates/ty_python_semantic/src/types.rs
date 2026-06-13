@@ -1239,6 +1239,11 @@ impl<'db> Type<'db> {
             return inner;
         }
 
+        // Dynamic fallbacks carry no finite structure for cycle recovery to preserve.
+        if matches!(inner, Type::Dynamic(_)) {
+            return inner;
+        }
+
         if !inner.is_recursion_value_like(db) {
             return inner;
         }
@@ -1255,6 +1260,28 @@ impl<'db> Type<'db> {
             },
             TypeContext::default(),
         );
+        // Cycle markers preserve recovered finite values. A top-level recovery marker is only the
+        // placeholder leaf for the current cycle, so it should not become part of the recovered value.
+        let inner = match inner {
+            Type::Union(union) => {
+                let elements = union.elements(db);
+                let kept: Vec<_> = elements
+                    .iter()
+                    .copied()
+                    .filter(|element| !element.same_divergent_marker(marker))
+                    .collect();
+                if kept.is_empty() {
+                    return Type::unknown();
+                }
+                if kept.len() == elements.len() {
+                    inner
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, kept)
+                }
+            }
+            _ if inner.same_divergent_marker(marker) => return Type::unknown(),
+            _ => inner,
+        };
         if RecursiveTypeNormalization::new(marker).contains_marker(db, inner) {
             return Type::implicit_recursive(db, binder_id, inner);
         }

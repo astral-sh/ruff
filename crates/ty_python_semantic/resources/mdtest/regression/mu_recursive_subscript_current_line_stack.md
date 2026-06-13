@@ -30,3 +30,36 @@ class TextFile:
                 else:
                     self.current_line = self.current_line + 1
 ```
+
+This is minimized from a Tanjun ecosystem failure. The recursive tree alias can flow through a
+loop-carried local, be read with a subscript, and then be used for a member lookup. Cycle recovery
+should not preserve markers on dynamic fallback values produced by the subscript operation.
+
+```py
+class MessageCommand:
+    pass
+
+class _IndexKeys:
+    COMMANDS = object()
+
+_TreeT = dict[str | object, "_TreeT | list[tuple[list[str], MessageCommand]]"]
+
+class MessageCommandIndex:
+    search_tree: _TreeT | None = None
+
+    def find(self, split: list[str]) -> None:
+        if self.search_tree is None:
+            return
+
+        node: _TreeT | list[tuple[list[str], MessageCommand]]
+        node = self.search_tree
+        for chars in split:
+            try:
+                node = node[chars.casefold()]
+            except KeyError:
+                break
+            else:
+                assert isinstance(node, dict)
+                if entries := node.get(_IndexKeys.COMMANDS):
+                    assert isinstance(entries, list)
+```
