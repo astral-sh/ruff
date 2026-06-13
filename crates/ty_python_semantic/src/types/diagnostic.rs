@@ -6142,6 +6142,48 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
+pub(super) fn report_incompatible_base_method<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    member: &str,
+    override_method: (ClassType<'db>, Definition<'db>),
+    overridden_method: (ClassType<'db>, Definition<'db>),
+    error_context: impl FnOnce() -> ErrorContextTree<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_METHOD_OVERRIDE, class.header_range(db))
+    else {
+        return;
+    };
+
+    let (override_owner, override_definition) = override_method;
+    let (overridden_owner, overridden_definition) = overridden_method;
+    let class_name = class.name(db);
+    let override_method = format!("{}.{member}", override_owner.name(db));
+    let overridden_method = format!("{}.{member}", overridden_owner.name(db));
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Base classes for class `{class_name}` define method `{member}` incompatibly"
+    ));
+    diagnostic.set_primary_message(format_args!(
+        "`{override_method}` is incompatible with `{overridden_method}`"
+    ));
+
+    error_context().attach_to(db, &mut diagnostic);
+    diagnostic.info("This violates the Liskov Substitution Principle");
+
+    for (definition, method) in [
+        (override_definition, override_method),
+        (overridden_definition, overridden_method),
+    ] {
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(definition.focus_range(db, &module)))
+                .message(format_args!("`{method}` defined here")),
+        );
+    }
+}
+
 pub(super) fn report_overridden_final_method<'db>(
     context: &InferContext<'db, '_>,
     member: &str,

@@ -588,6 +588,77 @@ class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
     attr: int
 ```
 
+### Inherited methods from multiple bases
+
+The method selected by the MRO must satisfy every direct base class. A class therefore cannot
+inherit incompatible methods from separate bases without defining a compatible override itself:
+
+```pyi
+class StrReturn:
+    def method(self) -> str: ...
+
+class IntReturn:
+    def method(self) -> int: ...
+
+class BoolReturn:
+    def method(self) -> bool: ...
+
+class IncompatibleReturns(StrReturn, IntReturn): ...  # error: [invalid-method-override]
+
+# `bool` is a subtype of `int`, so this order is compatible.
+class CompatibleCovariantReturn(BoolReturn, IntReturn): ...
+```
+
+The check follows inherited methods through intermediate bases, applies generic specializations, and
+avoids repeating violations already reported on a base class or explicit override. Dynamic bases
+participate according to their position in the MRO: a leading dynamic base obscures which method
+wins, but a later dynamic base does not erase a known conflict.
+
+```pyi
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Intermediate(StrReturn): ...
+class IndirectConflict(Intermediate, IntReturn): ...  # error: [invalid-method-override]
+
+class GenericReturn(Generic[T]):
+    def method(self) -> T: ...
+
+class GenericConflict(StrReturn, GenericReturn[int]): ...  # error: [invalid-method-override]
+
+class BrokenIntReturn(IntReturn):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+# The violation is defined on `BrokenIntReturn`; this class should not repeat it.
+class RedundantDirectBase(BrokenIntReturn, IntReturn): ...
+
+class ExplicitOverride(StrReturn, IntReturn):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class LeadingDynamicBase(Any, StrReturn, IntReturn): ...
+class LaterDynamicBase(StrReturn, Any, IntReturn): ...  # error: [invalid-method-override]
+
+class AttributeMask:
+    method = lambda: ""
+
+class MaskedMethod(AttributeMask, IntReturn): ...
+```
+
+Synthesized members also mask source methods later in the MRO:
+
+```pyi
+from typing import NamedTuple
+
+class GeneratedMake(NamedTuple):
+    value: int
+
+class SourceMake:
+    def _make(self) -> int: ...
+
+class MaskedBySynthesizedMember(GeneratedMake, SourceMake): ...
+```
+
 ### Dataclasses
 
 Dataclass fields are instance variables, even though they are usually declared in the class body.
