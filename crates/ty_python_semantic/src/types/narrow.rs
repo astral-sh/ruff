@@ -491,6 +491,12 @@ impl<'db> Conjunctions<'db> {
                 .iter()
                 .all(|ty| is_truthiness_guard_type(db, *ty))
     }
+
+    fn contains_cycle_recovery_marker(&self, db: &'db dyn Db) -> bool {
+        self.conjuncts
+            .iter()
+            .any(|ty| ty.contains_cycle_recovery_marker(db))
+    }
 }
 
 fn is_truthiness_guard_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
@@ -635,6 +641,13 @@ impl<'db> NarrowingConstraint<'db> {
                 .intersection_disjuncts
                 .iter()
                 .all(|conjunctions| conjunctions.is_truthiness_guard(db))
+    }
+
+    pub(crate) fn contains_cycle_recovery_marker(&self, db: &'db dyn Db) -> bool {
+        self.replacement_disjuncts
+            .iter()
+            .chain(&self.intersection_disjuncts)
+            .any(|conjunctions| conjunctions.contains_cycle_recovery_marker(db))
     }
 }
 

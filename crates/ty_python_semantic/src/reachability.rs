@@ -590,10 +590,13 @@ fn apply_accumulated_narrowing<'db>(
 ) -> Type<'db> {
     match accumulated {
         Some(constraint) => {
-            if base_ty.contains_cycle_recovery_marker(db) && constraint.is_truthiness_guard(db) {
+            if base_ty.contains_cycle_recovery_marker(db)
+                && (constraint.is_truthiness_guard(db)
+                    || constraint.contains_cycle_recovery_marker(db))
+            {
                 // Cycle recovery markers are provisional approximations. Truthiness guards
-                // refine those approximations into a different recovery shape instead of a
-                // stable user-visible type fact.
+                // and marker-derived constraints refine those approximations into a different
+                // recovery shape instead of a stable user-visible type fact.
                 return base_ty;
             }
             NarrowingConstraint::intersection(base_ty)
