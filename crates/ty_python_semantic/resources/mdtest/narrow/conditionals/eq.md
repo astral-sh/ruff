@@ -224,9 +224,9 @@ def narrow_typed_dict(value: Payload | None, other: Payload):
 
 ## Comparisons with user-defined methods
 
-Arbitrary user-defined comparison methods are not used for narrowing, i.e., we don't inspect
-the bodies of user-defined `__eq__` or `__ne__` methods to predict their results, and instead
-require a `Literal` return type annotation:
+Arbitrary user-defined comparison methods are not used for narrowing, i.e., we don't inspect the
+bodies of user-defined `__eq__` or `__ne__` methods to predict their results, and instead require a
+`Literal` return type annotation:
 
 ```py
 class Left:
