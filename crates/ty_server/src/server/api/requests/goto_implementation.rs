@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::request::{GotoImplementation, GotoImplementationParams};
-use lsp_types::{GotoDefinitionResponse, Url};
+use lsp_types::{ImplementationParams, ImplementationRequest, ImplementationResponse, Uri};
 use ty_ide::goto_implementation;
 use ty_project::ProjectDatabase;
 
@@ -15,11 +14,11 @@ use crate::session::client::Client;
 pub(crate) struct GotoImplementationRequestHandler;
 
 impl RequestHandler for GotoImplementationRequestHandler {
-    type RequestType = GotoImplementation;
+    type RequestType = ImplementationRequest;
 }
 
 impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
-    fn document_url(params: &GotoImplementationParams) -> Cow<'_, Url> {
+    fn document_uri(params: &ImplementationParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document_position_params.text_document.uri)
     }
 
@@ -27,8 +26,8 @@ impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
         db: &ProjectDatabase,
         snapshot: &DocumentSnapshot,
         _client: &Client,
-        params: GotoImplementationParams,
-    ) -> crate::server::Result<Option<GotoDefinitionResponse>> {
+        params: ImplementationParams,
+    ) -> crate::server::Result<Option<ImplementationResponse>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -43,7 +42,7 @@ impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
         let Some(offset) = params.text_document_position_params.position.to_text_size(
             db,
             file,
-            snapshot.url(),
+            snapshot.uri(),
             snapshot.encoding(),
         ) else {
             return Ok(None);
@@ -63,14 +62,14 @@ impl BackgroundDocumentRequestHandler for GotoImplementationRequestHandler {
                 .filter_map(|target| target.to_link(db, src, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Link(links)))
+            Ok(Some(links.into()))
         } else {
             let locations: Vec<_> = ranged
                 .into_iter()
                 .filter_map(|target| target.to_location(db, snapshot.encoding()))
                 .collect();
 
-            Ok(Some(GotoDefinitionResponse::Array(locations)))
+            Ok(Some(ImplementationResponse::Definition(locations.into())))
         }
     }
 }

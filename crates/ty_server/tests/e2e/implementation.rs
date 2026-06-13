@@ -1,8 +1,8 @@
 use anyhow::Result;
-use lsp_types::request::{GotoImplementation, GotoImplementationParams};
 use lsp_types::{
-    GotoDefinitionResponse, ImplementationProviderCapability, PartialResultParams, Position, Range,
-    TextDocumentIdentifier, TextDocumentPositionParams, WorkDoneProgressParams,
+    Definition, ImplementationParams, ImplementationProvider, ImplementationRequest,
+    ImplementationResponse, PartialResultParams, Position, Range, TextDocumentIdentifier,
+    TextDocumentPositionParams, WorkDoneProgressParams,
 };
 
 use crate::TestServerBuilder;
@@ -29,7 +29,7 @@ fn implementation_provider_is_advertised() -> Result<()> {
     let initialization_result = server.initialization_result().unwrap();
     assert_eq!(
         initialization_result.capabilities.implementation_provider,
-        Some(ImplementationProviderCapability::Simple(true))
+        Some(ImplementationProvider::Bool(true))
     );
 
     Ok(())
@@ -46,7 +46,7 @@ fn implementation_locations_without_link_support() -> Result<()> {
     server.open_text_document("foo.py", CONTENT, 1);
 
     let response = implementation(&mut server, "foo.py", Position::new(10, 13)).unwrap();
-    let GotoDefinitionResponse::Array(locations) = response else {
+    let ImplementationResponse::Definition(Definition::LocationList(locations)) = response else {
         panic!("Expected Location[] response, got {response:#?}");
     };
 
@@ -74,7 +74,7 @@ fn implementation_location_links_with_link_support() -> Result<()> {
     server.open_text_document("foo.py", CONTENT, 1);
 
     let response = implementation(&mut server, "foo.py", Position::new(10, 13)).unwrap();
-    let GotoDefinitionResponse::Link(links) = response else {
+    let ImplementationResponse::DefinitionLinkList(links) = response else {
         panic!("Expected LocationLink[] response, got {response:#?}");
     };
 
@@ -102,8 +102,8 @@ fn implementation(
     server: &mut crate::TestServer,
     path: impl AsRef<ruff_db::system::SystemPath>,
     position: Position,
-) -> Option<GotoDefinitionResponse> {
-    server.send_request_await::<GotoImplementation>(GotoImplementationParams {
+) -> Option<ImplementationResponse> {
+    server.send_request_await::<ImplementationRequest>(ImplementationParams {
         text_document_position_params: TextDocumentPositionParams {
             text_document: TextDocumentIdentifier {
                 uri: server.file_uri(path),
