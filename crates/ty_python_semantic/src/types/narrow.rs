@@ -1200,12 +1200,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
         let subject_node = subject.node_ref(self.db).node(self.module);
-        let expression_constraints = self
-            .evaluate_pattern_predicate_kind(kind, subject, is_positive)
-            .into_constraints();
         if !is_positive {
-            return expression_constraints;
+            return self
+                .evaluate_pattern_predicate_kind(kind, subject, false)
+                .into_constraints();
         }
+
+        // A name or named expression has no related expressions to constrain. Attributes,
+        // subscripts, and constructed subjects still use expression analysis to propagate
+        // constraints to their component places.
+        let expression_constraints =
+            if matches!(subject_node, ast::Expr::Name(_) | ast::Expr::Named(_)) {
+                None
+            } else {
+                self.evaluate_pattern_predicate_kind(kind, subject, true)
+                    .into_constraints()
+            };
 
         let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
             return expression_constraints;
