@@ -224,8 +224,9 @@ def narrow_typed_dict(value: Payload | None, other: Payload):
 
 ## Comparisons with user-defined methods
 
-Arbitrary user-defined comparison methods are not used for narrowing. This keeps both operand orders
-conservative without needing to model Python's reflected-comparison dispatch:
+Arbitrary user-defined comparison methods are not used for narrowing, i.e., we don't inspect
+the bodies of user-defined `__eq__` or `__ne__` methods to predict their results, and instead
+require a `Literal` return type annotation:
 
 ```py
 class Left:
@@ -241,18 +242,6 @@ def _(value: Right | None):
         reveal_type(value)  # revealed: Right | None
     else:
         reveal_type(value)  # revealed: Right | None
-```
-
-Distinct objects with known identity-based comparison semantics remain definitively unequal:
-
-```py
-def callback() -> None: ...
-def _(flag: bool):
-    value = callback if flag else None
-    if value == int:
-        reveal_type(value)  # revealed: Never
-    else:
-        reveal_type(value)  # revealed: (def callback() -> None) | None
 ```
 
 ## `x != y` where `y` is of literal type
