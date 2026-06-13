@@ -1201,7 +1201,7 @@ enum PackedTypeQualifierTag {
 /// Compact physical representation of a type.
 ///
 /// The tag is stored separately from an eight-byte payload. Literal kinds are flattened into the
-/// tag because [`LiteralValueType`] is itself larger than the payload. Use [`Type::data`] to access
+/// tag because `LiteralValueType` is itself larger than the payload. Use [`Type::data`] to access
 /// the logical enum representation.
 #[derive(Copy, Clone, PartialEq, Eq, Hash, salsa::Update)]
 pub struct Type<'db> {
