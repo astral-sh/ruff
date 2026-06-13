@@ -30,6 +30,7 @@ use crate::Db;
 use bitflags::bitflags;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr,
     walk_interpolated_string_element, walk_stmt,
@@ -38,6 +39,7 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, BytesLiteral, Expr, InterpolatedStringElement, Stmt,
     StringLiteral, TypeParam,
 };
+use ruff_source_file::{LineIndex, OneIndexed, PositionEncoding, SourceLocation};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_core::definition::{Definition, DefinitionKind, ParameterDefinitionNodeKind};
@@ -52,6 +54,7 @@ use ty_python_semantic::{
 
 /// Semantic token types supported by the language server.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
 pub enum SemanticTokenType {
     // This enum must be kept in sync with the SemanticTokenType below.
     Namespace,
@@ -191,6 +194,250 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
+}
+
+/// An LSP-compatible semantic token encoded relative to the previous token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EncodedSemanticToken {
+    pub delta_line: u32,
+    pub delta_start: u32,
+    pub length: u32,
+    pub token_type: u32,
+    pub token_modifiers_bitset: u32,
+}
+
+impl EncodedSemanticToken {
+    pub const LEN: usize = 5;
+
+    pub const fn as_u32_array(self) -> [u32; Self::LEN] {
+        [
+            self.delta_line,
+            self.delta_start,
+            self.length,
+            self.token_type,
+            self.token_modifiers_bitset,
+        ]
+    }
+}
+
+/// Generates LSP-compatible semantic tokens for a Python file within the specified range.
+///
+/// The encoded tokens use zero-based line and character offsets and are suitable for both LSP
+/// clients and Monaco's semantic-token provider.
+pub fn encoded_semantic_tokens(
+    db: &dyn Db,
+    file: File,
+    range: Option<TextRange>,
+    encoding: PositionEncoding,
+    multiline_token_support: bool,
+) -> Vec<EncodedSemanticToken> {
+    let source = source_text(db, file);
+    let line_index = line_index(db, file);
+    let semantic_token_data = semantic_tokens(db, file, range);
+
+    let mut encoder = EncodedSemanticTokensBuilder {
+        tokens: Vec::with_capacity(semantic_token_data.len()),
+        prev_line: 0,
+        prev_start: 0,
+    };
+
+    for token in &*semantic_token_data {
+        let Some(encoded_range) = EncodedSemanticTokenRange::from_text_range(
+            token.range(),
+            &source,
+            &line_index,
+            encoding,
+        ) else {
+            continue;
+        };
+
+        if encoded_range.start.line == encoded_range.end.line {
+            let length = encoded_range.end.character - encoded_range.start.character;
+            encoder.push_token_at(
+                encoded_range.start,
+                length,
+                token.token_type,
+                token.modifiers,
+            );
+        } else if multiline_token_support {
+            let Some(length) = encoded_range.multiline_length(&line_index, &source, encoding)
+            else {
+                continue;
+            };
+
+            encoder.push_token_at(
+                encoded_range.start,
+                length,
+                token.token_type,
+                token.modifiers,
+            );
+        } else {
+            for line in encoded_range.start.line..=encoded_range.end.line {
+                let start_character = if line == encoded_range.start.line {
+                    encoded_range.start.character
+                } else {
+                    0
+                };
+
+                let end_character = if line == encoded_range.end.line {
+                    encoded_range.end.character
+                } else if let Some(line_len) =
+                    encoded_range.line_len(line, &line_index, &source, encoding)
+                {
+                    line_len
+                } else {
+                    continue;
+                };
+
+                let Some(length) = end_character.checked_sub(start_character) else {
+                    continue;
+                };
+
+                if length == 0 {
+                    continue;
+                }
+
+                encoder.push_token_at(
+                    EncodedSemanticTokenPosition {
+                        line,
+                        character: start_character,
+                    },
+                    length,
+                    token.token_type,
+                    token.modifiers,
+                );
+            }
+        }
+    }
+
+    encoder.tokens
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EncodedSemanticTokenPosition {
+    line: u32,
+    character: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EncodedSemanticTokenRange {
+    start: EncodedSemanticTokenPosition,
+    end: EncodedSemanticTokenPosition,
+    /// Difference between a token's document-relative line and its line in the backing source.
+    /// This is non-zero for notebook cells, whose LSP ranges are cell-relative.
+    line_offset: usize,
+}
+
+impl EncodedSemanticTokenRange {
+    fn from_text_range(
+        range: TextRange,
+        source: &SourceText,
+        line_index: &LineIndex,
+        encoding: PositionEncoding,
+    ) -> Option<Self> {
+        let start = line_index.source_location(range.start(), source, encoding);
+        let end = line_index.source_location(range.end(), source, encoding);
+
+        let (start, end, line_offset) = if let Some(notebook) = source.as_notebook() {
+            let notebook_index = notebook.index();
+            let cell_index = notebook_index.cell(start.line)?;
+
+            if notebook_index.cell(end.line)? != cell_index {
+                return None;
+            }
+
+            let local_start = notebook_index.translate_source_location(&start);
+            let local_end = notebook_index.translate_source_location(&end);
+            let line_offset = start
+                .line
+                .to_zero_indexed()
+                .checked_sub(local_start.line.to_zero_indexed())?;
+
+            (local_start, local_end, line_offset)
+        } else {
+            (start, end, 0)
+        };
+
+        Some(Self {
+            start: source_location_to_position(&start)?,
+            end: source_location_to_position(&end)?,
+            line_offset,
+        })
+    }
+
+    fn multiline_length(
+        self,
+        line_index: &LineIndex,
+        source: &str,
+        encoding: PositionEncoding,
+    ) -> Option<u32> {
+        let mut length = 0u32;
+
+        for line in self.start.line..self.end.line {
+            length = length.checked_add(self.line_len(line, line_index, source, encoding)?)?;
+        }
+
+        length = length.checked_sub(self.start.character)?;
+        length.checked_add(self.end.character)
+    }
+
+    fn line_len(
+        self,
+        line: u32,
+        line_index: &LineIndex,
+        source: &str,
+        encoding: PositionEncoding,
+    ) -> Option<u32> {
+        let line = usize::try_from(line).ok()?.checked_add(self.line_offset)?;
+        let line_len = line_index.line_len(OneIndexed::from_zero_indexed(line), source, encoding);
+
+        u32::try_from(line_len).ok()
+    }
+}
+
+fn source_location_to_position(location: &SourceLocation) -> Option<EncodedSemanticTokenPosition> {
+    Some(EncodedSemanticTokenPosition {
+        line: u32::try_from(location.line.to_zero_indexed()).ok()?,
+        character: u32::try_from(location.character_offset.to_zero_indexed()).ok()?,
+    })
+}
+
+struct EncodedSemanticTokensBuilder {
+    tokens: Vec<EncodedSemanticToken>,
+    prev_line: u32,
+    prev_start: u32,
+}
+
+impl EncodedSemanticTokensBuilder {
+    fn push_token_at(
+        &mut self,
+        start: EncodedSemanticTokenPosition,
+        length: u32,
+        ty: SemanticTokenType,
+        modifiers: SemanticTokenModifier,
+    ) {
+        let Some(delta_line) = start.line.checked_sub(self.prev_line) else {
+            return;
+        };
+        let Some(delta_start) = (if delta_line == 0 {
+            start.character.checked_sub(self.prev_start)
+        } else {
+            Some(start.character)
+        }) else {
+            return;
+        };
+
+        self.tokens.push(EncodedSemanticToken {
+            delta_line,
+            delta_start,
+            length,
+            token_type: ty as u32,
+            token_modifiers_bitset: modifiers.bits(),
+        });
+
+        self.prev_line = start.line;
+        self.prev_start = start.character;
+    }
 }
 
 /// AST visitor that collects semantic tokens.
@@ -1256,6 +1503,20 @@ mod tests {
         let tokens = test.highlight_file();
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#""foo" @ 4..7: Function [definition]"#);
+    }
+
+    #[test]
+    fn encoded_semantic_tokens_basic() {
+        let test = SemanticTokenTest::new("def foo():\n    foo()\n");
+
+        let tokens =
+            encoded_semantic_tokens(&test.db, test.file, None, PositionEncoding::Utf16, true);
+        let data = tokens
+            .iter()
+            .flat_map(|token| token.as_u32_array())
+            .collect::<Vec<_>>();
+
+        assert_eq!(data, vec![0, 4, 3, 7, 1, 1, 4, 3, 7, 0]);
     }
 
     #[test]
