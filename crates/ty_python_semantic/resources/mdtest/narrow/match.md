@@ -742,6 +742,20 @@ def test_match_class_or_pattern_filters_union_arms(
             # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
             reveal_type(whole)
 
+class OrderedBase:
+    member: int = 0
+
+class OrderedChild(OrderedBase): ...
+
+def test_match_ordered_class_alternatives_preserve_later_bindings(
+    value: OrderedChild,
+) -> None:
+    match value:
+        # Attribute extraction in the first alternative can fail for a subclass, so the second
+        # alternative still contributes its binding type.
+        case OrderedBase(member=item) | (OrderedChild() as item):
+            reveal_type(item)  # revealed: int | OrderedChild
+
 def test_match_builtin_match_self(
     value: list[int] | dict[str, int] | int,
 ) -> None:

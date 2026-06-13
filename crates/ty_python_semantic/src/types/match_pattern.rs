@@ -272,16 +272,29 @@ pub(crate) fn definite_match_pattern_type<'db>(
             }
         }
         PatternPredicateKind::Class(kind) => {
-            if kind.kind().is_irrefutable() {
-                match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
-                    }
-                    _ => Type::Never,
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class)
+                    if kind.is_argumentless()
+                        || (kind.kind().is_irrefutable()
+                            && kind.keywords.is_empty()
+                            && class_pattern_positional_sources(
+                                db,
+                                Some(class),
+                                kind.positional.len(),
+                            )
+                            .iter()
+                            .all(|source| {
+                                matches!(source, ClassPatternPositionalSource::MatchSelf)
+                            })) =>
+                {
+                    Type::instance(db, class.top_materialization(db))
                 }
-            } else {
-                Type::Never
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless() =>
+                {
+                    callable_pattern_type(db)
+                }
+                _ => Type::Never,
             }
         }
         PatternPredicateKind::Mapping(kind) => {
