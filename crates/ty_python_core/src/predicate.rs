@@ -183,19 +183,6 @@ impl ClassPatternPredicateKind<'_> {
     pub fn is_argumentless(&self) -> bool {
         self.positional.is_empty() && self.keywords.is_empty()
     }
-
-    pub fn kind(&self) -> ClassPatternKind {
-        if self
-            .positional
-            .iter()
-            .chain(self.keywords.iter().map(|keyword| &keyword.pattern))
-            .all(PatternPredicateKind::is_syntactically_irrefutable)
-        {
-            ClassPatternKind::Irrefutable
-        } else {
-            ClassPatternKind::Refutable
-        }
-    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
