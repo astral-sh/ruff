@@ -302,8 +302,15 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
     /// Look up an instance member defined directly on this class (not inherited).
     ///
     /// `NamedTuple` fields are exposed via synthesized descriptors on the class rather than
-    /// instance attributes. If fields are unknown (dynamic), return `Any` for any attribute.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, _name: &str) -> Member<'db> {
+    /// instance attributes. If fields are unknown (dynamic), return `Any` for any name that is
+    /// not a generated class attribute.
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        // `__match_args__` is a generated class attribute and named tuples do not have instance
+        // dictionaries, so an unknown field cannot shadow it on an instance.
+        if name == "__match_args__" {
+            return Member::unbound();
+        }
+
         if !self.has_known_fields(db) {
             return Member::definitely_declared(Type::any());
         }

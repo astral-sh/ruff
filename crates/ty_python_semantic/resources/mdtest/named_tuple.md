@@ -1282,6 +1282,9 @@ reveal_type(FunctionalPoint.__match_args__)  # revealed: tuple[Literal["x"], Lit
 reveal_type(CollectionPoint.__match_args__)  # revealed: tuple[Literal["x"], Literal["y"]]
 reveal_type(UnknownPoint.__match_args__)  # revealed: tuple[str, ...]
 reveal_type(UnknownPointChild.__match_args__)  # revealed: tuple[str, ...]
+
+unknown_point = UnknownPoint(1, "")
+reveal_type(unknown_point.__match_args__)  # revealed: tuple[str, ...]
 ```
 
 The attribute is not generated when targeting an earlier Python version.
