@@ -452,7 +452,7 @@ impl<'src> Parser<'src> {
         &mut self,
         context: IpyEscapeContext,
     ) -> (Box<str>, IpyEscapeKind) {
-        let (value, kind) = self.cook_ipython_escape_command_value(context);
+        let (value, kind) = self.parse_ipython_escape_command_value(context);
         self.bump(TokenKind::IpyEscapeCommand);
         (value, kind)
     }
@@ -461,7 +461,7 @@ impl<'src> Parser<'src> {
         self.src_text(self.current_token_range())
     }
 
-    fn cook_ipython_escape_command_value(
+    fn parse_ipython_escape_command_value(
         &self,
         context: IpyEscapeContext,
     ) -> (Box<str>, IpyEscapeKind) {
