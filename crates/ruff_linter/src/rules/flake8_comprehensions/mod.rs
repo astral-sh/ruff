@@ -87,6 +87,28 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py313.py"))]
+    fn preview_rules_py313(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_comprehensions").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY313)
+            },
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code).with_target_version(PythonVersion::PY313)
+            },
+        );
+        Ok(())
+    }
+
     #[test_case(Rule::UnnecessaryLiteralWithinTupleCall, Path::new("C409_py315.py"))]
     fn preview_rules_py315(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
