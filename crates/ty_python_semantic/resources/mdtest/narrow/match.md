@@ -621,7 +621,7 @@ Class patterns pass the type of each extracted attribute to their nested pattern
 
 ```py
 from dataclasses import dataclass
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 T = TypeVar("T")
 
@@ -644,6 +644,22 @@ def test_match_dataclass_positional_capture(dataclass_box: DataclassBox[T]) -> N
     match dataclass_box:
         case DataclassBox(item):
             reveal_type(item)  # revealed: T@test_match_dataclass_positional_capture
+
+class NamedPoint(NamedTuple):
+    x: int
+    label: str
+
+def test_match_named_tuple_positional_captures(point: NamedPoint) -> None:
+    match point:
+        case NamedPoint(x, label):
+            reveal_type(x)  # revealed: int
+            reveal_type(label)  # revealed: str
+
+def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
+    item: str
+    match value:
+        case PatternBox(value=item):  # error: [invalid-assignment]
+            reveal_type(item)  # revealed: str
 ```
 
 `__match_args__` is read through the pattern class and must identify literal attribute names. This
@@ -758,6 +774,16 @@ def test_match_dict_bindings(value: dict[str, int]) -> None:
             reveal_type(item)  # revealed: int
             reveal_type(rest)  # revealed: dict[str, int]
             reveal_type(whole)  # revealed: dict[str, int]
+
+def test_incompatible_declared_mapping_captures(value: Mapping[str, int]) -> None:
+    item: str
+    rest: dict[str, str]
+    match value:
+        # error: [invalid-assignment]
+        # error: [invalid-assignment]
+        case {"item": item, **rest}:
+            reveal_type(item)  # revealed: str
+            reveal_type(rest)  # revealed: dict[str, str]
 
 def test_match_mapping_key_filters_union_arms(
     value: dict[Literal["a"], int] | dict[Literal["b"], str],

@@ -1578,15 +1578,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
-    fn match_class_pattern_subject_type(
-        &mut self,
-        kind: &ClassPatternPredicateKind<'db>,
-        subject_ty: Type<'db>,
-    ) -> Type<'db> {
-        self.match_class_pattern(kind, subject_ty)
-            .matched_subject_ty
-    }
-
     fn mapping_pattern_value_type_for_arm(
         &self,
         subject_ty: Type<'db>,
@@ -1698,15 +1689,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .unwrap_or_else(|| (Type::unknown(), Type::unknown())),
         };
         KnownClass::Dict.to_specialized_instance(self.db, &[key_ty, value_ty])
-    }
-
-    fn match_mapping_pattern_subject_type(
-        &mut self,
-        kind: &MappingPatternPredicateKind<'db>,
-        subject_ty: Type<'db>,
-    ) -> Type<'db> {
-        self.match_mapping_pattern(kind, subject_ty)
-            .matched_subject_ty
     }
 
     /// Return the subject and binding types of a successful sequence pattern.
