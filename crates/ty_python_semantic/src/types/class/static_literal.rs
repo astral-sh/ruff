@@ -2193,8 +2193,8 @@ impl<'db> StaticClassLiteral<'db> {
         let mut provenance = Provenance::Unknown;
 
         let file = class_body_scope.file(db);
-        let module = parsed_module(db, file).load(db);
         let index = semantic_index(db, file);
+        let module = index.parsed_module().load(db);
         let class_map = use_def_map(db, class_body_scope);
         let class_table = place_table(db, class_body_scope);
         let is_valid_scope = |method_scope: &Scope| {

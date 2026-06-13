@@ -2522,6 +2522,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         SemanticIndex {
+            parsed_module: self.module.module().clone(),
             place_tables: place_tables.into(),
             scopes: self.scopes.into(),
             definitions_by_node: DefinitionsByNode::from_map(self.definitions_by_node),

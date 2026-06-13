@@ -372,9 +372,12 @@ impl<'db> OverloadLiteral<'db> {
         db: &'db dyn Db,
         predicate: impl Fn(Type<'db>) -> bool,
     ) -> Option<Span> {
-        let definition = self.definition(db);
-        let file = definition.file(db);
-        self.node(db, file, &parsed_module(db, file).load(db))
+        let body_scope = self.body_scope(db);
+        let file = body_scope.file(db);
+        let index = semantic_index(db, file);
+        let definition = index.expect_single_definition(body_scope.node(db).expect_function());
+        let module = index.parsed_module().load(db);
+        self.node(db, file, &module)
             .decorator_list
             .iter()
             .find(|decorator| {
@@ -432,9 +435,12 @@ impl<'db> OverloadLiteral<'db> {
     fn previous_overload(self, db: &'db dyn Db) -> Option<FunctionLiteral<'db>> {
         // The semantic model records a use for each function on the name node. This is used
         // here to get the previous function definition with the same name.
-        let scope = self.definition(db).scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let body_scope = self.body_scope(db);
+        let index = semantic_index(db, body_scope.file(db));
+        let definition = index.expect_single_definition(body_scope.node(db).expect_function());
+        let scope = definition.scope(db);
+        let module = index.parsed_module().load(db);
+        let use_def = index.use_def_map(scope.file_scope_id(db));
         let use_id = self
             .body_scope(db)
             .node(db)
@@ -485,9 +491,9 @@ impl<'db> OverloadLiteral<'db> {
         let mut signature = self.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let function_node = scope.node(db).expect_function().node(&module);
         let index = semantic_index(db, scope.file(db));
+        let module = index.parsed_module().load(db);
+        let function_node = scope.node(db).expect_function().node(&module);
         let file_scope_id = scope.file_scope_id(db);
         let is_generator = file_scope_id.is_generator_function(index);
 
@@ -570,10 +576,10 @@ impl<'db> OverloadLiteral<'db> {
         }
 
         let scope = self.body_scope(db);
-        let module = parsed_module(db, self.file(db)).load(db);
-        let function_stmt_node = scope.node(db).expect_function().node(&module);
-        let definition = self.definition(db);
         let index = semantic_index(db, scope.file(db));
+        let module = index.parsed_module().load(db);
+        let function_stmt_node = scope.node(db).expect_function().node(&module);
+        let definition = index.expect_single_definition(scope.node(db).expect_function());
         let pep695_ctx = function_stmt_node.type_params.as_ref().map(|type_params| {
             GenericContext::from_type_params(db, index, definition, type_params)
         });
@@ -921,9 +927,11 @@ impl<'db> FunctionLiteral<'db> {
             db: &'db dyn Db,
             implementation: OverloadLiteral<'db>,
         ) -> FunctionBodyKind {
-            let definition = implementation.definition(db);
-            let file = definition.file(db);
-            let module = parsed_module(db, file).load(db);
+            let body_scope = implementation.body_scope(db);
+            let file = body_scope.file(db);
+            let index = semantic_index(db, file);
+            let definition = index.expect_single_definition(body_scope.node(db).expect_function());
+            let module = index.parsed_module().load(db);
             let node = implementation.node(db, file, &module);
             function_body_kind(db, node, |expr| {
                 definition_expression_type(db, definition, expr)
