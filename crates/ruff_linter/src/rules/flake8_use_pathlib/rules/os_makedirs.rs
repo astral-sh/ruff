@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_makedirs_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
-    has_unknown_keywords_or_starred_expr, is_pathlib_path_call,
+    has_unknown_keywords_or_starred_expr, is_bytes_path, is_pathlib_path_call,
 };
 use crate::{FixAvailability, Violation};
 
@@ -72,12 +72,16 @@ pub(crate) fn os_makedirs(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
-    let range = call.range();
-    let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func.range());
-
     let Some(name) = call.arguments.find_argument_value("name", 0) else {
         return;
     };
+
+    if is_bytes_path(name, checker.semantic()) {
+        return;
+    }
+
+    let range = call.range();
+    let mut diagnostic = checker.report_diagnostic(OsMakedirs, call.func.range());
 
     if !is_fix_os_makedirs_enabled(checker.settings()) {
         return;
