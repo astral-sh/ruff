@@ -1,5 +1,6 @@
 use std::collections::btree_map::{BTreeMap, Entry};
 
+use ruff_db::files::directory_listing;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
@@ -77,19 +78,13 @@ fn list_modules_in<'db>(
     let mut lister = Lister::new(db, search_path.path(db));
     match search_path.path(db).as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {
-            // Read the revision on the corresponding file root to
-            // register an explicit dependency on this directory. When
-            // the revision gets bumped, the cache that Salsa creates
-            // for this routine will be invalidated.
-            let root = db.files().expect_root(db, system_search_path);
-            let _ = root.revision(db);
-
-            let Ok(it) = db.system().read_directory(system_search_path) else {
+            let directory = db.files().directory(db, system_search_path);
+            let Ok(listing) = directory_listing(db, directory) else {
                 return vec![];
             };
-            for result in it {
-                let Ok(entry) = result else { continue };
-                lister.add_path(&entry.path().into(), entry.file_type().into());
+            for (name, file_type) in listing.iter() {
+                let path = system_search_path.join(name);
+                lister.add_path(&path.as_path().into(), file_type.into());
             }
         }
         SystemOrVendoredPathRef::Vendored(vendored_search_path) => {
@@ -402,6 +397,8 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
+    use salsa::Database as _;
+    use salsa::plumbing::AsId as _;
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
@@ -413,6 +410,24 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::list_modules;
+
+    fn assert_query_was_not_run(
+        db: &TestDb,
+        query_name: &str,
+        input: Option<salsa::Id>,
+        events: &[salsa::Event],
+    ) {
+        assert!(
+            !events.iter().any(|event| {
+                let salsa::EventKind::WillExecute { database_key } = event.kind else {
+                    return false;
+                };
+                db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+                    && input.is_none_or(|input| database_key.key_index() == input)
+            }),
+            "Expected {query_name} not to run:\n{events:#?}"
+        );
+    }
 
     struct ModuleDebugSnapshot<'db> {
         db: &'db dyn Db,
@@ -1050,6 +1065,60 @@ mod tests {
     }
 
     #[test]
+    fn nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .build();
+
+        list_modules(&db);
+        db.clear_salsa_events();
+
+        db.write_file(src.join("package/nested.py"), "")?;
+        list_modules(&db);
+
+        let events = db.take_salsa_events();
+        assert_query_was_not_run(&db, "list_modules_in", None, &events);
+
+        Ok(())
+    }
+
+    #[test]
+    fn sibling_file_does_not_invalidate_package_submodules() -> anyhow::Result<()> {
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("package/__init__.py", "")])
+            .build();
+
+        let package_id = {
+            let package = list_modules(&db)
+                .iter()
+                .find(|module| module.name(&db).as_str() == "package")
+                .copied()
+                .expect("package to exist");
+            package.all_submodules(&db);
+            package.as_id()
+        };
+        db.clear_salsa_events();
+
+        db.write_file(src.join("sibling.py"), "")?;
+        let package = list_modules(&db)
+            .iter()
+            .find(|module| module.name(&db).as_str() == "package")
+            .copied()
+            .expect("package to exist");
+        package.all_submodules(&db);
+
+        let events = db.take_salsa_events();
+        assert_query_was_not_run(
+            &db,
+            "all_submodule_names_for_package",
+            Some(package_id),
+            &events,
+        );
+
+        Ok(())
+    }
+
+    #[test]
     fn removing_file_on_which_module_resolution_depends_invalidates_previously_successful_query_that_now_fails()
     -> anyhow::Result<()> {
         const SRC: &[FileSpec] = &[("foo.py", "x = 1"), ("foo/__init__.py", "x = 2")];
@@ -1617,9 +1686,8 @@ not_a_directory
         db.write_file(src.join("main.py"), "print('Hy')")
             .context("Failed to write `main.py`")?;
 
-        // The symlink triggers the slow-path in the `OsSystem`'s
-        // `exists_path_case_sensitive` code because canonicalizing the path
-        // for `a/__init__.py` results in `a-package/__init__.py`
+        // Directory listings preserve the source entry's casing even though resolving the symlink
+        // for `a/__init__.py` results in `a-package/__init__.py`.
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 

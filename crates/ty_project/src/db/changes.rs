@@ -7,11 +7,9 @@ use std::collections::BTreeSet;
 use super::ignore::IgnoreFiles;
 use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
-use ruff_db::file_revision::FileRevision;
-use ruff_db::files::{File, FileRootKind, Files, system_path_to_file};
+use ruff_db::files::{File, Files, system_path_to_file};
 use ruff_db::system::{SystemPath, SystemPathBuf, deduplicate_nested_paths};
 use rustc_hash::FxHashSet;
-use salsa::Setter;
 use ty_python_core::program::{FallibleStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
@@ -58,6 +56,7 @@ impl ProjectDatabase {
 
         // Deduplicate the `sync` calls. Many file watchers emit multiple events for the same path.
         let mut synced_files = FxHashSet::default();
+        let mut changed_directories = BTreeSet::default();
         let mut sync_recursively = BTreeSet::default();
         // A non-file delete may be a deleted directory or an ambiguous LSP delete for a path
         // that no longer exists. Handle it recursively to keep Salsa's file state in sync.
@@ -74,6 +73,12 @@ impl ProjectDatabase {
         for change in changes {
             tracing::debug!("Handling file watcher change event: {:?}", change);
 
+            if let ChangeEvent::Created { path, .. } | ChangeEvent::Deleted { path, .. } = change
+                && let Some(parent) = path.parent()
+            {
+                changed_directories.insert(parent.to_path_buf());
+            }
+
             if let Some(path) = change.system_path() {
                 if is_project_configuration_path(
                     path,
@@ -81,14 +86,14 @@ impl ProjectDatabase {
                     config_file_override.as_ref(),
                     &extra_configuration_paths,
                 ) {
-                    File::sync_path(self, path);
+                    File::sync_path_only(self, path);
                     reload_project = true;
 
                     continue;
                 }
 
                 if is_ignore_file(path) && project.settings(self).src().respect_ignore_files {
-                    File::sync_path(self, path);
+                    File::sync_path_only(self, path);
                     if let Some(directory) = path.parent() {
                         if project
                             .included_paths_or_root(self)
@@ -138,35 +143,6 @@ impl ProjectDatabase {
                 ChangeEvent::Changed { path, kind: _ } | ChangeEvent::Opened(path) => {
                     if synced_files.insert(path.to_path_buf()) {
                         File::sync_path_only(self, path);
-                        if let Some(root) = self.files().root(self, path) {
-                            match root.kind_at_time_of_creation(self) {
-                                // When a file inside the root of
-                                // the project is changed, we don't
-                                // want to mark the entire root as
-                                // having changed too. In theory it
-                                // might make sense to, but at time
-                                // of writing, the file root revision
-                                // on a project is used to invalidate
-                                // the submodule files found within a
-                                // directory. If we bumped the revision
-                                // on every change within a project,
-                                // then this caching technique would be
-                                // effectively useless.
-                                //
-                                // It's plausible we should explore
-                                // a more robust cache invalidation
-                                // strategy that models more directly
-                                // what we care about. For example, by
-                                // keeping track of directories and
-                                // their direct children explicitly,
-                                // and then keying the submodule cache
-                                // off of that instead. ---AG
-                                FileRootKind::Project => {}
-                                FileRootKind::SearchPath => {
-                                    root.set_revision(self).to(FileRevision::now());
-                                }
-                            }
-                        }
                     }
                 }
 
@@ -174,7 +150,7 @@ impl ProjectDatabase {
                     match kind {
                         CreatedKind::File => {
                             if synced_files.insert(path.to_path_buf()) {
-                                File::sync_path(self, path);
+                                File::sync_path_only(self, path);
                             }
                         }
                         CreatedKind::Directory | CreatedKind::Any => {
@@ -225,7 +201,7 @@ impl ProjectDatabase {
 
                     if is_file {
                         if synced_files.insert(path.to_path_buf()) {
-                            File::sync_path(self, path);
+                            File::sync_path_only(self, path);
                         }
 
                         if let Some(file) = self.files().try_system(self, path) {
@@ -271,12 +247,16 @@ impl ProjectDatabase {
                     reload_project_files = true;
                     Files::sync_all(self);
                     sync_recursively.clear();
+                    changed_directories.clear();
                     removed_paths.clear();
                     break;
                 }
             }
         }
 
+        for directory in changed_directories {
+            Files::touch_directory(self, &directory);
+        }
         Files::sync_all_recursive(self, deduplicate_nested_paths(sync_recursively));
 
         if reload_project {

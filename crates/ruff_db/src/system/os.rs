@@ -11,9 +11,7 @@ use crate::system::{
 };
 use filetime::FileTime;
 use ruff_notebook::{Notebook, NotebookError};
-use rustc_hash::FxHashSet;
 use std::num::NonZeroUsize;
-use std::panic::RefUnwindSafe;
 use std::sync::Arc;
 use std::{any::Any, path::PathBuf};
 
@@ -26,8 +24,6 @@ pub struct OsSystem {
 #[derive(Default, Debug)]
 struct OsSystemInner {
     cwd: SystemPathBuf,
-
-    real_case_cache: CaseSensitivePathsCache,
 
     case_sensitivity: CaseSensitivity,
 
@@ -118,15 +114,6 @@ impl System for OsSystem {
 
     fn path_exists(&self, path: &SystemPath) -> bool {
         path.as_std_path().exists()
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        if self.case_sensitivity().is_case_sensitive() {
-            self.path_exists(path)
-        } else {
-            self.path_exists_case_sensitive_fast(path)
-                .unwrap_or_else(|| self.path_exists_case_sensitive_slow(path, prefix))
-        }
     }
 
     fn case_sensitivity(&self) -> CaseSensitivity {
@@ -242,94 +229,6 @@ impl System for OsSystem {
     }
 }
 
-impl OsSystem {
-    /// Path sensitive testing if a path exists by canonicalization the path and comparing it with `path`.
-    ///
-    /// This is faster than the slow path, because it requires a single system call for each path
-    /// instead of at least one system call for each component between `path` and `prefix`.
-    ///
-    /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
-    /// * if `path` is a symlink, `canonicalize` returns the symlink's target and not the symlink's source path.
-    /// * on Windows: If `path` is a mapped network drive, `canonicalize` returns the UNC path
-    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` returns `\\?\UNC\server\share`).
-    ///
-    /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
-    /// even if it comes at a cost for those rare use cases.
-    fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
-        // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
-        // We use this more forgiving version because we don't intend on using either path for anything other than comparison
-        // and the prefix is only relevant when passing the path to other programs and it's longer than 200 something
-        // characters.
-        fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
-            if cfg!(windows) {
-                if path.as_utf8_path().as_str().starts_with(r"\\?\") {
-                    SystemPath::new(&path.as_utf8_path().as_str()[r"\\?\".len()..])
-                } else {
-                    path
-                }
-            } else {
-                path
-            }
-        }
-
-        let Ok(canonicalized) = path.as_std_path().canonicalize() else {
-            // The path doesn't exist or can't be accessed. The path doesn't exist.
-            return Some(false);
-        };
-
-        let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
-            // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
-            // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!(
-                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8"
-            );
-            return None;
-        };
-
-        let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
-        let simplified = simplify_ignore_verbatim(path);
-
-        // Test if the paths differ by anything other than casing. If so, that suggests that
-        // `path` pointed to a symlink (or some other none reversible path normalization happened).
-        // In this case, fall back to the slow path.
-        if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!(
-                "Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing"
-            );
-            return None;
-        }
-
-        // If there are no symlinks involved, then `path` exists only if it is the same as the canonicalized path.
-        Some(simplified_canonicalized == simplified)
-    }
-
-    fn path_exists_case_sensitive_slow(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        // Iterate over the sub-paths up to prefix and check if they match the casing as on disk.
-        for ancestor in path.ancestors() {
-            if ancestor == prefix {
-                break;
-            }
-
-            match self.inner.real_case_cache.has_name_case(ancestor) {
-                Ok(true) => {
-                    // Component has correct casing, continue with next component
-                }
-                Ok(false) => {
-                    // Component has incorrect casing
-                    return false;
-                }
-                Err(_) => {
-                    // Directory doesn't exist or can't be accessed. We can assume that the file with
-                    // the given casing doesn't exist.
-                    return false;
-                }
-            }
-        }
-
-        true
-    }
-}
-
 impl WritableSystem for OsSystem {
     fn create_new_file(&self, path: &SystemPath) -> Result<()> {
         std::fs::File::create_new(path).map(drop)
@@ -355,84 +254,6 @@ impl Default for OsSystem {
                 .unwrap_or_default(),
         )
     }
-}
-
-#[derive(Debug, Default)]
-struct CaseSensitivePathsCache {
-    by_lower_case: dashmap::DashMap<SystemPathBuf, ListedDirectory>,
-}
-
-impl CaseSensitivePathsCache {
-    /// Test if `path`'s file name uses the exact same casing as the file on disk.
-    ///
-    /// Returns `false` if the file doesn't exist.
-    ///
-    /// Components other than the file portion are ignored.
-    fn has_name_case(&self, path: &SystemPath) -> Result<bool> {
-        let Some(parent) = path.parent() else {
-            // The root path is always considered to exist.
-            return Ok(true);
-        };
-
-        let Some(file_name) = path.file_name() else {
-            // We can only get here for paths ending in `..` or the root path. Root paths are handled above.
-            // Return `true` for paths ending in `..` because `..` is the same regardless of casing.
-            return Ok(true);
-        };
-
-        let lower_case_path = SystemPathBuf::from(parent.as_str().to_lowercase());
-        let last_modification_time =
-            FileTime::from_last_modification_time(&parent.as_std_path().metadata()?);
-
-        let entry = self.by_lower_case.entry(lower_case_path);
-
-        if let dashmap::Entry::Occupied(entry) = &entry {
-            // Only do a cached lookup if the directory hasn't changed.
-            if entry.get().last_modification_time == last_modification_time {
-                tracing::trace!("Use cached case-sensitive entry for directory `{}`", parent);
-                return Ok(entry.get().names.contains(file_name));
-            }
-        }
-
-        tracing::trace!(
-            "Reading directory `{}` for its case-sensitive filenames",
-            parent
-        );
-        let start = std::time::Instant::now();
-        let mut names = FxHashSet::default();
-
-        for entry in parent.as_std_path().read_dir()? {
-            let Ok(entry) = entry else {
-                continue;
-            };
-
-            let Ok(name) = entry.file_name().into_string() else {
-                continue;
-            };
-
-            names.insert(name.into_boxed_str());
-        }
-
-        let directory = entry.insert(ListedDirectory {
-            last_modification_time,
-            names,
-        });
-
-        tracing::debug!(
-            "Caching the case-sensitive paths for directory `{parent}` took {:?}",
-            start.elapsed()
-        );
-
-        Ok(directory.names.contains(file_name))
-    }
-}
-
-impl RefUnwindSafe for CaseSensitivePathsCache {}
-
-#[derive(Debug, Eq, PartialEq)]
-struct ListedDirectory {
-    last_modification_time: FileTime,
-    names: FxHashSet<Box<str>>,
 }
 
 #[derive(Debug)]

@@ -404,11 +404,6 @@ impl System for MdtestSystem {
         self.as_system().read_virtual_path_to_notebook(path)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.as_system()
-            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
-    }
-
     fn case_sensitivity(&self) -> CaseSensitivity {
         self.as_system().case_sensitivity()
     }
