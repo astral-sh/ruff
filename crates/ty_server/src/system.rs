@@ -181,10 +181,6 @@ impl System for LSPSystem {
         self.native_system.is_same_file(first, second)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.native_system.path_exists_case_sensitive(path, prefix)
-    }
-
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
         let document = self.system_path_to_document(path)?;
         Self::source_type_from_document(document, path.extension())
