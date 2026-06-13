@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC002 Implicitly concatenated string literals over multiple lines
+ISC002 [*] Implicitly concatenated string literals over multiple lines
  --> ISC.py:5:5
   |
 3 |   _ = "abc" + "def"
@@ -13,8 +13,20 @@ ISC002 Implicitly concatenated string literals over multiple lines
 7 |
 8 |   _ = (
   |
+help: Replace with explicit concatenation
+2 | 
+3 | _ = "abc" + "def"
+4 | 
+  - _ = "abc" \
+  -     "def"
+5 + _ = ("abc"
+6 +     "def")
+7 | 
+8 | _ = (
+9 |   "abc" +
+note: This is an unsafe fix and may change runtime behavior
 
-ISC002 Implicitly concatenated string literals over multiple lines
+ISC002 [*] Implicitly concatenated string literals over multiple lines
   --> ISC.py:74:10
    |
 72 |   _ = "a" f"b {f"c" f"d"} e" "f"
@@ -26,8 +38,20 @@ ISC002 Implicitly concatenated string literals over multiple lines
 76 |
 77 |   # Explicitly concatenated nested f-strings
    |
+help: Replace with explicit concatenation
+71 | # Nested f-strings
+72 | _ = "a" f"b {f"c" f"d"} e" "f"
+73 | _ = f"b {f"c" f"d {f"e" f"f"} g"} h"
+   - _ = f"b {f"abc" \
+   -     f"def"} g"
+74 + _ = f"b {(f"abc"
+75 +     f"def")} g"
+76 | 
+77 | # Explicitly concatenated nested f-strings
+78 | _ = f"a {f"first"
+note: This is an unsafe fix and may change runtime behavior
 
-ISC002 Implicitly concatenated string literals over multiple lines
+ISC002 [*] Implicitly concatenated string literals over multiple lines
    --> ISC.py:196:1
     |
 195 |   # ISC002
@@ -37,8 +61,20 @@ ISC002 Implicitly concatenated string literals over multiple lines
 198 |
 199 |   # ISC003
     |
+help: Replace with explicit concatenation
+193 | t"The quick " t"brown fox."
+194 | 
+195 | # ISC002
+    - t"The quick brown fox jumps over the lazy "\
+    - t"dog."
+196 + (t"The quick brown fox jumps over the lazy "
+197 + t"dog.")
+198 | 
+199 | # ISC003
+200 | (
+note: This is an unsafe fix and may change runtime behavior
 
-ISC002 Implicitly concatenated string literals over multiple lines
+ISC002 [*] Implicitly concatenated string literals over multiple lines
    --> ISC.py:208:10
     |
 206 |   _ = "a" f"b {t"c" t"d"} e" "f"
@@ -48,3 +84,15 @@ ISC002 Implicitly concatenated string literals over multiple lines
 209 | |     t"def"} g"
     | |__________^
     |
+help: Replace with explicit concatenation
+205 | # nested examples with both t and f-strings
+206 | _ = "a" f"b {t"c" t"d"} e" "f"
+207 | _ = t"b {f"c" f"d {t"e" t"f"} g"} h"
+    - _ = f"b {t"abc" \
+    -     t"def"} g"
+208 + _ = f"b {(t"abc"
+209 +     t"def")} g"
+210 | 
+211 | 
+212 | # Explicit concatenation with either operand being
+note: This is an unsafe fix and may change runtime behavior
