@@ -345,47 +345,40 @@ impl Project {
         {
             let db = db.clone();
             let project_span = &project_span;
+            let reporter = &*reporter;
 
-            rayon::scope(move |scope| {
-                for file in &files {
-                    let db = db.clone();
-                    let reporter = &*reporter;
+            let check_file = |db: &ProjectDatabase, file| {
+                db.unwind_if_revision_cancelled();
 
-                    db.unwind_if_revision_cancelled();
+                let check_file_span =
+                    tracing::debug_span!(parent: project_span, "check_file", ?file);
+                let _entered = check_file_span.entered();
 
-                    scope.spawn(move |_| {
-                        let check_file_span =
-                            tracing::debug_span!(parent: project_span, "check_file", ?file);
-                        let _entered = check_file_span.entered();
+                match check_file_impl(db, file) {
+                    Ok(diagnostics) => {
+                        reporter.report_checked_file(db, file, diagnostics);
 
-                        match check_file_impl(&db, file) {
-                            Ok(diagnostics) => {
-                                reporter.report_checked_file(&db, file, diagnostics);
+                        // This is outside `check_file_impl` to avoid that opening or closing
+                        // a file invalidates the `check_file_impl` query of every file!
+                        if !open_files.contains(&file) {
+                            // The module has already been parsed by `check_file_impl`.
+                            // We only retrieve it here so that we can call `clear` on it.
+                            let parsed = parsed_module(db, file);
 
-                                // This is outside `check_file_impl` to avoid that opening or closing
-                                // a file invalidates the `check_file_impl` query of every file!
-                                if !open_files.contains(&file) {
-                                    // The module has already been parsed by `check_file_impl`.
-                                    // We only retrieve it here so that we can call `clear` on it.
-                                    let parsed = parsed_module(&db, file);
-
-                                    // Drop the AST now that we are done checking this file. It is not currently open,
-                                    // so it is unlikely to be accessed again soon. If any queries need to access the AST
-                                    // from across files, it will be re-parsed.
-                                    parsed.clear();
-                                }
-                            }
-                            Err(io_error) => {
-                                reporter.report_checked_file(
-                                    &db,
-                                    file,
-                                    std::slice::from_ref(io_error),
-                                );
-                            }
+                            // Drop the AST now that we are done checking this file. It is not currently open,
+                            // so it is unlikely to be accessed again soon. If any queries need to access the AST
+                            // from across files, it will be re-parsed.
+                            parsed.clear();
                         }
-                    });
+                    }
+                    Err(io_error) => {
+                        reporter.report_checked_file(db, file, std::slice::from_ref(io_error));
+                    }
                 }
-            });
+            };
+
+            let files: Vec<_> = (&files).into_iter().collect();
+            check_files_in_parallel(&files, db, &check_file);
         };
 
         tracing::debug!(
@@ -778,6 +771,45 @@ impl Iterator for ProjectFilesIter<'_> {
 }
 
 impl FusedIterator for ProjectFilesIter<'_> {}
+
+fn check_files_in_parallel<F>(files: &[File], db: ProjectDatabase, check_file: &F)
+where
+    F: Fn(&ProjectDatabase, File) + Sync,
+{
+    // Keep enough work available for stealing while avoiding one Rayon task per file.
+    const TARGET_TASKS_PER_THREAD: usize = 4;
+    const MAX_FILES_PER_TASK: usize = 16;
+    let files_per_task = files
+        .len()
+        .div_ceil(rayon::current_num_threads() * TARGET_TASKS_PER_THREAD)
+        .clamp(1, MAX_FILES_PER_TASK);
+
+    check_files_in_parallel_impl(files, db, check_file, files_per_task);
+}
+
+fn check_files_in_parallel_impl<F>(
+    files: &[File],
+    db: ProjectDatabase,
+    check_file: &F,
+    files_per_task: usize,
+) where
+    F: Fn(&ProjectDatabase, File) + Sync,
+{
+    if files.len() <= files_per_task {
+        for &file in files {
+            check_file(&db, file);
+        }
+        return;
+    }
+
+    let (left, right) = files.split_at(files.len() / 2);
+    let right_db = db.clone();
+
+    rayon::join(
+        move || check_files_in_parallel_impl(left, db, check_file, files_per_task),
+        move || check_files_in_parallel_impl(right, right_db, check_file, files_per_task),
+    );
+}
 
 fn catch<F, R>(db: &dyn Db, file: File, f: F) -> Result<R, Diagnostic>
 where
