@@ -8,8 +8,9 @@ use anyhow::Context;
 use ignore::{WalkBuilder, WalkState};
 
 use ruff_linter::settings::types::GlobPath;
-use ruff_linter::{settings::types::FilePattern, settings::types::PreviewMode};
+use ruff_linter::settings::types::{FilePattern, FilePatternSet, PreviewMode};
 use ruff_workspace::Settings;
+use ruff_workspace::options::Options;
 use ruff_workspace::pyproject::find_fallback_target_version;
 use ruff_workspace::resolver::match_exclusion;
 use ruff_workspace::{
@@ -431,15 +432,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                 preview: format_preview.map(PreviewMode::from),
                 ..FormatConfiguration::default()
             },
-            exclude: exclude.map(|exclude| {
-                exclude
-                    .into_iter()
-                    .map(|pattern| {
-                        let absolute = GlobPath::normalize(&pattern, project_root);
-                        FilePattern::User(pattern, absolute)
-                    })
-                    .collect()
-            }),
+            exclude: exclude.and_then(|exclude| resolve_editor_exclude(exclude, project_root)),
             line_length,
             ..Configuration::default()
         };
@@ -468,7 +461,8 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                     tracing::debug!(
                         "Combining settings from editor-specified inline configuration"
                     );
-                    match Configuration::from_options(*options, None, project_root) {
+                    let options = sanitize_inline_editor_exclude_options(*options, project_root);
+                    match Configuration::from_options(options, None, project_root) {
                         Ok(configuration) => editor_configuration.combine(configuration),
                         Err(err) => {
                             tracing::error!(
@@ -495,6 +489,53 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
     }
 }
 
+fn sanitize_inline_editor_exclude_options(mut options: Options, project_root: &Path) -> Options {
+    if let Some(exclude) = options.exclude.take() {
+        options.exclude = filter_editor_exclude_patterns(exclude, project_root);
+    }
+
+    options
+}
+
+fn resolve_editor_exclude(exclude: Vec<String>, project_root: &Path) -> Option<Vec<FilePattern>> {
+    filter_editor_exclude_patterns(exclude, project_root).map(|exclude| {
+        exclude
+            .into_iter()
+            .map(|pattern| {
+                let absolute = GlobPath::normalize(&pattern, project_root);
+                FilePattern::User(pattern, absolute)
+            })
+            .collect()
+    })
+}
+
+fn filter_editor_exclude_patterns(
+    exclude: Vec<String>,
+    project_root: &Path,
+) -> Option<Vec<String>> {
+    let mut valid_patterns = Vec::with_capacity(exclude.len());
+    let mut saw_invalid_pattern = false;
+
+    for pattern in exclude {
+        let absolute = GlobPath::normalize(&pattern, project_root);
+        let file_pattern = FilePattern::User(pattern.clone(), absolute);
+
+        match FilePatternSet::try_from_iter([file_pattern]) {
+            Ok(_) => valid_patterns.push(pattern),
+            Err(err) => {
+                tracing::error!("Ignoring invalid editor exclude pattern `{pattern}`: {err}");
+                saw_invalid_pattern = true;
+            }
+        }
+    }
+
+    if valid_patterns.is_empty() && saw_invalid_pattern {
+        None
+    } else {
+        Some(valid_patterns)
+    }
+}
+
 fn open_configuration_file(config_path: &Path) -> crate::Result<Configuration> {
     ruff_workspace::resolver::resolve_configuration(
         config_path,
@@ -514,7 +555,6 @@ impl ConfigurationTransformer for IdentityTransformer {
 #[cfg(test)]
 mod tests {
     use ruff_linter::line_width::LineLength;
-    use ruff_workspace::options::Options;
 
     use super::*;
 
@@ -552,5 +592,101 @@ mod tests {
             .transform(Configuration::default());
 
         assert_eq!(config.line_length.unwrap().value(), 100);
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_are_ignored() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["src".to_string(), "foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+        let exclude = config
+            .exclude
+            .expect("valid exclude patterns should be preserved");
+
+        assert_eq!(exclude.len(), 1);
+        assert!(matches!(&exclude[0], FilePattern::User(pattern, _) if pattern == "src"));
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_are_removed_when_no_valid_patterns_remain() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+
+        assert!(config.exclude.is_none());
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_do_not_panic_editor_only_settings() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let settings = RuffSettings::editor_only(&editor_settings, Path::new("/src/project"));
+
+        assert!(!settings.file_resolver.exclude.is_empty());
+    }
+
+    #[test]
+    fn invalid_editor_exclude_patterns_do_not_fail_settings_resolution() {
+        let editor_settings = EditorSettings {
+            exclude: Some(vec!["foo[".to_string()]),
+            ..Default::default()
+        };
+
+        let settings = RuffSettings::with_editor_settings(
+            &editor_settings,
+            Path::new("/src/project"),
+            Configuration::default(),
+        );
+
+        assert!(settings.is_ok());
+    }
+
+    #[test]
+    fn invalid_inline_editor_exclude_patterns_are_ignored() {
+        let editor_settings = EditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
+                exclude: Some(vec!["src".to_string(), "foo[".to_string()]),
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+
+        let config = EditorConfigurationTransformer(&editor_settings, Path::new("/src/project"))
+            .transform(Configuration::default());
+        let exclude = config
+            .exclude
+            .expect("valid inline exclude patterns should be preserved");
+
+        assert_eq!(config.line_length.unwrap().value(), 120);
+        assert_eq!(exclude.len(), 1);
+        assert!(matches!(&exclude[0], FilePattern::User(pattern, _) if pattern == "src"));
+    }
+
+    #[test]
+    fn invalid_inline_editor_exclude_patterns_do_not_panic_editor_only_settings() {
+        let editor_settings = EditorSettings {
+            configuration: Some(ResolvedConfiguration::Inline(Box::new(Options {
+                exclude: Some(vec!["foo[".to_string()]),
+                line_length: Some(LineLength::try_from(120).unwrap()),
+                ..Default::default()
+            }))),
+            ..Default::default()
+        };
+
+        let settings = RuffSettings::editor_only(&editor_settings, Path::new("/src/project"));
+
+        assert_eq!(settings.linter.line_length.value(), 120);
     }
 }
