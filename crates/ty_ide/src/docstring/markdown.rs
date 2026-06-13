@@ -1,4 +1,5 @@
 mod postprocess;
+mod structured;
 
 /// Represents a fenced code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,5 +41,6 @@ impl<'a> MarkdownFence<'a> {
 }
 
 pub(super) fn render(raw: &str) -> String {
-    postprocess::render(raw)
+    let source = structured::render(raw);
+    postprocess::render(source.as_ref())
 }
