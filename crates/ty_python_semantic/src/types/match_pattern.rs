@@ -507,20 +507,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class)
-                    if kind.is_argumentless()
-                        || (kind.kind().is_irrefutable()
-                            && kind.keywords.is_empty()
-                            && class_pattern_positional_sources(
-                                db,
-                                Some(class),
-                                kind.positional.len(),
-                            )
-                            .iter()
-                            .all(|source| {
-                                matches!(source, ClassPatternPositionalSource::MatchSelf)
-                            })) =>
-                {
+                Type::ClassLiteral(class) if kind.is_argumentless() => {
                     Type::instance(db, class.top_materialization(db))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
