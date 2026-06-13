@@ -330,11 +330,20 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 
     match kind {
         PatternPredicateKind::Class(kind) => {
-            if let Type::ClassLiteral(class) =
-                infer_same_file_expression_type(db, kind.class, TypeContext::default())
-                && class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind)
-            {
-                return subject_ty;
+            let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
+            match class_ty {
+                Type::ClassLiteral(class)
+                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) =>
+                {
+                    return subject_ty;
+                }
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless()
+                        && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
+                {
+                    return callable_pattern_type(db);
+                }
+                _ => {}
             }
         }
         PatternPredicateKind::Sequence(kind)
