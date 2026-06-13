@@ -147,8 +147,9 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
     ) -> Type<'db> {
-        let Ok(mapped) =
-            self.try_map_impl(db, |element| Ok::<_, Infallible>(transform_fn(element)));
+        let Ok(mapped) = self.try_map_impl(db, false, |element| {
+            Ok::<_, Infallible>(transform_fn(element))
+        });
         mapped
     }
 
@@ -192,13 +193,25 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        self.try_map_impl(db, |element| transform_fn(element).ok_or(()))
+        self.try_map_impl(db, false, |element| transform_fn(element).ok_or(()))
+            .ok()
+    }
+
+    /// Like [`UnionType::try_map`], but recursively-defined literal results use the cycle
+    /// recovery widening threshold.
+    pub(crate) fn try_map_with_recursive_literal_widening(
+        self,
+        db: &'db dyn Db,
+        mut transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        self.try_map_impl(db, true, |element| transform_fn(element).ok_or(()))
             .ok()
     }
 
     fn try_map_impl<E>(
         self,
         db: &'db dyn Db,
+        recursive_literal_widening: bool,
         mut transform_fn: impl FnMut(&Type<'db>) -> Result<Type<'db>, E>,
     ) -> Result<Type<'db>, E> {
         let elements = self.elements(db);
@@ -206,10 +219,10 @@ impl<'db> UnionType<'db> {
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
             if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
-                let mut builder = elements[..i]
-                    .iter()
-                    .copied()
-                    .fold(UnionBuilder::new(db), UnionBuilder::add);
+                let mut builder = elements[..i].iter().copied().fold(
+                    UnionBuilder::new(db).recursive_literal_widening(recursive_literal_widening),
+                    UnionBuilder::add,
+                );
                 builder = builder.add(new_ty);
                 for (_, element) in iter {
                     builder = builder.add(transform_fn(element)?);

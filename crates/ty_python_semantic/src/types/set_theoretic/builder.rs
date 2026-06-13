@@ -637,6 +637,9 @@ pub(crate) struct UnionBuilder<'db> {
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
+    /// Use the smaller literal widening threshold for recursively-defined values without
+    /// otherwise changing union simplification.
+    recursive_literal_widening: bool,
     recursively_defined: RecursivelyDefined,
 }
 
@@ -703,6 +706,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
+            recursive_literal_widening: false,
             recursively_defined: RecursivelyDefined::No,
         }
     }
@@ -714,9 +718,15 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
+        self.recursive_literal_widening = val;
         if self.cycle_recovery {
             self.unpack_aliases = false;
         }
+        self
+    }
+
+    pub(crate) fn recursive_literal_widening(mut self, val: bool) -> Self {
+        self.recursive_literal_widening = val;
         self
     }
 
@@ -772,9 +782,9 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let cycle_recovery = self.cycle_recovery;
+        let recursive_literal_widening = self.recursive_literal_widening;
         let should_widen = |literals, recursively_defined: RecursivelyDefined| {
-            if recursively_defined.is_yes() && cycle_recovery {
+            if recursively_defined.is_yes() && recursive_literal_widening {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
             } else {
                 literals >= MAX_NON_RECURSIVE_UNION_LITERALS
@@ -794,7 +804,7 @@ impl<'db> UnionBuilder<'db> {
                 self.recursively_defined = self
                     .recursively_defined
                     .or(union.recursively_defined(self.db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                if self.recursive_literal_widening && self.recursively_defined.is_yes() {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
@@ -998,12 +1008,13 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
                                     // for why we avoid using the `should_widen` closure here.
-                                    let enum_literals_limit =
-                                        if self.recursively_defined.is_yes() && cycle_recovery {
-                                            MAX_RECURSIVE_UNION_LITERALS
-                                        } else {
-                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                        };
+                                    let enum_literals_limit = if self.recursively_defined.is_yes()
+                                        && recursive_literal_widening
+                                    {
+                                        MAX_RECURSIVE_UNION_LITERALS
+                                    } else {
+                                        MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
+                                    };
                                     if literals.len() >= enum_literals_limit {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
@@ -1245,6 +1256,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let recursive_literal_widening = self.recursive_literal_widening;
         let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -1313,6 +1325,7 @@ impl<'db> UnionBuilder<'db> {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
                 .cycle_recovery(cycle_recovery)
+                .recursive_literal_widening(recursive_literal_widening)
                 .recursively_defined(recursively_defined);
             return types
                 .into_iter()

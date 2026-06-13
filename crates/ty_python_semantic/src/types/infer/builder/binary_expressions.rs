@@ -292,6 +292,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             right_ty,
             op,
             &BinaryExpressionVisitor::new(Some(Type::Never)),
+            RecursivelyDefined::No,
         )
     }
 
@@ -303,8 +304,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         right_ty: Type<'db>,
         op: ast::Operator,
         visitor: &BinaryExpressionVisitor<'db>,
+        recursively_defined: RecursivelyDefined,
     ) -> Option<Type<'db>> {
         let db = self.db();
+        let recursively_defined = if recursively_defined.is_yes()
+            || left_ty.contains_cycle_recovery_marker(db)
+            || right_ty.contains_cycle_recovery_marker(db)
+        {
+            RecursivelyDefined::Yes
+        } else {
+            RecursivelyDefined::No
+        };
 
         // Check for division by zero; this doesn't change the inferred type for the expression, but
         // may emit a diagnostic
@@ -330,6 +340,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         rhs,
                         op,
                         visitor,
+                        recursively_defined,
                     )
                     .unwrap_or_else(|| Type::divergent(marked.binder_id(db)))
                 }))
@@ -343,30 +354,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         inner,
                         op,
                         visitor,
+                        recursively_defined,
                     )
                     .unwrap_or_else(|| Type::divergent(marked.binder_id(db)))
                 }))
             }),
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    *lhs_element,
-                    rhs,
-                    op,
-                    visitor,
-                )
-            }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, |rhs_element| {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    *rhs_element,
-                    op,
-                    visitor,
-                )
-            }),
+            (Type::Union(lhs_union), rhs, _) => {
+                lhs_union.try_map_with_recursive_literal_widening(db, |lhs_element| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        *lhs_element,
+                        rhs,
+                        op,
+                        visitor,
+                        recursively_defined,
+                    )
+                })
+            }
+            (lhs, Type::Union(rhs_union), _) => {
+                rhs_union.try_map_with_recursive_literal_widening(db, |rhs_element| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        *rhs_element,
+                        op,
+                        visitor,
+                        recursively_defined,
+                    )
+                })
+            }
 
             (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
                 self.infer_binary_expression_type_impl(
@@ -376,6 +394,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     rhs,
                     op,
                     visitor,
+                    recursively_defined,
                 )
             }),
 
@@ -387,6 +406,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     alias.value_type(db),
                     op,
                     visitor,
+                    recursively_defined,
                 )
             }),
 
@@ -420,6 +440,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         rhs,
                         op,
                         visitor,
+                        recursively_defined,
                     )
                 })
             }),
@@ -433,6 +454,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         unfolded,
                         op,
                         visitor,
+                        recursively_defined,
                     )
                 })
             }),
@@ -479,12 +501,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             left_ty,
                             constraints,
                             |constraint| {
-                                self.infer_binary_expression_type(
+                                self.infer_binary_expression_type_impl(
                                     node,
                                     emitted_division_by_zero_diagnostic,
                                     constraint,
                                     constraint,
                                     op,
+                                    visitor,
+                                    recursively_defined,
                                 )
                             },
                         )
@@ -516,6 +540,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     rhs,
                                     op,
                                     visitor,
+                                    recursively_defined,
                                 )
                             },
                         )
@@ -542,6 +567,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     constraint,
                                     op,
                                     visitor,
+                                    recursively_defined,
                                 )
                             },
                         )
@@ -566,6 +592,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         rhs,
                         op,
                         visitor,
+                        recursively_defined,
                     )
                 })
             }
@@ -578,6 +605,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         newtype.concrete_base_type(db),
                         op,
                         visitor,
+                        recursively_defined,
                     )
                 })
             }
@@ -606,7 +634,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
-                let recursively_defined = if left.recursively_defined().is_yes()
+                let literal_recursively_defined = if recursively_defined.is_yes()
+                    || left.recursively_defined().is_yes()
                     || right.recursively_defined().is_yes()
                 {
                     RecursivelyDefined::Yes
@@ -893,9 +922,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 };
 
                 result.map(|result| match result {
-                    Type::LiteralValue(literal) => {
-                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
-                    }
+                    Type::LiteralValue(literal) => Type::LiteralValue(
+                        literal.with_recursively_defined(literal_recursively_defined),
+                    ),
                     _ => result,
                 })
             }
