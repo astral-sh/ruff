@@ -710,6 +710,13 @@ def zqzqzq():
           |
         info: Function zqzqzq
         ");
+
+        let symbols = all_symbols(&test.db, test.cursor.file, &QueryPattern::fuzzy("zqzqzq"));
+        let symbol = symbols
+            .iter()
+            .find_map(|info| info.symbol.as_ref())
+            .expect("wildcard-imported symbol");
+        assert_eq!(symbol.full_range, symbol.name_range);
     }
 
     /// This tests that when we have multiple re-exports
