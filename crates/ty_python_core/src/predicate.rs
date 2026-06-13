@@ -192,6 +192,10 @@ pub struct ClassPatternPredicateKind<'db> {
 }
 
 impl ClassPatternPredicateKind<'_> {
+    pub fn is_argumentless(&self) -> bool {
+        self.positional.is_empty() && self.keywords.is_empty()
+    }
+
     pub fn kind(&self) -> ClassPatternKind {
         if self
             .positional
