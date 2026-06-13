@@ -1207,12 +1207,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let subject_class = instance.class(self.db);
                 if subject_class.is_subtype_of_class_literal(self.db, class) {
                     subject_ty
-                } else if ClassType::NonGeneric(class)
-                    .is_subtype_of_class_literal(self.db, subject_class.class_literal(self.db))
-                {
-                    self.intersect_types(subject_ty, class_ty)
-                } else {
+                } else if subject_ty.is_disjoint_from(self.db, class_ty) {
                     Type::Never
+                } else {
+                    self.intersect_types(subject_ty, class_ty)
                 }
             }
             Type::TypedDict(_) if filter_nominal_arms => {

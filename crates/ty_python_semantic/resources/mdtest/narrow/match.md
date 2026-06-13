@@ -474,21 +474,41 @@ The same rule applies outside sequence patterns. Preserving a recursive alias le
 using the recursive relationship after a class pattern matches.
 
 ```py
-from collections.abc import MutableMapping, MutableSequence
-from typing import TypeAlias
+from typing import TypeAlias, final
 
-RecursiveContainer: TypeAlias = int | MutableMapping[str, "RecursiveContainer"] | MutableSequence["RecursiveContainer"]
+RecursiveContainer: TypeAlias = int | dict[str, "RecursiveContainer"] | list["RecursiveContainer"]
 
 def test_match_class_alias_preserves_recursive_containers(
     value: RecursiveContainer,
 ) -> None:
     match value:
-        case MutableMapping() as mapping:
+        case dict() as mapping:
             for item in mapping.values():
                 test_match_class_alias_preserves_recursive_containers(item)
-        case MutableSequence() as sequence:
+        case list() as sequence:
             for item in sequence:
                 test_match_class_alias_preserves_recursive_containers(item)
+
+class OverlapA: ...
+class OverlapB: ...
+class OverlapC(OverlapA, OverlapB): ...
+
+def test_match_class_alias_preserves_possible_multiple_inheritance(
+    value: OverlapA,
+) -> None:
+    match value:
+        case OverlapB() as item:
+            reveal_type(item)  # revealed: OverlapA & OverlapB
+
+@final
+class FinalA: ...
+
+class FinalB: ...
+
+def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
+    match value:
+        case FinalB() as item:
+            reveal_type(item)  # revealed: Never
 ```
 
 Bindings nested inside class and mapping patterns are not inferred yet. A surrounding `as` pattern
