@@ -9,7 +9,7 @@ use ruff_text_size::{TextRange, TextSize};
 use super::super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
-pub(super) struct Docstring {
+pub(in crate::docstring) struct Docstring {
     field_lists: Vec<FieldList>,
 }
 
@@ -45,6 +45,10 @@ impl Docstring {
 
         parameters
     }
+
+    pub(in crate::docstring) fn field_lists(&self) -> &[FieldList] {
+        &self.field_lists
+    }
 }
 
 /// Cursor over docstring lines and their line numbers.
@@ -72,6 +76,18 @@ impl<'a> Lines<'a> {
         let (index, line) = self.inner.next()?;
         Some(DocstringLine::new(index, &line))
     }
+
+    /// Returns the next non-blank line without advancing the cursor.
+    fn peek_non_blank(&self) -> Option<DocstringLine<'a>> {
+        let mut next = self.clone();
+        while let Some(line) = next.peek()
+            && line.text.trim().is_empty()
+        {
+            next.next();
+        }
+
+        next.peek()
+    }
 }
 
 /// A docstring line with its source position.
@@ -96,7 +112,7 @@ impl<'a> DocstringLine<'a> {
 ///
 /// <https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#field-lists>
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct FieldList {
+pub(in crate::docstring) struct FieldList {
     start_line: usize,
     end_line: usize,
     range: TextRange,
@@ -105,6 +121,18 @@ struct FieldList {
 }
 
 impl FieldList {
+    pub(in crate::docstring) fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub(in crate::docstring) fn indent(&self) -> TextSize {
+        self.indent
+    }
+
+    pub(in crate::docstring) fn fields(&self) -> &[Field] {
+        &self.fields
+    }
+
     /// Parse all the field lists in the given lines of a docstring.
     fn parse_all(raw: &str) -> Vec<Self> {
         let mut field_lists = Vec::new();
@@ -144,14 +172,24 @@ impl FieldList {
         let mut range_end = line.range.end();
 
         while let Some(line) = lines.peek() {
+            // reST quoted literal blocks may use `:` as their quote character,
+            // so their lines must take precedence over field headers.
+            if current.consume_rest_preformatted_line(line.text) {
+                current.push_line(line.text);
+                lines.next();
+                end_line = line.index + 1;
+                range_end = line.range.end();
+                continue;
+            }
+
             if line.text.trim().is_empty() {
                 // Blank lines continue the field list only before another field or a continuation.
 
-                if !Self::blank_line_continues_field_list(lines, field_list_indent) {
+                if !current.blank_line_continues_field(lines, field_list_indent) {
                     break;
                 }
 
-                current.lines.push(line.text);
+                current.push_line(line.text);
                 lines.next();
                 end_line = line.index + 1;
                 range_end = line.range.end();
@@ -176,7 +214,7 @@ impl FieldList {
 
             // More-indented non-blank lines continue the current field body
             // (and hence also the current field list).
-            current.lines.push(line.text);
+            current.push_line(line.text);
             lines.next();
             end_line = line.index + 1;
             range_end = line.range.end();
@@ -194,46 +232,8 @@ impl FieldList {
         })
     }
 
-    /// Returns whether a blank line keeps the current field list open.
-    ///
-    /// A blank line before an indented continuation stays in the current field list:
-    ///
-    /// ```rst
-    /// :param x: First paragraph.
-    ///
-    ///     Second paragraph.
-    /// :param y: Next parameter.
-    /// ```
-    ///
-    /// A blank line before another same-indent field also stays in the current field list:
-    ///
-    /// ```rst
-    /// :param x: First parameter.
-    ///
-    /// :param y: Second parameter.
-    /// ```
-    ///
-    /// A blank line before same-indent prose ends the field list:
-    ///
-    /// ```rst
-    /// :param x: First parameter.
-    ///
-    /// This is normal prose.
-    /// ```
-    fn blank_line_continues_field_list(lines: &Lines<'_>, indent: TextSize) -> bool {
-        let mut next = lines.clone();
-        while let Some(line) = next.peek()
-            && line.text.trim().is_empty()
-        {
-            next.next();
-        }
-
-        let Some(non_blank_line) = next.peek() else {
-            return false;
-        };
-
-        FieldHeader::indentation(non_blank_line.text) > indent
-            || FieldHeader::at_indent(non_blank_line.text, indent).is_some()
+    fn line_continues_field_list(line: &str, indent: TextSize) -> bool {
+        FieldHeader::indentation(line) > indent || FieldHeader::at_indent(line, indent).is_some()
     }
 }
 
@@ -244,17 +244,23 @@ struct FieldBuilder<'a> {
     kind: FieldKind<'a>,
     body: &'a str,
     lines: Vec<&'a str>,
+    preformatted_blocks: PreformattedBlockScanner<'a>,
 }
 
 impl<'a> FieldBuilder<'a> {
     /// Initializes a builder object for a new field instance.
     fn new(header: FieldHeader<'a>) -> Self {
-        Self {
+        let mut builder = Self {
             indent: header.indent,
             kind: header.kind,
             body: header.body,
             lines: vec![header.raw],
-        }
+            preformatted_blocks: PreformattedBlockScanner::default(),
+        };
+        builder
+            .preformatted_blocks
+            .observe_rest_preformatted_marker(header.body, header.indent);
+        builder
     }
 
     /// Emits the field that was constructed with this builder.
@@ -347,6 +353,30 @@ impl<'a> FieldBuilder<'a> {
 
         // Trim empty lines from either end of the result.
         lines[start..end].join("\n")
+    }
+
+    fn consume_rest_preformatted_line(&mut self, line: &'a str) -> bool {
+        self.preformatted_blocks
+            .consume_rest_preformatted_line(line)
+    }
+
+    /// Returns whether a blank line keeps the current field open.
+    ///
+    /// Blank lines may precede another field, an indented continuation, or a quoted literal block
+    /// whose quote marker can look like a field header.
+    fn blank_line_continues_field(&self, lines: &Lines<'a>, field_list_indent: TextSize) -> bool {
+        let Some(non_blank_line) = lines.peek_non_blank() else {
+            return false;
+        };
+
+        self.preformatted_blocks
+            .would_consume_rest_preformatted_line(non_blank_line.text)
+            || FieldList::line_continues_field_list(non_blank_line.text, field_list_indent)
+    }
+
+    fn push_line(&mut self, line: &'a str) {
+        self.lines.push(line);
+        self.preformatted_blocks.observe_non_preformatted_line(line);
     }
 }
 
@@ -554,7 +584,7 @@ impl<'a> FieldKind<'a> {
 
 /// Represents the reST fields captured by the parser.
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Field {
+pub(in crate::docstring) enum Field {
     Parameter {
         display_name: CompactString,
         lookup_name: String,

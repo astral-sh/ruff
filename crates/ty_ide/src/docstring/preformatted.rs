@@ -27,7 +27,7 @@ impl<'a> PreformattedBlockScanner<'a> {
             return true;
         }
 
-        if self.is_within_preformatted_block(line) {
+        if self.consume_rest_preformatted_line(line) {
             return true;
         }
 
@@ -54,21 +54,28 @@ impl<'a> PreformattedBlockScanner<'a> {
     /// Updates internal state that allows us to detect preformatted blocks introduced by reST
     /// syntax.
     pub(super) fn observe_non_preformatted_line(&mut self, line: &str) {
+        self.observe_rest_preformatted_marker(line, indentation(line));
+    }
+
+    /// Updates internal state for a possible reST preformatted block marker whose text has already
+    /// been split out from its source line.
+    pub(super) fn observe_rest_preformatted_marker(&mut self, line: &str, marker_indent: TextSize) {
+        let line = line.trim_start();
         if matches!(
             self.preformatted_block_state,
             PreformattedBlockState::Inactive
-        ) && Self::line_starts_rest_preformatted_block(line.trim_start())
+        ) && Self::line_starts_rest_preformatted_block(line)
         {
             self.preformatted_block_state = PreformattedBlockState::Pending {
-                marker_indent: indentation(line),
-                allows_quoted_literal_block: Self::allows_quoted_literal_block(line.trim_start()),
+                marker_indent,
+                allows_quoted_literal_block: Self::allows_quoted_literal_block(line),
             };
         }
     }
 
-    /// Whether or not the given line is specifically within a preformatted block
-    /// introduced by reST syntax.
-    fn is_within_preformatted_block(&mut self, line: &str) -> bool {
+    /// Consumes a line if it is inside a reST preformatted block already observed by
+    /// `observe_rest_preformatted_marker`.
+    pub(super) fn consume_rest_preformatted_line(&mut self, line: &str) -> bool {
         let current_indent = indentation(line);
         let line_is_empty = line.trim_start().is_empty();
 
@@ -123,6 +130,12 @@ impl<'a> PreformattedBlockScanner<'a> {
             }
             PreformattedBlockState::Pending { .. } | PreformattedBlockState::Inactive => false,
         }
+    }
+
+    /// Returns whether `consume_rest_preformatted_line` would consume the given line.
+    pub(super) fn would_consume_rest_preformatted_line(&self, line: &str) -> bool {
+        let mut scanner = self.clone();
+        scanner.consume_rest_preformatted_line(line)
     }
 
     /// Whether or not the given line marks the start of a reST preformatted block.

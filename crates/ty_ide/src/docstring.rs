@@ -86,6 +86,34 @@ impl Docstring {
     }
 }
 
+/// Text extracted from within a larger docstring.
+///
+/// Unlike a complete docstring, a fragment has already lost its surrounding indentation context.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DocstringFragment(String);
+
+impl DocstringFragment {
+    pub fn new(raw: String) -> Self {
+        Self(raw)
+    }
+
+    pub fn render(&self, kind: MarkupKind) -> String {
+        match kind {
+            MarkupKind::PlainText => self.render_plaintext(),
+            MarkupKind::Markdown => self.render_markdown(),
+        }
+    }
+
+    fn render_plaintext(&self) -> String {
+        documentation_trim(&self.0)
+    }
+
+    fn render_markdown(&self) -> String {
+        let trimmed = documentation_trim(&self.0);
+        markdown::render_fragment(&trimmed)
+    }
+}
+
 /// Normalizes tabs and trims a docstring as specified in PEP-0257
 ///
 /// See: <https://peps.python.org/pep-0257/#handling-docstring-indentation>
@@ -1567,6 +1595,18 @@ mod tests {
     }
 
     #[test]
+    fn rest_markdown_does_not_special_case_first_line_field_continuation() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(":param value: First line.\n    Second line.".to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `value`: First line.<HB>
+        Second line.
+        ");
+    }
+
+    #[test]
     fn test_rest_style_parameter_documentation() {
         let _snap = bind_docstring_snapshot_filters();
         let docstring = r#"
@@ -1611,12 +1651,14 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        :param str param1: The first parameter description<HB>
-        :param int param2: The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        :param param3: A parameter without type annotation<HB>
-        :returns: The return value description<HB>
-        :rtype: str
+        `param3`: A parameter without type annotation<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -1687,8 +1729,9 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Google-style duplicate parameter<HB>
         <HB>
-        :param int param2: reST-style parameter<HB>
-        :param param3: Another reST-style parameter<HB>
+        ## Parameters<HB>
+        `param2` (`int`): reST-style parameter<HB>
+        `param3`: Another reST-style parameter<HB>
         <HB>
         Parameters<HB>
         ----------<HB>

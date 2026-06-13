@@ -23,4 +23,9 @@ impl Formats {
     pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
         self.rst.parameter_documentation()
     }
+
+    /// Returns the outcome of parsing the reStructuredText format.
+    pub(super) fn rst(&self) -> &rst::Docstring {
+        &self.rst
+    }
 }
