@@ -260,24 +260,6 @@ impl<'db> ProtocolInterface<'db> {
         Self::new(db, BTreeMap::default())
     }
 
-    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
-        let prev_inner = previous.inner(db);
-        let curr_inner = self.inner(db);
-
-        let members: BTreeMap<_, _> = curr_inner
-            .iter()
-            .map(|(name, curr_data)| {
-                let normalized = if let Some(prev_data) = prev_inner.get(name) {
-                    curr_data.cycle_normalized(db, prev_data, cycle)
-                } else {
-                    curr_data.clone()
-                };
-                (name.clone(), normalized)
-            })
-            .collect();
-        Self::new(db, members)
-    }
-
     pub(super) fn members<'a>(
         self,
         db: &'db dyn Db,
@@ -430,14 +412,6 @@ pub(super) struct ProtocolMemberData<'db> {
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
-        Self {
-            kind: self.kind.cycle_normalized(db, &previous.kind, cycle),
-            qualifiers: self.qualifiers,
-            definition: self.definition,
-        }
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -544,60 +518,6 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn is_cycle_marker(self, db: &'db dyn Db) -> bool {
-        match self {
-            Self::Other(Type::Divergent(_)) => true,
-            Self::Other(Type::Recursive(recursive)) if recursive.is_non_contractive(db) => true,
-            Self::Other(Type::CycleMarked(marked)) => {
-                Self::Other(marked.inner(db)).is_cycle_marker(db)
-            }
-            Self::Method(_) | Self::Property(_) | Self::Other(_) => false,
-        }
-    }
-
-    fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
-        match (self, previous) {
-            (Self::Method(curr), Self::Method(prev)) => {
-                debug_assert_eq!(curr.kind(db), prev.kind(db));
-                let normalized =
-                    curr.signatures(db)
-                        .cycle_normalized(db, prev.signatures(db), cycle);
-                Self::Method(CallableType::new(
-                    db,
-                    normalized,
-                    curr.kind(db),
-                    curr.provenance(db),
-                ))
-            }
-            (Self::Property(curr), Self::Property(prev)) => {
-                let getter = match (curr.getter(db), prev.getter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
-                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
-                    (None, _) => None,
-                };
-                let setter = match (curr.setter(db), prev.setter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
-                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
-                    (None, _) => None,
-                };
-                let deleter = match (curr.deleter(db), prev.deleter(db)) {
-                    (Some(curr), Some(prev)) => Some(curr.cycle_normalized(db, Some(prev), cycle)),
-                    (Some(curr), None) => Some(curr.cycle_normalized(db, None, cycle)),
-                    (None, _) => None,
-                };
-                Self::Property(PropertyInstanceType::new(db, getter, setter, deleter))
-            }
-            (Self::Other(curr), Self::Other(prev)) => {
-                Self::Other(curr.cycle_normalized(db, Some(*prev), cycle))
-            }
-            (_, previous) if previous.is_cycle_marker(db) => *self,
-            _ => {
-                debug_assert!(false);
-                *self
-            }
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -1117,13 +1037,16 @@ fn cached_protocol_interface<'db>(
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
 fn proto_interface_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous: &ProtocolInterface<'db>,
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    _previous: &ProtocolInterface<'db>,
     value: ProtocolInterface<'db>,
     _class: ClassType<'db>,
 ) -> ProtocolInterface<'db> {
-    value.cycle_normalized(db, *previous, cycle)
+    // Re-normalizing member signatures here can evaluate deferred annotations,
+    // simplify unions, and re-enter protocol queries while Salsa is computing a
+    // recovery value.
+    value
 }
 
 /// Bind `self`, and *also* discard the functionlike-ness of the callable.
