@@ -330,6 +330,7 @@ impl Configuration {
                         .into_iter()
                         .chain(lint.extend_per_file_ignores)
                         .collect(),
+                    lint_preview,
                 )?,
                 fix_safety: FixSafetyTable::from_rule_selectors(
                     &lint.extend_safe_fixes,
@@ -787,7 +788,7 @@ impl LintConfiguration {
                     per_file_ignores
                         .into_iter()
                         .map(|(pattern, prefixes)| {
-                            PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                            PerFileIgnore::new(pattern, prefixes, Some(project_root))
                         })
                         .collect()
                 })
@@ -799,7 +800,7 @@ impl LintConfiguration {
                 per_file_ignores
                     .into_iter()
                     .map(|(pattern, prefixes)| {
-                        PerFileIgnore::new(pattern, &prefixes, Some(project_root))
+                        PerFileIgnore::new(pattern, prefixes, Some(project_root))
                     })
                     .collect()
             }),
@@ -859,7 +860,7 @@ impl LintConfiguration {
             .collect();
 
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.all_rules(preview.mode).collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -933,7 +934,7 @@ impl LintConfiguration {
                     .chain(&selection.extend_fixable)
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, true);
                     }
                 }
@@ -943,7 +944,7 @@ impl LintConfiguration {
                     .chain(carriedover_unfixables.into_iter().flatten())
                     .filter(|s| s.specificity() == spec)
                 {
-                    for rule in selector.all_rules() {
+                    for rule in selector.all_rules(preview.mode) {
                         fixable_map_updates.insert(rule, false);
                     }
                 }
@@ -1010,10 +1011,15 @@ impl LintConfiguration {
             // Check for selections that require a warning
             for (kind, selector) in selection.selectors_by_kind() {
                 // Some of these checks are only for `Kind::Enable` which means only `--select` will warn
-                // and use with, e.g., `--ignore` or `--fixable` is okay
+                // and use with, e.g., `--ignore` or `--fixable` is okay.
+                //
+                // Human-readable names instead warn for all selectors.
 
                 // Unstable rules
-                if preview.mode.is_disabled() && kind.is_enable() {
+                if preview.mode.is_disabled()
+                    && kind.is_enable()
+                    && !matches!(selector, RuleSelector::Name(_))
+                {
                     // Check if the selector is empty because preview mode is disabled
                     if selector.rules(&preview).next().is_none()
                         && selector
@@ -1030,14 +1036,16 @@ impl LintConfiguration {
 
                 // Deprecated rules
                 if kind.is_enable() && selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_deprecated()) {
+                    let mut rules = selector.all_rules(preview.mode).peekable();
+                    if rules.peek().is_some() && rules.all(|rule| rule.is_deprecated()) {
                         deprecated_selectors.insert(selector.clone());
                     }
                 }
 
                 // Removed rules
                 if selector.is_exact() {
-                    if selector.all_rules().all(|rule| rule.is_removed()) {
+                    let mut rules = selector.all_rules(preview.mode).peekable();
+                    if rules.peek().is_some() && rules.all(|rule| rule.is_removed()) {
                         if kind.is_disable() {
                             removed_ignored_rules.insert(selector);
                         } else {

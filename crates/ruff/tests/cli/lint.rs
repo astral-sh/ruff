@@ -757,6 +757,66 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
 }
 
 #[test]
+fn rule_names_in_cli_require_preview() -> Result<()> {
+    let fixture = CliTest::new()?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "unused-import", "-"])
+        .pass_stdin("import os\n"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    warning: Selection `unused-import` has no effect because preview is not enabled.
+    ");
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--select", "unused-import", "--preview", "-"])
+        .pass_stdin("import os\n"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:8: error[F401] [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    fixture.write_file("test.py", "import os\n")?;
+
+    for args in [
+        ["--extend-select", "unused-import"],
+        ["--ignore", "unused-import"],
+        ["--fixable", "unused-import"],
+        ["--extend-fixable", "unused-import"],
+        ["--unfixable", "unused-import"],
+        ["--config", "lint.extend-safe-fixes=['unused-import']"],
+        ["--config", "lint.extend-unsafe-fixes=['unused-import']"],
+        ["--per-file-ignores", "test.py:unused-import"],
+        ["--extend-per-file-ignores", "test.py:unused-import"],
+    ] {
+        let output = fixture
+            .check_command()
+            .args(["--select", "F401"])
+            .args(args)
+            .arg("test.py")
+            .output()?;
+        assert_eq!(
+            str::from_utf8(&output.stderr)?,
+            "warning: Selection `unused-import` has no effect because preview is not enabled.\n",
+            "arguments: {args:?}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)

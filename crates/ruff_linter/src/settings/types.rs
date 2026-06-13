@@ -357,14 +357,11 @@ impl<T> PerFile<T> {
 ///
 /// See [`PerFile`] for details of the representation.
 #[derive(Debug, Clone)]
-pub struct PerFileIgnore(PerFile<RuleSet>);
+pub struct PerFileIgnore(PerFile<Vec<RuleSelector>>);
 
 impl PerFileIgnore {
-    pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        // Rules in preview are included here even if preview mode is disabled; it's safe to ignore
-        // disabled rules
-        let rules: RuleSet = prefixes.iter().flat_map(RuleSelector::all_rules).collect();
-        Self(PerFile::new(pattern, project_root, rules))
+    pub fn new(pattern: String, prefixes: Vec<RuleSelector>, project_root: Option<&Path>) -> Self {
+        Self(PerFile::new(pattern, project_root, prefixes))
     }
 }
 
@@ -927,9 +924,26 @@ impl CompiledPerFileIgnoreList {
     /// Given a list of [`PerFileIgnore`] patterns, create a compiled set of globs.
     ///
     /// Returns an error if either of the glob patterns cannot be parsed.
-    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>) -> Result<Self> {
+    pub fn resolve(per_file_ignores: Vec<PerFileIgnore>, preview: PreviewMode) -> Result<Self> {
         Ok(Self(CompiledPerFileList::resolve(
-            per_file_ignores.into_iter().map(|ignore| ignore.0),
+            per_file_ignores.into_iter().map(|ignore| {
+                let PerFile {
+                    basename,
+                    absolute,
+                    negated,
+                    data: selectors,
+                } = ignore.0;
+                let data = selectors
+                    .iter()
+                    .flat_map(|selector| selector.all_rules(preview))
+                    .collect();
+                PerFile {
+                    basename,
+                    absolute,
+                    negated,
+                    data,
+                }
+            }),
         )?))
     }
 }

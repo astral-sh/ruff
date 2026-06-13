@@ -588,11 +588,14 @@ mod tests {
         let mut settings =
             settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]);
 
-        settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-            "RUF100_2.py".to_string(),
-            &["F401".parse().unwrap()],
-            None,
-        )])
+        settings.per_file_ignores = CompiledPerFileIgnoreList::resolve(
+            vec![PerFileIgnore::new(
+                "RUF100_2.py".to_string(),
+                vec!["F401".parse().unwrap()],
+                None,
+            )],
+            PreviewMode::Disabled,
+        )
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
@@ -689,11 +692,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
             &settings::LinterSettings {
-                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-                    "ruff_per_file_ignores.py".to_string(),
-                    &["F401".parse().unwrap(), "RUF100".parse().unwrap()],
-                    None,
-                )])
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(
+                    vec![PerFileIgnore::new(
+                        "ruff_per_file_ignores.py".to_string(),
+                        vec!["F401".parse().unwrap(), "RUF100".parse().unwrap()],
+                        None,
+                    )],
+                    PreviewMode::Disabled,
+                )
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedImport, Rule::UnusedNOQA])
             },
@@ -707,11 +713,14 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
             &settings::LinterSettings {
-                per_file_ignores: CompiledPerFileIgnoreList::resolve(vec![PerFileIgnore::new(
-                    "ruff_per_file_ignores.py".to_string(),
-                    &["RUF100".parse().unwrap()],
-                    None,
-                )])
+                per_file_ignores: CompiledPerFileIgnoreList::resolve(
+                    vec![PerFileIgnore::new(
+                        "ruff_per_file_ignores.py".to_string(),
+                        vec!["RUF100".parse().unwrap()],
+                        None,
+                    )],
+                    PreviewMode::Disabled,
+                )
                 .unwrap(),
                 ..settings::LinterSettings::for_rules(vec![Rule::UnusedNOQA])
             },
