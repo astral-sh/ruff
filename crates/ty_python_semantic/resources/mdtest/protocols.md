@@ -186,7 +186,7 @@ But two exceptions to this rule are `object` and `Generic`:
 ```py
 from typing import TypeVar, Generic
 
-T = TypeVar("T")
+ProtocolT = TypeVar("ProtocolT")
 
 # Note: pyright and pyrefly do not consider this to be a valid `Protocol` class,
 # but mypy does (and has an explicit test for this behavior). Mypy was the
@@ -197,10 +197,10 @@ class Fine(Protocol, object): ...
 
 reveal_mro(Fine)  # revealed: (<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>)
 
-class StillFine(Protocol, Generic[T], object): ...
+class StillFine(Protocol, Generic[ProtocolT], object): ...
 class EvenThis[T](Protocol, object): ...
-class OrThis(Protocol, Generic[T]): ...
-class AndThis(Protocol, Generic[T], object): ...
+class OrThis(Protocol, Generic[ProtocolT]): ...
+class AndThis(Protocol, Generic[ProtocolT], object): ...
 ```
 
 And multiple inheritance from a mix of protocol and non-protocol classes is fine as long as
@@ -2234,10 +2234,10 @@ And they can also have generic contexts scoped to the method:
 class NewStyleFunctionScoped(Protocol):
     def f[T](self, input: T) -> T: ...
 
-S = TypeVar("S")
+FunctionT = TypeVar("FunctionT")
 
 class LegacyFunctionScoped(Protocol):
-    def f(self, input: S) -> S: ...
+    def f(self, input: FunctionT) -> FunctionT: ...
 
 class UsesSelf(Protocol):
     def g(self: Self) -> Self: ...
@@ -2247,7 +2247,7 @@ class NominalNewStyle:
         return input
 
 class NominalLegacy:
-    def f(self, input: S) -> S:
+    def f(self, input: FunctionT) -> FunctionT:
         return input
 
 class NominalWithSelf:

@@ -1,3 +1,5 @@
+mod postprocess;
+
 /// Represents a fenced code block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct MarkdownFence<'a> {
@@ -35,4 +37,8 @@ impl<'a> MarkdownFence<'a> {
     pub(super) fn is_closed_by(&self, line: &str) -> bool {
         line.trim_start_matches(' ').starts_with(self.marker)
     }
+}
+
+pub(super) fn render(raw: &str) -> String {
+    postprocess::render(raw)
 }

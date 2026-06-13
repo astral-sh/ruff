@@ -1,11 +1,12 @@
 use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
+use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
 
-use super::preformatted::PreformattedBlockScanner;
+use super::super::preformatted::PreformattedBlockScanner;
 
 /// Represents a parsed restructured text (reST) docstring.
 pub(super) struct Docstring {
@@ -20,8 +21,8 @@ impl Docstring {
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<ParameterDocumentation> {
-        let mut parameters = Vec::new();
+    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut parameters = IndexMap::new();
 
         for field_list in &self.field_lists {
             for field in &field_list.fields {
@@ -38,10 +39,7 @@ impl Docstring {
                     continue;
                 }
 
-                parameters.push(ParameterDocumentation {
-                    name: lookup_name.clone(),
-                    description: description.clone(),
-                });
+                parameters.insert(lookup_name.clone(), description.clone());
             }
         }
 
@@ -270,7 +268,7 @@ impl<'a> FieldBuilder<'a> {
                 ty,
             } => Field::Parameter {
                 display_name: display_name.to_compact_string(),
-                lookup_name: lookup_name.to_compact_string(),
+                lookup_name: lookup_name.to_string(),
                 ty: ty.map(|ty| ty.to_compact_string()),
                 description: body,
             },
@@ -559,7 +557,7 @@ impl<'a> FieldKind<'a> {
 enum Field {
     Parameter {
         display_name: CompactString,
-        lookup_name: CompactString,
+        lookup_name: String,
         ty: Option<CompactString>,
         description: String,
     },
@@ -593,12 +591,6 @@ enum Field {
         argument: CompactString,
         body: String,
     },
-}
-
-/// Parameter documentation extracted from a reST field list.
-pub(super) struct ParameterDocumentation {
-    pub(super) name: CompactString,
-    pub(super) description: String,
 }
 
 /// Container for the display name (shown to the user) and the lookup name
@@ -974,15 +966,15 @@ Section::
         let parameters = Docstring::parse(docstring).parameter_documentation();
         let mut rendered = String::new();
 
-        for parameter in parameters {
+        for (name, description) in parameters {
             if !rendered.is_empty() {
                 rendered.push('\n');
             }
 
-            rendered.push_str(parameter.name.as_str());
+            rendered.push_str(name.as_str());
             rendered.push_str(": ");
 
-            let mut lines = parameter.description.lines();
+            let mut lines = description.lines();
             let Some(first_line) = lines.next() else {
                 continue;
             };

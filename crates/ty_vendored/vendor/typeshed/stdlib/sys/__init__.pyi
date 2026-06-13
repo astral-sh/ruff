@@ -83,7 +83,7 @@ from typing_extensions import LiteralString, deprecated
 
 _T = TypeVar("_T")
 _LazyImportMode: TypeAlias = Literal["normal", "all", "none"]
-_LazyImportFilter: TypeAlias = Callable[[str, str, tuple[str, ...] | None], bool]
+_LazyImportFilter: TypeAlias = Callable[[str | None, str, tuple[str, ...] | None], bool]
 
 # see https://github.com/python/typeshed/issues/8513#issue-1333671093 for the rationale behind this alias
 _ExitCode: TypeAlias = str | int | None

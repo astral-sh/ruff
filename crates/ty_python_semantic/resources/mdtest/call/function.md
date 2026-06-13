@@ -1683,9 +1683,9 @@ mapping.
 ```py
 from typing import TypeVar
 
-_T = TypeVar("_T")
+_MappingT = TypeVar("_MappingT")
 
-def f(**kwargs: _T) -> _T:
+def f(**kwargs: _MappingT) -> _MappingT:
     return kwargs["a"]
 
 def _(kwargs: dict[str, int]) -> None:

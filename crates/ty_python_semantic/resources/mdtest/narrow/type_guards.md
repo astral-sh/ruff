@@ -372,12 +372,12 @@ The `TypeIs` type remains effective across generic boundaries:
 ```py
 from typing_extensions import TypeVar
 
-T = TypeVar("T")
+IdentityT = TypeVar("IdentityT")
 
 def f(v: object) -> TypeIs[Bar]:
     return True
 
-def g(v: T) -> T:
+def g(v: IdentityT) -> IdentityT:
     return v
 
 def _(a: Foo):
