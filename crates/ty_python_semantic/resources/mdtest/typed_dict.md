@@ -2626,24 +2626,54 @@ def _(p: Person) -> None:
 
 ## Special properties
 
+### Python 3.12
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
 `TypedDict` class definitions have some special properties that can be used for introspection:
 
 ```py
+from typing import TypedDict as TypingTypedDict
 from typing_extensions import TypedDict
+
+class StdlibPerson(TypingTypedDict):
+    name: str
+
+StdlibFunctionalPerson = TypingTypedDict("StdlibFunctionalPerson", {"name": str})
+DynamicStdlibPerson = type("DynamicStdlibPerson", (StdlibPerson,), {})
 
 class Person(TypedDict):
     name: str
     age: int | None
 
 FunctionalPerson = TypedDict("FunctionalPerson", {"name": str, "age": int | None})
+DynamicPerson = type("DynamicPerson", (Person,), {})
+
+class Employee(Person):
+    employee_id: int
+
+class GenericPerson[T](TypedDict):
+    value: T
+
+StdlibPerson.__closed__  # error: [unresolved-attribute]
+StdlibPerson.__readonly_keys__  # error: [unresolved-attribute]
+StdlibFunctionalPerson.__closed__  # error: [unresolved-attribute]
+DynamicStdlibPerson.__closed__  # error: [unresolved-attribute]
 
 reveal_type(Person.__total__)  # revealed: bool
 reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
 reveal_type(Person.__closed__)  # revealed: bool | None
 reveal_type(Person.__extra_items__)  # revealed: Any
+reveal_type(Person.__readonly_keys__)  # revealed: frozenset[str]
 reveal_type(FunctionalPerson.__closed__)  # revealed: bool | None
 reveal_type(FunctionalPerson.__extra_items__)  # revealed: Any
+reveal_type(Employee.__closed__)  # revealed: bool | None
+reveal_type(DynamicPerson.__closed__)  # revealed: bool | None
+reveal_type(GenericPerson[int].__readonly_keys__)  # revealed: frozenset[str]
 ```
 
 These attributes cannot be accessed on inhabitants:
@@ -2680,9 +2710,57 @@ def accepts_typed_dict_class(t_person: type[Person]) -> None:
     reveal_type(t_person.__extra_items__)  # revealed: Any
 
 accepts_typed_dict_class(Person)
+
+def accepts_stdlib_typed_dict_class(t_person: type[StdlibPerson]) -> None:
+    t_person.__closed__  # error: [unresolved-attribute]
+```
+
+### Python 3.13
+
+The standard-library `TypedDict` has the PEP 705 attributes on Python 3.13, but not the PEP 728
+attributes:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+
+reveal_type(Foo.__readonly_keys__)  # revealed: frozenset[str]
+Foo.__closed__  # error: [unresolved-attribute]
+```
+
+### Python 3.15
+
+On Python 3.15 and newer, classes defined using the standard-library `TypedDict` also have the PEP
+728 attributes:
+
+```toml
+[environment]
+python-version = "3.15"
+```
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+
+reveal_type(Person.__closed__)  # revealed: bool | None
+reveal_type(Person.__extra_items__)  # revealed: Any
 ```
 
 ## Subclassing
+
+```toml
+[environment]
+python-version = "3.12"
+```
 
 `TypedDict` types can be subclassed. The subclass can add new keys:
 
@@ -4383,6 +4461,36 @@ user_invalid = UserWithAlias(age=30)
 
 reveal_type(user_empty["name"])  # revealed: str
 reveal_type(user_partial["age"])  # revealed: int
+```
+
+Compatibility imports that fall back to `typing_extensions.TypedDict` should also preserve
+`TypedDict` semantics:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+try:
+    from typing import TypedDict as CompatTypedDict
+except ImportError:
+    from typing_extensions import TypedDict as CompatTypedDict
+
+class FormattedError(CompatTypedDict, total=False):
+    message: str
+
+class ErrorMessage(CompatTypedDict):
+    payload: FormattedError
+
+# `__closed__` is only available on the `typing_extensions` branch for Python 3.12.
+FormattedError.__closed__  # error: [unresolved-attribute]
+
+error = ErrorMessage(payload={"message": "Subscription limit reached"})
+reveal_type(error["payload"])  # revealed: FormattedError
+
+FunctionalError = CompatTypedDict("FunctionalError", {"message": str}, total=False)
+functional_error: FunctionalError = {"message": "Subscription limit reached"}
 ```
 
 ## Shadowing behavior

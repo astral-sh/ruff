@@ -1,7 +1,7 @@
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext, TypedDictModule,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
@@ -54,7 +54,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     self.infer_expression(base, TypeContext::default())
                 };
                 is_typed_dict |= match ty {
-                    Type::SpecialForm(SpecialFormType::TypedDict) => true,
+                    ty if TypedDictModule::from_type(self.db(), ty).is_some() => true,
                     Type::ClassLiteral(class) => class.is_typed_dict(self.db()),
                     Type::GenericAlias(alias) => alias.is_typed_dict(self.db()),
                     _ => false,
