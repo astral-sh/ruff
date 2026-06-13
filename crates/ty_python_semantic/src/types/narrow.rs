@@ -1016,13 +1016,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let subject_ty = type_narrowed_by_previous_patterns(self.db, pattern, subject_ty);
         Self::merge_optional_constraints_and(
             constraints,
-            self.evaluate_match_pattern_aliases(kind, subject_ty),
+            self.evaluate_match_pattern_bindings(kind, subject_ty),
         )
     }
 
     /// Record the types of names bound by a successful pattern.
     ///
-    /// Each nested pattern sees the part of the subject that reached it:
+    /// `subject_ty` is the type of the value reaching this pattern node. Structural patterns
+    /// determine the type reaching each child before recursively recording that child's bindings:
     ///
     /// ```python
     /// def f(value: tuple[int, str, bool]) -> None:
@@ -1034,7 +1035,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ///
     /// A failed pattern binds no names. For an `or` pattern, each later alternative sees only the
     /// values not definitely matched by an earlier alternative.
-    fn evaluate_match_pattern_aliases(
+    fn evaluate_match_pattern_bindings(
         &mut self,
         pattern: &PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
@@ -1047,7 +1048,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     |constraints, (pattern, element_ty)| {
                         Self::merge_optional_constraints_and(
                             constraints,
-                            self.evaluate_match_pattern_aliases(pattern, element_ty),
+                            self.evaluate_match_pattern_bindings(pattern, element_ty),
                         )
                     },
                 )
@@ -1056,7 +1057,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let mut patterns = patterns.iter();
                 let first_pattern = patterns.next()?;
                 let mut constraints =
-                    self.evaluate_match_pattern_aliases(first_pattern, subject_ty);
+                    self.evaluate_match_pattern_bindings(first_pattern, subject_ty);
                 let mut remaining_subject_ty = subject_ty;
                 let mut previous_pattern = first_pattern;
 
@@ -1067,7 +1068,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         .build();
                     constraints = Self::merge_optional_constraints_or(
                         constraints,
-                        self.evaluate_match_pattern_aliases(pattern, remaining_subject_ty),
+                        self.evaluate_match_pattern_bindings(pattern, remaining_subject_ty),
                     );
                     previous_pattern = pattern;
                 }
@@ -1077,7 +1078,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::As(pattern, name) => {
                 let nested = pattern
                     .as_deref()
-                    .and_then(|pattern| self.evaluate_match_pattern_aliases(pattern, subject_ty));
+                    .and_then(|pattern| self.evaluate_match_pattern_bindings(pattern, subject_ty));
                 let alias = name.as_ref().and_then(|name| {
                     let place = self.places().symbol_id(name.as_str())?;
                     let ty = pattern
@@ -1102,10 +1103,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    /// Return the subject type after `pattern` succeeds.
+    /// Return the type of the subject when `pattern` succeeds.
     ///
-    /// This type is used for `as` bindings and nested captures. A value pattern uses Python
-    /// equality, so it does not always narrow to the type of the value in the pattern:
+    /// This is the shared successful-match calculation used by bindings and structural pattern
+    /// analysis. It describes values that can match, not values that the pattern definitely
+    /// matches; negative narrowing and exhaustiveness use stricter analyses.
+    ///
+    /// A value pattern uses Python equality, so a successful match does not always narrow to the
+    /// type of the value in the pattern:
     ///
     /// ```python
     /// def f(target: int | str) -> None:
