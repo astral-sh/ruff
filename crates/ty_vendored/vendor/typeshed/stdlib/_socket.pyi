@@ -16,7 +16,11 @@ _CMSGArg: TypeAlias = tuple[int, int, ReadableBuffer]
 # Addresses can be either tuples of varying lengths (AF_INET, AF_INET6,
 # AF_NETLINK, AF_TIPC) or strings/buffers (AF_UNIX).
 # See getsockaddrarg() in socketmodule.c.
-_Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer
+if sys.version_info >= (3, 14):
+    # A bare int is accepted for Bluetooth HCI device IDs.
+    _Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer | int
+else:
+    _Address: TypeAlias = tuple[Any, ...] | str | ReadableBuffer
 _RetAddress: TypeAlias = Any
 
 # ===== Constants =====
@@ -255,8 +259,75 @@ if sys.version_info >= (3, 14):
         TCP_QUICKACK: Final[int]
 
     if sys.platform == "linux":
+        BDADDR_BREDR: Final[int]
+        BDADDR_LE_PUBLIC: Final[int]
+        BDADDR_LE_RANDOM: Final[int]
+        BT_CHANNEL_POLICY: Final[int]
+        BT_CHANNEL_POLICY_BREDR_ONLY: Final[int]
+        BT_CHANNEL_POLICY_BREDR_PREFERRED: Final[int]
+        BT_CODEC: Final[int]
+        BT_DEFER_SETUP: Final[int]
+        BT_FLUSHABLE: Final[int]
+        BT_FLUSHABLE_OFF: Final[int]
+        BT_FLUSHABLE_ON: Final[int]
+        BT_ISO_QOS: Final[int]
+        BT_MODE: Final[int]
+        BT_MODE_BASIC: Final[int]
+        BT_MODE_ERTM: Final[int]
+        BT_MODE_EXT_FLOWCTL: Final[int]
+        BT_MODE_LE_FLOWCTL: Final[int]
+        BT_MODE_STREAMING: Final[int]
+        BT_PHY: Final[int]
+        BT_PHY_BR_1M_1SLOT: Final[int]
+        BT_PHY_BR_1M_3SLOT: Final[int]
+        BT_PHY_BR_1M_5SLOT: Final[int]
+        BT_PHY_EDR_2M_1SLOT: Final[int]
+        BT_PHY_EDR_2M_3SLOT: Final[int]
+        BT_PHY_EDR_2M_5SLOT: Final[int]
+        BT_PHY_EDR_3M_1SLOT: Final[int]
+        BT_PHY_EDR_3M_3SLOT: Final[int]
+        BT_PHY_EDR_3M_5SLOT: Final[int]
+        BT_PHY_LE_1M_RX: Final[int]
+        BT_PHY_LE_1M_TX: Final[int]
+        BT_PHY_LE_2M_RX: Final[int]
+        BT_PHY_LE_2M_TX: Final[int]
+        BT_PHY_LE_CODED_RX: Final[int]
+        BT_PHY_LE_CODED_TX: Final[int]
+        BT_PKT_STATUS: Final[int]
+        BT_POWER: Final[int]
+        BT_POWER_FORCE_ACTIVE_OFF: Final[int]
+        BT_POWER_FORCE_ACTIVE_ON: Final[int]
+        BT_RCVMTU: Final[int]
+        BT_SECURITY: Final[int]
+        BT_SECURITY_FIPS: Final[int]
+        BT_SECURITY_HIGH: Final[int]
+        BT_SECURITY_LOW: Final[int]
+        BT_SECURITY_MEDIUM: Final[int]
+        BT_SECURITY_SDP: Final[int]
+        BT_SNDMTU: Final[int]
+        BT_VOICE: Final[int]
+        BT_VOICE_CVSD_16BIT: Final[int]
+        BT_VOICE_TRANSPARENT: Final[int]
+        BT_VOICE_TRANSPARENT_16BIT: Final[int]
+        HCI_CHANNEL_CONTROL: Final[int]
+        HCI_CHANNEL_LOGGING: Final[int]
+        HCI_CHANNEL_MONITOR: Final[int]
+        HCI_CHANNEL_RAW: Final[int]
+        HCI_CHANNEL_USER: Final[int]
+        HCI_DEV_NONE: Final[int]
         IP_FREEBIND: Final[int]
         IP_RECVORIGDSTADDR: Final[int]
+        L2CAP_LM: Final[int]
+        L2CAP_LM_AUTH: Final[int]
+        L2CAP_LM_ENCRYPT: Final[int]
+        L2CAP_LM_MASTER: Final[int]
+        L2CAP_LM_RELIABLE: Final[int]
+        L2CAP_LM_SECURE: Final[int]
+        L2CAP_LM_TRUSTED: Final[int]
+        SOL_BLUETOOTH: Final[int]
+        SOL_L2CAP: Final[int]
+        SOL_RFCOMM: Final[int]
+        SOL_SCO: Final[int]
         VMADDR_CID_LOCAL: Final[int]
 
 if sys.platform != "win32" and sys.platform != "darwin":

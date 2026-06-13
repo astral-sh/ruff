@@ -102,7 +102,8 @@ class XMLParserType:
         library.
         """
 
-    if sys.version_info >= (3, 15):
+    if sys.version_info >= (3, 13):
+        # Added in Python 3.13.4, 3.14.6
         def SetBillionLaughsAttackProtectionActivationThreshold(self, threshold: int, /) -> None:
             """Sets the number of output bytes needed to activate protection against billion laughs attacks.
 
