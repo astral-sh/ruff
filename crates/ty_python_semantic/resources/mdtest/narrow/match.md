@@ -783,8 +783,7 @@ def test_match_class_capture_preserves_possible_multiple_inheritance(
             reveal_type(whole)  # revealed: OverlapCaptureA & OverlapCaptureB
 ```
 
-Class patterns preserve gradual uncertainty alongside the member type declared by the pattern
-class.
+Class patterns preserve gradual uncertainty alongside the member type declared by the pattern class.
 
 ```py
 from typing import Any
@@ -875,8 +874,8 @@ def test_match_mapping_rejects_empty_key_domain(
             reveal_type(item)  # revealed: Never
 ```
 
-Mapping captures follow the same gradual-type rules. The rest pattern is a new dictionary whose
-key and value types come from the matched mapping.
+Mapping captures follow the same gradual-type rules. The rest pattern is a new dictionary whose key
+and value types come from the matched mapping.
 
 ```py
 from typing import Any
