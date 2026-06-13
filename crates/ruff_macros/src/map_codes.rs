@@ -8,10 +8,7 @@ use syn::{
     parenthesized, parse::Parse, spanned::Spanned,
 };
 
-use crate::{
-    kebab_case::kebab_case,
-    rule_code_prefix::{get_prefix_ident, intersection_all},
-};
+use crate::kebab_case::kebab_case;
 
 /// A rule entry in the big match statement such a
 /// `(Pycodestyle, "E112") => (RuleGroup::Preview, rules::pycodestyle::rules::logical_lines::NoIndentedBlock),`
@@ -75,7 +72,6 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
     }
 
     let linter_idents: Vec<_> = linter_to_rules.keys().collect();
-
     let all_rules = linter_to_rules.values().flat_map(BTreeMap::values);
     let mut output = register_rules(all_rules);
 
@@ -136,51 +132,6 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         });
     }
 
-    let mut all_codes = Vec::new();
-
-    for (linter, rules) in &linter_to_rules {
-        let rules_by_prefix = rules_by_prefix(rules);
-
-        for (prefix, rules) in &rules_by_prefix {
-            let prefix_ident = get_prefix_ident(prefix);
-            let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = if attrs.is_empty() {
-                quote!()
-            } else {
-                quote!(#(#attrs)*)
-            };
-            all_codes.push(quote! {
-                #attrs Self::#linter(#linter::#prefix_ident)
-            });
-        }
-
-        let mut prefix_into_iter_match_arms = quote!();
-
-        for (prefix, rules) in rules_by_prefix {
-            let rule_paths = rules.iter().map(|(path, .., attrs)| {
-                let rule_name = path.segments.last().unwrap();
-                quote!(#(#attrs)* Rule::#rule_name)
-            });
-            let prefix_ident = get_prefix_ident(&prefix);
-            let attrs = intersection_all(rules.iter().map(|(.., attrs)| attrs.as_slice()));
-            let attrs = if attrs.is_empty() {
-                quote!()
-            } else {
-                quote!(#(#attrs)*)
-            };
-            prefix_into_iter_match_arms.extend(quote! {
-                #attrs #linter::#prefix_ident => vec![#(#rule_paths,)*].into_iter(),
-            });
-        }
-
-        output.extend(quote! {
-            impl #linter {
-                pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
-                    match self { #prefix_into_iter_match_arms }
-                }
-            }
-        });
-    }
     output.extend(quote! {
         impl RuleCodePrefix {
             pub(crate) fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
@@ -191,46 +142,15 @@ pub(crate) fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
                 })
             }
 
-            pub(crate) fn rules(&self) -> ::std::vec::IntoIter<Rule> {
-                match self {
-                    #(RuleCodePrefix::#linter_idents(prefix) => prefix.clone().rules(),)*
-                }
-            }
         }
     });
 
     let rule_to_code = generate_rule_to_code(&linter_to_rules);
     output.extend(rule_to_code);
 
-    output.extend(generate_iter_impl(&linter_to_rules, &linter_idents));
+    output.extend(generate_rule_code_prefix_iter_impl(&linter_idents));
 
     Ok(output)
-}
-
-/// Group the rules by their common prefixes.
-fn rules_by_prefix(
-    rules: &BTreeMap<String, Rule>,
-) -> BTreeMap<String, Vec<(Path, Vec<Attribute>)>> {
-    // TODO(charlie): Why do we do this here _and_ in `rule_code_prefix::expand`?
-    let mut rules_by_prefix = BTreeMap::new();
-
-    for code in rules.keys() {
-        for i in 1..=code.len() {
-            let prefix = code[..i].to_string();
-            let rules: Vec<_> = rules
-                .iter()
-                .filter_map(|(code, rule)| {
-                    if code.starts_with(&prefix) {
-                        Some((rule.path.clone(), rule.attrs.clone()))
-                    } else {
-                        None
-                    }
-                })
-                .collect();
-            rules_by_prefix.insert(prefix, rules);
-        }
-    }
-    rules_by_prefix
 }
 
 /// Map from rule to codes that can be used to select it.
@@ -240,21 +160,13 @@ fn rules_by_prefix(
 /// done to support it, so the logic exists here.
 fn generate_rule_to_code(linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>) -> TokenStream {
     let mut rule_to_codes: HashMap<&Path, Vec<&Rule>> = HashMap::new();
-    let mut linter_code_for_rule_match_arms = quote!();
 
-    for (linter, map) in linter_to_rules {
-        for (code, rule) in map {
-            let Rule {
-                path, attrs, name, ..
-            } = rule;
+    for map in linter_to_rules.values() {
+        for rule in map.values() {
+            let Rule { path, .. } = rule;
             rule_to_codes.entry(path).or_default().push(rule);
-            linter_code_for_rule_match_arms.extend(quote! {
-                #(#attrs)* (Self::#linter, Rule::#name) => Some(#code),
-            });
         }
     }
-
-    let mut rule_noqa_code_match_arms = quote!();
 
     // Keep the proc-macro output stable so unchanged code can be reused incrementally.
     for (rule, codes) in rule_to_codes
@@ -279,55 +191,16 @@ See also https://github.com/astral-sh/ruff/issues/2186.
 ",
             rule_name.ident
         );
-
-        let Rule {
-            linter,
-            code,
-            attrs,
-            ..
-        } = codes
-            .iter()
-            .sorted_by_key(|data| data.linter == "Pylint")
-            .next()
-            .unwrap();
-
-        rule_noqa_code_match_arms.extend(quote! {
-            #(#attrs)* Rule::#rule_name => NoqaCode(crate::registry::Linter::#linter.common_prefix(), #code),
-        });
     }
 
     let rule_to_code = quote! {
-        impl Rule {
-            pub fn noqa_code(&self) -> NoqaCode {
-                use crate::registry::RuleNamespace;
-
-                match self {
-                    #rule_noqa_code_match_arms
-                }
-            }
-
-            pub fn is_preview(&self) -> bool {
-                matches!(self.group(), RuleGroup::Preview { .. })
-            }
-
-            pub(crate) fn is_stable(&self) -> bool {
-                matches!(self.group(), RuleGroup::Stable { .. })
-            }
-
-            pub fn is_deprecated(&self) -> bool {
-                matches!(self.group(), RuleGroup::Deprecated { .. })
-            }
-
-            pub fn is_removed(&self) -> bool {
-                matches!(self.group(), RuleGroup::Removed { .. })
-            }
-        }
-
         impl Linter {
             pub fn code_for_rule(&self, rule: Rule) -> Option<&'static str> {
-                match (self, rule) {
-                    #linter_code_for_rule_match_arms
-                    _ => None,
+                let metadata = rule.metadata();
+                if metadata.linter == *self {
+                    Some(metadata.code)
+                } else {
+                    None
                 }
             }
         }
@@ -335,46 +208,9 @@ See also https://github.com/astral-sh/ruff/issues/2186.
     rule_to_code
 }
 
-/// Implement `impl IntoIterator for &Linter` and `RuleCodePrefix::iter()`
-fn generate_iter_impl(
-    linter_to_rules: &BTreeMap<Ident, BTreeMap<String, Rule>>,
-    linter_idents: &[&Ident],
-) -> TokenStream {
-    let mut linter_rules_match_arms = quote!();
-    let mut linter_all_rules_match_arms = quote!();
-    for (linter, map) in linter_to_rules {
-        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
-            let rule_name = path.segments.last().unwrap();
-            quote!(#(#attrs)* Rule::#rule_name)
-        });
-        linter_rules_match_arms.extend(quote! {
-            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
-        });
-        let rule_paths = map.values().map(|Rule { attrs, path, .. }| {
-            let rule_name = path.segments.last().unwrap();
-            quote!(#(#attrs)* Rule::#rule_name)
-        });
-        linter_all_rules_match_arms.extend(quote! {
-            Linter::#linter => vec![#(#rule_paths,)*].into_iter(),
-        });
-    }
-
+/// Implement `RuleCodePrefix::iter()`
+fn generate_rule_code_prefix_iter_impl(linter_idents: &[&Ident]) -> TokenStream {
     quote! {
-        impl Linter {
-            /// Rules not in the preview.
-            pub(crate) fn rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
-                match self {
-                    #linter_rules_match_arms
-                }
-            }
-            /// All rules, including those in the preview.
-            pub fn all_rules(self: &Linter) -> ::std::vec::IntoIter<Rule> {
-                match self {
-                    #linter_all_rules_match_arms
-                }
-            }
-        }
-
         impl RuleCodePrefix {
             pub(crate) fn iter() -> impl Iterator<Item = RuleCodePrefix> {
                 use strum::IntoEnumIterator;
@@ -391,16 +227,15 @@ fn generate_iter_impl(
 /// Generate the `Rule` enum
 fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_variants = quote!();
-    let mut rule_message_formats_match_arms = quote!();
-    let mut rule_fixable_match_arms = quote!();
-    let mut rule_explanation_match_arms = quote!();
-    let mut rule_group_match_arms = quote!();
-    let mut rule_file_match_arms = quote!();
-    let mut rule_line_match_arms = quote!();
     let mut rule_parse_match_arms = quote!();
+    let mut rule_metadata = quote!();
 
     for Rule {
-        name, attrs, path, ..
+        name,
+        linter,
+        code,
+        attrs,
+        path,
     } in input
     {
         let kebab_name = kebab_case(name);
@@ -408,31 +243,25 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
             #(#attrs)*
             #name,
         });
-        // Apply the `attrs` to each arm, like `[cfg(feature = "foo")]`.
-        rule_message_formats_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::message_formats(),},
-        );
-        rule_fixable_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::Violation>::FIX_AVAILABILITY,},
-        );
-        rule_explanation_match_arms.extend(quote! {#(#attrs)* Self::#name => #path::explain(),});
-        rule_group_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::group(),},
-        );
-        rule_file_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::file(),},
-        );
-        rule_line_match_arms.extend(
-            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::line(),},
-        );
         rule_parse_match_arms.extend(quote! {#(#attrs)* #kebab_name => Ok(Self::#name),});
+        rule_metadata.extend(quote! {
+            #(#attrs)*
+            RuleMetadata {
+                rule: Rule::#name,
+                linter: Linter::#linter,
+                code: #code,
+                message_formats: <#path as crate::Violation>::message_formats,
+                fix_availability: <#path as crate::Violation>::FIX_AVAILABILITY,
+                explanation: <#path as crate::ViolationMetadata>::EXPLANATION,
+                group: <#path as crate::ViolationMetadata>::GROUP,
+                file: <#path as crate::ViolationMetadata>::FILE,
+                line: <#path as crate::ViolationMetadata>::LINE,
+            },
+        });
     }
 
     quote! {
-        use crate::Violation;
-
         #[derive(
-            EnumIter,
             Debug,
             PartialEq,
             Eq,
@@ -445,33 +274,30 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }
 
+        pub static RULE_METADATA: &[RuleMetadata] = &[
+            #rule_metadata
+        ];
+
+        pub struct RuleIter(::std::slice::Iter<'static, RuleMetadata>);
+
+        impl Iterator for RuleIter {
+            type Item = Rule;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                self.0.next().map(|metadata| metadata.rule)
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                self.0.size_hint()
+            }
+        }
+
+        impl ExactSizeIterator for RuleIter {}
+
         impl Rule {
-            /// Returns the format strings used to report violations of this rule.
-            pub fn message_formats(&self) -> &'static [&'static str] {
-                match self { #rule_message_formats_match_arms }
-            }
-
-            /// Returns the documentation for this rule.
-            pub fn explanation(&self) -> Option<&'static str> {
-                use crate::ViolationMetadata;
-                match self { #rule_explanation_match_arms }
-            }
-
-            /// Returns the fix status of this rule.
-            pub const fn fixable(&self) -> crate::FixAvailability {
-                match self { #rule_fixable_match_arms }
-            }
-
-            pub fn group(&self) -> crate::codes::RuleGroup {
-                match self { #rule_group_match_arms }
-            }
-
-            pub fn file(&self) -> &'static str {
-                match self { #rule_file_match_arms }
-            }
-
-            pub fn line(&self) -> u32 {
-                match self { #rule_line_match_arms }
+            /// Returns the metadata for this rule.
+            pub fn metadata(&self) -> &'static RuleMetadata {
+                &RULE_METADATA[*self as usize]
             }
 
             /// Try to parse a kebab-case rule name into a `Rule`.

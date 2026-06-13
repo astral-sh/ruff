@@ -2,10 +2,8 @@ use std::str::FromStr;
 
 use serde::de::{self, Visitor};
 use serde::{Deserialize, Serialize};
-use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 
-use crate::codes::RuleIter;
 use crate::codes::{RuleCodePrefix, RuleGroup};
 use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::rule_redirects::get_redirect;
@@ -190,24 +188,30 @@ impl Visitor<'_> for SelectorVisitor {
 impl RuleSelector {
     /// Return all matching rules, regardless of rule group filters like preview and deprecated.
     pub fn all_rules(&self) -> impl Iterator<Item = Rule> + '_ {
-        match self {
-            RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+        Rule::iter().filter(|rule| {
+            let metadata = rule.metadata();
 
-            RuleSelector::C => RuleSelectorIter::Chain(
-                Linter::Flake8Comprehensions
-                    .rules()
-                    .chain(Linter::McCabe.rules()),
-            ),
-            RuleSelector::T => RuleSelectorIter::Chain(
-                Linter::Flake8Debugger
-                    .rules()
-                    .chain(Linter::Flake8Print.rules()),
-            ),
-            RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.rules()),
-            RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
-                RuleSelectorIter::Vec(prefix.clone().rules())
+            match self {
+                RuleSelector::All => true,
+                RuleSelector::C => {
+                    matches!(
+                        metadata.linter,
+                        Linter::Flake8Comprehensions | Linter::McCabe
+                    )
+                }
+                RuleSelector::T => {
+                    matches!(
+                        metadata.linter,
+                        Linter::Flake8Debugger | Linter::Flake8Print
+                    )
+                }
+                RuleSelector::Linter(linter) => metadata.linter == *linter,
+                RuleSelector::Prefix { prefix, .. } | RuleSelector::Rule { prefix, .. } => {
+                    metadata.linter == *prefix.linter()
+                        && metadata.code.starts_with(prefix.short_code())
+                }
             }
-        }
+        })
     }
 
     /// Returns rules matching the selector, taking into account rule groups like preview and deprecated.
@@ -234,24 +238,6 @@ impl RuleSelector {
     /// Returns true if this selector is exact i.e. selects a single rule by code
     pub fn is_exact(&self) -> bool {
         matches!(self, Self::Rule { .. })
-    }
-}
-
-pub enum RuleSelectorIter {
-    All(RuleIter),
-    Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
-    Vec(std::vec::IntoIter<Rule>),
-}
-
-impl Iterator for RuleSelectorIter {
-    type Item = Rule;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            RuleSelectorIter::All(iter) => iter.next(),
-            RuleSelectorIter::Chain(iter) => iter.next(),
-            RuleSelectorIter::Vec(iter) => iter.next(),
-        }
     }
 }
 

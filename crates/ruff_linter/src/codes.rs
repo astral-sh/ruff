@@ -6,9 +6,8 @@ use std::fmt::Formatter;
 
 use ruff_db::diagnostic::SecondaryCode;
 use serde::Serialize;
-use strum_macros::EnumIter;
 
-use crate::registry::Linter;
+use crate::registry::{Linter, RuleNamespace};
 use crate::rule_selector::is_single_rule_selector;
 use crate::rules;
 
@@ -87,6 +86,25 @@ pub enum RuleGroup {
     Deprecated { since: &'static str },
     /// The rule was removed in the provided Ruff version, and errors will be displayed on use.
     Removed { since: &'static str },
+}
+
+#[derive(Debug)]
+pub struct RuleMetadata {
+    pub rule: Rule,
+    pub linter: Linter,
+    pub code: &'static str,
+    pub message_formats: fn() -> &'static [&'static str],
+    pub fix_availability: crate::FixAvailability,
+    pub explanation: Option<&'static str>,
+    pub group: RuleGroup,
+    pub file: &'static str,
+    pub line: u32,
+}
+
+impl RuleMetadata {
+    pub fn message_formats(&self) -> &'static [&'static str] {
+        (self.message_formats)()
+    }
 }
 
 #[ruff_macros::map_codes]
@@ -1219,6 +1237,78 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         _ => return None,
     })
+}
+
+impl Rule {
+    /// Iterate over all rules.
+    pub fn iter() -> RuleIter {
+        RuleIter(RULE_METADATA.iter())
+    }
+
+    /// Returns the format strings used to report violations of this rule.
+    pub fn message_formats(&self) -> &'static [&'static str] {
+        self.metadata().message_formats()
+    }
+
+    /// Returns the documentation for this rule.
+    pub fn explanation(&self) -> Option<&'static str> {
+        self.metadata().explanation
+    }
+
+    /// Returns the fix status of this rule.
+    pub fn fixable(&self) -> crate::FixAvailability {
+        self.metadata().fix_availability
+    }
+
+    pub fn group(&self) -> RuleGroup {
+        self.metadata().group
+    }
+
+    pub fn file(&self) -> &'static str {
+        self.metadata().file
+    }
+
+    pub fn line(&self) -> u32 {
+        self.metadata().line
+    }
+
+    pub fn noqa_code(&self) -> NoqaCode {
+        let metadata = self.metadata();
+        NoqaCode(metadata.linter.common_prefix(), metadata.code)
+    }
+
+    pub fn is_preview(&self) -> bool {
+        matches!(self.group(), RuleGroup::Preview { .. })
+    }
+
+    pub fn is_deprecated(&self) -> bool {
+        matches!(self.group(), RuleGroup::Deprecated { .. })
+    }
+
+    pub fn is_removed(&self) -> bool {
+        matches!(self.group(), RuleGroup::Removed { .. })
+    }
+}
+
+impl Linter {
+    /// All rules for this linter, regardless of rule group filters like preview and deprecated.
+    pub fn rules(self: &Linter) -> impl Iterator<Item = Rule> {
+        let linter = *self;
+
+        RULE_METADATA
+            .iter()
+            .filter_map(move |metadata| (metadata.linter == linter).then_some(metadata.rule))
+    }
+}
+
+impl RuleCodePrefix {
+    pub(crate) fn rules(&self) -> impl Iterator<Item = Rule> {
+        let short_code = self.short_code();
+
+        self.linter()
+            .rules()
+            .filter(move |rule| rule.metadata().code.starts_with(short_code))
+    }
 }
 
 impl std::fmt::Display for Rule {

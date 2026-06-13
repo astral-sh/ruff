@@ -23,25 +23,15 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
         #[automatically_derived]
         #[expect(deprecated)]
         impl #impl_generics crate::ViolationMetadata for #name #ty_generics #where_clause {
-            fn rule() -> crate::registry::Rule {
-                crate::registry::Rule::#name
-            }
+            const RULE: crate::registry::Rule = crate::registry::Rule::#name;
 
-            fn explain() -> Option<&'static str> {
-                Some(#docs)
-            }
+            const EXPLANATION: Option<&'static str> = Some(#docs);
 
-            fn group() -> crate::codes::RuleGroup {
-                crate::codes::#group
-            }
+            const GROUP: crate::codes::RuleGroup = crate::codes::#group;
 
-            fn file() -> &'static str {
-                file!()
-            }
+            const FILE: &'static str = file!();
 
-            fn line() -> u32 {
-                line!()
-            }
+            const LINE: u32 = line!();
         }
     })
 }

@@ -388,8 +388,6 @@ impl FusedIterator for RuleSetIterator {}
 
 #[cfg(test)]
 mod tests {
-    use strum::IntoEnumIterator;
-
     use crate::registry::{Rule, RuleSet};
 
     /// Tests that the set can contain all rules

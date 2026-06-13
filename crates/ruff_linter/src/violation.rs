@@ -29,21 +29,47 @@ impl Display for FixAvailability {
 }
 
 pub trait ViolationMetadata {
+    /// The rule for this violation.
+    const RULE: Rule;
+
+    /// An explanation of what this violation catches, why it's bad, and what users should do
+    /// instead.
+    const EXPLANATION: Option<&'static str>;
+
+    /// The rule group for this violation.
+    const GROUP: RuleGroup;
+
+    /// The file where the violation is declared.
+    const FILE: &'static str;
+
+    /// The 1-based line where the violation is declared.
+    const LINE: u32;
+
     /// Returns the rule for this violation
-    fn rule() -> Rule;
+    fn rule() -> Rule {
+        Self::RULE
+    }
 
     /// Returns an explanation of what this violation catches,
     /// why it's bad, and what users should do instead.
-    fn explain() -> Option<&'static str>;
+    fn explain() -> Option<&'static str> {
+        Self::EXPLANATION
+    }
 
     /// Returns the rule group for this violation.
-    fn group() -> RuleGroup;
+    fn group() -> RuleGroup {
+        Self::GROUP
+    }
 
     /// Returns the file where the violation is declared.
-    fn file() -> &'static str;
+    fn file() -> &'static str {
+        Self::FILE
+    }
 
     /// Returns the 1-based line where the violation is declared.
-    fn line() -> u32;
+    fn line() -> u32 {
+        Self::LINE
+    }
 }
 
 pub trait Violation: ViolationMetadata + Sized {

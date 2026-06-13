@@ -25,7 +25,7 @@ const SYMBOL_STYLE: &str = "style='width: 1em; display: inline-block;'";
 /// Style for the container wrapping the fixability and status icons.
 const SYMBOLS_CONTAINER: &str = "style='display: flex; gap: 0.5rem; justify-content: end;'";
 
-fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: &Linter) {
+fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>, linter: Linter) {
     table_out.push_str("| Code { scope='col' } | Name { scope='col' } | Message { scope='col' } | Fix/Status { scope='col' .sr-only } |");
     table_out.push('\n');
     table_out.push_str("| ---- | ---- | ------- | -: |");
@@ -189,7 +189,7 @@ pub(crate) fn generate() -> String {
         }
 
         let rules_by_upstream_category = linter
-            .all_rules()
+            .rules()
             .map(|rule| (rule.upstream_category(&linter), rule))
             .into_group_map();
 
@@ -222,10 +222,10 @@ pub(crate) fn generate() -> String {
                 }
                 table_out.push('\n');
                 table_out.push('\n');
-                generate_table(&mut table_out, rules.clone(), &linter);
+                generate_table(&mut table_out, rules.clone(), linter);
             }
         } else {
-            generate_table(&mut table_out, linter.all_rules(), &linter);
+            generate_table(&mut table_out, linter.rules(), linter);
         }
     }
 
