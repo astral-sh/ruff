@@ -684,6 +684,28 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
             reveal_type(item)  # revealed: str
 ```
 
+Class patterns also inherit ty's existing limitation around intersections of related generic types.
+Matching a generic base as one of its subclasses does not yet carry the base's specialization into
+the subclass. This is tracked by [astral-sh/ty#1824](https://github.com/astral-sh/ty/issues/1824)
+and [astral-sh/ty#3676](https://github.com/astral-sh/ty/issues/3676).
+
+```py
+from typing import Generic, TypeVar
+
+GenericPatternT = TypeVar("GenericPatternT")
+
+class GenericPatternBase(Generic[GenericPatternT]): ...
+
+class GenericPatternChild(GenericPatternBase[GenericPatternT]):
+    item: GenericPatternT
+
+def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
+    match value:
+        case GenericPatternChild(item=item):
+            # TODO: This should be `int` once related generic intersections can be simplified.
+            reveal_type(item)  # revealed: object
+```
+
 `__match_args__` is read through the pattern class and must identify literal attribute names. This
 includes attributes provided by a metaclass. An explicit widened annotation does not tell us which
 attribute a positional pattern extracts.
