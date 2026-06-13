@@ -223,29 +223,6 @@ pub enum PatternPredicateKind<'db> {
     Star(Option<Name>),
 }
 
-impl PatternPredicateKind<'_> {
-    /// Return whether this pattern contains a syntactic alternative that accepts every value.
-    ///
-    /// Captures and star patterns accept the value they receive without another runtime test. An
-    /// `or` pattern is therefore irrefutable when any alternative is irrefutable:
-    ///
-    /// ```python
-    /// match value:
-    ///     case (1 as item) | item:
-    ///         ...
-    /// ```
-    ///
-    /// This only describes the nested pattern syntax. A surrounding class, mapping, or sequence
-    /// pattern can still fail while selecting the value passed to this pattern.
-    fn is_syntactically_irrefutable(&self) -> bool {
-        match self {
-            Self::Or(patterns) => patterns.iter().any(Self::is_syntactically_irrefutable),
-            Self::As(Some(pattern), _) => pattern.is_syntactically_irrefutable(),
-            Self::As(None, _) | Self::Star(_) => true,
-            _ => false,
-        }
-    }
-}
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
     pub file: File,
