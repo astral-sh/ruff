@@ -583,6 +583,20 @@ impl<'db> Type<'db> {
                 Some(typed_dict_subscript(db, typed_dict, slice_ty))
             }
 
+            (
+                Type::NominalInstance(maybe_list_nominal),
+                Type::NominalInstance(maybe_slice_nominal),
+            ) if maybe_list_nominal.has_known_class(db, KnownClass::List)
+                && maybe_slice_nominal
+                    .slice_literal(db)
+                    .is_some_and(|slice| slice.step == Some(0)) =>
+            {
+                Some(Err(SubscriptError::new(
+                    value_ty,
+                    SubscriptErrorKind::SliceStepSizeZero,
+                )))
+            }
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int() => {
                 let i64_int = literal.as_int().unwrap();
