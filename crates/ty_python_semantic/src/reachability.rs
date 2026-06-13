@@ -1039,27 +1039,19 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(kind) => {
-            let (class_ty, is_exhaustive) =
+            let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => (
-                        Type::instance(db, class.top_materialization(db)),
-                        kind.is_argumentless(),
-                    ),
+                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        (callable_pattern_type(db), kind.is_argumentless())
+                        callable_pattern_type(db)
                     }
                     _ => return Truthiness::Ambiguous,
                 };
+            let definitely_matched =
+                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty);
 
-            if subject_ty.is_subtype_of(db, class_ty) {
-                if is_exhaustive {
-                    Truthiness::AlwaysTrue
-                } else {
-                    // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
-                    // i.e. it does not match all instances of `Point`. This means that
-                    // we can't tell for sure if this pattern will match or not.
-                    Truthiness::Ambiguous
-                }
+            if subject_ty.is_subtype_of(db, definitely_matched) {
+                Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, class_ty) {
                 Truthiness::AlwaysFalse
             } else {

@@ -84,7 +84,8 @@ fn class_pattern_is_exhaustive(
         return false;
     }
 
-    if kind.is_argumentless() {
+    let is_protocol = class.is_protocol(db);
+    if kind.is_argumentless() && !is_protocol {
         return true;
     }
 
@@ -92,10 +93,23 @@ fn class_pattern_is_exhaustive(
         return false;
     };
     let subject_class_literal = subject_class.class_literal(db);
+    let is_proper_non_final_subtype =
+        subject_class_literal != class && !subject_class_literal.is_final(db);
+
     // TODO: A non-final subject class also admits subclasses that can override attribute access.
     // Decide whether it should remain exhaustive under the static member model or be treated like
     // a proper non-final subtype.
-    if subject_class_literal != class && !subject_class_literal.is_final(db) {
+    if kind.is_argumentless() {
+        return !is_proper_non_final_subtype;
+    }
+
+    let positional_sources =
+        class_pattern_positional_sources(db, Some(class), kind.positional.len());
+    let extracts_attribute = !kind.keywords.is_empty()
+        || positional_sources
+            .iter()
+            .any(|source| !matches!(source, ClassPatternPositionalSource::MatchSelf));
+    if is_proper_non_final_subtype && (is_protocol || extracts_attribute) {
         return false;
     }
 
@@ -107,11 +121,7 @@ fn class_pattern_is_exhaustive(
 
     kind.positional
         .iter()
-        .zip(class_pattern_positional_sources(
-            db,
-            Some(class),
-            kind.positional.len(),
-        ))
+        .zip(positional_sources)
         .all(|(pattern, source)| match source {
             ClassPatternPositionalSource::MatchSelf => {
                 pattern_is_exhaustive_for_subject(db, pattern, subject_ty)
@@ -353,7 +363,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 /// Return whether exhaustiveness can differ based on the current subject type.
 fn pattern_requires_subject_type(kind: &PatternPredicateKind<'_>) -> bool {
     match kind {
-        PatternPredicateKind::Class(kind) => !kind.is_argumentless(),
+        PatternPredicateKind::Class(_) => true,
         PatternPredicateKind::Sequence(kind) => {
             kind.patterns.iter().any(pattern_requires_subject_type)
         }
@@ -507,7 +517,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_argumentless() => {
+                Type::ClassLiteral(class) if kind.is_argumentless() && !class.is_protocol(db) => {
                     Type::instance(db, class.top_materialization(db))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
