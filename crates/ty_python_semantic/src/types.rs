@@ -1844,6 +1844,23 @@ impl<'db> Type<'db> {
         (self, self.data())
     }
 
+    fn nominal_instance(self) -> NominalInstanceType<'db> {
+        debug_assert_eq!(self.tag, TypeTag::NominalInstance);
+        NominalInstanceType(match self.detail[0] {
+            x if x == PackedNominalInstanceTag::Object as u8 => NominalInstanceInner::Object,
+            x if x == PackedNominalInstanceTag::ExactTuple as u8 => {
+                NominalInstanceInner::ExactTuple(self.payload())
+            }
+            x if x == PackedNominalInstanceTag::NonTuple as u8 => {
+                NominalInstanceInner::NonTuple(self.class_type_at(1, 2))
+            }
+            x if x == PackedNominalInstanceTag::SysVersionInfo as u8 => {
+                NominalInstanceInner::SysVersionInfo
+            }
+            _ => unreachable!(),
+        })
+    }
+
     pub fn data(self) -> TypeData<'db> {
         use set_theoretic::RecursivelyDefined;
 
@@ -1924,21 +1941,7 @@ impl<'db> Type<'db> {
                     _ => unreachable!(),
                 }))
             }
-            TypeTag::NominalInstance => TypeData::NominalInstance(NominalInstanceType(match self
-                .detail[0]
-            {
-                x if x == PackedNominalInstanceTag::Object as u8 => NominalInstanceInner::Object,
-                x if x == PackedNominalInstanceTag::ExactTuple as u8 => {
-                    NominalInstanceInner::ExactTuple(self.payload())
-                }
-                x if x == PackedNominalInstanceTag::NonTuple as u8 => {
-                    NominalInstanceInner::NonTuple(self.class_type_at(1, 2))
-                }
-                x if x == PackedNominalInstanceTag::SysVersionInfo as u8 => {
-                    NominalInstanceInner::SysVersionInfo
-                }
-                _ => unreachable!(),
-            })),
+            TypeTag::NominalInstance => TypeData::NominalInstance(self.nominal_instance()),
             TypeTag::ProtocolInstance => TypeData::ProtocolInstance(
                 ProtocolInstanceType::from_packed_inner(match self.detail[0] {
                     x if x == PackedProtocolTag::FromClass as u8 => {
@@ -2900,6 +2903,14 @@ impl<'db> Type<'db> {
 
     pub(crate) fn is_intersection(self) -> bool {
         self.tag == TypeTag::Intersection
+    }
+
+    pub(crate) fn as_intersection(self) -> Option<IntersectionType<'db>> {
+        (self.tag == TypeTag::Intersection).then(|| self.payload())
+    }
+
+    pub(crate) fn as_enum_complement(self) -> Option<EnumComplementType<'db>> {
+        (self.tag == TypeTag::EnumComplement).then(|| self.payload())
     }
 
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an

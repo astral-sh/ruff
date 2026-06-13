@@ -9,7 +9,7 @@ use ty_module_resolver::{ModuleName, file_to_module};
 use super::protocol_class::ProtocolInterface;
 use super::{
     BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
+    SubclassOfType, Type, TypeTag, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -128,24 +128,17 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_nominal_instance(self) -> bool {
-        matches!((self).data(), crate::types::TypeData::NominalInstance(_))
+        self.tag == TypeTag::NominalInstance
     }
 
     pub(crate) fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
-        match (self).data() {
-            crate::types::TypeData::NominalInstance(instance_type) => Some(instance_type),
-            _ => None,
-        }
+        (self.tag == TypeTag::NominalInstance).then(|| self.nominal_instance())
     }
 
     /// Return `true` if `self` is a nominal instance of the given known class.
     pub(crate) fn is_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        match (self).data() {
-            crate::types::TypeData::NominalInstance(instance) => {
-                instance.class(db).is_known(db, known_class)
-            }
-            _ => false,
-        }
+        self.as_nominal_instance()
+            .is_some_and(|instance| instance.class(db).is_known(db, known_class))
     }
 
     /// Synthesize a protocol instance type with a given set of read-only property members.

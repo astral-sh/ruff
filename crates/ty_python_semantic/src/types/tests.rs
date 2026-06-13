@@ -74,6 +74,9 @@ fn packed_type_layout_and_representative_round_trips() {
         recursive_literal,
         KnownClass::Int.to_class_literal(&db),
         KnownClass::Int.to_instance(&db),
+        Type::object(),
+        Type::empty_tuple(&db),
+        Type::sys_version_info(),
         KnownClass::Int.to_subclass_of(&db),
         Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
             pep695_alias,
@@ -86,6 +89,9 @@ fn packed_type_layout_and_representative_round_trips() {
         let repacked = repack_type(data);
         assert_eq!(repacked, ty);
         assert_eq!(repacked.data(), data);
+        if let TypeData::NominalInstance(instance) = data {
+            assert_eq!(ty.as_nominal_instance(), Some(instance));
+        }
     }
 }
 

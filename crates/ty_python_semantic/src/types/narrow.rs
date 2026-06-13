@@ -96,33 +96,31 @@ fn finite_single_valued_union_alternatives<'db>(
 ) -> Option<Vec<Type<'db>>> {
     let ty = ty.resolve_type_alias(db);
 
-    match ty.data() {
-        crate::types::TypeData::EnumComplement(complement) => complement
+    if let Some(complement) = ty.as_enum_complement() {
+        return complement
             .has_finite_single_valued_alternatives(db)
-            .then(|| complement.remaining_literal_types(db)),
-        crate::types::TypeData::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db)?;
-            complement
-                .has_finite_single_valued_alternatives(db)
-                .then(|| complement.remaining_literal_types(db))
-        }
-        crate::types::TypeData::NominalInstance(instance)
-            if instance.has_known_class(db, KnownClass::Bool) =>
-        {
-            Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
-        }
-        crate::types::TypeData::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db)).is_some()
-                && !ty.overrides_equality(db) =>
-        {
-            Some(
-                enum_member_literals(db, instance.class_literal(db), None)
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect(),
-            )
-        }
-        _ => None,
+            .then(|| complement.remaining_literal_types(db));
     }
+
+    if let Some(intersection) = ty.as_intersection() {
+        let complement = intersection.enum_complement(db)?;
+        return complement
+            .has_finite_single_valued_alternatives(db)
+            .then(|| complement.remaining_literal_types(db));
+    }
+
+    let instance = ty.as_nominal_instance()?;
+    if instance.has_known_class(db, KnownClass::Bool) {
+        return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
+    }
+    if enum_metadata(db, instance.class_literal(db)).is_some() && !ty.overrides_equality(db) {
+        return Some(
+            enum_member_literals(db, instance.class_literal(db), None)
+                .expect("Calling `enum_member_literals` on an enum class")
+                .collect(),
+        );
+    }
+    None
 }
 
 /// Return `true` if `finite_single_valued_union_alternatives` would produce a non-empty list.
@@ -132,27 +130,22 @@ fn finite_single_valued_union_alternatives<'db>(
 fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
 
-    match ty.data() {
-        crate::types::TypeData::EnumComplement(complement) => {
-            complement.has_finite_single_valued_alternatives(db)
-        }
-        crate::types::TypeData::Intersection(intersection) => intersection
-            .enum_complement(db)
-            .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db)),
-        crate::types::TypeData::NominalInstance(instance)
-            if instance.has_known_class(db, KnownClass::Bool) =>
-        {
-            true
-        }
-        crate::types::TypeData::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db))
-                .is_some_and(|metadata| !metadata.members.is_empty())
-                && !ty.overrides_equality(db) =>
-        {
-            true
-        }
-        _ => false,
+    if let Some(complement) = ty.as_enum_complement() {
+        return complement.has_finite_single_valued_alternatives(db);
     }
+    if let Some(intersection) = ty.as_intersection() {
+        return intersection
+            .enum_complement(db)
+            .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db));
+    }
+
+    let Some(instance) = ty.as_nominal_instance() else {
+        return false;
+    };
+    instance.has_known_class(db, KnownClass::Bool)
+        || (enum_metadata(db, instance.class_literal(db))
+            .is_some_and(|metadata| !metadata.members.is_empty())
+            && !ty.overrides_equality(db))
 }
 
 /// Return the type constraints that `test` would place on `symbol` if true and false.
@@ -778,47 +771,48 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
             .any(|ty| could_compare_equal(db, left_ty, ty));
     }
 
-    match (left_ty.data(), right_ty.data()) {
-        // In order to be sure a union type cannot compare equal to another type, it
-        // must be true that no element of the union can compare equal to that type.
-        (crate::types::TypeData::Union(union), _) => union
+    // In order to be sure a union type cannot compare equal to another type, it
+    // must be true that no element of the union can compare equal to that type.
+    if let Some(union) = left_ty.as_union() {
+        return union
             .elements(db)
             .iter()
-            .any(|ty| could_compare_equal(db, *ty, right_ty)),
-        (_, crate::types::TypeData::Union(union)) => union
-            .elements(db)
-            .iter()
-            .any(|ty| could_compare_equal(db, left_ty, *ty)),
-        (
-            crate::types::TypeData::LiteralValue(left),
-            crate::types::TypeData::LiteralValue(right),
-        ) => {
-            match (left.kind(), right.kind()) {
-                // Boolean literals and int literals are disjoint, and single valued, and yet
-                // `True == 1` and `False == 0`.
-                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
-                | (LiteralValueTypeKind::Int(i), LiteralValueTypeKind::Bool(b)) => {
-                    i64::from(b) == i.as_i64()
-                }
-                _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
-            }
-        }
-        // We assume that tuples use `tuple.__eq__` which only returns True
-        // for other tuples, so they cannot compare equal to non-tuple types.
-        (crate::types::TypeData::NominalInstance(instance), _)
-            if instance.tuple_spec(db).is_some() =>
-        {
-            false
-        }
-        (_, crate::types::TypeData::NominalInstance(instance))
-            if instance.tuple_spec(db).is_some() =>
-        {
-            false
-        }
-        // Other than the above cases, two single-valued disjoint types cannot compare
-        // equal.
-        _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
+            .any(|ty| could_compare_equal(db, *ty, right_ty));
     }
+    if let Some(union) = right_ty.as_union() {
+        return union
+            .elements(db)
+            .iter()
+            .any(|ty| could_compare_equal(db, left_ty, *ty));
+    }
+
+    if let (Some(left), Some(right)) = (left_ty.as_literal_value(), right_ty.as_literal_value()) {
+        return match (left.kind(), right.kind()) {
+            // Boolean literals and int literals are disjoint, and single valued, and yet
+            // `True == 1` and `False == 0`.
+            (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
+            | (LiteralValueTypeKind::Int(i), LiteralValueTypeKind::Bool(b)) => {
+                i64::from(b) == i.as_i64()
+            }
+            _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
+        };
+    }
+
+    // We assume that tuples use `tuple.__eq__` which only returns True
+    // for other tuples, so they cannot compare equal to non-tuple types.
+    if left_ty
+        .as_nominal_instance()
+        .is_some_and(|instance| instance.tuple_spec(db).is_some())
+        || right_ty
+            .as_nominal_instance()
+            .is_some_and(|instance| instance.tuple_spec(db).is_some())
+    {
+        return false;
+    }
+
+    // Other than the above cases, two single-valued disjoint types cannot compare
+    // equal.
+    !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db))
 }
 
 fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
@@ -1301,7 +1295,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 lhs_ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> bool {
-                if let crate::types::TypeData::Union(union) = lhs_ty.data() {
+                if let Some(union) = lhs_ty.as_union() {
                     return union
                         .elements(db)
                         .iter()
@@ -1330,7 +1324,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> Type<'db> {
-                if let crate::types::TypeData::Union(union) = ty.data() {
+                if let Some(union) = ty.as_union() {
                     return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
                 }
 
