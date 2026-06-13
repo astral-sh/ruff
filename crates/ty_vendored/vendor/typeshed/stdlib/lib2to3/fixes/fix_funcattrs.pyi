@@ -1,5 +1,3 @@
-"""Fix function attribute names (f.func_x -> f.__x__)."""
-
 from typing import ClassVar, Literal
 
 from .. import fixer_base
