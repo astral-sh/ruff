@@ -20,6 +20,16 @@ impl DirectoryListing {
             .map(|index| self.0[index].1)
     }
 
+    /// Returns whether any entry name starts with `prefix`.
+    pub fn contains_name_with_prefix(&self, prefix: &str) -> bool {
+        let index = self
+            .0
+            .partition_point(|(candidate, _)| candidate.as_str() < prefix);
+        self.0
+            .get(index)
+            .is_some_and(|(name, _)| name.starts_with(prefix))
+    }
+
     /// Returns whether `name` resolves to a file, following symbolic links.
     pub fn entry_is_file(&self, db: &dyn Db, directory: &SystemPath, name: &str) -> bool {
         match self.file_type(name) {
@@ -133,6 +143,8 @@ mod tests {
             listing.iter().map(|(name, _)| name).collect::<Vec<_>>(),
             ["a.py", "z.py"]
         );
+        assert!(listing.contains_name_with_prefix("a"));
+        assert!(!listing.contains_name_with_prefix("b"));
 
         Ok(())
     }
