@@ -298,9 +298,9 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 
 /// The types produced when a match pattern succeeds.
 ///
-/// This positive structural analysis infers the type of each name bound by a successful pattern.
-/// Definite-match analysis, which is used for negative narrowing and exhaustiveness, intentionally
-/// remains separate.
+/// This positive structural analysis infers the type of each supported name bound by a successful
+/// pattern. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
+/// intentionally remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct SuccessfulPatternAnalysis<'db> {
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
@@ -308,10 +308,18 @@ pub(crate) struct SuccessfulPatternAnalysis<'db> {
 }
 
 impl<'db> SuccessfulPatternAnalysis<'db> {
-    pub(crate) fn binding_type(&self, place: ScopedPlaceId) -> Option<Type<'db>> {
+    fn try_binding_type(&self, place: ScopedPlaceId) -> Option<Type<'db>> {
         // An OR pattern's alternatives define one runtime binding, so their types are merged by
         // place.
         self.bindings.get(&place).copied().or(self.cycle_recovery)
+    }
+
+    /// Return the inferred binding type, or `Unknown` when the analysis has no entry for it.
+    ///
+    /// Missing entries are an explicit recovery path for unsupported or invalid patterns. Salsa
+    /// cycle recovery is represented separately by `cycle_recovery`.
+    pub(crate) fn binding_type_or_unknown(&self, place: ScopedPlaceId) -> Type<'db> {
+        self.try_binding_type(place).unwrap_or_else(Type::unknown)
     }
 
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
@@ -323,7 +331,7 @@ impl<'db> SuccessfulPatternAnalysis<'db> {
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         for (place, ty) in &mut self.bindings {
-            if let Some(previous_ty) = previous.binding_type(*place) {
+            if let Some(previous_ty) = previous.try_binding_type(*place) {
                 *ty = ty.cycle_normalized(db, previous_ty, cycle);
             }
         }

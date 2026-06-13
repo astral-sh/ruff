@@ -630,8 +630,7 @@ def test_match_mapping_rest_capture_is_not_yet_inferred(
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
-make a match exhaustive, but nested class patterns that may fail during attribute lookup must leave
-the fallback reachable.
+make a match exhaustive.
 
 ```py
 from typing_extensions import assert_never
