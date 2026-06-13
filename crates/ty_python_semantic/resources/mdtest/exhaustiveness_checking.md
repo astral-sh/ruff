@@ -349,7 +349,7 @@ def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
         case GenericClass(x=x):
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: Unknown
             reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
             return obj
 ```

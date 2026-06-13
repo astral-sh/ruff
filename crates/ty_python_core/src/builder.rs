@@ -38,7 +38,10 @@ use crate::definition::{
 use crate::expression::{Expression, ExpressionKind};
 use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
-use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
+use crate::place::{
+    PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId,
+    match_subject_place_expressions,
+};
 use crate::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
     PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
@@ -203,7 +206,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     /// the most recent visit at the end of the Vec.
     current_statements: Vec<CurrentStatement<'ast, 'db>>,
     /// The match case we're currently visiting.
-    current_match_case: Option<CurrentMatchCase<'ast>>,
+    current_match_case: Option<CurrentMatchCase<'ast, 'db>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
     current_first_parameter_name: Option<&'ast str>,
 
@@ -1970,25 +1973,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 })
             }
             ast::Pattern::MatchSequence(pattern) => {
-                let mut has_star = false;
-                let patterns = pattern
-                    .patterns
-                    .iter()
-                    .map(|pattern| {
-                        if matches!(pattern, ast::Pattern::MatchStar(_)) {
-                            has_star = true;
-                        }
-                        self.predicate_kind(pattern)
-                    })
-                    .collect();
-                PatternPredicateKind::Sequence(SequencePatternPredicateKind { patterns, has_star })
+                PatternPredicateKind::Sequence(SequencePatternPredicateKind {
+                    patterns: pattern
+                        .patterns
+                        .iter()
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
                     .patterns
                     .iter()
                     .map(|pattern| self.predicate_kind(pattern))
-                    .collect();
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
                 PatternPredicateKind::Or(predicates)
             }
             ast::Pattern::MatchAs(pattern) => PatternPredicateKind::As(
@@ -1998,23 +1997,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .map(|p| Box::new(self.predicate_kind(p))),
                 pattern.name.as_ref().map(|name| name.id.clone()),
             ),
-            ast::Pattern::MatchStar(_) => PatternPredicateKind::MatchStar,
+            ast::Pattern::MatchStar(pattern) => {
+                PatternPredicateKind::Star(pattern.name.as_ref().map(|name| name.id.clone()))
+            }
         }
     }
 
-    fn add_pattern_narrowing_constraint(
+    fn create_pattern_predicate(
         &mut self,
         subject: Expression<'db>,
         pattern: &ast::Pattern,
-        sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
-        is_catchall: bool,
-    ) -> (
-        PredicateOrLiteral<'db>,
-        ScopedPredicateId,
-        PatternPredicate<'db>,
-    ) {
+    ) -> PatternPredicate<'db> {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -2029,7 +2024,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let kind = self.predicate_kind(pattern);
         let guard = guard.map(|guard| self.add_standalone_expression(guard));
 
-        let pattern_predicate = PatternPredicate::new(
+        PatternPredicate::new(
             self.db,
             self.file,
             self.current_scope(),
@@ -2037,8 +2032,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             kind,
             guard,
             previous_pattern.map(Box::new),
-        );
+        )
+    }
 
+    fn add_pattern_narrowing_constraint(
+        &mut self,
+        pattern_predicate: PatternPredicate<'db>,
+        subject_targets: &[(ScopedPlaceId, ScopedUseId)],
+        sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
+        is_catchall: bool,
+    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
@@ -2052,10 +2055,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // predicates are still created normally for proper control flow tracking.
         let predicate_id = if is_catchall {
             ScopedPredicateId::ALWAYS_TRUE
-        } else if sequence_subject_targets.is_empty() {
-            self.record_narrowing_constraint(predicate)
         } else {
             let predicate_id = self.add_predicate(predicate);
+            for &(place, use_id) in subject_targets {
+                self.current_use_def_map_mut()
+                    .record_narrowing_constraint_for_bindings_at_use(predicate_id, place, use_id);
+            }
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
                     self.add_predicate(PredicateOrLiteral::Predicate(Predicate {
@@ -2076,7 +2081,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             predicate_id
         };
-        (predicate, predicate_id, pattern_predicate)
+        (predicate, predicate_id)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -3407,6 +3412,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that case predicates constrain those values rather than later rebindings.
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
+                let mut subject_targets = SmallVec::<[(ScopedPlaceId, ScopedUseId); 2]>::new();
+                for expression in match_subject_place_expressions(subject) {
+                    if let Some((place, use_id)) = PlaceExpr::try_from_expr(expression)
+                        .and_then(|place| places.place_id((&place).into()))
+                        .zip(ast_ids.try_use_id(expression))
+                    {
+                        subject_targets.push((place, use_id));
+                    }
+                }
                 let mut sequence_subject_targets =
                     SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
                 let mut subject_elements: Vec<&ast::Expr> = match subject.as_ref() {
@@ -3444,7 +3458,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
                 for (i, case) in cases.iter().enumerate() {
-                    self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
+                    let match_pattern_predicate = self.create_pattern_predicate(
+                        subject_expr,
+                        &case.pattern,
+                        case.guard.as_deref(),
+                        previous_pattern,
+                    );
+                    self.current_match_case = Some(CurrentMatchCase::new(
+                        &case.pattern,
+                        match_pattern_predicate,
+                    ));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
                     // unlike in [Stmt::If], we don't reset [no_case_matched]
@@ -3452,13 +3475,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
                     let is_catchall = has_catchall && i == cases.len() - 1;
-                    let (match_predicate, match_narrowing_id, match_pattern_predicate) = self
+                    let (match_predicate, match_narrowing_id) = self
                         .add_pattern_narrowing_constraint(
-                            subject_expr,
-                            &case.pattern,
+                            match_pattern_predicate,
+                            &subject_targets,
                             &sequence_subject_targets,
-                            case.guard.as_deref(),
-                            previous_pattern,
                             is_catchall,
                         );
                     previous_pattern = Some(match_pattern_predicate);
@@ -4390,7 +4411,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
                     identifier: name,
-                    index: state.index,
+                    predicate: state.predicate,
                 },
             );
         }
@@ -4411,12 +4432,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 MatchPatternDefinitionNodeRef {
                     pattern: state.pattern,
                     identifier: name,
-                    index: state.index,
+                    predicate: state.predicate,
                 },
             );
         }
-
-        self.current_match_case.as_mut().unwrap().index += 1;
     }
 }
 
@@ -4665,27 +4684,17 @@ struct CurrentStatement<'ast, 'db> {
 }
 
 #[derive(Debug, PartialEq)]
-struct CurrentMatchCase<'ast> {
+struct CurrentMatchCase<'ast, 'db> {
     /// The pattern that's part of the current match case.
     pattern: &'ast ast::Pattern,
 
-    /// The index of the sub-pattern that's being currently visited within the pattern.
-    ///
-    /// For example:
-    /// ```py
-    /// match subject:
-    ///     case a as b: ...
-    ///     case [a, b]: ...
-    ///     case a | b: ...
-    /// ```
-    ///
-    /// In all of the above cases, the index would be 0 for `a` and 1 for `b`.
-    index: u32,
+    /// The predicate for the complete match case.
+    predicate: PatternPredicate<'db>,
 }
 
-impl<'a> CurrentMatchCase<'a> {
-    fn new(pattern: &'a ast::Pattern) -> Self {
-        Self { pattern, index: 0 }
+impl<'ast, 'db> CurrentMatchCase<'ast, 'db> {
+    fn new(pattern: &'ast ast::Pattern, predicate: PatternPredicate<'db>) -> Self {
+        Self { pattern, predicate }
     }
 }
 
