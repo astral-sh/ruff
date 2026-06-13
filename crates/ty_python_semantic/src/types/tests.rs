@@ -273,6 +273,33 @@ fn cycle_marked_type_is_transparent_but_preferred_in_unions() {
 }
 
 #[test]
+fn cycle_marked_type_folds_marker_containing_inner_to_recursive() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let tuple_marker = Type::heterogeneous_tuple(&db, [marker]);
+
+    assert_eq!(
+        Type::cycle_marked(&db, binder_id, tuple_marker),
+        Type::implicit_recursive(&db, binder_id, tuple_marker)
+    );
+}
+
+#[test]
+fn recursive_type_folds_same_binder_nesting() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let tuple_marker = Type::heterogeneous_tuple(&db, [marker]);
+    let recursive = Type::implicit_recursive(&db, binder_id, tuple_marker);
+
+    assert_eq!(
+        Type::implicit_recursive(&db, binder_id, recursive),
+        recursive
+    );
+}
+
+#[test]
 fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
@@ -305,6 +332,30 @@ fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() 
         union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker)),
         Some(int)
     );
+}
+
+#[test]
+fn top_level_union_cycle_normalization_keeps_structural_markers_recursive() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(binder_id);
+    let int = KnownClass::Int.to_instance(&db);
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let list_marker = KnownClass::List.to_specialized_instance(&db, &[marker]);
+
+    let union = UnionType::from_elements(&db, [marker, list_int, list_marker]).expect_union();
+    let normalized = union
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker))
+        .unwrap();
+
+    assert_eq!(
+        normalized.display(&db).to_string(),
+        UnionType::from_elements_cycle_recovery(&db, [list_int, list_marker])
+            .display(&db)
+            .to_string()
+    );
+    assert!(!normalized.contains_cycle_marked(&db));
+    assert!(RecursiveTypeNormalization::new(marker).contains_marker(&db, normalized));
 }
 
 #[test]

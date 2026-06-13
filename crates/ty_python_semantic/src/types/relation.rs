@@ -928,6 +928,28 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         )
     }
 
+    fn protocol_is_equivalent_to_object(
+        &self,
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> bool {
+        let object = Type::object();
+        let protocol_ty = Type::ProtocolInstance(protocol);
+        let checker = Self {
+            relation: TypeRelation::Subtyping,
+            typevar_evaluation: TypeVarEvaluation::Eager,
+            inferable: InferableTypeVars::None,
+            context_tree: ErrorContextTree::disabled(),
+            ..self.clone()
+        };
+
+        checker
+            .with_recursion_guard(object, protocol_ty, || {
+                checker.check_type_satisfies_protocol(db, object, protocol)
+            })
+            .is_always_satisfied(db)
+    }
+
     fn wrapping_recursive_for_divergent(
         &self,
         db: &'db dyn Db,
@@ -1118,7 +1140,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         match (source, target) {
             // Everything is a subtype of `object`.
             (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
-            (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
+            (_, Type::ProtocolInstance(target))
+                if self.protocol_is_equivalent_to_object(db, target) =>
+            {
                 self.always()
             }
 

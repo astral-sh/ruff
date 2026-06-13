@@ -1219,6 +1219,11 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn cycle_marked(db: &'db dyn Db, binder_id: salsa::Id, inner: Type<'db>) -> Self {
+        let marker = Type::divergent(binder_id);
+        if RecursiveTypeNormalization::new(marker).contains_marker(db, inner) {
+            return Type::implicit_recursive(db, binder_id, inner);
+        }
+
         match inner {
             Type::CycleMarked(marked) if marked.binder(db).into_id() == binder_id => inner,
             _ => Self::CycleMarked(CycleMarkedType::new(
@@ -1329,6 +1334,12 @@ impl<'db> Type<'db> {
         origin: RecursiveOrigin<'db>,
         body: Type<'db>,
     ) -> Self {
+        if let Type::Recursive(recursive) = body
+            && recursive.binder_id(db) == binder_id
+        {
+            return body;
+        }
+
         let marker = Type::divergent(binder_id);
         if RecursiveTypeNormalization::new(marker).contains_marker(db, body) {
             Self::Recursive(RecursiveType::build(db, binder_id, origin, body))
@@ -2571,13 +2582,7 @@ impl<'db> Type<'db> {
             Type::CycleMarked(marked) => marked
                 .inner(db)
                 .recursive_type_normalized_impl(db, normalization)
-                .map(|inner| {
-                    if inner == marked.inner(db) {
-                        self
-                    } else {
-                        Type::cycle_marked(db, marked.binder(db).into_id(), inner)
-                    }
-                }),
+                .map(|inner| Type::cycle_marked(db, marked.binder(db).into_id(), inner)),
             Type::Union(union) => union.recursive_type_normalized_impl(db, normalization),
             Type::Intersection(intersection) => intersection
                 .recursive_type_normalized_impl(db, normalization)

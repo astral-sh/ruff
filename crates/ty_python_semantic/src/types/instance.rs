@@ -10,18 +10,13 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::types::RecursiveTypeNormalization;
-use crate::types::constraints::{
-    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
-};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
-use crate::types::generics::{InferableTypeVars, walk_specialization};
+use crate::types::generics::walk_specialization;
 use crate::types::protocol_class::{
     ProtocolClass, has_all_protocol_members_defined, walk_protocol_interface,
 };
-use crate::types::relation::{
-    DisjointnessChecker, HasRelationToVisitor, IsDisjointVisitor, TypeRelationChecker,
-};
-use crate::types::signatures::SignatureRelationVisitor;
+use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
@@ -741,40 +736,6 @@ impl<'db> ProtocolInstanceType<'db> {
             // ```
             Protocol::Synthesized(_) => KnownClass::Type.to_instance(db),
         }
-    }
-
-    /// Return `true` if this protocol is a supertype of `object`.
-    ///
-    /// This indicates that the protocol represents the same set of possible runtime objects
-    /// as `object` (since `object` is the universal set of *all* possible runtime objects!).
-    /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
-    /// normalised to `object`.
-    pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
-        fn is_equivalent_to_object_inner<'db>(
-            db: &'db dyn Db,
-            protocol: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> bool {
-            let constraints = ConstraintSetBuilder::new();
-            let relation_visitor = HasRelationToVisitor::default(&constraints);
-            let disjointness_visitor = IsDisjointVisitor::default(&constraints);
-            let signature_relation_visitor = SignatureRelationVisitor::default();
-            let materialization_visitor = ApplyTypeMappingVisitor::default();
-            let checker = TypeRelationChecker::subtyping(
-                &constraints,
-                InferableTypeVars::None,
-                &relation_visitor,
-                &disjointness_visitor,
-                &signature_relation_visitor,
-                &materialization_visitor,
-            );
-            checker
-                .check_type_satisfies_protocol(db, Type::object(), protocol)
-                .is_always_satisfied(db)
-        }
-
-        is_equivalent_to_object_inner(db, self, ())
     }
 
     pub(super) fn recursive_type_normalized_impl(

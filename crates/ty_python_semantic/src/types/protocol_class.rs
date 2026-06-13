@@ -544,6 +544,17 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
+    fn is_cycle_marker(self, db: &'db dyn Db) -> bool {
+        match self {
+            Self::Other(Type::Divergent(_)) => true,
+            Self::Other(Type::Recursive(recursive)) if recursive.is_non_contractive(db) => true,
+            Self::Other(Type::CycleMarked(marked)) => {
+                Self::Other(marked.inner(db)).is_cycle_marker(db)
+            }
+            Self::Method(_) | Self::Property(_) | Self::Other(_) => false,
+        }
+    }
+
     fn cycle_normalized(&self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
         match (self, previous) {
             (Self::Method(curr), Self::Method(prev)) => {
@@ -579,6 +590,7 @@ impl<'db> ProtocolMemberKind<'db> {
             (Self::Other(curr), Self::Other(prev)) => {
                 Self::Other(curr.cycle_normalized(db, Some(*prev), cycle))
             }
+            (_, previous) if previous.is_cycle_marker(db) => *self,
             _ => {
                 debug_assert!(false);
                 *self
