@@ -1,14 +1,20 @@
 import { SubDiagnosticSeverity } from "ty_wasm";
 import type {
+  DiagnosticAnnotation,
   Severity,
   Range,
   SubDiagnostic,
-  SubDiagnosticAnnotation,
   TextRange,
   Diagnostic as TyDiagnostic,
 } from "ty_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
+import {
+  type DiagnosticDetailInput,
+  createDiagnosticDetail,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
 import { useMemo } from "react";
 
 interface Props {
@@ -93,6 +99,9 @@ function Items({
           currentFilePath == null || position == null
             ? null
             : { path: currentFilePath, range: position };
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
+          diagnostic.annotations,
+        );
 
         const mostlyUniqueId = `${startLine}:${startColumn}-${id}`;
 
@@ -119,10 +128,25 @@ function Items({
                 </span>
               </button>
             )}
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(
+                        annotation,
+                        currentFilePath,
+                        onGoTo,
+                      )}
+                    />
+                  </li>
+                ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
+                  <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
                       currentFilePath={currentFilePath}
@@ -142,6 +166,7 @@ function Items({
 export interface Diagnostic {
   id: string;
   message: string;
+  annotations: DiagnosticAnnotation[];
   subDiagnostics: SubDiagnostic[];
   severity: Severity;
   range: Range | null;
@@ -163,8 +188,8 @@ function SubDiagnosticItem({
   currentFilePath: string | null;
   onGoTo(location: DiagnosticLocation): void;
 }) {
-  let primaryAnnotation: SubDiagnosticAnnotation | undefined;
-  const additionalAnnotations: SubDiagnosticAnnotation[] = [];
+  let primaryAnnotation: DiagnosticAnnotation | undefined;
+  const additionalAnnotations: DiagnosticAnnotation[] = [];
 
   for (const annotation of subDiagnostic.annotations) {
     if (annotation.primary && primaryAnnotation == null) {
@@ -174,35 +199,47 @@ function SubDiagnosticItem({
     }
   }
 
+  const severity = formatSubDiagnosticSeverity(subDiagnostic.severity);
+
   return (
     <>
       {primaryAnnotation == null ? (
-        <span>{formatSubDiagnostic(subDiagnostic)}</span>
+        <DiagnosticDetailItem
+          item={{ message: subDiagnostic.message, severity }}
+        />
       ) : (
-        <SubDiagnosticAnnotationItem
-          prefix={`${formatSubDiagnosticSeverity(subDiagnostic.severity)}: `}
-          message={formatSubDiagnosticAnnotation(
-            subDiagnostic,
-            primaryAnnotation,
+        <DiagnosticDetailItem
+          item={toDisplayDiagnosticDetail(
+            {
+              message: formatSubDiagnosticAnnotation(
+                subDiagnostic,
+                primaryAnnotation,
+              ),
+              location: primaryAnnotation.location,
+              severity,
+            },
+            currentFilePath,
+            onGoTo,
           )}
-          annotation={primaryAnnotation}
-          currentFilePath={currentFilePath}
-          onGoTo={onGoTo}
         />
       )}
       {additionalAnnotations.length > 0 ? (
         <ul className="pl-3">
           {additionalAnnotations.map((annotation, index) => (
             <li key={index}>
-              <SubDiagnosticAnnotationItem
-                message={formatSubDiagnosticAnnotation(
-                  subDiagnostic,
-                  annotation,
-                  false,
+              <DiagnosticDetailItem
+                item={toDisplayDiagnosticDetail(
+                  {
+                    message: formatSubDiagnosticAnnotation(
+                      subDiagnostic,
+                      annotation,
+                      false,
+                    ),
+                    location: annotation.location,
+                  },
+                  currentFilePath,
+                  onGoTo,
                 )}
-                annotation={annotation}
-                currentFilePath={currentFilePath}
-                onGoTo={onGoTo}
               />
             </li>
           ))}
@@ -212,47 +249,22 @@ function SubDiagnosticItem({
   );
 }
 
-function SubDiagnosticAnnotationItem({
-  prefix,
-  message,
-  annotation,
-  currentFilePath,
-  onGoTo,
-}: {
-  prefix?: string;
-  message: string;
-  annotation: SubDiagnosticAnnotation;
-  currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
-}) {
-  const location = annotation.location;
-  if (location == null) {
-    return (
-      <span>
-        {prefix}
-        {message}
-      </span>
-    );
-  }
+function toDisplayDiagnosticDetail(
+  item: DiagnosticDetailInput<DiagnosticLocation>,
+  currentFilePath: string | null,
+  onGoTo: (location: DiagnosticLocation) => void,
+) {
+  return createDiagnosticDetail(item, (location) => {
+    const { line, column } = location.range.start;
 
-  const start = location.range.start;
-  const locationLabel =
-    location.path === currentFilePath
-      ? `[Ln ${start.line}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.line}, Col ${start.column}]`;
-
-  return (
-    <>
-      {prefix}
-      {message}{" "}
-      <button
-        onClick={() => onGoTo(location)}
-        className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-      >
-        {locationLabel}
-      </button>
-    </>
-  );
+    return {
+      line,
+      column,
+      displayPath:
+        location.path === currentFilePath ? undefined : location.path,
+      onGoTo: () => onGoTo(location),
+    };
+  });
 }
 
 export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
@@ -261,7 +273,7 @@ export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
 
 export function formatSubDiagnosticAnnotation(
   subDiagnostic: SubDiagnostic,
-  annotation: SubDiagnosticAnnotation,
+  annotation: DiagnosticAnnotation,
   includeSubDiagnosticMessage = annotation.primary,
 ): string {
   if (annotation.message == null) {

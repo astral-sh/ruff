@@ -276,6 +276,11 @@ impl Diagnostic {
             .find(|ann| ann.is_primary)
     }
 
+    /// Returns all annotations in the order in which they were added.
+    pub fn annotations(&self) -> &[Annotation] {
+        &self.inner.annotations
+    }
+
     /// Returns a mutable borrow of all annotations of this diagnostic.
     pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
         Arc::make_mut(&mut self.inner).annotations.iter_mut()

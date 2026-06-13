@@ -17,13 +17,14 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { Theme } from "shared";
+import { secondaryAnnotationsWithMessages, Theme } from "shared";
 import {
   Hint,
   Position as TyPosition,
   Range as TyRange,
   SemanticToken,
   Severity,
+  type DiagnosticAnnotation,
   type Workspace,
   CompletionKind,
   type FileHandle,
@@ -983,22 +984,38 @@ class PlaygroundServer
   private diagnosticRelatedInformation(
     diagnostic: Diagnostic,
   ): editor.IRelatedInformation[] {
-    return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
-      return subDiagnostic.annotations.flatMap((annotation) => {
-        const location = annotation.location;
+    const secondaryAnnotations = secondaryAnnotationsWithMessages(
+      diagnostic.annotations,
+    ).flatMap((annotation) =>
+      this.diagnosticAnnotationRelatedInformation(
+        annotation,
+        annotation.message,
+      ),
+    );
 
-        if (location == null) {
-          return [];
-        }
+    const subDiagnosticAnnotations = diagnostic.subDiagnostics.flatMap(
+      (subDiagnostic) =>
+        subDiagnostic.annotations.flatMap((annotation) =>
+          this.diagnosticAnnotationRelatedInformation(
+            annotation,
+            formatSubDiagnosticAnnotation(subDiagnostic, annotation),
+          ),
+        ),
+    );
 
-        return [
-          {
-            message: formatSubDiagnosticAnnotation(subDiagnostic, annotation),
-            ...this.mapLocation(location),
-          },
-        ];
-      });
-    });
+    return secondaryAnnotations.concat(subDiagnosticAnnotations);
+  }
+
+  private diagnosticAnnotationRelatedInformation(
+    annotation: DiagnosticAnnotation,
+    message: string,
+  ): editor.IRelatedInformation[] {
+    const location = annotation.location;
+    if (location == null || message.length === 0) {
+      return [];
+    }
+
+    return [{ message, ...this.mapLocation(location) }];
   }
 
   private mapNavigationTargets(

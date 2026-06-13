@@ -1,6 +1,12 @@
-import type { Diagnostic, SubDiagnostic } from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
+import {
+  type DiagnosticDetailInput,
+  createDiagnosticDetail,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
 import { useMemo } from "react";
 import { PLAYGROUND_FILE_PATH } from "./SourceEditor";
 
@@ -74,6 +80,9 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
+          diagnostic.annotations,
+        );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
 
         const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
@@ -91,13 +100,23 @@ function Items({
                 Col {column}]
               </span>
             </button>
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(annotation, onGoTo)}
+                    />
+                  </li>
+                ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
-                    <SubDiagnosticItem
-                      subDiagnostic={subDiagnostic}
-                      onGoTo={onGoTo}
+                  <li key={`sub-diagnostic-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(subDiagnostic, onGoTo)}
                     />
                   </li>
                 ))}
@@ -110,46 +129,19 @@ function Items({
   );
 }
 
-function SubDiagnosticItem({
-  subDiagnostic,
-  onGoTo,
-}: {
-  subDiagnostic: SubDiagnostic;
-  onGoTo(line: number, column: number): void;
-}) {
-  const location = subDiagnostic.location;
+function toDisplayDiagnosticDetail(
+  item: DiagnosticDetailInput<DiagnosticLocation>,
+  onGoTo: (line: number, column: number) => void,
+) {
+  return createDiagnosticDetail(item, (location) => {
+    const { row, column } = location.start_location;
+    const isCurrentFile = location.path === PLAYGROUND_FILE_PATH;
 
-  if (location == null) {
-    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
-  }
-
-  const start = location.start_location;
-  const locationLabel =
-    location.path === PLAYGROUND_FILE_PATH
-      ? `[Ln ${start.row}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
-
-  return (
-    <>
-      {subDiagnostic.severity}:{" "}
-      {location.path === PLAYGROUND_FILE_PATH ? (
-        <button
-          onClick={() => onGoTo(start.row, start.column)}
-          className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-        >
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </button>
-      ) : (
-        <span>
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </span>
-      )}
-    </>
-  );
-}
-
-function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
-  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+    return {
+      line: row,
+      column,
+      displayPath: isCurrentFile ? undefined : location.path,
+      onGoTo: isCurrentFile ? () => onGoTo(row, column) : undefined,
+    };
+  });
 }
