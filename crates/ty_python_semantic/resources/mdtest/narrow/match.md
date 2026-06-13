@@ -1002,7 +1002,7 @@ def _(value: FinalPatternInt):
     match value:
         case 1 as captured:
             reveal_type(value)  # revealed: FinalPatternInt
-            reveal_type(captured)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(captured)  # revealed: FinalPatternInt
 
     match value:
         case PatternValues.ONE:
