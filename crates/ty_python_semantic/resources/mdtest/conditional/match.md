@@ -291,6 +291,20 @@ def _(subj: int | abc.Callable[..., str]) -> None:
             y = 3
 
     reveal_type(y)  # revealed: Literal[2, 3]
+
+def callable_then_int(subj: abc.Callable[..., str] | int) -> int:
+    match subj:
+        case abc.Callable():
+            return 1
+        case int():
+            return 2
+
+def int_then_callable(subj: abc.Callable[..., str] | int) -> int:
+    match subj:
+        case int():
+            return 1
+        case abc.Callable():
+            return 2
 ```
 
 ### With arguments
@@ -336,6 +350,15 @@ def _(target: Point | Other):
             reveal_type(target)  # revealed: Point
         case Other():
             reveal_type(target)  # revealed: Other
+
+def ordered_or_class_pattern_preserves_fallthrough(target: Point):
+    y = 1
+
+    match target:
+        case Point(missing=_) | Other():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Singleton match
