@@ -1156,7 +1156,7 @@ nested pattern consumes that attribute's full static type. Positional patterns f
 `__match_args__`, including attributes supplied by a metaclass.
 
 ```py
-from typing import Literal, final
+from typing import Literal, Protocol, final, runtime_checkable
 
 def builtin_match_self_patterns_are_exhaustive(
     value: tuple[
@@ -1326,6 +1326,21 @@ def nested_proper_non_final_subclass_is_not_exhaustive(
 ) -> int:
     match value:
         case [BaseWithX(x=_)]:
+            return 1
+
+@runtime_checkable
+class RuntimeProtocolWithX(Protocol):
+    x: int
+
+class RuntimeProtocolImplementer:
+    x: int = 0
+
+def runtime_protocol_pattern_is_not_exhaustive_for_non_final_implementer(
+    value: RuntimeProtocolImplementer,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case RuntimeProtocolWithX(x=_):
             return 1
 
 class BaseWithoutX: ...
