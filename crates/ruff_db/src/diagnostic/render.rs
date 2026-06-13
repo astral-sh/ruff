@@ -117,7 +117,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 FullRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Azure => {
-                AzureRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                AzureRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Json => {
@@ -130,23 +130,24 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Rdjson => {
-                rdjson::RdjsonRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                rdjson::RdjsonRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Pylint => {
-                PylintRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                PylintRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
-                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                gitlab::GitlabRenderer::new(self.resolver, self.config)
+                    .render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, self.config.program)
-                    .render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, self.config).render(f, self.diagnostics)?;
             }
         }
 
@@ -247,6 +248,10 @@ impl<'a> ResolvedDiagnostic<'a> {
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
             )
+        } else if config.preview {
+            // In preview, Ruff shows both the severity and the human-readable name, so we don't
+            // need a colon.
+            diag.id().to_string()
         } else {
             diag.secondary_code_or_id().to_string()
         };
@@ -2827,7 +2832,7 @@ watermelon
         }
 
         /// Set the secondary code on the diagnostic.
-        fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
+        pub(super) fn secondary_code(mut self, secondary_code: &str) -> DiagnosticBuilder<'e> {
             self.diag
                 .set_secondary_code(SecondaryCode::new(secondary_code.to_string()));
             self
