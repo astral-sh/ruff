@@ -77,19 +77,20 @@ fn has_exact_builtin_membership_semantics(expr: &ast::Expr) -> bool {
     )
 }
 
-/// Return whether membership is known to compare the subject against iterable values.
+/// Return whether the iterable type can be used to filter broad membership union arms.
 ///
 /// Tuple subclasses are assumed to preserve tuple containment semantics, just as they are assumed
-/// to preserve tuple equality semantics. Other nominal types must be final so that a runtime
-/// subclass cannot introduce an arbitrary `__contains__` implementation.
-fn has_elementwise_membership_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+/// to preserve tuple equality semantics. Other nominal types must be final, and an inherited
+/// built-in `__contains__` method cannot be paired with an overridden iterator whose element type
+/// no longer describes the values searched by containment.
+fn can_filter_membership_union_arms<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
 
     match ty {
         Type::Union(union) => union
             .elements(db)
             .iter()
-            .all(|element| has_elementwise_membership_semantics(db, *element)),
+            .all(|element| can_filter_membership_union_arms(db, *element)),
         Type::LiteralValue(literal) => matches!(
             literal.kind(),
             LiteralValueTypeKind::String(_)
@@ -101,6 +102,7 @@ fn has_elementwise_membership_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> 
         Type::NominalInstance(instance) if instance.class(db).is_final(db) => {
             // Walk the MRO to preserve the identity of the class that defines `__contains__`;
             // normal member lookup specializes inherited method signatures for the subclass.
+            let mut overrides_iteration = false;
             for base in instance.class(db).iter_mro(db) {
                 let class = match base {
                     ClassBase::Class(class) => class,
@@ -113,20 +115,23 @@ fn has_elementwise_membership_semantics<'db>(db: &'db dyn Db, ty: Type<'db>) -> 
                     .own_class_member(db, None, "__contains__")
                     .is_undefined()
                 {
+                    overrides_iteration |=
+                        !class.own_class_member(db, None, "__iter__").is_undefined();
                     continue;
                 }
-                return matches!(
-                    class.known(db),
-                    Some(
-                        KnownClass::Str
-                            | KnownClass::Bytes
-                            | KnownClass::Bytearray
-                            | KnownClass::List
-                            | KnownClass::Set
-                            | KnownClass::FrozenSet
-                            | KnownClass::Dict
-                    )
-                );
+                return !overrides_iteration
+                    && matches!(
+                        class.known(db),
+                        Some(
+                            KnownClass::Str
+                                | KnownClass::Bytes
+                                | KnownClass::Bytearray
+                                | KnownClass::List
+                                | KnownClass::Set
+                                | KnownClass::FrozenSet
+                                | KnownClass::Dict
+                        )
+                    );
             }
             true
         }
@@ -1266,7 +1271,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .homogeneous_element_type(self.db);
             let can_filter_broad_arms = rhs_expr
                 .is_some_and(has_exact_builtin_membership_semantics)
-                || has_elementwise_membership_semantics(self.db, rhs_ty);
+                || can_filter_membership_union_arms(self.db, rhs_ty);
 
             let mut builder = UnionBuilder::new(self.db);
 

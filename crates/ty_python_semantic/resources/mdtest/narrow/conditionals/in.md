@@ -301,6 +301,41 @@ class FinalIterable:
 def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
+
+@final
+class OverridesBuiltinIteration(list[object]):
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def inherited_builtin_contains(
+    x: Payload | Literal["missing"],
+    values: OverridesBuiltinIteration,
+):
+    if x in values:
+        # `list.__contains__` searches the stored values, not those produced by the override.
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+```
+
+## Custom containment methods on tuple subclasses
+
+Tuple subclasses are currently assumed to preserve tuple containment semantics, just as they are
+assumed to preserve tuple equality semantics. A custom `__contains__` method can violate that
+assumption:
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContainsEverything(tuple[Literal["missing"], ...]):
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_tuple_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+    if x in values:
+        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
+        reveal_type(x)  # revealed: Literal["missing"]
 ```
 
 ## No present-key narrowing without a `TypedDict`
