@@ -319,6 +319,40 @@ fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
 }
 
 #[test]
+fn cycle_recovery_overlays_union_marker_with_finite_counterpart() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let marker_or_int = UnionType::from_elements(&db, [Type::divergent(binder_id), int]);
+    let marker_tuple = Type::heterogeneous_tuple(&db, [marker_or_int, int]);
+    let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
+    let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
+
+    assert_eq!(
+        overlay_cycle_marker(&db, marker_tuple, finite_tuple),
+        Some(marked_finite_tuple)
+    );
+}
+
+#[test]
+fn cycle_recovery_overlays_cycle_marked_counterpart() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let marked_int = Type::cycle_marked(&db, binder_id, int);
+    let marker_or_marked_int =
+        UnionType::from_elements(&db, [marked_int, Type::divergent(binder_id)]);
+    let marker_tuple = Type::heterogeneous_tuple(&db, [marker_or_marked_int, int]);
+    let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
+    let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
+
+    assert_eq!(
+        overlay_cycle_marker(&db, marker_tuple, marked_finite_tuple),
+        Some(marked_finite_tuple)
+    );
+}
+
+#[test]
 fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);

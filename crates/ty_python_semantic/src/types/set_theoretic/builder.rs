@@ -321,6 +321,16 @@ impl CycleFusionOverlay {
         marker: Type<'db>,
         finite: Type<'db>,
     ) -> Option<Type<'db>> {
+        // `CycleMarked<T>` is transparent, but its binder is the marker we are preserving.
+        if let Type::CycleMarked(marked) = marker {
+            self.add_divergent_id(marked.binder_id(db));
+            return self.overlay_type(db, marked.inner(db), finite);
+        }
+        if let Type::CycleMarked(marked) = finite {
+            self.add_divergent_id(marked.binder_id(db));
+            return self.overlay_type(db, marker, marked.inner(db));
+        }
+
         if marker == finite {
             return Some(marker);
         }
@@ -336,7 +346,9 @@ impl CycleFusionOverlay {
                 let mut elements = Vec::with_capacity(union.elements(db).len() + 1);
                 for element in union.elements(db) {
                     let summary = CycleFusionSummary::collect(db, *element);
-                    if summary.divergent_id.get().is_some() {
+                    if summary.divergent_id.get().is_some()
+                        || matches!(element, Type::CycleMarked(_))
+                    {
                         elements.push(self.overlay_type(db, *element, finite)?);
                     } else if summary.is_finite_cycle_fusion_target() {
                         elements.push(*element);
@@ -392,6 +404,15 @@ impl CycleFusionOverlay {
             .collect::<Option<Vec<_>>>()?;
         Some(Type::heterogeneous_tuple(db, elements))
     }
+}
+
+/// Recover a finite shape from a marker-tainted candidate while preserving the marker.
+pub(in crate::types) fn overlay_cycle_marker<'db>(
+    db: &'db dyn Db,
+    marker_candidate: Type<'db>,
+    finite_candidate: Type<'db>,
+) -> Option<Type<'db>> {
+    CycleFusionOverlay::build(db, marker_candidate, finite_candidate)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
