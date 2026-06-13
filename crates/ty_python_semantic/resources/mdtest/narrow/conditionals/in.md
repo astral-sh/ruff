@@ -218,6 +218,50 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
+## Known equality semantics
+
+Broad union arms can be excluded from the positive branch when their equality implementation is
+known and cannot compare equal to any right-hand-side value:
+
+```py
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+@final
+class Token: ...
+
+@final
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def typed_dict(x: Payload | Literal["missing"]):
+    if x in ("missing",):
+        reveal_type(x)  # revealed: Literal["missing"]
+    else:
+        reveal_type(x)  # revealed: Payload
+
+def identity_equality(x: Token | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: Token
+
+def overlapping_union_member(x: int | Literal["missing"]):
+    if x in ("missing", 1):
+        reveal_type(x)  # revealed: Literal["missing"] | int
+    else:
+        reveal_type(x)  # revealed: int
+
+def custom_equality(x: AlwaysEqual | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1] | AlwaysEqual
+    else:
+        reveal_type(x)  # revealed: AlwaysEqual
+```
+
 ## No present-key narrowing without a `TypedDict`
 
 We only synthesize a key-access protocol for string membership tests on right-hand-side values that

@@ -1177,6 +1177,53 @@ fn benchmark_literal_equality_fallthrough_guarded_any(criterion: &mut Criterion)
     );
 }
 
+/// Benchmarks compatibility checks for membership narrowing with custom equality methods.
+///
+/// Each broad union arm may compare equal to the first literal in the right-hand-side tuple. The
+/// compatibility probe should therefore short-circuit instead of exhaustively evaluating every
+/// pair or constructing narrowing constraints that its caller discards.
+fn benchmark_membership_comparison_compatibility(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 40;
+    const NUM_VALUES: usize = 40;
+
+    setup_rayon();
+
+    let mut code = "from typing import Literal, final\n\n".to_string();
+    for index in 0..NUM_CLASSES {
+        writeln!(
+            &mut code,
+            "@final\nclass C{index}:\n    def __eq__(self, other: object) -> bool:\n        return True\n"
+        )
+        .ok();
+    }
+
+    code.push_str("Value = Literal[");
+    for index in 0..NUM_VALUES {
+        write!(&mut code, "\"v{index}\", ").ok();
+    }
+    code.push(']');
+    for index in 0..NUM_CLASSES {
+        write!(&mut code, " | C{index}").ok();
+    }
+    code.push_str("\n\ndef check(value: Value) -> None:\n    if value in (");
+    for index in 0..NUM_VALUES {
+        write!(&mut code, "\"v{index}\", ").ok();
+    }
+    code.push_str("):\n        repr(value)\n");
+
+    criterion.bench_function("ty_micro[membership_comparison_compatibility]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn benchmark_literal_fallthrough(criterion: &mut Criterion, name: &str, code: &str) {
     setup_rayon();
 
@@ -1523,6 +1570,7 @@ criterion_group!(
     benchmark_literal_match_fallthrough,
     benchmark_literal_match_fallthrough_guarded_any,
     benchmark_literal_equality_fallthrough_guarded_any,
+    benchmark_membership_comparison_compatibility,
     benchmark_typeis_narrowing,
     benchmark_pandas_tdd,
     benchmark_recursive_typed_dict_union_contextual_inference,
