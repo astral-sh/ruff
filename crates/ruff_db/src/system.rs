@@ -124,17 +124,6 @@ pub trait System: Debug + Sync + Send {
         self.path_metadata(path).is_ok()
     }
 
-    /// Returns `true` if `path` exists on disk using the exact casing as specified in `path` for the parts after `prefix`.
-    ///
-    /// This is the same as [`Self::path_exists`] on case-sensitive systems.
-    ///
-    /// ## The use of prefix
-    ///
-    /// Prefix is only intended as an optimization for systems that can't efficiently check
-    /// if an entire path exists with the exact casing as specified in `path`. However,
-    /// implementations are allowed to check the casing of the entire path if they can do so efficiently.
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool;
-
     /// Returns the [`CaseSensitivity`] of the system's file system.
     fn case_sensitivity(&self) -> CaseSensitivity;
 
@@ -341,7 +330,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize)]
 pub enum FileType {
     File,
     Directory,
