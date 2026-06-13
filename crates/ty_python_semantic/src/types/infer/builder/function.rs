@@ -135,7 +135,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for parameter in &function.parameters {
             let definition = self.index.expect_single_definition(parameter);
             let inference = infer_parameter_types_untracked(db, definition);
-            self.extend_definition(&inference);
+            self.extend_definition(definition, &inference);
         }
 
         validate_paramspec_components(&self.context, &function.parameters, |expr| {
