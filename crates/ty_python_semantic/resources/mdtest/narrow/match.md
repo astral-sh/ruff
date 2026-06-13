@@ -558,6 +558,29 @@ arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow
 In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
 rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
 
+A final subclass with inherited builtin equality can compare equal to a literal despite being
+disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
+
+```py
+from typing import Final, final
+
+@final
+class FinalPatternInt(int): ...
+
+class PatternValues:
+    ONE: Final = 1
+
+def _(value: FinalPatternInt):
+    match value:
+        case 1 as captured:
+            reveal_type(value)  # revealed: FinalPatternInt
+            reveal_type(captured)  # revealed: @Todo(`match` pattern definition types)
+
+    match value:
+        case PatternValues.ONE:
+            reveal_type(value)  # revealed: FinalPatternInt
+```
+
 More examples follow.
 
 ```py

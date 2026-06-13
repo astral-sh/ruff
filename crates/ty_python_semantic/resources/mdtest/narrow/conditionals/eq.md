@@ -492,6 +492,51 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[2]
 ```
 
+## Final subclasses of scalar builtins
+
+Final subclasses can inherit the equality behavior of `int`, `str`, or `bytes`. Instances of these
+subclasses can compare equal to builtin literals even though the subclass and literal types are
+disjoint, so equality does not narrow the subclass to the literal type.
+
+```py
+from typing import final
+
+@final
+class FinalInt(int): ...
+
+@final
+class FinalStr(str): ...
+
+@final
+class FinalBytes(bytes): ...
+
+def _(value: FinalInt):
+    if value == 1:
+        reveal_type(value)  # revealed: FinalInt
+    else:
+        reveal_type(value)  # revealed: FinalInt
+
+    if 1 == value:
+        reveal_type(value)  # revealed: FinalInt
+
+    if value != 1:
+        reveal_type(value)  # revealed: FinalInt
+    else:
+        reveal_type(value)  # revealed: FinalInt
+
+def _(value: FinalStr):
+    if value == "value":
+        reveal_type(value)  # revealed: FinalStr
+    else:
+        reveal_type(value)  # revealed: FinalStr
+
+def _(value: FinalBytes):
+    if value == b"value":
+        reveal_type(value)  # revealed: FinalBytes
+    else:
+        reveal_type(value)  # revealed: FinalBytes
+```
+
 ## Narrowing `LiteralString` in union
 
 ```py
