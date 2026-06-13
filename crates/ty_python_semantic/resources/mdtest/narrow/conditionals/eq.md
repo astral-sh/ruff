@@ -122,6 +122,89 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+An assigned enum construction hook can replace the value declared in the class body. In that case,
+we cannot compare an enum member with its declared value statically:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import EnumMeta, StrEnum
+from typing import Any, Literal, cast
+
+def external_new(cls: type[Any], value: object) -> Any: ...
+def external_init(self: Any, value: object) -> None: ...
+def external_prepare(*args: Any, **kwargs: Any) -> Any: ...
+
+class OpaqueNew(StrEnum):
+    __new__ = cast(Any, staticmethod(external_new))
+
+    MEMBER = "member"
+
+class OpaqueInit(StrEnum):
+    __init__ = cast(Any, external_init)
+
+    MEMBER = "member"
+
+class OpaqueMeta(EnumMeta):
+    __prepare__ = cast(Any, external_prepare)
+
+class TransformedByMeta(StrEnum, metaclass=OpaqueMeta):
+    MEMBER = "member"
+
+def opaque_new(value: Literal[OpaqueNew.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: OpaqueNew | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: OpaqueNew
+
+def opaque_init(value: Literal[OpaqueInit.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: OpaqueInit | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: OpaqueInit
+
+def transformed_by_metaclass(value: Literal[TransformedByMeta.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: TransformedByMeta | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: TransformedByMeta
+```
+
+An opaque `_generate_next_value_` affects `auto()` members, but explicit members still have their
+declared values:
+
+```py
+from enum import StrEnum, auto
+from typing import Any, Literal, cast
+
+def external_generate_next_value(*args: Any) -> Any: ...
+
+class OpaqueGenerator(StrEnum):
+    _generate_next_value_ = cast(Any, staticmethod(external_generate_next_value))
+
+    AUTOMATIC = auto()
+    EXPLICIT = "explicit"
+
+def opaque_generated_value(
+    value: Literal[OpaqueGenerator.AUTOMATIC] | Literal["automatic"],
+):
+    if value == "automatic":
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.AUTOMATIC, "automatic"]
+    else:
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.AUTOMATIC]
+
+def explicit_value(
+    value: Literal[OpaqueGenerator.EXPLICIT] | Literal["other"],
+):
+    if value == "explicit":
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT]
+    else:
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT, "other"]
+```
+
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
 
 ```py
