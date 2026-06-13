@@ -8,6 +8,7 @@ use ruff_db::{
 use ruff_python_ast as ast;
 use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_text_size::{Ranged, TextRange};
+use salsa::plumbing::AsId;
 use std::cell::RefCell;
 
 use crate::{
@@ -22,8 +23,9 @@ use crate::{
         ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
         GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
         MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        RecursiveTypeNormalization, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        binding_type,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -47,6 +49,7 @@ use crate::{
         known_instance::DeprecatedInstance,
         member::{Member, class_member},
         mro::{Mro, MroIterator},
+        recursive::BinderId,
         signatures::CallableSignature,
         tuple::{FixedLengthTuple, Tuple},
         typed_dict::{TypedDictParams, TypedDictType, typed_dict_params_from_class_def},
@@ -2345,21 +2348,24 @@ impl<'db> StaticClassLiteral<'db> {
                 continue;
             }
 
-            let scope_for_reachability_analysis = {
+            let scope_for_reachability_analysis_id = {
                 if binding_scope.node().as_function().is_some() {
-                    binding_scope
+                    attribute_binding_scope_id
                 } else if binding_scope.is_eager() {
+                    let mut eager_scope_parent_id = attribute_binding_scope_id;
                     let mut eager_scope_parent = binding_scope;
                     while eager_scope_parent.is_eager()
-                        && let Some(parent) = eager_scope_parent.parent()
+                        && let Some(parent_id) = eager_scope_parent.parent()
                     {
-                        eager_scope_parent = index.scope(parent);
+                        eager_scope_parent_id = parent_id;
+                        eager_scope_parent = index.scope(parent_id);
                     }
-                    eager_scope_parent
+                    eager_scope_parent_id
                 } else {
-                    binding_scope
+                    attribute_binding_scope_id
                 }
             };
+            let scope_for_reachability_analysis = index.scope(scope_for_reachability_analysis_id);
 
             // The attribute assignment inherits the reachability of the method which contains it
             let is_method_reachable =
@@ -2511,6 +2517,12 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
+                    let inferred_ty = replace_resolved_loop_header_markers(
+                        db,
+                        scope_for_reachability_analysis_id
+                            .to_scope_id(db, class_body_scope.file(db)),
+                        inferred_ty,
+                    );
                     provenance = provenance.or(Provenance::SingleDefinition(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
@@ -3211,6 +3223,75 @@ fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>
     names.sort_unstable();
     names.dedup();
     names.into_boxed_slice()
+}
+
+/// Replace provisional loop-header markers that have converged to a type without that marker.
+///
+/// Attribute inference reads assignment types independently, which can observe a loop-header marker
+/// before that loop header's own cycle recovery has finished. If the loop-header binding still
+/// contains its marker, keep it as recursive structure.
+fn replace_resolved_loop_header_markers<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    mut ty: Type<'db>,
+) -> Type<'db> {
+    let table = place_table(db, scope);
+    let use_def = use_def_map(db, scope);
+    let mut seen = FxIndexSet::default();
+
+    let mut replace_from_binding = |binding: DefinitionState<'db>| {
+        let DefinitionState::Defined(definition) = binding else {
+            return;
+        };
+        if !matches!(definition.kind(db), DefinitionKind::LoopHeader(_)) {
+            return;
+        }
+
+        let binder_id = BinderId::new(definition.as_id());
+        if !seen.insert(binder_id) {
+            return;
+        }
+
+        let normalization = RecursiveTypeNormalization::new(Type::divergent(binder_id.into_id()));
+        if !normalization.contains_marker(db, ty) {
+            return;
+        }
+
+        let replacement = binding_type(db, definition);
+        if normalization.contains_marker(db, replacement) {
+            return;
+        }
+
+        let mapping = TypeMapping::ReplaceDivergent {
+            binder_id,
+            replacement,
+        };
+        ty = match ty {
+            Type::Recursive(recursive) if recursive.binder(db) == binder_id => recursive
+                .body(db)
+                .apply_type_mapping(db, &mapping, TypeContext::default()),
+            _ => ty.apply_type_mapping(db, &mapping, TypeContext::default()),
+        };
+    };
+
+    for symbol in table.symbols() {
+        let Some(place_id) = table.place_id(symbol) else {
+            continue;
+        };
+        for binding in use_def.reachable_bindings(place_id) {
+            replace_from_binding(binding.binding);
+        }
+    }
+    for member in table.members() {
+        let Some(place_id) = table.place_id(member) else {
+            continue;
+        };
+        for binding in use_def.reachable_bindings(place_id) {
+            replace_from_binding(binding.binding);
+        }
+    }
+
+    ty
 }
 
 fn implicit_attribute_cycle_recover<'db>(
