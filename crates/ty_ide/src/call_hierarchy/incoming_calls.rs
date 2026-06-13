@@ -1,6 +1,6 @@
 use crate::call_hierarchy::{CalleeLeaf, module_detail};
 use crate::goto::{Definitions, GotoTarget, find_goto_target};
-use crate::references::{contains_identifier, has_any_external_visible_definitions};
+use crate::references::has_any_external_visible_definitions;
 use crate::{CallHierarchyItem, Db, SymbolKind};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -14,7 +14,9 @@ use rustc_hash::FxHashMap;
 use ty_python_core::scope::{NodeWithScopeKind, ScopeKind};
 use ty_python_semantic::types::ide_support::static_member_type_for_attribute;
 use ty_python_semantic::types::{PropertyAccessorRole, Type};
-use ty_python_semantic::{HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel};
+use ty_python_semantic::{
+    HasDefinition as _, HasType as _, ImportAliasResolution, SemanticModel, contains_identifier,
+};
 
 /// Find every place in the project that calls the symbol at `offset`, grouped
 /// by enclosing function/method/class/module.
