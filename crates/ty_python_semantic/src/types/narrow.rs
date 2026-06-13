@@ -1573,6 +1573,83 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
+    fn evaluate_syntactic_singleton_identity_compare(
+        &mut self,
+        expr_compare: &ast::ExprCompare,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        fn directly_narrowable_ast(expr: &ast::Expr) -> bool {
+            // Named expressions can contain complex targets like `(x := t[0])`, where the value
+            // expression may also narrow an outer place.
+            matches!(expr, ast::Expr::Name(_) | ast::Expr::Attribute(_))
+        }
+
+        fn syntactic_singleton_type<'db>(db: &'db dyn Db, expr: &ast::Expr) -> Option<Type<'db>> {
+            match expr.expression_value() {
+                ast::Expr::NoneLiteral(_) => Some(Type::none(db)),
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                    Some(Type::bool_literal(*value))
+                }
+                _ => None,
+            }
+        }
+
+        fn identity_constraint<'db>(
+            db: &'db dyn Db,
+            singleton_ty: Type<'db>,
+            op: ast::CmpOp,
+            is_positive: bool,
+        ) -> Option<NarrowingConstraint<'db>> {
+            let op = if is_positive { op } else { op.negate() };
+            let ty = match op {
+                ast::CmpOp::Is => singleton_ty,
+                ast::CmpOp::IsNot => singleton_ty.negate(db),
+                _ => return None,
+            };
+            Some(NarrowingConstraint::intersection(ty))
+        }
+
+        let comparator_tuples = std::iter::once(&*expr_compare.left)
+            .chain(&expr_compare.comparators)
+            .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
+        let mut constraints = NarrowingConstraints::default();
+        let mut handled_any = false;
+
+        for (op, (left, right)) in std::iter::zip(&*expr_compare.ops, comparator_tuples) {
+            let mut handled_pair = false;
+
+            if directly_narrowable_ast(left)
+                && let Some(singleton_ty) = syntactic_singleton_type(self.db, right)
+                && let Some(constraint) =
+                    identity_constraint(self.db, singleton_ty, *op, is_positive)
+                && let Some(narrowable) = PlaceExpr::try_from_expr(left)
+            {
+                let place = self.expect_place(&narrowable);
+                insert_narrowing_constraint(&mut constraints, place, constraint);
+                handled_any = true;
+                handled_pair = true;
+            }
+
+            if directly_narrowable_ast(right)
+                && let Some(singleton_ty) = syntactic_singleton_type(self.db, left)
+                && let Some(constraint) =
+                    identity_constraint(self.db, singleton_ty, *op, is_positive)
+                && let Some(narrowable) = PlaceExpr::try_from_expr(right)
+            {
+                let place = self.expect_place(&narrowable);
+                insert_narrowing_constraint(&mut constraints, place, constraint);
+                handled_any = true;
+                handled_pair = true;
+            }
+
+            if !handled_pair {
+                return None;
+            }
+        }
+
+        handled_any.then_some(constraints)
+    }
+
     fn evaluate_expr_compare(
         &mut self,
         expr_compare: &ast::ExprCompare,
@@ -1683,6 +1760,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // For example, the negation of  `x is 1 is y is 2`, would be `(x is not 1) or (y is not 1) or (y is not 2)`
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
+        }
+
+        if let Some(constraints) =
+            self.evaluate_syntactic_singleton_identity_compare(expr_compare, is_positive)
+        {
+            return Some(constraints);
         }
 
         let inference = infer_expression_types(self.db, expression, TypeContext::default());

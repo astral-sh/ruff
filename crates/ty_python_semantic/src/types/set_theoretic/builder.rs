@@ -1097,6 +1097,48 @@ impl<'db> UnionBuilder<'db> {
             && preferred.erase_cycle_marks(db) == other.erase_cycle_marks(db)
     }
 
+    fn cycle_recovery_representative_covers(
+        db: &'db dyn Db,
+        preferred: Type<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        // Cycle recovery must not start relation queries while normalizing a union. Only compare
+        // top-level representatives and direct union elements.
+        fn top_level_cycle_marked_inner<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+            match ty {
+                Type::CycleMarked(marked) => Some(marked.inner(db)),
+                _ => None,
+            }
+        }
+
+        fn union_elements<'db>(db: &'db dyn Db, ty: Type<'db>) -> SmallVec<[Type<'db>; 2]> {
+            ty.as_union().map_or_else(
+                || smallvec::smallvec![ty],
+                |union| SmallVec::from_slice(union.elements(db)),
+            )
+        }
+
+        let preferred_inner = top_level_cycle_marked_inner(db, preferred);
+        let other_inner = top_level_cycle_marked_inner(db, other);
+        let preferred_repr = preferred_inner.unwrap_or(preferred);
+        let other_repr = other_inner.unwrap_or(other);
+
+        let preferred_elements = union_elements(db, preferred_repr);
+        let other_elements = union_elements(db, other_repr);
+        if preferred_elements.len() == other_elements.len()
+            && preferred_elements
+                .iter()
+                .all(|preferred| other_elements.contains(preferred))
+        {
+            return true;
+        }
+
+        preferred_inner.is_some()
+            && preferred_elements.len() > 1
+            && other_elements.len() == 1
+            && preferred_elements.contains(&other_repr)
+    }
+
     fn cycle_fusion_candidate(
         db: &'db dyn Db,
         cycle_recovery: bool,
@@ -1148,6 +1190,19 @@ impl<'db> UnionBuilder<'db> {
 
             if ty == element_type {
                 return;
+            }
+
+            if self.cycle_recovery
+                && Self::cycle_recovery_representative_covers(self.db, element_type, ty)
+            {
+                return;
+            }
+
+            if self.cycle_recovery
+                && Self::cycle_recovery_representative_covers(self.db, ty, element_type)
+            {
+                to_remove.push(i);
+                continue;
             }
 
             if let Some(fused) =
