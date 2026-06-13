@@ -1594,6 +1594,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) -> Option<Type<'db>> {
         if let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(self.db) {
             let key_ty = key_ty.resolve_type_alias(self.db);
+            let typed_dict_key_ty = typed_dict.key_type(self.db);
+            if typed_dict_key_ty.is_never()
+                || !may_compare_equal(self.db, typed_dict_key_ty, key_ty)
+            {
+                return None;
+            }
             if let Some(key) = key_ty.as_string_literal() {
                 return typed_dict
                     .item(self.db, key.value(self.db))

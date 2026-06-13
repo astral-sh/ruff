@@ -812,6 +812,16 @@ class ClosedBoolPayload(TypedDict, closed=True):
     tag: Literal["bool"]
     value: bool
 
+class ClosedPayload(TypedDict, closed=True):
+    x: int
+
+def test_match_closed_typed_dict_rejects_non_string_key(
+    value: ClosedPayload,
+) -> None:
+    match value:
+        case {1: item}:
+            reveal_type(item)  # revealed: Never
+
 def test_match_closed_typed_dict_rest(value: ClosedIntPayload) -> None:
     match value:
         case {"tag": "int", **rest}:
