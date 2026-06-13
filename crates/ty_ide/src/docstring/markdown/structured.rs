@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::ops::Range;
 
 mod google;
+mod numpy;
 mod rst;
 
 use super::super::formats::Formats;
@@ -653,6 +654,7 @@ impl SectionItem {
 fn parse_blocks<'a>(raw: &'a str, formats: &Formats<'_>) -> Vec<Block<'a>> {
     let mut sections = rst::section_candidates(formats.rst());
     sections.extend(google::section_candidates(formats.google()));
+    sections.extend(numpy::section_candidates(formats.numpy()));
     sections.sort_by_key(|section| section.range.start);
     let mut blocks = Vec::new();
     let mut rendered_through = 0;
@@ -1394,12 +1396,131 @@ Args:
     }
 
     #[test]
+    fn numpy_sections_render_markdown_sections() {
+        let docstring = "\
+Summary.
+
+Parameters
+----------
+value, alias : str
+    The value.
+other
+    Another value.
+
+Returns
+-------
+result : bool
+    Whether validation passed.
+
+Yields
+------
+int
+    Next value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value, alias` (`str`): The value.
+        `other`: Another value.
+
+        ## Returns
+        `result` (`bool`): Whether validation passed.
+
+        ## Yields
+        `int`: Next value.
+        ");
+
+        let docstring = "\
+Summary.
+
+Parameters
+----------
+value: str
+    The value.
+
+Returns
+-------
+result: bool
+    Whether validation passed.
+
+Yields
+------
+item: int
+    Next value.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Parameters
+        `value` (`str`): The value.
+
+        ## Returns
+        `result` (`bool`): Whether validation passed.
+
+        ## Yields
+        `item` (`int`): Next value.
+        ");
+
+        let docstring = "\
+Summary.
+
+Returns
+-------
+list of int
+    Primary values.
+list of node-like
+    Related nodes.
+
+Yields
+------
+str
+    Next label.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_snapshot!(parsed.render_markdown_source(), @"
+        Summary.
+
+        ## Returns
+        `list of int`: Primary values.
+        `list of node-like`: Related nodes.
+
+        ## Yields
+        `str`: Next label.
+        ");
+    }
+
+    #[test]
+    fn unsupported_numpy_sections_stay_raw() {
+        let docstring = "\
+Summary.
+
+Returns
+-------
+    The created object.
+";
+        let parsed = ParsedDocstring::parse(docstring);
+
+        assert_eq!(parsed.render_markdown_source(), docstring);
+    }
+
+    #[test]
     fn indented_sections_stay_raw() {
         let docstring = "\
 Summary.
 
-    :param value: The value.
-    :returns: Another value.
+    Args:
+        value: The value.
+
+    Parameters
+    ----------
+    other : str
+        Another value.
 ";
         let parsed = ParsedDocstring::parse(docstring);
 

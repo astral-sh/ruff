@@ -1436,41 +1436,137 @@ Args:
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2, param4 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The shared parameter description<HB>
-        <HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2, param4` (`int`): The shared parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a second paragraph.<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of the shared description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
-        *args : object<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;Extra positional arguments<HB>
-        **kwargs : object<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;Extra keyword arguments<HB>
-        options.mode : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;Nested field documentation<HB>
-        π : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A Unicode parameter<HB>
+        `param3`: A parameter without type annotation<HB>
+        `*args` (`object`): Extra positional arguments<HB>
+        `**kwargs` (`object`): Extra keyword arguments<HB>
+        `options.mode` (`str`): Nested field documentation<HB>
+        `π` (`int`): A Unicode parameter<HB>
         <HB>
-        Other Parameters<HB>
-        ----------------<HB>
-        kw\\_only : str, optional<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A less commonly used keyword-only parameter<HB>
+        ## Parameters<HB>
+        `kw_only` (`str, optional`): A less commonly used keyword-only parameter<HB>
         <HB>
-        Returns<HB>
-        -------<HB>
-        str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description<HB>
+        ## Returns<HB>
+        `str`: The return value description<HB>
         <HB>
-        Yields<HB>
-        ------<HB>
-        int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The next value
+        ## Yields<HB>
+        `int`: The next value
         ");
+    }
+
+    #[test]
+    fn numpy_sections_render_edge_cases() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(
+            "\
+Attributes
+----------
+name : str
+    Display name.
+
+Raises
+------
+ValueError
+    If invalid.
+TypeError : If wrong type.
+RuntimeError : If unavailable.
+    Retry later.
+This paragraph is not an exception."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Attributes<HB>
+        `name` (`str`): Display name.<HB>
+        <HB>
+        ## Raises<HB>
+        `ValueError`: If invalid.<HB>
+        `TypeError`: If wrong type.<HB>
+        `RuntimeError`: If unavailable.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Retry later.<HB>
+        This paragraph is not an exception.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+name : str
+    Display name.
+    if name:
+        return name
+This paragraph is not a parameter.
+
+Returns
+-------
+str
+    Display result.
+This paragraph is not a return."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `name` (`str`): Display name.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;if name:<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return name<HB>
+        This paragraph is not a parameter.<HB>
+        <HB>
+        ## Returns<HB>
+        `str`: Display result.<HB>
+        This paragraph is not a return.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Parameters
+----------
+value : int
+    Example.
+    >>> value
+    1
+
+Returns
+-------
+bool
+    Done."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters<HB>
+        `value` (`int`): Example.<HB>
+        <HB>
+        ```````````python
+        >>> value
+        1
+        ```````````<HB>
+        ## Returns<HB>
+        `bool`: Done.
+        ");
+
+        let docstring = Docstring::new(
+            "\
+Returns
+-------
+Literal[\"header : value\", \"http://\"]
+    First paragraph.
+
+    Second paragraph."
+                .to_owned(),
+        );
+
+        assert_snapshot!(docstring.render_markdown(), @r#"
+        ## Returns<HB>
+        `Literal["header : value", "http://"]`: First paragraph.<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;Second paragraph.
+        "#);
     }
 
     #[test]
@@ -1599,10 +1695,8 @@ Args:
         `param1` (`str`): Google-style parameter<HB>
         `param2` (`int`): Another Google-style parameter<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param3 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters<HB>
+        `param3` (`bool`): NumPy-style parameter
         ");
     }
 
@@ -1745,12 +1839,9 @@ Args:
         `param2` (`int`): reST-style parameter<HB>
         `param3`: Another reST-style parameter<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param3 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style duplicate parameter<HB>
-        param4 : bool<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;NumPy-style parameter
+        ## Parameters<HB>
+        `param3` (`str`): NumPy-style duplicate parameter<HB>
+        `param4` (`bool`): NumPy-style parameter
         ");
     }
 
@@ -1815,20 +1906,14 @@ Args:
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation<HB>
+        `param3`: A parameter without type annotation<HB>
         <HB>
-        Returns<HB>
-        -------<HB>
-        str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;The return value description
+        ## Returns<HB>
+        `str`: The return value description
         ");
     }
 
@@ -1884,15 +1969,11 @@ Args:
         assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.<HB>
         <HB>
-        Parameters<HB>
-        ----------<HB>
-        param1 : str<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The first parameter description<HB>
-        param2 : int<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        param3<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;A parameter without type annotation
+        ## Parameters<HB>
+        `param1` (`str`): The first parameter description<HB>
+        `param2` (`int`): The second parameter description<HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
+        `param3`: A parameter without type annotation
         ");
     }
 
