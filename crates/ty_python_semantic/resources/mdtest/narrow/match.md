@@ -715,6 +715,21 @@ def test_match_builtin_match_self(
         case int(contents):
             reveal_type(contents)  # revealed: int
 
+class OverlapCaptureA: ...
+
+class OverlapCaptureB:
+    member: int
+
+class OverlapCaptureC(OverlapCaptureA, OverlapCaptureB): ...
+
+def test_match_class_capture_preserves_possible_multiple_inheritance(
+    value: OverlapCaptureA,
+) -> None:
+    match value:
+        case OverlapCaptureB(member=item) as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: OverlapCaptureA & OverlapCaptureB
+
 ```
 
 Mapping patterns use the mapping's key and value types. A successful keyed pattern can filter union
