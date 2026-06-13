@@ -1441,14 +1441,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     self.intersect_types(subject_ty, class_ty)
                 }
             }
-            Type::TypedDict(_) => {
+            Type::TypedDict(_)
                 if class.is_some_and(|class| {
                     KnownClass::Dict.is_subclass_of(self.db, ClassType::NonGeneric(class))
-                }) {
-                    subject_ty
-                } else {
-                    Type::Never
-                }
+                }) =>
+            {
+                subject_ty
             }
             _ if subject_ty.is_subtype_of(self.db, class_ty) => subject_ty,
             _ if subject_ty.is_disjoint_from(self.db, class_ty) => Type::Never,
