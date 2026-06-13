@@ -1926,28 +1926,11 @@ match subject:
         );
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [
-            ("a", 0),
-            ("b", 0),
-            ("c", 1),
-            ("d", 2),
-            ("e", 0),
-            ("f", 1),
-            ("g", 0),
-            ("h", 1),
-            ("i", 0),
-            ("j", 1),
-            ("k", 0),
-            ("l", 1),
-        ] {
+        for name in ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 
@@ -1969,15 +1952,11 @@ match 1:
         assert_eq!(names(global_table), vec!["first", "second"]);
 
         let use_def = use_def_map(&db, global_scope_id);
-        for (name, expected_index) in [("first", 0), ("second", 0)] {
+        for name in ["first", "second"] {
             let binding = use_def
                 .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
-            if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
-                assert_eq!(pattern.index(), expected_index);
-            } else {
-                panic!("Expected match pattern definition for {name}");
-            }
+            assert!(matches!(binding.kind(&db), DefinitionKind::MatchPattern(_)));
         }
     }
 
