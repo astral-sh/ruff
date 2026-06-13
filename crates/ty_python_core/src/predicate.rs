@@ -145,18 +145,6 @@ pub struct SubjectElementPatternPredicate<'db> {
     pub target: ExpressionNodeKey,
 }
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub enum ClassPatternKind {
-    Irrefutable,
-    Refutable,
-}
-
-impl ClassPatternKind {
-    pub fn is_irrefutable(self) -> bool {
-        matches!(self, ClassPatternKind::Irrefutable)
-    }
-}
-
 /// Structural details for sequence patterns that affect narrowing and reachability.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct SequencePatternPredicateKind<'db> {
@@ -271,7 +259,6 @@ impl PatternPredicateKind<'_> {
         }
     }
 }
-
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct PatternPredicate<'db> {
     pub file: File,

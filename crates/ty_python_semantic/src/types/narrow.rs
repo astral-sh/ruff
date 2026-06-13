@@ -17,6 +17,7 @@ use crate::types::{
     Parameter, Parameters, Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
     Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type,
     class_pattern_positional_sources, definite_match_pattern_type, definite_sequence_pattern_type,
+    definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     singleton_pattern_type, starred_sequence_pattern_type, typed_dict_matches_class_pattern,
 };
@@ -24,8 +25,8 @@ use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternKind, ClassPatternPredicateKind, MappingPatternPredicateKind,
-    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
+    CallableAndCallExpr, ClassPatternPredicateKind, MappingPatternPredicateKind, PatternPredicate,
+    PatternPredicateKind, Predicate, PredicateNode, SequencePatternPredicateKind,
     SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
@@ -1132,15 +1133,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
             ),
-            PatternPredicateKind::Class(kind) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_class(subject, kind.class, kind.kind(), is_positive),
-            ),
+            PatternPredicateKind::Class(kind) => {
+                PatternNarrowingResult::Possible(self.evaluate_match_pattern_class(
+                    subject,
+                    kind.class,
+                    pattern_predicate_kind,
+                    is_positive,
+                ))
+            }
             PatternPredicateKind::Mapping(kind) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_mapping(subject, kind.is_irrefutable(), is_positive),
             ),
-            PatternPredicateKind::Sequence(kind) => {
-                self.evaluate_match_pattern_sequence(subject, kind, is_positive)
-            }
+            PatternPredicateKind::Sequence(kind) => self.evaluate_match_pattern_sequence(
+                subject,
+                kind,
+                pattern_predicate_kind,
+                is_positive,
+            ),
             PatternPredicateKind::Value(expr) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_value(subject, *expr, is_positive),
             ),
@@ -1247,18 +1256,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut previous_pattern = first_pattern;
 
                 for pattern in patterns {
-                    let definitely_matched_ty = if Self::contains_class_pattern(previous_pattern) {
-                        // A class pattern can fail after its runtime type check, for example when
-                        // a protocol member is only declared but is absent at runtime. Without the
-                        // subject type, `definite_match_pattern_type` cannot distinguish those
-                        // cases, so leave the later alternative intact.
-                        Type::Never
-                    } else {
-                        definite_match_pattern_type(self.db, previous_pattern)
-                    };
                     remaining_subject_ty = IntersectionBuilder::new(self.db)
                         .add_positive(remaining_subject_ty)
-                        .add_negative(definitely_matched_ty)
+                        .add_negative(definite_match_pattern_type_for_subject(
+                            self.db,
+                            previous_pattern,
+                            remaining_subject_ty,
+                        ))
                         .build();
                     let alternative =
                         self.analyze_successful_pattern(pattern, remaining_subject_ty);
@@ -1339,22 +1343,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         evaluate_type_equality(self.db, subject_ty, value_ty, true)
             .map(|constraint| self.intersect_types(subject_ty, constraint))
             .unwrap_or(subject_ty)
-    }
-
-    fn contains_class_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
-        match pattern {
-            PatternPredicateKind::Class(..) => true,
-            PatternPredicateKind::Mapping(kind) => kind
-                .entries
-                .iter()
-                .any(|entry| Self::contains_class_pattern(&entry.pattern)),
-            PatternPredicateKind::Sequence(kind) => {
-                kind.patterns.iter().any(Self::contains_class_pattern)
-            }
-            PatternPredicateKind::Or(patterns) => patterns.iter().any(Self::contains_class_pattern),
-            PatternPredicateKind::As(Some(pattern), _) => Self::contains_class_pattern(pattern),
-            _ => false,
-        }
     }
 
     /// Narrow a class-pattern binding while keeping the original type arguments and aliases.
@@ -2797,28 +2785,44 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
-        kind: ClassPatternKind,
+        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if !kind.is_irrefutable() && !is_positive {
-            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
-            // we can still narrow the type of the match subject to `Point`. But in the negative case,
-            // we cannot exclude `Point` as a possibility.
-            return None;
-        }
-
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject);
-
+        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject_place);
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
+
+        if !is_positive {
+            if let dynamic @ Type::Dynamic(_) = class_type {
+                return Some(NarrowingConstraints::from_iter([(
+                    place,
+                    NarrowingConstraint::intersection(dynamic),
+                )]));
+            }
+
+            let subject_ty =
+                infer_same_file_expression_type(self.db, subject, TypeContext::default());
+            let definitely_matched =
+                definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
+            if definitely_matched.is_never() {
+                // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive
+                // case, we can still narrow the subject to `Point`. In the negative case, we cannot
+                // exclude `Point` as a possibility.
+                return None;
+            }
+
+            return Some(NarrowingConstraints::from_iter([(
+                place,
+                NarrowingConstraint::intersection(definitely_matched.negate(self.db)),
+            )]));
+        }
 
         let narrowed_type = match class_type {
             Type::ClassLiteral(class) => {
                 Type::instance(self.db, class.top_materialization(self.db))
-                    .negate_if(self.db, !is_positive)
             }
             Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                callable_pattern_type(self.db).negate_if(self.db, !is_positive)
+                callable_pattern_type(self.db)
             }
             dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,
@@ -2861,6 +2865,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject: Expression<'db>,
         kind: &SequencePatternPredicateKind<'db>,
+        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
@@ -2880,21 +2885,24 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             );
         }
 
-        let Some(subject) = PlaceExpr::try_from_expr(subject_node) else {
+        let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
             return PatternNarrowingResult::Possible(None);
         };
 
         let constraint = if is_positive {
             NarrowingConstraint::intersection(necessary_sequence_pattern_type(self.db, kind))
         } else {
-            let sequence_type = definite_sequence_pattern_type(self.db, kind);
+            let subject_ty =
+                infer_same_file_expression_type(self.db, subject, TypeContext::default());
+            let sequence_type =
+                definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
             if sequence_type.is_never() {
                 return PatternNarrowingResult::Possible(None);
             }
             NarrowingConstraint::intersection(sequence_type.negate(self.db))
         };
 
-        let place = self.expect_place(&subject);
+        let place = self.expect_place(&subject_place);
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place, constraint,
