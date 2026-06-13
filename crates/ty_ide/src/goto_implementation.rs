@@ -5,16 +5,16 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{
     SemanticModel, implementation_definitions_for_attribute, implementation_definitions_for_class,
-    implementation_definitions_for_method,
+    implementation_definitions_for_class_reference, implementation_definitions_for_method,
 };
 
-/// Navigate from an attribute access or method declaration to that method and known subclass overrides.
+/// Navigate from an attribute access or method declaration to that member and known subclass overrides.
 ///
-/// For an attribute access, this resolves the receiver type and returns the method implementation
-/// family for that type:
+/// For an attribute access, this resolves the receiver type and returns the implementation family
+/// for that type. The member may be a method or an attribute such as `sound: str = ...`:
 ///
 /// ```py
-/// animal.speak()
+/// animal.sound
 ///        ^^^^^
 /// ```
 ///
@@ -35,6 +35,14 @@ use ty_python_semantic::{
 ///       ^^^^^^
 ///     pass
 /// ```
+///
+/// For a reference to a class (a base class, annotation, or `Animal()`), this behaves like clicking
+/// the class declaration: the referenced class plus its known transitive subclasses.
+///
+/// ```py
+/// class Dog(Animal): ...
+///           ^^^^^^
+/// ```
 pub fn goto_implementation(
     db: &dyn Db,
     file: File,
@@ -50,6 +58,11 @@ pub fn goto_implementation(
             callable: ruff_python_ast::ExprRef::Attribute(attribute),
             ..
         } => implementation_definitions_for_attribute(&model, attribute),
+        GotoTarget::Expression(ruff_python_ast::ExprRef::Name(name))
+        | GotoTarget::Call {
+            callable: ruff_python_ast::ExprRef::Name(name),
+            ..
+        } => implementation_definitions_for_class_reference(&model, name),
         GotoTarget::FunctionDef(function) => {
             implementation_definitions_for_method(&model, function)
         }
@@ -286,7 +299,20 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:5
+          |
+        9 | dog.speak()
+          |     ^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> main.py:6:5
+          |
+        6 |     speak = 1
+          |     -----
+          |
+        ");
     }
 
     #[test]
@@ -1037,7 +1063,7 @@ class MyClass:
     }
 
     #[test]
-    fn implementation_class_reference_is_unsupported() {
+    fn implementation_class_reference_in_base_list() {
         let test = cursor_test(
             r#"
             class Animal:
@@ -1045,6 +1071,112 @@ class MyClass:
 
             class Dog(Anim<CURSOR>al):
                 pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:5:11
+          |
+        5 | class Dog(Animal):
+          |           ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_reference_in_annotation() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Dog(Animal):
+                pass
+
+            def f(x: Anim<CURSOR>al):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:8:10
+          |
+        8 | def f(x: Animal):
+          |          ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_reference_in_instantiation() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Dog(Animal):
+                pass
+
+            Anim<CURSOR>al()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:8:1
+          |
+        8 | Animal()
+          | ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_instance_reference_is_unsupported() {
+        // A bare reference to an instance is not a class reference, so it does not resolve to the
+        // class implementation family.
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Dog(Animal):
+                pass
+
+            def f(animal: Animal):
+                anim<CURSOR>al
             "#,
         );
 
@@ -1097,6 +1229,561 @@ class MyClass:
           |
         4 | class Derived(Base):
           |       -------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_family_from_base_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                sound: str = "woof"
+
+            class Cat(Animal):
+                sound: str = "meow"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:12
+           |
+        12 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 3 implementations
+         --> main.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     sound: str = "woof"
+          |     -----
+        7 |
+        8 | class Cat(Animal):
+        9 |     sound: str = "meow"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_partial_override() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                sound: str = "woof"
+
+            class Cat(Animal):
+                pass
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:12
+           |
+        12 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     sound: str = "woof"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_inherited_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                pass
+
+            class Cat(Animal):
+                sound: str = "meow"
+
+            def f(dog: Dog):
+                dog.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:9
+           |
+        12 |     dog.sound
+           |         ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_overridden_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                sound: str = "woof"
+
+            class Cat(Animal):
+                sound: str = "meow"
+
+            def f(dog: Dog):
+                dog.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:12:9
+           |
+        12 |     dog.sound
+           |         ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:6:5
+          |
+        6 |     sound: str = "woof"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_plain_assignment() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound = "generic"
+
+            class Dog(Animal):
+                sound = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:12
+          |
+        9 |     animal.sound
+          |            ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:3:5
+          |
+        3 |     sound = "generic"
+          |     -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     sound = "woof"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_bare_annotation_declaration() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str
+
+            class Dog(Animal):
+                sound: str = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:12
+          |
+        9 |     animal.sound
+          |            ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:3:5
+          |
+        3 |     sound: str
+          |     -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     sound: str = "woof"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_classvar() {
+        let test = cursor_test(
+            r#"
+            from typing import ClassVar
+
+            class Animal:
+                sound: ClassVar[str] = "generic"
+
+            class Dog(Animal):
+                sound: ClassVar[str] = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:11:12
+           |
+        11 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:5:5
+          |
+        5 |     sound: ClassVar[str] = "generic"
+          |     -----
+        6 |
+        7 | class Dog(Animal):
+        8 |     sound: ClassVar[str] = "woof"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_method_and_data_mixed() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def speak(self): ...
+
+            class Dog(Animal):
+                speak = 1
+
+            def f(animal: Animal):
+                animal.spe<CURSOR>ak
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+         --> main.py:9:12
+          |
+        9 |     animal.speak
+          |            ^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:3:9
+          |
+        3 |     def speak(self): ...
+          |         -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     speak = 1
+          |     -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_instance_attribute_family() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def __init__(self):
+                    self.sound = "generic"
+
+            class Dog(Animal):
+                def __init__(self):
+                    self.sound = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:11:12
+           |
+        11 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:4:9
+          |
+        4 |         self.sound = "generic"
+          |         ----------
+        5 |
+        6 | class Dog(Animal):
+        7 |     def __init__(self):
+        8 |         self.sound = "woof"
+          |         ----------
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_instance_attribute_from_concrete_receiver() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                def __init__(self):
+                    self.sound = "generic"
+
+            class Dog(Animal):
+                pass
+
+            class Cat(Animal):
+                def __init__(self):
+                    self.sound = "meow"
+
+            def f(dog: Dog):
+                dog.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:14:9
+           |
+        14 |     dog.sound
+           |         ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:4:9
+          |
+        4 |         self.sound = "generic"
+          |         ----------
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_class_body_and_instance_mixed() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+
+            class Dog(Animal):
+                def __init__(self):
+                    self.sound = "woof"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+          --> main.py:10:12
+           |
+        10 |     animal.sound
+           |            ^^^^^ Clicking here
+           |
+        info: Found 2 implementations
+         --> main.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+        4 |
+        5 | class Dog(Animal):
+        6 |     def __init__(self):
+        7 |         self.sound = "woof"
+          |         ----------
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_class_body_takes_priority_over_instance() {
+        // When a class defines the attribute both in its body and on `self`, the class-body
+        // definition wins for that class, matching the goto-definition lookup.
+        let test = cursor_test(
+            r#"
+            class Animal:
+                sound: str = "generic"
+                def __init__(self):
+                    self.sound = "override"
+
+            def f(animal: Animal):
+                animal.so<CURSOR>und
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+         --> main.py:8:12
+          |
+        8 |     animal.sound
+          |            ^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> main.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_stub_mapped() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+def f(x: MyClass):
+    x.so<CURSOR>und
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    sound: str = "generic"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    sound: str
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @r#"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:7
+          |
+        4 |     x.sound
+          |       ^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> mymodule.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+          |
+        "#);
+    }
+
+    #[test]
+    fn implementation_attribute_protocol_method_nominal_only() {
+        // TODO: the receiver is a `Protocol`, so implementations should be determined by structural
+        // inheritance and return all three `speak` definitions (`Speaker`, `Dog`, and `Cat`). We
+        // currently use nominal inheritance only and return `Speaker.speak`. See
+        // https://github.com/astral-sh/ruff/pull/25410#discussion_r3344203732.
+        let test = cursor_test(
+            r#"
+            from typing import Protocol
+
+            class Speaker(Protocol):
+                def speak(self) -> None: ...
+
+            class Dog:
+                def speak(self) -> None: ...
+
+            class Cat:
+                def speak(self) -> None: ...
+
+            def f(speaker: Speaker):
+                speaker.spe<CURSOR>ak()
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:14:13
+           |
+        14 |     speaker.speak()
+           |             ^^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:5:9
+          |
+        5 |     def speak(self) -> None: ...
+          |         -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_attribute_protocol_data_nominal_only() {
+        // TODO: as with `implementation_attribute_protocol_method_nominal_only`, structural
+        // inheritance should return all three `name` definitions (`Named`, `Dog`, and `Cat`); we
+        // currently return only `Named.name`.
+        let test = cursor_test(
+            r#"
+            from typing import Protocol
+
+            class Named(Protocol):
+                name: str
+
+            class Dog:
+                name: str
+
+            class Cat:
+                name: str
+
+            def f(named: Named):
+                named.na<CURSOR>me
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @r"
+        info[goto-implementation]: Go to implementation
+          --> main.py:14:11
+           |
+        14 |     named.name
+           |           ^^^^ Clicking here
+           |
+        info: Found 1 implementation
+         --> main.py:5:5
+          |
+        5 |     name: str
+          |     ----
           |
         ");
     }

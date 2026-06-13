@@ -594,6 +594,91 @@ class MyOtherClass:
         ");
     }
 
+    /// goto-definition on a class attribute should go to the .py not the .pyi
+    #[test]
+    fn goto_definition_stub_map_class_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import MyClass
+def f(x: MyClass):
+    x.so<CURSOR>und
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+class MyClass:
+    sound: str = "generic"
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+class MyClass:
+    sound: str
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r#"
+        info[goto-definition]: Go to definition
+         --> main.py:4:7
+          |
+        4 |     x.sound
+          |       ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> mymodule.py:3:5
+          |
+        3 |     sound: str = "generic"
+          |     -----
+          |
+        "#);
+    }
+
+    /// goto-definition on a module-level variable should go to the .py not the .pyi
+    #[test]
+    fn goto_definition_stub_map_module_variable() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+import mymodule
+mymodule.CO<CURSOR>UNT
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+COUNT = 0
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+COUNT: int
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:3:10
+          |
+        3 | mymodule.COUNT
+          |          ^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> mymodule.py:2:1
+          |
+        2 | COUNT = 0
+          | -----
+          |
+        ");
+    }
+
     /// goto-definition on a class function should go to the .py not the .pyi
     #[test]
     fn goto_definition_stub_map_class_function() {
