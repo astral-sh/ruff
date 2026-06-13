@@ -240,6 +240,7 @@
 //! visits a `StmtIf` node.
 
 use std::collections::hash_map::Entry;
+use std::marker::PhantomData;
 use std::ops::{Index, Range};
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
@@ -473,10 +474,159 @@ impl Index<InternedBindingsId> for RetainedBindings {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 struct RetainedPlaceStates<T> {
     end_of_scope: T,
     reachable: T,
+}
+
+trait Narrowable: Copy {
+    type Narrow: Copy + std::fmt::Debug + Eq + salsa::Update + get_size2::GetSize;
+
+    fn narrow(self) -> Option<Self::Narrow>;
+    fn widen(value: Self::Narrow) -> Self;
+}
+
+impl Narrowable for InternedBindingsId {
+    type Narrow = u16;
+
+    fn narrow(self) -> Option<Self::Narrow> {
+        u16::try_from(self.index()).ok()
+    }
+
+    fn widen(value: Self::Narrow) -> Self {
+        Self::new(usize::from(value))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct NarrowPlaceStateId {
+    bindings: u16,
+    declarations: u16,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct NarrowPlaceStates {
+    end_of_scope: NarrowPlaceStateId,
+    reachable: NarrowPlaceStateId,
+}
+
+impl Narrowable for RetainedPlaceStates<InternedPlaceStateId> {
+    type Narrow = NarrowPlaceStates;
+
+    fn narrow(self) -> Option<Self::Narrow> {
+        let narrow_id = |state: InternedPlaceStateId| {
+            Some(NarrowPlaceStateId {
+                bindings: u16::try_from(state.bindings_id().index()).ok()?,
+                declarations: u16::try_from(state.declarations_id().index()).ok()?,
+            })
+        };
+        Some(NarrowPlaceStates {
+            end_of_scope: narrow_id(self.end_of_scope)?,
+            reachable: narrow_id(self.reachable)?,
+        })
+    }
+
+    fn widen(value: Self::Narrow) -> Self {
+        let widen_id = |state: NarrowPlaceStateId| {
+            InternedPlaceStateId(
+                InternedBindingsId::new(usize::from(state.bindings)),
+                InternedDeclarationsId::new(usize::from(state.declarations)),
+            )
+        };
+        Self {
+            end_of_scope: widen_id(value.end_of_scope),
+            reachable: widen_id(value.reachable),
+        }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+enum CompactIndexVecStorage<T: Narrowable> {
+    Narrow(Box<[T::Narrow]>),
+    Wide(Box<[T]>),
+}
+
+/// An immutable index vector that stores scope-local IDs as 16-bit values when possible.
+///
+/// Most scopes have far fewer than 65,536 definitions and states, but the wide representation
+/// preserves support for unusually large generated modules.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+struct CompactIndexVec<I, T: Narrowable> {
+    storage: CompactIndexVecStorage<T>,
+    marker: PhantomData<I>,
+}
+
+impl<I: Idx, T: Narrowable> CompactIndexVec<I, T> {
+    fn get(&self, index: I) -> T {
+        match &self.storage {
+            CompactIndexVecStorage::Narrow(values) => T::widen(values[index.index()]),
+            CompactIndexVecStorage::Wide(values) => values[index.index()],
+        }
+    }
+
+    fn len(&self) -> usize {
+        match &self.storage {
+            CompactIndexVecStorage::Narrow(values) => values.len(),
+            CompactIndexVecStorage::Wide(values) => values.len(),
+        }
+    }
+
+    fn indices(&self) -> impl Iterator<Item = I> {
+        (0..self.len()).map(I::new)
+    }
+
+    fn iter_enumerated(&self) -> impl Iterator<Item = (I, T)> + '_ {
+        self.indices().map(|index| (index, self.get(index)))
+    }
+}
+
+impl<I: Idx, T: Narrowable> From<IndexVec<I, T>> for CompactIndexVec<I, T> {
+    fn from(values: IndexVec<I, T>) -> Self {
+        let narrow = values.iter().copied().map(T::narrow).collect::<Option<_>>();
+        let storage = if let Some(narrow) = narrow {
+            CompactIndexVecStorage::Narrow(narrow)
+        } else {
+            CompactIndexVecStorage::Wide(values.into_iter().collect())
+        };
+        Self {
+            storage,
+            marker: PhantomData,
+        }
+    }
+}
+
+#[cfg(test)]
+mod compact_index_vec_tests {
+    use super::*;
+
+    #[test]
+    fn stores_u16_boundary_in_narrow_storage() {
+        let values = IndexVec::<ScopedUseId, _>::from_iter([
+            InternedBindingsId::new(0),
+            InternedBindingsId::new(usize::from(u16::MAX)),
+        ]);
+        let compact = CompactIndexVec::from(values);
+
+        assert!(matches!(
+            &compact.storage,
+            CompactIndexVecStorage::Narrow(_)
+        ));
+        assert_eq!(compact.get(ScopedUseId::new(0)), InternedBindingsId::new(0));
+        assert_eq!(
+            compact.get(ScopedUseId::new(1)),
+            InternedBindingsId::new(usize::from(u16::MAX))
+        );
+    }
+
+    #[test]
+    fn falls_back_to_wide_storage() {
+        let wide_id = InternedBindingsId::new(usize::from(u16::MAX) + 1);
+        let compact = CompactIndexVec::from(IndexVec::<ScopedUseId, _>::from_iter([wide_id]));
+
+        assert!(matches!(&compact.storage, CompactIndexVecStorage::Wide(_)));
+        assert_eq!(compact.get(ScopedUseId::new(0)), wide_id);
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -518,7 +668,7 @@ pub struct UseDefMap<'db> {
     interned_declarations: FrozenIndexVec<InternedDeclarationsId, Declarations>,
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: FrozenIndexVec<ScopedUseId, InternedBindingsId>,
+    bindings_by_use: CompactIndexVec<ScopedUseId, InternedBindingsId>,
 
     /// [`Bindings`] for each member reaching a [`ScopedUseId`].
     ///
@@ -550,10 +700,10 @@ pub struct UseDefMap<'db> {
     >,
 
     /// Retained [`PlaceState`] values for each symbol.
-    symbol_states: FrozenIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
+    symbol_states: CompactIndexVec<ScopedSymbolId, RetainedPlaceStates<InternedPlaceStateId>>,
 
     /// Retained [`PlaceState`] values for each member.
-    member_states: FrozenIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
+    member_states: CompactIndexVec<ScopedMemberId, RetainedPlaceStates<InternedPlaceStateId>>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
@@ -646,7 +796,7 @@ impl<'db> UseDefMap<'db> {
     }
 
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.bindings_by_use[use_id];
+        let bindings_id = self.bindings_by_use.get(use_id);
         self.bindings_iterator(
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -739,7 +889,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
+        let place_state_id = self.symbol_states.get(symbol).end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -750,7 +900,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
+        let place_state_id = self.member_states.get(member).end_of_scope;
         self.bindings_iterator(
             &self.interned_bindings[place_state_id.bindings_id()],
             BoundnessAnalysis::BasedOnUnboundVisibility,
@@ -771,7 +921,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
+        let place_state_id = self.symbol_states.get(symbol).reachable;
         let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
@@ -780,7 +930,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
+        let place_state_id = self.member_states.get(member).reachable;
         let bindings = &self.interned_bindings[place_state_id.bindings_id()];
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
@@ -851,7 +1001,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.symbol_states[symbol].end_of_scope;
+        let place_state_id = self.symbol_states.get(symbol).end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -860,7 +1010,7 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let place_state_id = self.member_states[member].end_of_scope;
+        let place_state_id = self.member_states.get(member).end_of_scope;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
@@ -869,7 +1019,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.symbol_states[symbol].reachable;
+        let place_state_id = self.symbol_states.get(symbol).reachable;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
@@ -878,7 +1028,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let place_state_id = self.member_states[member].reachable;
+        let place_state_id = self.member_states.get(member).reachable;
         let declarations = &self.interned_declarations[place_state_id.declarations_id()];
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
@@ -2079,7 +2229,10 @@ impl<'db> UseDefMapBuilder<'db> {
     fn zip_place_states<I: Idx, T>(
         end_of_scope: IndexVec<I, T>,
         reachable: IndexVec<I, T>,
-    ) -> FrozenIndexVec<I, RetainedPlaceStates<T>> {
+    ) -> CompactIndexVec<I, RetainedPlaceStates<T>>
+    where
+        RetainedPlaceStates<T>: Narrowable,
+    {
         assert_eq!(end_of_scope.len(), reachable.len());
 
         end_of_scope
@@ -2089,7 +2242,8 @@ impl<'db> UseDefMapBuilder<'db> {
                 end_of_scope,
                 reachable,
             })
-            .collect()
+            .collect::<IndexVec<_, _>>()
+            .into()
     }
 
     fn intern_definitions_by_definition(
