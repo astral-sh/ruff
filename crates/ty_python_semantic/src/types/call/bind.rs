@@ -60,11 +60,12 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    ClassLiteral, CycleMarkable, CycleMarkedType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    DynamicType, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members,
     recursive::{Foldable, RecursiveType},
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
@@ -481,6 +482,9 @@ pub(crate) struct Bindings<'db> {
     /// `None` means the caller did not provide lexical collision information. `Some([])` means the
     /// caller knows there are no enclosing binding contexts.
     enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
+
+    deferred_return_type_folds: SmallVec<[RecursiveType<'db>; 1]>,
+    deferred_return_type_marks: SmallVec<[CycleMarkedType<'db>; 1]>,
 }
 
 impl<'db> Bindings<'db> {
@@ -590,6 +594,8 @@ impl<'db> Bindings<'db> {
         let mut implicit_dunder_new_is_possibly_unbound = false;
         let mut implicit_dunder_init_is_possibly_unbound = false;
         let mut elements_acc = SmallVec::new();
+        let mut deferred_return_type_folds = SmallVec::new();
+        let mut deferred_return_type_marks = SmallVec::new();
 
         // Preserve each input's existing union/intersection structure.
         for set in bindings_iter {
@@ -597,6 +603,8 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound |=
                 set.implicit_dunder_init_is_possibly_unbound;
             elements_acc.extend(set.elements);
+            deferred_return_type_folds.extend(set.deferred_return_type_folds);
+            deferred_return_type_marks.extend(set.deferred_return_type_marks);
         }
 
         let elements = elements_acc;
@@ -607,6 +615,8 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
             enclosing_binding_contexts: None,
+            deferred_return_type_folds,
+            deferred_return_type_marks,
         }
     }
 
@@ -621,6 +631,8 @@ impl<'db> Bindings<'db> {
         let mut implicit_dunder_new_is_possibly_unbound = true;
         let mut implicit_dunder_init_is_possibly_unbound = true;
         let mut inner_items_acc = SmallVec::new();
+        let mut deferred_return_type_folds = SmallVec::new();
+        let mut deferred_return_type_marks = SmallVec::new();
 
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound &= set.implicit_dunder_new_is_possibly_unbound;
@@ -629,6 +641,8 @@ impl<'db> Bindings<'db> {
             for element in set.elements {
                 inner_items_acc.extend(element.items);
             }
+            deferred_return_type_folds.extend(set.deferred_return_type_folds);
+            deferred_return_type_marks.extend(set.deferred_return_type_marks);
         }
         assert!(!inner_items_acc.is_empty());
         let elements = smallvec![BindingsElement {
@@ -640,6 +654,8 @@ impl<'db> Bindings<'db> {
             implicit_dunder_init_is_possibly_unbound,
             elements,
             enclosing_binding_contexts: None,
+            deferred_return_type_folds,
+            deferred_return_type_marks,
         }
     }
 
@@ -947,6 +963,8 @@ impl<'db> Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             enclosing_binding_contexts: self.enclosing_binding_contexts,
+            deferred_return_type_folds: self.deferred_return_type_folds,
+            deferred_return_type_marks: self.deferred_return_type_marks,
             elements: self
                 .elements
                 .into_iter()
@@ -1107,10 +1125,46 @@ impl<'db> Bindings<'db> {
     /// For calls with binding errors, this is a type that best approximates the return type. For
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(
+        let mut return_ty = UnionType::from_elements(
             db,
             self.elements.iter().map(|element| element.return_type(db)),
-        )
+        );
+        for rec in &self.deferred_return_type_folds {
+            return_ty = return_ty.fold(db, *rec);
+            return_ty = Self::drop_top_level_recursive_return_marker(db, return_ty, *rec);
+        }
+        for marked in &self.deferred_return_type_marks {
+            return_ty = return_ty.mark_cycle(db, *marked);
+        }
+        return_ty
+    }
+
+    fn drop_top_level_recursive_return_marker(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        rec: RecursiveType<'db>,
+    ) -> Type<'db> {
+        let Type::Union(union) = ty else {
+            return ty;
+        };
+
+        let elements = union.elements(db);
+        let kept = elements
+            .iter()
+            .copied()
+            .filter(|element| {
+                !matches!(
+                    element,
+                    Type::Recursive(element_rec) if element_rec.binder(db) == rec.binder(db)
+                )
+            })
+            .collect_vec();
+
+        if kept.len() == elements.len() || kept.is_empty() {
+            ty
+        } else {
+            UnionType::from_elements(db, kept)
+        }
     }
 
     /// Returns the inferred type for the argument at the specified index.
@@ -2740,7 +2794,17 @@ impl<'db> Bindings<'db> {
 
 impl<'db> Foldable<'db> for Bindings<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
-        self.fields_mapped(&mut |ty| ty.fold(db, rec))
+        let mut bindings = self.fields_mapped(&mut |ty| ty.fold(db, rec));
+        bindings.deferred_return_type_folds.push(rec);
+        bindings
+    }
+}
+
+impl<'db> CycleMarkable<'db> for Bindings<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        let mut bindings = self.fields_mapped(&mut |ty| ty.mark_cycle(db, marked));
+        bindings.deferred_return_type_marks.push(marked);
+        bindings
     }
 }
 
@@ -2754,6 +2818,8 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
             enclosing_binding_contexts: None,
+            deferred_return_type_folds: SmallVec::new(),
+            deferred_return_type_marks: SmallVec::new(),
         }
     }
 }
@@ -2779,6 +2845,8 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
             enclosing_binding_contexts: None,
+            deferred_return_type_folds: SmallVec::new(),
+            deferred_return_type_marks: SmallVec::new(),
         }
     }
 }
@@ -3141,17 +3209,6 @@ impl<'db> CallableBinding<'db> {
         self.callable_type = map(self.callable_type);
         self.signature_type = map(self.signature_type);
         self.bound_type = self.bound_type.map(&mut *map);
-        self.overload_call_return_type =
-            self.overload_call_return_type
-                .map(|return_type| match return_type {
-                    OverloadCallReturnType::ArgumentTypeExpansion(ty) => {
-                        OverloadCallReturnType::ArgumentTypeExpansion(map(ty))
-                    }
-                    OverloadCallReturnType::ArgumentTypeExpansionLimitReached(limit) => {
-                        OverloadCallReturnType::ArgumentTypeExpansionLimitReached(limit)
-                    }
-                    OverloadCallReturnType::Ambiguous => OverloadCallReturnType::Ambiguous,
-                });
         for binding in &mut self.overloads {
             binding.map_fields(map);
         }
@@ -6169,10 +6226,14 @@ impl<'db> Binding<'db> {
     }
 
     fn map_fields(&mut self, map: &mut impl FnMut(Type<'db>) -> Type<'db>) {
-        self.signature = self.signature.clone().map_types(map);
+        let return_ty = self.signature.return_ty;
+        self.signature = self
+            .signature
+            .clone()
+            .map_types(map)
+            .with_return_type(return_ty);
         self.callable_type = map(self.callable_type);
         self.signature_type = map(self.signature_type);
-        self.return_ty = map(self.return_ty);
         self.constructor_context = self
             .constructor_context
             .map(|context| context.map_instance_type(map));

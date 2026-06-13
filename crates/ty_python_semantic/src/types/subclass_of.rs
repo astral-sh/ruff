@@ -92,6 +92,7 @@ impl<'db> SubclassOfType<'db> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => {
                 rec.map(db, |unfolded| Self::try_from_instance(db, unfolded))
             }
+            Type::CycleMarked(marked) => marked.map(db, |inner| Self::try_from_instance(db, inner)),
             Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
             _ => SubclassOfInner::try_from_instance(db, ty)
                 .map(|subclass_of| Self::from(db, subclass_of)),

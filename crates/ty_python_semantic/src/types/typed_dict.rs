@@ -1,4 +1,4 @@
-use crate::types::RecursiveTypeNormalization;
+use crate::types::{CycleMarkable, CycleMarkedType, RecursiveTypeNormalization};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -189,11 +189,32 @@ impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
     }
 }
 
+impl<'db> CycleMarkable<'db> for TypedDictExtraItems<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            declared_ty: self.declared_ty.mark_cycle(db, marked),
+            is_read_only: self.is_read_only,
+        }
+    }
+}
+
 impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         match self {
             Self::Extra(extra_items) => {
                 let extra_items = extra_items.fold(db, rec);
+                Self::extra(db, extra_items.declared_ty, extra_items.is_read_only)
+            }
+            Self::ImplicitlyOpen | Self::Closed => self,
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for TypedDictOpenness<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            Self::Extra(extra_items) => {
+                let extra_items = extra_items.mark_cycle(db, marked);
                 Self::extra(db, extra_items.declared_ty, extra_items.is_read_only)
             }
             Self::ImplicitlyOpen | Self::Closed => self,
@@ -1627,6 +1648,16 @@ impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
     }
 }
 
+impl<'db> CycleMarkable<'db> for UnpackedTypedDictKey<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            value_ty: self.value_ty.mark_cycle(db, marked),
+            is_required: self.is_required,
+            definition: self.definition,
+        }
+    }
+}
+
 /// A normalized view of a `TypedDict`-shaped value used when unpacking it.
 ///
 /// Union and intersection inputs are combined into one set of possible keys and one openness
@@ -1647,6 +1678,15 @@ impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
                 .map(|(name, key)| (name, key.fold(db, rec)))
                 .collect(),
             openness: self.openness.fold(db, rec),
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for UnpackedTypedDict<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            keys: self.keys.mark_cycle(db, marked),
+            openness: self.openness.mark_cycle(db, marked),
         }
     }
 }
@@ -1899,9 +1939,9 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             extract_unpacked_typed_dict_from_value_type(db, unfolded)
         }),
-        Type::CycleMarked(marked) => {
-            extract_unpacked_typed_dict_from_value_type(db, marked.inner(db))
-        }
+        Type::CycleMarked(marked) => marked.map(db, |inner| {
+            extract_unpacked_typed_dict_from_value_type(db, inner)
+        }),
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2004,6 +2044,7 @@ pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -
             .any(|element| element.resolve_type_alias(db).is_dynamic()),
         Type::Recursive(rec) if rec.is_non_contractive(db) => true,
         Type::Recursive(rec) => rec.map(db, |unfolded| unpacked_keyword_is_gradual(db, unfolded)),
+        Type::CycleMarked(marked) => marked.map(db, |inner| unpacked_keyword_is_gradual(db, inner)),
         _ => false,
     }
 }

@@ -2661,13 +2661,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     emit_diagnostics,
                 )
             }),
-            Type::CycleMarked(marked) => self.validate_attribute_assignment(
-                target,
-                marked.inner(db),
-                attribute,
-                infer_value_ty,
-                emit_diagnostics,
-            ),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                self.validate_attribute_assignment(
+                    target,
+                    inner,
+                    attribute,
+                    infer_value_ty,
+                    emit_diagnostics,
+                )
+            }),
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -3322,12 +3324,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
             }),
-            Type::CycleMarked(marked) => self.validate_attribute_deletion(
-                target,
-                marked.inner(db),
-                attribute,
-                emit_diagnostics,
-            ),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                self.validate_attribute_deletion(target, inner, attribute, emit_diagnostics)
+            }),
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -3518,7 +3517,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
                 Type::CycleMarked(marked) => {
-                    return self.assignment_attribute_members(marked.inner(db), attribute);
+                    return marked.map(db, |inner| {
+                        self.assignment_attribute_members(inner, attribute)
+                    });
                 }
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
@@ -5290,9 +5291,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
-                Type::CycleMarked(marked) => {
-                    propagate_callable_kind(db, marked.inner(db), kind, provenance)
-                }
+                Type::CycleMarked(marked) => marked.map(db, |inner| {
+                    propagate_callable_kind(db, inner, kind, provenance)
+                }),
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -10099,9 +10100,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::CycleMarked(marked)) => {
-                self.infer_unary_expression_type(op, marked.inner(self.db()), unary)
-            }
+            (_, Type::CycleMarked(marked)) => marked.map(self.db(), |inner| {
+                self.infer_unary_expression_type(op, inner, unary)
+            }),
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Recursive(rec)) if rec.is_non_contractive(self.db()) => operand_type,

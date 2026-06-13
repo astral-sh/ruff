@@ -218,6 +218,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
                         ty => vec![ty],
                     }),
+                    Type::CycleMarked(marked) => marked.map(self.db(), |inner| match inner {
+                        Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
+                        ty => vec![ty],
+                    }),
                     _ => vec![value_ty],
                 };
 

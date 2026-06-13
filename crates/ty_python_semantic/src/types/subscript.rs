@@ -24,8 +24,8 @@ use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
-    TypedDictType, UnionBuilder, UnionType, todo_type,
+    CycleMarkable, CycleMarkedType, DynamicType, IntersectionBuilder, IntersectionType,
+    KnownInstanceType, Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -198,6 +198,19 @@ impl<'db> Foldable<'db> for SubscriptError<'db> {
     }
 }
 
+impl<'db> CycleMarkable<'db> for SubscriptError<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            result_ty: self.result_ty.mark_cycle(db, marked),
+            errors: self
+                .errors
+                .into_iter()
+                .map(|error| error.mark_cycle(db, marked))
+                .collect(),
+        }
+    }
+}
+
 impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         match self {
@@ -248,6 +261,65 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
             } => Self::InvalidLegacyGenericArgument {
                 origin,
                 argument_ty: argument_ty.fold(db, rec),
+            },
+            Self::NonGenericTypeAlias { .. }
+            | Self::DuplicateTypevar { .. }
+            | Self::TypeVarTupleNotUnpacked { .. }
+            | Self::SliceStepSizeZero => self,
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            Self::IndexOutOfBounds {
+                kind,
+                tuple_ty,
+                length,
+                index,
+            } => Self::IndexOutOfBounds {
+                kind,
+                tuple_ty: tuple_ty.mark_cycle(db, marked),
+                length,
+                index,
+            },
+            Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
+                method,
+                value_ty: value_ty.mark_cycle(db, marked),
+            },
+            Self::DunderCallError {
+                method,
+                value_ty,
+                slice_ty,
+                kind,
+                bindings,
+            } => Self::DunderCallError {
+                method,
+                value_ty: value_ty.mark_cycle(db, marked),
+                slice_ty: slice_ty.mark_cycle(db, marked),
+                kind,
+                bindings: bindings.mark_cycle(db, marked),
+            },
+            Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty,
+                full_object_ty,
+            } => Self::InvalidTypedDictKey {
+                typed_dict,
+                slice_ty: slice_ty.mark_cycle(db, marked),
+                full_object_ty: full_object_ty.mark_cycle(db, marked),
+            },
+            Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
+                value_ty: value_ty.mark_cycle(db, marked),
+                method,
+            },
+            Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty,
+            } => Self::InvalidLegacyGenericArgument {
+                origin,
+                argument_ty: argument_ty.mark_cycle(db, marked),
             },
             Self::NonGenericTypeAlias { .. }
             | Self::DuplicateTypevar { .. }
@@ -602,10 +674,10 @@ impl<'db> Type<'db> {
 
         let inferred = match (value_ty, slice_ty) {
             (Type::CycleMarked(marked), _) => {
-                Some(marked.inner(db).subscript(db, slice_ty, expr_context))
+                Some(marked.map(db, |inner| inner.subscript(db, slice_ty, expr_context)))
             }
             (_, Type::CycleMarked(marked)) => {
-                Some(value_ty.subscript(db, marked.inner(db), expr_context))
+                Some(marked.map(db, |inner| value_ty.subscript(db, inner, expr_context)))
             }
             // `Divergent` is the recursive α-leaf (reached after a `Type::Recursive` unfold, or a
             // cycle mid-iteration provisional), not a standalone type — subscripting it yields

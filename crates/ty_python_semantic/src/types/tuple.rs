@@ -29,8 +29,9 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ErrorContext, FindLegacyTypeVarsVisitor,
-    IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder, UnionType,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleMarkable, CycleMarkedType, ErrorContext,
+    FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder,
+    UnionType,
 };
 use crate::{Db, FxOrderSet, Program};
 use ty_python_core::Truthiness;
@@ -1570,6 +1571,12 @@ impl<'db> Tuple<Type<'db>> {
             release_level_ty,
             int_instance_ty,
         ])
+    }
+}
+
+impl<'db> CycleMarkable<'db> for Tuple<Type<'db>> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.map_elements(|ty| ty.mark_cycle(db, marked))
     }
 }
 

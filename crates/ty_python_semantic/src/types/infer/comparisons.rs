@@ -10,9 +10,9 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    DynamicType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType,
-    LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder,
+    CycleMarkable, CycleMarkedType, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -118,6 +118,16 @@ impl<'db> Foldable<'db> for UnsupportedComparisonError<'db> {
             op: self.op,
             left_ty: self.left_ty.fold(db, rec),
             right_ty: self.right_ty.fold(db, rec),
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for UnsupportedComparisonError<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            op: self.op,
+            left_ty: self.left_ty.mark_cycle(db, marked),
+            right_ty: self.right_ty.mark_cycle(db, marked),
         }
     }
 }
@@ -285,6 +295,18 @@ pub(super) fn infer_binary_type_comparison<'db>(
 
         (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), || {
             infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
+        })),
+
+        (Type::CycleMarked(marked), right) => Some(visitor.visit((left, op, right), || {
+            marked.map(db, |inner| {
+                infer_binary_type_comparison(context, inner, op, right, range, visitor)
+            })
+        })),
+
+        (left, Type::CycleMarked(marked)) => Some(visitor.visit((left, op, right), || {
+            marked.map(db, |inner| {
+                infer_binary_type_comparison(context, left, op, inner, range, visitor)
+            })
         })),
 
         // Mirror the `Type::TypeAlias` arms for an opaque μ-binder: compare the one-step unfold,

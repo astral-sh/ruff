@@ -728,6 +728,12 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| could_compare_equal(db, left_ty, unfolded))
         }
+        (Type::CycleMarked(marked), _) => {
+            marked.map(db, |inner| could_compare_equal(db, inner, right_ty))
+        }
+        (_, Type::CycleMarked(marked)) => {
+            marked.map(db, |inner| could_compare_equal(db, left_ty, inner))
+        }
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
             match (left.kind(), right.kind()) {
                 // Boolean literals and int literals are disjoint, and single valued, and yet
@@ -1043,6 +1049,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 Self::narrow_type_by_len(db, unfolded, is_positive)
             }),
+            Type::CycleMarked(marked) => {
+                marked.map(db, |inner| Self::narrow_type_by_len(db, inner, is_positive))
+            }
             Type::Intersection(intersection) => {
                 // For intersections, check if any positive element is narrowable.
                 let positive = intersection.positive(db);
@@ -1095,6 +1104,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }),
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 Self::narrow_type_by_exact_len(db, unfolded, length, is_equality)
+            }),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                Self::narrow_type_by_exact_len(db, inner, length, is_equality)
             }),
             Type::Intersection(intersection) => intersection.map_positive(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
@@ -1220,6 +1232,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return rec.map(db, |unfolded| can_narrow_to_rhs(db, unfolded, rhs_ty));
                 }
 
+                if let Type::CycleMarked(marked) = lhs_ty {
+                    return marked.map(db, |inner| can_narrow_to_rhs(db, inner, rhs_ty));
+                }
+
                 if let Some(alternatives) = finite_single_valued_union_alternatives(db, lhs_ty) {
                     return alternatives
                         .into_iter()
@@ -1252,6 +1268,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return rec.map(db, |unfolded| {
                         filter_to_cannot_be_equal(db, unfolded, rhs_ty)
                     });
+                }
+
+                if let Type::CycleMarked(marked) = ty {
+                    return marked.map(db, |inner| filter_to_cannot_be_equal(db, inner, rhs_ty));
                 }
 
                 if let Some(alternatives) = finite_single_valued_union_alternatives(db, ty) {
@@ -2580,6 +2600,9 @@ fn narrow_attribute_union<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             narrow_attribute_union(db, unfolded, should_keep)
         }),
+        Type::CycleMarked(marked) => {
+            marked.map(db, |inner| narrow_attribute_union(db, inner, should_keep))
+        }
         _ => ty,
     }
 }
@@ -2601,7 +2624,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Recursive(rec) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| is_or_contains_typeddict(db, unfolded))
         }
-        Type::CycleMarked(marked) => is_or_contains_typeddict(db, marked.inner(db)),
+        Type::CycleMarked(marked) => marked.map(db, |inner| is_or_contains_typeddict(db, inner)),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2651,6 +2674,7 @@ fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> boo
         Type::Recursive(rec) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| typeddict_declares_key(db, unfolded, key))
         }
+        Type::CycleMarked(marked) => marked.map(db, |inner| typeddict_declares_key(db, inner, key)),
         _ => false,
     }
 }
@@ -2781,9 +2805,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             all_matching_typeddict_fields_have_literal_types(db, unfolded, field_name)
         }),
-        Type::CycleMarked(marked) => {
-            all_matching_typeddict_fields_have_literal_types(db, marked.inner(db), field_name)
-        }
+        Type::CycleMarked(marked) => marked.map(db, |inner| {
+            all_matching_typeddict_fields_have_literal_types(db, inner, field_name)
+        }),
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)

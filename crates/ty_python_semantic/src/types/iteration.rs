@@ -1,9 +1,9 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, KnownClass, LintDiagnosticGuard,
-        LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type, TypeContext,
-        TypeVarBoundOrConstraints, UnionType,
+        AwaitError, Bindings, CallArguments, CallDunderError, CycleMarkable, CycleMarkedType,
+        KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type,
+        TypeContext, TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         context::InferContext,
         diagnostic::NOT_ITERABLE,
@@ -152,7 +152,9 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::Never)))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, alias.value_type(db)),
-                Type::CycleMarked(marked) => non_async_special_case(db, marked.inner(db)),
+                Type::CycleMarked(marked) => {
+                    marked.map(db, |inner| non_async_special_case(db, inner))
+                }
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => non_async_special_case(db, bound),
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
@@ -349,6 +351,10 @@ impl<'db> Type<'db> {
             return rec.map(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
         }
 
+        if let Type::CycleMarked(marked) = self {
+            return marked.map(db, |inner| inner.try_iterate_with_mode(db, mode));
+        }
+
         if let Type::TypeAlias(alias) = self {
             return alias.value_type(db).try_iterate_with_mode(db, mode);
         }
@@ -523,6 +529,12 @@ impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
     }
 }
 
+impl<'db> CycleMarkable<'db> for Cow<'db, TupleSpec<'db>> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Cow::Owned(self.into_owned().mark_cycle(db, marked))
+    }
+}
+
 impl<'db> Foldable<'db> for IterationError<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         match self {
@@ -557,6 +569,46 @@ impl<'db> Foldable<'db> for IterationError<'db> {
                 dunder_getitem_error,
             } => Self::UnboundIterAndGetitemError {
                 dunder_getitem_error: dunder_getitem_error.fold(db, rec),
+            },
+            Self::UnboundAiterError => Self::UnboundAiterError,
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for IterationError<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            Self::IterCallError {
+                kind,
+                bindings,
+                mode,
+            } => Self::IterCallError {
+                kind,
+                bindings: bindings.mark_cycle(db, marked),
+                mode,
+            },
+            Self::IterReturnsInvalidIterator {
+                iterator,
+                dunder_error,
+                mode,
+            } => Self::IterReturnsInvalidIterator {
+                iterator: iterator.mark_cycle(db, marked),
+                dunder_error: dunder_error.mark_cycle(db, marked),
+                mode,
+            },
+            Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return,
+                unbound_on_iter,
+                dunder_getitem_error,
+            } => Self::PossiblyUnboundIterAndGetitemError {
+                dunder_next_return: dunder_next_return.mark_cycle(db, marked),
+                unbound_on_iter: unbound_on_iter.mark_cycle(db, marked),
+                dunder_getitem_error: dunder_getitem_error.mark_cycle(db, marked),
+            },
+            Self::UnboundIterAndGetitemError {
+                dunder_getitem_error,
+            } => Self::UnboundIterAndGetitemError {
+                dunder_getitem_error: dunder_getitem_error.mark_cycle(db, marked),
             },
             Self::UnboundAiterError => Self::UnboundAiterError,
         }

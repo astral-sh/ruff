@@ -6,13 +6,14 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, FindLegacyTypeVarsVisitor,
-        FunctionType, InternedType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, CycleMarkable, CycleMarkedType,
+        FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
+        KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         RecursiveTypeNormalization, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
         TypeVarBoundOrConstraints, UnionType,
         constraints::{ConstraintSet, IteratorConstraintsExtension},
         known_instance::FunctoolsPartialInstance,
+        recursive::{Foldable, RecursiveType},
         relation::{TypeRelation, TypeRelationChecker},
         signatures::{CallableSignature, PartialSignatureApplication},
         visitor, walk_signature,
@@ -56,6 +57,7 @@ impl<'db> Type<'db> {
             UpcastPolicy::default(),
             CallableUpcastContext {
                 recursive_definition,
+                ..CallableUpcastContext::default()
             },
         )
     }
@@ -91,13 +93,25 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            Type::Recursive(recursive) if context.is_recursive_type(db, recursive) => {
+                Some(CallableTypes::one(CallableType::bottom(db)))
+            }
+            Type::Recursive(recursive) if !recursive.is_non_contractive(db) => {
+                recursive.map(db, |unfolded| {
+                    unfolded.try_upcast_to_callable_with_policy_and_context(
+                        db,
+                        policy,
+                        context.with_recursive_type(recursive),
+                    )
+                })
+            }
             Type::Recursive(_) => Some(CallableTypes::one(CallableType::function_like(
                 db,
                 Signature::dynamic(self),
             ))),
-            Type::CycleMarked(marked) => marked
-                .inner(db)
-                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                inner.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+            }),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -304,12 +318,25 @@ impl<'db> Type<'db> {
 #[derive(Clone, Copy, Debug, Default)]
 struct CallableUpcastContext<'db> {
     recursive_definition: Option<Definition<'db>>,
+    recursive_type: Option<RecursiveType<'db>>,
 }
 
 impl<'db> CallableUpcastContext<'db> {
+    fn with_recursive_type(self, recursive_type: RecursiveType<'db>) -> Self {
+        Self {
+            recursive_type: Some(recursive_type),
+            ..self
+        }
+    }
+
     fn is_recursive_reference(self, db: &'db dyn Db, function: FunctionType<'db>) -> bool {
         self.recursive_definition
             .is_some_and(|definition| function.contains_definition(db, definition))
+    }
+
+    fn is_recursive_type(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
+        self.recursive_type
+            .is_some_and(|active| active.binder_id(db) == recursive.binder_id(db))
     }
 }
 
@@ -697,6 +724,41 @@ impl<'db> CallableTypes<'db> {
             CallableFunctionProvenance::None,
         )
         .into_precise_functools_partial_instance(db, wrapped)
+    }
+}
+
+impl<'db> Foldable<'db> for CallableType<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        if let Type::Callable(callable) = Type::Callable(self).fold(db, rec) {
+            callable
+        } else {
+            self
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for CallableType<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        let signatures = CallableSignature::from_overloads(
+            self.signatures(db).overloads.iter().map(|signature| {
+                signature
+                    .clone()
+                    .with_return_type(signature.return_ty.mark_cycle(db, marked))
+            }),
+        );
+        CallableType::new(db, signatures, self.kind(db), self.provenance(db))
+    }
+}
+
+impl<'db> Foldable<'db> for CallableTypes<'db> {
+    fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
+        self.map(|callable| callable.fold(db, rec))
+    }
+}
+
+impl<'db> CycleMarkable<'db> for CallableTypes<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.map(|callable| callable.mark_cycle(db, marked))
     }
 }
 

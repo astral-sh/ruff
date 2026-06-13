@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::{Cell, OnceCell};
+use std::collections::BTreeMap;
 use std::iter;
 use std::rc::Rc;
 use std::time::Duration;
@@ -1045,6 +1046,12 @@ impl<'db> GeneratorTypes<'db> {
 impl<'db> Foldable<'db> for GeneratorTypes<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         self.map_types(|ty| ty.fold(db, rec))
+    }
+}
+
+impl<'db> CycleMarkable<'db> for GeneratorTypes<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.map_types(|ty| ty.mark_cycle(db, marked))
     }
 }
 
@@ -2269,7 +2276,7 @@ impl<'db> Type<'db> {
 
             // A divergent marker is a gradual leaf; its negation is itself (like `~Any == Any`).
             Type::Divergent(_) => *self,
-            Type::CycleMarked(marked) => marked.inner(db).negate(db),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.negate(db)),
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
@@ -2995,9 +3002,9 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) => rec.map(db, |unfolded| {
                 unfolded.find_name_in_mro_with_policy(db, name, policy)
             }),
-            Type::CycleMarked(marked) => marked
-                .inner(db)
-                .find_name_in_mro_with_policy(db, name, policy),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                inner.find_name_in_mro_with_policy(db, name, policy)
+            }),
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
             }
@@ -3306,7 +3313,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
             Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.instance_member(db, name)),
-            Type::CycleMarked(marked) => marked.inner(db).instance_member(db, name),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.instance_member(db, name)),
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
                 newtype.concrete_base_type(db).instance_member(db, name)
@@ -3921,9 +3928,9 @@ impl<'db> Type<'db> {
                 Type::Recursive(rec) => rec.map(db, |unfolded| {
                     unfolded.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
                 }),
-                Type::CycleMarked(marked) => marked
-                    .inner(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                Type::CycleMarked(marked) => marked.map(db, |inner| {
+                    inner.member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                }),
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4833,7 +4840,7 @@ impl<'db> Type<'db> {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
             Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.bindings(db)),
-            Type::CycleMarked(marked) => marked.inner(db).bindings(db),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.bindings(db)),
 
             // Note that this correctly returns `None` if none of the union elements are callable.
             Type::Union(union) => Bindings::from_union(
@@ -5936,7 +5943,7 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => {
                 rec.map(db, |unfolded| unfolded.generator_types(db))
             }
-            Type::CycleMarked(marked) => marked.inner(db).generator_types(db),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.generator_types(db)),
             ty @ (Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never) => {
                 Some(GeneratorTypes {
                     yield_ty: Some(ty),
@@ -5961,7 +5968,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::CycleMarked(marked) => marked.inner(db).to_instance(db),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.to_instance(db)),
             Type::Dynamic(_) | Type::Divergent(_) | Type::Recursive(_) | Type::Never => Some(self),
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
@@ -6210,12 +6217,9 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
-            Type::CycleMarked(marked) => marked.inner(db).in_type_expression(
-                db,
-                scope_id,
-                typevar_binding_context,
-                inference_flags,
-            ),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                inner.in_type_expression(db, scope_id, typevar_binding_context, inference_flags)
+            }),
 
             Type::Recursive(rec) if rec.is_non_contractive(db) => Ok(*self),
             Type::Recursive(rec) => rec.map(db, |unfolded| {
@@ -6273,7 +6277,7 @@ impl<'db> Type<'db> {
             Type::SpecialForm(special_form) => special_form.to_meta_type(db),
             Type::PropertyInstance(property) => property.instance_class(db).to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
-            Type::CycleMarked(marked) => marked.inner(db).to_meta_type(db),
+            Type::CycleMarked(marked) => marked.map(db, |inner| inner.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
             Type::TypeForm(_) => Type::object().to_meta_type(db),
             Type::LiteralValue(literal) => match literal.kind() {
@@ -6347,6 +6351,10 @@ impl<'db> Type<'db> {
             && !rec.is_non_contractive(db)
         {
             return rec.map(db, |unfolded| unfolded.dunder_class(db));
+        }
+
+        if let Type::CycleMarked(marked) = self {
+            return marked.map(db, |inner| inner.dunder_class(db));
         }
 
         if self.is_typed_dict() {
@@ -8001,9 +8009,102 @@ pub struct CycleMarkedType<'db> {
     pub(crate) inner: Type<'db>,
 }
 
-impl CycleMarkedType<'_> {
+pub(crate) trait CycleMarkable<'db>: Sized {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self;
+}
+
+impl<'db> CycleMarkedType<'db> {
     pub(crate) fn binder_id(self, db: &dyn Db) -> salsa::Id {
         self.binder(db).into_id()
+    }
+
+    pub(crate) fn map<F: CycleMarkable<'db>>(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(Type<'db>) -> F,
+    ) -> F {
+        f(self.inner(db)).mark_cycle(db, self)
+    }
+}
+
+impl<'db> CycleMarkable<'db> for Type<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Type::cycle_marked(db, marked.binder_id(db), self)
+    }
+}
+
+impl<'db> CycleMarkable<'db> for () {
+    fn mark_cycle(self, _db: &'db dyn Db, _marked: CycleMarkedType<'db>) -> Self {}
+}
+
+impl<'db> CycleMarkable<'db> for bool {
+    fn mark_cycle(self, _db: &'db dyn Db, _marked: CycleMarkedType<'db>) -> Self {
+        self
+    }
+}
+
+impl<'db> CycleMarkable<'db> for usize {
+    fn mark_cycle(self, _db: &'db dyn Db, _marked: CycleMarkedType<'db>) -> Self {
+        self
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>> CycleMarkable<'db> for Option<T> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.map(|inner| inner.mark_cycle(db, marked))
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>> CycleMarkable<'db> for Box<T> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Box::new((*self).mark_cycle(db, marked))
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>> CycleMarkable<'db> for Box<[T]> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.into_vec()
+            .into_iter()
+            .map(|inner| inner.mark_cycle(db, marked))
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>> CycleMarkable<'db> for Vec<T> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.into_iter()
+            .map(|inner| inner.mark_cycle(db, marked))
+            .collect::<Vec<_>>()
+    }
+}
+
+impl<'db, K: Ord, V: CycleMarkable<'db>> CycleMarkable<'db> for BTreeMap<K, V> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.into_iter()
+            .map(|(key, value)| (key, value.mark_cycle(db, marked)))
+            .collect()
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>, E: CycleMarkable<'db>> CycleMarkable<'db> for Result<T, E> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            Ok(ok) => Ok(ok.mark_cycle(db, marked)),
+            Err(err) => Err(err.mark_cycle(db, marked)),
+        }
+    }
+}
+
+impl<'db, T: CycleMarkable<'db>, U: CycleMarkable<'db>> CycleMarkable<'db> for (T, U) {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        (self.0.mark_cycle(db, marked), self.1.mark_cycle(db, marked))
+    }
+}
+
+impl<'db> CycleMarkable<'db> for PlaceAndQualifiers<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        self.map_type(|ty| ty.mark_cycle(db, marked))
     }
 }
 
@@ -8274,6 +8375,19 @@ impl<'db> Foldable<'db> for InvalidTypeExpressionError<'db> {
     }
 }
 
+impl<'db> CycleMarkable<'db> for InvalidTypeExpressionError<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        Self {
+            invalid_expressions: self
+                .invalid_expressions
+                .into_iter()
+                .map(|error| error.mark_cycle(db, marked))
+                .collect(),
+            fallback_type: self.fallback_type.mark_cycle(db, marked),
+        }
+    }
+}
+
 /// Enumeration of various types that are invalid in type-expression contexts
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 enum InvalidTypeExpression<'db> {
@@ -8530,6 +8644,17 @@ impl<'db> Foldable<'db> for InvalidTypeExpression<'db> {
         match self {
             InvalidTypeExpression::InvalidType(ty, scope) => {
                 InvalidTypeExpression::InvalidType(ty.fold(db, rec), scope)
+            }
+            other => other,
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for InvalidTypeExpression<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            InvalidTypeExpression::InvalidType(ty, scope) => {
+                InvalidTypeExpression::InvalidType(ty.mark_cycle(db, marked), scope)
             }
             other => other,
         }

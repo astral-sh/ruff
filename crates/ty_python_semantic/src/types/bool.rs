@@ -4,9 +4,9 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, SubclassOfInner, Type, TypeContext, TypeVarBoundOrConstraints,
-        UnionType,
+        CallArguments, CallDunderError, ClassType, CycleDetector, CycleMarkable, CycleMarkedType,
+        KnownClass, KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
+        TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
         constraints::ConstraintSetBuilder,
         context::InferContext,
@@ -217,9 +217,9 @@ impl<'db> Type<'db> {
                 unfolded.try_bool_impl(db, allow_short_circuit, visitor)
             })?,
             Type::CycleMarked(marked) => visitor.visit(*self, || {
-                marked
-                    .inner(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)
+                marked.map(db, |inner| {
+                    inner.try_bool_impl(db, allow_short_circuit, visitor)
+                })
             })?,
 
             // `Divergent` is the recursive α-leaf. A non-contractive `Recursive` has no structure
@@ -391,6 +391,12 @@ impl<'db> Foldable<'db> for Truthiness {
     }
 }
 
+impl<'db> CycleMarkable<'db> for Truthiness {
+    fn mark_cycle(self, _db: &'db dyn Db, _marked: CycleMarkedType<'db>) -> Self {
+        self
+    }
+}
+
 impl<'db> Foldable<'db> for BoolError<'db> {
     fn fold(self, db: &'db dyn Db, rec: RecursiveType<'db>) -> Self {
         match self {
@@ -417,6 +423,37 @@ impl<'db> Foldable<'db> for BoolError<'db> {
             },
             Self::Other { not_boolable_type } => Self::Other {
                 not_boolable_type: not_boolable_type.fold(db, rec),
+            },
+        }
+    }
+}
+
+impl<'db> CycleMarkable<'db> for BoolError<'db> {
+    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+        match self {
+            Self::NotCallable { not_boolable_type } => Self::NotCallable {
+                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+            },
+            Self::IncorrectArguments {
+                not_boolable_type,
+                truthiness,
+            } => Self::IncorrectArguments {
+                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+                truthiness,
+            },
+            Self::IncorrectReturnType {
+                not_boolable_type,
+                return_type,
+            } => Self::IncorrectReturnType {
+                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+                return_type: return_type.mark_cycle(db, marked),
+            },
+            Self::Union { union, truthiness } => match Type::Union(union).mark_cycle(db, marked) {
+                Type::Union(union) => Self::Union { union, truthiness },
+                not_boolable_type => Self::Other { not_boolable_type },
+            },
+            Self::Other { not_boolable_type } => Self::Other {
+                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
             },
         }
     }

@@ -276,7 +276,7 @@ impl<'db> AllMembers<'db> {
                 rec.map(db, |unfolded| self.extend_with_type(db, unfolded));
             }
             Type::CycleMarked(marked) => {
-                self.extend_with_type(db, marked.inner(db));
+                marked.map(db, |inner| self.extend_with_type(db, inner));
             }
 
             Type::Dynamic(_)

@@ -451,6 +451,12 @@ impl<'db> Type<'db> {
             (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 self.is_trivially_constraint_set_assignable_to(db, unfolded)
             }),
+            (Type::CycleMarked(marked), _) => marked.map(db, |inner| {
+                inner.is_trivially_constraint_set_assignable_to(db, target)
+            }),
+            (_, Type::CycleMarked(marked)) => marked.map(db, |inner| {
+                self.is_trivially_constraint_set_assignable_to(db, inner)
+            }),
             _ => false,
         }
     }
