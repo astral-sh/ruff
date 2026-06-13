@@ -1304,12 +1304,17 @@ class ClassPoint(NamedTuple):
 FunctionalPoint = NamedTuple("FunctionalPoint", [("x", int), ("y", str)])
 CollectionPoint = namedtuple("CollectionPoint", ["x", "y"])
 
+field_names: list[str] = ["x", "y"]
+UnknownPoint = namedtuple("UnknownPoint", field_names)
+
 # error: [unresolved-attribute]
 reveal_type(ClassPoint.__match_args__)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(FunctionalPoint.__match_args__)  # revealed: Unknown
 # error: [unresolved-attribute]
 reveal_type(CollectionPoint.__match_args__)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(UnknownPoint.__match_args__)  # revealed: Unknown
 ```
 
 ### Other attributes
