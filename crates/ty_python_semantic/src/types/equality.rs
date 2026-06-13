@@ -723,14 +723,9 @@ fn finite_alternatives<'db>(
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
         }
         Type::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db)).is_some()
-                && KnownComparisonSemantics::of_type(db, ty, operator).is_some() =>
+            if KnownComparisonSemantics::of_type(db, ty, operator).is_some() =>
         {
-            Some(
-                enum_member_literals(db, instance.class_literal(db), None)
-                    .expect("enum metadata is available")
-                    .collect(),
-            )
+            enum_member_literals(db, instance.class_literal(db), None).map(Iterator::collect)
         }
         _ => None,
     }
