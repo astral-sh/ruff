@@ -1050,7 +1050,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
             let definitely_matched =
                 definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty);
 
-            if subject_ty.is_subtype_of(db, definitely_matched) {
+            if subject_ty.is_equivalent_to(db, definitely_matched)
+                || subject_ty.is_subtype_of(db, definitely_matched)
+            {
                 Truthiness::AlwaysTrue
             } else if subject_ty.is_disjoint_from(db, class_ty) {
                 Truthiness::AlwaysFalse
