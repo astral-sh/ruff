@@ -1390,10 +1390,10 @@ mod tests {
            |                 ^^ Clicking here
            |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:LL:1
+          --> stdlib/builtins.pyi:LL:7
            |
-        LL | Unknown: _SpecialForm
-           | -------
+        LL | class str(Sequence[str]):
+           |       ---
            |
         ");
     }

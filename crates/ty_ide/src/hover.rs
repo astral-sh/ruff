@@ -3844,10 +3844,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Unknown
+        str
         ---------------------------------------------
         ```python
-        Unknown
+        str
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
