@@ -426,6 +426,38 @@ def test_match_sequence_as_pattern_excludes_previous_cases(
             reveal_type(item)  # revealed: Literal[2]
 ```
 
+## Declared pattern captures
+
+A capture still has to satisfy an earlier declaration for the same name. This uses the same
+assignment checks as other bindings; the declaration remains the authoritative type when the
+captured value is incompatible.
+
+```py
+def test_incompatible_declared_capture(subject: int) -> None:
+    item: str
+    match subject:
+        case item:  # error: [invalid-assignment]
+            reveal_type(item)  # revealed: str
+
+def test_incompatible_declared_sequence_capture(subject: tuple[int]) -> None:
+    item: str
+    match subject:
+        case [item]:  # error: [invalid-assignment]
+            reveal_type(item)  # revealed: str
+
+def test_incompatible_declared_star_capture(subject: tuple[int, int]) -> None:
+    rest: list[str]
+    match subject:
+        case [*rest]:  # error: [invalid-assignment]
+            reveal_type(rest)  # revealed: list[str]
+
+def test_compatible_declared_alias(subject: object) -> None:
+    item: int
+    match subject:
+        case int() as item:
+            reveal_type(item)  # revealed: int
+```
+
 When an alias surrounds the whole pattern, it preserves the subject's type variable instead of
 reconstructing a structural type from the pattern. If only some constraints can match, the binding
 keeps both the type variable and the sequence shape established by the pattern.
