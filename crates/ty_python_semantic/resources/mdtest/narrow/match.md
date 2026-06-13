@@ -738,6 +738,7 @@ arms, while `**rest` is always a new `dict` containing the unmatched items.
 ```py
 from collections.abc import Mapping
 from typing import Literal, TypeVar
+from typing_extensions import Never
 
 MappingValueT = TypeVar("MappingValueT")
 
@@ -773,6 +774,13 @@ def test_match_mapping_nested_sequence(
         case {"pair": [number, text]}:
             reveal_type(number)  # revealed: int
             reveal_type(text)  # revealed: str
+
+def test_match_mapping_rejects_empty_key_domain(
+    value: dict[Never, int],
+) -> None:
+    match value:
+        case {"item": item}:
+            reveal_type(item)  # revealed: Never
 
 ```
 

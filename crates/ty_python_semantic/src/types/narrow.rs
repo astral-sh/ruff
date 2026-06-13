@@ -1619,6 +1619,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             return Some(Type::unknown());
         };
 
+        if mapping_key_ty.is_never() {
+            return None;
+        }
         may_compare_equal(self.db, mapping_key_ty, key_ty).then_some(mapping_value_ty)
     }
 
