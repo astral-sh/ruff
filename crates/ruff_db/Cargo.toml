@@ -26,6 +26,7 @@ ty_static = { workspace = true }
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
 camino = { workspace = true }
+compact_str = { workspace = true }
 dashmap = { workspace = true }
 dunce = { workspace = true }
 filetime = { workspace = true }

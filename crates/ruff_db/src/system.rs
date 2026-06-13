@@ -341,7 +341,7 @@ impl Metadata {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug, Hash, get_size2::GetSize)]
 pub enum FileType {
     File,
     Directory,
