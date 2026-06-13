@@ -1433,6 +1433,28 @@ def nested_argumentless_runtime_protocol_pattern_is_not_exhaustive(
         case [RuntimeProtocolWithX()]:
             return 1
 
+def nested_argumentless_runtime_protocol_union_preserves_fallback(
+    value: tuple[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            # revealed: tuple[DeclaredRuntimeProtocolImplementer | int] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+
+def nested_argumentless_runtime_protocol_list_preserves_fallback(
+    value: list[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            # revealed: list[DeclaredRuntimeProtocolImplementer | int] & <Protocol with members '__getitem__', '__len__'>
+            reveal_type(value)
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+
 class BaseWithoutX: ...
 
 @final
