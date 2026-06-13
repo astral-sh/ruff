@@ -42,8 +42,15 @@ impl ProjectWatcher {
     pub fn update(&mut self, db: &ProjectDatabase) {
         let search_paths: Vec<_> = system_module_search_paths(db).collect();
         let project_path = db.project().root(db);
+        let config_paths: Vec<_> = db
+            .project()
+            .metadata(db)
+            .extra_configuration_paths()
+            .iter()
+            .map(SystemPathBuf::as_path)
+            .collect();
 
-        let new_cache_key = Self::compute_cache_key(project_path, &search_paths);
+        let new_cache_key = Self::compute_cache_key(project_path, &search_paths, &config_paths);
 
         if self.cache_key == Some(new_cache_key) {
             return;
@@ -68,13 +75,6 @@ impl ProjectWatcher {
         }
 
         self.has_errored_paths = false;
-
-        let config_paths = db
-            .project()
-            .metadata(db)
-            .extra_configuration_paths()
-            .iter()
-            .map(SystemPathBuf::as_path);
 
         // Watch both the project root and any paths provided by the user on the CLI (removing any redundant nested paths).
         // This is necessary to observe changes to files that are outside the project root.
@@ -131,9 +131,14 @@ impl ProjectWatcher {
         self.cache_key = Some(new_cache_key);
     }
 
-    fn compute_cache_key(project_root: &SystemPath, search_paths: &[&SystemPath]) -> u64 {
+    fn compute_cache_key(
+        project_root: &SystemPath,
+        search_paths: &[&SystemPath],
+        config_paths: &[&SystemPath],
+    ) -> u64 {
         let mut cache_key_hasher = CacheKeyHasher::new();
         search_paths.cache_key(&mut cache_key_hasher);
+        config_paths.cache_key(&mut cache_key_hasher);
         project_root.cache_key(&mut cache_key_hasher);
 
         cache_key_hasher.finish()

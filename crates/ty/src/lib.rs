@@ -6,6 +6,7 @@ mod rule;
 mod version;
 
 use std::fmt::Write;
+use std::io::Read;
 use std::process::{ExitCode, Termination};
 use std::sync::Mutex;
 
@@ -26,6 +27,7 @@ use ruff_diagnostics::Applicability;
 use salsa::Database;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
+use ty_project::metadata::uv::UvWorkspace;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -114,7 +116,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             })?
     };
 
-    let project_path = args
+    let explicit_project_path = args
         .project
         .as_ref()
         .map(|project| {
@@ -126,15 +128,31 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
                 ))
             }
         })
-        .transpose()?
-        .unwrap_or_else(|| cwd.clone());
+        .transpose()?;
+    let project_path = explicit_project_path
+        .as_deref()
+        .unwrap_or(&cwd)
+        .to_path_buf();
 
-    let check_paths: Vec<_> = args
+    let system = OsSystem::new(&cwd);
+    let stdin_uv_workspace = if args.uv_metadata {
+        let mut metadata = Vec::new();
+        std::io::stdin()
+            .read_to_end(&mut metadata)
+            .context("Failed to read `uv workspace metadata` output from stdin")?;
+        Some(
+            UvWorkspace::from_metadata(&cwd, &metadata, &system)
+                .context("Failed to use `uv workspace metadata` output from stdin")?,
+        )
+    } else {
+        None
+    };
+
+    let mut check_paths: Vec<_> = args
         .paths
         .iter()
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
-
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
     } else if args.add_ignore {
@@ -143,7 +161,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         MainLoopMode::Check
     };
 
-    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let config_file = args
@@ -155,9 +172,26 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut project_metadata = match &config_file {
         Some(config_file) => {
             ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+                .with_uv_workspace(stdin_uv_workspace)
+        }
+        None if explicit_project_path.is_some() => {
+            ProjectMetadata::discover_with_uv_workspace(&project_path, &system, None)?
+                .with_uv_workspace(stdin_uv_workspace)
+        }
+        None if stdin_uv_workspace.is_some() => {
+            ProjectMetadata::discover_with_uv_workspace(&project_path, &system, stdin_uv_workspace)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
+
+    // Use uv to discover workspace settings without checking sibling workspace members by default.
+    if check_paths.is_empty()
+        && explicit_project_path.is_none()
+        && let Some(workspace_member) = project_metadata.uv_workspace_member()
+        && workspace_member != project_metadata.root()
+    {
+        check_paths.push(workspace_member.to_path_buf());
+    }
 
     project_metadata.apply_configuration_files(&system)?;
 
