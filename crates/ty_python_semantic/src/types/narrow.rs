@@ -728,6 +728,14 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints with OR semantics (union/disjunction).
+    fn merge_constraint_or(&mut self, other: Self) {
+        self.intersection_disjuncts
+            .extend(other.intersection_disjuncts);
+        self.replacement_disjuncts
+            .extend(other.replacement_disjuncts);
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
@@ -869,16 +877,7 @@ fn merge_constraints_or<'db>(
     for (key, from_constraint) in from {
         match into.entry(key) {
             Entry::Occupied(mut entry) => {
-                let into_constraint = entry.get_mut();
-                // Union the intersection constraints by concatenating disjunct lists.
-                into_constraint
-                    .intersection_disjuncts
-                    .extend(from_constraint.intersection_disjuncts);
-
-                // Concatenate replacement disjuncts
-                into_constraint
-                    .replacement_disjuncts
-                    .extend(from_constraint.replacement_disjuncts);
+                entry.get_mut().merge_constraint_or(from_constraint);
             }
             Entry::Vacant(_) => {
                 // Place only appears in `from`, not in `into`. No constraint needed.
@@ -1195,16 +1194,68 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
         let place = self.expect_place(&subject_place);
         let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
-        let matched_subject_ty = PatternSuccessAnalyzer::new(self.db, self.scope())
-            .match_pattern_subject_type(kind, subject_ty);
         // Keep constraints propagated from the subject expression to related places, but use the
-        // successful pattern's subject type to narrow the subject itself.
+        // successful pattern's positive constraint to narrow the subject itself.
         let mut constraints = expression_constraints.unwrap_or_default();
         constraints.remove(&place);
-        if !matched_subject_ty.is_equivalent_to(self.db, subject_ty) {
-            constraints.insert(place, NarrowingConstraint::intersection(matched_subject_ty));
+        if let Some(subject_constraint) = self.positive_subject_constraint(kind, subject_ty) {
+            constraints.insert(place, subject_constraint);
         }
         (!constraints.is_empty()).then_some(constraints)
+    }
+
+    /// Return the positive constraint produced when `pattern` matches `subject_ty`.
+    ///
+    /// A matched subject type includes the incoming type, which is necessary when that type is
+    /// assigned to a pattern binding. A narrowing constraint is instead applied to the current
+    /// flow type later. For a leaf pattern, keep the direct runtime-test constraint so that the
+    /// incoming type is not intersected once here and then a second time during flow analysis:
+    ///
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// def f(value: Literal[1, 2]) -> None:
+    ///     match value:
+    ///         case 1:
+    ///             reveal_type(value)  # Literal[1]
+    /// ```
+    fn positive_subject_constraint(
+        &mut self,
+        pattern: &PatternPredicateKind<'db>,
+        subject_ty: Type<'db>,
+    ) -> Option<NarrowingConstraint<'db>> {
+        match pattern {
+            PatternPredicateKind::Value(value) => {
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
+                self.evaluate_expr_compare_op(subject_ty, value_ty, None, ast::CmpOp::Eq, true)
+                    .map(NarrowingConstraint::intersection)
+            }
+            PatternPredicateKind::Singleton(singleton) => Some(NarrowingConstraint::intersection(
+                singleton_pattern_type(self.db, *singleton),
+            )),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                self.positive_subject_constraint(pattern, subject_ty)
+            }
+            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => None,
+            PatternPredicateKind::Or(patterns) => {
+                let mut patterns = patterns.iter();
+                let mut constraint =
+                    self.positive_subject_constraint(patterns.next()?, subject_ty)?;
+                for pattern in patterns {
+                    constraint.merge_constraint_or(
+                        self.positive_subject_constraint(pattern, subject_ty)?,
+                    );
+                }
+                Some(constraint)
+            }
+            _ => {
+                let matched_subject_ty = PatternSuccessAnalyzer::new(self.db, self.scope())
+                    .match_pattern_subject_type(pattern, subject_ty);
+                (!matched_subject_ty.is_equivalent_to(self.db, subject_ty))
+                    .then(|| NarrowingConstraint::intersection(matched_subject_ty))
+            }
+        }
     }
 }
 
