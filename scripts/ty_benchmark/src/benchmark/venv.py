@@ -74,8 +74,8 @@ class Venv:
             # our projects isn't unexpectedly broken by a change in the
             # annotations of one of that project's dependencies
             "--exclude-newer",
-            "2025-12-13T00:00:00Z",
-            "mypy",  # We need to install mypy into the virtual environment or it fails to load plugins.
+            "2026-06-07T00:00:00Z",
+            "mypy==2.1.0",  # We need to install mypy into the virtual environment or it fails to load plugins.
             *pip_install_args,
         ]
 
