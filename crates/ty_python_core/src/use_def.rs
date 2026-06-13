@@ -262,8 +262,8 @@ use crate::reachability_constraints::{
 use crate::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::symbol::ScopedSymbolId;
 use crate::use_def::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState,
+    Bindings, Declarations, EnclosingSnapshot, LiveDeclaration, LiveDeclarationsIterator,
+    PlaceState,
 };
 use crate::{BoundnessAnalysis, EnclosingSnapshotResult, PossiblyNarrowedPlaces, SemanticIndex};
 
@@ -421,8 +421,81 @@ impl PlaceStateInterner {
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct RetainedBindings {
     ends: FrozenIndexVec<InternedBindingsId, u32>,
-    live_bindings: Box<[LiveBinding]>,
+    live_bindings: RetainedLiveBindings,
 }
+
+#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+enum RetainedLiveBindings {
+    /// Fallback for unusually large scopes whose constraint IDs do not fit in 16 bits.
+    Dense(Box<[LiveBinding]>),
+    /// The common representation, with 16-bit scope-local constraint IDs.
+    Compact(Box<[CompactLiveBinding]>),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+struct CompactLiveBinding {
+    binding: ScopedDefinitionId,
+    narrowing_constraint: u16,
+    reachability_constraint: u16,
+}
+
+impl CompactLiveBinding {
+    const NARROWING_ALWAYS_TRUE: u16 = u16::MAX;
+    const NARROWING_ALWAYS_FALSE: u16 = u16::MAX - 1;
+    const REACHABILITY_ALWAYS_TRUE: u16 = u16::MAX;
+    const REACHABILITY_AMBIGUOUS: u16 = u16::MAX - 1;
+    const REACHABILITY_ALWAYS_FALSE: u16 = u16::MAX - 2;
+
+    fn try_from_live_binding(binding: &LiveBinding) -> Option<Self> {
+        Some(Self {
+            binding: binding.binding(),
+            narrowing_constraint: Self::encode_narrowing(binding.narrowing_constraint())?,
+            reachability_constraint: Self::encode_reachability(binding.reachability_constraint())?,
+        })
+    }
+
+    fn encode_narrowing(constraint: ScopedNarrowingConstraint) -> Option<u16> {
+        match constraint {
+            ScopedNarrowingConstraint::ALWAYS_TRUE => Some(Self::NARROWING_ALWAYS_TRUE),
+            ScopedNarrowingConstraint::ALWAYS_FALSE => Some(Self::NARROWING_ALWAYS_FALSE),
+            _ => {
+                let index = u16::try_from(constraint.index()).ok()?;
+                (index < Self::NARROWING_ALWAYS_FALSE).then_some(index)
+            }
+        }
+    }
+
+    fn encode_reachability(constraint: ScopedReachabilityConstraintId) -> Option<u16> {
+        match constraint {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => Some(Self::REACHABILITY_ALWAYS_TRUE),
+            ScopedReachabilityConstraintId::AMBIGUOUS => Some(Self::REACHABILITY_AMBIGUOUS),
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => Some(Self::REACHABILITY_ALWAYS_FALSE),
+            _ => {
+                let index = u16::try_from(constraint.index()).ok()?;
+                (index < Self::REACHABILITY_ALWAYS_FALSE).then_some(index)
+            }
+        }
+    }
+
+    fn narrowing_constraint(self) -> ScopedNarrowingConstraint {
+        match self.narrowing_constraint {
+            Self::NARROWING_ALWAYS_TRUE => ScopedNarrowingConstraint::ALWAYS_TRUE,
+            Self::NARROWING_ALWAYS_FALSE => ScopedNarrowingConstraint::ALWAYS_FALSE,
+            index => ScopedNarrowingConstraint::new(usize::from(index)),
+        }
+    }
+
+    fn reachability_constraint(self) -> ScopedReachabilityConstraintId {
+        match self.reachability_constraint {
+            Self::REACHABILITY_ALWAYS_TRUE => ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            Self::REACHABILITY_AMBIGUOUS => ScopedReachabilityConstraintId::AMBIGUOUS,
+            Self::REACHABILITY_ALWAYS_FALSE => ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            index => ScopedReachabilityConstraintId::new(usize::from(index)),
+        }
+    }
+}
+
+static_assertions::assert_eq_size!(CompactLiveBinding, [u32; 2]);
 
 struct RetainedBindingsBuilder {
     ends: IndexVec<InternedBindingsId, u32>,
@@ -455,24 +528,41 @@ impl RetainedBindingsBuilder {
             reachability_constraints.mark_used(binding.reachability_constraint());
             narrowing_constraints.mark_used(binding.narrowing_constraint());
         }
+
+        let compact = self
+            .live_bindings
+            .iter()
+            .map(CompactLiveBinding::try_from_live_binding)
+            .collect::<Option<Box<[_]>>>();
+        let live_bindings = match compact {
+            Some(compact) => RetainedLiveBindings::Compact(compact),
+            None => RetainedLiveBindings::Dense(self.live_bindings.into_boxed_slice()),
+        };
+
         RetainedBindings {
             ends: self.ends.into(),
-            live_bindings: self.live_bindings.into_boxed_slice(),
+            live_bindings,
         }
     }
 }
 
-impl Index<InternedBindingsId> for RetainedBindings {
-    type Output = [LiveBinding];
-
-    fn index(&self, index: InternedBindingsId) -> &Self::Output {
+impl RetainedBindings {
+    fn iter(&self, index: InternedBindingsId) -> LiveBindingIterator<'_> {
         let end = self.ends[index];
         let start = if index.index() == 0 {
             0
         } else {
             self.ends[InternedBindingsId::new(index.index() - 1)]
         };
-        &self.live_bindings[start as usize..end as usize]
+        let range = start as usize..end as usize;
+        match &self.live_bindings {
+            RetainedLiveBindings::Dense(bindings) => {
+                LiveBindingIterator::Dense(bindings[range].iter())
+            }
+            RetainedLiveBindings::Compact(bindings) => {
+                LiveBindingIterator::Compact(bindings[range].iter())
+            }
+        }
     }
 }
 
@@ -707,7 +797,7 @@ impl<'db> UseDefMap<'db> {
     pub fn bindings_at_use(&self, use_id: ScopedUseId) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings_id = self.bindings_by_use[use_id];
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            self.interned_bindings.iter(bindings_id),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -721,7 +811,7 @@ impl<'db> UseDefMap<'db> {
             .map(|member_bindings| {
                 member_bindings.iter().map(|bindings| {
                     self.bindings_iterator(
-                        bindings.as_slice(),
+                        LiveBindingIterator::Dense(bindings.as_slice().iter()),
                         BoundnessAnalysis::BasedOnUnboundVisibility,
                     )
                 })
@@ -800,7 +890,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.symbol_states[symbol].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            self.interned_bindings.iter(place_state_id.bindings_id()),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -811,7 +901,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.member_states[member].end_of_scope;
         self.bindings_iterator(
-            &self.interned_bindings[place_state_id.bindings_id()],
+            self.interned_bindings.iter(place_state_id.bindings_id()),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -831,7 +921,7 @@ impl<'db> UseDefMap<'db> {
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.symbol_states[symbol].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
+        let bindings = self.interned_bindings.iter(place_state_id.bindings_id());
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -840,7 +930,7 @@ impl<'db> UseDefMap<'db> {
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let place_state_id = self.member_states[member].reachable;
-        let bindings = &self.interned_bindings[place_state_id.bindings_id()];
+        let bindings = self.interned_bindings.iter(place_state_id.bindings_id());
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -861,12 +951,10 @@ impl<'db> UseDefMap<'db> {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
             Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
-                EnclosingSnapshotResult::FoundBindings(
-                    self.bindings_iterator(
-                        &self.interned_bindings[*bindings_id],
-                        boundness_analysis,
-                    ),
-                )
+                EnclosingSnapshotResult::FoundBindings(self.bindings_iterator(
+                    self.interned_bindings.iter(*bindings_id),
+                    boundness_analysis,
+                ))
             }
             None => EnclosingSnapshotResult::NotFound,
         }
@@ -878,7 +966,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         let bindings_id = self.definitions_by_definition[&definition].bindings;
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            self.interned_bindings.iter(bindings_id),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -982,7 +1070,7 @@ impl<'db> UseDefMap<'db> {
                     BoundnessAnalysis::AssumeBound,
                 );
                 let bindings = self.bindings_iterator(
-                    &self.interned_bindings[reachable.bindings_id()],
+                    self.interned_bindings.iter(reachable.bindings_id()),
                     BoundnessAnalysis::AssumeBound,
                 );
                 (symbol_id, declarations, bindings)
@@ -992,7 +1080,7 @@ impl<'db> UseDefMap<'db> {
 
     fn bindings_iterator<'map>(
         &'map self,
-        bindings: &'map [LiveBinding],
+        bindings: LiveBindingIterator<'map>,
         boundness_analysis: BoundnessAnalysis,
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
@@ -1001,7 +1089,7 @@ impl<'db> UseDefMap<'db> {
             narrowing_constraints: &self.narrowing_constraints,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
-            inner: bindings.iter(),
+            inner: bindings,
         }
     }
 
@@ -1051,13 +1139,46 @@ pub(crate) struct EnclosingSnapshotKey {
 type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>;
 
 #[derive(Clone, Debug)]
+enum LiveBindingIterator<'a> {
+    Dense(std::slice::Iter<'a, LiveBinding>),
+    Compact(std::slice::Iter<'a, CompactLiveBinding>),
+}
+
+impl Iterator for LiveBindingIterator<'_> {
+    type Item = (
+        ScopedDefinitionId,
+        ScopedNarrowingConstraint,
+        ScopedReachabilityConstraintId,
+    );
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Dense(iter) => iter.next().map(|binding| {
+                (
+                    binding.binding(),
+                    binding.narrowing_constraint(),
+                    binding.reachability_constraint(),
+                )
+            }),
+            Self::Compact(iter) => iter.next().map(|binding| {
+                (
+                    binding.binding,
+                    binding.narrowing_constraint(),
+                    binding.reachability_constraint(),
+                )
+            }),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub struct BindingWithConstraintsIterator<'map, 'db> {
     all_definitions: &'map IndexSlice<ScopedDefinitionId, DefinitionState<'db>>,
     predicates: &'map Predicates<'db>,
     narrowing_constraints: &'map NarrowingConstraints,
     reachability_constraints: &'map ReachabilityConstraints,
     boundness_analysis: BoundnessAnalysis,
-    inner: LiveBindingsIterator<'map>,
+    inner: LiveBindingIterator<'map>,
 }
 
 impl<'map, 'db> BindingWithConstraintsIterator<'map, 'db> {
@@ -1083,15 +1204,17 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
         self.inner
             .next()
-            .map(|live_binding| BindingWithConstraints {
-                binding: self.all_definitions[live_binding.binding()],
-                binding_order: live_binding.binding(),
-                narrowing_constraint: NarrowingEvaluator {
-                    constraint: live_binding.narrowing_constraint(),
-                    predicates,
-                    narrowing_constraints,
-                },
-                reachability_constraint: live_binding.reachability_constraint(),
+            .map(|(binding, narrowing_constraint, reachability_constraint)| {
+                BindingWithConstraints {
+                    binding: self.all_definitions[binding],
+                    binding_order: binding,
+                    narrowing_constraint: NarrowingEvaluator {
+                        constraint: narrowing_constraint,
+                        predicates,
+                        narrowing_constraints,
+                    },
+                    reachability_constraint,
+                }
             })
     }
 }
@@ -2274,5 +2397,58 @@ impl<'db> UseDefMapBuilder<'db> {
 
         interned_ids_by_snapshot.shrink_to_fit();
         interned_ids_by_snapshot
+    }
+}
+
+#[cfg(test)]
+mod retained_bindings_tests {
+    use super::*;
+
+    #[test]
+    fn compact_constraint_ids_round_trip() {
+        for constraint in [
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
+            ScopedNarrowingConstraint::ALWAYS_FALSE,
+            ScopedNarrowingConstraint::new(usize::from(u16::MAX - 2)),
+        ] {
+            let encoded = CompactLiveBinding::encode_narrowing(constraint).unwrap();
+            let compact = CompactLiveBinding {
+                binding: ScopedDefinitionId::UNBOUND,
+                narrowing_constraint: encoded,
+                reachability_constraint: CompactLiveBinding::REACHABILITY_ALWAYS_TRUE,
+            };
+            assert_eq!(compact.narrowing_constraint(), constraint);
+        }
+
+        for constraint in [
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            ScopedReachabilityConstraintId::AMBIGUOUS,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            ScopedReachabilityConstraintId::new(usize::from(u16::MAX - 3)),
+        ] {
+            let encoded = CompactLiveBinding::encode_reachability(constraint).unwrap();
+            let compact = CompactLiveBinding {
+                binding: ScopedDefinitionId::UNBOUND,
+                narrowing_constraint: CompactLiveBinding::NARROWING_ALWAYS_TRUE,
+                reachability_constraint: encoded,
+            };
+            assert_eq!(compact.reachability_constraint(), constraint);
+        }
+    }
+
+    #[test]
+    fn first_non_compact_constraint_ids_are_rejected() {
+        assert_eq!(
+            CompactLiveBinding::encode_narrowing(ScopedNarrowingConstraint::new(usize::from(
+                u16::MAX - 1,
+            ))),
+            None,
+        );
+        assert_eq!(
+            CompactLiveBinding::encode_reachability(ScopedReachabilityConstraintId::new(
+                usize::from(u16::MAX - 2),
+            )),
+            None,
+        );
     }
 }
