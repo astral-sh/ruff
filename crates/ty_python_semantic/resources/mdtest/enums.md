@@ -441,6 +441,51 @@ reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 ```
 
+### Assigned `__init__`
+
+An opaque `__init__` shadows a function with the same name, so we can't validate members against it
+(although a separate `__new__` still validates the member arguments). Without an explicit `_value_`
+annotation, `.value` becomes `Any`:
+
+```py
+from enum import Enum
+from typing import Any, cast
+
+def external_init(self: Any, value: object) -> None: ...
+
+class ReassignedInit(Enum):
+    _value_: int
+
+    def __init__(self, value: int) -> None: ...
+
+    __init__ = cast(Any, external_init)
+
+    A = "accepted by the assigned hook"
+
+reveal_type(ReassignedInit.A.value)  # revealed: int
+
+class AssignedInitWithFunctionNew(Enum):
+    def __new__(cls, value: int): ...
+
+    __init__ = external_init
+
+    A = "not an int"  # error: [invalid-assignment]
+
+class FunctionInitBase(Enum):
+    def __init__(self, value: int) -> None: ...
+
+class AssignedInitMiddle(FunctionInitBase):
+    __init__ = cast(Any, external_init)
+
+class AssignedInitChild(AssignedInitMiddle):
+    A = "accepted by the assigned hook"
+
+reveal_type(AssignedInitChild.A.value)  # revealed: Any
+
+def assigned_init_instance(value: AssignedInitChild) -> None:
+    reveal_type(value.value)  # revealed: Any
+```
+
 ### `__new__` without `_value_` annotation
 
 When `__new__` is defined but no explicit `_value_` annotation exists, member RHS values are passed
@@ -620,6 +665,58 @@ class Child(Base):
     GITHUB = "github"  # error: [invalid-assignment]
 ```
 
+### Assigned `__new__`
+
+Assigning to `__new__` can prevent us from validating members against its signature or inferring
+`.value` from the member right-hand side. Even if we can't analyze `__new__`, though, we still
+respect an explicit `_value_` annotation, and `__init__` can still validate the member arguments:
+
+```py
+from enum import Enum
+from ty_extensions import enum_members
+from typing import Any, cast
+
+def external_new(cls: type[Any], value: object) -> Any: ...
+
+class ReassignedNew(Enum):
+    _value_: int
+
+    def __new__(cls, value: int): ...
+
+    __new__ = cast(Any, staticmethod(external_new))
+
+    A = "accepted by the assigned hook"
+    B = "accepted by the assigned hook"
+
+reveal_type(ReassignedNew.A.value)  # revealed: int
+
+# revealed: tuple[Literal["A"], Literal["B"]]
+reveal_type(enum_members(ReassignedNew))
+
+class AssignedNewWithFunctionInit(Enum):
+    __new__ = staticmethod(external_new)
+
+    def __init__(self, value: int) -> None: ...
+
+    A = "not an int"  # error: [invalid-assignment]
+```
+
+An assigned hook also shadows same-name function hooks from classes later in the MRO. We should not
+validate members against the shadowed method:
+
+```py
+class FunctionNewBase(Enum):
+    def __new__(cls, value: int): ...
+
+class AssignedNewMiddle(FunctionNewBase):
+    __new__ = staticmethod(external_new)
+
+class AssignedNewChild(AssignedNewMiddle):
+    A = "accepted by the assigned hook"
+
+reveal_type(AssignedNewChild.A.value)  # revealed: Any
+```
+
 ### Custom enum metaclass member transformation
 
 A custom `EnumMeta` metaclass can rewrite member values before the stdlib enum constructor validates
@@ -658,6 +755,33 @@ class AnnotatedChoices(IntegerChoices):
 
 reveal_type(AnnotatedChoices.GOOD.value)  # revealed: int
 reveal_type(AnnotatedChoices.GOOD._value_)  # revealed: int
+```
+
+The metaclass can also transform assignments through `__prepare__` or through an assigned `__new__`
+hook:
+
+```py
+from enum import EnumMeta, IntEnum
+from typing import Any
+
+class PreparedChoicesType(EnumMeta):
+    @classmethod
+    def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwds: Any) -> Any: ...
+
+class PreparedChoices(IntEnum, metaclass=PreparedChoicesType):
+    GOOD = 1, "I like this"
+
+reveal_type(PreparedChoices.GOOD.value)  # revealed: Any
+
+def external_metaclass_new(*args: Any, **kwargs: Any) -> Any: ...
+
+class AssignedChoicesType(EnumMeta):
+    __new__ = staticmethod(external_metaclass_new)
+
+class AssignedChoices(IntEnum, metaclass=AssignedChoicesType):
+    GOOD = 1, "I like this"
+
+reveal_type(AssignedChoices.GOOD.value)  # revealed: Any
 ```
 
 ### Non-member attributes with disallowed type
@@ -1204,6 +1328,51 @@ class CustomNextValueInt(IntEnum):
 # `IntEnum` inherits `_value_: int`, which takes precedence over `_generate_next_value_`
 # revealed: int
 reveal_type(CustomNextValueInt.A.value)
+```
+
+Assigning to `_generate_next_value_` can prevent us from inspecting its return type, in which case,
+`auto()` values become `Any` while explicit member values remain precise. We also avoid inferring
+aliases between generated values:
+
+```py
+from enum import Enum, auto
+from ty_extensions import enum_members
+from typing import Any, Literal, cast
+
+def external_generate_next_value(*args: Any) -> Any: ...
+
+class ReassignedGenerator(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["same"]:
+        return "same"
+
+    _generate_next_value_ = cast(Any, staticmethod(external_generate_next_value))
+
+    A = auto()
+    B = auto()
+    EXPLICIT = 1
+
+reveal_type(ReassignedGenerator.A.value)  # revealed: Any
+reveal_type(ReassignedGenerator.EXPLICIT.value)  # revealed: Literal[1]
+# revealed: tuple[Literal["A"], Literal["B"], Literal["EXPLICIT"]]
+reveal_type(enum_members(ReassignedGenerator))
+```
+
+An assigned generator also shadows a function generator from a class later in the MRO:
+
+```py
+class FunctionGeneratorBase(Enum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values) -> Literal["same"]:
+        return "same"
+
+class AssignedGeneratorMiddle(FunctionGeneratorBase):
+    _generate_next_value_ = staticmethod(external_generate_next_value)
+
+class AssignedGeneratorChild(AssignedGeneratorMiddle):
+    A = auto()
+
+reveal_type(AssignedGeneratorChild.A.value)  # revealed: Any
 ```
 
 When an enum defines both `_generate_next_value_` and a construction hook (`__new__`, `__init__`, or
