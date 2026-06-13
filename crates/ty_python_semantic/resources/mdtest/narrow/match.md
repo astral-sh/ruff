@@ -1217,6 +1217,26 @@ def builtin_match_self_subclass_is_exhaustive(value: MyInt) -> int:
         case MyInt(_):
             return 1
 
+def builtin_match_self_is_exhaustive_for_proper_subclass(value: MyInt) -> int:
+    match value:
+        case int(_):
+            return 1
+
+def nested_builtin_match_self_is_exhaustive_for_proper_subclass(
+    value: tuple[MyInt],
+) -> int:
+    match value:
+        case [int(_)]:
+            return 1
+
+def builtin_match_self_literal_is_not_exhaustive(
+    value: MyInt,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case int(0):
+            return 1
+
 class MyIntWithValidMatchArgs(int):
     __match_args__ = ("real",)
 
@@ -1368,6 +1388,25 @@ def runtime_protocol_pattern_is_not_exhaustive_for_non_final_implementer(
 ) -> int:
     match value:
         case RuntimeProtocolWithX(x=_):
+            return 1
+
+class DeclaredRuntimeProtocolImplementer:
+    x: int
+
+def argumentless_runtime_protocol_pattern_is_not_exhaustive(
+    value: DeclaredRuntimeProtocolImplementer,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case RuntimeProtocolWithX():
+            return 1
+
+def nested_argumentless_runtime_protocol_pattern_is_not_exhaustive(
+    value: tuple[DeclaredRuntimeProtocolImplementer],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [RuntimeProtocolWithX()]:
             return 1
 
 class BaseWithoutX: ...
