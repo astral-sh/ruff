@@ -2835,6 +2835,20 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, actual_instance, polarity, seen);
             }
 
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::KnownInstance(known_instance @ KnownInstanceType::Range { .. }),
+            ) => {
+                // `range(...)` is a known instance only to preserve its truthiness; use the
+                // ordinary `range` instance when inferring through generic nominal/protocol types.
+                return self.infer_map_impl(
+                    formal,
+                    known_instance.instance_fallback(self.db),
+                    polarity,
+                    seen,
+                );
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.

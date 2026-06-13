@@ -134,6 +134,9 @@ pub enum KnownInstanceType<'db> {
     /// A `functools.partial(func, ...)` call result where we could determine
     /// the remaining callable signature after binding some arguments.
     FunctoolsPartial(FunctoolsPartialInstance<'db>),
+
+    /// A `range(...)` call result where we could determine whether it is non-empty.
+    Range { is_non_empty: bool },
 }
 
 pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -153,6 +156,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_type_alias_type(db, type_alias);
         }
         KnownInstanceType::Deprecated(_)
+        | KnownInstanceType::Range { .. }
         | KnownInstanceType::ConstraintSet(_)
         | KnownInstanceType::GenericContext(_)
         | KnownInstanceType::Specialization(_) => {
@@ -221,6 +225,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::SubscriptedProtocol(context) => Some(Self::SubscriptedProtocol(context)),
             Self::SubscriptedGeneric(context) => Some(Self::SubscriptedGeneric(context)),
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
+            Self::Range { is_non_empty } => Some(Self::Range { is_non_empty }),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
             Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
@@ -288,6 +293,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Sentinel(_) => KnownClass::Sentinel,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
             Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
+            Self::Range { .. } => KnownClass::Range,
         }
     }
 
@@ -414,6 +420,7 @@ impl<'db> KnownInstanceType<'db> {
             | KnownInstanceType::SubscriptedGeneric(_)
             | KnownInstanceType::TypeAliasType(_)
             | KnownInstanceType::Deprecated(_)
+            | KnownInstanceType::Range { .. }
             | KnownInstanceType::Field(_)
             | KnownInstanceType::ConstraintSet(_)
             | KnownInstanceType::GenericContext(_)

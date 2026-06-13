@@ -5728,12 +5728,14 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Sentinel(sentinel) => {
                     Ok(Type::KnownInstance(KnownInstanceType::Sentinel(*sentinel)))
                 }
-                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
-                        *self, scope_id
-                    )],
-                    fallback_type: Type::unknown(),
-                }),
+                KnownInstanceType::FunctoolsPartial(_) | KnownInstanceType::Range { .. } => {
+                    Err(InvalidTypeExpressionError {
+                        invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                            *self, scope_id
+                        )],
+                        fallback_type: Type::unknown(),
+                    })
+                }
             },
 
             Type::SpecialForm(special_form) => special_form
@@ -6556,6 +6558,7 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::NamedTupleSpec(_)
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::Sentinel(_)
+                | KnownInstanceType::Range { .. }
                 | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }

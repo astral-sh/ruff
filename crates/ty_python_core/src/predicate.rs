@@ -130,6 +130,11 @@ pub enum PredicateNode<'db> {
     /// call is `Unknown`/`Any`, because that would result in too many false
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
+    /// A direct `range(...)` call used as a `for` iterable.
+    ///
+    /// This is resolved semantically during type checking, so shadowed `range` calls stay
+    /// ambiguous.
+    IsNonEmptyIterable(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
