@@ -1609,7 +1609,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             reason = "bindings for distinct places are collected independently"
         )]
         for place_id in loop_header_places {
-            for live_binding in use_def.loop_back_bindings(*place_id) {
+            for live_binding in use_def.current_bindings(*place_id) {
                 if live_binding.binding() >= loop_min_definition_id {
                     loop_header.add_binding(*place_id, live_binding);
                 }
@@ -3425,7 +3425,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             // A named-expression subject creates its target binding instead of
                             // reading one, so snapshot the binding that was just created.
                             self.current_use_def_map()
-                                .loop_back_bindings(place)
+                                .current_bindings(place)
                                 .map(|binding| LiveBinding::binding(&binding))
                                 .collect()
                         },
