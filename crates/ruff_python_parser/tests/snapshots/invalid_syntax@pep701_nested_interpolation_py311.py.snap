@@ -38,6 +38,7 @@ Module(
                                                                 ),
                                                             },
                                                         ),
+                                                        expression_source: "1",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -77,6 +78,7 @@ Module(
                                                                                     },
                                                                                 },
                                                                             ),
+                                                                            expression_source: "'aa'",
                                                                             debug_text: None,
                                                                             conversion: None,
                                                                             format_spec: None,
@@ -137,6 +139,7 @@ Module(
                                                                 ),
                                                             },
                                                         ),
+                                                        expression_source: "1",
                                                         debug_text: None,
                                                         conversion: None,
                                                         format_spec: Some(
@@ -176,6 +179,7 @@ Module(
                                                                                     },
                                                                                 },
                                                                             ),
+                                                                            expression_source: "\"\\n\"",
                                                                             debug_text: None,
                                                                             conversion: None,
                                                                             format_spec: None,

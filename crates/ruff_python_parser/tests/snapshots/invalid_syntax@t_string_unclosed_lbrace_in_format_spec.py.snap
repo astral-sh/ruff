@@ -43,6 +43,7 @@ Module(
                                                             ctx: Load,
                                                         },
                                                     ),
+                                                    expression_source: "x",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: Some(
@@ -101,6 +102,7 @@ Module(
                                                             ctx: Load,
                                                         },
                                                     ),
+                                                    expression_source: "x",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: Some(

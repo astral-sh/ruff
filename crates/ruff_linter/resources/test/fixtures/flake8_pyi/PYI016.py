@@ -156,3 +156,9 @@ field53: typing.Literal[f"{x:.2f}"] | typing.Literal[f"{x:.3f}"]  # OK (differen
 field54: typing.Literal[f"{x}"] | typing.Literal[f"{x}"]  # Error (true duplicate)
 field55: typing.Literal[f"{x =}"] | typing.Literal[f"{x=}"]  # OK (different debug text due to spaces)
 field56: typing.Literal[f"{0x0=}"] | typing.Literal[f"{0o0=}"]  # OK (different source text: "0x0" vs "0o0")
+
+# Regression test for https://github.com/astral-sh/ruff/issues/25164
+# t-string interpolations preserve their expression source text
+field57: typing.Annotated[int, t"{00}"] | typing.Annotated[int, t"{000}"]  # OK (different expression source: "00" vs "000")
+field58: typing.Annotated[int, t"{0x0=}"] | typing.Annotated[int, t"{0o0=}"]  # OK (different debug expression source: "0x0" vs "0o0")
+field59: typing.Annotated[int, t"{x}"] | typing.Annotated[int, t"{x}"]  # Error (true duplicate)

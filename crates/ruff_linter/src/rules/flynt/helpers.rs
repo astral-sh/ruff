@@ -5,6 +5,7 @@ use ruff_text_size::TextRange;
 fn to_interpolated_string_interpolation_element(inner: &Expr) -> ast::InterpolatedStringElement {
     ast::InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
         expression: Box::new(inner.clone()),
+        expression_source: "".into(),
         debug_text: None,
         conversion: ConversionFlag::None,
         format_spec: None,

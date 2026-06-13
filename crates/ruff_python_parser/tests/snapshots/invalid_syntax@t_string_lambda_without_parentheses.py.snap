@@ -69,6 +69,7 @@ Module(
                                                             ),
                                                         },
                                                     ),
+                                                    expression_source: "lambda x:",
                                                     debug_text: None,
                                                     conversion: None,
                                                     format_spec: None,
