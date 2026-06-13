@@ -214,3 +214,16 @@ class Spam:
     def __new__(cls) -> 'Spam':
         """New!!"""
         return cls()
+
+
+# OK - bare `return` in a generator returns `None`; the loose `-> object`
+# annotation doesn't describe the generator's return value
+def my_generator(val: object) -> object:
+    """Minimal generator.
+
+    Yields:
+        val
+    """
+    if val is not None:
+        yield val
+    return
