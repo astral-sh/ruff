@@ -616,6 +616,28 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
             reveal_type(item)  # revealed: Never
 ```
 
+A `TypedDict` is a `dict` at runtime, so it can also satisfy a runtime-checkable protocol. Class
+pattern filtering retains that structural overlap instead of treating every non-`dict` class as
+disjoint.
+
+```py
+from typing import Protocol, TypedDict, runtime_checkable
+
+class ProtocolPayload(TypedDict):
+    value: int
+
+@runtime_checkable
+class SizedProtocol(Protocol):
+    def __len__(self) -> int: ...
+
+def test_match_typed_dict_alias_preserves_runtime_protocol_overlap(
+    value: ProtocolPayload,
+) -> None:
+    match value:
+        case SizedProtocol() as item:
+            reveal_type(item)  # revealed: ProtocolPayload
+```
+
 Class patterns pass the type of each extracted attribute to their nested patterns. The surrounding
 `as` pattern keeps the subject's original generic type or type variable.
 
