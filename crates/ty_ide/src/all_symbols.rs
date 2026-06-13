@@ -711,13 +711,20 @@ def zqzqzq():
 
         assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
-         --> pandas/__init__.py:2:5
+         --> pandas/__init__.py:2:27
           |
         2 | from pandas.io.api import *
-          |     ^^^^^^
+          |                           ^
           |
         info: Function zqzqzq
         ");
+
+        let symbols = all_symbols(&test.db, test.cursor.file, &QueryPattern::fuzzy("zqzqzq"));
+        let symbol = symbols
+            .iter()
+            .find_map(|info| info.symbol.as_ref())
+            .expect("wildcard-imported symbol");
+        assert_eq!(symbol.full_range, symbol.name_range);
     }
 
     /// This tests that when we have multiple re-exports
