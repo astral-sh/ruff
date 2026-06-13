@@ -558,6 +558,29 @@ arbitrary `int` subclass with an arbitrary `__eq__`, so we can't actually narrow
 In the second `match`'s `case "bar"` we know `x == "bar"`. As discussed above, this isn't enough to
 rule out `int`, but we know that `"foo" == "bar"` is false so we can eliminate `Literal["foo"]`.
 
+A final subclass with inherited builtin equality can compare equal to a literal despite being
+disjoint from the literal's type. This applies both to literal patterns and dotted value patterns:
+
+```py
+from typing import Final, final
+
+@final
+class FinalPatternInt(int): ...
+
+class PatternValues:
+    ONE: Final = 1
+
+def _(value: FinalPatternInt):
+    match value:
+        case 1 as captured:
+            reveal_type(value)  # revealed: FinalPatternInt
+            reveal_type(captured)  # revealed: @Todo(`match` pattern definition types)
+
+    match value:
+        case PatternValues.ONE:
+            reveal_type(value)  # revealed: FinalPatternInt
+```
+
 More examples follow.
 
 ```py
@@ -580,6 +603,64 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
             reveal_type(x)  # revealed: (int & ~Literal[42]) | Literal[b"foo"] | float | complex
         case _:
             reveal_type(x)  # revealed: Literal["bar"] | (int & ~Literal[42]) | float | complex
+```
+
+## Enum equality semantics
+
+Enum value patterns use the enum class's actual `__eq__` implementation. Members of `StrEnum`
+therefore compare equal to string literals with the same value:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal, assert_never, reveal_type
+
+class Color(StrEnum):
+    RED = "r"
+    GREEN = "g"
+    BLUE = "b"
+
+def test_literal_as_enum(x: Literal["g"]) -> None:
+    match x:
+        case Color.RED:
+            assert_never(x)
+        case Color.GREEN:
+            reveal_type(x)  # revealed: Literal["g"]
+        case Color.BLUE:
+            assert_never(x)
+        case _:
+            assert_never(x)
+
+def test_enum_as_literal(y: Literal[Color.BLUE]) -> None:
+    match y:
+        case "r":
+            assert_never(y)
+        case "g":
+            assert_never(y)
+        case "b":
+            reveal_type(y)  # revealed: Literal[Color.BLUE]
+        case _:
+            assert_never(y)
+
+class AlwaysEqual(Enum):
+    RED = "r"
+    GREEN = "g"
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def custom_eq(value: AlwaysEqual) -> None:
+    match value:
+        case AlwaysEqual.RED:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case AlwaysEqual.GREEN:
+            reveal_type(value)  # revealed: AlwaysEqual
+        case _:
+            reveal_type(value)  # revealed: AlwaysEqual
 ```
 
 ## Value patterns with guard

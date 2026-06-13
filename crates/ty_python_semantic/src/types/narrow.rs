@@ -31,6 +31,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
 use super::enums::{enum_member_literals, enum_metadata};
+use super::equality::{evaluate_type_equality, evaluate_type_inequality};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -1249,109 +1250,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
-
-        // We can only narrow on equality checks against single-valued types.
-        if is_union_of_single_valued(self.db, rhs_ty) {
-            // The fully-general (and more efficient) approach here would be to introduce a
-            // `NeverEqualTo` type that can wrap a single-valued type, and then simply return
-            // `~NeverEqualTo(rhs_ty)` here and let union/intersection builder sort it out. This is
-            // how we handle `AlwaysTruthy` and `AlwaysFalsy`. But this means we have to deal with
-            // this type everywhere, and possibly have it show up unsimplified in some cases, and
-            // so we instead prefer to just do the simplification here. (Another hybrid option that
-            // would be similar to this, but more efficient, would be to allow narrowing to return
-            // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
-            // instead of intersecting with a type.)
-
-            // Return `true` if `lhs_ty` consists only of `LiteralString` and types that cannot
-            // compare equal to `rhs_ty`.
-            fn can_narrow_to_rhs<'db>(
-                db: &'db dyn Db,
-                lhs_ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> bool {
-                if let Type::Union(union) = lhs_ty {
-                    return union
-                        .elements(db)
-                        .iter()
-                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty));
-                }
-
-                if let Some(alternatives) = finite_single_valued_union_alternatives(db, lhs_ty) {
-                    return alternatives
-                        .into_iter()
-                        .all(|ty| can_narrow_to_rhs(db, ty, rhs_ty));
-                }
-
-                // Either `rhs_ty` is a string literal, in which case we can narrow to it (no other
-                // string literal could compare equal to it), or it is not a string literal, in which
-                // case (given that it is single-valued), LiteralString cannot compare equal to it.
-                if lhs_ty.is_subtype_of(db, Type::literal_string()) {
-                    return true;
-                }
-
-                !could_compare_equal(db, lhs_ty, rhs_ty)
-            }
-
-            // Filter `ty` to just the types that cannot be equal to `rhs_ty`.
-            fn filter_to_cannot_be_equal<'db>(
-                db: &'db dyn Db,
-                ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> Type<'db> {
-                if let Type::Union(union) = ty {
-                    return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
-                }
-
-                if let Some(alternatives) = finite_single_valued_union_alternatives(db, ty) {
-                    return UnionType::from_elements(
-                        db,
-                        alternatives
-                            .into_iter()
-                            .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                    );
-                }
-
-                if !could_compare_equal(db, ty, rhs_ty) {
-                    // Cannot compare equal to rhs, so keep this type
-                    ty
-                } else {
-                    Type::Never
-                }
-            }
-            Some(if can_narrow_to_rhs(self.db, lhs_ty, rhs_ty) {
-                rhs_ty
-            } else {
-                filter_to_cannot_be_equal(self.db, lhs_ty, rhs_ty).negate(self.db)
-            })
-        } else {
-            None
-        }
-    }
-
-    fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        match (lhs_ty, rhs_ty.as_literal_value_kind()) {
-            (Type::NominalInstance(instance), Some(LiteralValueTypeKind::Int(i)))
-                if instance.has_known_class(self.db, KnownClass::Bool) =>
-            {
-                if i.as_i64() == 0 {
-                    Some(Type::bool_literal(false).negate(self.db))
-                } else if i.as_i64() == 1 {
-                    Some(Type::bool_literal(true).negate(self.db))
-                } else {
-                    None
-                }
-            }
-            (_, Some(LiteralValueTypeKind::Bool(b))) => Some(
-                UnionType::from_two_elements(self.db, rhs_ty, Type::int_literal(i64::from(b)))
-                    .negate(self.db),
-            ),
-            _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
-            _ => None,
-        }
-    }
-
     fn exact_fixed_length_membership_values(&self, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let iterable = rhs_ty.try_iterate(self.db).ok()?;
         let fixed_length = iterable.as_fixed_length()?;
@@ -1456,6 +1354,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         op: ast::CmpOp,
         is_positive: bool,
     ) -> Option<Type<'db>> {
+        if op == ast::CmpOp::Eq {
+            return evaluate_type_equality(self.db, lhs_ty, rhs_ty, is_positive);
+        }
+        if op == ast::CmpOp::NotEq {
+            return evaluate_type_inequality(self.db, lhs_ty, rhs_ty, is_positive);
+        }
+
         let op = if is_positive { op } else { op.negate() };
 
         match op {
@@ -1468,8 +1373,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             ast::CmpOp::Is => Some(rhs_ty),
-            ast::CmpOp::Eq => self.evaluate_expr_eq(lhs_ty, rhs_ty),
-            ast::CmpOp::NotEq => self.evaluate_expr_ne(lhs_ty, rhs_ty),
             ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,

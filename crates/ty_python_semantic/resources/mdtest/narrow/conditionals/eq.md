@@ -122,6 +122,89 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+An assigned enum construction hook can replace the value declared in the class body. In that case,
+we cannot compare an enum member with its declared value statically:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import EnumMeta, StrEnum
+from typing import Any, Literal, cast
+
+def external_new(cls: type[Any], value: object) -> Any: ...
+def external_init(self: Any, value: object) -> None: ...
+def external_prepare(*args: Any, **kwargs: Any) -> Any: ...
+
+class OpaqueNew(StrEnum):
+    __new__ = cast(Any, staticmethod(external_new))
+
+    MEMBER = "member"
+
+class OpaqueInit(StrEnum):
+    __init__ = cast(Any, external_init)
+
+    MEMBER = "member"
+
+class OpaqueMeta(EnumMeta):
+    __prepare__ = cast(Any, external_prepare)
+
+class TransformedByMeta(StrEnum, metaclass=OpaqueMeta):
+    MEMBER = "member"
+
+def opaque_new(value: Literal[OpaqueNew.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: OpaqueNew | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: OpaqueNew
+
+def opaque_init(value: Literal[OpaqueInit.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: OpaqueInit | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: OpaqueInit
+
+def transformed_by_metaclass(value: Literal[TransformedByMeta.MEMBER] | Literal["member"]):
+    if value == "member":
+        reveal_type(value)  # revealed: TransformedByMeta | Literal["member"]
+    else:
+        reveal_type(value)  # revealed: TransformedByMeta
+```
+
+An opaque `_generate_next_value_` affects `auto()` members, but explicit members still have their
+declared values:
+
+```py
+from enum import StrEnum, auto
+from typing import Any, Literal, cast
+
+def external_generate_next_value(*args: Any) -> Any: ...
+
+class OpaqueGenerator(StrEnum):
+    _generate_next_value_ = cast(Any, staticmethod(external_generate_next_value))
+
+    AUTOMATIC = auto()
+    EXPLICIT = "explicit"
+
+def opaque_generated_value(
+    value: Literal[OpaqueGenerator.AUTOMATIC] | Literal["automatic"],
+):
+    if value == "automatic":
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.AUTOMATIC, "automatic"]
+    else:
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.AUTOMATIC]
+
+def explicit_value(
+    value: Literal[OpaqueGenerator.EXPLICIT] | Literal["other"],
+):
+    if value == "explicit":
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT]
+    else:
+        reveal_type(value)  # revealed: Literal[OpaqueGenerator.EXPLICIT, "other"]
+```
+
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
 
 ```py
@@ -159,6 +242,89 @@ def _(answer: AmbiguousEnum):
         reveal_type(answer)  # revealed: AmbiguousEnum
     else:
         reveal_type(answer)  # revealed: AmbiguousEnum
+```
+
+`==` and `!=` must use the semantics of their respective dunder methods. In particular, a custom
+`__ne__` method does not affect narrowing based on `__eq__`:
+
+```py
+from enum import Enum
+
+class IndependentEquality(Enum):
+    NO = 0
+    YES = 1
+
+    def __ne__(self, other: object) -> bool:
+        return True
+
+def _(answer: IndependentEquality):
+    if answer == IndependentEquality.NO:
+        reveal_type(answer)  # revealed: Literal[IndependentEquality.NO]
+    else:
+        reveal_type(answer)  # revealed: Literal[IndependentEquality.YES]
+
+    if answer != IndependentEquality.NO:
+        reveal_type(answer)  # revealed: IndependentEquality
+    else:
+        reveal_type(answer)  # revealed: IndependentEquality
+```
+
+## Equality between concrete runtime classes
+
+Types such as `bool`, `LiteralString`, and `TypedDict` correspond to specific runtime classes.
+Equality with another instance of the same runtime class can therefore eliminate `None`:
+
+```py
+from typing import TypedDict
+from typing_extensions import LiteralString
+
+class Payload(TypedDict):
+    value: int
+
+def narrow_bool(value: bool | None, other: bool):
+    if value == other:
+        reveal_type(value)  # revealed: bool
+    else:
+        reveal_type(value)  # revealed: bool | None
+
+    if value != other:
+        reveal_type(value)  # revealed: bool | None
+    else:
+        reveal_type(value)  # revealed: bool
+
+def narrow_literal_string(value: LiteralString | None, other: LiteralString):
+    if value == other:
+        reveal_type(value)  # revealed: LiteralString
+    else:
+        reveal_type(value)  # revealed: LiteralString | None
+
+def narrow_typed_dict(value: Payload | None, other: Payload):
+    if value == other:
+        reveal_type(value)  # revealed: Payload
+    else:
+        reveal_type(value)  # revealed: Payload | None
+```
+
+## Comparisons with user-defined methods
+
+Arbitrary user-defined comparison methods are not used for narrowing, i.e., we don't inspect the
+bodies of user-defined `__eq__` or `__ne__` methods to predict their results, and instead require a
+`Literal` return type annotation:
+
+```py
+class Left:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Right:
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def _(value: Right | None):
+    if Left() == value:
+        reveal_type(value)  # revealed: Right | None
+    else:
+        reveal_type(value)  # revealed: Right | None
 ```
 
 ## `x != y` where `y` is of literal type
@@ -273,13 +439,30 @@ else:
 ## Union with `Any`
 
 ```py
-from typing import Any
+from typing import Any, Literal
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
-        reveal_type(x)  # revealed: (Any & ~Literal[1]) | None
+        reveal_type(x)  # revealed: (Any & ~Literal[1] & ~Literal[True]) | None
     if y == 1:
         reveal_type(y)  # revealed: Any & ~None
+
+def _(x: Any):
+    if x == True:
+        reveal_type(x)  # revealed: Any
+    else:
+        reveal_type(x)  # revealed: Any & ~Literal[True] & ~Literal[1]
+
+    if x != True:
+        reveal_type(x)  # revealed: Any & ~Literal[True] & ~Literal[1]
+    else:
+        reveal_type(x)  # revealed: Any
+
+def _(x: Literal["foo", "bar"] | Any):
+    if x != "bar":
+        reveal_type(x)  # revealed: Literal["foo"] | (Any & ~Literal["bar"])
+    else:
+        reveal_type(x)  # revealed: Literal["bar"] | (Any & ~Literal["foo"])
 ```
 
 ## Booleans and integers
@@ -309,6 +492,51 @@ def _(b: bool, i: Literal[1, 2]):
         reveal_type(i)  # revealed: Literal[2]
 ```
 
+## Final subclasses of scalar builtins
+
+Final subclasses can inherit the equality behavior of `int`, `str`, or `bytes`. Instances of these
+subclasses can compare equal to builtin literals even though the subclass and literal types are
+disjoint, so equality does not narrow the subclass to the literal type.
+
+```py
+from typing import final
+
+@final
+class FinalInt(int): ...
+
+@final
+class FinalStr(str): ...
+
+@final
+class FinalBytes(bytes): ...
+
+def _(value: FinalInt):
+    if value == 1:
+        reveal_type(value)  # revealed: FinalInt
+    else:
+        reveal_type(value)  # revealed: FinalInt
+
+    if 1 == value:
+        reveal_type(value)  # revealed: FinalInt
+
+    if value != 1:
+        reveal_type(value)  # revealed: FinalInt
+    else:
+        reveal_type(value)  # revealed: FinalInt
+
+def _(value: FinalStr):
+    if value == "value":
+        reveal_type(value)  # revealed: FinalStr
+    else:
+        reveal_type(value)  # revealed: FinalStr
+
+def _(value: FinalBytes):
+    if value == b"value":
+        reveal_type(value)  # revealed: FinalBytes
+    else:
+        reveal_type(value)  # revealed: FinalBytes
+```
+
 ## Narrowing `LiteralString` in union
 
 ```py
@@ -326,8 +554,7 @@ def _(s: LiteralString | None, t: LiteralString | Any):
         reveal_type(s)  # revealed: Never
 
     if t == "foo":
-        # TODO could be `Literal["foo"] | Any`
-        reveal_type(t)  # revealed: LiteralString | Any
+        reveal_type(t)  # revealed: Literal["foo"] | Any
 ```
 
 ## Narrowing with tuple types
