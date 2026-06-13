@@ -593,7 +593,7 @@ python-version = "3.11"
 ```
 
 ```py
-from enum import Enum, StrEnum
+from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, assert_never, reveal_type
 
 class Color(StrEnum):
@@ -620,6 +620,62 @@ def test_enum_as_literal(y: Literal[Color.BLUE]) -> None:
             assert_never(y)
         case "b":
             reveal_type(y)  # revealed: Literal[Color.BLUE]
+        case _:
+            assert_never(y)
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def test_int_literal_as_enum(x: Literal[1]) -> None:
+    match x:
+        case Number.ONE:
+            reveal_type(x)  # revealed: Literal[1]
+        case _:
+            assert_never(x)
+
+def test_enum_as_int_literal(y: Literal[Number.ONE]) -> None:
+    match y:
+        case 1:
+            reveal_type(y)  # revealed: Literal[Number.ONE]
+        case _:
+            assert_never(y)
+
+class GeneratedNumber(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values):
+        return 42
+
+    ANSWER = auto()
+
+def test_generated_int_enum(y: Literal[GeneratedNumber.ANSWER]) -> None:
+    match y:
+        case 1:
+            reveal_type(y)  # revealed: GeneratedNumber
+        case _:
+            reveal_type(y)  # revealed: GeneratedNumber
+
+class NeverEqualNumber(IntEnum):
+    ONE = 1
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def test_reversed_custom_int_enum_equality(x: Literal[1]) -> None:
+    match x:
+        case NeverEqualNumber.ONE:
+            reveal_type(x)  # revealed: Literal[1]
+        case _:
+            reveal_type(x)  # revealed: Literal[1]
+
+class BooleanNumber(IntEnum):
+    FALSE = False
+    ZERO = 0
+
+def test_bool_int_enum_alias(y: Literal[BooleanNumber.ZERO]) -> None:
+    match y:
+        case BooleanNumber.FALSE:
+            reveal_type(y)  # revealed: BooleanNumber
         case _:
             assert_never(y)
 

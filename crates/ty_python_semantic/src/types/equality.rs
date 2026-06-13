@@ -5,7 +5,7 @@ use crate::{Db, place::PlaceAndQualifiers};
 use super::{
     EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
     Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
-    enums::{enum_member_literals, enum_metadata},
+    enums::{EnumMetadata, enum_member_literals, enum_metadata},
 };
 
 /// The result of evaluating a runtime comparison between two types.
@@ -86,6 +86,7 @@ pub(super) fn evaluate_type_equality<'db>(
     is_positive: bool,
 ) -> Option<Type<'db>> {
     enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
+        .or_else(|| standard_int_enum_constraint(db, left, right, is_positive))
         .or_else(|| builtin_literal_constraint(db, left, right, is_positive))
         .or_else(|| {
             if comparison_domain(db, left, right, ComparisonOperator::Equality)
@@ -97,6 +98,76 @@ pub(super) fn evaluate_type_equality<'db>(
                 None
             }
         })
+}
+
+/// Return a constraint for equality between a standard `IntEnum` and an integer-like literal.
+///
+/// This runs before the built-in literal shortcut only for the narrow enum/integer case. Running
+/// the full recursive comparison evaluator for every literal comparison makes guarded literal
+/// chains quadratic.
+fn standard_int_enum_constraint<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+    is_positive: bool,
+) -> Option<Type<'db>> {
+    if is_int_like_literal(right) && is_standard_int_enum_domain(db, left) {
+        return comparison_result(db, left, right, is_positive, ComparisonOperator::Equality)
+            .constraint(is_positive);
+    }
+
+    let LiteralValueTypeKind::Enum(right_enum) = right.as_literal_value_kind()? else {
+        return None;
+    };
+    let metadata = enum_metadata(db, right_enum.enum_class(db))?;
+    if !metadata.has_standard_int_value_semantics()
+        || KnownComparisonSemantics::of_instance(
+            db,
+            right_enum.enum_class_instance(db),
+            ComparisonOperator::Equality,
+        ) != Some(KnownComparisonSemantics::Int)
+    {
+        return None;
+    }
+    let right_value = metadata.runtime_value_type(db, right_enum.name(db))?;
+    builtin_literal_constraint(db, left, right_value, is_positive)
+}
+
+fn is_int_like_literal(ty: Type) -> bool {
+    matches!(
+        ty,
+        Type::LiteralValue(literal)
+            if matches!(
+                literal.kind(),
+                LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_)
+            )
+    )
+}
+
+fn is_standard_int_enum_domain(db: &dyn Db, ty: Type) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::LiteralValue(literal) => {
+            let LiteralValueTypeKind::Enum(literal) = literal.kind() else {
+                return false;
+            };
+            enum_metadata(db, literal.enum_class(db))
+                .is_some_and(EnumMetadata::has_standard_int_value_semantics)
+        }
+        Type::NominalInstance(instance) => enum_metadata(db, instance.class_literal(db))
+            .is_some_and(EnumMetadata::has_standard_int_value_semantics),
+        Type::EnumComplement(complement) => enum_metadata(db, complement.enum_class(db))
+            .is_some_and(EnumMetadata::has_standard_int_value_semantics),
+        Type::Intersection(intersection) => {
+            intersection.enum_complement(db).is_some_and(|complement| {
+                is_standard_int_enum_domain(db, Type::EnumComplement(complement))
+            })
+        }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| is_standard_int_enum_domain(db, *element)),
+        _ => false,
+    }
 }
 
 /// Return a constraint for `left` in a branch where `left != right` has the given truthiness.
@@ -1217,18 +1288,7 @@ fn known_literal_equality<'db>(
 /// Custom enum construction can replace the declared value, so members of such enums return `None`.
 fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
     let metadata = enum_metadata(db, literal.enum_class(db))?;
-    let name = metadata.resolve_member(literal.name(db))?;
-    if metadata.init_function.is_some()
-        || metadata.new_function.is_some()
-        || metadata.custom_enum_metaclass_new
-    {
-        return None;
-    }
-    if metadata.auto_members.contains(name) {
-        metadata.value_type(db, name)
-    } else {
-        metadata.members.get(name).copied()
-    }
+    metadata.runtime_value_type(db, literal.name(db))
 }
 
 /// Return whether two enum literals resolve to the same member, including aliases.

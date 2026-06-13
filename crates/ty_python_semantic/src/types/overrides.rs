@@ -255,7 +255,7 @@ fn check_class_declaration<'db>(
             let is_auto = enum_info.auto_members.contains(&member.name);
             let skip_type_check = (context.in_stub() && is_ellipsis)
                 || is_auto
-                || enum_info.custom_enum_metaclass_new;
+                || enum_info.has_custom_metaclass_hooks();
 
             if !skip_type_check {
                 if let Some(new_function) = enum_info.new_function {

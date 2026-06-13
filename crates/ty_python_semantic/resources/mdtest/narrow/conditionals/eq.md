@@ -122,6 +122,245 @@ def enum_complement_rhs(x: Color, y: Intersection[Color, Not[Literal[Color.RED]]
         reveal_type(x)  # revealed: Literal[Color.GREEN, Color.BLUE]
 ```
 
+`IntEnum` members use integer equality. The standard `IntEnum` constructor preserves integer literal
+values, so these comparisons can narrow both operands:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+from typing_extensions import assert_never
+
+class Number(IntEnum):
+    ONE = 1
+    TWO = 2
+
+def narrow_int_enum(number: Number):
+    if number == 1:
+        reveal_type(number)  # revealed: Literal[Number.ONE]
+    else:
+        reveal_type(number)  # revealed: Literal[Number.TWO]
+
+def int_enum_on_left(number: Literal[Number.ONE]):
+    if number == 1:
+        reveal_type(number)  # revealed: Literal[Number.ONE]
+    else:
+        assert_never(number)
+
+def int_enum_on_right(number: Literal[Number.ONE]):
+    if 1 == number:
+        reveal_type(number)  # revealed: Literal[Number.ONE]
+    else:
+        assert_never(number)
+
+class AutoNumber(IntEnum):
+    ONE = auto()
+    TWO = auto()
+
+def narrow_auto_int_enum(number: AutoNumber):
+    if number == 1:
+        reveal_type(number)  # revealed: Literal[AutoNumber.ONE]
+    else:
+        reveal_type(number)  # revealed: Literal[AutoNumber.TWO]
+```
+
+A custom constructor can replace an `IntEnum` member's runtime value, so these comparisons remain
+ambiguous:
+
+```py
+from enum import IntEnum
+
+class ShiftedNumber(IntEnum):
+    def __new__(cls, value: int) -> "ShiftedNumber":
+        member = int.__new__(cls, value + 1)
+        member._value_ = value + 1
+        return member
+
+    ONE = 1
+    TWO = 2
+
+def _(number: ShiftedNumber):
+    if number == 1:
+        reveal_type(number)  # revealed: ShiftedNumber
+    else:
+        reveal_type(number)  # revealed: ShiftedNumber
+```
+
+This also applies when the custom constructor is assigned through `staticmethod`:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
+def shifted_new(cls: type["AssignedShiftedNumber"], value: int) -> "AssignedShiftedNumber":
+    member = int.__new__(cls, value + 10)
+    member._value_ = value + 10
+    return member
+
+class AssignedShiftedNumber(IntEnum):
+    __new__ = staticmethod(shifted_new)
+    ONE = 1
+
+def shifted_auto_new(cls: type["AssignedAutoShiftedNumber"], value: int) -> "AssignedAutoShiftedNumber":
+    member = int.__new__(cls, value + 10)
+    member._value_ = value + 10
+    return member
+
+class AssignedAutoShiftedNumber(IntEnum):
+    __new__ = staticmethod(shifted_auto_new)
+    ONE = 1
+    ANSWER = auto()
+
+def _(number: Literal[AssignedShiftedNumber.ONE]):
+    if number == 1:
+        reveal_type(number)  # revealed: AssignedShiftedNumber
+    else:
+        reveal_type(number)  # revealed: AssignedShiftedNumber
+
+    if number == 11:
+        reveal_type(number)  # revealed: AssignedShiftedNumber
+    else:
+        reveal_type(number)  # revealed: AssignedShiftedNumber
+
+def _(number: Literal[AssignedAutoShiftedNumber.ANSWER]):
+    reveal_type(number)  # revealed: Literal[AssignedAutoShiftedNumber.ANSWER]
+```
+
+A custom `_generate_next_value_` means the placeholder for an `auto()` member is not its runtime
+value. Comparisons against either value therefore remain ambiguous:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
+class GeneratedNumber(IntEnum):
+    @staticmethod
+    def _generate_next_value_(name, start, count, last_values):
+        return 42
+
+    ANSWER = auto()
+
+def _(number: Literal[GeneratedNumber.ANSWER]):
+    if number == 1:
+        reveal_type(number)  # revealed: GeneratedNumber
+    else:
+        reveal_type(number)  # revealed: GeneratedNumber
+
+    if number == 42:
+        reveal_type(number)  # revealed: GeneratedNumber
+    else:
+        reveal_type(number)  # revealed: GeneratedNumber
+```
+
+Assigned custom generators are likewise treated conservatively:
+
+```py
+from enum import IntEnum, auto
+from typing import Literal
+
+def generated(name: str, start: int, count: int, last_values: list[int]) -> int:
+    return 42
+
+class AssignedGeneratedNumber(IntEnum):
+    _generate_next_value_ = staticmethod(generated)
+    ONE = 1
+    ANSWER = auto()
+
+def _(number: Literal[AssignedGeneratedNumber.ANSWER]):
+    if number == 1:
+        reveal_type(number)  # revealed: Literal[AssignedGeneratedNumber.ANSWER]
+    else:
+        reveal_type(number)  # revealed: Literal[AssignedGeneratedNumber.ANSWER]
+
+    if number == 42:
+        reveal_type(number)  # revealed: Literal[AssignedGeneratedNumber.ANSWER]
+    else:
+        reveal_type(number)  # revealed: Literal[AssignedGeneratedNumber.ANSWER]
+```
+
+A custom metaclass can also rewrite values through the namespace returned by `__prepare__`:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from enum import EnumDict, EnumType, IntEnum
+from typing import Any, Literal
+
+class ShiftedEnumDict(EnumDict):
+    def __setitem__(self, key: str, value: object) -> None:
+        if key.isupper() and isinstance(value, int):
+            value += 10
+        super().__setitem__(key, value)
+
+class ShiftedEnumType(EnumType):
+    @classmethod
+    def __prepare__(metacls, cls: str, bases: tuple[type, ...], **kwds: Any) -> ShiftedEnumDict:
+        return ShiftedEnumDict(cls)
+
+class PreparedNumber(IntEnum, metaclass=ShiftedEnumType):
+    ONE = 1
+
+def _(number: Literal[PreparedNumber.ONE]):
+    if number == 1:
+        reveal_type(number)  # revealed: PreparedNumber
+    else:
+        reveal_type(number)  # revealed: PreparedNumber
+
+    if number == 11:
+        reveal_type(number)  # revealed: PreparedNumber
+    else:
+        reveal_type(number)  # revealed: PreparedNumber
+```
+
+The right operand's reflected equality method takes precedence when it is a strict subclass of the
+left operand's type, so reversing the operands is still ambiguous for an `IntEnum` with a custom
+`__eq__`:
+
+```py
+from enum import IntEnum
+from typing import Literal
+
+class NeverEqualNumber(IntEnum):
+    ONE = 1
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+def _(number: Literal[NeverEqualNumber.ONE]):
+    if 1 == number:
+        reveal_type(number)  # revealed: NeverEqualNumber
+    else:
+        reveal_type(number)  # revealed: NeverEqualNumber
+```
+
+Boolean and integer values with the same runtime value are aliases under the standard `IntEnum`
+constructor:
+
+```py
+from enum import IntEnum
+from typing import Literal
+from typing_extensions import assert_never
+
+class BooleanNumber(IntEnum):
+    FALSE = False
+    ZERO = 0
+    TRUE = True
+    ONE = 1
+
+def _(number: Literal[BooleanNumber.ZERO]):
+    if number == BooleanNumber.FALSE:
+        reveal_type(number)  # revealed: Literal[BooleanNumber.FALSE]
+    else:
+        assert_never(number)
+
+    if number == 0:
+        reveal_type(number)  # revealed: Literal[BooleanNumber.FALSE]
+    else:
+        assert_never(number)
+```
+
 This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__` method:
 
 ```py
