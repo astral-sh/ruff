@@ -19,6 +19,7 @@ use crate::types::{
     class_pattern_positional_sources, definite_match_pattern_type, definite_sequence_pattern_type,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     singleton_pattern_type, starred_sequence_pattern_type,
+    typed_dict_matches_class_pattern,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -1442,9 +1443,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 }
             }
             Type::TypedDict(_)
-                if class.is_some_and(|class| {
-                    KnownClass::Dict.is_subclass_of(self.db, ClassType::NonGeneric(class))
-                }) =>
+                if class.is_some_and(|class| typed_dict_matches_class_pattern(self.db, class)) =>
             {
                 subject_ty
             }
