@@ -264,35 +264,32 @@ impl ResolvedClientCapabilities {
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .hover
-                        .as_ref()?
-                        .content_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
+            .and_then(|document| document.hover.as_ref())
+            .and_then(|hover| hover.content_format.as_ref())
+            .and_then(|formats| {
+                formats.iter().find(|markup_kind| {
+                    matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText)
+                })
             })
-            .unwrap_or_default()
+            .is_some_and(|first_supported| {
+                matches!(first_supported, MarkupKind::Markdown)
+            })
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .completion
-                        .as_ref()?
-                        .completion_item
-                        .as_ref()?
-                        .documentation_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
+            .and_then(|document| document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| completion_item.documentation_format.as_ref())
+            .and_then(|formats| {
+                formats.iter().find(|markup_kind| {
+                    matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText)
+                })
             })
-            .unwrap_or_default()
+            .is_some_and(|first_supported| {
+                matches!(first_supported, MarkupKind::Markdown)
+            })
         {
             flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }

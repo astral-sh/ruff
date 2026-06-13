@@ -1,5 +1,5 @@
 use anyhow::Result;
-use lsp_types::Position;
+use lsp_types::{Documentation, MarkupKind, Position};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -589,6 +589,167 @@ take({\"\"})
       }
     ]
     "#);
+
+    Ok(())
+}
+
+#[test]
+fn documentation_prefers_markdown_over_plain_text() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"\
+def foo_with_documentation() -> None:
+    """
+    Example doc comment
+    """
+    ...
+
+fo
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_completion_documentation_format(vec![MarkupKind::Markdown, MarkupKind::PlainText])
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 1));
+
+    let completion = completions
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("Completion of function should exist");
+    let documentation = completion
+        .documentation
+        .expect("Expected documentation in hover");
+
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+    assert_eq!(markup.kind, MarkupKind::Markdown);
+
+    Ok(())
+}
+
+#[test]
+fn documentation_prefers_plain_text_over_markdown() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"\
+def foo_with_documentation() -> None:
+    """
+    Example doc comment
+    """
+    ...
+
+fo
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_completion_documentation_format(vec![MarkupKind::PlainText, MarkupKind::Markdown])
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 1));
+
+    let completion = completions
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("Completion of function should exist");
+    let documentation = completion
+        .documentation
+        .expect("Expected documentation in hover");
+
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+
+    assert_eq!(markup.kind, MarkupKind::PlainText);
+
+    Ok(())
+}
+
+#[test]
+fn documentation_markdown_only() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"\
+def foo_with_documentation() -> None:
+    """
+    Example doc comment
+    """
+    ...
+
+fo
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_completion_documentation_format(vec![MarkupKind::Markdown])
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 1));
+
+    let completion = completions
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("Completion of function should exist");
+    let documentation = completion
+        .documentation
+        .expect("Expected documentation in hover");
+
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+    assert_eq!(markup.kind, MarkupKind::Markdown);
+
+    Ok(())
+}
+
+#[test]
+fn documentation_plain_text_only() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"\
+def foo_with_documentation() -> None:
+    """
+    Example doc comment
+    """
+    ...
+
+fo
+"#;
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_completion_documentation_format(vec![MarkupKind::PlainText])
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 1));
+
+    let completion = completions
+        .into_iter()
+        .find(|completion| completion.label == "foo_with_documentation")
+        .expect("Completion of function should exist");
+    let documentation = completion
+        .documentation
+        .expect("Expected documentation in hover");
+
+    let Documentation::MarkupContent(markup) = documentation else {
+        panic!("Expected markup documentation");
+    };
+    assert_eq!(markup.kind, MarkupKind::PlainText);
 
     Ok(())
 }
