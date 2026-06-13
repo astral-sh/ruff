@@ -1208,7 +1208,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
+        run: cargo codspeed build -m walltime --features "codspeed,module_resolution,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark --bench module_resolution --bench ty_walltime
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -1220,7 +1220,7 @@ jobs:
           retention-days: 1
 
   benchmarks-walltime-run:
-    name: "benchmarks walltime (${{ matrix.benchmark }})"
+    name: "benchmarks walltime (${{ matrix.benchmark.name }})"
     runs-on: codspeed-macro
     needs: benchmarks-walltime-build
     timeout-minutes: 20
@@ -1230,10 +1230,21 @@ jobs:
     strategy:
       matrix:
         benchmark:
-          - sympy
-          - "pandas|tanjun"
-          - "colour_science|static_frame"
-          - "pydantic|freqtrade|multithreaded|altair"
+          - name: sympy
+            target: ty_walltime
+            filter: sympy
+          - name: "pandas|tanjun"
+            target: ty_walltime
+            filter: "pandas|tanjun"
+          - name: "colour_science|static_frame"
+            target: ty_walltime
+            filter: "colour_science|static_frame"
+          - name: "pydantic|freqtrade|multithreaded|altair"
+            target: ty_walltime
+            filter: "pydantic|freqtrade|multithreaded|altair"
+          - name: module_resolution
+            target: module_resolution
+            filter: ty_module_resolver
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
@@ -1268,7 +1279,7 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
+          run: cargo codspeed run --bench "${{ matrix.benchmark.target }}" -m walltime "${{ matrix.benchmark.filter }}"
 
   required-checks-passed:
     name: "all required checks passed"

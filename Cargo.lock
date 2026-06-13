@@ -3040,6 +3040,7 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing",
+ "ty_module_resolver",
  "ty_project",
 ]
 
