@@ -7206,6 +7206,62 @@ fn self_typevar_owner_class_literal<'db>(
         .map(|class| class.class_literal(db))
 }
 
+/// Remove value-level truthiness refinements from a receiver before using it to bind `Self`.
+///
+/// A different instance returned through `Self` is not necessarily truthy or falsy just because
+/// the receiver was narrowed by a condition.
+///
+/// ```python
+/// from typing import Self
+///
+/// class Base:
+///     def copy(self) -> Self: ...
+///
+/// class Child(Base): ...
+///
+/// def copy_if_truthy(value: Child | None) -> Child:
+///     if value:
+///         return value.copy()
+///     raise ValueError
+/// ```
+///
+/// Here, `value` is narrowed to `Child & ~AlwaysFalsy`, but `copy` returns a different `Child`
+/// whose truthiness is unknown.
+fn self_binding_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    let intersection = match ty {
+        Type::Union(union) => return union.map(db, |element| self_binding_type(db, *element)),
+        Type::Intersection(intersection) => intersection,
+        _ => return ty,
+    };
+
+    let is_truthiness_refinement =
+        |ty: &Type<'db>| matches!(ty, Type::AlwaysTruthy | Type::AlwaysFalsy);
+    if !intersection
+        .positive(db)
+        .iter()
+        .chain(intersection.negative(db))
+        .any(is_truthiness_refinement)
+    {
+        return ty;
+    }
+
+    intersection
+        .negative(db)
+        .iter()
+        .filter(|ty| !is_truthiness_refinement(ty))
+        .fold(
+            IntersectionBuilder::new(db).positive_elements(
+                intersection
+                    .positive(db)
+                    .iter()
+                    .filter(|ty| !is_truthiness_refinement(ty))
+                    .copied(),
+            ),
+            |builder, negative| builder.add_negative(*negative),
+        )
+        .build()
+}
+
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn class_mro_literals<'db>(
     db: &'db dyn Db,
@@ -7245,6 +7301,7 @@ impl<'db> SelfBinding<'db> {
         self_type: Type<'db>,
         binding_context: Option<BindingContext<'db>>,
     ) -> Self {
+        let self_type = self_binding_type(db, self_type);
         let class_literal = match self_type {
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
                 self_typevar_owner_class_literal(db, typevar)

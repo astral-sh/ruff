@@ -514,6 +514,51 @@ def _(c: MyClass):
     c.field = c
 ```
 
+Truthiness narrowing applies to a specific value, not to every value of the same concrete class.
+These refinements should not be preserved when binding `Self` in an attribute or method return.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3755>.
+
+```py
+from typing import Self
+from ty_extensions import AlwaysTruthy, Intersection, Not
+
+class Base:
+    values: list[Self]
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+    def preserve[T](self: Intersection[Self, T]) -> T:
+        raise NotImplementedError
+
+class Child(Base): ...
+class Other(Base): ...
+
+def truthy(value: Child | None) -> list[Child]:
+    if value:
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(value.preserve())  # revealed: Child & ~AlwaysFalsy
+        return value.values
+    raise ValueError
+
+def falsy(value: Child) -> None:
+    if not value:
+        reveal_type(value.copy())  # revealed: Child
+
+def union(value: Child | Other | None) -> None:
+    if value:
+        reveal_type(value.copy())  # revealed: Child | Other
+
+class Excluded: ...
+
+def positive_truthiness(
+    value: Intersection[Child, AlwaysTruthy, Not[Excluded]],
+) -> None:
+    reveal_type(value.copy())  # revealed: Child & ~Excluded
+```
+
 Self from class body annotations and method signatures represent the same logical type variable.
 When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
 and the method's `Self` should be considered the same type, even though they have different binding
