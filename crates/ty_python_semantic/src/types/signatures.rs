@@ -31,12 +31,13 @@ use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
 use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
-use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
+use crate::types::typevar::max_typevar_freshness_matching_generic_context;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
-    ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
-    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    CallableType, ErrorContext, ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass,
+    MaterializationKind, ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext,
+    TypeMapping, TypeVarNonce, TypedDictType, UnionBuilder, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -478,7 +479,7 @@ impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
 
 impl<'db> VarianceInferable<'db> for &CallableSignature<'db> {
     // TODO: possibly need to replace self
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         self.overloads
             .iter()
             .map(|signature| signature.variance_of(db, typevar))
@@ -1441,10 +1442,10 @@ impl<'db> Signature<'db> {
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
-    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
+    fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarIdentity<'db>) -> TypeVarVariance {
         tracing::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
-            tvar = typevar.typevar(db).name(db)
+            tvar = typevar.identity.name(db)
         );
 
         let parameter_variance = |parameter: &Parameter<'db>| {
@@ -1800,8 +1801,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
-        let inferable = source_inferable.merge(db, target_inferable);
-        let inferable = self.inferable.merge(db, inferable);
+        let signature_inferable = source_inferable.merge(db, target_inferable);
+        let inferable = self.inferable.merge(db, signature_inferable);
 
         // `inner` will create a constraint set that references these newly inferable typevars.
         let checker = self.with_inferable_typevars(inferable);
@@ -1810,14 +1811,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         });
 
         // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(
-            db,
-            self.constraints,
-            source_inferable.iter(db).chain(target_inferable.iter(db)),
-        )
+        // we produce, those signature-local typevars should be existentially quantified away
+        // before final semantic observation or solution extraction. Record that quantification on
+        // the returned constraint set so later positive constraint construction can still refer to
+        // the freshened callable typevars.
+        when.quantify_typevars(db, self.constraints, signature_inferable)
     }
 
     fn with_signature_recursion_guard(
