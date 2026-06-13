@@ -164,3 +164,51 @@ def i():
         pass
     except (ValueError, TypeError) as e:
         raise e
+
+
+from somewhere import AnotherError
+
+
+# This should NOT trigger DOC502 because ValueError is explicitly raised via a classmethod
+def validate_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: The value to validate.
+
+    Raises:
+        ValueError: If the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    )
+
+
+# This should NOT trigger DOC502 because AnotherError is explicitly raised via a classmethod
+def validate_imported_classmethod(value):
+    """Validate a value.
+
+    Args:
+        value: The value to validate.
+
+    Raises:
+        AnotherError: If the value is invalid.
+    """
+    raise AnotherError.create(value)
+
+
+# This should NOT trigger DOC502 because ValueError is explicitly raised in a chained call
+def chained_with_traceback(value):
+    """Validate a value.
+
+    Args:
+        value: The value to validate.
+
+    Raises:
+        ValueError: If the value is invalid.
+    """
+    raise ValueError.from_exception_data(
+        title="Validation",
+        line_errors=[],
+    ).with_traceback(None)
