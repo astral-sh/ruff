@@ -65,7 +65,7 @@ use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
-pub(crate) use crate::types::enums::{EnumComplementType, enum_metadata};
+pub(crate) use crate::types::enums::{EnumClassLiteral, EnumComplementType, enum_metadata};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, FunctionDecorators, FunctionSpans,
     FunctionType, KnownFunction,
@@ -3768,24 +3768,23 @@ impl<'db> Type<'db> {
                         }) =>
                 {
                     let enum_literal = literal.as_enum().unwrap();
-                    let enum_class = enum_literal.enum_class(db);
-                    let is_enum_subclass = Type::ClassLiteral(enum_class)
+                    let enum_class = enum_literal.enum_class_literal(db);
+                    let is_enum_subclass = Type::ClassLiteral(enum_class.class_literal(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db));
 
-                    enum_metadata(db, enum_class)
-                        .and_then(|metadata| match name_str {
-                            "name" if is_enum_subclass => {
-                                metadata.name_type(db, enum_literal.name(db))
-                            }
-                            "_name_" => metadata.name_type(db, enum_literal.name(db)),
-                            "value" if is_enum_subclass => {
-                                metadata.value_type(db, enum_literal.name(db))
-                            }
-                            "_value_" => metadata.value_type(db, enum_literal.name(db)),
-                            _ => None,
-                        })
-                        .map_or_else(|| Place::Undefined, Place::bound)
-                        .into()
+                    (match name_str {
+                        "name" if is_enum_subclass => {
+                            enum_class.name_type(db, enum_literal.name(db))
+                        }
+                        "_name_" => enum_class.name_type(db, enum_literal.name(db)),
+                        "value" if is_enum_subclass => {
+                            enum_class.value_type(db, enum_literal.name(db))
+                        }
+                        "_value_" => enum_class.value_type(db, enum_literal.name(db)),
+                        _ => None,
+                    })
+                    .map_or_else(|| Place::Undefined, Place::bound)
+                    .into()
                 }
 
                 Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
@@ -3880,10 +3879,15 @@ impl<'db> Type<'db> {
 
                     // Enum members can be accessed through enum instances and other enum members,
                     // e.g. `answer.YES` or `Answer.YES.NO`.
-                    if let Some(enum_class) =
-                        this.nominal_class(db).map(|class| class.class_literal(db))
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                    if let Some(enum_class) = match this {
+                        Type::LiteralValue(literal) => literal
+                            .as_enum()
+                            .map(|enum_literal| enum_literal.enum_class_literal(db)),
+                        _ => this
+                            .nominal_class(db)
+                            .map(|class| class.class_literal(db))
+                            .and_then(|class| class.into_enum_class(db)),
+                    } && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
@@ -3917,16 +3921,15 @@ impl<'db> Type<'db> {
 
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     let enum_class = match this {
-                        Type::ClassLiteral(literal) => Some(literal),
+                        Type::ClassLiteral(literal) => literal.into_enum_class(db),
                         Type::SubclassOf(subclass_of) => subclass_of
                             .subclass_of()
                             .into_class(db)
-                            .map(|class| class.class_literal(db)),
+                            .and_then(|class| class.class_literal(db).into_enum_class(db)),
                         _ => None,
                     };
                     if let Some(enum_class) = enum_class
-                        && let Some(metadata) = enum_metadata(db, enum_class)
-                        && let Some(resolved_name) = metadata.resolve_member(&name)
+                        && let Some(resolved_name) = enum_class.resolve_member(db, &name)
                     {
                         return Place::bound(Type::enum_literal(EnumLiteralType::new(
                             db,
