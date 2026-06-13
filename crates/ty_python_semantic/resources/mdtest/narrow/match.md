@@ -783,6 +783,26 @@ def test_match_class_capture_preserves_possible_multiple_inheritance(
             reveal_type(whole)  # revealed: OverlapCaptureA & OverlapCaptureB
 ```
 
+Class patterns preserve gradual uncertainty alongside the member type declared by the pattern
+class.
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+class GradualPatternBox:
+    value: int
+
+def test_match_gradual_class_captures(any_value: Any, unknown_value: Unknown) -> None:
+    match any_value:
+        case GradualPatternBox(value=item):
+            reveal_type(item)  # revealed: Any & int
+
+    match unknown_value:
+        case GradualPatternBox(value=item):
+            reveal_type(item)  # revealed: Unknown & int
+```
+
 Mapping patterns use the mapping's key and value types. A successful keyed pattern can filter union
 arms, while `**rest` is always a new `dict` containing the unmatched items.
 
@@ -855,6 +875,25 @@ def test_match_mapping_rejects_empty_key_domain(
             reveal_type(item)  # revealed: Never
 ```
 
+Mapping captures follow the same gradual-type rules. The rest pattern is a new dictionary whose
+key and value types come from the matched mapping.
+
+```py
+from typing import Any
+from ty_extensions import Unknown
+
+def test_match_gradual_mapping_captures(any_value: Any, unknown_value: Unknown) -> None:
+    match any_value:
+        case {"item": item, **rest}:
+            reveal_type(item)  # revealed: Any
+            reveal_type(rest)  # revealed: dict[Any, Any]
+
+    match unknown_value:
+        case {"item": item, **rest}:
+            reveal_type(item)  # revealed: Unknown
+            reveal_type(rest)  # revealed: dict[Unknown, Unknown]
+```
+
 For a `TypedDict`, a literal key uses the declared field type. Closed dictionaries can rule out
 missing keys, and tagged unions remain correlated through `or` patterns.
 
@@ -894,6 +933,9 @@ class ClosedBoolPayload(TypedDict, closed=True):
 class ClosedPayload(TypedDict, closed=True):
     x: int
 
+class ExtraItemsPayload(TypedDict, extra_items=int):
+    tag: Literal["extra"]
+
 def test_match_closed_typed_dict_rejects_non_string_key(
     value: ClosedPayload,
 ) -> None:
@@ -905,6 +947,14 @@ def test_match_closed_typed_dict_rest(value: ClosedIntPayload) -> None:
     match value:
         case {"tag": "int", **rest}:
             reveal_type(rest)  # revealed: dict[str, object]
+
+def test_match_typed_dict_extra_items(
+    value: ClosedPayload | ExtraItemsPayload,
+) -> None:
+    match value:
+        case {"other": item} as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: ExtraItemsPayload
 
 def test_match_typed_dict_or_pattern_filters_union_arms(
     value: ClosedIntPayload | ClosedStrPayload | ClosedBoolPayload,
