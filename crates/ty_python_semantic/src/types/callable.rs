@@ -712,10 +712,25 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: CallableType<'db>,
         target: CallableType<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        if target.is_function_like(db) && !source.is_function_like(db) {
+        self.check_callable_signature_source_pair(
+            db,
+            source.signatures(db),
+            source.kind(db),
+            target,
+        )
+    }
+
+    pub(super) fn check_callable_signature_source_pair(
+        &self,
+        db: &'db dyn Db,
+        source: &CallableSignature<'db>,
+        source_kind: CallableTypeKind,
+        target: CallableType<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        if target.is_function_like(db) && source_kind != CallableTypeKind::FunctionLike {
             return self.never();
         }
-        self.check_callable_signature_pair(db, source.signatures(db), target.signatures(db))
+        self.check_callable_signature_pair(db, source, target.signatures(db))
     }
 
     pub(super) fn check_callables_vs_callable(
