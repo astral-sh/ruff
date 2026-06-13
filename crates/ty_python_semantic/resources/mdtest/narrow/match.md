@@ -1158,6 +1158,13 @@ def test_match_mapping_narrows_subject(value: IntPayload | StrPayload) -> None:
         case {"tag": "int"}:
             reveal_type(value)  # revealed: IntPayload
 
+def test_nested_mapping_narrows_sequence_subject(
+    value: tuple[IntPayload] | tuple[StrPayload],
+) -> None:
+    match value:
+        case [{"tag": "int"}]:
+            reveal_type(value)  # revealed: tuple[IntPayload]
+
 def test_match_mapping_does_not_narrow_tuple_display_element(
     value: IntPayload | StrPayload,
 ) -> None:

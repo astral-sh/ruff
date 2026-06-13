@@ -299,9 +299,10 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 
 /// The types produced when a match pattern succeeds.
 ///
-/// This positive structural analysis infers the type of each supported name bound by a successful
-/// pattern. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
-/// intentionally remains separate.
+/// This positive structural analysis is shared by binding inference and subject narrowing. It
+/// records the type entering the top-level pattern, the subject type after assuming success, and
+/// the type of each supported name bound inside the pattern. Definite-match analysis, which is used
+/// for negative narrowing and exhaustiveness, intentionally remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PatternSuccessTypes<'db> {
     incoming_subject_ty: Type<'db>,
