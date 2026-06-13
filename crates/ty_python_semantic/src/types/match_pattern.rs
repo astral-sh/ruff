@@ -80,7 +80,11 @@ fn class_pattern_is_exhaustive(
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
     let class_instance_ty = Type::instance(db, class.top_materialization(db));
-    if !subject_ty.is_subtype_of(db, class_instance_ty) {
+    // Typed dictionaries are runtime dictionaries, even though they are not nominal subtypes of
+    // `dict` in the static type system.
+    let is_typed_dict_matching_dict =
+        matches!(subject_ty, Type::TypedDict(_)) && class.known(db) == Some(KnownClass::Dict);
+    if !is_typed_dict_matching_dict && !subject_ty.is_subtype_of(db, class_instance_ty) {
         return false;
     }
 
@@ -89,12 +93,15 @@ fn class_pattern_is_exhaustive(
         return true;
     }
 
-    let Some(subject_class) = subject_ty.nominal_class(db) else {
-        return false;
+    let is_proper_non_final_subtype = if is_typed_dict_matching_dict {
+        false
+    } else {
+        let Some(subject_class) = subject_ty.nominal_class(db) else {
+            return false;
+        };
+        let subject_class_literal = subject_class.class_literal(db);
+        subject_class_literal != class && !subject_class_literal.is_final(db)
     };
-    let subject_class_literal = subject_class.class_literal(db);
-    let is_proper_non_final_subtype =
-        subject_class_literal != class && !subject_class_literal.is_final(db);
 
     // TODO: A non-final subject class also admits subclasses that can override attribute access.
     // Decide whether it should remain exhaustive under the static member model or be treated like
