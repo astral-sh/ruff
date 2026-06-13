@@ -1,10 +1,10 @@
 use std::borrow::Cow;
 
-use ruff_python_ast::PythonVersion;
+use ruff_python_ast::{ExprList, ExprName, ExprTuple, PythonVersion};
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{ResolvedReference, SemanticModel};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_semantic::{ResolvedReference, ScopeId, SemanticModel, TypingOnlyBindingsStatus};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_async::rules::blocking_open_call::is_open_call_from_pathlib;
@@ -449,6 +449,105 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
         }
         _ => Cow::Borrowed(iter_in_source),
     }
+}
+
+/// Find the names in a `for` loop target
+/// that are assigned to during iteration.
+///
+/// ```python
+/// for ((), [(a,), [[b]]], c.d, e[f], *[*g]) in h:
+///     #      ^      ^                   ^
+///     ...
+/// ```
+pub(super) fn binding_names(for_target: &Expr) -> Vec<&ExprName> {
+    fn collect_names<'a>(expr: &'a Expr, names: &mut Vec<&'a ExprName>) {
+        match expr {
+            Expr::Name(name) => names.push(name),
+
+            Expr::Starred(starred) => collect_names(&starred.value, names),
+
+            Expr::List(ExprList { elts, .. }) | Expr::Tuple(ExprTuple { elts, .. }) => elts
+                .iter()
+                .for_each(|element| collect_names(element, names)),
+
+            _ => {}
+        }
+    }
+
+    let mut names = vec![];
+    collect_names(for_target, &mut names);
+    names
+}
+
+/// Detects if loop variables are used outside the loop. E.g.
+/// 
+/// ```python
+/// for a in [1, 2, 3]:
+///     print(a + 1)
+/// print(a)  # `a` is used outside the loop
+/// ```
+/// 
+/// ```python
+/// a = 1
+/// for a in [1, 2, 3]: # here loop variable `a` shadows the outer `a` and changes its value.
+///     print(a + 1)
+/// # a = 3 here
+/// ```
+pub(super) fn loop_variables_are_used_outside_loop(
+    binding_names: &[&ExprName],
+    loop_range: TextRange,
+    semantic: &SemanticModel,
+    scope_id: ScopeId,
+) -> bool {
+    let find_binding_id = |name: &ExprName, offset: TextSize| {
+        semantic.simulate_runtime_load_at_location_in_scope(
+            name.id.as_str(),
+            TextRange::at(offset, 0.into()),
+            scope_id,
+            TypingOnlyBindingsStatus::Disallowed,
+        )
+    };
+
+    // If the load simulation succeeds at the position right before the loop,
+    // that binding is shadowed.
+    // ```python
+    //   a = 1
+    //   for a in b: ...
+    // # ^ Load here
+    // ```
+    let name_overwrites_outer = |name: &ExprName| {
+    let Some(id) = find_binding_id(name, loop_range.start()) else {
+            return false;
+        };
+        !semantic.binding(id).kind.is_loop_var()
+    };
+
+    let name_is_used_later = |name: &ExprName| {
+        let Some(binding_id) = semantic.resolve_name(name) else {
+            return false;
+        };
+
+        let binding = semantic.binding(binding_id);
+        
+        // verify this binding belongs to THIS loop (not a different for x)
+        if !name.range().contains_range(binding.range) {
+            return false;
+        }
+
+        for reference_id in semantic.binding(binding_id).references() {
+            let reference = semantic.reference(reference_id);
+
+            if !loop_range.contains_range(reference.range()) {
+                return true;
+            }
+        }
+
+        false
+    };
+
+    binding_names
+        .iter()
+        .any(|name| name_overwrites_outer(name) || name_is_used_later(name))
 }
 
 #[derive(Copy, Clone)]
