@@ -1313,6 +1313,13 @@ impl<'db> Type<'db> {
         visitor.found.get()
     }
 
+    pub(crate) fn contains_cycle_recovery_marker(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| {
+            matches!(ty, Type::Divergent(_) | Type::CycleMarked(_))
+                || matches!(ty, Type::Recursive(recursive) if recursive.is_non_contractive(db))
+        })
+    }
+
     pub(crate) const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
     }

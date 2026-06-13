@@ -589,9 +589,17 @@ fn apply_accumulated_narrowing<'db>(
     accumulated: Option<NarrowingConstraint<'db>>,
 ) -> Type<'db> {
     match accumulated {
-        Some(constraint) => NarrowingConstraint::intersection(base_ty)
-            .merge_constraint_and(constraint)
-            .evaluate_constraint_type(db),
+        Some(constraint) => {
+            if base_ty.contains_cycle_recovery_marker(db) && constraint.is_truthiness_guard(db) {
+                // Cycle recovery markers are provisional approximations. Truthiness guards
+                // refine those approximations into a different recovery shape instead of a
+                // stable user-visible type fact.
+                return base_ty;
+            }
+            NarrowingConstraint::intersection(base_ty)
+                .merge_constraint_and(constraint)
+                .evaluate_constraint_type(db)
+        }
         None => base_ty,
     }
 }

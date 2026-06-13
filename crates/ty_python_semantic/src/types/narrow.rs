@@ -483,6 +483,27 @@ impl<'db> Conjunctions<'db> {
         }
         intersection.build()
     }
+
+    fn is_truthiness_guard(&self, db: &'db dyn Db) -> bool {
+        !self.conjuncts.is_empty()
+            && self
+                .conjuncts
+                .iter()
+                .all(|ty| is_truthiness_guard_type(db, *ty))
+    }
+}
+
+fn is_truthiness_guard_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::Intersection(intersection) if intersection.positive(db).is_empty() => {
+            let mut negative = intersection.negative(db).iter();
+            matches!(
+                (negative.next(), negative.next()),
+                (Some(Type::AlwaysFalsy | Type::AlwaysTruthy), None)
+            )
+        }
+        _ => false,
+    }
 }
 
 /// Represents narrowing constraints in Disjunctive Normal Form (DNF).
@@ -605,6 +626,15 @@ impl<'db> NarrowingConstraint<'db> {
             union = union.add(conjunctions.evaluate_constraint_type(db));
         }
         union.build()
+    }
+
+    pub(crate) fn is_truthiness_guard(&self, db: &'db dyn Db) -> bool {
+        self.replacement_disjuncts.is_empty()
+            && !self.intersection_disjuncts.is_empty()
+            && self
+                .intersection_disjuncts
+                .iter()
+                .all(|conjunctions| conjunctions.is_truthiness_guard(db))
     }
 }
 
