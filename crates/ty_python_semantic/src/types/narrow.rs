@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
 use crate::Db;
 use crate::reachability::{narrow_type_by_constraint, type_narrowed_by_previous_patterns};
@@ -41,7 +42,6 @@ use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
-use std::collections::hash_map::Entry;
 
 fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
@@ -298,46 +298,34 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 
 /// The types produced when a match pattern succeeds.
 ///
-/// This is the positive structural analysis shared by match-binding inference and subject
-/// narrowing. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
-/// intentionally remains separate.
+/// This positive structural analysis infers the type of each name bound by a successful pattern.
+/// Definite-match analysis, which is used for negative narrowing and exhaustiveness, intentionally
+/// remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct SuccessfulPatternAnalysis<'db> {
-    incoming_subject_ty: Type<'db>,
-    matched_subject_ty: Type<'db>,
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> SuccessfulPatternAnalysis<'db> {
-    pub(crate) fn binding_type(&self, place: ScopedPlaceId) -> Type<'db> {
+    pub(crate) fn binding_type(&self, place: ScopedPlaceId) -> Option<Type<'db>> {
         // An OR pattern's alternatives define one runtime binding, so their types are merged by
-        // place. `Unknown` is used for pattern forms whose child bindings are not analyzed yet.
-        self.bindings
-            .get(&place)
-            .copied()
-            .or(self.cycle_recovery)
-            .unwrap_or_else(Type::unknown)
+        // place.
+        self.bindings.get(&place).copied().or(self.cycle_recovery)
     }
 
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
-            incoming_subject_ty: cycle_recovery,
-            matched_subject_ty: cycle_recovery,
             bindings: FrozenMap::default(),
             cycle_recovery: Some(cycle_recovery),
         }
     }
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
-        self.incoming_subject_ty =
-            self.incoming_subject_ty
-                .cycle_normalized(db, previous.incoming_subject_ty, cycle);
-        self.matched_subject_ty =
-            self.matched_subject_ty
-                .cycle_normalized(db, previous.matched_subject_ty, cycle);
         for (place, ty) in &mut self.bindings {
-            *ty = ty.cycle_normalized(db, previous.binding_type(*place), cycle);
+            if let Some(previous_ty) = previous.binding_type(*place) {
+                *ty = ty.cycle_normalized(db, previous_ty, cycle);
+            }
         }
         self
     }
@@ -345,7 +333,7 @@ impl<'db> SuccessfulPatternAnalysis<'db> {
 
 struct SuccessfulPatternNode<'db> {
     matched_subject_ty: Type<'db>,
-    bindings: FxHashMap<ScopedPlaceId, Type<'db>>,
+    bindings: BTreeMap<ScopedPlaceId, Type<'db>>,
 }
 
 struct SuccessfulSequencePattern<'db> {
@@ -373,8 +361,6 @@ pub(crate) fn successful_pattern_analysis<'db>(
         NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true);
     let result = builder.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     SuccessfulPatternAnalysis {
-        incoming_subject_ty,
-        matched_subject_ty: result.matched_subject_ty,
         bindings: FrozenMap::from(result.bindings),
         cycle_recovery: None,
     }
@@ -1097,15 +1083,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> SuccessfulPatternNode<'db> {
         fn merge_binding<'db>(
             db: &'db dyn Db,
-            bindings: &mut FxHashMap<ScopedPlaceId, Type<'db>>,
+            bindings: &mut BTreeMap<ScopedPlaceId, Type<'db>>,
             place: ScopedPlaceId,
             ty: Type<'db>,
         ) {
             match bindings.entry(place) {
-                Entry::Occupied(mut entry) => {
+                BTreeEntry::Occupied(mut entry) => {
                     *entry.get_mut() = UnionType::from_elements(db, [*entry.get(), ty]);
                 }
-                Entry::Vacant(entry) => {
+                BTreeEntry::Vacant(entry) => {
                     entry.insert(ty);
                 }
             }
@@ -1114,7 +1100,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match pattern {
             PatternPredicateKind::Sequence(kind) => {
                 let sequence = self.match_sequence_pattern(kind, subject_ty);
-                let mut bindings = FxHashMap::default();
+                let mut bindings = BTreeMap::new();
                 for (pattern, element_ty) in kind.patterns.iter().zip(sequence.element_types) {
                     let child = self.analyze_successful_pattern(pattern, element_ty);
                     for (place, ty) in child.bindings {
@@ -1131,7 +1117,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let Some(first_pattern) = patterns.next() else {
                     return SuccessfulPatternNode {
                         matched_subject_ty: Type::Never,
-                        bindings: FxHashMap::default(),
+                        bindings: BTreeMap::new(),
                     };
                 };
                 let first = self.analyze_successful_pattern(first_pattern, subject_ty);
@@ -1166,7 +1152,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let mut result = pattern.as_deref().map_or_else(
                     || SuccessfulPatternNode {
                         matched_subject_ty: subject_ty,
-                        bindings: FxHashMap::default(),
+                        bindings: BTreeMap::new(),
                     },
                     |pattern| self.analyze_successful_pattern(pattern, subject_ty),
                 );
@@ -1184,7 +1170,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 result
             }
             PatternPredicateKind::Star(name) => {
-                let mut bindings = FxHashMap::default();
+                let mut bindings = BTreeMap::new();
                 if let Some(place) = name
                     .as_ref()
                     .and_then(|name| self.places().symbol_id(name.as_str()))
@@ -1198,7 +1184,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             _ => SuccessfulPatternNode {
                 matched_subject_ty: self.match_pattern_subject_type(pattern, subject_ty),
-                bindings: FxHashMap::default(),
+                bindings: BTreeMap::new(),
             },
         }
     }
@@ -1244,7 +1230,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .map(|pattern| self.match_pattern_subject_type(pattern, subject_ty)),
             ),
             PatternPredicateKind::Sequence(kind) => {
-                self.match_sequence_pattern_subject_type(kind, subject_ty)
+                self.match_sequence_pattern(kind, subject_ty)
+                    .matched_subject_ty
             }
             PatternPredicateKind::Class(class_expr, _) => {
                 let class_ty = self.necessary_match_pattern_type(pattern);
@@ -1401,16 +1388,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 vec![Type::Never; kind.patterns.len()]
             },
         }
-    }
-
-    /// Return the sequence type after the complete pattern succeeds.
-    fn match_sequence_pattern_subject_type(
-        &mut self,
-        kind: &SequencePatternPredicateKind<'db>,
-        subject_ty: Type<'db>,
-    ) -> Type<'db> {
-        self.match_sequence_pattern(kind, subject_ty)
-            .matched_subject_ty
     }
 
     /// Check one subject union member against the complete sequence pattern.

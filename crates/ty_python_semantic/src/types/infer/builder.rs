@@ -2369,7 +2369,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let ty = successful_pattern_analysis(self.db(), predicate)
-            .binding_type(definition.place(self.db()));
+            .binding_type(definition.place(self.db()))
+            .unwrap_or_else(Type::unknown);
         self.add_binding(pattern.into(), definition)
             .insert(self, ty);
     }

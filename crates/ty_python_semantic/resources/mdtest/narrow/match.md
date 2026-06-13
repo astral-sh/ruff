@@ -384,6 +384,12 @@ not handled by earlier cases.
 ```py
 from typing import Literal
 
+def test_match_equality_alias(target: int | str) -> None:
+    match target:
+        case 1 as item:
+            # A subclass of `str` can override equality and compare equal to `1`.
+            reveal_type(item)  # revealed: int | str
+
 def test_match_sequence_as_pattern(value: object) -> None:
     match value:
         case [int() as item, _]:
