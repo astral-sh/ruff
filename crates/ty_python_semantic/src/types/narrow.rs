@@ -1193,18 +1193,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
         if is_positive
-            && PatternSuccessAnalyzer::requires_successful_subject_replacement(kind)
+            && PatternSuccessAnalyzer::new(self.db, self.scope())
+                .uses_successful_subject_analysis(kind)
             && let Some(subject) =
                 PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))
         {
             let analysis = pattern_success_types(self.db, pattern);
             let narrowed = analysis.matched_subject_type();
-            if !narrowed.is_equivalent_to(self.db, analysis.incoming_subject_type()) {
-                return Some(NarrowingConstraints::from_iter([(
-                    self.expect_place(&subject),
-                    NarrowingConstraint::replacement(narrowed),
-                )]));
+            if narrowed.is_equivalent_to(self.db, analysis.incoming_subject_type()) {
+                return None;
             }
+            return Some(NarrowingConstraints::from_iter([(
+                self.expect_place(&subject),
+                NarrowingConstraint::replacement(narrowed),
+            )]));
         }
 
         self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
@@ -1243,19 +1245,29 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
-    fn requires_successful_subject_replacement(pattern: &PatternPredicateKind<'db>) -> bool {
+    fn uses_successful_subject_analysis(&self, pattern: &PatternPredicateKind<'db>) -> bool {
         match pattern {
-            PatternPredicateKind::Class(kind) => !kind.is_argumentless(),
+            PatternPredicateKind::Class(kind) => {
+                !kind.is_argumentless()
+                    || matches!(
+                        infer_same_file_expression_type(
+                            self.db,
+                            kind.class,
+                            TypeContext::default()
+                        ),
+                        Type::Dynamic(_)
+                    )
+            }
             PatternPredicateKind::Mapping(kind) => !kind.entries.is_empty(),
             PatternPredicateKind::Sequence(kind) => kind
                 .patterns
                 .iter()
-                .any(Self::requires_successful_subject_replacement),
+                .any(|pattern| self.uses_successful_subject_analysis(pattern)),
             PatternPredicateKind::Or(patterns) => patterns
                 .iter()
-                .any(Self::requires_successful_subject_replacement),
+                .any(|pattern| self.uses_successful_subject_analysis(pattern)),
             PatternPredicateKind::As(Some(pattern), _) => {
-                Self::requires_successful_subject_replacement(pattern)
+                self.uses_successful_subject_analysis(pattern)
             }
             _ => false,
         }

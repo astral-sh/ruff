@@ -1119,7 +1119,7 @@ the result is preserved through an `or` pattern. This analysis does not yet narr
 to construct tuple or dictionary display subjects.
 
 ```py
-from typing import Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar
 from typing_extensions import TypedDict
 
 TagT = TypeVar("TagT")
@@ -1144,6 +1144,14 @@ def test_match_class_or_pattern_narrows_subject(
         case TaggedPayload("int", _) | TaggedPayload("str", _):
             # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
             reveal_type(value)
+
+DynamicClass: Any = int
+
+def test_dynamic_class_keeps_subject_and_alias_consistent(value: int | str) -> None:
+    match value:
+        case DynamicClass() as whole:
+            reveal_type(value)  # revealed: int | str
+            reveal_type(whole)  # revealed: int | str
 
 class IntPayload(TypedDict):
     tag: Literal["int"]
