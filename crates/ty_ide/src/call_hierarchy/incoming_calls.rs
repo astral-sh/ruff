@@ -303,9 +303,10 @@ impl<'a> CallSitesFinder<'a, '_> {
     /// accessor: a read calls the getter, a write calls the setter, and a
     /// `del` calls the deleter.
     fn check_property_access(&mut self, attribute: &'a ast::ExprAttribute) {
-        let Some(Type::PropertyInstance(property)) =
-            static_member_type_for_attribute(self.model, attribute)
-        else {
+        let Some(ty) = static_member_type_for_attribute(self.model, attribute) else {
+            return;
+        };
+        let ty_python_semantic::types::TypeData::PropertyInstance(property) = ty.data() else {
             return;
         };
 

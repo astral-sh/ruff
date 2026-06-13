@@ -207,16 +207,22 @@ impl<'db> Type<'db> {
             Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
         };
 
-        let truthiness = match self {
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::Never
-            | Type::Callable(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypeForm(_) => Truthiness::Ambiguous,
+        let truthiness = match {
+            let __ty_view_value = self;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (
+                _,
+                crate::types::TypeData::Dynamic(_)
+                | crate::types::TypeData::Divergent(_)
+                | crate::types::TypeData::Never
+                | crate::types::TypeData::Callable(_)
+                | crate::types::TypeData::TypeIs(_)
+                | crate::types::TypeData::TypeGuard(_)
+                | crate::types::TypeData::TypeForm(_),
+            ) => Truthiness::Ambiguous,
 
-            Type::TypedDict(td) => {
+            (_, crate::types::TypeData::TypedDict(td)) => {
                 if td.items(db).values().any(TypedDictField::is_required) {
                     Truthiness::AlwaysTrue
                 } else if td.openness(db).is_closed()
@@ -228,37 +234,45 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
+            (
+                _,
+                crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(
+                    tracked_set,
+                )),
+            ) => {
                 let constraints = ConstraintSetBuilder::new();
                 let tracked_set = constraints.load(db, tracked_set.constraints(db));
                 Truthiness::from(tracked_set.is_always_satisfied(db))
             }
 
-            Type::FunctionLiteral(_)
-            | Type::BoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(_)
-            | Type::PropertyInstance(_)
-            | Type::BoundSuper(_)
-            | Type::KnownInstance(_)
-            | Type::SpecialForm(_)
-            | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
+            (
+                _,
+                crate::types::TypeData::FunctionLiteral(_)
+                | crate::types::TypeData::BoundMethod(_)
+                | crate::types::TypeData::WrapperDescriptor(_)
+                | crate::types::TypeData::KnownBoundMethod(_)
+                | crate::types::TypeData::DataclassDecorator(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::ModuleLiteral(_)
+                | crate::types::TypeData::PropertyInstance(_)
+                | crate::types::TypeData::BoundSuper(_)
+                | crate::types::TypeData::KnownInstance(_)
+                | crate::types::TypeData::SpecialForm(_)
+                | crate::types::TypeData::AlwaysTruthy,
+            ) => Truthiness::AlwaysTrue,
 
-            Type::AlwaysFalsy => Truthiness::AlwaysFalse,
+            (_, crate::types::TypeData::AlwaysFalsy) => Truthiness::AlwaysFalse,
 
-            Type::ClassLiteral(class) => {
+            (_, crate::types::TypeData::ClassLiteral(class)) => {
                 class
                     .metaclass_instance_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)?
             }
-            Type::GenericAlias(alias) => ClassType::from(*alias)
+            (_, crate::types::TypeData::GenericAlias(alias)) => ClassType::from(alias)
                 .metaclass_instance_type(db)
                 .try_bool_impl(db, allow_short_circuit, visitor)?,
 
-            Type::SubclassOf(subclass_of_ty) => {
+            (_, crate::types::TypeData::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of().with_transposed_type_var(db) {
                     SubclassOfInner::Dynamic(_) => Truthiness::Ambiguous,
                     SubclassOfInner::Class(class) => {
@@ -269,7 +283,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::TypeVar(bound_typevar) => {
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Truthiness::Ambiguous,
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -281,17 +295,17 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::NominalInstance(instance) => instance
+            (_, crate::types::TypeData::NominalInstance(instance)) => instance
                 .known_class(db)
                 .and_then(KnownClass::bool)
                 .map(Ok)
                 .unwrap_or_else(try_dunders)?,
 
-            Type::ProtocolInstance(_) => try_dunders()?,
+            (_, crate::types::TypeData::ProtocolInstance(_)) => try_dunders()?,
 
-            Type::Union(union) => try_union(*union)?,
+            (_, crate::types::TypeData::Union(union)) => try_union(union)?,
 
-            Type::Intersection(intersection) => {
+            (_, crate::types::TypeData::Intersection(intersection)) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
                     alternatives.try_bool_impl(db, allow_short_circuit, visitor)?
                 } else {
@@ -300,11 +314,11 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::EnumComplement(complement) => complement
+            (_, crate::types::TypeData::EnumComplement(complement)) => complement
                 .remaining_literal_union(db)
                 .try_bool_impl(db, allow_short_circuit, visitor)?,
 
-            Type::LiteralValue(literal) => match literal.kind() {
+            (_, crate::types::TypeData::LiteralValue(literal)) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
                 LiteralValueTypeKind::Enum(enum_type) => enum_type
                     .enum_class_instance(db)
@@ -316,16 +330,14 @@ impl<'db> Type<'db> {
                 LiteralValueTypeKind::Bytes(bytes) => Truthiness::from(!bytes.value(db).is_empty()),
             },
 
-            Type::TypeAlias(alias) => visitor.visit(*self, || {
+            (_, crate::types::TypeData::TypeAlias(alias)) => visitor.visit(*self, || {
                 alias
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)
             })?,
-            Type::NewTypeInstance(newtype) => {
-                newtype
-                    .concrete_base_type(db)
-                    .try_bool_impl(db, allow_short_circuit, visitor)?
-            }
+            (_, crate::types::TypeData::NewTypeInstance(newtype)) => newtype
+                .concrete_base_type(db)
+                .try_bool_impl(db, allow_short_circuit, visitor)?,
         };
 
         Ok(truthiness)

@@ -300,7 +300,10 @@ impl<'db> EnumComplementType<'db> {
         let mut enum_class = None;
         let mut rest = SmallVec::<[Type<'db>; 1]>::default();
         for positive in positive {
-            let Type::NominalInstance(instance) = positive else {
+            let (_, crate::types::TypeData::NominalInstance(instance)) = ({
+                let __ty_view_value = positive;
+                (__ty_view_value, __ty_view_value.data())
+            }) else {
                 rest.push(*positive);
                 continue;
             };
@@ -703,12 +706,21 @@ pub(crate) fn enum_metadata<'db>(
                     return None;
                 }
                 Place::Defined(DefinedPlace { ty, .. }) => {
-                    let special_case = match ty {
-                        Type::Callable(_) | Type::FunctionLiteral(_) => {
+                    let special_case = match {
+                        let __ty_view_value = ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (
+                            _,
+                            crate::types::TypeData::Callable(_)
+                            | crate::types::TypeData::FunctionLiteral(_),
+                        ) => {
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        Type::NominalInstance(instance) => match instance.known_class(db) {
+                        (_, crate::types::TypeData::NominalInstance(instance)) => match instance
+                            .known_class(db)
+                        {
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
 
@@ -780,7 +792,7 @@ pub(crate) fn enum_metadata<'db>(
                             _ => None,
                         },
 
-                        _ => None,
+                        (_, _) => None,
                     };
 
                     if let Some(special_case) = special_case {
@@ -795,12 +807,8 @@ pub(crate) fn enum_metadata<'db>(
                             .place;
 
                         match dunder_get {
-                            Place::Undefined
-                            | Place::Defined(DefinedPlace {
-                                ty: Type::Dynamic(_),
-                                ..
-                            }) => ty,
-
+                            Place::Undefined => ty,
+                            Place::Defined(defined) if defined.ty.is_dynamic() => ty,
                             Place::Defined(_) => {
                                 // Descriptors are not considered members.
                                 return None;
@@ -1001,9 +1009,12 @@ fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType
     .ignore_conflicting_declarations()
     .ignore_possibly_undefined()?;
 
-    match init_type {
-        Type::FunctionLiteral(f) => Some(f),
-        _ => None,
+    match {
+        let __ty_view_value = init_type;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::FunctionLiteral(f)) => Some(f),
+        (_, _) => None,
     }
 }
 
@@ -1017,9 +1028,12 @@ fn custom_new<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<
     .ignore_conflicting_declarations()
     .ignore_possibly_undefined()?;
 
-    match new_type {
-        Type::FunctionLiteral(f) => Some(f),
-        _ => None,
+    match {
+        let __ty_view_value = new_type;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::FunctionLiteral(f)) => Some(f),
+        (_, _) => None,
     }
 }
 
@@ -1037,9 +1051,12 @@ fn custom_generate_next_value<'db>(
     .ignore_conflicting_declarations()
     .ignore_possibly_undefined();
     let new_type = new_type?;
-    match new_type {
-        Type::FunctionLiteral(f) => Some(f),
-        _ => None,
+    match {
+        let __ty_view_value = new_type;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::FunctionLiteral(f)) => Some(f),
+        (_, _) => None,
     }
 }
 
@@ -1062,9 +1079,14 @@ pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'d
 }
 
 pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
-        _ => false,
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
+            enum_metadata(db, class_literal).is_some()
+        }
+        (_, _) => false,
     }
 }
 
@@ -1091,8 +1113,13 @@ pub(crate) fn is_enum_class_by_inheritance<'db>(
 ///
 /// Returns `Some(value_type)` if the type is a `nonmember[T]`, otherwise `None`.
 pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-    match ty {
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::NominalInstance(instance))
+            if instance.has_known_class(db, KnownClass::Nonmember) =>
+        {
             Some(
                 ty.member(db, "value")
                     .place
@@ -1100,6 +1127,6 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
                     .unwrap_or(Type::unknown()),
             )
         }
-        _ => None,
+        (_, _) => None,
     }
 }

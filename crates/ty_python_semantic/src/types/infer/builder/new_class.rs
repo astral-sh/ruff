@@ -216,7 +216,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Get the already-inferred class type from the initial pass.
         let inferred_type = definition_expression_type(db, definition, call_expr);
-        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
+        let (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))) = ({
+            let __ty_view_value = inferred_type;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return;
         };
 

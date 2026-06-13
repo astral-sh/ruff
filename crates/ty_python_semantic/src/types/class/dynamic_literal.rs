@@ -484,15 +484,22 @@ impl<'db> DynamicClassLiteral<'db> {
         for (name, ty) in self.members(db) {
             if name.as_str() == "__slots__" {
                 // Check if the slots are non-empty
-                let is_non_empty = match ty {
+                let is_non_empty = match {
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     // __slots__ = ("a", "b")
-                    Type::NominalInstance(nominal) => nominal.tuple_spec(db).is_some_and(|spec| {
-                        spec.len().into_fixed_length().is_some_and(|len| len > 0)
-                    }),
+                    (_, crate::types::TypeData::NominalInstance(nominal)) => {
+                        nominal.tuple_spec(db).is_some_and(|spec| {
+                            spec.len().into_fixed_length().is_some_and(|len| len > 0)
+                        })
+                    }
                     // __slots__ = "abc"  # Same as ("abc",)
-                    Type::LiteralValue(literal) if literal.is_string() => true,
+                    (_, crate::types::TypeData::LiteralValue(literal)) if literal.is_string() => {
+                        true
+                    }
                     // Other types are considered dynamic/unknown
-                    _ => false,
+                    (_, _) => false,
                 };
                 if is_non_empty {
                     return Some(DisjointBase::due_to_dunder_slots(ClassLiteral::Dynamic(

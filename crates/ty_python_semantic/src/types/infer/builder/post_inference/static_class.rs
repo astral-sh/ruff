@@ -81,7 +81,10 @@ pub(crate) fn check_static_class_definitions<'db>(
 ) {
     let db = context.db();
 
-    let Type::ClassLiteral(ClassLiteral::Static(class)) = ty else {
+    let (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class))) = ({
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    }) else {
         return;
     };
 
@@ -233,9 +236,17 @@ pub(crate) fn check_static_class_definitions<'db>(
 
         if class_kind == Some(CodeGeneratorKind::NamedTuple)
             && !matches!(
-                base_class,
-                Type::SpecialForm(SpecialFormType::NamedTuple)
-                    | Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+                {
+                    let __ty_view_value = base_class;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (
+                    _,
+                    crate::types::TypeData::SpecialForm(SpecialFormType::NamedTuple)
+                        | crate::types::TypeData::KnownInstance(
+                            KnownInstanceType::SubscriptedGeneric(_)
+                        )
+                )
             )
             && let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, source_node)
         {
@@ -245,8 +256,11 @@ pub(crate) fn check_static_class_definitions<'db>(
             ));
         }
 
-        let base_class = match base_class {
-            Type::SpecialForm(SpecialFormType::Generic) => {
+        let base_class = match {
+            let __ty_view_value = base_class;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Generic)) => {
                 if let Some(builder) = context.report_lint(&INVALID_BASE, source_node) {
                     // Unsubscripted `Generic` can appear in the MRO of many classes,
                     // but it is never valid as an explicit base class in user code.
@@ -254,7 +268,12 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
                 continue;
             }
-            Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(new_context)) => {
+            (
+                _,
+                crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedGeneric(
+                    new_context,
+                )),
+            ) => {
                 let Some((previous_node, previous_context)) = protocol_base_with_generic_context
                 else {
                     continue;
@@ -281,7 +300,12 @@ pub(crate) fn check_static_class_definitions<'db>(
             // Note that unlike several of the other errors caught in this function,
             // this does not lead to the class creation failing at runtime,
             // but it is semantically invalid.
-            Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(generic_context)) => {
+            (
+                _,
+                crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedProtocol(
+                    generic_context,
+                )),
+            ) => {
                 if let Some(type_params) = class_node.type_params.as_deref() {
                     let node = source_node;
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, node) else {
@@ -309,8 +333,8 @@ pub(crate) fn check_static_class_definitions<'db>(
                 }
                 continue;
             }
-            Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(base_alias) => {
+            (_, crate::types::TypeData::ClassLiteral(class)) => ClassType::NonGeneric(class),
+            (_, crate::types::TypeData::GenericAlias(base_alias)) => {
                 if check_explicit_base_variance
                     && let Some(generic_context) = class.generic_context(db)
                     && let Some((typevar, declared_variance, required_variance)) =
@@ -344,7 +368,7 @@ pub(crate) fn check_static_class_definitions<'db>(
 
                 ClassType::Generic(base_alias)
             }
-            _ => continue,
+            (_, _) => continue,
         };
 
         if let Some(disjoint_base) = base_class.nearest_disjoint_base(db) {
@@ -809,10 +833,16 @@ pub(crate) fn check_static_class_definitions<'db>(
                 };
 
                 let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-                    let tvar = match t {
-                        Type::TypeVar(tvar) => tvar.typevar(db),
-                        Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                        _ => return None,
+                    let tvar = match {
+                        let __ty_view_value = t;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::TypeVar(tvar)) => tvar.typevar(db),
+                        (
+                            _,
+                            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(tvar)),
+                        ) => tvar,
+                        (_, _) => return None,
                     };
                     if !typevars.clone().take(i).contains(&tvar) {
                         Some(tvar)
@@ -1273,7 +1303,10 @@ fn check_final_class_abstract_methods<'db>(
 
     let defining_class_name = defining_class.name(db);
 
-    if let Type::FunctionLiteral(function) = binding_type(db, *definition) {
+    if let (_, crate::types::TypeData::FunctionLiteral(function)) = {
+        let __ty_view_value = binding_type(db, *definition);
+        (__ty_view_value, __ty_view_value.data())
+    } {
         let policy = if kind.is_explicit() {
             AbstractMethodAnnotationPolicy::ExcludeVerboseBody
         } else {

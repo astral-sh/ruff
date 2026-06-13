@@ -162,24 +162,33 @@ impl<'db> AllMembers<'db> {
     }
 
     fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        match ty {
-            Type::Union(union) => {
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Union(union)) => {
                 fn is_dynamic(db: &dyn Db, ty: Type<'_>) -> bool {
                     // We don't need to use recursion here because
                     // `Type` guarantees that unions/intersections
                     // are kept in DNF (i.e., they are flattened).
                     ty.is_dynamic()
-                        || match ty {
-                            Type::Intersection(intersection) => {
+                        || match {
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        } {
+                            (_, crate::types::TypeData::Intersection(intersection)) => {
                                 intersection.positive(db).iter().any(Type::is_dynamic)
                             }
-                            _ => false,
+                            (_, _) => false,
                         }
                 }
 
-                let union = match union.filter(db, |&ty| !is_dynamic(db, ty)) {
-                    Type::Union(union) => union,
-                    ty => return self.extend_with_type(db, ty),
+                let union = match {
+                    let __ty_view_value = union.filter(db, |&ty| !is_dynamic(db, ty));
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::Union(union)) => union,
+                    (ty, _) => return self.extend_with_type(db, ty),
                 };
                 self.members.extend(
                     union
@@ -191,7 +200,7 @@ impl<'db> AllMembers<'db> {
                 );
             }
 
-            Type::Intersection(intersection) => self.members.extend(
+            (_, crate::types::TypeData::Intersection(intersection)) => self.members.extend(
                 intersection
                     .positive(db)
                     .iter()
@@ -200,11 +209,11 @@ impl<'db> AllMembers<'db> {
                     .unwrap_or_default(),
             ),
 
-            Type::EnumComplement(complement) => {
+            (_, crate::types::TypeData::EnumComplement(complement)) => {
                 self.extend_with_type(db, complement.to_intersection(db));
             }
 
-            Type::NominalInstance(instance) => {
+            (_, crate::types::TypeData::NominalInstance(instance)) => {
                 let class = instance.class(db);
                 if let Some((class_literal, _)) = class.static_class_literal(db) {
                     self.extend_with_instance_members(db, ty, class_literal);
@@ -216,36 +225,44 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
-            Type::NewTypeInstance(newtype) => {
+            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
                 self.extend_with_type(db, newtype.concrete_base_type(db));
             }
 
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
+            (_, crate::types::TypeData::ClassLiteral(class_literal))
+                if class_literal.is_typed_dict(db) =>
+            {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
+            (_, crate::types::TypeData::GenericAlias(generic_alias))
+                if generic_alias.is_typed_dict(db) =>
+            {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
-            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
+            (_, crate::types::TypeData::SubclassOf(subclass_of_type))
+                if subclass_of_type.is_typed_dict(db) =>
+            {
                 self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
             }
 
-            Type::ClassLiteral(class_literal) => {
+            (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
                 self.extend_with_class_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal);
                 self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
-            Type::GenericAlias(generic_alias) => {
+            (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
                 let class_literal = generic_alias.origin(db);
                 self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                 self.extend_with_synthetic_members(db, ty, ClassLiteral::Static(class_literal));
                 self.extend_with_metaclass_members(db, ty, class_literal.metaclass(db));
             }
 
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+            (_, crate::types::TypeData::SubclassOf(subclass_of_type)) => match subclass_of_type
+                .subclass_of()
+            {
                 SubclassOfInner::Dynamic(_) => {
                     self.extend_with_type(db, KnownClass::Type.to_instance(db));
                 }
@@ -268,18 +285,23 @@ impl<'db> AllMembers<'db> {
                 }
             },
 
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::Never
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy
-            | Type::TypeForm(_) => {
+            (
+                _,
+                crate::types::TypeData::Dynamic(_)
+                | crate::types::TypeData::Divergent(_)
+                | crate::types::TypeData::Never
+                | crate::types::TypeData::AlwaysTruthy
+                | crate::types::TypeData::AlwaysFalsy
+                | crate::types::TypeData::TypeForm(_),
+            ) => {
                 self.extend_with_type(db, Type::object());
             }
 
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
+            (_, crate::types::TypeData::TypeAlias(alias)) => {
+                self.extend_with_type(db, alias.value_type(db))
+            }
 
-            Type::TypeVar(bound_typevar) => {
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => {
                         self.extend_with_type(db, Type::object());
@@ -302,51 +324,61 @@ impl<'db> AllMembers<'db> {
                 }
             }
 
-            Type::LiteralValue(_)
-            | Type::PropertyInstance(_)
-            | Type::FunctionLiteral(_)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_)
-            | Type::ProtocolInstance(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_) => match ty.to_meta_type(db) {
-                Type::ClassLiteral(class_literal) => {
+            (
+                _,
+                crate::types::TypeData::LiteralValue(_)
+                | crate::types::TypeData::PropertyInstance(_)
+                | crate::types::TypeData::FunctionLiteral(_)
+                | crate::types::TypeData::BoundMethod(_)
+                | crate::types::TypeData::KnownBoundMethod(_)
+                | crate::types::TypeData::WrapperDescriptor(_)
+                | crate::types::TypeData::DataclassDecorator(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::Callable(_)
+                | crate::types::TypeData::ProtocolInstance(_)
+                | crate::types::TypeData::SpecialForm(_)
+                | crate::types::TypeData::KnownInstance(_)
+                | crate::types::TypeData::BoundSuper(_)
+                | crate::types::TypeData::TypeIs(_)
+                | crate::types::TypeData::TypeGuard(_),
+            ) => match {
+                let __ty_view_value = ty.to_meta_type(db);
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
-                Type::SubclassOf(subclass_of) => {
+                (_, crate::types::TypeData::SubclassOf(subclass_of)) => {
                     if let Some(class) = subclass_of.subclass_of().into_class(db)
                         && let Some((class_literal, _)) = class.static_class_literal(db)
                     {
                         self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                     }
                 }
-                Type::GenericAlias(generic_alias) => {
+                (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
                     let class_literal = generic_alias.origin(db);
                     self.extend_with_class_members(db, ty, ClassLiteral::Static(class_literal));
                 }
-                _ => {}
+                (_, _) => {}
             },
 
-            Type::TypedDict(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
+            (_, crate::types::TypeData::TypedDict(_)) => {
+                if let (_, crate::types::TypeData::ClassLiteral(class_literal)) = {
+                    let __ty_view_value = ty.to_meta_type(db);
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
 
-                if let Type::ClassLiteral(ClassLiteral::Static(class)) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
-                {
+                if let (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class))) = {
+                    let __ty_view_value = KnownClass::TypedDictFallback.to_class_literal(db);
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     self.extend_with_instance_members(db, ty, class);
                 }
             }
 
-            Type::ModuleLiteral(literal) => {
+            (_, crate::types::TypeData::ModuleLiteral(literal)) => {
                 // Looking up `__file__` on `types.ModuleType` will not give as precise a type
                 // as we infer in type inference, but it's confuisng if autocomplete etc.
                 // shows a different type in the tooltip to the one inferred by the type checker.
@@ -386,8 +418,11 @@ impl<'db> AllMembers<'db> {
                         NameKind::Sunder => true,
                     };
                     if is_private_symbol && is_stub_file {
-                        match ty {
-                            Type::NominalInstance(instance)
+                        match {
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        } {
+                            (_, crate::types::TypeData::NominalInstance(instance))
                                 if matches!(
                                     instance.known_class(db),
                                     Some(
@@ -400,15 +435,22 @@ impl<'db> AllMembers<'db> {
                             {
                                 continue;
                             }
-                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
-                            Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_)
-                                | KnownInstanceType::TypeAliasType(_)
-                                | KnownInstanceType::UnionType(_)
-                                | KnownInstanceType::Literal(_)
-                                | KnownInstanceType::Annotated(_),
+                            (_, crate::types::TypeData::ClassLiteral(class))
+                                if class.is_protocol(db) =>
+                            {
+                                continue;
+                            }
+                            (
+                                _,
+                                crate::types::TypeData::KnownInstance(
+                                    KnownInstanceType::TypeVar(_)
+                                    | KnownInstanceType::TypeAliasType(_)
+                                    | KnownInstanceType::UnionType(_)
+                                    | KnownInstanceType::Literal(_)
+                                    | KnownInstanceType::Annotated(_),
+                                ),
                             ) => continue,
-                            _ => {}
+                            (_, _) => {}
                         }
                     }
 

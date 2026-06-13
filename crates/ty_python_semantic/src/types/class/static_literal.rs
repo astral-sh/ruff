@@ -122,11 +122,19 @@ impl<'db> StaticClassLiteral<'db> {
     /// When the base namedtuple's fields were determined dynamically (e.g., from a variable),
     /// we can't synthesize precise method signatures and should fall back to `NamedTupleFallback`.
     pub(crate) fn namedtuple_base_has_unknown_fields(self, db: &'db dyn Db) -> bool {
-        self.explicit_bases(db).iter().any(|base| match base {
-            Type::ClassLiteral(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
-                !namedtuple.has_known_fields(db)
+        self.explicit_bases(db).iter().any(|base| {
+            match {
+                let __ty_view_value = base;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(ClassLiteral::DynamicNamedTuple(
+                        namedtuple,
+                    )),
+                ) => !namedtuple.has_known_fields(db),
+                (_, _) => false,
             }
-            _ => false,
         })
     }
 
@@ -298,12 +306,20 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.explicit_bases(db).iter().find_map(|base| match base {
-            Type::KnownInstance(
-                KnownInstanceType::SubscriptedGeneric(generic_context)
-                | KnownInstanceType::SubscriptedProtocol(generic_context),
-            ) => Some(*generic_context),
-            _ => None,
+        self.explicit_bases(db).iter().find_map(|base| {
+            match {
+                let __ty_view_value = base;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(
+                        KnownInstanceType::SubscriptedGeneric(generic_context)
+                        | KnownInstanceType::SubscriptedProtocol(generic_context),
+                    ),
+                ) => Some(generic_context),
+                (_, _) => None,
+            }
         })
     }
 
@@ -322,11 +338,15 @@ impl<'db> StaticClassLiteral<'db> {
             GenericContext::from_base_classes(
                 db,
                 class.definition(db),
-                class
-                    .explicit_bases(db)
-                    .iter()
-                    .copied()
-                    .filter(|ty| matches!(ty, Type::GenericAlias(_))),
+                class.explicit_bases(db).iter().copied().filter(|ty| {
+                    matches!(
+                        {
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (_, crate::types::TypeData::GenericAlias(_))
+                    )
+                }),
             )
         }
 
@@ -553,9 +573,17 @@ impl<'db> StaticClassLiteral<'db> {
                 //                                and the final base being `object`)
                 self.explicit_bases(db).iter().rev().take(3).any(|base| {
                     matches!(
-                        base,
-                        Type::SpecialForm(SpecialFormType::Protocol)
-                            | Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_))
+                        {
+                            let __ty_view_value = base;
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (
+                            _,
+                            crate::types::TypeData::SpecialForm(SpecialFormType::Protocol)
+                                | crate::types::TypeData::KnownInstance(
+                                    KnownInstanceType::SubscriptedProtocol(_)
+                                )
+                        )
                     )
                 })
             })
@@ -914,7 +942,9 @@ impl<'db> StaticClassLiteral<'db> {
             // Generic metaclasses parameterized by type variables are not supported.
             // `metaclass=Meta[int]` is fine, but `metaclass=Meta[T]` is not.
             // See: https://typing.python.org/en/latest/spec/generics.html#generic-metaclasses
-            if let Some(Type::GenericAlias(alias)) = explicit_metaclass {
+            if let Some(crate::types::TypeData::GenericAlias(alias)) =
+                explicit_metaclass.map(Type::data)
+            {
                 let specialization_has_typevars = alias
                     .specialization(db)
                     .types(db)
@@ -1046,19 +1076,24 @@ impl<'db> StaticClassLiteral<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
-            match ty {
-                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
-                    db,
-                    callable_ty.signatures(db),
-                    CallableTypeKind::FunctionLike,
-                    callable_ty.provenance(db),
-                )),
-                Type::Union(union) => {
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::Callable(callable_ty)) => {
+                    Type::Callable(CallableType::new(
+                        db,
+                        callable_ty.signatures(db),
+                        CallableTypeKind::FunctionLike,
+                        callable_ty.provenance(db),
+                    ))
+                }
+                (_, crate::types::TypeData::Union(union)) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
-                Type::Intersection(intersection) => intersection
+                (_, crate::types::TypeData::Intersection(intersection)) => intersection
                     .map_positive(db, |element| into_function_like_callable(db, *element)),
-                _ => ty,
+                (_, _) => ty,
             }
         }
 
@@ -1178,10 +1213,18 @@ impl<'db> StaticClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (inherited_generic_context, ty, specialization, name) {
+            match (
+                inherited_generic_context,
+                ({
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                }),
+                specialization,
+                name,
+            ) {
                 (
                     Some(generic_context),
-                    Type::FunctionLiteral(function),
+                    (_, crate::types::TypeData::FunctionLiteral(function)),
                     Some(_),
                     "__new__" | "__init__",
                 ) => Type::FunctionLiteral(
@@ -1882,8 +1925,10 @@ impl<'db> StaticClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
 
-            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
-            else {
+            let Some(ty) = attr.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            let crate::types::TypeData::FunctionLiteral(literal) = ty.data() else {
                 continue;
             };
 
@@ -2033,7 +2078,10 @@ impl<'db> StaticClassLiteral<'db> {
                 let mut kw_only = None;
                 let mut alias = None;
                 let mut converter = None;
-                if let Some(Type::KnownInstance(KnownInstanceType::Field(field))) = default_ty {
+                if let Some(crate::types::TypeData::KnownInstance(KnownInstanceType::Field(
+                    field,
+                ))) = default_ty.map(Type::data)
+                {
                     default_ty = field.default_type(db);
                     init = field.init(db);
                     kw_only = field.kw_only(db);
@@ -2214,7 +2262,10 @@ impl<'db> StaticClassLiteral<'db> {
             for decorator in &function_node.decorator_list {
                 let decorator_ty =
                     definition_expression_type(db, definition, &decorator.expression);
-                if let Type::ClassLiteral(class) = decorator_ty {
+                if let (_, crate::types::TypeData::ClassLiteral(class)) = {
+                    let __ty_view_value = decorator_ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     match class.known(db) {
                         Some(KnownClass::Classmethod) => is_classmethod = true,
                         Some(KnownClass::Staticmethod) => is_staticmethod = true,
@@ -2766,10 +2817,17 @@ impl<'db> StaticClassLiteral<'db> {
             ) -> bool {
                 let mut result = false;
                 for explicit_base in class.explicit_bases(db) {
-                    let explicit_base_class_literal = match explicit_base {
-                        Type::ClassLiteral(class_literal) => class_literal.as_static(),
-                        Type::GenericAlias(generic_alias) => Some(generic_alias.origin(db)),
-                        _ => continue,
+                    let explicit_base_class_literal = match {
+                        let __ty_view_value = explicit_base;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
+                            class_literal.as_static()
+                        }
+                        (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
+                            Some(generic_alias.origin(db))
+                        }
+                        (_, _) => continue,
                     };
                     let Some(explicit_base_class_literal) = explicit_base_class_literal else {
                         continue;

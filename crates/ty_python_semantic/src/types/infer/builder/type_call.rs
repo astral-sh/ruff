@@ -158,7 +158,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     })
                     .collect();
                 (members, !all_keys_are_string_literals)
-            } else if let Type::TypedDict(typed_dict) = namespace_type {
+            } else if let (_, crate::types::TypeData::TypedDict(typed_dict)) = {
+                let __ty_view_value = namespace_type;
+                (__ty_view_value, __ty_view_value.data())
+            } {
                 // `namespace` is a TypedDict instance. Extract known keys as members.
                 // TypedDicts are "open" (can have additional string keys), so this
                 // is still a dynamic namespace for unknown attributes.
@@ -173,15 +176,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 (Box::new([]), true)
             };
 
-        if !matches!(namespace_type, Type::TypedDict(_))
-            && !namespace_type.is_assignable_to(
-                db,
-                KnownClass::Dict
-                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
-            )
-            && let Some(builder) = self
-                .context
-                .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
+        if !matches!(
+            {
+                let __ty_view_value = namespace_type;
+                (__ty_view_value, __ty_view_value.data())
+            },
+            (_, crate::types::TypeData::TypedDict(_))
+        ) && !namespace_type.is_assignable_to(
+            db,
+            KnownClass::Dict
+                .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]),
+        ) && let Some(builder) = self
+            .context
+            .report_lint(&INVALID_ARGUMENT_TYPE, namespace_arg)
         {
             let mut diagnostic = builder
                 .into_diagnostic("Invalid argument to parameter 3 (`namespace`) of `type()`");
@@ -329,7 +336,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Get the already-inferred class type from the initial pass.
         let inferred_type = definition_expression_type(db, definition, call_expr);
-        let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) = inferred_type else {
+        let (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))) = ({
+            let __ty_view_value = inferred_type;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return;
         };
 

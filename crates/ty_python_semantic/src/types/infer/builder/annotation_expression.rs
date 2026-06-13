@@ -84,8 +84,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder: &TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
-            let special_case = match ty {
-                Type::SpecialForm(special_form) => match special_form {
+            let special_case = match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::SpecialForm(special_form)) => match special_form {
                     SpecialFormType::TypeQualifier(qualifier) => {
                         match qualifier {
                             TypeQualifier::InitVar
@@ -117,12 +120,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 },
                 // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
                 // Python version where the former doesn't exist.
-                Type::Union(union)
+                (_, crate::types::TypeData::Union(union))
                     if pep_613_policy == PEP613Policy::Allowed
                         && union.elements(builder.db()).iter().all(|ty| {
                             matches!(
-                                ty,
-                                Type::SpecialForm(SpecialFormType::TypeAlias) | Type::Dynamic(_)
+                                {
+                                    let __ty_view_value = ty;
+                                    (__ty_view_value, __ty_view_value.data())
+                                },
+                                (
+                                    _,
+                                    crate::types::TypeData::SpecialForm(SpecialFormType::TypeAlias)
+                                        | crate::types::TypeData::Dynamic(_)
+                                )
                             )
                         }) =>
                 {
@@ -130,7 +140,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         SpecialFormType::TypeAlias,
                     )))
                 }
-                _ => None,
+                (_, _) => None,
             };
 
             special_case.unwrap_or_else(|| {
@@ -184,8 +194,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let slice = &**slice;
                 let value_ty = self.infer_expression(value, TypeContext::default());
 
-                match value_ty {
-                    Type::SpecialForm(special_form) => match special_form {
+                match {
+                    let __ty_view_value = value_ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::SpecialForm(special_form)) => match special_form {
                         SpecialFormType::Annotated => {
                             let inferred = self.parse_subscription_of_annotated_special_form(
                                 subscript,
@@ -302,7 +315,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             ),
                         ),
                     },
-                    _ => TypeAndQualifiers::declared(
+                    (_, _) => TypeAndQualifiers::declared(
                         self.infer_subscript_type_expression_no_store(subscript, slice, value_ty),
                     ),
                 }

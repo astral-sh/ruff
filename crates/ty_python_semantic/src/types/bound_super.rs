@@ -118,14 +118,17 @@ impl<'db> BoundSuperError<'db> {
             }
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
-                    match pivot_class {
-                        Type::GenericAlias(alias) => {
+                    match {
+                        let __ty_view_value = pivot_class;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::GenericAlias(alias)) => {
                             builder.into_diagnostic(format_args!(
                                 "`types.GenericAlias` instance `{}` is not a valid class",
                                 alias.display_with(context.db(), DisplaySettings::default()),
                             ));
                         }
-                        _ => {
+                        (_, _) => {
                             let mut diagnostic =
                                 builder.into_diagnostic("Argument is not a valid class");
                             diagnostic.set_primary_message(format_args!(
@@ -526,9 +529,15 @@ impl<'db> BoundSuperType<'db> {
         //   but are not valid as pivot classes, e.g. `typing.ChainMap`
         // - There are objects that are not valid in a class's bases list
         //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
-        let pivot_class = match pivot_class_type {
-            Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+        let pivot_class = match {
+            let __ty_view_value = pivot_class_type;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::ClassLiteral(class)) => {
+                ClassBase::Class(ClassType::NonGeneric(class))
+            }
+            (_, crate::types::TypeData::SubclassOf(subclass_of)) => match subclass_of.subclass_of()
+            {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
                 _ => match subclass_of.subclass_of().into_class(db) {
                     Some(class) => ClassBase::Class(class),
@@ -539,12 +548,18 @@ impl<'db> BoundSuperType<'db> {
                     }
                 },
             },
-            Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
-            Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
-            Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-            Type::Divergent(divergent) => ClassBase::Divergent(divergent),
-            _ => {
+            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Protocol)) => {
+                ClassBase::Protocol
+            }
+            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Generic)) => {
+                ClassBase::Generic
+            }
+            (_, crate::types::TypeData::SpecialForm(SpecialFormType::TypedDict)) => {
+                ClassBase::TypedDict
+            }
+            (_, crate::types::TypeData::Dynamic(dynamic)) => ClassBase::Dynamic(dynamic),
+            (_, crate::types::TypeData::Divergent(divergent)) => ClassBase::Divergent(divergent),
+            (_, _) => {
                 return Err(BoundSuperError::InvalidPivotClassType {
                     pivot_class: pivot_class_type,
                 });
@@ -558,9 +573,14 @@ impl<'db> BoundSuperType<'db> {
          -> Result<Type<'db>, BoundSuperError<'db>> {
             let mut builder = UnionBuilder::new(db);
             for constraint in constraints.elements(db) {
-                let class = match constraint {
-                    Type::NominalInstance(instance) => Some(instance.class(db)),
-                    _ => constraint.to_class_type(db),
+                let class = match {
+                    let __ty_view_value = constraint;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::NominalInstance(instance)) => {
+                        Some(instance.class(db))
+                    }
+                    (_, _) => constraint.to_class_type(db),
                 };
                 match class {
                     Some(class) => {
@@ -599,20 +619,29 @@ impl<'db> BoundSuperType<'db> {
             Ok(builder.build())
         };
 
-        let owner = match owner_type {
-            Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
-            Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
-            Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
-            Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
-                db,
-                pivot_class,
-                pivot_class_type,
-                owner_type,
-                Type::from(ClassType::NonGeneric(class)),
-                ClassType::NonGeneric(class),
-                None,
-            )?),
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+        let owner = match {
+            let __ty_view_value = owner_type;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Never) => SuperOwnerKind::Dynamic(DynamicType::Unknown),
+            (_, crate::types::TypeData::Dynamic(dynamic)) => SuperOwnerKind::Dynamic(dynamic),
+            (_, crate::types::TypeData::Divergent(divergent)) => {
+                SuperOwnerKind::Divergent(divergent)
+            }
+            (_, crate::types::TypeData::ClassLiteral(class)) => {
+                SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
+                    db,
+                    pivot_class,
+                    pivot_class_type,
+                    owner_type,
+                    Type::from(ClassType::NonGeneric(class)),
+                    ClassType::NonGeneric(class),
+                    None,
+                )?)
+            }
+            (_, crate::types::TypeData::SubclassOf(subclass_of_type)) => match subclass_of_type
+                .subclass_of()
+            {
                 SubclassOfInner::Class(class) => {
                     SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                         db,
@@ -629,12 +658,17 @@ impl<'db> BoundSuperType<'db> {
                     let typevar = bound_typevar.typevar(db);
                     match typevar.bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            let class = match bound {
-                                Type::NominalInstance(instance) => Some(instance.class(db)),
-                                Type::ProtocolInstance(protocol) => protocol
+                            let class = match {
+                                let __ty_view_value = bound;
+                                (__ty_view_value, __ty_view_value.data())
+                            } {
+                                (_, crate::types::TypeData::NominalInstance(instance)) => {
+                                    Some(instance.class(db))
+                                }
+                                (_, crate::types::TypeData::ProtocolInstance(protocol)) => protocol
                                     .to_nominal_instance()
                                     .map(|instance| instance.class(db)),
-                                _ => None,
+                                (_, _) => None,
                             };
                             if let Some(class) = class {
                                 SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
@@ -676,7 +710,7 @@ impl<'db> BoundSuperType<'db> {
                     }
                 }
             },
-            Type::NominalInstance(instance) => {
+            (_, crate::types::TypeData::NominalInstance(instance)) => {
                 SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                     db,
                     pivot_class,
@@ -687,7 +721,7 @@ impl<'db> BoundSuperType<'db> {
                 )?)
             }
 
-            Type::ProtocolInstance(protocol) => {
+            (_, crate::types::TypeData::ProtocolInstance(protocol)) => {
                 if let Some(nominal_instance) = protocol.to_nominal_instance() {
                     SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
                         db,
@@ -706,7 +740,7 @@ impl<'db> BoundSuperType<'db> {
                 }
             }
 
-            Type::Union(union) => {
+            (_, crate::types::TypeData::Union(union)) => {
                 return Ok(union
                     .elements(db)
                     .iter()
@@ -715,7 +749,7 @@ impl<'db> BoundSuperType<'db> {
                     })?
                     .build());
             }
-            Type::Intersection(intersection) => {
+            (_, crate::types::TypeData::Intersection(intersection)) => {
                 let mut builder = IntersectionBuilder::new(db);
                 let mut one_good_element_found = false;
                 for positive in intersection.positive(db) {
@@ -738,22 +772,27 @@ impl<'db> BoundSuperType<'db> {
                 }
                 return Ok(builder.build());
             }
-            Type::EnumComplement(complement) => {
+            (_, crate::types::TypeData::EnumComplement(complement)) => {
                 return delegate_to(complement.to_intersection(db));
             }
-            Type::TypeAlias(alias) => {
+            (_, crate::types::TypeData::TypeAlias(alias)) => {
                 return delegate_to(alias.value_type(db));
             }
-            Type::TypeVar(bound_typevar) => {
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        let class = match bound {
-                            Type::NominalInstance(instance) => Some(instance.class(db)),
-                            Type::ProtocolInstance(protocol) => protocol
+                        let class = match {
+                            let __ty_view_value = bound;
+                            (__ty_view_value, __ty_view_value.data())
+                        } {
+                            (_, crate::types::TypeData::NominalInstance(instance)) => {
+                                Some(instance.class(db))
+                            }
+                            (_, crate::types::TypeData::ProtocolInstance(protocol)) => protocol
                                 .to_nominal_instance()
                                 .map(|instance| instance.class(db)),
-                            _ => None,
+                            (_, _) => None,
                         };
                         if let Some(class) = class {
                             SuperOwnerKind::Resolved(Self::resolve_instance_super_owner(
@@ -790,35 +829,47 @@ impl<'db> BoundSuperType<'db> {
                     }
                 }
             }
-            Type::TypeIs(_) | Type::TypeGuard(_) => {
+            (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
-            Type::LiteralValue(literal) => return delegate_to(literal.fallback_instance(db)),
-            Type::SpecialForm(special_form) => {
+            (_, crate::types::TypeData::LiteralValue(literal)) => {
+                return delegate_to(literal.fallback_instance(db));
+            }
+            (_, crate::types::TypeData::SpecialForm(special_form)) => {
                 return delegate_to(special_form.instance_fallback(db));
             }
-            Type::KnownInstance(instance) => {
+            (_, crate::types::TypeData::KnownInstance(instance)) => {
                 return delegate_to(instance.instance_fallback(db));
             }
-            Type::FunctionLiteral(_) | Type::DataclassDecorator(_) => {
+            (
+                _,
+                crate::types::TypeData::FunctionLiteral(_)
+                | crate::types::TypeData::DataclassDecorator(_),
+            ) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }
-            Type::WrapperDescriptor(_) => {
+            (_, crate::types::TypeData::WrapperDescriptor(_)) => {
                 return delegate_to(KnownClass::WrapperDescriptorType.to_instance(db));
             }
-            Type::KnownBoundMethod(method) => {
+            (_, crate::types::TypeData::KnownBoundMethod(method)) => {
                 return delegate_to(method.class().to_instance(db));
             }
-            Type::BoundMethod(_) => return delegate_to(KnownClass::MethodType.to_instance(db)),
-            Type::ModuleLiteral(_) => {
+            (_, crate::types::TypeData::BoundMethod(_)) => {
+                return delegate_to(KnownClass::MethodType.to_instance(db));
+            }
+            (_, crate::types::TypeData::ModuleLiteral(_)) => {
                 return delegate_to(KnownClass::ModuleType.to_instance(db));
             }
-            Type::GenericAlias(_) => return delegate_to(KnownClass::GenericAlias.to_instance(db)),
-            Type::PropertyInstance(property) => {
+            (_, crate::types::TypeData::GenericAlias(_)) => {
+                return delegate_to(KnownClass::GenericAlias.to_instance(db));
+            }
+            (_, crate::types::TypeData::PropertyInstance(property)) => {
                 return delegate_to(property.instance_fallback(db));
             }
-            Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
-            Type::TypedDict(td) => {
+            (_, crate::types::TypeData::BoundSuper(_)) => {
+                return delegate_to(KnownClass::Super.to_instance(db));
+            }
+            (_, crate::types::TypeData::TypedDict(td)) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
                 // but here it seems like it's probably sound?
                 let mut key_builder = UnionBuilder::new(db);
@@ -832,17 +883,20 @@ impl<'db> BoundSuperType<'db> {
                         .to_specialized_instance(db, &[key_builder.build(), value_builder.build()]),
                 );
             }
-            Type::NewTypeInstance(newtype) => {
+            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
                 return delegate_to(newtype.concrete_base_type(db));
             }
-            Type::Callable(callable) if callable.is_function_like(db) => {
+            (_, crate::types::TypeData::Callable(callable)) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }
-            Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::Callable(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeForm(_) => {
+            (
+                _,
+                crate::types::TypeData::AlwaysFalsy
+                | crate::types::TypeData::AlwaysTruthy
+                | crate::types::TypeData::Callable(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::TypeForm(_),
+            ) => {
                 return Err(BoundSuperError::AbstractOwnerType {
                     owner_type,
                     pivot_class: pivot_class_type,

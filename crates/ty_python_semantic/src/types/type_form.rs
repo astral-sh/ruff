@@ -45,12 +45,17 @@ impl<'db> Type<'db> {
             ty: Type<'db>,
             visitor: &TypeFormArgumentVisitor<'db>,
         ) -> Option<Type<'db>> {
-            match ty {
-                Type::TypeForm(type_form) => Some(type_form.type_argument(db)),
-                Type::TypeAlias(alias) => {
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::TypeForm(type_form)) => {
+                    Some(type_form.type_argument(db))
+                }
+                (_, crate::types::TypeData::TypeAlias(alias)) => {
                     visitor.visit(ty, || project(db, alias.value_type(db), visitor))
                 }
-                Type::Union(union) => {
+                (_, crate::types::TypeData::Union(union)) => {
                     let mut elements = union
                         .elements(db)
                         .iter()
@@ -59,7 +64,7 @@ impl<'db> Type<'db> {
                     elements.peek()?;
                     Some(UnionType::from_elements(db, elements))
                 }
-                Type::Intersection(intersection) => {
+                (_, crate::types::TypeData::Intersection(intersection)) => {
                     let mut elements = intersection
                         .iter_positive(db)
                         .filter_map(|element| project(db, element, visitor))
@@ -67,7 +72,7 @@ impl<'db> Type<'db> {
                     elements.peek()?;
                     Some(IntersectionType::from_elements(db, elements))
                 }
-                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                (_, crate::types::TypeData::TypeVar(typevar)) => visitor.visit(ty, || {
                     typevar
                         .typevar(db)
                         .bound_or_constraints(db)
@@ -75,14 +80,21 @@ impl<'db> Type<'db> {
                             project(db, bound_or_constraints.as_type(db), visitor)
                         })
                 }),
-                Type::SpecialForm(special_form) => special_form.type_form_argument(db),
-                Type::KnownInstance(instance) if instance.is_type_form_value() => {
+                (_, crate::types::TypeData::SpecialForm(special_form)) => {
+                    special_form.type_form_argument(db)
+                }
+                (_, crate::types::TypeData::KnownInstance(instance))
+                    if instance.is_type_form_value() =>
+                {
                     instance.type_form_argument(db)
                 }
-                Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                    ty.to_instance(db)
-                }
-                _ => None,
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::GenericAlias(_)
+                    | crate::types::TypeData::SubclassOf(_),
+                ) => ty.to_instance(db),
+                (_, _) => None,
             }
         }
 

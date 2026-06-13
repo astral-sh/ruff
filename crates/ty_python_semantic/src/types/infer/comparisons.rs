@@ -169,8 +169,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    let comparison_result = match (left, right) {
-        (Type::EnumComplement(complement), right) => Some(infer_binary_type_comparison(
+    let comparison_result = match (({ let __ty_view_value = left; (__ty_view_value, __ty_view_value.data()) }), ({ let __ty_view_value = right; (__ty_view_value, __ty_view_value.data()) })) {
+        ((_, crate::types::TypeData::EnumComplement(complement)), (right, _)) => Some(infer_binary_type_comparison(
             context,
             complement.remaining_literal_union(db),
             op,
@@ -178,7 +178,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             range,
             visitor,
         )),
-        (left, Type::EnumComplement(complement)) => Some(infer_binary_type_comparison(
+        ((left, _), (_, crate::types::TypeData::EnumComplement(complement))) => Some(infer_binary_type_comparison(
             context,
             left,
             op,
@@ -187,7 +187,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             visitor,
         )),
 
-        (Type::Union(union), other) => {
+        ((_, crate::types::TypeData::Union(union)), (other, _)) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
                 builder = builder.add(infer_binary_type_comparison(
@@ -196,7 +196,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
             Some(Ok(builder.build()))
         }
-        (other, Type::Union(union)) => {
+        ((other, _), (_, crate::types::TypeData::Union(union))) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {
                 builder = builder.add(infer_binary_type_comparison(
@@ -206,7 +206,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             Some(Ok(builder.build()))
         }
 
-        (Type::Intersection(intersection), right)
+        ((_, crate::types::TypeData::Intersection(intersection)), (right, _))
             if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
         {
             Some(infer_binary_type_comparison(
@@ -218,7 +218,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 visitor
             ))
         }
-        (left, Type::Intersection(intersection))
+        ((left, _), (_, crate::types::TypeData::Intersection(intersection)))
             if intersection.positive(db).iter().copied().any(Type::is_type_var) =>
         {
             Some(infer_binary_type_comparison(
@@ -231,7 +231,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             ))
         }
 
-        (Type::Intersection(intersection), right) => {
+        ((_, crate::types::TypeData::Intersection(intersection)), (right, _)) => {
             Some(
                 infer_binary_intersection_type_comparison(
                     context,
@@ -249,7 +249,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 }),
             )
         }
-        (left, Type::Intersection(intersection)) => {
+        ((left, _), (_, crate::types::TypeData::Intersection(intersection))) => {
             Some(
                 infer_binary_intersection_type_comparison(
                     context,
@@ -268,11 +268,11 @@ pub(super) fn infer_binary_type_comparison<'db>(
             )
         }
 
-        (Type::TypeAlias(alias), right) => Some(visitor.visit((left, op, right), || {
+        ((_, crate::types::TypeData::TypeAlias(alias)), (right, _)) => Some(visitor.visit((left, op, right), || {
             infer_binary_type_comparison(context, alias.value_type(db), op, right, range, visitor)
         })),
 
-        (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), || {
+        ((left, _), (_, crate::types::TypeData::TypeAlias(alias))) => Some(visitor.visit((left, op, right), || {
             infer_binary_type_comparison(context, left, op, alias.value_type(db), range, visitor)
         })),
 
@@ -282,7 +282,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         // the same `int | float` and `int | float | complex` special treatment that the
         // positional arguments get. In those cases we need to explicitly delegate to the base
         // type, so that it hits the `Type::Union` branches above.
-        (Type::NewTypeInstance(newtype), right) => Some(
+        ((_, crate::types::TypeData::NewTypeInstance(newtype)), (right, _)) => Some(
             try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                 visitor.visit((left, op, right), || {
                     infer_binary_type_comparison(
@@ -296,7 +296,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                 })
             }),
         ),
-        (left, Type::NewTypeInstance(newtype)) => Some(
+        ((left, _), (_, crate::types::TypeData::NewTypeInstance(newtype))) => Some(
             try_dunder(MemberLookupPolicy::default()).or_else(|_| {
                 visitor.visit((left, op, right), || {
                     infer_binary_type_comparison(
@@ -316,7 +316,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         //
         // When both operands are the same bounded TypeVar, we check the comparison on the bound
         // type paired with itself.
-        (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
+        ((_, crate::types::TypeData::TypeVar(left_tvar)), (_, crate::types::TypeData::TypeVar(right_tvar)))
             if left_tvar.identity(db) == right_tvar.identity(db) =>
         {
             match left_tvar.typevar(db).bound_or_constraints(db) {
@@ -344,7 +344,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
         // When the left operand is a bounded TypeVar and the right is not a TypeVar,
         // delegate to the bound type.
-        (Type::TypeVar(left_tvar), right) if !right.is_type_var() => {
+        ((_, crate::types::TypeData::TypeVar(left_tvar)), (right, _)) if !right.is_type_var() => {
             match left_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
@@ -369,7 +369,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
         // When the right operand is a bounded TypeVar and the left is not a TypeVar,
         // delegate to the bound type.
-        (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
+        ((left, _), (_, crate::types::TypeData::TypeVar(right_tvar))) if !left.is_type_var() => {
             match right_tvar.typevar(db).bound_or_constraints(db) {
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                     try_dunder(MemberLookupPolicy::default()).or_else(|_| {
@@ -393,7 +393,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
 
-        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
+        ((_, crate::types::TypeData::LiteralValue(left_literal)), (_, crate::types::TypeData::LiteralValue(right_literal))) => {
             match (left_literal.kind(), right_literal.kind()) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
                     Some(match op {
@@ -570,8 +570,8 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
 
         (
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-            Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(left))),
+            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(right))),
         ) => {
             let constraints = ConstraintSetBuilder::new();
             let left = constraints.load(db, left.constraints(db));
@@ -585,7 +585,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
             }
         }
 
-        (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1
+        ((_, crate::types::TypeData::NominalInstance(nominal1)), (_, crate::types::TypeData::NominalInstance(nominal2))) => nominal1
             .tuple_spec(db)
             .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(db)?)))
             .map(|(lhs_tuple, rhs_tuple)| {
@@ -619,12 +619,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
                             )
                             .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-                            match eq_result {
-                                todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
+                            match { let __ty_view_value = eq_result; (__ty_view_value, __ty_view_value.data()) }  {
+                                (todo, crate::types::TypeData::Dynamic(DynamicType::Todo(_))) => return Ok(todo),
                                 // It's okay to ignore errors here because Python doesn't call `__bool__`
                                 // for different union variants. Instead, this is just for us to
                                 // evaluate a possibly truthy value to `false` or `true`.
-                                ty => match ty.bool(db) {
+                                (ty, _) => match ty.bool(db) {
                                     Truthiness::AlwaysTrue => any_eq = true,
                                     Truthiness::AlwaysFalse => (),
                                     Truthiness::Ambiguous => any_ambiguous = true,
@@ -648,12 +648,12 @@ pub(super) fn infer_binary_type_comparison<'db>(
                                 "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
                             );
 
-                        Ok(match eq_result {
-                            todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
+                        Ok(match { let __ty_view_value = eq_result; (__ty_view_value, __ty_view_value.data()) }  {
+                            (todo, crate::types::TypeData::Dynamic(DynamicType::Todo(_))) => todo,
                             // It's okay to ignore errors here because Python doesn't call `__bool__`
                             // for `is` and `is not` comparisons. This is an implementation detail
                             // for how we determine the truthiness of a type.
-                            ty => match ty.bool(db) {
+                            (ty, _) => match ty.bool(db) {
                                 Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
                                 _ => KnownClass::Bool.to_instance(db),
                             },
@@ -932,7 +932,13 @@ fn infer_membership_test_comparison<'db>(
 
     compare_result_opt
         .map(|ty| {
-            if matches!(ty, Type::Dynamic(DynamicType::Todo(_))) {
+            if matches!(
+                {
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (_, crate::types::TypeData::Dynamic(DynamicType::Todo(_)))
+            ) {
                 return ty;
             }
 

@@ -135,10 +135,15 @@ fn check_legacy_typevar_defaults<'db>(
         };
 
         let first_bad_tvar = find_over_type(db, default_ty, false, |t| {
-            let tvar = match t {
-                Type::TypeVar(tvar) => tvar.typevar(db),
-                Type::KnownInstance(KnownInstanceType::TypeVar(tvar)) => tvar,
-                _ => return None,
+            let tvar = match {
+                let __ty_view_value = t;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::TypeVar(tvar)) => tvar.typevar(db),
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(tvar))) => {
+                    tvar
+                }
+                (_, _) => return None,
             };
             if !typevars.clone().take(i).contains(&tvar) {
                 Some(tvar)

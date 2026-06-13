@@ -285,10 +285,13 @@ impl<'db> TypedDictType<'db> {
 
             for base in static_class.explicit_bases(db) {
                 let base = base.apply_optional_specialization(db, specialization);
-                let base_class = match base {
-                    Type::ClassLiteral(base) => ClassType::NonGeneric(base),
-                    Type::GenericAlias(base) => ClassType::Generic(base),
-                    _ => continue,
+                let base_class = match {
+                    let __ty_view_value = base;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::ClassLiteral(base)) => ClassType::NonGeneric(base),
+                    (_, crate::types::TypeData::GenericAlias(base)) => ClassType::Generic(base),
+                    (_, _) => continue,
                 };
 
                 if base_class.class_literal(db).is_typed_dict(db) {
@@ -1704,8 +1707,11 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<UnpackedTypedDict<'db>> {
-    match ty {
-        Type::TypedDict(td) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::TypedDict(td)) => {
             let keys = td
                 .items(db)
                 .iter()
@@ -1725,7 +1731,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 openness: td.openness(db),
             })
         }
-        Type::Intersection(intersection) => {
+        (_, crate::types::TypeData::Intersection(intersection)) => {
             // Collect TypedDict shapes from all TypedDicts in the intersection.
             let unpacked_elements: Vec<_> = intersection
                 .positive(db)
@@ -1786,7 +1792,7 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 openness,
             })
         }
-        Type::Union(union) => {
+        (_, crate::types::TypeData::Union(union)) => {
             let unpacked_elements: Vec<_> = union
                 .elements(db)
                 .iter()
@@ -1848,39 +1854,42 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
                 openness,
             })
         }
-        Type::TypeAlias(alias) => {
+        (_, crate::types::TypeData::TypeAlias(alias)) => {
             extract_unpacked_typed_dict_from_value_type(db, alias.value_type(db))
         }
         // All other types cannot contain a TypedDict
-        Type::Dynamic(_)
-        | Type::Divergent(_)
-        | Type::Never
-        | Type::EnumComplement(_)
-        | Type::FunctionLiteral(_)
-        | Type::BoundMethod(_)
-        | Type::KnownBoundMethod(_)
-        | Type::WrapperDescriptor(_)
-        | Type::DataclassDecorator(_)
-        | Type::DataclassTransformer(_)
-        | Type::Callable(_)
-        | Type::ModuleLiteral(_)
-        | Type::ClassLiteral(_)
-        | Type::GenericAlias(_)
-        | Type::SubclassOf(_)
-        | Type::NominalInstance(_)
-        | Type::ProtocolInstance(_)
-        | Type::SpecialForm(_)
-        | Type::KnownInstance(_)
-        | Type::PropertyInstance(_)
-        | Type::AlwaysTruthy
-        | Type::AlwaysFalsy
-        | Type::LiteralValue(_)
-        | Type::TypeVar(_)
-        | Type::BoundSuper(_)
-        | Type::TypeIs(_)
-        | Type::TypeGuard(_)
-        | Type::TypeForm(_)
-        | Type::NewTypeInstance(_) => None,
+        (
+            _,
+            crate::types::TypeData::Dynamic(_)
+            | crate::types::TypeData::Divergent(_)
+            | crate::types::TypeData::Never
+            | crate::types::TypeData::EnumComplement(_)
+            | crate::types::TypeData::FunctionLiteral(_)
+            | crate::types::TypeData::BoundMethod(_)
+            | crate::types::TypeData::KnownBoundMethod(_)
+            | crate::types::TypeData::WrapperDescriptor(_)
+            | crate::types::TypeData::DataclassDecorator(_)
+            | crate::types::TypeData::DataclassTransformer(_)
+            | crate::types::TypeData::Callable(_)
+            | crate::types::TypeData::ModuleLiteral(_)
+            | crate::types::TypeData::ClassLiteral(_)
+            | crate::types::TypeData::GenericAlias(_)
+            | crate::types::TypeData::SubclassOf(_)
+            | crate::types::TypeData::NominalInstance(_)
+            | crate::types::TypeData::ProtocolInstance(_)
+            | crate::types::TypeData::SpecialForm(_)
+            | crate::types::TypeData::KnownInstance(_)
+            | crate::types::TypeData::PropertyInstance(_)
+            | crate::types::TypeData::AlwaysTruthy
+            | crate::types::TypeData::AlwaysFalsy
+            | crate::types::TypeData::LiteralValue(_)
+            | crate::types::TypeData::TypeVar(_)
+            | crate::types::TypeData::BoundSuper(_)
+            | crate::types::TypeData::TypeIs(_)
+            | crate::types::TypeData::TypeGuard(_)
+            | crate::types::TypeData::TypeForm(_)
+            | crate::types::TypeData::NewTypeInstance(_),
+        ) => None,
     }
 }
 
@@ -1944,13 +1953,16 @@ pub(super) fn infer_unpacked_keyword_types<'db>(
 }
 
 pub(super) fn unpacked_keyword_is_gradual<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        ty if ty.is_never() || ty.is_dynamic() => true,
-        Type::Union(union) => union
+    match {
+        let __ty_view_value = ty.resolve_type_alias(db);
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (ty, _) if ty.is_never() || ty.is_dynamic() => true,
+        (_, crate::types::TypeData::Union(union)) => union
             .elements(db)
             .iter()
             .any(|element| element.resolve_type_alias(db).is_dynamic()),
-        _ => false,
+        (_, _) => false,
     }
 }
 

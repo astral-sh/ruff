@@ -1045,18 +1045,18 @@ impl KnownClass {
         let symbol = known_module_symbol(db, self.canonical_module(db), self.name(db)).place;
         match symbol {
             Place::Defined(DefinedPlace {
-                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                definedness: Definedness::AlwaysDefined,
-                ..
-            }) => Ok(class_literal),
-            Place::Defined(DefinedPlace {
-                ty: Type::ClassLiteral(ClassLiteral::Static(class_literal)),
-                definedness: Definedness::PossiblyUndefined,
-                ..
-            }) => Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal }),
-            Place::Defined(DefinedPlace { ty: found_type, .. }) => {
-                Err(KnownClassLookupError::SymbolNotAClass { found_type })
-            }
+                ty, definedness, ..
+            }) => match ty.data() {
+                crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class_literal)) => {
+                    match definedness {
+                        Definedness::AlwaysDefined => Ok(class_literal),
+                        Definedness::PossiblyUndefined => {
+                            Err(KnownClassLookupError::ClassPossiblyUnbound { class_literal })
+                        }
+                    }
+                }
+                _ => Err(KnownClassLookupError::SymbolNotAClass { found_type: ty }),
+            },
             Place::Undefined => Err(KnownClassLookupError::ClassNotFound),
         }
     }

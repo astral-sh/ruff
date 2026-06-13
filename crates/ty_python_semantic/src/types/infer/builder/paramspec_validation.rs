@@ -20,8 +20,10 @@ pub(super) fn validate_paramspec_components<'db>(
     let args_paramspec = parameters.vararg.as_deref().and_then(|vararg| {
         let annotation = vararg.annotation()?;
         let ty = infer_type(annotation);
-        if let Type::TypeVar(typevar) = ty
-            && typevar.is_paramspec(db)
+        if let (_, crate::types::TypeData::TypeVar(typevar)) = ({
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) && typevar.is_paramspec(db)
             && typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Args)
         {
             Some((typevar.without_paramspec_attr(db), annotation))
@@ -34,8 +36,10 @@ pub(super) fn validate_paramspec_components<'db>(
     let kwargs_paramspec = parameters.kwarg.as_deref().and_then(|kwarg| {
         let annotation = kwarg.annotation()?;
         let ty = infer_type(annotation);
-        if let Type::TypeVar(typevar) = ty
-            && typevar.is_paramspec(db)
+        if let (_, crate::types::TypeData::TypeVar(typevar)) = ({
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) && typevar.is_paramspec(db)
             && typevar.paramspec_attr(db) == Some(ParamSpecAttrKind::Kwargs)
         {
             Some((typevar.without_paramspec_attr(db), annotation))

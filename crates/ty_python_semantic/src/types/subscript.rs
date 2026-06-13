@@ -539,52 +539,52 @@ impl<'db> Type<'db> {
 
         let value_ty = self;
 
-        let inferred = match (value_ty, slice_ty) {
-            (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
+        let inferred = match (({ let __ty_view_value = value_ty; (__ty_view_value, __ty_view_value.data()) }), ({ let __ty_view_value = slice_ty; (__ty_view_value, __ty_view_value.data()) })) {
+            ((_, crate::types::TypeData::Dynamic(_) | crate::types::TypeData::Divergent(_) | crate::types::TypeData::Never), (_, _)) => Some(Ok(value_ty)),
 
-            (Type::TypeAlias(alias), _) => {
+            ((_, crate::types::TypeData::TypeAlias(alias)), (_, _)) => {
                 Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
             }
 
-            (_, Type::TypeAlias(alias)) => {
+            ((_, _), (_, crate::types::TypeData::TypeAlias(alias))) => {
                 Some(value_ty.subscript(db, alias.value_type(db), expr_context))
             }
 
-            (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
+            ((_, crate::types::TypeData::Union(union)), (_, _)) => Some(map_union_subscript(db, union, |element| {
                 element.subscript(db, slice_ty, expr_context)
             })),
 
-            (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
+            ((_, _), (_, crate::types::TypeData::Union(union))) => Some(map_union_subscript(db, union, |element| {
                 value_ty.subscript(db, element, expr_context)
             })),
 
-            (Type::EnumComplement(complement), _) => {
+            ((_, crate::types::TypeData::EnumComplement(complement)), (_, _)) => {
                 Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
             }
 
-            (_, Type::EnumComplement(complement)) => {
+            ((_, _), (_, crate::types::TypeData::EnumComplement(complement))) => {
                 Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
             }
 
-            (Type::Intersection(intersection), _) => {
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _)) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
                     element.subscript(db, slice_ty, expr_context)
                 }))
             }
 
-            (_, Type::Intersection(intersection)) => {
+            ((_, _), (_, crate::types::TypeData::Intersection(intersection))) => {
                 Some(map_intersection_subscript(db, intersection, |element| {
                     value_ty.subscript(db, element, expr_context)
                 }))
             }
 
             // Ex) Given `person["name"]`, return `str`
-            (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
+            ((_, crate::types::TypeData::TypedDict(typed_dict)), (_, _)) if expr_context != ast::ExprContext::Store => {
                 Some(typed_dict_subscript(db, typed_dict, slice_ty))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int() => {
+            ((_, crate::types::TypeData::NominalInstance(nominal)), (_, crate::types::TypeData::LiteralValue(literal))) if literal.is_int() => {
                 let i64_int = literal.as_int().unwrap();
                 nominal
                     .tuple_spec(db)
@@ -605,8 +605,8 @@ impl<'db> Type<'db> {
 
             // Ex) Given `("a", 1, Null)[0:2]`, return `("a", 1)`
             (
-                Type::NominalInstance(maybe_tuple_nominal),
-                Type::NominalInstance(maybe_slice_nominal),
+                (_, crate::types::TypeData::NominalInstance(maybe_tuple_nominal)),
+                (_, crate::types::TypeData::NominalInstance(maybe_slice_nominal)),
             ) => maybe_tuple_nominal
                 .tuple_spec(db)
                 .as_deref()
@@ -627,7 +627,7 @@ impl<'db> Type<'db> {
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_string() && rhs_literal.is_int() => {
+            ((_, crate::types::TypeData::LiteralValue(lhs_literal)), (_, crate::types::TypeData::LiteralValue(rhs_literal))) if lhs_literal.is_string() && rhs_literal.is_int() => {
                 let literal_ty = lhs_literal.as_string().unwrap();
                 let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
@@ -648,7 +648,7 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_string() => {
+            ((_, crate::types::TypeData::LiteralValue(literal)), (_, crate::types::TypeData::NominalInstance(nominal))) if literal.is_string() => {
                 let literal_ty = literal.as_string().unwrap();
                 nominal
                 .slice_literal(db)
@@ -669,18 +669,18 @@ impl<'db> Type<'db> {
                 })
             },
 
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_literal_string() && (rhs_literal.is_int() || rhs_literal.is_bool()) => {
+            ((_, crate::types::TypeData::LiteralValue(lhs_literal)), (_, crate::types::TypeData::LiteralValue(rhs_literal))) if lhs_literal.is_literal_string() && (rhs_literal.is_int() || rhs_literal.is_bool()) => {
                 Some(Ok(Type::literal_string()))
             }
 
-            (Type::LiteralValue(literal), Type::NominalInstance(nominal))
+            ((_, crate::types::TypeData::LiteralValue(literal)), (_, crate::types::TypeData::NominalInstance(nominal)))
                 if literal.is_literal_string() && nominal.slice_literal(db).is_some() =>
             {
                 Some(Ok(Type::literal_string()))
             }
 
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_bytes() && rhs_literal.is_int() => {
+            ((_, crate::types::TypeData::LiteralValue(lhs_literal)), (_, crate::types::TypeData::LiteralValue(rhs_literal))) if lhs_literal.is_bytes() && rhs_literal.is_int() => {
                 let literal_ty = lhs_literal.as_bytes().unwrap();
                 let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
@@ -701,7 +701,7 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_bytes() =>
+            ((_, crate::types::TypeData::LiteralValue(literal)), (_, crate::types::TypeData::NominalInstance(nominal))) if literal.is_bytes() =>
             {
                 let literal_ty = literal.as_bytes().unwrap();
                 nominal
@@ -723,26 +723,26 @@ impl<'db> Type<'db> {
             },
 
             // Ex) Given `"value"[True]`, return `"a"`
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
+            ((_, crate::types::TypeData::LiteralValue(lhs_literal)), (_, crate::types::TypeData::LiteralValue(rhs_literal))) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
                 let bool = rhs_literal.as_bool().unwrap();
                 Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
-            (Type::NominalInstance(nominal), Type::LiteralValue(literal))
+            ((_, crate::types::TypeData::NominalInstance(nominal)), (_, crate::types::TypeData::LiteralValue(literal)))
                 if literal.is_bool() && nominal.tuple_spec(db).is_some() =>
             {
                 let bool = literal.as_bool().unwrap();
                 Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
-            (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
+            ((_, crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedProtocol(_))), (_, _)) => {
                 // TODO: emit a diagnostic
                 Some(Ok(todo_type!("doubly-specialized typing.Protocol")))
             }
 
             (
-                Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))),
-                _,
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias)))),
+                (_, _),
             ) if alias.generic_context(db).is_none() => {
                 debug_assert!(alias.specialization(db).is_none());
                 Some(Err(SubscriptError::new(
@@ -753,58 +753,58 @@ impl<'db> Type<'db> {
                 )))
             }
 
-            (Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_)), _) => {
+            ((_, crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))), (_, _)) => {
                 // TODO: emit a diagnostic
                 Some(Ok(todo_type!("doubly-specialized typing.Generic")))
             }
 
-            (Type::SpecialForm(SpecialFormType::Unpack), _) => {
+            ((_, crate::types::TypeData::SpecialForm(SpecialFormType::Unpack)), (_, _)) => {
                 Some(Ok(Type::Dynamic(DynamicType::TodoUnpack)))
             }
 
-            (Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar)), _) => {
+            ((_, crate::types::TypeData::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::InitVar))), (_, _)) => {
                 // Subscripting `InitVar` gives you (bizarrely) an instance of `InitVar`,
                 // which isn't representable in our model because we don't recognise there as being
                 // an `InitVar` class at all. This doesn't really matter that much, so just infer `Any` here.
                 Some(Ok(Type::any()))
             }
 
-            (Type::SpecialForm(special_form), _) if special_form.class().is_special_form() => {
+            ((_, crate::types::TypeData::SpecialForm(special_form)), (_, _)) if special_form.class().is_special_form() => {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 
-            (Type::KnownInstance(known_instance), _) if known_instance.class(db).is_special_form() => {
+            ((_, crate::types::TypeData::KnownInstance(known_instance)), (_, _)) if known_instance.class(db).is_special_form() => {
                 Some(Ok(todo_type!("Inference of subscript on special form")))
             }
 
             (
-                Type::FunctionLiteral(_)
-                | Type::WrapperDescriptor(_)
-                | Type::BoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::Callable(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::AlwaysFalsy
-                | Type::AlwaysTruthy
-                | Type::ProtocolInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::BoundSuper(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_)
-                | Type::NominalInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::LiteralValue(_)
-                | Type::TypeVar(_)  // TODO: more complex logic required here!
-                | Type::KnownBoundMethod(_),
-                _,
+                (_, crate::types::TypeData::FunctionLiteral(_)
+                | crate::types::TypeData::WrapperDescriptor(_)
+                | crate::types::TypeData::BoundMethod(_)
+                | crate::types::TypeData::DataclassDecorator(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::Callable(_)
+                | crate::types::TypeData::ModuleLiteral(_)
+                | crate::types::TypeData::ClassLiteral(_)
+                | crate::types::TypeData::GenericAlias(_)
+                | crate::types::TypeData::SubclassOf(_)
+                | crate::types::TypeData::AlwaysFalsy
+                | crate::types::TypeData::AlwaysTruthy
+                | crate::types::TypeData::ProtocolInstance(_)
+                | crate::types::TypeData::PropertyInstance(_)
+                | crate::types::TypeData::BoundSuper(_)
+                | crate::types::TypeData::TypeIs(_)
+                | crate::types::TypeData::TypeGuard(_)
+                | crate::types::TypeData::TypeForm(_)
+                | crate::types::TypeData::TypedDict(_)
+                | crate::types::TypeData::NewTypeInstance(_)
+                | crate::types::TypeData::NominalInstance(_)
+                | crate::types::TypeData::SpecialForm(_)
+                | crate::types::TypeData::KnownInstance(_)
+                | crate::types::TypeData::LiteralValue(_)
+                | crate::types::TypeData::TypeVar(_)  // TODO: more complex logic required here!
+                | crate::types::TypeData::KnownBoundMethod(_)),
+                (_, _),
             ) => None,
         };
 
@@ -896,7 +896,10 @@ impl<'db> Type<'db> {
                 }
             }
 
-            if let Type::ClassLiteral(class) = value_ty {
+            if let (_, crate::types::TypeData::ClassLiteral(class)) = {
+                let __ty_view_value = value_ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
                 if class.is_known(db, KnownClass::Type) {
                     return Ok(KnownClass::GenericAlias.to_instance(db));
                 }

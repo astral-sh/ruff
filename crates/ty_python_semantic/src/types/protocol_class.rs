@@ -46,7 +46,7 @@ impl<'db> ClassType<'db> {
 
 /// Representation of a single `Protocol` class definition.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(super) struct ProtocolClass<'db>(ClassType<'db>);
+pub(super) struct ProtocolClass<'db>(pub(super) ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
     /// Returns the protocol members of this class.
@@ -1065,21 +1065,23 @@ fn cached_protocol_interface<'db>(
 
             let ty = ty.apply_optional_specialization(db, specialization);
 
-            let member = match ty {
-                Type::PropertyInstance(property) => ProtocolMemberKind::Property(property),
-                Type::Callable(callable)
+            let member = match (ty).data() {
+                crate::types::TypeData::PropertyInstance(property) => {
+                    ProtocolMemberKind::Property(property)
+                }
+                crate::types::TypeData::Callable(callable)
                     if bound_on_class.is_yes() && callable.is_function_like(db) =>
                 {
                     ProtocolMemberKind::Method(callable)
                 }
-                Type::FunctionLiteral(function)
+                crate::types::TypeData::FunctionLiteral(function)
                     if function.is_staticmethod(db) || function.is_classmethod(db) =>
                 {
                     ProtocolMemberKind::Other(todo_type!(
                         "classmethod and staticmethod protocol members"
                     ))
                 }
-                Type::FunctionLiteral(function) if bound_on_class.is_yes() => {
+                crate::types::TypeData::FunctionLiteral(function) if bound_on_class.is_yes() => {
                     ProtocolMemberKind::Method(function.into_callable_type(db))
                 }
                 _ => ProtocolMemberKind::Other(ty),
@@ -1154,8 +1156,8 @@ pub(super) fn has_all_protocol_members_defined<'db>(
 ) -> bool {
     let target_interface = protocol.interface(db);
 
-    match ty {
-        Type::ProtocolInstance(source_protocol) => {
+    match (ty).data() {
+        crate::types::TypeData::ProtocolInstance(source_protocol) => {
             let source_interface = source_protocol.interface(db);
 
             source_interface.member_count(db) >= target_interface.member_count(db)

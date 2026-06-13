@@ -670,13 +670,14 @@ impl<'a> ImportRequest<'a> {
             //
             // ... unless the module symbol we found here is
             // actually a module symbol.
-            (
-                Some(&MemberInScope {
-                    ty: Type::ModuleLiteral(_),
-                    ..
-                }),
-                None,
-            ) => self,
+            (Some(member), None)
+                if matches!(
+                    member.ty.data(),
+                    ty_python_semantic::types::TypeData::ModuleLiteral(_)
+                ) =>
+            {
+                self
+            }
             (Some(_), None) => Self {
                 style: ImportStyle::ImportFrom,
                 force_style: true,

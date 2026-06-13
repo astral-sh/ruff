@@ -523,10 +523,15 @@ impl<'a, 'db> FromIterator<(Argument<'a>, Option<Type<'db>>)> for CallArguments<
 ///
 /// In other words, it returns `true` if [`expand_type`] returns [`Some`] for the given type.
 pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty {
-        Type::EnumComplement(_) => true,
-        Type::Intersection(intersection) => intersection.finite_alternatives(db).is_some(),
-        Type::NominalInstance(instance) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::EnumComplement(_)) => true,
+        (_, crate::types::TypeData::Intersection(intersection)) => {
+            intersection.finite_alternatives(db).is_some()
+        }
+        (_, crate::types::TypeData::NominalInstance(instance)) => {
             let class = instance.class(db);
             class.is_known(db, KnownClass::Bool)
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
@@ -537,9 +542,11 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                 })
                 || enum_metadata(db, class.class_literal(db)).is_some()
         }
-        Type::Union(_) => true,
-        Type::TypeAlias(alias) => is_expandable_type(db, alias.value_type(db)),
-        _ => false,
+        (_, crate::types::TypeData::Union(_)) => true,
+        (_, crate::types::TypeData::TypeAlias(alias)) => {
+            is_expandable_type(db, alias.value_type(db))
+        }
+        (_, _) => false,
     }
 }
 
@@ -548,10 +555,17 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 /// Returns [`None`] if the type cannot be expanded.
 fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
     // NOTE: Update `is_expandable_type` if this logic changes accordingly.
-    match ty {
-        Type::EnumComplement(complement) => Some(complement.remaining_literal_types(db)),
-        Type::Intersection(intersection) => intersection.finite_alternatives(db),
-        Type::NominalInstance(instance) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::EnumComplement(complement)) => {
+            Some(complement.remaining_literal_types(db))
+        }
+        (_, crate::types::TypeData::Intersection(intersection)) => {
+            intersection.finite_alternatives(db)
+        }
+        (_, crate::types::TypeData::NominalInstance(instance)) => {
             let class = instance.class(db);
 
             if class.is_known(db, KnownClass::Bool) {
@@ -599,24 +613,31 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
 
             None
         }
-        Type::Union(union) => Some(
+        (_, crate::types::TypeData::Union(union)) => Some(
             union
                 .elements(db)
                 .iter()
-                .flat_map(|element| match element {
-                    Type::EnumComplement(complement) => complement.remaining_literal_types(db),
-                    Type::Intersection(intersection) => intersection
-                        .finite_alternatives(db)
-                        .unwrap_or_else(|| vec![*element]),
-                    _ => vec![*element],
+                .flat_map(|element| {
+                    match {
+                        let __ty_view_value = element;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::EnumComplement(complement)) => {
+                            complement.remaining_literal_types(db)
+                        }
+                        (_, crate::types::TypeData::Intersection(intersection)) => intersection
+                            .finite_alternatives(db)
+                            .unwrap_or_else(|| vec![*element]),
+                        (_, _) => vec![*element],
+                    }
                 })
                 .collect(),
         ),
         // For type aliases, expand the underlying value type.
-        Type::TypeAlias(alias) => expand_type(db, alias.value_type(db)),
+        (_, crate::types::TypeData::TypeAlias(alias)) => expand_type(db, alias.value_type(db)),
         // We don't handle `type[A | B]` here because it's already stored in the expanded form
         // i.e., `type[A] | type[B]` which is handled by the `Type::Union` case.
-        _ => None,
+        (_, _) => None,
     }
 }
 

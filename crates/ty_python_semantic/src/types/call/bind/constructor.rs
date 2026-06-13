@@ -555,23 +555,26 @@ fn constructor_returns_instance<'db>(
     class_literal: ClassLiteral<'db>,
     return_ty: Type<'db>,
 ) -> bool {
-    match return_ty.resolve_type_alias(db) {
-        Type::Union(union) => union
+    match {
+        let __ty_view_value = return_ty.resolve_type_alias(db);
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::Union(union)) => union
             .elements(db)
             .iter()
             .all(|element| constructor_returns_instance(db, class_literal, *element)),
-        Type::Intersection(intersection) => intersection
+        (_, crate::types::TypeData::Intersection(intersection)) => intersection
             .iter_positive(db)
             .any(|element| constructor_returns_instance(db, class_literal, element)),
         // Spec says an explicit `Any` return type should be considered non-instance.
-        Type::Dynamic(DynamicType::Any) => false,
+        (_, crate::types::TypeData::Dynamic(DynamicType::Any)) => false,
         // But a missing return annotation should be considered instance.
         // TODO currently this is also true for explicit annotations that resolve to `Unknown`;
         // should it be? Other type checkers also treat it this way.
-        Type::Dynamic(_) => true,
+        (_, crate::types::TypeData::Dynamic(_)) => true,
         // A `Never` constructor return is terminal and does not run downstream construction.
-        Type::Never => false,
-        Type::NominalInstance(instance) => instance
+        (_, crate::types::TypeData::Never) => false,
+        (_, crate::types::TypeData::NominalInstance(instance)) => instance
             .class(db)
             .is_subtype_of_class_literal(db, class_literal),
         // We don't need to handle `ProtocolInstance` here, since the only way a protocol can be
@@ -580,7 +583,7 @@ fn constructor_returns_instance<'db>(
         // in which case we'll already solve it to the subclass and consider it an instance
         // type, or it will return an explicit annotation of the protocol type itself, in which
         // case we shouldn't (and don't) consider it an instance of the subclass.
-        _ => false,
+        (_, _) => false,
     }
 }
 
@@ -607,7 +610,10 @@ impl<'db> Binding<'db> {
             return false;
         };
 
-        let Type::SubclassOf(subclass_of) = cls_parameter_ty else {
+        let (_, crate::types::TypeData::SubclassOf(subclass_of)) = ({
+            let __ty_view_value = cls_parameter_ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return false;
         };
         let Some(cls_typevar) = subclass_of.into_type_var() else {
@@ -662,11 +668,14 @@ impl<'db> Binding<'db> {
 
         match (
             constructor_context.kind(),
-            self.signature.return_ty.resolve_type_alias(db),
+            ({
+                let __ty_view_value = self.signature.return_ty.resolve_type_alias(db);
+                (__ty_view_value, __ty_view_value.data())
+            }),
         ) {
-            (ConstructorCallableKind::Init, _) => Some(instance_type),
-            (_, ty) if ty.is_unknown() => Some(instance_type),
-            (ConstructorCallableKind::New, Type::TypeVar(typevar))
+            (ConstructorCallableKind::Init, (_, _)) => Some(instance_type),
+            (_, (ty, _)) if ty.is_unknown() => Some(instance_type),
+            (ConstructorCallableKind::New, (_, crate::types::TypeData::TypeVar(typevar)))
                 if self.is_self_like_constructor_return_typevar(db, typevar) =>
             {
                 Some(instance_type)

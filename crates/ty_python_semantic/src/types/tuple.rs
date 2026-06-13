@@ -192,9 +192,12 @@ impl<'db> TupleType<'db> {
     }
 
     pub(crate) fn homogeneous(db: &'db dyn Db, element: Type<'db>) -> Self {
-        match element {
-            Type::Never => TupleType::empty(db),
-            _ => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
+        match {
+            let __ty_view_value = element;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Never) => TupleType::empty(db),
+            (_, _) => TupleType::new_internal(db, TupleSpec::homogeneous(element)),
         }
     }
 
@@ -430,13 +433,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             Tuple::Variable(target) => {
                 // When prenormalizing below, we assume that a dynamic variable-length portion of
                 // one tuple materializes to the variable-length portion of the other tuple.
-                let source_prenormalize_variable = match source.variable() {
-                    Type::Dynamic(_) => Some(target.variable()),
-                    _ => None,
+                let source_prenormalize_variable = match {
+                    let __ty_view_value = source.variable();
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::Dynamic(_)) => Some(target.variable()),
+                    (_, _) => None,
                 };
-                let target_prenormalize_variable = match target.variable() {
-                    Type::Dynamic(_) => Some(source.variable()),
-                    _ => None,
+                let target_prenormalize_variable = match {
+                    let __ty_view_value = target.variable();
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::Dynamic(_)) => Some(source.variable()),
+                    (_, _) => None,
                 };
 
                 // The overlapping parts of the prefixes and suffixes must satisfy the relation.

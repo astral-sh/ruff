@@ -334,37 +334,36 @@ impl<'db> Place<'db> {
     /// This is used to resolve (potential) descriptor attributes.
     pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
-            Place::Defined(
-                place @ DefinedPlace {
-                    ty: Type::Union(union),
-                    ..
-                },
-            ) => union.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
-            }),
-
-            Place::Defined(
-                place @ DefinedPlace {
-                    ty: Type::Intersection(intersection),
-                    ..
-                },
-            ) => intersection.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
-            }),
-
-            Place::Defined(defined) => {
-                if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, None, owner)
-                {
+            Place::Defined(defined) => match defined.ty.data() {
+                crate::types::TypeData::Union(union) => union.map_with_boundness(db, |elem| {
                     Place::Defined(DefinedPlace {
-                        ty: dunder_get_return_ty,
-                        provenance: Provenance::Unknown,
+                        ty: *elem,
                         ..defined
                     })
-                } else {
-                    self
+                    .try_call_dunder_get(db, owner)
+                }),
+                crate::types::TypeData::Intersection(intersection) => intersection
+                    .map_with_boundness(db, |elem| {
+                        Place::Defined(DefinedPlace {
+                            ty: *elem,
+                            ..defined
+                        })
+                        .try_call_dunder_get(db, owner)
+                    }),
+                _ => {
+                    if let Some((dunder_get_return_ty, _)) =
+                        defined.ty.try_call_dunder_get(db, None, owner)
+                    {
+                        Place::Defined(DefinedPlace {
+                            ty: dunder_get_return_ty,
+                            provenance: Provenance::Unknown,
+                            ..defined
+                        })
+                    } else {
+                        self
+                    }
                 }
-            }
+            },
 
             Place::Undefined => Place::Undefined,
         }
@@ -1028,14 +1027,19 @@ pub(crate) fn place_by_id<'db>(
         PlaceAndQualifiers {
             place:
                 Place::Defined(DefinedPlace {
-                    ty: Type::Dynamic(DynamicType::Unknown),
+                    ty,
                     origin,
                     definedness,
                     provenance: declared_provenance,
                     ..
                 }),
             qualifiers,
-        } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
+        } if qualifiers.contains(TypeQualifiers::CLASS_VAR)
+            && matches!(
+                ty.data(),
+                crate::types::TypeData::Dynamic(DynamicType::Unknown)
+            ) =>
+        {
             let bindings = all_considered_bindings();
             match place_from_bindings_impl(db, bindings, requires_explicit_reexport, None).place {
                 Place::Defined(DefinedPlace {
@@ -1734,15 +1738,21 @@ impl<'db> PublicTypeBuilder<'db> {
     }
 
     fn add(&mut self, element: Type<'db>, reachability: Truthiness) -> bool {
-        match element {
-            Type::FunctionLiteral(function) => {
+        match {
+            let __ty_view_value = element;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::FunctionLiteral(function)) => {
                 let last_definition = function.literal(self.db).last_definition;
                 if last_definition.is_overload(self.db) {
                     // Distinct overloaded function values can be assigned to the same public
                     // symbol in separate branches. Preserve the queued value unless the next
                     // overload belongs to the same place.
                     if !self.queue.is_some_and(|queued| {
-                        let Type::FunctionLiteral(queued_function) = queued else {
+                        let (_, crate::types::TypeData::FunctionLiteral(queued_function)) = ({
+                            let __ty_view_value = queued;
+                            (__ty_view_value, __ty_view_value.data())
+                        }) else {
                             return false;
                         };
                         function.has_same_place_as(self.db, queued_function)
@@ -1758,7 +1768,10 @@ impl<'db> PublicTypeBuilder<'db> {
                     // several, so keep any unrelated queued overloaded function in the union.
                     if reachability.is_always_true()
                         || self.queue.is_some_and(|queued| {
-                            let Type::FunctionLiteral(queued_function) = queued else {
+                            let (_, crate::types::TypeData::FunctionLiteral(queued_function)) = ({
+                                let __ty_view_value = queued;
+                                (__ty_view_value, __ty_view_value.data())
+                            }) else {
                                 return false;
                             };
                             let queued_definition = queued_function.last_definition(self.db);
@@ -1773,7 +1786,7 @@ impl<'db> PublicTypeBuilder<'db> {
                     true
                 }
             }
-            _ => {
+            (_, _) => {
                 self.drain_queue();
                 self.add_to_union(element);
                 true
@@ -2010,8 +2023,10 @@ pub(crate) mod implicit_globals {
         {
             return Place::Undefined.into();
         }
-        let Type::ClassLiteral(module_type_class) = KnownClass::ModuleType.to_class_literal(db)
-        else {
+        let (_, crate::types::TypeData::ClassLiteral(module_type_class)) = ({
+            let __ty_view_value = KnownClass::ModuleType.to_class_literal(db);
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return Place::Undefined.into();
         };
         let Some(class) = module_type_class.as_static() else {
@@ -2381,10 +2396,10 @@ mod tests {
         assert!(matches!(
             symbol,
             Place::Defined(DefinedPlace {
-                ty: Type::NominalInstance(_),
+                ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            })
+            }) if matches!(ty.data(), crate::types::TypeData::NominalInstance(_))
         ));
         assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
     }

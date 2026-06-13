@@ -578,7 +578,11 @@ impl<'db> UnionTypeInstance<'db> {
         // instance when its semantic union already contains the new operand, rather than storing
         // an ever-deeper value-expression tree like `((A | B) | B) | B`.
         for ty in &value_expr_types {
-            if let Type::KnownInstance(KnownInstanceType::UnionType(union)) = ty
+            if let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(union))) =
+                ({
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                })
                 && let Ok(&existing_union) = union.union_type(db).as_ref()
                 && existing_union == union_type
             {
@@ -635,11 +639,14 @@ impl<'db> UnionTypeInstance<'db> {
         if let Some(value_expr_types) = self._value_expr_types(db) {
             Ok(Either::Left(value_expr_types.iter().copied()))
         } else {
-            match self.union_type(db).clone()? {
-                Type::Union(union) => Ok(Either::Right(Either::Left(
+            match {
+                let __ty_view_value = self.union_type(db).clone()?;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::Union(union)) => Ok(Either::Right(Either::Left(
                     union.elements(db).iter().copied().map(to_class_literal),
                 ))),
-                ty => Ok(Either::Right(Either::Right(std::iter::once(
+                (ty, _) => Ok(Either::Right(Either::Right(std::iter::once(
                     to_class_literal(ty),
                 )))),
             }

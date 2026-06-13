@@ -29,6 +29,14 @@ pub(super) fn walk_subclass_of_type<'db, V: super::visitor::TypeVisitor<'db> + ?
 }
 
 impl<'db> SubclassOfType<'db> {
+    pub(super) const fn packed_inner(self) -> SubclassOfInner<'db> {
+        self.subclass_of
+    }
+
+    pub(super) const fn from_packed_inner(subclass_of: SubclassOfInner<'db>) -> Self {
+        Self { subclass_of }
+    }
+
     /// Construct a new [`Type`] instance representing a given class object (or a given dynamic type)
     /// and all possible subclasses of that class object/dynamic type.
     ///
@@ -60,14 +68,18 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given the class object `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-        let subclass_of = match ty {
-            Type::Dynamic(dynamic) => SubclassOfInner::Dynamic(dynamic),
-            Type::ClassLiteral(literal) => {
+        let subclass_of = match (ty).data() {
+            crate::types::TypeData::Dynamic(dynamic) => SubclassOfInner::Dynamic(dynamic),
+            crate::types::TypeData::ClassLiteral(literal) => {
                 SubclassOfInner::Class(literal.default_specialization(db))
             }
-            Type::GenericAlias(generic) => SubclassOfInner::Class(ClassType::Generic(generic)),
-            Type::SpecialForm(SpecialFormType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::SpecialForm(SpecialFormType::Unknown) => {
+            crate::types::TypeData::GenericAlias(generic) => {
+                SubclassOfInner::Class(ClassType::Generic(generic))
+            }
+            crate::types::TypeData::SpecialForm(SpecialFormType::Any) => {
+                SubclassOfInner::Dynamic(DynamicType::Any)
+            }
+            crate::types::TypeData::SpecialForm(SpecialFormType::Unknown) => {
                 SubclassOfInner::Dynamic(DynamicType::Unknown)
             }
             _ => return None,
@@ -80,22 +92,22 @@ impl<'db> SubclassOfType<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
         // Handle unions by distributing `type[]` over each element:
         // `type[A | B]` -> `type[A] | type[B]`
-        match ty {
-            Type::Union(union) => UnionType::try_from_elements(
+        match (ty).data() {
+            crate::types::TypeData::Union(union) => UnionType::try_from_elements(
                 db,
                 union
                     .elements(db)
                     .iter()
                     .map(|element| Self::try_from_instance(db, *element)),
             ),
-            Type::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
+            crate::types::TypeData::ProtocolInstance(protocol) => Some(protocol.to_meta_type(db)),
             _ => SubclassOfInner::try_from_instance(db, ty)
                 .map(|subclass_of| Self::from(db, subclass_of)),
         }
     }
 
     /// Return a [`Type`] instance representing the type `type[Unknown]`.
-    pub(crate) const fn subclass_of_unknown() -> Type<'db> {
+    pub(crate) fn subclass_of_unknown() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
             subclass_of: SubclassOfInner::unknown(),
         })
@@ -103,7 +115,7 @@ impl<'db> SubclassOfType<'db> {
 
     /// Return a [`Type`] instance representing the type `type[Any]`.
     #[cfg(test)]
-    pub(crate) const fn subclass_of_any() -> Type<'db> {
+    pub(crate) fn subclass_of_any() -> Type<'db> {
         Type::SubclassOf(SubclassOfType {
             subclass_of: SubclassOfInner::Dynamic(DynamicType::Any),
         })
@@ -420,17 +432,25 @@ impl<'db> SubclassOfInner<'db> {
     }
 
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        Some(match ty {
-            Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
-            Type::TypedDict(typed_dict) => match typed_dict {
+        Some(match (ty).data() {
+            crate::types::TypeData::NominalInstance(instance) => {
+                SubclassOfInner::Class(instance.class(db))
+            }
+            crate::types::TypeData::TypedDict(typed_dict) => match typed_dict {
                 TypedDictType::Class(class) => SubclassOfInner::Class(class),
                 TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
                     todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
                 ),
             },
-            Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
-            Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
-            Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
+            crate::types::TypeData::TypeVar(bound_typevar) => {
+                SubclassOfInner::TypeVar(bound_typevar)
+            }
+            crate::types::TypeData::Dynamic(DynamicType::Any) => {
+                SubclassOfInner::Dynamic(DynamicType::Any)
+            }
+            crate::types::TypeData::Dynamic(DynamicType::Unknown) => {
+                SubclassOfInner::Dynamic(DynamicType::Unknown)
+            }
             _ => return None,
         })
     }

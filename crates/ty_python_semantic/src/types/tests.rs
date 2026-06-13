@@ -7,6 +7,88 @@ use ruff_python_ast as ast;
 use ruff_python_ast::PythonVersion;
 use test_case::test_case;
 
+fn repack_type(data: TypeData<'_>) -> Type<'_> {
+    match data {
+        TypeData::Dynamic(value) => Type::Dynamic(value),
+        TypeData::Divergent(value) => Type::Divergent(value),
+        TypeData::Never => Type::Never,
+        TypeData::FunctionLiteral(value) => Type::FunctionLiteral(value),
+        TypeData::BoundMethod(value) => Type::BoundMethod(value),
+        TypeData::KnownBoundMethod(value) => Type::KnownBoundMethod(value),
+        TypeData::WrapperDescriptor(value) => Type::WrapperDescriptor(value),
+        TypeData::DataclassDecorator(value) => Type::DataclassDecorator(value),
+        TypeData::DataclassTransformer(value) => Type::DataclassTransformer(value),
+        TypeData::Callable(value) => Type::Callable(value),
+        TypeData::ModuleLiteral(value) => Type::ModuleLiteral(value),
+        TypeData::ClassLiteral(value) => Type::ClassLiteral(value),
+        TypeData::GenericAlias(value) => Type::GenericAlias(value),
+        TypeData::SubclassOf(value) => Type::SubclassOf(value),
+        TypeData::NominalInstance(value) => Type::NominalInstance(value),
+        TypeData::ProtocolInstance(value) => Type::ProtocolInstance(value),
+        TypeData::SpecialForm(value) => Type::SpecialForm(value),
+        TypeData::KnownInstance(value) => Type::KnownInstance(value),
+        TypeData::PropertyInstance(value) => Type::PropertyInstance(value),
+        TypeData::Union(value) => Type::Union(value),
+        TypeData::Intersection(value) => Type::Intersection(value),
+        TypeData::EnumComplement(value) => Type::EnumComplement(value),
+        TypeData::AlwaysTruthy => Type::AlwaysTruthy,
+        TypeData::AlwaysFalsy => Type::AlwaysFalsy,
+        TypeData::LiteralValue(value) => Type::LiteralValue(value),
+        TypeData::TypeVar(value) => Type::TypeVar(value),
+        TypeData::BoundSuper(value) => Type::BoundSuper(value),
+        TypeData::TypeIs(value) => Type::TypeIs(value),
+        TypeData::TypeGuard(value) => Type::TypeGuard(value),
+        TypeData::TypeForm(value) => Type::TypeForm(value),
+        TypeData::TypedDict(value) => Type::TypedDict(value),
+        TypeData::TypeAlias(value) => Type::TypeAlias(value),
+        TypeData::NewTypeInstance(value) => Type::NewTypeInstance(value),
+    }
+}
+
+#[test]
+fn packed_type_layout_and_representative_round_trips() {
+    #[cfg(not(debug_assertions))]
+    assert_eq!(std::mem::size_of::<Type>(), 12);
+
+    let db = setup_db();
+    let id = salsa::Id::from_bits(1);
+    let pep695_alias = <PEP695TypeAliasType<'_> as salsa::plumbing::FromId>::from_id(id);
+    let recursive_literal = Type::LiteralValue(
+        LiteralValueType::promotable(i64::MIN)
+            .with_recursively_defined(set_theoretic::RecursivelyDefined::Yes),
+    );
+    let types = [
+        Type::any(),
+        Type::unknown(),
+        Type::Divergent(DivergentType::new(id).materialized(MaterializationKind::Top)),
+        Type::Never,
+        Type::AlwaysTruthy,
+        Type::AlwaysFalsy,
+        Type::SpecialForm(SpecialFormType::TypedDict),
+        Type::SpecialForm(SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Dict)),
+        Type::SpecialForm(SpecialFormType::TypeQualifier(TypeQualifier::Final)),
+        Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways),
+        Type::int_literal(i64::MAX),
+        Type::bool_literal(false),
+        Type::string_literal(&db, "packed"),
+        recursive_literal,
+        KnownClass::Int.to_class_literal(&db),
+        KnownClass::Int.to_instance(&db),
+        KnownClass::Int.to_subclass_of(&db),
+        Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
+            pep695_alias,
+        ))),
+        Type::TypeAlias(TypeAliasType::PEP695(pep695_alias)),
+    ];
+
+    for ty in types {
+        let data = ty.data();
+        let repacked = repack_type(data);
+        assert_eq!(repacked, ty);
+        assert_eq!(repacked.data(), data);
+    }
+}
+
 /// Explicitly test for Python version <3.13 and >=3.13, to ensure that
 /// the fallback to `typing_extensions` is working correctly.
 /// See [`KnownClass::canonical_module`] for more information.
@@ -285,9 +367,15 @@ fn type_alias_variance() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-            type_alias,
-        ))) = ty
+        let (
+            _,
+            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+                TypeAliasType::PEP695(type_alias),
+            )),
+        ) = ({
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        })
         else {
             panic!("Expected `{name}` to be a type alias");
         };
@@ -441,9 +529,15 @@ fn eager_expansion() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
-        let Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(
-            type_alias,
-        ))) = ty
+        let (
+            _,
+            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+                TypeAliasType::PEP695(type_alias),
+            )),
+        ) = ({
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        })
         else {
             panic!("Expected `{name}` to be a type alias");
         };

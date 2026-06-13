@@ -181,10 +181,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // follow the same compatibility rules:
         // - `Type::KnownInstance(TypeVar(..))` for legacy `typing.TypeVar(...)` values
         // - `Type::TypeVar(..)` for bound in-scope type parameters (for example, PEP 695)
-        let default_typevar = match default_ty {
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => Some(typevar),
-            Type::TypeVar(bound_typevar) => Some(bound_typevar.typevar(db)),
-            _ => None,
+        let default_typevar = match {
+            let __ty_view_value = default_ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) => {
+                Some(typevar)
+            }
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => Some(bound_typevar.typevar(db)),
+            (_, _) => None,
         };
 
         let not_assignable_message =
@@ -487,8 +492,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let expected_binding = BindingContext::Definition(expected_binding_def);
 
         let outer_tv = find_over_type(db, default_ty, false, |ty| {
-            if let Type::TypeVar(bound_tv) = ty
-                && bound_tv.binding_context(db) != expected_binding
+            if let (_, crate::types::TypeData::TypeVar(bound_tv)) = ({
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            }) && bound_tv.binding_context(db) != expected_binding
             {
                 Some(bound_tv)
             } else {
@@ -634,12 +641,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     return;
                 }
-                let is_paramspec = match ty {
-                    Type::TypeVar(typevar) => typevar.is_paramspec(db),
-                    Type::KnownInstance(known_instance) => {
+                let is_paramspec = match {
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::TypeVar(typevar)) => typevar.is_paramspec(db),
+                    (_, crate::types::TypeData::KnownInstance(known_instance)) => {
                         known_instance.class(db) == KnownClass::ParamSpec
                     }
-                    _ => false,
+                    (_, _) => false,
                 };
                 if is_paramspec {
                     return;

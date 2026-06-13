@@ -246,8 +246,8 @@ fn check_class_declaration<'db>(
             // in the source, rather than matching on the type. But this would require storing
             // additional information in `EnumMetadata`.
             let is_ellipsis = matches!(
-                member_value_type,
-                Type::NominalInstance(nominal_instance)
+                { let __ty_view_value = member_value_type; (__ty_view_value, __ty_view_value.data()) },
+                (_, crate::types::TypeData::NominalInstance(nominal_instance))
                     if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
             );
             // `auto()` values are computed at runtime by the enum metaclass,
@@ -533,7 +533,10 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Type::FunctionLiteral(subclass_function) = member.ty else {
+            let (_, crate::types::TypeData::FunctionLiteral(subclass_function)) = ({
+                let __ty_view_value = member.ty;
+                (__ty_view_value, __ty_view_value.data())
+            }) else {
                 continue;
             };
 
@@ -847,10 +850,8 @@ fn variable_kind<'db>(
     // ```
     if matches!(
         class_member.place,
-        Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(_),
-            ..
-        })
+        Place::Defined(defined)
+            if matches!(defined.ty.data(), crate::types::TypeData::FunctionLiteral(_))
     ) {
         return None;
     }
@@ -1195,8 +1196,11 @@ fn extract_overriding_functions<'db>(
     member_name: &Name,
     subclass_scope: ScopeId<'db>,
 ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    match ty {
-        Type::PropertyInstance(property) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::PropertyInstance(property)) => {
             let subclass_file = subclass_scope.file(db);
             let mut functions = smallvec::smallvec![];
 
@@ -1220,7 +1224,7 @@ fn extract_overriding_functions<'db>(
 
             functions
         }
-        Type::Union(union) => {
+        (_, crate::types::TypeData::Union(union)) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {
                 functions.extend(extract_overriding_functions(
@@ -1232,7 +1236,7 @@ fn extract_overriding_functions<'db>(
             }
             functions
         }
-        _ => extract_underlying_functions(db, ty),
+        (_, _) => extract_underlying_functions(db, ty),
     }
 }
 
@@ -1255,21 +1259,28 @@ fn extract_underlying_functions<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> smallvec::SmallVec<[FunctionType<'db>; 1]> {
-    match ty {
-        Type::FunctionLiteral(function) => smallvec::smallvec_inline![function],
-        Type::BoundMethod(method) => smallvec::smallvec_inline![method.function(db)],
-        Type::PropertyInstance(property) => property.getter(db).map_or_else(
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::FunctionLiteral(function)) => {
+            smallvec::smallvec_inline![function]
+        }
+        (_, crate::types::TypeData::BoundMethod(method)) => {
+            smallvec::smallvec_inline![method.function(db)]
+        }
+        (_, crate::types::TypeData::PropertyInstance(property)) => property.getter(db).map_or_else(
             || smallvec::smallvec![],
             |getter| extract_underlying_functions(db, getter),
         ),
-        Type::Union(union) => {
+        (_, crate::types::TypeData::Union(union)) => {
             let mut functions = smallvec::smallvec![];
             for member in union.elements(db) {
                 functions.extend(extract_underlying_functions(db, *member));
             }
             functions
         }
-        _ => smallvec::smallvec![],
+        (_, _) => smallvec::smallvec![],
     }
 }
 
@@ -1379,7 +1390,10 @@ fn check_enum_member_against_constructor_hook<'db>(
     // The enum metaclass unpacks tuple values as positional args:
     //   MEMBER = (a, b, c)  →  __new__(cls, a, b, c) / __init__(self, a, b, c)
     //   MEMBER = x          →  __new__(cls, x) / __init__(self, x)
-    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
+    let args: Vec<Type<'db>> = if let (_, crate::types::TypeData::NominalInstance(instance)) = {
+        let __ty_view_value = member_value_type;
+        (__ty_view_value, __ty_view_value.data())
+    } {
         if let Some(spec) = instance.tuple_spec(db) {
             if let Tuple::Fixed(fixed) = &*spec {
                 fixed.all_elements().to_vec()

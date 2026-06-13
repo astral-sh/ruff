@@ -173,9 +173,11 @@ impl Ty {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place
                     .expect_type();
-                debug_assert!(
-                    matches!(ty, Type::NominalInstance(instance) if is_single_member_enum(db, instance.class_literal(db)))
-                );
+                debug_assert!(matches!(
+                    ty.data(),
+                    crate::types::TypeData::NominalInstance(instance)
+                        if is_single_member_enum(db, instance.class_literal(db))
+                ));
                 ty
             }
             Ty::BuiltinInstance(s) => builtins_symbol(db, s)
@@ -286,9 +288,14 @@ fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );
     };
-    match ty {
-        Type::KnownInstance(KnownInstanceType::NewType(newtype)) => Type::NewTypeInstance(newtype),
-        _ => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype))) => {
+            Type::NewTypeInstance(newtype)
+        }
+        (_, _) => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
     }
 }
 

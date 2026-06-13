@@ -18,18 +18,33 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         expression: &ast::Expr,
         target: Type<'db>,
     ) -> Option<Type<'db>> {
-        let non_type_form_fallback = match target.resolve_type_alias(self.db()) {
-            Type::TypeForm(_) => None,
-            Type::Union(union)
+        let non_type_form_fallback = match {
+            let __ty_view_value = target.resolve_type_alias(self.db());
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::TypeForm(_)) => None,
+            (_, crate::types::TypeData::Union(union))
                 if union.elements(self.db()).iter().any(|element| {
-                    matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                    matches!(
+                        {
+                            let __ty_view_value = element.resolve_type_alias(self.db());
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (_, crate::types::TypeData::TypeForm(_))
+                    )
                 }) =>
             {
                 Some(target.filter_union(self.db(), |element| {
-                    !matches!(element.resolve_type_alias(self.db()), Type::TypeForm(_))
+                    !matches!(
+                        {
+                            let __ty_view_value = element.resolve_type_alias(self.db());
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (_, crate::types::TypeData::TypeForm(_))
+                    )
                 }))
             }
-            _ => return None,
+            (_, _) => return None,
         };
 
         // Suppress contextual `TypeForm` evaluation only if ordinary inference already
@@ -37,8 +52,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let value_ty = self
             .speculate()
             .infer_maybe_standalone_expression(expression, TypeContext::default());
-        if matches!(value_ty.resolve_type_alias(self.db()), Type::Never)
-            || self.contains_type_form_value(expression, value_ty)
+        if matches!(
+            {
+                let __ty_view_value = value_ty.resolve_type_alias(self.db());
+                (__ty_view_value, __ty_view_value.data())
+            },
+            (_, crate::types::TypeData::Never)
+        ) || self.contains_type_form_value(expression, value_ty)
             || non_type_form_fallback
                 .is_some_and(|alternative| value_ty.is_assignable_to(self.db(), alternative))
         {
@@ -82,31 +102,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ty: Type<'db>,
             visitor: &ContainsTypeFormValueVisitor<'db>,
         ) -> bool {
-            match ty {
-                Type::TypeForm(_) | Type::SubclassOf(_) => true,
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (
+                    _,
+                    crate::types::TypeData::TypeForm(_) | crate::types::TypeData::SubclassOf(_),
+                ) => true,
                 // A bare class object is valid type-expression syntax and should still be
                 // interpreted as a `TypeForm`. Preserve its ordinary value type only when
                 // it was produced by an expression that is not itself a type expression.
-                Type::ClassLiteral(_) => builder
+                (_, crate::types::TypeData::ClassLiteral(_)) => builder
                     .speculate()
                     .infer_type_expression_no_store(expression)
                     .is_unknown(),
-                Type::NominalInstance(instance)
+                (_, crate::types::TypeData::NominalInstance(instance))
                     if instance.has_known_class(builder.db(), KnownClass::Type) =>
                 {
                     true
                 }
-                Type::Union(union) => union
+                (_, crate::types::TypeData::Union(union)) => union
                     .elements(builder.db())
                     .iter()
                     .any(|element| imp(builder, expression, *element, visitor)),
-                Type::Intersection(intersection) => intersection
+                (_, crate::types::TypeData::Intersection(intersection)) => intersection
                     .iter_positive(builder.db())
                     .any(|element| imp(builder, expression, element, visitor)),
-                Type::TypeAlias(alias) => visitor.visit(ty, || {
+                (_, crate::types::TypeData::TypeAlias(alias)) => visitor.visit(ty, || {
                     imp(builder, expression, alias.value_type(builder.db()), visitor)
                 }),
-                Type::TypeVar(typevar) => visitor.visit(ty, || {
+                (_, crate::types::TypeData::TypeVar(typevar)) => visitor.visit(ty, || {
                     typevar
                         .typevar(builder.db())
                         .bound_or_constraints(builder.db())
@@ -119,7 +145,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                         })
                 }),
-                _ => false,
+                (_, _) => false,
             }
         }
 

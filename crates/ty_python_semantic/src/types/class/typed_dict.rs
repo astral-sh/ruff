@@ -705,8 +705,10 @@ fn synthesize_typed_dict_merge<'db>(
     let mut overloads: smallvec::SmallVec<[Signature<'db>; 3]>;
 
     let first_overload_value_ty = if name == "__ior__"
-        && let Type::TypedDict(typed_dict) = instance_ty
-    {
+        && let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
+            let __ty_view_value = instance_ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) {
         Type::TypedDict(typed_dict.to_update_patch(db))
     } else {
         instance_ty
@@ -724,7 +726,10 @@ fn synthesize_typed_dict_merge<'db>(
     )];
 
     if name != "__ior__" {
-        let partial_ty = if let Type::TypedDict(td) = instance_ty {
+        let partial_ty = if let (_, crate::types::TypeData::TypedDict(td)) = {
+            let __ty_view_value = instance_ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
             Type::TypedDict(td.to_partial(db))
         } else {
             instance_ty

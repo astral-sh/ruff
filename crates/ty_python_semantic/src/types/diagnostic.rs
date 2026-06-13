@@ -2037,8 +2037,11 @@ pub(super) fn report_missing_type_arguments<'db>(
     ty: Type<'db>,
     annotation: &ast::Expr,
 ) {
-    match ty {
-        Type::ClassLiteral(class) => {
+    match {
+        let __ty_view_value = ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::ClassLiteral(class)) => {
             let db = context.db();
 
             let Some(generic_context) = class.generic_context(db) else {
@@ -2073,8 +2076,11 @@ pub(super) fn report_missing_type_arguments<'db>(
                 }
             }
         }
-        Type::SpecialForm(
-            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+        (
+            _,
+            crate::types::TypeData::SpecialForm(
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+            ),
         ) => {
             if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
                 builder.into_diagnostic(format_args!(
@@ -2083,7 +2089,7 @@ pub(super) fn report_missing_type_arguments<'db>(
                 ));
             }
         }
-        _ => {}
+        (_, _) => {}
     }
 }
 
@@ -3749,20 +3755,23 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
 
     let mut diag = builder.into_diagnostic(message);
 
-    match target_ty {
-        Type::ClassLiteral(class) => {
+    match {
+        let __ty_view_value = target_ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::ClassLiteral(class)) => {
             diag.info(format_args!(
                 "Implicit shadowing of class `{}`. Add an annotation to make it explicit if this is intentional",
                 class.name(context.db()),
             ));
         }
-        Type::FunctionLiteral(function) => {
+        (_, crate::types::TypeData::FunctionLiteral(function)) => {
             diag.info(format_args!(
                 "Implicit shadowing of function `{}`. Add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
             ));
         }
-        _ => {}
+        (_, _) => {}
     }
     Some(diag)
 }
@@ -3776,7 +3785,10 @@ pub(super) fn note_numbers_module_not_supported<'db>(
     const BUILTIN_NUMBERS: [KnownClass; 3] =
         [KnownClass::Int, KnownClass::Float, KnownClass::Complex];
 
-    if let Type::NominalInstance(target_instance) = target_ty {
+    if let (_, crate::types::TypeData::NominalInstance(target_instance)) = {
+        let __ty_view_value = target_ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
         let file = target_instance.class(db).class_literal(db).file(db);
         if let Some(module) = file_to_module(db, file)
             && module.is_known(db, KnownModule::Numbers)
@@ -4349,20 +4361,25 @@ pub(super) fn report_possibly_missing_attribute(
         return;
     };
     let db = context.db();
-    match object_ty {
-        Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-            "Member `{attribute}` may be missing on module `{}`",
-            module.module(db).name(db),
-        )),
-        Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+    match {
+        let __ty_view_value = object_ty;
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::ModuleLiteral(module)) => {
+            builder.into_diagnostic(format_args!(
+                "Member `{attribute}` may be missing on module `{}`",
+                module.module(db).name(db),
+            ))
+        }
+        (_, crate::types::TypeData::ClassLiteral(class)) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
             class.name(db),
         )),
-        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+        (_, crate::types::TypeData::GenericAlias(alias)) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on class `{}`",
             alias.display(db),
         )),
-        _ => builder.into_diagnostic(format_args!(
+        (_, _) => builder.into_diagnostic(format_args!(
             "Attribute `{attribute}` may be missing on object of type `{}`",
             object_ty.display(db),
         )),
@@ -5095,24 +5112,31 @@ pub(crate) fn report_undeclared_protocol_member(
     /// because the user almost certainly doesn't want to write `x: None = None`.
     /// We also want to avoid suggesting invalid syntax such as `x: <class 'int'> = int`.
     fn should_give_hint<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        let class = match ty {
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::FromClass(_),
-                ..
-            }) => return true,
-            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+        let class = match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (
+                _,
+                crate::types::TypeData::ProtocolInstance(ProtocolInstanceType {
+                    inner: Protocol::FromClass(_),
+                    ..
+                }),
+            ) => return true,
+            (_, crate::types::TypeData::SubclassOf(subclass_of)) => match subclass_of.subclass_of()
+            {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
                 SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
             },
-            Type::NominalInstance(instance) => instance.class(db),
-            Type::Union(union) => {
+            (_, crate::types::TypeData::NominalInstance(instance)) => instance.class(db),
+            (_, crate::types::TypeData::Union(union)) => {
                 return union
                     .elements(db)
                     .iter()
                     .all(|elem| should_give_hint(db, *elem));
             }
-            _ => return false,
+            (_, _) => return false,
         };
 
         !matches!(
@@ -5239,7 +5263,10 @@ pub(crate) fn report_invalid_or_unsupported_base(
         return;
     }
 
-    if let Type::KnownInstance(KnownInstanceType::NewType(newtype)) = base_type {
+    if let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype))) = {
+        let __ty_view_value = base_type;
+        (__ty_view_value, __ty_view_value.data())
+    } {
         let Some(builder) = context.report_lint(&INVALID_BASE, base_node) else {
             return;
         };
@@ -5422,8 +5449,12 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 
                 let existing_keys = items.keys().map(Name::as_str);
 
-                if !matches!(full_object_ty, Some(Type::Union(_) | Type::Intersection(_)))
-                    && let Some(suggestion) = did_you_mean(existing_keys, key)
+                if !full_object_ty.is_some_and(|ty| {
+                    matches!(
+                        ty.data(),
+                        crate::types::TypeData::Union(_) | crate::types::TypeData::Intersection(_)
+                    )
+                }) && let Some(suggestion) = did_you_mean(existing_keys, key)
                 {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(
@@ -5682,10 +5713,16 @@ pub(crate) fn report_invalid_type_param_order<'db>(
         .iter()
         .position(|base| {
             matches!(
-                base,
-                Type::KnownInstance(
-                    KnownInstanceType::SubscriptedProtocol(_)
-                        | KnownInstanceType::SubscriptedGeneric(_)
+                {
+                    let __ty_view_value = base;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(
+                        KnownInstanceType::SubscriptedProtocol(_)
+                            | KnownInstanceType::SubscriptedGeneric(_)
+                    )
                 )
             )
         })
@@ -5824,12 +5861,17 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
         FxHashMap::<StaticClassLiteral<'db>, (GenericAlias<'db>, usize)>::default();
 
     'outer: for (i, base) in explicit_bases.iter().enumerate() {
-        let base_class = match base {
-            Type::GenericAlias(alias) => ClassType::Generic(*alias),
-            Type::ClassLiteral(class) if class.generic_context(db).is_none() => {
-                ClassType::NonGeneric(*class)
+        let base_class = match {
+            let __ty_view_value = base;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::GenericAlias(alias)) => ClassType::Generic(alias),
+            (_, crate::types::TypeData::ClassLiteral(class))
+                if class.generic_context(db).is_none() =>
+            {
+                ClassType::NonGeneric(class)
             }
-            _ => continue,
+            (_, _) => continue,
         };
 
         for supercls in base_class.iter_mro(db) {
@@ -5856,8 +5898,8 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         origin.name(db)
                     ));
                     let later_is_direct = matches!(
-                        base,
-                        Type::GenericAlias(alias) if alias.origin(db) == origin
+                        { let __ty_view_value = base; (__ty_view_value, __ty_view_value.data()) } ,
+                        (_, crate::types::TypeData::GenericAlias(alias)) if alias.origin(db) == origin
                     );
 
                     if let (Some(earlier_base), Some(later_base)) = (
@@ -5940,10 +5982,13 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
     };
-    let span = match binding_type(db, other_definition) {
-        Type::ClassLiteral(class) => class.header_span(db),
-        Type::FunctionLiteral(function) => function.spans(db).signature,
-        _ => return,
+    let span = match {
+        let __ty_view_value = binding_type(db, other_definition);
+        (__ty_view_value, __ty_view_value.data())
+    } {
+        (_, crate::types::TypeData::ClassLiteral(class)) => class.header_span(db),
+        (_, crate::types::TypeData::FunctionLiteral(function)) => function.spans(db).signature,
+        (_, _) => return,
     };
     diagnostic.annotate(Annotation::secondary(span).message(format_args!(
         "Type variable `{typevar_name}` is bound in this enclosing scope",
@@ -6013,13 +6058,14 @@ pub(super) fn report_invalid_method_override<'db>(
     };
 
     if let Place::Defined(DefinedPlace {
-        ty: Type::FunctionLiteral(subclass_function),
-        ..
+        ty: subclass_type, ..
     }) = class_member(subclass)
+        && let crate::types::TypeData::FunctionLiteral(subclass_function) = subclass_type.data()
         && let Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(superclass_function),
+            ty: superclass_type,
             ..
         }) = class_member(superclass)
+        && let crate::types::TypeData::FunctionLiteral(superclass_function) = superclass_type.data()
         && let Some(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Some(subclass_function_kind) =
@@ -6063,10 +6109,17 @@ pub(super) fn report_invalid_method_override<'db>(
                         .full_range(db, &parsed_module(db, superclass_scope.file(db)).load(db)),
                 );
 
-                let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => Some(signature_span(function)),
-                    Type::BoundMethod(method) => Some(signature_span(method.function(db))),
-                    _ => None,
+                let superclass_function_span = match {
+                    let __ty_view_value = superclass_type;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::FunctionLiteral(function)) => {
+                        Some(signature_span(function))
+                    }
+                    (_, crate::types::TypeData::BoundMethod(method)) => {
+                        Some(signature_span(method.function(db)))
+                    }
+                    (_, _) => None,
                 };
 
                 let superclass_definition_kind = definition.kind(db);
@@ -6156,8 +6209,11 @@ pub(super) fn report_overridden_final_method<'db>(
 
     // Some hijinks so that we emit a diagnostic on the property getter rather than the property setter
     let property_getter_definition = if subclass_definition.kind(db).is_function_def()
-        && let Type::PropertyInstance(property) = subclass_type
-        && let Some(Type::FunctionLiteral(getter)) = property.getter(db)
+        && let (_, crate::types::TypeData::PropertyInstance(property)) = ({
+            let __ty_view_value = subclass_type;
+            (__ty_view_value, __ty_view_value.data())
+        })
+        && let Some(getter) = property.getter(db).and_then(Type::as_function_literal)
     {
         let getter_definition = getter.definition(db);
         if getter_definition.scope(db) == subclass_definition.scope(db) {
@@ -6238,8 +6294,10 @@ pub(super) fn report_overridden_final_method<'db>(
     // We also only provide autofixes if the subclass member is a function definition (not an
     // assignment like `method = some_function`). If it's an assignment, the function type
     // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
-    if let Type::FunctionLiteral(function) = subclass_type
-        && subclass_definition.kind(db).is_function_def()
+    if let (_, crate::types::TypeData::FunctionLiteral(function)) = ({
+        let __ty_view_value = subclass_type;
+        (__ty_view_value, __ty_view_value.data())
+    }) && subclass_definition.kind(db).is_function_def()
     {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {
             return;
@@ -6320,8 +6378,10 @@ pub(super) fn report_overridden_final_method<'db>(
                 );
             }
         }
-    } else if let Type::PropertyInstance(property) = subclass_type
-        && property.setter(db).is_some()
+    } else if let (_, crate::types::TypeData::PropertyInstance(property)) = ({
+        let __ty_view_value = subclass_type;
+        (__ty_view_value, __ty_view_value.data())
+    }) && property.setter(db).is_some()
     {
         diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
@@ -6791,7 +6851,10 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // Currently we limit this analysis to attributes of stdlib modules,
     // as this covers the most important cases while not being too noisy
     // about basic typos or special types like `super(C, self)`
-    let Type::ModuleLiteral(module_ty) = value_type else {
+    let (_, crate::types::TypeData::ModuleLiteral(module_ty)) = ({
+        let __ty_view_value = value_type;
+        (__ty_view_value, __ty_view_value.data())
+    }) else {
         return;
     };
     let module = module_ty.module(db);

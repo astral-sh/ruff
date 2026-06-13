@@ -753,12 +753,17 @@ impl NamedTupleKind {
     }
 
     pub(super) fn from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
-        match ty {
-            Type::SpecialForm(SpecialFormType::NamedTuple) => Some(NamedTupleKind::Typing),
-            Type::FunctionLiteral(function) => function
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::SpecialForm(SpecialFormType::NamedTuple)) => {
+                Some(NamedTupleKind::Typing)
+            }
+            (_, crate::types::TypeData::FunctionLiteral(function)) => function
                 .is_known(db, KnownFunction::NamedTuple)
                 .then_some(NamedTupleKind::Collections),
-            _ => None,
+            (_, _) => None,
         }
     }
 }

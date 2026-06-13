@@ -455,12 +455,18 @@ impl<'db> CompletionBuilder<'db> {
             if ctx.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
-                        ty,
-                        Type::SpecialForm(
-                            SpecialFormType::Protocol
-                                | SpecialFormType::Generic
-                                | SpecialFormType::TypedDict
-                                | SpecialFormType::NamedTuple
+                        {
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (
+                            _,
+                            ty_python_semantic::types::TypeData::SpecialForm(
+                                SpecialFormType::Protocol
+                                    | SpecialFormType::Generic
+                                    | SpecialFormType::TypedDict
+                                    | SpecialFormType::NamedTuple
+                            )
                         )
                     );
             }
@@ -904,10 +910,14 @@ impl<'m> ContextCursor<'m> {
             ast::AnyNodeRef::StmtAnnAssign(stmt) => {
                 contains(&stmt.annotation)
                     || (stmt.value.as_deref().is_some_and(contains)
-                        && matches!(
-                            stmt.annotation.inferred_type(model),
-                            Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                        ))
+                        && stmt.annotation.inferred_type(model).is_some_and(|ty| {
+                            matches!(
+                                ty.data(),
+                                ty_python_semantic::types::TypeData::SpecialForm(
+                                    SpecialFormType::TypeAlias
+                                )
+                            )
+                        }))
             }
             ast::AnyNodeRef::StmtFunctionDef(stmt) => stmt.returns.as_deref().is_some_and(contains),
             ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
@@ -2681,7 +2691,9 @@ fn add_import_completions<'db>(
     semantic_completions: impl IntoIterator<Item = SemanticCompletion<'db>>,
 ) {
     add_import_completions_impl(db, completions, semantic_completions, |semantic| {
-        if let Some(Type::ModuleLiteral(module_literal)) = semantic.ty {
+        if let Some(ty_python_semantic::types::TypeData::ModuleLiteral(module_literal)) =
+            semantic.ty.map(Type::data)
+        {
             Some(ModuleDependencyKind::from_module(
                 db,
                 module_literal.module(db),
@@ -2812,49 +2824,86 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
         ty: Type<'db>,
         visitor: &CompletionKindVisitor<'db>,
     ) -> Option<CompletionKind> {
-        Some(match ty {
-            Type::FunctionLiteral(_)
-            | Type::DataclassDecorator(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_) => CompletionKind::Function,
-            Type::BoundMethod(_) | Type::KnownBoundMethod(_) => CompletionKind::Method,
-            Type::ModuleLiteral(_) => CompletionKind::Module,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => {
-                CompletionKind::Class
-            }
-            // This is a little weird for "struct." I'm mostly interpreting
-            // "struct" here as a more general "object." ---AG
-            Type::NominalInstance(_)
-            | Type::PropertyInstance(_)
-            | Type::BoundSuper(_)
-            | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::EnumComplement(_) => CompletionKind::Struct,
-            Type::LiteralValue(literal) if literal.is_enum() => CompletionKind::Enum,
-            Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_) | Type::TypeForm(_) => {
-                CompletionKind::Value
-            }
-            Type::ProtocolInstance(_) => CompletionKind::Interface,
-            Type::TypeVar(_) => CompletionKind::TypeParameter,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .find_map(|&ty| imp(db, ty, visitor))?,
-            Type::Intersection(intersection) => intersection
-                .iter_positive(db)
-                .find_map(|ty| imp(db, ty, visitor))?,
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::Never
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => return None,
-            Type::TypeAlias(alias) => {
-                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
-            }
-        })
+        Some(
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::FunctionLiteral(_)
+                    | ty_python_semantic::types::TypeData::DataclassDecorator(_)
+                    | ty_python_semantic::types::TypeData::WrapperDescriptor(_)
+                    | ty_python_semantic::types::TypeData::DataclassTransformer(_)
+                    | ty_python_semantic::types::TypeData::Callable(_),
+                ) => CompletionKind::Function,
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::BoundMethod(_)
+                    | ty_python_semantic::types::TypeData::KnownBoundMethod(_),
+                ) => CompletionKind::Method,
+                (_, ty_python_semantic::types::TypeData::ModuleLiteral(_)) => {
+                    CompletionKind::Module
+                }
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::ClassLiteral(_)
+                    | ty_python_semantic::types::TypeData::GenericAlias(_)
+                    | ty_python_semantic::types::TypeData::SubclassOf(_),
+                ) => CompletionKind::Class,
+                // This is a little weird for "struct." I'm mostly interpreting
+                // "struct" here as a more general "object." ---AG
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::NominalInstance(_)
+                    | ty_python_semantic::types::TypeData::PropertyInstance(_)
+                    | ty_python_semantic::types::TypeData::BoundSuper(_)
+                    | ty_python_semantic::types::TypeData::TypedDict(_)
+                    | ty_python_semantic::types::TypeData::NewTypeInstance(_)
+                    | ty_python_semantic::types::TypeData::EnumComplement(_),
+                ) => CompletionKind::Struct,
+                (_, ty_python_semantic::types::TypeData::LiteralValue(literal))
+                    if literal.is_enum() =>
+                {
+                    CompletionKind::Enum
+                }
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::LiteralValue(_)
+                    | ty_python_semantic::types::TypeData::TypeIs(_)
+                    | ty_python_semantic::types::TypeData::TypeGuard(_)
+                    | ty_python_semantic::types::TypeData::TypeForm(_),
+                ) => CompletionKind::Value,
+                (_, ty_python_semantic::types::TypeData::ProtocolInstance(_)) => {
+                    CompletionKind::Interface
+                }
+                (_, ty_python_semantic::types::TypeData::TypeVar(_)) => {
+                    CompletionKind::TypeParameter
+                }
+                (_, ty_python_semantic::types::TypeData::Union(union)) => union
+                    .elements(db)
+                    .iter()
+                    .find_map(|&ty| imp(db, ty, visitor))?,
+                (_, ty_python_semantic::types::TypeData::Intersection(intersection)) => {
+                    intersection
+                        .iter_positive(db)
+                        .find_map(|ty| imp(db, ty, visitor))?
+                }
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::Dynamic(_)
+                    | ty_python_semantic::types::TypeData::Divergent(_)
+                    | ty_python_semantic::types::TypeData::Never
+                    | ty_python_semantic::types::TypeData::SpecialForm(_)
+                    | ty_python_semantic::types::TypeData::KnownInstance(_)
+                    | ty_python_semantic::types::TypeData::AlwaysTruthy
+                    | ty_python_semantic::types::TypeData::AlwaysFalsy,
+                ) => return None,
+                (_, ty_python_semantic::types::TypeData::TypeAlias(alias)) => {
+                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                }
+            },
+        )
     }
     imp(db, ty, &CompletionKindVisitor::default())
 }

@@ -281,14 +281,17 @@ pub trait HasNavigationTargets {
 
 impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match self {
-            Type::Union(union) => union
+        match {
+            let __ty_view_value = self;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, ty_python_semantic::types::TypeData::Union(union)) => union
                 .elements(db)
                 .iter()
                 .flat_map(|target| target.navigation_targets(db))
                 .collect(),
 
-            Type::Intersection(intersection) => {
+            (_, ty_python_semantic::types::TypeData::Intersection(intersection)) => {
                 if let Some(alternatives) = intersection.finite_alternatives(db) {
                     return alternatives
                         .iter()
@@ -313,13 +316,13 @@ impl HasNavigationTargets for Type<'_> {
                 }
             }
 
-            Type::EnumComplement(complement) => complement
+            (_, ty_python_semantic::types::TypeData::EnumComplement(complement)) => complement
                 .remaining_literal_types(db)
                 .iter()
                 .flat_map(|alternative| alternative.navigation_targets(db))
                 .collect(),
 
-            ty => ty
+            (ty, _) => ty
                 .definition(db)
                 .map(|definition| definition.navigation_targets(db))
                 .unwrap_or_else(NavigationTargets::empty),

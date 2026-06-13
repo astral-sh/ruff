@@ -227,7 +227,7 @@ impl TypeRelation {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
+    pub(crate) fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
         match self {
             TypeRelation::Assignability | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
@@ -247,13 +247,13 @@ impl<'db> Type<'db> {
     ///
     /// This method may have false negatives, but it should not have false positives. It should be
     /// a cheap shallow check, not an exhaustive recursive check.
-    const fn subtyping_is_always_reflexive(self) -> bool {
-        match self {
-            Type::Never
-            | Type::FunctionLiteral(..)
-            | Type::BoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::KnownBoundMethod(
+    fn subtyping_is_always_reflexive(self) -> bool {
+        match { let __ty_view_value = self; (__ty_view_value, __ty_view_value.data()) }  {
+            (_, crate::types::TypeData::Never
+            | crate::types::TypeData::FunctionLiteral(..)
+            | crate::types::TypeData::BoundMethod(_)
+            | crate::types::TypeData::WrapperDescriptor(_)
+            | crate::types::TypeData::KnownBoundMethod(
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::StrStartswith(_)
@@ -265,43 +265,43 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             )
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::ModuleLiteral(..)
-            | Type::LiteralValue(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
+            | crate::types::TypeData::DataclassDecorator(_)
+            | crate::types::TypeData::DataclassTransformer(_)
+            | crate::types::TypeData::ModuleLiteral(..)
+            | crate::types::TypeData::LiteralValue(_)
+            | crate::types::TypeData::SpecialForm(_)
+            | crate::types::TypeData::KnownInstance(_)
+            | crate::types::TypeData::AlwaysFalsy
+            | crate::types::TypeData::AlwaysTruthy
             // `T` is always a subtype of itself,
             // and `T` is always a subtype of `T | None`
-            | Type::TypeVar(_)
+            | crate::types::TypeData::TypeVar(_)
             // might inherit `Any`, but subtyping is still reflexive
-            | Type::ClassLiteral(_)
+            | crate::types::TypeData::ClassLiteral(_))
              => true,
-            Type::Dynamic(_)
-            | Type::Divergent(_)
-            | Type::NominalInstance(_)
-            | Type::ProtocolInstance(_)
-            | Type::GenericAlias(_)
-            | Type::SubclassOf(_)
-            | Type::Union(_)
-            | Type::Intersection(_)
-            | Type::EnumComplement(_)
-            | Type::Callable(_)
-            | Type::KnownBoundMethod(
+            (_, crate::types::TypeData::Dynamic(_)
+            | crate::types::TypeData::Divergent(_)
+            | crate::types::TypeData::NominalInstance(_)
+            | crate::types::TypeData::ProtocolInstance(_)
+            | crate::types::TypeData::GenericAlias(_)
+            | crate::types::TypeData::SubclassOf(_)
+            | crate::types::TypeData::Union(_)
+            | crate::types::TypeData::Intersection(_)
+            | crate::types::TypeData::EnumComplement(_)
+            | crate::types::TypeData::Callable(_)
+            | crate::types::TypeData::KnownBoundMethod(
                 KnownBoundMethodType::PropertyDunderGet(_)
                 | KnownBoundMethodType::PropertyDunderSet(_)
                 | KnownBoundMethodType::PropertyDunderDelete(_),
             )
-            | Type::PropertyInstance(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::TypeForm(_)
-            | Type::TypedDict(_)
-            | Type::TypeAlias(_)
-            | Type::NewTypeInstance(_) => false,
+            | crate::types::TypeData::PropertyInstance(_)
+            | crate::types::TypeData::BoundSuper(_)
+            | crate::types::TypeData::TypeIs(_)
+            | crate::types::TypeData::TypeGuard(_)
+            | crate::types::TypeData::TypeForm(_)
+            | crate::types::TypeData::TypedDict(_)
+            | crate::types::TypeData::TypeAlias(_)
+            | crate::types::TypeData::NewTypeInstance(_)) => false,
         }
     }
 
@@ -436,14 +436,28 @@ impl<'db> Type<'db> {
             return false;
         }
 
-        match (self, target) {
-            (Type::Never | Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => true,
-            (_, Type::NominalInstance(target)) if target.is_object() => true,
-            (_, Type::Union(union)) => {
+        match (
+            ({
+                let __ty_view_value = self;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+            ({
+                let __ty_view_value = target;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+        ) {
+            ((_, crate::types::TypeData::Never | crate::types::TypeData::Dynamic(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::Dynamic(_))) => true,
+            ((_, _), (_, crate::types::TypeData::NominalInstance(target)))
+                if target.is_object() =>
+            {
+                true
+            }
+            ((_, _), (_, crate::types::TypeData::Union(union))) => {
                 self.materialized_divergent_fallback().is_none()
                     && union.elements(db).contains(&self)
             }
-            (Type::Intersection(intersection), _) => {
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _)) => {
                 target.materialized_divergent_fallback().is_none()
                     && intersection.positive(db).contains(&target)
             }
@@ -904,11 +918,17 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         // These displays already expose the signature being compared; wrapping them would
         // duplicate the lower-level callable mismatch context.
         !matches!(
-            source,
-            Type::Callable(_)
-                | Type::FunctionLiteral(_)
-                | Type::BoundMethod(_)
-                | Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+            {
+                let __ty_view_value = source;
+                (__ty_view_value, __ty_view_value.data())
+            },
+            (
+                _,
+                crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::FunctionLiteral(_)
+                    | crate::types::TypeData::BoundMethod(_)
+                    | crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(_))
+            )
         )
     }
 
@@ -1038,7 +1058,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // constraint set. If the typevar has an upper bound or constraints, then the relation
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
-            if let Type::TypeVar(bound_typevar) = source {
+            if let (_, crate::types::TypeData::TypeVar(bound_typevar)) = {
+                let __ty_view_value = source;
+                (__ty_view_value, __ty_view_value.data())
+            } {
                 let upper = if self.relation.is_subtyping() {
                     target.bottom_materialization(db)
                 } else {
@@ -1050,7 +1073,10 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     bound_typevar,
                     upper,
                 );
-            } else if let Type::TypeVar(bound_typevar) = target {
+            } else if let (_, crate::types::TypeData::TypeVar(bound_typevar)) = {
+                let __ty_view_value = target;
+                (__ty_view_value, __ty_view_value.data())
+            } {
                 let lower = if self.relation.is_subtyping() {
                     source.top_materialization(db)
                 } else {
@@ -1066,126 +1092,159 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         }
 
         let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection
-                .positive(db)
-                .iter()
-                .any(|element| match element {
-                    Type::TypeVar(tvar) => !tvar.is_inferable(db, self.inferable),
-                    Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_union(),
-                    _ => false,
-                })
+            intersection.positive(db).iter().any(|element| {
+                match {
+                    let __ty_view_value = element;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::TypeVar(tvar)) => {
+                        !tvar.is_inferable(db, self.inferable)
+                    }
+                    (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
+                        newtype.concrete_base_type(db).is_union()
+                    }
+                    (_, _) => false,
+                }
+            })
         };
 
-        match (source, target) {
+        match (
+            ({
+                let __ty_view_value = source;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+            ({
+                let __ty_view_value = target;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+        ) {
             // Everything is a subtype of `object`.
-            (_, Type::NominalInstance(target)) if target.is_object() => self.always(),
-            (_, Type::ProtocolInstance(target)) if target.is_equivalent_to_object(db) => {
+            ((_, _), (_, crate::types::TypeData::NominalInstance(target)))
+                if target.is_object() =>
+            {
+                self.always()
+            }
+            ((_, _), (_, crate::types::TypeData::ProtocolInstance(target)))
+                if target.is_equivalent_to_object(db) =>
+            {
                 self.always()
             }
 
             // `Never` is the bottom type, the empty set.
             // It is a subtype of all other types.
-            (Type::Never, _) => self.always(),
+            ((_, crate::types::TypeData::Never), (_, _)) => self.always(),
 
-            (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))
-                if source_typevar.is_same_typevar_as(db, target_typevar) =>
-            {
-                self.always()
-            }
+            (
+                (_, crate::types::TypeData::TypeVar(source_typevar)),
+                (_, crate::types::TypeData::TypeVar(target_typevar)),
+            ) if source_typevar.is_same_typevar_as(db, target_typevar) => self.always(),
 
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
+            ((_, crate::types::TypeData::Divergent(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::Divergent(_))) => {
                 ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
-            (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source_alias.value_type(db), target)
-            }),
+            ((_, crate::types::TypeData::TypeAlias(source_alias)), (_, _)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source_alias.value_type(db), target)
+                }),
 
-            (_, Type::TypeAlias(target_alias)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, target_alias.value_type(db))
-            }),
+            ((_, _), (_, crate::types::TypeData::TypeAlias(target_alias))) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_type_pair(db, source, target_alias.value_type(db))
+                }),
 
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
-            (_, Type::Union(union)) if union.has_aliases(db) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(db, source, union.expand_aliases(db))
-                })
-            }
-
-            (Type::TypeForm(source_typeform), Type::TypeForm(target_typeform)) => self
+            ((_, _), (_, crate::types::TypeData::Union(union))) if union.has_aliases(db) => self
                 .with_recursion_guard(source, target, || {
-                    self.check_type_pair(
-                        db,
-                        source_typeform.type_argument(db),
-                        target_typeform.type_argument(db),
-                    )
+                    self.check_type_pair(db, source, union.expand_aliases(db))
                 }),
 
-            (Type::SubclassOf(source_subclass), Type::TypeForm(target_typeform)) => self
-                .check_type_pair(
+            (
+                (_, crate::types::TypeData::TypeForm(source_typeform)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(
                     db,
-                    source_subclass.to_instance(db),
+                    source_typeform.type_argument(db),
                     target_typeform.type_argument(db),
-                ),
+                )
+            }),
 
-            (Type::NominalInstance(source_instance), Type::TypeForm(target_typeform))
-                if source_instance.has_known_class(db, KnownClass::Type) =>
-            {
+            (
+                (_, crate::types::TypeData::SubclassOf(source_subclass)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) => self.check_type_pair(
+                db,
+                source_subclass.to_instance(db),
+                target_typeform.type_argument(db),
+            ),
+
+            (
+                (_, crate::types::TypeData::NominalInstance(source_instance)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) if source_instance.has_known_class(db, KnownClass::Type) => {
                 self.check_type_pair(db, Type::object(), target_typeform.type_argument(db))
             }
 
-            (Type::ClassLiteral(source_class), Type::TypeForm(target_typeform)) => self
-                .check_type_pair(
-                    db,
-                    Type::instance(db, source_class.default_specialization(db)),
-                    target_typeform.type_argument(db),
-                ),
+            (
+                (_, crate::types::TypeData::ClassLiteral(source_class)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) => self.check_type_pair(
+                db,
+                Type::instance(db, source_class.default_specialization(db)),
+                target_typeform.type_argument(db),
+            ),
 
-            (Type::GenericAlias(source_alias), Type::TypeForm(target_typeform)) => self
-                .check_type_pair(
-                    db,
-                    Type::instance(db, ClassType::Generic(source_alias)),
-                    target_typeform.type_argument(db),
-                ),
+            (
+                (_, crate::types::TypeData::GenericAlias(source_alias)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) => self.check_type_pair(
+                db,
+                Type::instance(db, ClassType::Generic(source_alias)),
+                target_typeform.type_argument(db),
+            ),
 
-            (Type::KnownInstance(source_instance), Type::TypeForm(target_typeform))
-                if source_instance.is_type_form_value() =>
-            {
-                source_instance.type_form_argument(db).when_some_and(
-                    db,
-                    self.constraints,
-                    |source_argument| {
-                        self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
-                    },
-                )
-            }
-
-            (Type::SpecialForm(source_form), Type::TypeForm(target_typeform)) => source_form
+            (
+                (_, crate::types::TypeData::KnownInstance(source_instance)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) if source_instance.is_type_form_value() => source_instance
                 .type_form_argument(db)
                 .when_some_and(db, self.constraints, |source_argument| {
                     self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
                 }),
 
-            (Type::GenericAlias(_), Type::NominalInstance(target_instance))
-                if target_instance.has_known_class(db, KnownClass::GenericAlias) =>
-            {
-                self.always()
-            }
+            (
+                (_, crate::types::TypeData::SpecialForm(source_form)),
+                (_, crate::types::TypeData::TypeForm(target_typeform)),
+            ) => source_form.type_form_argument(db).when_some_and(
+                db,
+                self.constraints,
+                |source_argument| {
+                    self.check_type_pair(db, source_argument, target_typeform.type_argument(db))
+                },
+            ),
 
-            (Type::EnumComplement(complement), Type::LiteralValue(_) | Type::Union(_)) => {
-                self.check_type_pair(db, complement.remaining_literal_union(db), target)
-            }
+            (
+                (_, crate::types::TypeData::GenericAlias(_)),
+                (_, crate::types::TypeData::NominalInstance(target_instance)),
+            ) if target_instance.has_known_class(db, KnownClass::GenericAlias) => self.always(),
 
-            (Type::EnumComplement(complement), _) => {
+            (
+                (_, crate::types::TypeData::EnumComplement(complement)),
+                (_, crate::types::TypeData::LiteralValue(_) | crate::types::TypeData::Union(_)),
+            ) => self.check_type_pair(db, complement.remaining_literal_union(db), target),
+
+            ((_, crate::types::TypeData::EnumComplement(complement)), (_, _)) => {
                 self.check_type_pair(db, complement.to_intersection(db), target)
             }
 
-            (_, Type::EnumComplement(complement)) => {
+            ((_, _), (_, crate::types::TypeData::EnumComplement(complement))) => {
                 self.check_type_pair(db, source, complement.to_intersection(db))
             }
 
@@ -1210,34 +1269,53 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             //        declared field type.
             //     3. If neither a converter nor a default value is provided, we allow the field to be
             //        considered assignable to any type.
-            (Type::KnownInstance(KnownInstanceType::Field(field)), _)
-                if self.is_eager_assignability() =>
-            {
-                field
-                    .default_type(db)
-                    .when_none_or(db, self.constraints, |default_type| {
-                        self.check_type_pair(db, default_type, target)
-                    })
-                    .and(db, self.constraints, || {
-                        field
-                            .converter(db)
-                            .map(|(_, output_ty)| output_ty)
-                            .when_none_or(db, self.constraints, |converter_output_type| {
-                                self.check_type_pair(db, converter_output_type, target)
-                            })
-                    })
-            }
+            (
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::Field(field))),
+                (_, _),
+            ) if self.is_eager_assignability() => field
+                .default_type(db)
+                .when_none_or(db, self.constraints, |default_type| {
+                    self.check_type_pair(db, default_type, target)
+                })
+                .and(db, self.constraints, || {
+                    field
+                        .converter(db)
+                        .map(|(_, output_ty)| output_ty)
+                        .when_none_or(db, self.constraints, |converter_output_type| {
+                            self.check_type_pair(db, converter_output_type, target)
+                        })
+                }),
 
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_partial)),
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(target_partial)),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                        source_partial,
+                    )),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                        target_partial,
+                    )),
+                ),
             ) => self.with_recursion_guard(source, target, || {
                 self.check_callable_pair(db, source_partial.partial(db), target_partial.partial(db))
             }),
 
             (
-                Type::KnownInstance(KnownInstanceType::Sentinel(source_sentinel)),
-                Type::KnownInstance(KnownInstanceType::Sentinel(target_sentinel)),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::Sentinel(
+                        source_sentinel,
+                    )),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::Sentinel(
+                        target_sentinel,
+                    )),
+                ),
             ) => ConstraintSet::from_bool(
                 self.constraints,
                 source_sentinel.is_same_sentinel(db, target_sentinel),
@@ -1246,8 +1324,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // When checking `FunctoolsPartial <: functools.partial[T]`, we need to specialize
             // the nominal instance with the partial's return type so the check is precise.
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)),
-                Type::NominalInstance(target_instance),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                        partial,
+                    )),
+                ),
+                (_, crate::types::TypeData::NominalInstance(target_instance)),
             ) if target_instance
                 .class(db)
                 .is_known(db, KnownClass::FunctoolsPartial) =>
@@ -1263,33 +1346,41 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // if `T` is also a dynamic type or a union that contains a dynamic type. Similarly,
             // `T <: Any` only holds true if `T` is a dynamic type or an intersection that
             // contains a dynamic type.
-            (Type::Dynamic(_dynamic), _) => ConstraintSet::from_bool(
+            ((_, crate::types::TypeData::Dynamic(_dynamic)), (_, _)) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                     TypeRelation::Assignability => true,
-                    TypeRelation::Redundancy { .. } => match target {
-                        Type::Dynamic(_) => true,
-                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
-                        _ => false,
+                    TypeRelation::Redundancy { .. } => match {
+                        let __ty_view_value = target;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::Dynamic(_)) => true,
+                        (_, crate::types::TypeData::Union(union)) => {
+                            union.elements(db).iter().any(Type::is_dynamic)
+                        }
+                        (_, _) => false,
                     },
                 },
             ),
-            (_, Type::Dynamic(_)) => ConstraintSet::from_bool(
+            ((_, _), (_, crate::types::TypeData::Dynamic(_))) => ConstraintSet::from_bool(
                 self.constraints,
                 match self.relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                     TypeRelation::Assignability => true,
-                    TypeRelation::Redundancy { .. } => match source {
-                        Type::Dynamic(_) => true,
-                        Type::Intersection(intersection) => {
+                    TypeRelation::Redundancy { .. } => match {
+                        let __ty_view_value = source;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::Dynamic(_)) => true,
+                        (_, crate::types::TypeData::Intersection(intersection)) => {
                             // If a `Divergent` type is involved, it must not be eliminated.
                             intersection
                                 .positive(db)
                                 .iter()
                                 .any(Type::is_non_divergent_dynamic)
                         }
-                        _ => false,
+                        (_, _) => false,
                     },
                 },
             ),
@@ -1301,7 +1392,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             //
             // However, there is one exception to this general rule: for any given typevar `T`,
             // `T` will always be a subtype of any union containing `T`.
-            (_, Type::Union(union))
+            ((_, _), (_, crate::types::TypeData::Union(union)))
                 if self.relation.can_safely_assume_reflexivity(source)
                     && union.elements(db).contains(&source) =>
             {
@@ -1309,13 +1400,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // A similar rule applies in reverse to intersection types.
-            (Type::Intersection(intersection), _)
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _))
                 if self.relation.can_safely_assume_reflexivity(target)
                     && intersection.positive(db).contains(&target) =>
             {
                 self.always()
             }
-            (Type::Intersection(intersection), _)
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _))
                 if self.is_eager_assignability()
                     && intersection.positive(db).iter().any(Type::is_dynamic) =>
             {
@@ -1324,7 +1415,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 // `T` and any `S`, and `Never` is a subtype of all types.
                 self.always()
             }
-            (Type::Intersection(intersection), _)
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _))
                 if self.relation.can_safely_assume_reflexivity(target)
                     && intersection.negative(db).contains(&target) =>
             {
@@ -1336,7 +1427,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // subclass of `type`), we instead compare in the metaclass-instance domain, since
             // collapsing `A` through `to_instance()` would erase it to `object` (we have no
             // precise representation for "all instances of any classes with a given metaclass").
-            (Type::SubclassOf(subclass_of), _)
+            ((_, crate::types::TypeData::SubclassOf(subclass_of)), (_, _))
                 if subclass_of.is_type_var()
                     && Self::can_check_typevar_subclass_relation_to_target(db, target) =>
             {
@@ -1345,7 +1436,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // And vice versa. (No special metaclass handling is needed in this direction, since
             // "collapse to 'object'" in this case is a sound over-approximation.)
-            (_, Type::SubclassOf(subclass_of))
+            ((_, _), (_, crate::types::TypeData::SubclassOf(subclass_of)))
                 if subclass_of.is_type_var() && source.to_instance(db).is_some() =>
             {
                 subclass_of
@@ -1360,22 +1451,29 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // `ParamSpec` value. This only applies to fixed `ParamSpec` values in already-
             // specialized generic aliases; inferable `ParamSpec`s are handled by the inference
             // paths below.
-            (Type::TypeVar(bound_typevar), Type::Callable(other))
-            | (Type::Callable(other), Type::TypeVar(bound_typevar))
-                if self.is_eager_assignability()
-                    && !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.is_paramspec(db)
-                    && Self::is_gradual_paramspec_value(db, other) =>
+            (
+                (_, crate::types::TypeData::TypeVar(bound_typevar)),
+                (_, crate::types::TypeData::Callable(other)),
+            )
+            | (
+                (_, crate::types::TypeData::Callable(other)),
+                (_, crate::types::TypeData::TypeVar(bound_typevar)),
+            ) if self.is_eager_assignability()
+                && !bound_typevar.is_inferable(db, self.inferable)
+                && bound_typevar.is_paramspec(db)
+                && Self::is_gradual_paramspec_value(db, other) =>
             {
                 self.always()
             }
 
             // Any concrete specialization of a `ParamSpec` is a subtype of the top
             // materialization of a `ParamSpec` value.
-            (Type::TypeVar(bound_typevar), Type::Callable(other))
-                if !bound_typevar.is_inferable(db, self.inferable)
-                    && bound_typevar.is_paramspec(db)
-                    && Self::is_top_paramspec_value(db, other) =>
+            (
+                (_, crate::types::TypeData::TypeVar(bound_typevar)),
+                (_, crate::types::TypeData::Callable(other)),
+            ) if !bound_typevar.is_inferable(db, self.inferable)
+                && bound_typevar.is_paramspec(db)
+                && Self::is_top_paramspec_value(db, other) =>
             {
                 self.always()
             }
@@ -1383,7 +1481,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // A fully static typevar is a subtype of its upper bound, and to something similar to
             // the union of its constraints. An unbound, unconstrained, fully static typevar has an
             // implicit upper bound of `object` (which is handled above).
-            (Type::TypeVar(bound_typevar), _)
+            ((_, crate::types::TypeData::TypeVar(bound_typevar)), (_, _))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && bound_typevar.typevar(db).bound_or_constraints(db).is_some() =>
             {
@@ -1405,7 +1503,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // If the typevar is constrained, there must be multiple constraints, and the typevar
             // might be specialized to any one of them. However, the constraints do not have to be
             // disjoint, which means an lhs type might be a subtype of all of the constraints.
-            (_, Type::TypeVar(bound_typevar))
+            ((_, _), (_, crate::types::TypeData::TypeVar(bound_typevar)))
                 if !bound_typevar.is_inferable(db, self.inferable)
                     && !bound_typevar
                         .typevar(db)
@@ -1432,7 +1530,9 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::TypeVar(bound_typevar), _) if bound_typevar.is_inferable(db, self.inferable) => {
+            ((_, crate::types::TypeData::TypeVar(bound_typevar)), (_, _))
+                if bound_typevar.is_inferable(db, self.inferable) =>
+            {
                 // The implicit lower bound of a typevar is `Never`, which means
                 // that it is always assignable to any other type.
 
@@ -1445,45 +1545,48 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // (`object` can be a subtype of some protocols, or of itself, but those cases are
             // handled above).
             (
-                Type::NominalInstance(source),
-                Type::NominalInstance(_)
-                | Type::SubclassOf(_)
-                | Type::Callable(_)
-                | Type::ProtocolInstance(_),
+                (_, crate::types::TypeData::NominalInstance(source)),
+                (
+                    _,
+                    crate::types::TypeData::NominalInstance(_)
+                    | crate::types::TypeData::SubclassOf(_)
+                    | crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::ProtocolInstance(_),
+                ),
             ) if source.is_object() => self.never(),
 
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
-            (Type::NominalInstance(source), Type::TypeVar(typevar))
-                if source.is_object() && !typevar.is_inferable(db, self.inferable) =>
-            {
-                self.never()
-            }
+            (
+                (_, crate::types::TypeData::NominalInstance(source)),
+                (_, crate::types::TypeData::TypeVar(typevar)),
+            ) if source.is_object() && !typevar.is_inferable(db, self.inferable) => self.never(),
 
-            (Type::NewTypeInstance(source_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self.check_newtype_pair(db, source_newtype, target_newtype)
-            }
+            (
+                (_, crate::types::TypeData::NewTypeInstance(source_newtype)),
+                (_, crate::types::TypeData::NewTypeInstance(target_newtype)),
+            ) => self.check_newtype_pair(db, source_newtype, target_newtype),
 
-            (Type::Union(union), _) => {
-                union
-                    .elements(db)
-                    .iter()
-                    .when_all(db, self.constraints, |&elem_ty| {
-                        let constraint_set = self.check_type_pair(db, elem_ty, target);
-                        if constraint_set.is_never_satisfied(db) {
-                            self.provide_context(|| ErrorContext::NotAllUnionElementsAssignable {
-                                element: elem_ty,
-                                union: source,
-                                target,
-                            });
-                        }
-                        constraint_set
-                    })
-            }
+            ((_, crate::types::TypeData::Union(union)), (_, _)) => union
+                .elements(db)
+                .iter()
+                .when_all(db, self.constraints, |&elem_ty| {
+                    let constraint_set = self.check_type_pair(db, elem_ty, target);
+                    if constraint_set.is_never_satisfied(db) {
+                        self.provide_context(|| ErrorContext::NotAllUnionElementsAssignable {
+                            element: elem_ty,
+                            union: source,
+                            target,
+                        });
+                    }
+                    constraint_set
+                }),
 
-            (_, Type::Union(union)) => {
-                if let Type::Intersection(intersection) = source
-                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+            ((_, _), (_, crate::types::TypeData::Union(union))) => {
+                if let (_, crate::types::TypeData::Intersection(intersection)) = ({
+                    let __ty_view_value = source;
+                    (__ty_view_value, __ty_view_value.data())
+                }) && let Some(alternatives) = intersection.finite_alternative_union(db)
                 {
                     return self.check_type_pair(db, alternatives, target);
                 }
@@ -1494,8 +1597,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     // to be a newtype of a union, for an intersection to contain a newtype of a union, or for
                     // a non-inferable typevar (possibly inside an intersection) to widen to a bound or set of
                     // constraints that exposes a union; this requires special handling.
-                    match source {
-                        Type::Intersection(intersection)
+                    match {
+                        let __ty_view_value = source;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::Intersection(intersection))
                             if should_expand_intersection(intersection) =>
                         {
                             self.check_type_pair(
@@ -1504,7 +1610,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 target,
                             )
                         }
-                        Type::NewTypeInstance(newtype) => {
+                        (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
                             let concrete_base = newtype.concrete_base_type(db);
                             if concrete_base.is_union() {
                                 self.check_type_pair(db, concrete_base, target)
@@ -1512,7 +1618,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                                 self.never()
                             }
                         }
-                        _ => self.never(),
+                        (_, _) => self.never(),
                     }
                 };
 
@@ -1562,7 +1668,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => intersection
+            ((_, _), (_, crate::types::TypeData::Intersection(intersection))) => intersection
                 .positive(db)
                 .iter()
                 .when_all(db, self.constraints, |&pos_ty| {
@@ -1611,9 +1717,14 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                         })
                 }),
 
-            (Type::Intersection(intersection), _) => {
-                if matches!(target, Type::LiteralValue(_))
-                    && let Some(alternatives) = intersection.finite_alternative_union(db)
+            ((_, crate::types::TypeData::Intersection(intersection)), (_, _)) => {
+                if matches!(
+                    {
+                        let __ty_view_value = target;
+                        (__ty_view_value, __ty_view_value.data())
+                    },
+                    (_, crate::types::TypeData::LiteralValue(_))
+                ) && let Some(alternatives) = intersection.finite_alternative_union(db)
                 {
                     return self.check_type_pair(db, alternatives, target);
                 }
@@ -1667,21 +1778,23 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // `Never` is the bottom type, the empty set.
-            (_, Type::Never) => self.never(),
+            ((_, _), (_, crate::types::TypeData::Never)) => self.never(),
 
             // Other than the special cases checked above, no other types are a subtype of a
             // typevar, since there's no guarantee what type the typevar will be specialized to.
             // (If the typevar is bounded, it might be specialized to a smaller type than the
             // bound. This is true even if the bound is a final class, since the typevar can still
             // be specialized to `Never`.)
-            (_, Type::TypeVar(bound_typevar))
+            ((_, _), (_, crate::types::TypeData::TypeVar(bound_typevar)))
                 if !bound_typevar.is_inferable(db, self.inferable) =>
             {
                 self.never()
             }
 
             // TODO: Infer specializations here
-            (_, Type::TypeVar(typevar)) if typevar.is_inferable(db, self.inferable) => {
+            ((_, _), (_, crate::types::TypeData::TypeVar(typevar)))
+                if typevar.is_inferable(db, self.inferable) =>
+            {
                 if self.is_eager_assignability() {
                     // TODO: record the unification constraints
                     typevar.typevar(db).upper_bound(db).when_none_or(
@@ -1693,7 +1806,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.never()
                 }
             }
-            (Type::TypeVar(bound_typevar), _) => {
+            ((_, crate::types::TypeData::TypeVar(bound_typevar)), (_, _)) => {
                 // All inferable cases should have been handled above
                 assert!(!bound_typevar.is_inferable(db, self.inferable));
                 self.never()
@@ -1703,36 +1816,43 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // This case must come after the TypeVar cases above, so that when checking
             // `NewType <: TypeVar`, we use the TypeVar handling rather than falling back
             // to the NewType's concrete base type.
-            (Type::NewTypeInstance(source_newtype), _) => {
+            ((_, crate::types::TypeData::NewTypeInstance(source_newtype)), (_, _)) => {
                 self.check_type_pair(db, source_newtype.concrete_base_type(db), target)
             }
 
             // Note that the definition of `Type::AlwaysFalsy` depends on the return value of `__bool__`.
             // If `__bool__` always returns True or False, it can be treated as a subtype of `AlwaysTruthy` or `AlwaysFalsy`, respectively.
-            (_, Type::AlwaysFalsy) => {
+            ((_, _), (_, crate::types::TypeData::AlwaysFalsy)) => {
                 ConstraintSet::from_bool(self.constraints, source.bool(db).is_always_false())
             }
-            (_, Type::AlwaysTruthy) => {
+            ((_, _), (_, crate::types::TypeData::AlwaysTruthy)) => {
                 ConstraintSet::from_bool(self.constraints, source.bool(db).is_always_true())
             }
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
-            (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_type_pair(db, Type::object(), target)
-                })
-            }
+            (
+                (_, crate::types::TypeData::AlwaysFalsy | crate::types::TypeData::AlwaysTruthy),
+                (_, _),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, Type::object(), target)
+            }),
 
             // These clauses handle type variants that include function literals. A function
             // literal is the subtype of itself, and not of any other function literal. However,
             // our representation of a function literal includes any specialization that should be
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
-            (Type::FunctionLiteral(source_function), Type::FunctionLiteral(target_function)) => {
-                self.check_function_pair(db, source_function, target_function)
-            }
             (
-                Type::KnownInstance(KnownInstanceType::FunctoolsPartial(source_partial)),
-                Type::FunctionLiteral(target_function),
+                (_, crate::types::TypeData::FunctionLiteral(source_function)),
+                (_, crate::types::TypeData::FunctionLiteral(target_function)),
+            ) => self.check_function_pair(db, source_function, target_function),
+            (
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(
+                        source_partial,
+                    )),
+                ),
+                (_, crate::types::TypeData::FunctionLiteral(target_function)),
             ) if matches!(self.relation, TypeRelation::Assignability) => {
                 self.with_recursion_guard(source, target, || {
                     self.check_callable_signature_pair(
@@ -1742,57 +1862,68 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     )
                 })
             }
-            (Type::BoundMethod(source_method), Type::BoundMethod(target_method)) => {
-                self.check_bound_method_pair(db, source_method, target_method)
-            }
-            (Type::KnownBoundMethod(source_method), Type::KnownBoundMethod(target_method)) => {
-                self.check_known_bound_method_pair(db, source_method, target_method)
-            }
+            (
+                (_, crate::types::TypeData::BoundMethod(source_method)),
+                (_, crate::types::TypeData::BoundMethod(target_method)),
+            ) => self.check_bound_method_pair(db, source_method, target_method),
+            (
+                (_, crate::types::TypeData::KnownBoundMethod(source_method)),
+                (_, crate::types::TypeData::KnownBoundMethod(target_method)),
+            ) => self.check_known_bound_method_pair(db, source_method, target_method),
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
-            (Type::LiteralValue(source), Type::LiteralValue(target))
-                if source.is_string() && target.is_literal_string() =>
-            {
-                self.always()
-            }
+            (
+                (_, crate::types::TypeData::LiteralValue(source)),
+                (_, crate::types::TypeData::LiteralValue(target)),
+            ) if source.is_string() && target.is_literal_string() => self.always(),
 
             // For union simplification, we want to preserve the unpromotable form of a literal value,
             // and so redundancy is not symmetric.
-            (Type::LiteralValue(source), Type::LiteralValue(target))
-                if matches!(self.relation, TypeRelation::Redundancy { pure: false }) =>
-            {
+            (
+                (_, crate::types::TypeData::LiteralValue(source)),
+                (_, crate::types::TypeData::LiteralValue(target)),
+            ) if matches!(self.relation, TypeRelation::Redundancy { pure: false }) => {
                 ConstraintSet::from_bool(
                     self.constraints,
                     source.kind() == target.kind() && source.is_promotable(),
                 )
             }
 
-            (Type::LiteralValue(source), Type::LiteralValue(target)) => {
-                ConstraintSet::from_bool(self.constraints, source.kind() == target.kind())
-            }
+            (
+                (_, crate::types::TypeData::LiteralValue(source)),
+                (_, crate::types::TypeData::LiteralValue(target)),
+            ) => ConstraintSet::from_bool(self.constraints, source.kind() == target.kind()),
 
             // No literal type is a subtype of any other literal type, unless they are the same
             // type (which is handled above). This case is not necessary from a correctness
             // perspective (the fallback cases below will handle it correctly), but it is important
             // for performance of simplifying large unions of literal types.
             (
-                Type::LiteralValue(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_),
-                Type::LiteralValue(_)
-                | Type::ClassLiteral(_)
-                | Type::FunctionLiteral(_)
-                | Type::ModuleLiteral(_),
+                (
+                    _,
+                    crate::types::TypeData::LiteralValue(_)
+                    | crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::FunctionLiteral(_)
+                    | crate::types::TypeData::ModuleLiteral(_),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::LiteralValue(_)
+                    | crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::FunctionLiteral(_)
+                    | crate::types::TypeData::ModuleLiteral(_),
+                ),
             ) => self.never(),
 
-            (Type::Callable(source_callable), Type::Callable(target_callable)) => self
-                .with_recursion_guard(source, target, || {
-                    self.check_callable_pair(db, source_callable, target_callable)
-                }),
+            (
+                (_, crate::types::TypeData::Callable(source_callable)),
+                (_, crate::types::TypeData::Callable(target_callable)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_callable_pair(db, source_callable, target_callable)
+            }),
 
-            (_, Type::Callable(target_callable)) => {
-                self.with_recursion_guard(source, target, || {
+            ((_, _), (_, crate::types::TypeData::Callable(target_callable))) => self
+                .with_recursion_guard(source, target, || {
                     let Some(callables) = source
                         .try_upcast_to_callable_with_policy(db, UpcastPolicy::from(self.relation))
                     else {
@@ -1811,8 +1942,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     }
 
                     result
-                })
-            }
+                }),
 
             // `type[Any]` is assignable to arbitrary protocols as it has arbitrary attributes
             // (this is handled by a lower-down branch), but it is only a subtype of a given
@@ -1820,64 +1950,72 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // always be assignable to any protocol if `type[<upper bound of T>]` is assignable
             // to that protocol (handled lower down), but it is only a subtype of that protocol
             // if `type` is a subtype of that protocol.
-            (Type::SubclassOf(source_subclass_ty), Type::ProtocolInstance(_))
-                if (source_subclass_ty.is_dynamic() || source_subclass_ty.is_type_var())
-                    && !self.is_eager_assignability() =>
+            (
+                (_, crate::types::TypeData::SubclassOf(source_subclass_ty)),
+                (_, crate::types::TypeData::ProtocolInstance(_)),
+            ) if (source_subclass_ty.is_dynamic() || source_subclass_ty.is_type_var())
+                && !self.is_eager_assignability() =>
             {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
             }
 
-            (_, Type::ProtocolInstance(target_proto)) => {
-                self.with_recursion_guard(source, target, || {
+            ((_, _), (_, crate::types::TypeData::ProtocolInstance(target_proto))) => self
+                .with_recursion_guard(source, target, || {
                     self.check_type_satisfies_protocol(db, source, target_proto)
-                })
-            }
+                }),
 
             // A protocol instance can never be a subtype of a nominal type, with the *sole* exception of `object`.
-            (Type::ProtocolInstance(_), _) => self.never(),
+            ((_, crate::types::TypeData::ProtocolInstance(_)), (_, _)) => self.never(),
 
-            (Type::TypedDict(source_td), Type::TypedDict(target_td)) => {
-                self.with_recursion_guard(source, target, || {
-                    self.check_typeddict_pair(db, source_td, target_td)
-                })
-            }
-
-            (Type::TypedDict(typed_dict), _) => self.with_recursion_guard(source, target, || {
-                let dict_value_type = if self.relation.is_assignability() {
-                    typed_dict.assignable_dict_value_type(db)
-                } else {
-                    typed_dict.dict_value_type(db)
-                };
-                let fallback = if let Some(value_ty) = dict_value_type {
-                    KnownClass::Dict
-                        .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), value_ty])
-                } else {
-                    KnownClass::Mapping.to_specialized_instance(
-                        db,
-                        &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
-                    )
-                };
-                let result = self.check_type_pair(db, fallback, target);
-                if result.is_never_satisfied(db) {
-                    if let Type::NominalInstance(instance) = target
-                        && instance.class(db).is_known(db, KnownClass::Dict)
-                    {
-                        self.provide_context(|| {
-                            ErrorContext::TypedDictNotAssignableToDict(typed_dict)
-                        });
-                    }
-                }
-                result
+            (
+                (_, crate::types::TypeData::TypedDict(source_td)),
+                (_, crate::types::TypeData::TypedDict(target_td)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_typeddict_pair(db, source_td, target_td)
             }),
 
+            ((_, crate::types::TypeData::TypedDict(typed_dict)), (_, _)) => self
+                .with_recursion_guard(source, target, || {
+                    let dict_value_type = if self.relation.is_assignability() {
+                        typed_dict.assignable_dict_value_type(db)
+                    } else {
+                        typed_dict.dict_value_type(db)
+                    };
+                    let fallback = if let Some(value_ty) = dict_value_type {
+                        KnownClass::Dict.to_specialized_instance(
+                            db,
+                            &[KnownClass::Str.to_instance(db), value_ty],
+                        )
+                    } else {
+                        KnownClass::Mapping.to_specialized_instance(
+                            db,
+                            &[KnownClass::Str.to_instance(db), typed_dict.value_type(db)],
+                        )
+                    };
+                    let result = self.check_type_pair(db, fallback, target);
+                    if result.is_never_satisfied(db) {
+                        if let (_, crate::types::TypeData::NominalInstance(instance)) = ({
+                            let __ty_view_value = target;
+                            (__ty_view_value, __ty_view_value.data())
+                        }) && instance.class(db).is_known(db, KnownClass::Dict)
+                        {
+                            self.provide_context(|| {
+                                ErrorContext::TypedDictNotAssignableToDict(typed_dict)
+                            });
+                        }
+                    }
+                    result
+                }),
+
             // A non-`TypedDict` cannot subtype a `TypedDict`
-            (_, Type::TypedDict(_)) => self.never(),
+            ((_, _), (_, crate::types::TypeData::TypedDict(_))) => self.never(),
 
             // A string literal `Literal["abc"]` is assignable to `str` *and* to
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_string() =>
-            {
+            (
+                (_, crate::types::TypeData::LiteralValue(literal)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            ) if literal.is_string() => {
                 let value = literal.as_string().unwrap();
                 let target_class = instance.class(db);
 
@@ -1919,13 +2057,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            (Type::LiteralValue(literal), _) if literal.is_string() => self.never(),
+            ((_, crate::types::TypeData::LiteralValue(literal)), (_, _)) if literal.is_string() => {
+                self.never()
+            }
 
             // A bytes literal `Literal[b"abc"]` is assignable to `bytes` *and* to
             // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
-            (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_bytes() =>
-            {
+            (
+                (_, crate::types::TypeData::LiteralValue(literal)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            ) if literal.is_bytes() => {
                 let value = literal.as_bytes().unwrap();
                 let target_class = instance.class(db);
 
@@ -1966,11 +2107,16 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     })
             }
 
-            (Type::LiteralValue(literal), _) if literal.is_bytes() => self.never(),
+            ((_, crate::types::TypeData::LiteralValue(literal)), (_, _)) if literal.is_bytes() => {
+                self.never()
+            }
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
-            (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum() => {
+            (
+                (_, crate::types::TypeData::NominalInstance(_)),
+                (_, crate::types::TypeData::LiteralValue(literal)),
+            ) if literal.is_enum() => {
                 let target_enum_literal = literal.as_enum().unwrap();
                 if target_enum_literal.enum_class_instance(db) != source {
                     return self.never();
@@ -1985,34 +2131,50 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Except for the special `BytesLiteral`, `LiteralString`, and string literal cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `source` is exactly equivalent to `target` (handled above)
-            (Type::ModuleLiteral(_) | Type::LiteralValue(_) | Type::FunctionLiteral(_), _) => {
-                source.literal_fallback_instance(db).when_some_and(
-                    db,
-                    self.constraints,
-                    |source_instance| self.check_type_pair(db, source_instance, target),
-                )
-            }
+            (
+                (
+                    _,
+                    crate::types::TypeData::ModuleLiteral(_)
+                    | crate::types::TypeData::LiteralValue(_)
+                    | crate::types::TypeData::FunctionLiteral(_),
+                ),
+                (_, _),
+            ) => source.literal_fallback_instance(db).when_some_and(
+                db,
+                self.constraints,
+                |source_instance| self.check_type_pair(db, source_instance, target),
+            ),
 
             // The same reasoning applies for these special callable types:
-            (Type::BoundMethod(_), _) => {
+            ((_, crate::types::TypeData::BoundMethod(_)), (_, _)) => {
                 self.check_type_pair(db, KnownClass::MethodType.to_instance(db), target)
             }
-            (Type::KnownBoundMethod(method), _) => {
+            ((_, crate::types::TypeData::KnownBoundMethod(method)), (_, _)) => {
                 self.check_type_pair(db, method.class().to_instance(db), target)
             }
-            (Type::WrapperDescriptor(_), _) => self.check_type_pair(
+            ((_, crate::types::TypeData::WrapperDescriptor(_)), (_, _)) => self.check_type_pair(
                 db,
                 KnownClass::WrapperDescriptorType.to_instance(db),
                 target,
             ),
 
-            (Type::DataclassDecorator(_) | Type::DataclassTransformer(_), _) => {
+            (
+                (
+                    _,
+                    crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_),
+                ),
+                (_, _),
+            ) => {
                 // TODO: Implement subtyping using an equivalent `Callable` type.
                 self.never()
             }
 
             // `TypeIs` is invariant.
-            (Type::TypeIs(source), Type::TypeIs(target)) => {
+            (
+                (_, crate::types::TypeData::TypeIs(source)),
+                (_, crate::types::TypeData::TypeIs(target)),
+            ) => {
                 let source_type = source.type_argument(db);
                 let target_type = target.type_argument(db);
                 self.check_type_pair(db, source_type, target_type)
@@ -2022,31 +2184,39 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // `TypeGuard` is covariant.
-            (Type::TypeGuard(source), Type::TypeGuard(target)) => {
-                self.check_type_pair(db, source.return_type(db), target.return_type(db))
-            }
+            (
+                (_, crate::types::TypeData::TypeGuard(source)),
+                (_, crate::types::TypeData::TypeGuard(target)),
+            ) => self.check_type_pair(db, source.return_type(db), target.return_type(db)),
 
             // `TypeIs[T]` and `TypeGuard[T]` are subtypes of `bool`.
-            (Type::TypeIs(_) | Type::TypeGuard(_), _) => {
-                self.check_type_pair(db, KnownClass::Bool.to_instance(db), target)
-            }
+            (
+                (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)),
+                (_, _),
+            ) => self.check_type_pair(db, KnownClass::Bool.to_instance(db), target),
 
             // Function-like callables are subtypes of `FunctionType`
-            (Type::Callable(callable), _) if callable.is_function_like(db) => {
+            ((_, crate::types::TypeData::Callable(callable)), (_, _))
+                if callable.is_function_like(db) =>
+            {
                 self.check_type_pair(db, KnownClass::FunctionType.to_instance(db), target)
             }
 
-            (Type::Callable(_), _) => self.never(),
+            ((_, crate::types::TypeData::Callable(_)), (_, _)) => self.never(),
 
-            (Type::BoundSuper(source), Type::BoundSuper(target)) => self
+            (
+                (_, crate::types::TypeData::BoundSuper(source)),
+                (_, crate::types::TypeData::BoundSuper(target)),
+            ) => self
                 .as_equivalence_checker()
                 .check_bound_super_pair(db, source, target),
 
-            (Type::BoundSuper(_), _) => {
+            ((_, crate::types::TypeData::BoundSuper(_)), (_, _)) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), target)
             }
 
-            (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))
+            ((_, crate::types::TypeData::SubclassOf(subclass_of)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::SubclassOf(subclass_of)))
                 if subclass_of.is_type_var() =>
             {
                 self.never()
@@ -2054,68 +2224,78 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
 
             // `Literal[<class 'C'>]` is a subtype of `type[B]` if `C` is a subclass of `B`,
             // since `type[B]` describes all possible runtime subclasses of the class object `B`.
-            (Type::ClassLiteral(source_cls), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, source_cls.default_specialization(db), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
-            }
+            (
+                (_, crate::types::TypeData::ClassLiteral(source_cls)),
+                (_, crate::types::TypeData::SubclassOf(target_subclass_ty)),
+            ) => target_subclass_ty
+                .subclass_of()
+                .into_class(db)
+                .map(|target_cls| {
+                    self.check_class_pair(db, source_cls.default_specialization(db), target_cls)
+                })
+                .unwrap_or_else(|| {
+                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                }),
 
             // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
             // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
             // with final generic types, where `type[C[...]]` is simplified to the generic-alias
             // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
-            (Type::ClassLiteral(source_cls), Type::GenericAlias(target_alias)) => self
-                .check_class_pair(
-                    db,
-                    source_cls.default_specialization(db),
-                    ClassType::Generic(target_alias),
-                ),
+            (
+                (_, crate::types::TypeData::ClassLiteral(source_cls)),
+                (_, crate::types::TypeData::GenericAlias(target_alias)),
+            ) => self.check_class_pair(
+                db,
+                source_cls.default_specialization(db),
+                ClassType::Generic(target_alias),
+            ),
 
             // For generic aliases, we delegate to the underlying class type.
-            (Type::GenericAlias(source_alias), Type::GenericAlias(target_alias)) => self
-                .check_class_pair(
-                    db,
-                    ClassType::Generic(source_alias),
-                    ClassType::Generic(target_alias),
-                ),
+            (
+                (_, crate::types::TypeData::GenericAlias(source_alias)),
+                (_, crate::types::TypeData::GenericAlias(target_alias)),
+            ) => self.check_class_pair(
+                db,
+                ClassType::Generic(source_alias),
+                ClassType::Generic(target_alias),
+            ),
 
-            (Type::GenericAlias(source_alias), Type::SubclassOf(target_subclass_ty)) => {
-                target_subclass_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|target_cls| {
-                        self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
-                    })
-                    .unwrap_or_else(|| {
-                        ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
-                    })
-            }
+            (
+                (_, crate::types::TypeData::GenericAlias(source_alias)),
+                (_, crate::types::TypeData::SubclassOf(target_subclass_ty)),
+            ) => target_subclass_ty
+                .subclass_of()
+                .into_class(db)
+                .map(|target_cls| {
+                    self.check_class_pair(db, ClassType::Generic(source_alias), target_cls)
+                })
+                .unwrap_or_else(|| {
+                    ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+                }),
 
             // This branch asks: given two types `type[T]` and `type[S]`, is `type[T]` a subtype of `type[S]`?
-            (Type::SubclassOf(source), Type::SubclassOf(target)) => {
-                self.check_subclassof_pair(db, source, target)
-            }
+            (
+                (_, crate::types::TypeData::SubclassOf(source)),
+                (_, crate::types::TypeData::SubclassOf(target)),
+            ) => self.check_subclassof_pair(db, source, target),
 
             // `Literal[str]` is a subtype of `type` because the `str` class object is an instance of its metaclass `type`.
             // `Literal[abc.ABC]` is a subtype of `abc.ABCMeta` because the `abc.ABC` class object
             // is an instance of its metaclass `abc.ABCMeta`.
-            (Type::ClassLiteral(source_class), _) => {
+            ((_, crate::types::TypeData::ClassLiteral(source_class)), (_, _)) => {
                 self.check_type_pair(db, source_class.metaclass_instance_type(db), target)
             }
-            (Type::GenericAlias(source_alias), _) => self.check_type_pair(
-                db,
-                ClassType::Generic(source_alias).metaclass_instance_type(db),
-                target,
-            ),
+            ((_, crate::types::TypeData::GenericAlias(source_alias)), (_, _)) => self
+                .check_type_pair(
+                    db,
+                    ClassType::Generic(source_alias).metaclass_instance_type(db),
+                    target,
+                ),
 
             // `type[Any]` is a subtype of `type[object]`, and is assignable to any `type[...]`
-            (Type::SubclassOf(subclass_of_ty), _) if subclass_of_ty.is_dynamic() => {
+            ((_, crate::types::TypeData::SubclassOf(subclass_of_ty)), (_, _))
+                if subclass_of_ty.is_dynamic() =>
+            {
                 self.check_type_pair(db, KnownClass::Type.to_instance(db), target)
                     .or(db, self.constraints, || {
                         ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
@@ -2126,7 +2306,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
 
             // Any `type[...]` type is assignable to `type[Any]`
-            (_, Type::SubclassOf(subclass_of_ty))
+            ((_, _), (_, crate::types::TypeData::SubclassOf(subclass_of_ty)))
                 if subclass_of_ty.is_dynamic() && self.is_eager_assignability() =>
             {
                 self.check_type_pair(db, source, KnownClass::Type.to_instance(db))
@@ -2139,50 +2319,57 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Similarly `type[enum.Enum]`  is a subtype of `enum.EnumMeta` because `enum.Enum`
             // is an instance of `enum.EnumMeta`. `type[Any]` and `type[Unknown]` do not participate in subtyping,
             // however, as they are not fully static types.
-            (Type::SubclassOf(subclass_of_ty), _) => self.check_type_pair(
-                db,
-                subclass_of_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|source_class| source_class.metaclass_instance_type(db))
-                    .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
-                target,
-            ),
+            ((_, crate::types::TypeData::SubclassOf(subclass_of_ty)), (_, _)) => self
+                .check_type_pair(
+                    db,
+                    subclass_of_ty
+                        .subclass_of()
+                        .into_class(db)
+                        .map(|source_class| source_class.metaclass_instance_type(db))
+                        .unwrap_or_else(|| KnownClass::Type.to_instance(db)),
+                    target,
+                ),
 
-            (Type::TypeForm(_), _) => self.check_type_pair(db, Type::object(), target),
+            ((_, crate::types::TypeData::TypeForm(_)), (_, _)) => {
+                self.check_type_pair(db, Type::object(), target)
+            }
 
             // For example: `Type::SpecialForm(SpecialFormType::Type)` is a subtype of `Type::NominalInstance(_SpecialForm)`,
             // because `Type::SpecialForm(SpecialFormType::Type)` is a set with exactly one runtime value in it
             // (the symbol `typing.Type`), and that symbol is known to be an instance of `typing._SpecialForm` at runtime.
-            (Type::SpecialForm(source_form), _) => {
+            ((_, crate::types::TypeData::SpecialForm(source_form)), (_, _)) => {
                 self.check_type_pair(db, source_form.instance_fallback(db), target)
             }
 
-            (Type::KnownInstance(source), _) => {
+            ((_, crate::types::TypeData::KnownInstance(source)), (_, _)) => {
                 self.check_type_pair(db, source.instance_fallback(db), target)
             }
 
             // `bool` is a subtype of `int`, because `bool` subclasses `int`,
             // which means that all instances of `bool` are also instances of `int`
-            (Type::NominalInstance(source_i), Type::NominalInstance(target_i)) => self
-                .with_recursion_guard(source, target, || {
-                    self.check_nominal_instance_pair(db, source_i, target_i)
-                }),
+            (
+                (_, crate::types::TypeData::NominalInstance(source_i)),
+                (_, crate::types::TypeData::NominalInstance(target_i)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_nominal_instance_pair(db, source_i, target_i)
+            }),
 
-            (Type::PropertyInstance(source_p), Type::PropertyInstance(target_p)) => self
-                .with_recursion_guard(source, target, || {
-                    self.check_property_instance_pair(db, source_p, target_p)
-                }),
+            (
+                (_, crate::types::TypeData::PropertyInstance(source_p)),
+                (_, crate::types::TypeData::PropertyInstance(target_p)),
+            ) => self.with_recursion_guard(source, target, || {
+                self.check_property_instance_pair(db, source_p, target_p)
+            }),
 
-            (Type::PropertyInstance(property), _) => {
+            ((_, crate::types::TypeData::PropertyInstance(property)), (_, _)) => {
                 self.check_type_pair(db, property.instance_fallback(db), target)
             }
-            (_, Type::PropertyInstance(property)) => {
+            ((_, _), (_, crate::types::TypeData::PropertyInstance(property))) => {
                 self.check_type_pair(db, source, property.instance_fallback(db))
             }
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
-            (Type::NominalInstance(_), _) => self.never(),
+            ((_, crate::types::TypeData::NominalInstance(_)), (_, _)) => self.never(),
         }
     }
 
@@ -2483,42 +2670,62 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             return self.check_type_pair(db, left, right);
         }
 
-        match (left, right) {
-            (Type::Never, _) | (_, Type::Never) => self.always(),
+        match (
+            ({
+                let __ty_view_value = left;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+            ({
+                let __ty_view_value = right;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+        ) {
+            ((_, crate::types::TypeData::Never), (_, _))
+            | ((_, _), (_, crate::types::TypeData::Never)) => self.always(),
 
-            (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => self.never(),
+            ((_, crate::types::TypeData::Dynamic(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::Dynamic(_))) => self.never(),
+            ((_, crate::types::TypeData::Divergent(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::Divergent(_))) => self.never(),
 
-            (Type::TypeAlias(alias), _) => {
+            ((_, crate::types::TypeData::TypeAlias(alias)), (_, _)) => {
                 let left_alias_ty = alias.value_type(db);
                 self.with_recursion_guard(left, right, || {
                     self.check_type_pair(db, left_alias_ty, right)
                 })
             }
 
-            (_, Type::TypeAlias(alias)) => {
+            ((_, _), (_, crate::types::TypeData::TypeAlias(alias))) => {
                 let right_alias_ty = alias.value_type(db);
                 self.with_recursion_guard(left, right, || {
                     self.check_type_pair(db, left, right_alias_ty)
                 })
             }
 
-            (Type::EnumComplement(complement), other) => {
+            ((_, crate::types::TypeData::EnumComplement(complement)), (other, _)) => {
                 self.check_type_pair(db, complement.remaining_literal_union(db), other)
             }
 
-            (other, Type::EnumComplement(complement)) => {
+            ((other, _), (_, crate::types::TypeData::EnumComplement(complement))) => {
                 self.check_type_pair(db, other, complement.remaining_literal_union(db))
             }
 
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
             (
-                Type::SubclassOf(subclass_of),
-                other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
+                (_, crate::types::TypeData::SubclassOf(subclass_of)),
+                (
+                    other,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::ProtocolInstance(_),
+                ),
             )
             | (
-                other @ (Type::Callable(_) | Type::ProtocolInstance(_)),
-                Type::SubclassOf(subclass_of),
+                (
+                    other,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::ProtocolInstance(_),
+                ),
+                (_, crate::types::TypeData::SubclassOf(subclass_of)),
             ) if subclass_of.is_type_var() => {
                 let type_var = subclass_of
                     .subclass_of()
@@ -2530,7 +2737,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             // `type[T]` is disjoint from a class object `A` if every instance of `T` is disjoint from an instance of `A`.
-            (Type::SubclassOf(subclass_of), other) | (other, Type::SubclassOf(subclass_of))
+            ((_, crate::types::TypeData::SubclassOf(subclass_of)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::SubclassOf(subclass_of)))
                 if subclass_of.is_type_var() && other.to_instance(db).is_some() =>
             {
                 subclass_of
@@ -2545,17 +2753,24 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // be specialized to the same type. (This is an important difference between typevars
             // and `Any`!) Different typevars might be disjoint, depending on their bounds and
             // constraints, which are handled below.
-            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar))
-                if !left_tvar.is_inferable(db, self.inferable)
-                    && left_tvar.is_same_typevar_as(db, right_tvar) =>
+            (
+                (_, crate::types::TypeData::TypeVar(left_tvar)),
+                (_, crate::types::TypeData::TypeVar(right_tvar)),
+            ) if !left_tvar.is_inferable(db, self.inferable)
+                && left_tvar.is_same_typevar_as(db, right_tvar) =>
             {
                 self.never()
             }
 
-            (Type::TypeVar(tvar), Type::Intersection(intersection))
-            | (Type::Intersection(intersection), Type::TypeVar(tvar))
-                if !tvar.is_inferable(db, self.inferable)
-                    && intersection.negative(db).contains(&Type::TypeVar(tvar)) =>
+            (
+                (_, crate::types::TypeData::TypeVar(tvar)),
+                (_, crate::types::TypeData::Intersection(intersection)),
+            )
+            | (
+                (_, crate::types::TypeData::Intersection(intersection)),
+                (_, crate::types::TypeData::TypeVar(tvar)),
+            ) if !tvar.is_inferable(db, self.inferable)
+                && intersection.negative(db).contains(&Type::TypeVar(tvar)) =>
             {
                 self.always()
             }
@@ -2564,7 +2779,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // specialized to any type. A bounded typevar is not disjoint from its bound, and is
             // only disjoint from other types if its bound is. A constrained typevar is disjoint
             // from a type if all of its constraints are.
-            (Type::TypeVar(tvar), other) | (other, Type::TypeVar(tvar))
+            ((_, crate::types::TypeData::TypeVar(tvar)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::TypeVar(tvar)))
                 if !tvar.is_inferable(db, self.inferable) =>
             {
                 match tvar.typevar(db).bound_or_constraints(db) {
@@ -2583,9 +2799,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             // TODO: Infer specializations here
-            (Type::TypeVar(_), _) | (_, Type::TypeVar(_)) => self.never(),
+            ((_, crate::types::TypeData::TypeVar(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::TypeVar(_))) => self.never(),
 
-            (Type::Union(union), other) | (other, Type::Union(union)) => union
+            ((_, crate::types::TypeData::Union(union)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::Union(union))) => union
                 .elements(db)
                 .iter()
                 .when_all(db, self.constraints, |e| {
@@ -2595,7 +2813,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // If we have two intersections, we test the positive elements of each one against the other intersection
             // Negative elements need a positive element on the other side in order to be disjoint.
             // This is similar to what would happen if we tried to build a new intersection that combines the two
-            (Type::Intersection(left_intersection), Type::Intersection(right_intersection)) => {
+            (
+                (_, crate::types::TypeData::Intersection(left_intersection)),
+                (_, crate::types::TypeData::Intersection(right_intersection)),
+            ) => {
                 if let Some(alternatives) = left_intersection.finite_alternative_union(db) {
                     self.check_type_pair(db, alternatives, right)
                 } else if let Some(alternatives) = right_intersection.finite_alternative_union(db) {
@@ -2619,7 +2840,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
 
-            (Type::Intersection(intersection), other) => {
+            ((_, crate::types::TypeData::Intersection(intersection)), (other, _)) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
                     self.check_type_pair(db, alternatives, other)
                 } else {
@@ -2627,7 +2848,7 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
 
-            (other, Type::Intersection(intersection)) => {
+            ((other, _), (_, crate::types::TypeData::Intersection(intersection))) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
                     self.check_type_pair(db, other, alternatives)
                 } else {
@@ -2635,38 +2856,82 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
 
-            (Type::LiteralValue(left), Type::LiteralValue(right))
-                if left.is_literal_string() && right.is_literal_string()
-                    || (left.is_string() && right.is_literal_string())
-                    || (left.is_literal_string() && right.is_string()) =>
+            (
+                (_, crate::types::TypeData::LiteralValue(left)),
+                (_, crate::types::TypeData::LiteralValue(right)),
+            ) if left.is_literal_string() && right.is_literal_string()
+                || (left.is_string() && right.is_literal_string())
+                || (left.is_literal_string() && right.is_string()) =>
             {
                 self.never()
             }
 
-            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from_bool(self.constraints, left.kind() != right.kind())
-            }
-
-            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
-                self.check_property_instance_pair(db, left, right)
-            }
+            (
+                (_, crate::types::TypeData::LiteralValue(left)),
+                (_, crate::types::TypeData::LiteralValue(right)),
+            ) => ConstraintSet::from_bool(self.constraints, left.kind() != right.kind()),
 
             (
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(left)),
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(right)),
-            )
-            | (
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(left)),
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(right)),
-            )
-            | (
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(left)),
-                Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderDelete(right)),
+                (_, crate::types::TypeData::PropertyInstance(left)),
+                (_, crate::types::TypeData::PropertyInstance(right)),
             ) => self.check_property_instance_pair(db, left, right),
 
             (
-                Type::KnownInstance(KnownInstanceType::Sentinel(left_sentinel)),
-                Type::KnownInstance(KnownInstanceType::Sentinel(right_sentinel)),
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderGet(left),
+                    ),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderGet(right),
+                    ),
+                ),
+            )
+            | (
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderSet(left),
+                    ),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderSet(right),
+                    ),
+                ),
+            )
+            | (
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderDelete(left),
+                    ),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownBoundMethod(
+                        KnownBoundMethodType::PropertyDunderDelete(right),
+                    ),
+                ),
+            ) => self.check_property_instance_pair(db, left, right),
+
+            (
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::Sentinel(
+                        left_sentinel,
+                    )),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::Sentinel(
+                        right_sentinel,
+                    )),
+                ),
             ) => ConstraintSet::from_bool(
                 self.constraints,
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
@@ -2676,75 +2941,101 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // iff the two types are nonequal
             (
                 // note `LiteralString` is not single-valued, but we handle the special case above
-                left @ (Type::FunctionLiteral(..)
-                | Type::KnownBoundMethod(..)
-                | Type::WrapperDescriptor(..)
-                | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)),
-                right @ (Type::FunctionLiteral(..)
-                | Type::KnownBoundMethod(..)
-                | Type::WrapperDescriptor(..)
-                | Type::ModuleLiteral(..)
-                | Type::ClassLiteral(..)
-                | Type::SpecialForm(..)
-                | Type::KnownInstance(..)),
+                (
+                    left,
+                    crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::KnownBoundMethod(..)
+                    | crate::types::TypeData::WrapperDescriptor(..)
+                    | crate::types::TypeData::ModuleLiteral(..)
+                    | crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SpecialForm(..)
+                    | crate::types::TypeData::KnownInstance(..),
+                ),
+                (
+                    right,
+                    crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::KnownBoundMethod(..)
+                    | crate::types::TypeData::WrapperDescriptor(..)
+                    | crate::types::TypeData::ModuleLiteral(..)
+                    | crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SpecialForm(..)
+                    | crate::types::TypeData::KnownInstance(..),
+                ),
             ) => ConstraintSet::from_bool(self.constraints, left != right),
 
             (
-                Type::SubclassOf(_),
-                Type::LiteralValue(..)
-                | Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
-                | Type::KnownBoundMethod(..)
-                | Type::WrapperDescriptor(..)
-                | Type::ModuleLiteral(..),
+                (_, crate::types::TypeData::SubclassOf(_)),
+                (
+                    _,
+                    crate::types::TypeData::LiteralValue(..)
+                    | crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::BoundMethod(..)
+                    | crate::types::TypeData::KnownBoundMethod(..)
+                    | crate::types::TypeData::WrapperDescriptor(..)
+                    | crate::types::TypeData::ModuleLiteral(..),
+                ),
             )
             | (
-                Type::LiteralValue(..)
-                | Type::FunctionLiteral(..)
-                | Type::BoundMethod(..)
-                | Type::KnownBoundMethod(..)
-                | Type::WrapperDescriptor(..)
-                | Type::ModuleLiteral(..),
-                Type::SubclassOf(_),
+                (
+                    _,
+                    crate::types::TypeData::LiteralValue(..)
+                    | crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::BoundMethod(..)
+                    | crate::types::TypeData::KnownBoundMethod(..)
+                    | crate::types::TypeData::WrapperDescriptor(..)
+                    | crate::types::TypeData::ModuleLiteral(..),
+                ),
+                (_, crate::types::TypeData::SubclassOf(_)),
             ) => self.always(),
 
-            (Type::AlwaysTruthy, ty) | (ty, Type::AlwaysTruthy) => {
+            ((_, crate::types::TypeData::AlwaysTruthy), (ty, _))
+            | ((ty, _), (_, crate::types::TypeData::AlwaysTruthy)) => {
                 // `Truthiness::Ambiguous` may include `AlwaysTrue` as a subset, so it's not guaranteed to be disjoint.
                 // Thus, they are only disjoint if `ty.bool() == AlwaysFalse`.
                 ConstraintSet::from_bool(self.constraints, ty.bool(db).is_always_false())
             }
-            (Type::AlwaysFalsy, ty) | (ty, Type::AlwaysFalsy) => {
+            ((_, crate::types::TypeData::AlwaysFalsy), (ty, _))
+            | ((ty, _), (_, crate::types::TypeData::AlwaysFalsy)) => {
                 // Similarly, they are only disjoint if `ty.bool() == AlwaysTrue`.
                 ConstraintSet::from_bool(self.constraints, ty.bool(db).is_always_true())
             }
 
-            (Type::ProtocolInstance(left_proto), Type::ProtocolInstance(right_proto)) => self
-                .with_recursion_guard(left, right, || {
-                    self.check_protocol_instance_pair(db, left_proto, right_proto)
-                }),
+            (
+                (_, crate::types::TypeData::ProtocolInstance(left_proto)),
+                (_, crate::types::TypeData::ProtocolInstance(right_proto)),
+            ) => self.with_recursion_guard(left, right, || {
+                self.check_protocol_instance_pair(db, left_proto, right_proto)
+            }),
 
-            (Type::ProtocolInstance(protocol), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::ProtocolInstance(protocol)) => self
-                .with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
-                        db,
-                        protocol,
-                        special_form.instance_fallback(db),
-                    )
-                }),
+            (
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+            )
+            | (
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+            ) => self.with_recursion_guard(left, right, || {
+                self.any_protocol_members_absent_or_disjoint(
+                    db,
+                    protocol,
+                    special_form.instance_fallback(db),
+                )
+            }),
 
-            (Type::ProtocolInstance(protocol), Type::KnownInstance(known_instance))
-            | (Type::KnownInstance(known_instance), Type::ProtocolInstance(protocol)) => self
-                .with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
-                        db,
-                        protocol,
-                        known_instance.instance_fallback(db),
-                    )
-                }),
+            (
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+                (_, crate::types::TypeData::KnownInstance(known_instance)),
+            )
+            | (
+                (_, crate::types::TypeData::KnownInstance(known_instance)),
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+            ) => self.with_recursion_guard(left, right, || {
+                self.any_protocol_members_absent_or_disjoint(
+                    db,
+                    protocol,
+                    known_instance.instance_fallback(db),
+                )
+            }),
 
             // The absence of a protocol member on one of these types guarantees
             // that the type will be disjoint from the protocol,
@@ -2774,20 +3065,26 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             //     print(Foo.X)
             // ```
             (
-                ty @ (Type::LiteralValue(..)
-                | Type::ClassLiteral(..)
-                | Type::FunctionLiteral(..)
-                | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)),
-                Type::ProtocolInstance(protocol),
+                (
+                    ty,
+                    crate::types::TypeData::LiteralValue(..)
+                    | crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::ModuleLiteral(..)
+                    | crate::types::TypeData::GenericAlias(..),
+                ),
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
             )
             | (
-                Type::ProtocolInstance(protocol),
-                ty @ (Type::LiteralValue(..)
-                | Type::ClassLiteral(..)
-                | Type::FunctionLiteral(..)
-                | Type::ModuleLiteral(..)
-                | Type::GenericAlias(..)),
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+                (
+                    ty,
+                    crate::types::TypeData::LiteralValue(..)
+                    | crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::FunctionLiteral(..)
+                    | crate::types::TypeData::ModuleLiteral(..)
+                    | crate::types::TypeData::GenericAlias(..),
+                ),
             ) => self.with_recursion_guard(left, right, || {
                 self.any_protocol_members_absent_or_disjoint(db, protocol, ty)
             }),
@@ -2795,22 +3092,24 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             // This is the same as the branch above --
             // once guard patterns are stabilised, it could be unified with that branch
             // (<https://github.com/rust-lang/rust/issues/129967>)
-            (Type::ProtocolInstance(protocol), Type::NominalInstance(nominal))
-            | (Type::NominalInstance(nominal), Type::ProtocolInstance(protocol))
-                if nominal.class(db).is_final(db) =>
-            {
-                self.with_recursion_guard(left, right, || {
-                    self.any_protocol_members_absent_or_disjoint(
-                        db,
-                        protocol,
-                        Type::NominalInstance(nominal),
-                    )
-                })
-            }
+            (
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+                (_, crate::types::TypeData::NominalInstance(nominal)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(nominal)),
+                (_, crate::types::TypeData::ProtocolInstance(protocol)),
+            ) if nominal.class(db).is_final(db) => self.with_recursion_guard(left, right, || {
+                self.any_protocol_members_absent_or_disjoint(
+                    db,
+                    protocol,
+                    Type::NominalInstance(nominal),
+                )
+            }),
 
-            (Type::ProtocolInstance(protocol), other)
-            | (other, Type::ProtocolInstance(protocol)) => {
-                self.with_recursion_guard(left, right, || {
+            ((_, crate::types::TypeData::ProtocolInstance(protocol)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::ProtocolInstance(protocol))) => self
+                .with_recursion_guard(left, right, || {
                     protocol
                         .interface(db)
                         .members(db)
@@ -2826,104 +3125,136 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                                 Place::Undefined => self.never(),
                             }
                         })
-                })
-            }
+                }),
 
-            (Type::SubclassOf(subclass_of_ty), _) | (_, Type::SubclassOf(subclass_of_ty))
+            ((_, crate::types::TypeData::SubclassOf(subclass_of_ty)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::SubclassOf(subclass_of_ty)))
                 if subclass_of_ty.is_type_var() =>
             {
                 self.always()
             }
 
-            (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    left_alias.origin(db) != right_alias.origin(db),
+            (
+                (_, crate::types::TypeData::GenericAlias(left_alias)),
+                (_, crate::types::TypeData::GenericAlias(right_alias)),
+            ) => ConstraintSet::from_bool(
+                self.constraints,
+                left_alias.origin(db) != right_alias.origin(db),
+            )
+            .or(db, self.constraints, || {
+                self.check_specialization_pair(
+                    db,
+                    left_alias.specialization(db),
+                    right_alias.specialization(db),
                 )
-                .or(db, self.constraints, || {
-                    self.check_specialization_pair(
-                        db,
-                        left_alias.specialization(db),
-                        right_alias.specialization(db),
-                    )
-                })
-            }
+            }),
 
-            (Type::ClassLiteral(class), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::ClassLiteral(class)) => class
+            (
+                (_, crate::types::TypeData::ClassLiteral(class)),
+                (_, crate::types::TypeData::GenericAlias(alias_b)),
+            )
+            | (
+                (_, crate::types::TypeData::GenericAlias(alias_b)),
+                (_, crate::types::TypeData::ClassLiteral(class)),
+            ) => class
                 .default_specialization(db)
                 .into_generic_alias()
                 .when_none_or(db, self.constraints, |alias| {
                     self.check_type_pair(db, Type::GenericAlias(alias_b), Type::GenericAlias(alias))
                 }),
 
-            (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
-            | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => self.never(),
-                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
-                        self.constraints,
-                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
-                            db,
-                            ClassType::NonGeneric(class_b),
-                            self,
-                        ),
+            (
+                (_, crate::types::TypeData::SubclassOf(subclass_of_ty)),
+                (_, crate::types::TypeData::ClassLiteral(class_b)),
+            )
+            | (
+                (_, crate::types::TypeData::ClassLiteral(class_b)),
+                (_, crate::types::TypeData::SubclassOf(subclass_of_ty)),
+            ) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Dynamic(_) => self.never(),
+                SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
+                    self.constraints,
+                    !class_a.could_exist_in_mro_of_with_disjointness_checker(
+                        db,
+                        ClassType::NonGeneric(class_b),
+                        self,
                     ),
-                    SubclassOfInner::TypeVar(_) => unreachable!(),
-                }
-            }
-
-            (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
-            | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
-                match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) => self.never(),
-                    SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
-                        self.constraints,
-                        !class_a.could_exist_in_mro_of_with_disjointness_checker(
-                            db,
-                            ClassType::Generic(alias_b),
-                            self,
-                        ),
-                    ),
-                    SubclassOfInner::TypeVar(_) => unreachable!(),
-                }
-            }
-
-            (Type::SubclassOf(left), Type::SubclassOf(right)) => {
-                self.check_subclassof_pair(db, left, right)
-            }
-
-            // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
-            // so although the type is dynamic we can still determine disjointedness in some situations
-            (Type::SubclassOf(subclass_of_ty), other)
-            | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) => {
-                    self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
-                }
-                SubclassOfInner::Class(class) => {
-                    self.check_type_pair(db, class.metaclass_instance_type(db), other)
-                }
+                ),
                 SubclassOfInner::TypeVar(_) => unreachable!(),
             },
 
-            (Type::SpecialForm(special_form), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::SpecialForm(special_form)) => {
-                ConstraintSet::from_bool(
+            (
+                (_, crate::types::TypeData::SubclassOf(subclass_of_ty)),
+                (_, crate::types::TypeData::GenericAlias(alias_b)),
+            )
+            | (
+                (_, crate::types::TypeData::GenericAlias(alias_b)),
+                (_, crate::types::TypeData::SubclassOf(subclass_of_ty)),
+            ) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Dynamic(_) => self.never(),
+                SubclassOfInner::Class(class_a) => ConstraintSet::from_bool(
                     self.constraints,
-                    !special_form.is_instance_of(db, instance.class(db)),
-                )
+                    !class_a.could_exist_in_mro_of_with_disjointness_checker(
+                        db,
+                        ClassType::Generic(alias_b),
+                        self,
+                    ),
+                ),
+                SubclassOfInner::TypeVar(_) => unreachable!(),
+            },
+
+            (
+                (_, crate::types::TypeData::SubclassOf(left)),
+                (_, crate::types::TypeData::SubclassOf(right)),
+            ) => self.check_subclassof_pair(db, left, right),
+
+            // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
+            // so although the type is dynamic we can still determine disjointedness in some situations
+            ((_, crate::types::TypeData::SubclassOf(subclass_of_ty)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::SubclassOf(subclass_of_ty))) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Dynamic(_) => {
+                        self.check_type_pair(db, KnownClass::Type.to_instance(db), other)
+                    }
+                    SubclassOfInner::Class(class) => {
+                        self.check_type_pair(db, class.metaclass_instance_type(db), other)
+                    }
+                    SubclassOfInner::TypeVar(_) => unreachable!(),
+                }
             }
 
-            (Type::KnownInstance(known_instance), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::KnownInstance(known_instance)) => {
-                ConstraintSet::from_bool(
-                    self.constraints,
-                    !known_instance.is_instance_of(db, instance.class(db)),
-                )
-            }
+            (
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+            ) => ConstraintSet::from_bool(
+                self.constraints,
+                !special_form.is_instance_of(db, instance.class(db)),
+            ),
 
-            (Type::LiteralValue(literal), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::LiteralValue(literal)) => {
+            (
+                (_, crate::types::TypeData::KnownInstance(known_instance)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::KnownInstance(known_instance)),
+            ) => ConstraintSet::from_bool(
+                self.constraints,
+                !known_instance.is_instance_of(db, instance.class(db)),
+            ),
+
+            (
+                (_, crate::types::TypeData::LiteralValue(literal)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::LiteralValue(literal)),
+            ) => {
                 let positive_relation_holds = match literal.kind() {
                     LiteralValueTypeKind::Int(_) => {
                         KnownClass::Int.when_subclass_of(db, instance.class(db), self.constraints)
@@ -2948,8 +3279,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 positive_relation_holds.negate(db, self.constraints)
             }
 
-            (Type::TypeIs(_) | Type::TypeGuard(_), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::TypeIs(_) | Type::TypeGuard(_)) => {
+            (
+                (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)),
+            ) => {
                 // A boolean literal must be an instance of exactly `bool`
                 // (it cannot be an instance of a `bool` subclass)
                 KnownClass::Bool
@@ -2957,16 +3294,29 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                     .negate(db, self.constraints)
             }
 
-            (Type::TypeIs(_) | Type::TypeGuard(_), _)
-            | (_, Type::TypeIs(_) | Type::TypeGuard(_)) => self.always(),
+            (
+                (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)),
+                (_, _),
+            )
+            | (
+                (_, _),
+                (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)),
+            ) => self.always(),
 
-            (Type::LiteralValue(_), _) | (_, Type::LiteralValue(_)) => self.always(),
+            ((_, crate::types::TypeData::LiteralValue(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::LiteralValue(_))) => self.always(),
 
             // A class-literal type `X` is always disjoint from an instance type `Y`,
             // unless the type expressing "all instances of `Z`" is a subtype of of `Y`,
             // where `Z` is `X`'s metaclass.
-            (Type::ClassLiteral(class), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::ClassLiteral(class)) => class
+            (
+                (_, crate::types::TypeData::ClassLiteral(class)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::ClassLiteral(class)),
+            ) => class
                 .metaclass_instance_type(db)
                 .when_subtype_of(
                     db,
@@ -2976,8 +3326,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
                 .negate(db, self.constraints),
 
-            (Type::GenericAlias(alias), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::GenericAlias(alias)) => self
+            (
+                (_, crate::types::TypeData::GenericAlias(alias)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::GenericAlias(alias)),
+            ) => self
                 .as_relation_checker(TypeRelation::Subtyping)
                 .check_type_pair(
                     db,
@@ -2986,8 +3342,14 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
                 .negate(db, self.constraints),
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
+            (
+                (_, crate::types::TypeData::FunctionLiteral(..)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::FunctionLiteral(..)),
+            ) => {
                 // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
                 // (it cannot be an instance of a `types.FunctionType` subclass)
                 KnownClass::FunctionType
@@ -2997,7 +3359,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
             // A `BoundMethod` type includes instances of the same method bound to a
             // subtype/subclass of the self type.
-            (Type::BoundMethod(a), Type::BoundMethod(b)) => {
+            (
+                (_, crate::types::TypeData::BoundMethod(a)),
+                (_, crate::types::TypeData::BoundMethod(b)),
+            ) => {
                 if a.function(db).name(db) != b.function(db).name(db) {
                     // We typically ask about `BoundMethod` disjointness when we're looking at a
                     // method call on an intersection type like `A & B`. In that case, the same
@@ -3047,28 +3412,47 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }
             }
 
-            (Type::BoundMethod(_), other) | (other, Type::BoundMethod(_)) => {
+            ((_, crate::types::TypeData::BoundMethod(_)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::BoundMethod(_))) => {
                 self.check_type_pair(db, KnownClass::MethodType.to_instance(db), other)
             }
 
-            (Type::KnownBoundMethod(method), other) | (other, Type::KnownBoundMethod(method)) => {
+            ((_, crate::types::TypeData::KnownBoundMethod(method)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::KnownBoundMethod(method))) => {
                 self.check_type_pair(db, method.class().to_instance(db), other)
             }
 
-            (Type::WrapperDescriptor(_), other) | (other, Type::WrapperDescriptor(_)) => {
+            ((_, crate::types::TypeData::WrapperDescriptor(_)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::WrapperDescriptor(_))) => {
                 self.check_type_pair(db, KnownClass::WrapperDescriptorType.to_instance(db), other)
             }
 
-            (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
-            | (Type::Callable(_), Type::FunctionLiteral(_)) => {
+            (
+                (
+                    _,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::FunctionLiteral(_),
+                ),
+                (_, crate::types::TypeData::Callable(_)),
+            )
+            | (
+                (_, crate::types::TypeData::Callable(_)),
+                (_, crate::types::TypeData::FunctionLiteral(_)),
+            ) => {
                 // No two callable types are ever disjoint because
                 // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
                 // callable types.
                 self.never()
             }
 
-            (Type::Callable(_), Type::SpecialForm(special_form))
-            | (Type::SpecialForm(special_form), Type::Callable(_)) => {
+            (
+                (_, crate::types::TypeData::Callable(_)),
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+            )
+            | (
+                (_, crate::types::TypeData::SpecialForm(special_form)),
+                (_, crate::types::TypeData::Callable(_)),
+            ) => {
                 // A callable type is disjoint from special form types, except for special forms
                 // that are callable (like TypedDict and collection constructors).
                 // Most special forms are type constructors/annotations (like `typing.Literal`,
@@ -3077,12 +3461,22 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             }
 
             (
-                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-                Type::NominalInstance(nominal),
+                (
+                    _,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_),
+                ),
+                (_, crate::types::TypeData::NominalInstance(nominal)),
             )
             | (
-                Type::NominalInstance(nominal),
-                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                (_, crate::types::TypeData::NominalInstance(nominal)),
+                (
+                    _,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_),
+                ),
             ) if nominal.class(db).is_final(db) => Type::NominalInstance(nominal)
                 .member_lookup_with_policy(
                     db,
@@ -3098,19 +3492,35 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 }),
 
             (
-                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
-                _,
+                (
+                    _,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_),
+                ),
+                (_, _),
             )
             | (
-                _,
-                Type::Callable(_) | Type::DataclassDecorator(_) | Type::DataclassTransformer(_),
+                (_, _),
+                (
+                    _,
+                    crate::types::TypeData::Callable(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_),
+                ),
             ) => {
                 // TODO: Implement disjointness for general callable type with other types
                 self.never()
             }
 
-            (Type::ModuleLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::ModuleLiteral(..)) => {
+            (
+                (_, crate::types::TypeData::ModuleLiteral(..)),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+            )
+            | (
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (_, crate::types::TypeData::ModuleLiteral(..)),
+            ) => {
                 // Modules *can* actually be instances of `ModuleType` subclasses
                 self.check_type_pair(
                     db,
@@ -3119,47 +3529,59 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 )
             }
 
-            (Type::NominalInstance(left_i), Type::NominalInstance(right_i)) => self
-                .with_recursion_guard(left, right, || {
-                    self.check_nominal_instance_pair(db, left_i, right_i)
-                }),
+            (
+                (_, crate::types::TypeData::NominalInstance(left_i)),
+                (_, crate::types::TypeData::NominalInstance(right_i)),
+            ) => self.with_recursion_guard(left, right, || {
+                self.check_nominal_instance_pair(db, left_i, right_i)
+            }),
 
-            (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
-                self.check_newtype_pair(db, left, right)
-            }
-            (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
+            (
+                (_, crate::types::TypeData::NewTypeInstance(left)),
+                (_, crate::types::TypeData::NewTypeInstance(right)),
+            ) => self.check_newtype_pair(db, left, right),
+            ((_, crate::types::TypeData::NewTypeInstance(newtype)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::NewTypeInstance(newtype))) => {
                 self.check_type_pair(db, newtype.concrete_base_type(db), other)
             }
 
-            (Type::PropertyInstance(property), other)
-            | (other, Type::PropertyInstance(property)) => {
+            ((_, crate::types::TypeData::PropertyInstance(property)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::PropertyInstance(property))) => {
                 self.check_type_pair(db, property.instance_fallback(db), other)
             }
 
-            (Type::BoundSuper(left), Type::BoundSuper(right)) => self
+            (
+                (_, crate::types::TypeData::BoundSuper(left)),
+                (_, crate::types::TypeData::BoundSuper(right)),
+            ) => self
                 .as_equivalence_checker()
                 .check_bound_super_pair(db, left, right)
                 .negate(db, self.constraints),
 
-            (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
+            ((_, crate::types::TypeData::BoundSuper(_)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::BoundSuper(_))) => {
                 self.check_type_pair(db, KnownClass::Super.to_instance(db), other)
             }
 
-            (Type::TypeForm(_), _) | (_, Type::TypeForm(_)) => self.never(),
+            ((_, crate::types::TypeData::TypeForm(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::TypeForm(_))) => self.never(),
 
-            (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => self.always(),
+            ((_, crate::types::TypeData::GenericAlias(_)), (_, _))
+            | ((_, _), (_, crate::types::TypeData::GenericAlias(_))) => self.always(),
 
-            (Type::TypedDict(left_td), Type::TypedDict(right_td)) => {
-                self.with_recursion_guard(left, right, || {
-                    self.check_typeddict_pair(db, left_td, right_td)
-                })
-            }
+            (
+                (_, crate::types::TypeData::TypedDict(left_td)),
+                (_, crate::types::TypeData::TypedDict(right_td)),
+            ) => self.with_recursion_guard(left, right, || {
+                self.check_typeddict_pair(db, left_td, right_td)
+            }),
 
             // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
             // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
             // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
             // approximation, and some false negatives are acceptable.
-            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
+            ((_, crate::types::TypeData::TypedDict(_)), (other, _))
+            | ((other, _), (_, crate::types::TypeData::TypedDict(_))) => {
                 let dict_str_any = KnownClass::Dict
                     .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
 

@@ -134,14 +134,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
             let right_ty = self.infer_expression(right, operand_tcx(right));
-            if let Type::TypedDict(typed_dict) = right_ty
-                && let Some(ty) = self.try_typed_dict_pep_584_dunder(
-                    left,
-                    typed_dict.to_partial(self.db()),
-                    typed_dict,
-                    "__ror__",
-                )
-            {
+            if let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
+                let __ty_view_value = right_ty;
+                (__ty_view_value, __ty_view_value.data())
+            }) && let Some(ty) = self.try_typed_dict_pep_584_dunder(
+                left,
+                typed_dict.to_partial(self.db()),
+                typed_dict,
+                "__ror__",
+            ) {
                 return BinaryExpressionOperandTypes::TypedDictResult(ty);
             }
 
@@ -155,7 +156,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let left_ty = self.infer_expression(left, operand_tcx(left));
         if op == ast::Operator::BitOr
-            && let Type::TypedDict(typed_dict) = left_ty
+            && let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
+                let __ty_view_value = left_ty;
+                (__ty_view_value, __ty_view_value.data())
+            })
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
@@ -216,7 +220,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        let Type::TypedDict(typed_dict) = target_type else {
+        let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
+            let __ty_view_value = target_type;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return None;
         };
 
@@ -320,85 +327,140 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
 
-        match (left_ty, right_ty, op) {
-            (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    *lhs_element,
-                    rhs,
-                    op,
-                    visitor,
-                )
+        match (
+            ({
+                let __ty_view_value = left_ty;
+                (__ty_view_value, __ty_view_value.data())
             }),
-            (lhs, Type::Union(rhs_union), _) => rhs_union.try_map(db, |rhs_element| {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    *rhs_element,
-                    op,
-                    visitor,
-                )
+            ({
+                let __ty_view_value = right_ty;
+                (__ty_view_value, __ty_view_value.data())
             }),
+            op,
+        ) {
+            ((_, crate::types::TypeData::Union(lhs_union)), (rhs, _), _) => {
+                lhs_union.try_map(db, |lhs_element| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        *lhs_element,
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                })
+            }
+            ((lhs, _), (_, crate::types::TypeData::Union(rhs_union)), _) => {
+                rhs_union.try_map(db, |rhs_element| {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        *rhs_element,
+                        op,
+                        visitor,
+                    )
+                })
+            }
 
-            (Type::TypeAlias(alias), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    alias.value_type(db),
-                    rhs,
-                    op,
-                    visitor,
-                )
-            }),
+            ((_, crate::types::TypeData::TypeAlias(alias)), (rhs, _), _) => {
+                visitor.visit((left_ty, op, right_ty), || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        alias.value_type(db),
+                        rhs,
+                        op,
+                        visitor,
+                    )
+                })
+            }
 
-            (lhs, Type::TypeAlias(alias), _) => visitor.visit((left_ty, op, right_ty), || {
-                self.infer_binary_expression_type_impl(
-                    node,
-                    emitted_division_by_zero_diagnostic,
-                    lhs,
-                    alias.value_type(db),
-                    op,
-                    visitor,
-                )
-            }),
+            ((lhs, _), (_, crate::types::TypeData::TypeAlias(alias)), _) => {
+                visitor.visit((left_ty, op, right_ty), || {
+                    self.infer_binary_expression_type_impl(
+                        node,
+                        emitted_division_by_zero_diagnostic,
+                        lhs,
+                        alias.value_type(db),
+                        op,
+                        visitor,
+                    )
+                })
+            }
 
-            (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
-                if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
-            {
+            (
+                (_, crate::types::TypeData::TypedDict(left_typed_dict)),
+                (rhs, _),
+                ast::Operator::BitOr,
+            ) if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) => {
                 Some(Type::TypedDict(left_typed_dict))
             }
 
-            (lhs, Type::TypedDict(right_typed_dict), ast::Operator::BitOr)
-                if lhs.is_assignable_to(db, Type::TypedDict(right_typed_dict)) =>
-            {
+            (
+                (lhs, _),
+                (_, crate::types::TypeData::TypedDict(right_typed_dict)),
+                ast::Operator::BitOr,
+            ) if lhs.is_assignable_to(db, Type::TypedDict(right_typed_dict)) => {
                 Some(Type::TypedDict(right_typed_dict))
             }
 
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
-            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
+            ((div, crate::types::TypeData::Divergent(_)), (_, _), _)
+            | ((_, _), (div, crate::types::TypeData::Divergent(_)), _) => Some(div),
 
-            (unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::AmbiguousOverload), _) => Some(unknown),
+            (
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::AmbiguousOverload)),
+                (_, _),
+                _,
+            )
+            | (
+                (_, _),
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::AmbiguousOverload)),
+                _,
+            ) => Some(unknown),
 
-            (any @ Type::Dynamic(DynamicType::Any), _, _)
-            | (_, any @ Type::Dynamic(DynamicType::Any), _) => Some(any),
+            ((any, crate::types::TypeData::Dynamic(DynamicType::Any)), (_, _), _)
+            | ((_, _), (any, crate::types::TypeData::Dynamic(DynamicType::Any)), _) => Some(any),
 
-            (unknown @ Type::Dynamic(DynamicType::Unknown), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::Unknown), _) => Some(unknown),
-
-            (unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::InvalidConcatenateUnknown), _) => {
+            ((unknown, crate::types::TypeData::Dynamic(DynamicType::Unknown)), (_, _), _)
+            | ((_, _), (unknown, crate::types::TypeData::Dynamic(DynamicType::Unknown)), _) => {
                 Some(unknown)
             }
 
-            (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
-            | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+            (
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::InvalidConcatenateUnknown)),
+                (_, _),
+                _,
+            )
+            | (
+                (_, _),
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::InvalidConcatenateUnknown)),
+                _,
+            ) => Some(unknown),
 
-            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
-            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
+            (
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::UnknownGeneric(_))),
+                (_, _),
+                _,
+            )
+            | (
+                (_, _),
+                (unknown, crate::types::TypeData::Dynamic(DynamicType::UnknownGeneric(_))),
+                _,
+            ) => Some(unknown),
+
+            (
+                (typevar, crate::types::TypeData::Dynamic(DynamicType::UnspecializedTypeVar)),
+                (_, _),
+                _,
+            )
+            | (
+                (_, _),
+                (typevar, crate::types::TypeData::Dynamic(DynamicType::UnspecializedTypeVar)),
+                _,
+            ) => Some(typevar),
 
             // When both operands are the same constrained TypeVar (e.g., `T: (int, str)`),
             // we check if the operation is valid for each constraint paired with itself.
@@ -412,9 +474,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             //
             // TODO: We expect to replace this with more general support for handling constrained TypeVars
             // in arbitrary method/function calls.
-            (Type::TypeVar(left_tvar), Type::TypeVar(right_tvar), _)
-                if left_tvar.identity(db) == right_tvar.identity(db) =>
-            {
+            (
+                (_, crate::types::TypeData::TypeVar(left_tvar)),
+                (_, crate::types::TypeData::TypeVar(right_tvar)),
+                _,
+            ) if left_tvar.identity(db) == right_tvar.identity(db) => {
                 match left_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
@@ -444,7 +508,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             //
             // TODO: We expect to replace this with more general support once we migrate to the new
             // solver.
-            (Type::TypeVar(left_tvar), rhs, _) if !rhs.is_type_var() => {
+            ((_, crate::types::TypeData::TypeVar(left_tvar)), (rhs, _), _)
+                if !rhs.is_type_var() =>
+            {
                 match left_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
@@ -470,7 +536,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // When the right operand is a constrained TypeVar and the left operand is not a TypeVar,
             // we check if each constraint supports the operation with the left operand.
-            (lhs, Type::TypeVar(right_tvar), _) if !lhs.is_type_var() => {
+            ((lhs, _), (_, crate::types::TypeData::TypeVar(right_tvar)), _)
+                if !lhs.is_type_var() =>
+            {
                 match right_tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         Self::map_constrained_typevar_constraints(
@@ -500,7 +568,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // get the same `int | float` and `int | float | complex` special treatment that the
             // positional arguments get. In those cases we need to explicitly delegate to the base
             // type, so that it hits the `Type::Union` branches above.
-            (Type::NewTypeInstance(newtype), rhs, _) => {
+            ((_, crate::types::TypeData::NewTypeInstance(newtype)), (rhs, _), _) => {
                 Type::try_call_bin_op_return_type(db, left_ty, op, right_ty).or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
@@ -512,7 +580,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 })
             }
-            (lhs, Type::NewTypeInstance(newtype), _) => {
+            ((lhs, _), (_, crate::types::TypeData::NewTypeInstance(newtype)), _) => {
                 Type::try_call_bin_op_return_type(db, left_ty, op, right_ty).or_else(|| {
                     self.infer_binary_expression_type_impl(
                         node,
@@ -526,29 +594,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             (
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
+                (
+                    todo,
+                    crate::types::TypeData::Dynamic(
+                        DynamicType::Todo(_)
+                        | DynamicType::TodoUnpack
+                        | DynamicType::TodoStarredExpression
+                        | DynamicType::TodoTypeVarTuple,
+                    ),
                 ),
-                _,
+                (_, _),
                 _,
             )
             | (
-                _,
-                todo @ Type::Dynamic(
-                    DynamicType::Todo(_)
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoTypeVarTuple,
+                (_, _),
+                (
+                    todo,
+                    crate::types::TypeData::Dynamic(
+                        DynamicType::Todo(_)
+                        | DynamicType::TodoUnpack
+                        | DynamicType::TodoStarredExpression
+                        | DynamicType::TodoTypeVarTuple,
+                    ),
                 ),
                 _,
             ) => Some(todo),
 
-            (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
+            ((_, crate::types::TypeData::Never), (_, _), _)
+            | ((_, _), (_, crate::types::TypeData::Never), _) => Some(Type::Never),
 
-            (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
+            (
+                (_, crate::types::TypeData::LiteralValue(left)),
+                (_, crate::types::TypeData::LiteralValue(right)),
+                _,
+            ) => {
                 let recursively_defined = if left.recursively_defined().is_yes()
                     || right.recursively_defined().is_yes()
                 {
@@ -835,17 +914,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 };
 
-                result.map(|result| match result {
-                    Type::LiteralValue(literal) => {
-                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
+                result.map(|result| {
+                    match {
+                        let __ty_view_value = result;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, crate::types::TypeData::LiteralValue(literal)) => Type::LiteralValue(
+                            literal.with_recursively_defined(recursively_defined),
+                        ),
+                        (_, _) => result,
                     }
-                    _ => result,
                 })
             }
 
             (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(left))),
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(right))),
                 ast::Operator::BitAnd,
             ) => {
                 let constraints = ConstraintSetBuilder::new();
@@ -860,8 +944,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             (
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(left))),
+                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::ConstraintSet(right))),
                 ast::Operator::BitOr,
             ) => {
                 let constraints = ConstraintSetBuilder::new();
@@ -877,33 +961,39 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
             // PEP 604-style union types using the `|` operator.
             (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SubclassOf(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::SpecialForm(_)
+                    | crate::types::TypeData::KnownInstance(
+                        KnownInstanceType::UnionType(_)
+                        | KnownInstanceType::Literal(_)
+                        | KnownInstanceType::Annotated(_)
+                        | KnownInstanceType::TypeGenericAlias(_)
+                        | KnownInstanceType::Callable(_)
+                        | KnownInstanceType::TypeVar(_)
+                        | KnownInstanceType::TypeAliasType(_)
+                        | KnownInstanceType::NewType(_),
+                    ),
                 ),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Literal(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::TypeGenericAlias(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeVar(_)
-                    | KnownInstanceType::TypeAliasType(_)
-                    | KnownInstanceType::NewType(_),
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SubclassOf(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::SpecialForm(_)
+                    | crate::types::TypeData::KnownInstance(
+                        KnownInstanceType::UnionType(_)
+                        | KnownInstanceType::Literal(_)
+                        | KnownInstanceType::Annotated(_)
+                        | KnownInstanceType::TypeGenericAlias(_)
+                        | KnownInstanceType::Callable(_)
+                        | KnownInstanceType::TypeVar(_)
+                        | KnownInstanceType::TypeAliasType(_)
+                        | KnownInstanceType::NewType(_),
+                    ),
                 ),
                 ast::Operator::BitOr,
             ) => {
@@ -920,21 +1010,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
             (
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
-                Type::NominalInstance(instance),
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SubclassOf(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::KnownInstance(..)
+                    | crate::types::TypeData::SpecialForm(..),
+                ),
+                (_, crate::types::TypeData::NominalInstance(instance)),
                 ast::Operator::BitOr,
             )
             | (
-                Type::NominalInstance(instance),
-                Type::ClassLiteral(..)
-                | Type::SubclassOf(..)
-                | Type::GenericAlias(..)
-                | Type::KnownInstance(..)
-                | Type::SpecialForm(..),
+                (_, crate::types::TypeData::NominalInstance(instance)),
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::SubclassOf(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::KnownInstance(..)
+                    | crate::types::TypeData::SpecialForm(..),
+                ),
                 ast::Operator::BitOr,
             ) if instance.has_known_class(db, KnownClass::NoneType) => {
                 Some(UnionTypeInstance::from_value_expression_types(
@@ -954,13 +1050,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // that custom method as we'd take one of the earlier branches.
             // This seems like it's probably rare enough that it's acceptable, however.
             (
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
-                _,
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::SubclassOf(..),
+                ),
+                (_, _),
                 ast::Operator::BitOr,
             )
             | (
-                _,
-                Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..),
+                (_, _),
+                (
+                    _,
+                    crate::types::TypeData::ClassLiteral(..)
+                    | crate::types::TypeData::GenericAlias(..)
+                    | crate::types::TypeData::SubclassOf(..),
+                ),
                 ast::Operator::BitOr,
             ) => Type::try_call_bin_op_with_policy(
                 db,
@@ -975,60 +1081,66 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // We've handled all of the special cases that we support for literals, so we need to
             // fall back on looking for dunder methods on one of the operand types.
             (
-                Type::FunctionLiteral(_)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::KnownBoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::Intersection(_)
-                | Type::EnumComplement(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::LiteralValue(_)
-                | Type::BoundSuper(_)
-                | Type::TypeVar(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_),
-                Type::FunctionLiteral(_)
-                | Type::Callable(..)
-                | Type::BoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::KnownBoundMethod(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::ModuleLiteral(_)
-                | Type::ClassLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::SubclassOf(_)
-                | Type::NominalInstance(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::Intersection(_)
-                | Type::EnumComplement(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::LiteralValue(_)
-                | Type::BoundSuper(_)
-                | Type::TypeVar(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_),
+                (
+                    _,
+                    crate::types::TypeData::FunctionLiteral(_)
+                    | crate::types::TypeData::Callable(..)
+                    | crate::types::TypeData::BoundMethod(_)
+                    | crate::types::TypeData::WrapperDescriptor(_)
+                    | crate::types::TypeData::KnownBoundMethod(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_)
+                    | crate::types::TypeData::ModuleLiteral(_)
+                    | crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::GenericAlias(_)
+                    | crate::types::TypeData::SubclassOf(_)
+                    | crate::types::TypeData::NominalInstance(_)
+                    | crate::types::TypeData::ProtocolInstance(_)
+                    | crate::types::TypeData::SpecialForm(_)
+                    | crate::types::TypeData::KnownInstance(_)
+                    | crate::types::TypeData::PropertyInstance(_)
+                    | crate::types::TypeData::Intersection(_)
+                    | crate::types::TypeData::EnumComplement(_)
+                    | crate::types::TypeData::AlwaysTruthy
+                    | crate::types::TypeData::AlwaysFalsy
+                    | crate::types::TypeData::LiteralValue(_)
+                    | crate::types::TypeData::BoundSuper(_)
+                    | crate::types::TypeData::TypeVar(_)
+                    | crate::types::TypeData::TypeIs(_)
+                    | crate::types::TypeData::TypeGuard(_)
+                    | crate::types::TypeData::TypeForm(_)
+                    | crate::types::TypeData::TypedDict(_),
+                ),
+                (
+                    _,
+                    crate::types::TypeData::FunctionLiteral(_)
+                    | crate::types::TypeData::Callable(..)
+                    | crate::types::TypeData::BoundMethod(_)
+                    | crate::types::TypeData::WrapperDescriptor(_)
+                    | crate::types::TypeData::KnownBoundMethod(_)
+                    | crate::types::TypeData::DataclassDecorator(_)
+                    | crate::types::TypeData::DataclassTransformer(_)
+                    | crate::types::TypeData::ModuleLiteral(_)
+                    | crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::GenericAlias(_)
+                    | crate::types::TypeData::SubclassOf(_)
+                    | crate::types::TypeData::NominalInstance(_)
+                    | crate::types::TypeData::ProtocolInstance(_)
+                    | crate::types::TypeData::SpecialForm(_)
+                    | crate::types::TypeData::KnownInstance(_)
+                    | crate::types::TypeData::PropertyInstance(_)
+                    | crate::types::TypeData::Intersection(_)
+                    | crate::types::TypeData::EnumComplement(_)
+                    | crate::types::TypeData::AlwaysTruthy
+                    | crate::types::TypeData::AlwaysFalsy
+                    | crate::types::TypeData::LiteralValue(_)
+                    | crate::types::TypeData::BoundSuper(_)
+                    | crate::types::TypeData::TypeVar(_)
+                    | crate::types::TypeData::TypeIs(_)
+                    | crate::types::TypeData::TypeGuard(_)
+                    | crate::types::TypeData::TypeForm(_)
+                    | crate::types::TypeData::TypedDict(_),
+                ),
                 op,
             ) => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
         }
@@ -1044,18 +1156,21 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         left: Type<'db>,
     ) -> bool {
         let db = self.db();
-        match left {
-            Type::LiteralValue(literal)
+        match {
+            let __ty_view_value = left;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::LiteralValue(literal))
                 if matches!(
                     literal.kind(),
                     LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
                 ) => {}
-            Type::NominalInstance(instance)
+            (_, crate::types::TypeData::NominalInstance(instance))
                 if matches!(
                     instance.known_class(db),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
-            _ => return false,
+            (_, _) => return false,
         }
 
         let (op, by_zero) = match op {

@@ -551,8 +551,11 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
                 let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
+                let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) =
+                    ({
+                        let __ty_view_value = declared.inner_type();
+                        (__ty_view_value, __ty_view_value.data())
+                    })
                 else {
                     return None;
                 };
@@ -561,8 +564,11 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(node) => {
                 let definition = index.expect_single_definition(node);
                 let declared = inferred_declaration(db, definition).declared()?;
-                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                    declared.inner_type()
+                let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) =
+                    ({
+                        let __ty_view_value = declared.inner_type();
+                        (__ty_view_value, __ty_view_value.data())
+                    })
                 else {
                     return None;
                 };
@@ -1633,7 +1639,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // return `self.always()` from that branch, as that leads to union
             // simplification, which means that we lose track of type variables
             // without recording the constraints under which the relation holds.
-            if matches!(target, Type::TypeVar(_)) || matches!(source, Type::TypeVar(_)) {
+            if matches!(
+                {
+                    let __ty_view_value = target;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (_, crate::types::TypeData::TypeVar(_))
+            ) || matches!(
+                {
+                    let __ty_view_value = source;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (_, crate::types::TypeData::TypeVar(_))
+            ) {
                 return self.always();
             }
 
@@ -2026,22 +2044,27 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) -> bool {
-        match ty {
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
             // A bare `T = U` edge only replaces one typevar with another; it does not wrap the
             // replacement in additional structure and therefore cannot grow during repeated
             // specialization.
-            Type::TypeVar(_) => false,
+            (_, crate::types::TypeData::TypeVar(_)) => false,
             // Unions and intersections are flattened and deduplicated as they are constructed.
             // A cyclic reference directly inside one can add elements but cannot create
             // unbounded nesting. Keep looking inside its elements for a genuinely embedded edge.
-            Type::Union(union) => union.elements(self.db).iter().any(|element| {
-                self.has_expanding_cycle(generic_context, types, identity, *element)
-            }),
-            Type::Intersection(intersection) => intersection
+            (_, crate::types::TypeData::Union(union)) => {
+                union.elements(self.db).iter().any(|element| {
+                    self.has_expanding_cycle(generic_context, types, identity, *element)
+                })
+            }
+            (_, crate::types::TypeData::Intersection(intersection)) => intersection
                 .iter_positive(self.db)
                 .chain(intersection.iter_negative(self.db))
                 .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            _ => any_over_type(self.db, ty, false, |nested| {
+            (_, _) => any_over_type(self.db, ty, false, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(self.db);
                     dependency != identity
@@ -2133,8 +2156,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        match ty {
-            Type::Union(union)
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Union(union))
                 if union.elements(self.db).iter().any(|element| {
                     !self.is_inferable_typevar_artifact(generic_context, *element)
                 }) =>
@@ -2143,7 +2169,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     !self.is_inferable_typevar_artifact(generic_context, *element)
                 })
             }
-            _ => ty,
+            (_, _) => ty,
         }
     }
 
@@ -2152,8 +2178,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        match ty {
-            Type::Intersection(intersection)
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Intersection(intersection))
                 if intersection.iter_positive(self.db).any(|element| {
                     !self.is_inferable_typevar_artifact(generic_context, element)
                 }) =>
@@ -2166,7 +2195,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 })
             }
-            _ => ty,
+            (_, _) => ty,
         }
     }
 
@@ -2322,12 +2351,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return *result;
             }
 
-            let result = match ty {
-                Type::TypedDict(_) => {
+            let result = match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::TypedDict(_)) => {
                     typed_dicts.insert(ty);
                     true
                 }
-                Type::Union(union) => {
+                (_, crate::types::TypeData::Union(union)) => {
                     if !resolving.insert(ty) {
                         return false;
                     }
@@ -2337,7 +2369,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
-                _ => false,
+                (_, _) => false,
             };
             completed.insert(ty, result);
             result
@@ -2471,14 +2503,26 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
         let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
-        match (formal, actual) {
+        match (
+            ({
+                let __ty_view_value = formal;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+            ({
+                let __ty_view_value = actual;
+                (__ty_view_value, __ty_view_value.data())
+            }),
+        ) {
             // Expand PEP 695 type aliases in the formal type.
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
-            (Type::TypeAlias(alias), _) => {
+            ((_, crate::types::TypeData::TypeAlias(alias)), (_, _)) => {
                 return self.infer_map_impl(alias.value_type(self.db), actual, polarity, seen);
             }
 
-            (Type::TypeForm(formal_typeform), Type::TypeForm(actual_typeform)) => {
+            (
+                (_, crate::types::TypeData::TypeForm(formal_typeform)),
+                (_, crate::types::TypeData::TypeForm(actual_typeform)),
+            ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 return self.infer_map_impl(
                     formal_typeform.type_argument(self.db),
@@ -2489,8 +2533,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                Type::TypeForm(formal_typeform),
-                actual @ (Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)),
+                (_, crate::types::TypeData::TypeForm(formal_typeform)),
+                (
+                    actual,
+                    crate::types::TypeData::ClassLiteral(_)
+                    | crate::types::TypeData::GenericAlias(_)
+                    | crate::types::TypeData::SubclassOf(_),
+                ),
             ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 if let Some(actual_instance) = actual.to_instance(self.db) {
@@ -2503,9 +2552,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::TypeForm(formal_typeform), Type::KnownInstance(actual_instance))
-                if actual_instance.is_type_form_value() =>
-            {
+            (
+                (_, crate::types::TypeData::TypeForm(formal_typeform)),
+                (_, crate::types::TypeData::KnownInstance(actual_instance)),
+            ) if actual_instance.is_type_form_value() => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 if let Some(actual_argument) = actual_instance.type_form_argument(self.db) {
                     return self.infer_map_impl(
@@ -2517,7 +2567,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::TypeForm(formal_typeform), Type::SpecialForm(actual_form)) => {
+            (
+                (_, crate::types::TypeData::TypeForm(formal_typeform)),
+                (_, crate::types::TypeData::SpecialForm(actual_form)),
+            ) => {
                 let variance = TypeVarVariance::Covariant.compose(polarity);
                 if let Some(actual_argument) = actual_form.type_form_argument(self.db) {
                     return self.infer_map_impl(
@@ -2535,7 +2588,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             //
             // For now, we punt on fully handling multiple typevar elements. Instead, we handle two
             // common cases specially:
-            (Type::Union(formal_union), Type::Union(actual_union)) => {
+            (
+                (_, crate::types::TypeData::Union(formal_union)),
+                (_, crate::types::TypeData::Union(actual_union)),
+            ) => {
                 // First, if both formal and actual are unions, and precisely one formal union
                 // element _is_ a typevar (not _contains_ a typevar), then we remove any actual
                 // union elements that are a subtype of the formal (as a whole), and map the formal
@@ -2560,7 +2616,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     .elements(self.db)
                     .iter()
                     .filter(|ty| ty.has_typevar(self.db));
-                let Ok(Type::TypeVar(formal_bound_typevar)) = types_have_typevars.exactly_one()
+                let Ok(formal_typevar) = types_have_typevars.exactly_one() else {
+                    return Ok(());
+                };
+                let crate::types::TypeData::TypeVar(formal_bound_typevar) = formal_typevar.data()
                 else {
                     return Ok(());
                 };
@@ -2576,17 +2635,19 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity);
+                self.add_type_mapping(formal_bound_typevar, remaining_actual, polarity);
             }
-            (Type::Union(union_formal), _) => {
+            ((_, crate::types::TypeData::Union(union_formal)), (_, _)) => {
                 // If the formal is a union and the actual is a bare inferable TypeVar in an
                 // invariant position, record the whole union as the mapping. Invariant matching is
                 // equality-like; probing individual union elements below can leave spurious
                 // partial mappings from non-matching elements. For example, while comparing
                 // `ClassSelector[T]` with `ClassSelector[CT | None]`, descending into `None`
                 // would map `T` to `None` before `CT` is solved from another argument.
-                if let Type::TypeVar(actual_typevar) = actual
-                    && actual_typevar.is_inferable(self.db, self.inferable)
+                if let (_, crate::types::TypeData::TypeVar(actual_typevar)) = ({
+                    let __ty_view_value = actual;
+                    (__ty_view_value, __ty_view_value.data())
+                }) && actual_typevar.is_inferable(self.db, self.inferable)
                     && matches!(polarity, TypeVarVariance::Invariant)
                 {
                     self.add_type_mapping(actual_typevar, formal, polarity);
@@ -2661,7 +2722,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
+            ((_, crate::types::TypeData::TypeVar(bound_typevar)), (ty, _))
+            | ((ty, _), (_, crate::types::TypeData::TypeVar(bound_typevar)))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
@@ -2712,9 +2774,11 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // that is a strict subtype (e.g. `bool` vs `int`) would allow
                         // the callee to return a widened type that violates the caller's
                         // constraint.
-                        if let Type::TypeVar(actual_typevar) = ty
-                            && let Some(actual_constraints) =
-                                actual_typevar.typevar(self.db).constraints(self.db)
+                        if let (_, crate::types::TypeData::TypeVar(actual_typevar)) = ({
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        }) && let Some(actual_constraints) =
+                            actual_typevar.typevar(self.db).constraints(self.db)
                         {
                             let all_satisfied =
                                 actual_constraints.iter().all(|actual_constraint| {
@@ -2765,7 +2829,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::Intersection(formal_intersection), _) => {
+            ((_, crate::types::TypeData::Intersection(formal_intersection)), (_, _)) => {
                 // The actual type must be assignable to every (positive) element of the
                 // formal intersection, so we must infer type mappings for each of them. (The
                 // actual type must also be disjoint from every negative element of the
@@ -2774,7 +2838,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     self.infer_map_impl(positive, actual, polarity, seen)?;
                 }
             }
-            (_, Type::Intersection(actual_intersection)) => {
+            ((_, _), (_, crate::types::TypeData::Intersection(actual_intersection))) => {
                 // Try to infer type mappings by checking against each intersection element. This
                 // is the dual of the `union_formal` arm above, and it handles cases like:
                 //
@@ -2816,7 +2880,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (Type::SubclassOf(subclass_of), ty) | (ty, Type::SubclassOf(subclass_of))
+            ((_, crate::types::TypeData::SubclassOf(subclass_of)), (ty, _))
+            | ((ty, _), (_, crate::types::TypeData::SubclassOf(subclass_of)))
                 if subclass_of.is_type_var() =>
             {
                 let formal_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
@@ -2826,8 +2891,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             }
 
             (
-                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                Type::LiteralValue(literal),
+                (
+                    formal,
+                    crate::types::TypeData::NominalInstance(_)
+                    | crate::types::TypeData::ProtocolInstance(_),
+                ),
+                (_, crate::types::TypeData::LiteralValue(literal)),
             ) => {
                 // Retry specialization with the literal's fallback instance so literals can
                 // contribute to generic inference for nominal and protocol formals.
@@ -2835,7 +2904,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return self.infer_map_impl(formal, actual_instance, polarity, seen);
             }
 
-            (formal, Type::ProtocolInstance(actual_protocol)) => {
+            ((formal, _), (_, crate::types::TypeData::ProtocolInstance(actual_protocol))) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
                 // To handle classes that implicitly implement a generic protocol, we
@@ -2851,7 +2920,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
             }
 
-            (formal, Type::NominalInstance(actual_nominal)) => {
+            ((formal, _), (_, crate::types::TypeData::NominalInstance(actual_nominal))) => {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
                     formal.tuple_instance_spec(self.db),
@@ -2880,12 +2949,15 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
 
                 // Extract formal_alias if this is a generic class
-                let formal_alias = match formal {
-                    Type::NominalInstance(formal_nominal) => {
+                let formal_alias = match {
+                    let __ty_view_value = formal;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::NominalInstance(formal_nominal)) => {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
 
-                    Type::ProtocolInstance(_) => {
+                    (_, crate::types::TypeData::ProtocolInstance(_)) => {
                         // TODO: For protocols, we use the new constraint set implementation, which
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
@@ -2904,7 +2976,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     }
 
-                    _ => None,
+                    (_, _) => None,
                 };
 
                 if let Some(formal_alias) = formal_alias {
@@ -2939,7 +3011,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // TODO: in principle this could be a generalized Union-actual arm that maps over the
             // union, but the old solver isn't well-equipped to handle that (due to side effects
             // from even failed matches), so for now we handle this particular case.
-            (formal @ Type::ProtocolInstance(_), actual @ Type::Union(actual_union)) => {
+            (
+                (formal, crate::types::TypeData::ProtocolInstance(_)),
+                (actual, crate::types::TypeData::Union(actual_union)),
+            ) => {
                 let when = self
                     .common_typed_dict_protocol_constraints(formal, actual_union)
                     .unwrap_or_else(|| {
@@ -2954,7 +3029,10 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return Ok(());
             }
 
-            (formal @ Type::ProtocolInstance(_), actual @ Type::TypedDict(_)) => {
+            (
+                (formal, crate::types::TypeData::ProtocolInstance(_)),
+                (actual, crate::types::TypeData::TypedDict(_)),
+            ) => {
                 let when = actual.when_constraint_set_assignable_to_owned(self.db, formal);
                 let when = self.constraints.load(self.db, &when);
                 // For protocol inference via constraint sets, keep unsatisfiable results non-fatal
@@ -2969,7 +3047,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // When the formal type is a protocol with a `__call__` method, infer the specialization
             // from matching the actual type's callable signature against the protocol's `__call__`
             // method signature.
-            (Type::ProtocolInstance(formal_protocol), _) => {
+            ((_, crate::types::TypeData::ProtocolInstance(formal_protocol)), (_, _)) => {
                 let Some(call_method) = formal_protocol.interface(self.db).call_method(self.db)
                 else {
                     return Ok(());
@@ -2989,7 +3067,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 let _ = self.infer_from_callable_signature(formal_signature, &actual_callables);
             }
 
-            (Type::Callable(formal_callable), _) => {
+            ((_, crate::types::TypeData::Callable(formal_callable)), (_, _)) => {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
@@ -3007,7 +3085,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             // This is placed at the end of the match block to avoid expanding the type alias
             // when it can be matched directly against a type variable in the formal type,
             // e.g., `reveal_type(alias)` should reveal the type alias, not its value type.
-            (formal, Type::TypeAlias(alias)) => {
+            ((formal, _), (_, crate::types::TypeData::TypeAlias(alias))) => {
                 return self.infer_map_impl(formal, alias.value_type(self.db), polarity, seen);
             }
 

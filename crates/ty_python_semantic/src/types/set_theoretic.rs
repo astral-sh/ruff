@@ -95,9 +95,15 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db)
-            .iter()
-            .any(|element| matches!(element, Type::TypeAlias(_)))
+        self.elements(db).iter().any(|element| {
+            matches!(
+                {
+                    let __ty_view_value = element;
+                    (__ty_view_value, __ty_view_value.data())
+                },
+                (_, crate::types::TypeData::TypeAlias(_))
+            )
+        })
     }
 
     /// Recursively expands aliases that expose top-level union elements.
@@ -204,7 +210,15 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if &new_ty != ty || matches!(new_ty, Type::TypeAlias(_)) {
+            if &new_ty != ty
+                || matches!(
+                    {
+                        let __ty_view_value = new_ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    },
+                    (_, crate::types::TypeData::TypeAlias(_))
+                )
+            {
                 let mut builder = elements[..i]
                     .iter()
                     .copied()
@@ -961,8 +975,11 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db);
     for &element in positive {
-        match element {
-            Type::TypeVar(tvar) => {
+        match {
+            let __ty_view_value = element;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::TypeVar(tvar)) => {
                 match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         builder = builder.add_positive(bound);
@@ -975,10 +992,10 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                     None => {}
                 }
             }
-            Type::NewTypeInstance(newtype) => {
+            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
                 builder = builder.add_positive(newtype.concrete_base_type(db));
             }
-            _ => builder = builder.add_positive(element),
+            (_, _) => builder = builder.add_positive(element),
         }
     }
 

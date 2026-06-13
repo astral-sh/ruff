@@ -104,15 +104,15 @@ impl<'db> Type<'db> {
             // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
             const MAX_TUPLE_LENGTH: usize = 128;
 
-            match ty {
-                Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
-                Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
+            match { let __ty_view_value = ty; (__ty_view_value, __ty_view_value.data()) }  {
+                (_, crate::types::TypeData::NominalInstance(nominal)) => nominal.tuple_spec(db),
+                (_, crate::types::TypeData::NewTypeInstance(newtype)) => non_async_special_case(db, newtype.concrete_base_type(db)),
+                (_, crate::types::TypeData::GenericAlias(alias)) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
                     ))))
                 }
-                Type::LiteralValue(literal) => match literal.kind() {
+                (_, crate::types::TypeData::LiteralValue(literal)) => match literal.kind() {
                     LiteralValueTypeKind::Bytes(bytes) => {
                         let bytes_literal = bytes.value(db);
                         let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
@@ -145,7 +145,7 @@ impl<'db> Type<'db> {
                     }
                     _ => None
                 }
-                Type::Never => {
+                (_, crate::types::TypeData::Never) => {
                     // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
                     // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
                     // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
@@ -153,16 +153,16 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                Type::TypeAlias(alias) => {
+                (_, crate::types::TypeData::TypeAlias(alias)) => {
                     non_async_special_case(db, alias.value_type(db))
                 }
-                Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
+                (_, crate::types::TypeData::TypeVar(tvar)) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => non_async_special_case(db, constraints.as_type(db)),
                 },
-                Type::Union(union) => {
+                (_, crate::types::TypeData::Union(union)) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
                         let mut elements_iter = elements.iter();
@@ -176,7 +176,7 @@ impl<'db> Type<'db> {
                         None
                     }
                 }
-                Type::Intersection(intersection) => {
+                (_, crate::types::TypeData::Intersection(intersection)) => {
                     // For intersections containing TypeVars with union bounds, we need to
                     // flatten the TypeVars first. This distributes the intersection over
                     // the union and simplifies, e.g.:
@@ -214,44 +214,47 @@ impl<'db> Type<'db> {
                     // Flattening changed the type; recursively iterate the flattened result.
                     flattened.try_iterate(db).ok()
                 }
-                Type::EnumComplement(complement) => {
+                (_, crate::types::TypeData::EnumComplement(complement)) => {
                     non_async_special_case(db, complement.remaining_literal_union(db))
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
-                Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
-                Type::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                (_, crate::types::TypeData::Dynamic(_)) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                (_, crate::types::TypeData::Divergent(_)) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
-                Type::FunctionLiteral(_)
-                | Type::GenericAlias(_)
-                | Type::BoundMethod(_)
-                | Type::KnownBoundMethod(_)
-                | Type::WrapperDescriptor(_)
-                | Type::DataclassDecorator(_)
-                | Type::DataclassTransformer(_)
-                | Type::Callable(_)
-                | Type::ModuleLiteral(_)
+                (_, crate::types::TypeData::FunctionLiteral(_)
+                | crate::types::TypeData::GenericAlias(_)
+                | crate::types::TypeData::BoundMethod(_)
+                | crate::types::TypeData::KnownBoundMethod(_)
+                | crate::types::TypeData::WrapperDescriptor(_)
+                | crate::types::TypeData::DataclassDecorator(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::Callable(_)
+                | crate::types::TypeData::ModuleLiteral(_)
                 // We could infer a precise tuple spec for enum classes with members,
                 // but it's not clear whether that's worth the added complexity:
                 // you'd have to check that `EnumMeta.__iter__` is not overridden for it to be sound
                 // (enums can have `EnumMeta` subclasses as their metaclasses).
-                | Type::ClassLiteral(_)
-                | Type::SubclassOf(_)
-                | Type::ProtocolInstance(_)
-                | Type::SpecialForm(_)
-                | Type::KnownInstance(_)
-                | Type::PropertyInstance(_)
-                | Type::AlwaysTruthy
-                | Type::AlwaysFalsy
-                | Type::BoundSuper(_)
-                | Type::TypeIs(_)
-                | Type::TypeGuard(_)
-                | Type::TypeForm(_)
-                | Type::TypedDict(_) => None
+                | crate::types::TypeData::ClassLiteral(_)
+                | crate::types::TypeData::SubclassOf(_)
+                | crate::types::TypeData::ProtocolInstance(_)
+                | crate::types::TypeData::SpecialForm(_)
+                | crate::types::TypeData::KnownInstance(_)
+                | crate::types::TypeData::PropertyInstance(_)
+                | crate::types::TypeData::AlwaysTruthy
+                | crate::types::TypeData::AlwaysFalsy
+                | crate::types::TypeData::BoundSuper(_)
+                | crate::types::TypeData::TypeIs(_)
+                | crate::types::TypeData::TypeGuard(_)
+                | crate::types::TypeData::TypeForm(_)
+                | crate::types::TypeData::TypedDict(_)) => None
             }
         }
 
         if mode.is_async() {
-            if let Type::Intersection(_) = self {
+            if let (_, crate::types::TypeData::Intersection(_)) = {
+                let __ty_view_value = self;
+                (__ty_view_value, __ty_view_value.data())
+            } {
                 let flattened = self.flatten_typevars(db);
                 if flattened != self {
                     return flattened.try_iterate_with_mode(db, mode);

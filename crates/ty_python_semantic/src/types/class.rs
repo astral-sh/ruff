@@ -1097,12 +1097,17 @@ impl<'db> ClassType<'db> {
             ty: Type<'db>,
             defining_class: ClassType<'db>,
         ) -> Option<AbstractMethodKind> {
-            match ty {
-                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
-                Type::BoundMethod(method) => {
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::FunctionLiteral(function)) => {
+                    function.as_abstract_method(db, defining_class)
+                }
+                (_, crate::types::TypeData::BoundMethod(method)) => {
                     method.function(db).as_abstract_method(db, defining_class)
                 }
-                Type::PropertyInstance(property) => {
+                (_, crate::types::TypeData::PropertyInstance(property)) => {
                     // A property is abstract if any of its accessors is abstract.
                     property
                         .getter(db)
@@ -1118,7 +1123,7 @@ impl<'db> ClassType<'db> {
                             })
                         })
                 }
-                _ => None,
+                (_, _) => None,
             }
         }
 
@@ -1904,10 +1909,8 @@ impl<'db> ClassType<'db> {
             )
             .place;
 
-        if let Place::Defined(DefinedPlace {
-            ty: Type::BoundMethod(metaclass_dunder_call_function),
-            ..
-        }) = metaclass_dunder_call_function_symbol
+        if let Place::Defined(DefinedPlace { ty, .. }) = metaclass_dunder_call_function_symbol
+            && let crate::types::TypeData::BoundMethod(metaclass_dunder_call_function) = ty.data()
         {
             // TODO: this intentionally diverges from step 1 in
             // https://typing.python.org/en/latest/spec/constructors.html#converting-a-constructor-to-callable
@@ -1929,10 +1932,19 @@ impl<'db> ClassType<'db> {
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
-            .and_then(|ty| match ty {
-                Type::FunctionLiteral(function) => Some(function.signature(db)),
-                Type::Callable(callable) => Some(callable.signatures(db)),
-                _ => None,
+            .and_then(|ty| {
+                match {
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::FunctionLiteral(function)) => {
+                        Some(function.signature(db))
+                    }
+                    (_, crate::types::TypeData::Callable(callable)) => {
+                        Some(callable.signatures(db))
+                    }
+                    (_, _) => None,
+                }
             });
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
@@ -1980,12 +1992,15 @@ impl<'db> ClassType<'db> {
         let synthesized_dunder_init_callable = if let Place::Defined(DefinedPlace { ty, .. }) =
             dunder_init_function_symbol
         {
-            let signature = match ty {
-                Type::FunctionLiteral(dunder_init_function) => {
+            let signature = match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, crate::types::TypeData::FunctionLiteral(dunder_init_function)) => {
                     Some(dunder_init_function.signature(db))
                 }
-                Type::Callable(callable) => Some(callable.signatures(db)),
-                _ => None,
+                (_, crate::types::TypeData::Callable(callable)) => Some(callable.signatures(db)),
+                (_, _) => None,
             };
 
             if let Some(signature) = signature {
@@ -2053,10 +2068,8 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(DefinedPlace {
-                    ty: Type::FunctionLiteral(mut new_function),
-                    ..
-                }) = new_function_symbol
+                if let Place::Defined(DefinedPlace { ty, .. }) = new_function_symbol
+                    && let crate::types::TypeData::FunctionLiteral(mut new_function) = ty.data()
                 {
                     if let Some(class_generic_context) = class_generic_context {
                         new_function =
@@ -2791,9 +2804,12 @@ impl SlotsKind {
             return Self::Dynamic;
         }
 
-        match slots_ty {
+        match {
+            let __ty_view_value = slots_ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
             // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => match nominal
+            (_, crate::types::TypeData::NominalInstance(nominal)) => match nominal
                 .tuple_spec(db)
                 .and_then(|spec| spec.len().into_fixed_length())
             {
@@ -2803,9 +2819,11 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
+            (_, crate::types::TypeData::LiteralValue(literal)) if literal.is_string() => {
+                Self::NotEmpty
+            }
 
-            _ => Self::Dynamic,
+            (_, _) => Self::Dynamic,
         }
     }
 }

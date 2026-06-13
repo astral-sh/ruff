@@ -329,7 +329,10 @@ impl<'db> ErrorContext<'db> {
                 )
             }
             Self::TypeNotCompatibleWithProtocol { ty, protocol } => {
-                if let Type::ProtocolInstance(_) = ty {
+                if let (_, crate::types::TypeData::ProtocolInstance(_)) = {
+                    let __ty_view_value = ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     format!(
                         "protocol `{}` is not assignable to protocol `{}`",
                         ty.display(db),

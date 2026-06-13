@@ -176,7 +176,10 @@ impl<'db> Type<'db> {
     /// ```
     ///
     pub(crate) fn promote_tuple_size_in_union(self, db: &'db dyn Db) -> Type<'db> {
-        let Type::Union(union) = self else {
+        let (_, crate::types::TypeData::Union(union)) = ({
+            let __ty_view_value = self;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             return self;
         };
 

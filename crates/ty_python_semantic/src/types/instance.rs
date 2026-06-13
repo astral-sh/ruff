@@ -34,18 +34,19 @@ pub(super) use synthesized_protocol::SynthesizedProtocolType;
 use ty_python_core::definition::Definition;
 
 impl<'db> Type<'db> {
-    pub(crate) const fn object() -> Self {
+    pub(crate) fn object() -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
     }
 
-    pub(crate) const fn is_object(&self) -> bool {
+    pub(crate) fn is_object(&self) -> bool {
         matches!(
-            self,
-            Type::NominalInstance(NominalInstanceType(NominalInstanceInner::Object))
-                | Type::Divergent(DivergentType {
-                    materialization: Some(MaterializationKind::Top),
-                    ..
-                })
+            (self).data(),
+            crate::types::TypeData::NominalInstance(NominalInstanceType(
+                NominalInstanceInner::Object
+            )) | crate::types::TypeData::Divergent(DivergentType {
+                materialization: Some(MaterializationKind::Top),
+                ..
+            })
         )
     }
 
@@ -119,28 +120,30 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
-    pub(crate) const fn sys_version_info() -> Self {
+    pub(crate) fn sys_version_info() -> Self {
         // Keep construction query-free: resolving the backing typeshed class here is on the hot
         // path for projects with many version guards. Resolve it lazily when class behavior is
         // actually needed instead.
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::SysVersionInfo))
     }
 
-    pub(crate) const fn is_nominal_instance(self) -> bool {
-        matches!(self, Type::NominalInstance(_))
+    pub(crate) fn is_nominal_instance(self) -> bool {
+        matches!((self).data(), crate::types::TypeData::NominalInstance(_))
     }
 
-    pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
-        match self {
-            Type::NominalInstance(instance_type) => Some(instance_type),
+    pub(crate) fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
+        match (self).data() {
+            crate::types::TypeData::NominalInstance(instance_type) => Some(instance_type),
             _ => None,
         }
     }
 
     /// Return `true` if `self` is a nominal instance of the given known class.
     pub(crate) fn is_instance_of(self, db: &'db dyn Db, known_class: KnownClass) -> bool {
-        match self {
-            Type::NominalInstance(instance) => instance.class(db).is_known(db, known_class),
+        match (self).data() {
+            crate::types::TypeData::NominalInstance(instance) => {
+                instance.class(db).is_known(db, known_class)
+            }
             _ => false,
         }
     }
@@ -171,7 +174,7 @@ impl<'db> Type<'db> {
 pub struct NominalInstanceType<'db>(
     // Keep this field private, so that the only way of constructing `NominalInstanceType` instances
     // is through the `Type::instance` constructor function.
-    NominalInstanceInner<'db>,
+    pub(super) NominalInstanceInner<'db>,
 );
 
 pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -346,13 +349,13 @@ impl<'db> NominalInstanceType<'db> {
             return None;
         };
 
-        let to_u32 = |ty: &Type<'db>| match ty {
-            Type::LiteralValue(literal) => match literal.kind() {
+        let to_u32 = |ty: &Type<'db>| match (ty).data() {
+            crate::types::TypeData::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
                 LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
                 _ => None,
             },
-            Type::NominalInstance(instance)
+            crate::types::TypeData::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {
                 Some(None)
@@ -526,22 +529,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             return result;
         }
 
-        let structurally_satisfied = if let Type::ProtocolInstance(source_protocol) = ty {
-            self.check_protocol_interface_pair(
-                db,
-                ty,
-                source_protocol.interface(db),
-                protocol.interface(db),
-            )
-        } else {
-            protocol
-                .inner
-                .interface(db)
-                .members(db)
-                .when_all(db, self.constraints, |member| {
-                    self.type_satisfies_protocol_member(db, ty, &member)
-                })
-        };
+        let structurally_satisfied =
+            if let crate::types::TypeData::ProtocolInstance(source_protocol) = (ty).data() {
+                self.check_protocol_interface_pair(
+                    db,
+                    ty,
+                    source_protocol.interface(db),
+                    protocol.interface(db),
+                )
+            } else {
+                protocol
+                    .inner
+                    .interface(db)
+                    .members(db)
+                    .when_all(db, self.constraints, |member| {
+                        self.type_satisfies_protocol_member(db, ty, &member)
+                    })
+            };
         if structurally_satisfied.is_never_satisfied(db) {
             self.provide_context(|| ErrorContext::TypeNotCompatibleWithProtocol {
                 ty,
@@ -619,7 +623,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
 /// optimization to avoid having to materialize the [`ClassType`] for tuple
 /// instances where it would be unnecessary (this is somewhat expensive!).
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-enum NominalInstanceInner<'db> {
+pub(super) enum NominalInstanceInner<'db> {
     /// An instance of `object`.
     ///
     /// We model it with a dedicated enum variant since its use as "the type of all values" is so
@@ -693,6 +697,17 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 }
 
 impl<'db> ProtocolInstanceType<'db> {
+    pub(super) const fn packed_inner(self) -> Protocol<'db> {
+        self.inner
+    }
+
+    pub(super) const fn from_packed_inner(inner: Protocol<'db>) -> Self {
+        Self {
+            inner,
+            _phantom: PhantomData,
+        }
+    }
+
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
     fn from_class(class: ProtocolClass<'db>) -> Self {

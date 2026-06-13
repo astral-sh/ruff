@@ -165,68 +165,88 @@ pub(super) enum TypeKind<'db> {
 
 impl<'db> From<Type<'db>> for TypeKind<'db> {
     fn from(ty: Type<'db>) -> Self {
-        match ty {
-            Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::Never
-            | Type::LiteralValue(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::WrapperDescriptor(_)
-            | Type::ModuleLiteral(_)
-            | Type::ClassLiteral(_)
-            | Type::SpecialForm(_)
-            | Type::Divergent(_)
-            | Type::Dynamic(_) => TypeKind::Atomic,
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (
+                _,
+                crate::types::TypeData::AlwaysFalsy
+                | crate::types::TypeData::AlwaysTruthy
+                | crate::types::TypeData::Never
+                | crate::types::TypeData::LiteralValue(_)
+                | crate::types::TypeData::DataclassDecorator(_)
+                | crate::types::TypeData::DataclassTransformer(_)
+                | crate::types::TypeData::WrapperDescriptor(_)
+                | crate::types::TypeData::ModuleLiteral(_)
+                | crate::types::TypeData::ClassLiteral(_)
+                | crate::types::TypeData::SpecialForm(_)
+                | crate::types::TypeData::Divergent(_)
+                | crate::types::TypeData::Dynamic(_),
+            ) => TypeKind::Atomic,
 
             // Non-atomic types
-            Type::FunctionLiteral(function) => {
+            (_, crate::types::TypeData::FunctionLiteral(function)) => {
                 TypeKind::NonAtomic(NonAtomicType::FunctionLiteral(function))
             }
-            Type::Intersection(intersection) => {
+            (_, crate::types::TypeData::Intersection(intersection)) => {
                 TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
             }
-            Type::EnumComplement(complement) => {
+            (_, crate::types::TypeData::EnumComplement(complement)) => {
                 TypeKind::NonAtomic(NonAtomicType::EnumComplement(complement))
             }
-            Type::Union(union) => TypeKind::NonAtomic(NonAtomicType::Union(union)),
-            Type::BoundMethod(method) => TypeKind::NonAtomic(NonAtomicType::BoundMethod(method)),
-            Type::BoundSuper(bound_super) => {
+            (_, crate::types::TypeData::Union(union)) => {
+                TypeKind::NonAtomic(NonAtomicType::Union(union))
+            }
+            (_, crate::types::TypeData::BoundMethod(method)) => {
+                TypeKind::NonAtomic(NonAtomicType::BoundMethod(method))
+            }
+            (_, crate::types::TypeData::BoundSuper(bound_super)) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
             }
-            Type::KnownBoundMethod(method_wrapper) => {
+            (_, crate::types::TypeData::KnownBoundMethod(method_wrapper)) => {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
-            Type::Callable(callable) => TypeKind::NonAtomic(NonAtomicType::Callable(callable)),
-            Type::GenericAlias(alias) => TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias)),
-            Type::KnownInstance(known_instance) => {
+            (_, crate::types::TypeData::Callable(callable)) => {
+                TypeKind::NonAtomic(NonAtomicType::Callable(callable))
+            }
+            (_, crate::types::TypeData::GenericAlias(alias)) => {
+                TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias))
+            }
+            (_, crate::types::TypeData::KnownInstance(known_instance)) => {
                 TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
             }
-            Type::SubclassOf(subclass_of) => {
+            (_, crate::types::TypeData::SubclassOf(subclass_of)) => {
                 TypeKind::NonAtomic(NonAtomicType::SubclassOf(subclass_of))
             }
-            Type::NominalInstance(nominal) => {
+            (_, crate::types::TypeData::NominalInstance(nominal)) => {
                 TypeKind::NonAtomic(NonAtomicType::NominalInstance(nominal))
             }
-            Type::ProtocolInstance(protocol) => {
+            (_, crate::types::TypeData::ProtocolInstance(protocol)) => {
                 TypeKind::NonAtomic(NonAtomicType::ProtocolInstance(protocol))
             }
-            Type::PropertyInstance(property) => {
+            (_, crate::types::TypeData::PropertyInstance(property)) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::TypeVar(bound_typevar) => {
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
-            Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
-            Type::TypeGuard(type_guard) => {
+            (_, crate::types::TypeData::TypeIs(type_is)) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is))
+            }
+            (_, crate::types::TypeData::TypeGuard(type_guard)) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
             }
-            Type::TypeForm(typeform) => TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform)),
-            Type::TypedDict(typed_dict) => {
+            (_, crate::types::TypeData::TypeForm(typeform)) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform))
+            }
+            (_, crate::types::TypeData::TypedDict(typed_dict)) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
-            Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
-            Type::NewTypeInstance(newtype) => {
+            (_, crate::types::TypeData::TypeAlias(alias)) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias))
+            }
+            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
         }

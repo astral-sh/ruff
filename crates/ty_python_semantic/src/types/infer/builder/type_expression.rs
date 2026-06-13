@@ -107,7 +107,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation: &ast::Expr,
     ) -> Type<'db> {
         if annotation.is_attribute_expr()
-            && let Type::TypeVar(tvar) = ty
+            && let (_, crate::types::TypeData::TypeVar(tvar)) = ({
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            })
             && tvar.paramspec_attr(self.db()).is_some()
         {
             return ty;
@@ -243,18 +246,36 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             let should_emit_error = if dunder_fails {
                                 true
                             } else {
-                                let literal = match (left_type_value, right_type_value) {
-                                    (Type::ClassLiteral(class), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::ClassLiteral(class))
-                                        if class.metaclass(self.db())
-                                            == KnownClass::Type.to_class_literal(self.db()) =>
+                                let literal = match (
+                                    ({
+                                        let __ty_view_value = left_type_value;
+                                        (__ty_view_value, __ty_view_value.data())
+                                    }),
+                                    ({
+                                        let __ty_view_value = right_type_value;
+                                        (__ty_view_value, __ty_view_value.data())
+                                    }),
+                                ) {
+                                    (
+                                        (_, crate::types::TypeData::ClassLiteral(class)),
+                                        (_, crate::types::TypeData::LiteralValue(literal)),
+                                    )
+                                    | (
+                                        (_, crate::types::TypeData::LiteralValue(literal)),
+                                        (_, crate::types::TypeData::ClassLiteral(class)),
+                                    ) if class.metaclass(self.db())
+                                        == KnownClass::Type.to_class_literal(self.db()) =>
                                     {
                                         Some(literal)
                                     }
-                                    (Type::GenericAlias(_), Type::LiteralValue(literal))
-                                    | (Type::LiteralValue(literal), Type::GenericAlias(_)) => {
-                                        Some(literal)
-                                    }
+                                    (
+                                        (_, crate::types::TypeData::GenericAlias(_)),
+                                        (_, crate::types::TypeData::LiteralValue(literal)),
+                                    )
+                                    | (
+                                        (_, crate::types::TypeData::LiteralValue(literal)),
+                                        (_, crate::types::TypeData::GenericAlias(_)),
+                                    ) => Some(literal),
                                     _ => None,
                                 };
                                 literal.is_some_and(|literal| !literal.is_enum())
@@ -864,13 +885,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         slice: &ast::Expr,
         value_ty: Type<'db>,
     ) -> Type<'db> {
-        match value_ty {
-            Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
+        match {
+            let __ty_view_value = value_ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::ClassLiteral(class_literal)) => match class_literal
+                .known(self.db())
+            {
                 Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
-            _ => self.infer_subscript_type_expression(subscript, value_ty),
+            (_, _) => self.infer_subscript_type_expression(subscript, value_ty),
         }
     }
 
@@ -1143,21 +1169,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             SubclassOfType::subclass_of_unknown()
         };
 
-        let infer_type_argument = |builder: &mut Self, slice: &ast::Expr| {
-            let slice_ty = builder.infer_type_expression(slice);
-            if matches!(slice_ty, Type::ProtocolInstance(_)) {
-                return SubclassOfType::from(
-                    builder.db(),
-                    todo_type!("type[T] for protocols").expect_dynamic(),
-                );
-            }
-            SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| {
-                match slice_ty {
-                    Type::Callable(_) => invalid_type_argument(builder, slice),
-                    _ => todo_type!("unsupported type[X] special form"),
+        let infer_type_argument =
+            |builder: &mut Self, slice: &ast::Expr| {
+                let slice_ty = builder.infer_type_expression(slice);
+                if matches!(
+                    {
+                        let __ty_view_value = slice_ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    },
+                    (_, crate::types::TypeData::ProtocolInstance(_))
+                ) {
+                    return SubclassOfType::from(
+                        builder.db(),
+                        todo_type!("type[T] for protocols").expect_dynamic(),
+                    );
                 }
-            })
-        };
+                SubclassOfType::try_from_instance(builder.db(), slice_ty).unwrap_or_else(|| match {
+                    let __ty_view_value = slice_ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::Callable(_)) => {
+                        invalid_type_argument(builder, slice)
+                    }
+                    (_, _) => todo_type!("unsupported type[X] special form"),
+                })
+            };
 
         match slice {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::StringLiteral(_) => {
@@ -1186,21 +1222,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ..
                 },
             ) => {
-                let parameters_ty = match self.infer_expression(value, TypeContext::default()) {
-                    Type::SpecialForm(SpecialFormType::Union) => match &**parameters {
-                        ast::Expr::Tuple(tuple) => {
-                            let ty = UnionType::from_elements_leave_aliases(
-                                self.db(),
-                                tuple
-                                    .iter()
-                                    .map(|element| self.infer_subclass_of_type_expression(element)),
-                            );
-                            self.store_expression_type(parameters, ty);
-                            ty
+                let parameters_ty = match {
+                    let __ty_view_value = self.infer_expression(value, TypeContext::default());
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::SpecialForm(SpecialFormType::Union)) => {
+                        match &**parameters {
+                            ast::Expr::Tuple(tuple) => {
+                                let ty = UnionType::from_elements_leave_aliases(
+                                    self.db(),
+                                    tuple.iter().map(|element| {
+                                        self.infer_subclass_of_type_expression(element)
+                                    }),
+                                );
+                                self.store_expression_type(parameters, ty);
+                                ty
+                            }
+                            _ => self.infer_subclass_of_type_expression(parameters),
                         }
-                        _ => self.infer_subclass_of_type_expression(parameters),
-                    },
-                    value_ty @ Type::ClassLiteral(class_literal) => {
+                    }
+                    (value_ty, crate::types::TypeData::ClassLiteral(class_literal)) => {
                         if class_literal.is_protocol(self.db()) {
                             SubclassOfType::from(
                                 self.db(),
@@ -1240,9 +1281,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         }
                     }
-                    Type::SpecialForm(
-                        special_form @ (SpecialFormType::TypingCallable
-                        | SpecialFormType::CollectionsAbcCallable),
+                    (
+                        _,
+                        crate::types::TypeData::SpecialForm(
+                            special_form @ (SpecialFormType::TypingCallable
+                            | SpecialFormType::CollectionsAbcCallable),
+                        ),
                     ) => {
                         self.infer_parameterized_special_form_type_expression(
                             subscript,
@@ -1250,7 +1294,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         );
                         invalid_type_argument(self, slice)
                     }
-                    _ => {
+                    (_, _) => {
                         self.infer_expression(parameters, TypeContext::default());
                         todo_type!("unsupported nested subscript in type[X]")
                     }
@@ -1274,8 +1318,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         let db = self.db();
 
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_ty
-            && let Some(definition) = typevar.definition(db)
+        if let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) = ({
+            let __ty_view_value = value_ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) && let Some(definition) = typevar.definition(db)
         {
             value_ty = value_ty.apply_type_mapping(
                 db,
@@ -1367,8 +1413,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ctx: _,
         } = subscript;
 
-        match value_ty {
-            Type::Never => {
+        match {
+            let __ty_view_value = value_ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (_, crate::types::TypeData::Never) => {
                 // This case can be entered when we use a type annotation like `Literal[1]`
                 // in unreachable code, since we infer `Never` for `Literal`.  We call
                 // `infer_expression` (instead of `infer_type_expression`) here to avoid
@@ -1379,10 +1428,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 Type::unknown()
             }
-            Type::SpecialForm(special_form) => {
+            (_, crate::types::TypeData::SpecialForm(special_form)) => {
                 self.infer_parameterized_special_form_type_expression(subscript, special_form)
             }
-            Type::KnownInstance(known_instance) => match known_instance {
+            (_, crate::types::TypeData::KnownInstance(known_instance)) => match known_instance {
                 KnownInstanceType::SubscriptedProtocol(_) => {
                     if !self.in_string_annotation() {
                         self.infer_expression(slice, TypeContext::default());
@@ -1634,10 +1683,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
             },
-            Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
+            (_, crate::types::TypeData::Dynamic(DynamicType::UnknownGeneric(_))) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::Dynamic(_) | Type::Divergent(_) => {
+            (_, crate::types::TypeData::Dynamic(_) | crate::types::TypeData::Divergent(_)) => {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
                 // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
@@ -1646,7 +1695,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 value_ty
             }
-            Type::ClassLiteral(class) => {
+            (_, crate::types::TypeData::ClassLiteral(class)) => {
                 match (class.generic_context(self.db()), class.as_static()) {
                     (Some(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
@@ -1672,15 +1721,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                 }
             }
-            Type::GenericAlias(_) => {
+            (_, crate::types::TypeData::GenericAlias(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::LiteralValue(literal) if literal.is_string() => {
+            (_, crate::types::TypeData::LiteralValue(literal)) if literal.is_string() => {
                 self.infer_expression(slice, TypeContext::default());
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
             }
-            Type::Union(union) => {
+            (_, crate::types::TypeData::Union(union)) => {
                 let db = self.db();
                 let mut union_builder =
                     UnionBuilder::new(db).recursively_defined(union.recursively_defined(db));
@@ -1699,7 +1748,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 union_builder.build()
             }
-            _ => {
+            (_, _) => {
                 if !self.in_string_annotation() {
                     self.infer_expression(slice, TypeContext::default());
                 }
@@ -2407,22 +2456,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .iter()
                         .copied();
 
-                    let probably_meant_literal = argument_elements.all(|ty| match ty {
-                        Type::LiteralValue(literal)
-                            if matches!(
-                                literal.kind(),
-                                LiteralValueTypeKind::String(_)
-                                    | LiteralValueTypeKind::Bytes(_)
-                                    | LiteralValueTypeKind::Enum(_)
-                                    | LiteralValueTypeKind::Bool(_)
-                            ) =>
-                        {
-                            true
+                    let probably_meant_literal = argument_elements.all(|ty| {
+                        match {
+                            let __ty_view_value = ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        } {
+                            (_, crate::types::TypeData::LiteralValue(literal))
+                                if matches!(
+                                    literal.kind(),
+                                    LiteralValueTypeKind::String(_)
+                                        | LiteralValueTypeKind::Bytes(_)
+                                        | LiteralValueTypeKind::Enum(_)
+                                        | LiteralValueTypeKind::Bool(_)
+                                ) =>
+                            {
+                                true
+                            }
+                            (_, crate::types::TypeData::NominalInstance(instance)) => {
+                                instance.has_known_class(db, KnownClass::NoneType)
+                            }
+                            (_, _) => false,
                         }
-                        Type::NominalInstance(instance) => {
-                            instance.has_known_class(db, KnownClass::NoneType)
-                        }
-                        _ => false,
                     });
 
                     if probably_meant_literal {
@@ -2462,7 +2516,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let ty = match parameters {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
-                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
+                if matches!(
+                    {
+                        let __ty_view_value = value_ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    },
+                    (
+                        _,
+                        crate::types::TypeData::SpecialForm(SpecialFormType::Literal)
+                    )
+                ) {
                     let ty = self.infer_literal_parameter_type(slice)?;
 
                     // This branch deals with annotations such as `Literal[Literal[1]]`.
@@ -2530,32 +2593,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             // enum members and aliases to literal types
             ast::Expr::Name(_) | ast::Expr::Attribute(_) => {
                 let subscript_ty = self.infer_expression(parameters, TypeContext::default());
-                match subscript_ty {
+                match {
+                    let __ty_view_value = subscript_ty;
+                    (__ty_view_value, __ty_view_value.data())
+                } {
                     // type aliases to literal types
-                    Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
+                    (
+                        _,
+                        crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+                            type_alias,
+                        )),
+                    ) => {
                         let value_ty = type_alias.value_type(self.db());
                         if value_ty.is_literal_or_union_of_literals(self.db()) {
                             return Ok(value_ty);
                         }
                     }
-                    Type::KnownInstance(KnownInstanceType::Literal(ty)) => {
+                    (_, crate::types::TypeData::KnownInstance(KnownInstanceType::Literal(ty))) => {
                         return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
-                    Type::LiteralValue(literal) if literal.is_enum() => {
+                    (_, crate::types::TypeData::LiteralValue(literal)) if literal.is_enum() => {
                         // Avoid promoting values originating from an explicitly annotated literal type.
                         return Ok(Type::LiteralValue(literal.to_unpromotable()));
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
                     // just `SingletonEnum`.
-                    Type::NominalInstance(_) if subscript_ty.is_enum(self.db()) => {
+                    (_, crate::types::TypeData::NominalInstance(_))
+                        if subscript_ty.is_enum(self.db()) =>
+                    {
                         return Ok(subscript_ty);
                     }
                     // suppress false positives for e.g. members of functional-syntax enums
-                    Type::Dynamic(DynamicType::Todo(_)) => {
+                    (_, crate::types::TypeData::Dynamic(DynamicType::Todo(_))) => {
                         return Ok(subscript_ty);
                     }
-                    _ => {}
+                    (_, _) => {}
                 }
                 return Err(vec![parameters]);
             }
@@ -2567,12 +2640,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         };
 
-        Ok(if let Type::LiteralValue(literal) = ty {
-            // Avoid promoting values originating from an explicitly annotated literal type.
-            Type::LiteralValue(literal.to_unpromotable())
-        } else {
-            ty
-        })
+        Ok(
+            if let (_, crate::types::TypeData::LiteralValue(literal)) = {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                // Avoid promoting values originating from an explicitly annotated literal type.
+                Type::LiteralValue(literal.to_unpromotable())
+            } else {
+                ty
+            },
+        )
     }
 
     /// Infer the first argument to a `typing.Callable` type expression and returns the
@@ -2633,7 +2711,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::Subscript(subscript) => {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
-                if matches!(value_ty, Type::SpecialForm(SpecialFormType::Concatenate)) {
+                if matches!(
+                    {
+                        let __ty_view_value = value_ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    },
+                    (
+                        _,
+                        crate::types::TypeData::SpecialForm(SpecialFormType::Concatenate)
+                    )
+                ) {
                     return Some(self.infer_concatenate_special_form(subscript));
                 }
 
@@ -2661,8 +2748,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
-                if let Type::TypeVar(tvar) = parameters_type
-                    && tvar.is_paramspec(self.db())
+                if let (_, crate::types::TypeData::TypeVar(tvar)) = ({
+                    let __ty_view_value = parameters_type;
+                    (__ty_view_value, __ty_view_value.data())
+                }) && tvar.is_paramspec(self.db())
                 {
                     return Some(Parameters::paramspec(self.db(), tvar));
                 }
@@ -2803,7 +2892,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     InferenceFlags::ALLOW_PARAMSPEC_TYPE_EXPR,
                     previously_allowed_paramspec,
                 );
-                let Type::TypeVar(typevar) = expr_type else {
+                let (_, crate::types::TypeData::TypeVar(typevar)) = ({
+                    let __ty_view_value = expr_type;
+                    (__ty_view_value, __ty_view_value.data())
+                }) else {
                     // `Concatenate` *is* allowed inside `Concatenate`, so avoid emitting here a diagnostic
                     // saying that the argument is invalid if the inner type is an invalid use of the
                     // `Concatenate` special form (we'll already have complained about the invalid use
@@ -2873,7 +2965,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         {
             return ty;
         }
-        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty {
+        if let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) = {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
             if let Some(builder) = self.context.report_lint(&UNBOUND_TYPE_VARIABLE, expression) {
                 builder.into_diagnostic(format_args!(
                     "Type variable `{name}` is not bound to any outer generic context",

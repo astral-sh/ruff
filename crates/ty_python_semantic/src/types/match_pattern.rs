@@ -184,12 +184,21 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(class_expr, kind) => {
             if kind.is_irrefutable() {
-                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
+                match {
+                    let __ty_view_value =
+                        infer_same_file_expression_type(db, *class_expr, TypeContext::default());
+                    (__ty_view_value, __ty_view_value.data())
+                } {
+                    (_, crate::types::TypeData::ClassLiteral(class)) => {
+                        Type::instance(db, class.top_materialization(db))
                     }
-                    _ => Type::Never,
+                    (
+                        _,
+                        crate::types::TypeData::SpecialForm(
+                            SpecialFormType::CollectionsAbcCallable,
+                        ),
+                    ) => callable_pattern_type(db),
+                    (_, _) => Type::Never,
                 }
             } else {
                 Type::Never

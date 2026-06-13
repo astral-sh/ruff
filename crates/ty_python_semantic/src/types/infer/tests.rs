@@ -237,7 +237,10 @@ fn pep695_type_params() {
         let name_ty = var_ty.member(&db, "__name__").place.expect_type();
         assert_eq!(name_ty.display(&db).to_string(), expected_name_ty);
 
-        let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = var_ty else {
+        let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) = ({
+            let __ty_view_value = var_ty;
+            (__ty_view_value, __ty_view_value.data())
+        }) else {
             panic!("expected TypeVar");
         };
 

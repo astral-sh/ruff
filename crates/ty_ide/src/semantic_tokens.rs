@@ -318,12 +318,17 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
                 if let Some(ty) = ty {
-                    let type_var = match ty {
-                        Type::TypeVar(type_var) => Some((type_var, false)),
-                        Type::SubclassOf(subclass_of) => {
+                    let type_var = match {
+                        let __ty_view_value = ty;
+                        (__ty_view_value, __ty_view_value.data())
+                    } {
+                        (_, ty_python_semantic::types::TypeData::TypeVar(type_var)) => {
+                            Some((type_var, false))
+                        }
+                        (_, ty_python_semantic::types::TypeData::SubclassOf(subclass_of)) => {
                             subclass_of.into_type_var().map(|var| (var, true))
                         }
-                        _ => None,
+                        (_, _) => None,
                     };
 
                     if let Some((type_var, is_cls)) = type_var
@@ -367,7 +372,18 @@ impl<'db> SemanticTokenVisitor<'db> {
                 if let Some(value) = value
                     && let Some(value_ty) = value.inferred_type(&model)
                 {
-                    if matches!(value_ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))) {
+                    if matches!(
+                        {
+                            let __ty_view_value = value_ty;
+                            (__ty_view_value, __ty_view_value.data())
+                        },
+                        (
+                            _,
+                            ty_python_semantic::types::TypeData::KnownInstance(
+                                KnownInstanceType::TypeVar(_)
+                            )
+                        )
+                    ) {
                         modifiers.remove(SemanticTokenModifier::READONLY);
                         return Some((SemanticTokenType::TypeParameter, modifiers));
                     }
@@ -400,31 +416,47 @@ impl<'db> SemanticTokenVisitor<'db> {
             return Some(classification);
         }
 
-        Some(match ty {
-            Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
-            Type::KnownInstance(KnownInstanceType::TypeVar(_)) => {
-                (SemanticTokenType::TypeParameter, modifiers)
-            }
-            Type::FunctionLiteral(_) => {
-                // Check if this is a method based on current scope
-                if self.in_class_scope {
+        Some(
+            match {
+                let __ty_view_value = ty;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, ty_python_semantic::types::TypeData::ClassLiteral(_)) => {
+                    (SemanticTokenType::Class, modifiers)
+                }
+                (_, ty_python_semantic::types::TypeData::TypeVar(_)) => {
+                    (SemanticTokenType::TypeParameter, modifiers)
+                }
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(
+                        _,
+                    )),
+                ) => (SemanticTokenType::TypeParameter, modifiers),
+                (_, ty_python_semantic::types::TypeData::FunctionLiteral(_)) => {
+                    // Check if this is a method based on current scope
+                    if self.in_class_scope {
+                        (SemanticTokenType::Method, modifiers)
+                    } else {
+                        (SemanticTokenType::Function, modifiers)
+                    }
+                }
+                (_, ty_python_semantic::types::TypeData::BoundMethod(_)) => {
                     (SemanticTokenType::Method, modifiers)
-                } else {
-                    (SemanticTokenType::Function, modifiers)
                 }
-            }
-            Type::BoundMethod(_) => (SemanticTokenType::Method, modifiers),
-            Type::ModuleLiteral(_) => (SemanticTokenType::Namespace, modifiers),
-            _ => {
-                // Check for constant naming convention
-                if Self::is_constant_name(name_str) {
-                    modifiers |= SemanticTokenModifier::READONLY;
+                (_, ty_python_semantic::types::TypeData::ModuleLiteral(_)) => {
+                    (SemanticTokenType::Namespace, modifiers)
                 }
-                // For other types (variables, modules, etc.), assume variable
-                (SemanticTokenType::Variable, modifiers)
-            }
-        })
+                (_, _) => {
+                    // Check for constant naming convention
+                    if Self::is_constant_name(name_str) {
+                        modifiers |= SemanticTokenModifier::READONLY;
+                    }
+                    // For other types (variables, modules, etc.), assume variable
+                    (SemanticTokenType::Variable, modifiers)
+                }
+            },
+        )
     }
 
     fn classify_type_form_expr(
@@ -437,15 +469,19 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         // In type-form contexts, these types all denote class-like type expressions that should be
         // highlighted like `int` in `x: int`, even if their inferred type is instance-shaped.
-        match ty {
-            Type::ClassLiteral(_)
-            | Type::GenericAlias(_)
-            | Type::SubclassOf(_)
-            | Type::NominalInstance(_)
-            | Type::ProtocolInstance(_) => {
-                Some((SemanticTokenType::Class, SemanticTokenModifier::empty()))
-            }
-            _ => None,
+        match {
+            let __ty_view_value = ty;
+            (__ty_view_value, __ty_view_value.data())
+        } {
+            (
+                _,
+                ty_python_semantic::types::TypeData::ClassLiteral(_)
+                | ty_python_semantic::types::TypeData::GenericAlias(_)
+                | ty_python_semantic::types::TypeData::SubclassOf(_)
+                | ty_python_semantic::types::TypeData::NominalInstance(_)
+                | ty_python_semantic::types::TypeData::ProtocolInstance(_),
+            ) => Some((SemanticTokenType::Class, SemanticTokenModifier::empty())),
+            (_, _) => None,
         }
     }
 
@@ -502,27 +538,34 @@ impl<'db> SemanticTokenVisitor<'db> {
 
         for element in elements {
             // Classify based on the inferred type of the attribute
-            match element {
-                Type::ClassLiteral(_) => {
+            match {
+                let __ty_view_value = element;
+                (__ty_view_value, __ty_view_value.data())
+            } {
+                (_, ty_python_semantic::types::TypeData::ClassLiteral(_)) => {
                     token_type.add(SemanticTokenType::Class);
                 }
-                Type::FunctionLiteral(_) => {
+                (_, ty_python_semantic::types::TypeData::FunctionLiteral(_)) => {
                     // This is a function accessed as an attribute, likely a method
                     token_type.add(SemanticTokenType::Method);
                 }
-                Type::BoundMethod(_) | Type::KnownBoundMethod(_) => {
+                (
+                    _,
+                    ty_python_semantic::types::TypeData::BoundMethod(_)
+                    | ty_python_semantic::types::TypeData::KnownBoundMethod(_),
+                ) => {
                     // Method bound to an instance
                     token_type.add(SemanticTokenType::Method);
                 }
-                Type::ModuleLiteral(_) => {
+                (_, ty_python_semantic::types::TypeData::ModuleLiteral(_)) => {
                     // Module accessed as an attribute (e.g., from os import path)
                     token_type.add(SemanticTokenType::Namespace);
                 }
-                Type::PropertyInstance(property) => {
+                (_, ty_python_semantic::types::TypeData::PropertyInstance(property)) => {
                     token_type.add(SemanticTokenType::Property);
                     all_properties_are_readonly &= property.setter(db).is_none();
                 }
-                _ => {
+                (_, _) => {
                     token_type = UnifiedTokenType::Fallback;
                 }
             }
@@ -575,10 +618,12 @@ impl<'db> SemanticTokenVisitor<'db> {
             return SemanticTokenType::Function;
         }
 
-        if matches!(
-            func.inferred_type(self.model),
-            Some(Type::PropertyInstance(_))
-        ) {
+        if func.inferred_type(self.model).is_some_and(|ty| {
+            matches!(
+                ty.data(),
+                ty_python_semantic::types::TypeData::PropertyInstance(_)
+            )
+        }) {
             SemanticTokenType::Property
         } else {
             SemanticTokenType::Method
@@ -859,10 +904,18 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(value) = &assignment.value {
                     // PEP 613 alias values are type forms even though they appear as annotated
                     // assignments rather than dedicated `type` statements.
-                    if matches!(
-                        assignment.annotation.inferred_type(self.model),
-                        Some(Type::SpecialForm(SpecialFormType::TypeAlias))
-                    ) {
+                    if assignment
+                        .annotation
+                        .inferred_type(self.model)
+                        .is_some_and(|ty| {
+                            matches!(
+                                ty.data(),
+                                ty_python_semantic::types::TypeData::SpecialForm(
+                                    SpecialFormType::TypeAlias
+                                )
+                            )
+                        })
+                    {
                         self.visit_annotation(value);
                     } else {
                         self.visit_expr(value);
@@ -1007,10 +1060,14 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 }
             }
             ast::Expr::Subscript(subscript)
-                if matches!(
-                    subscript.value.inferred_type(self.model),
-                    Some(Type::SpecialForm(SpecialFormType::Annotated))
-                ) =>
+                if subscript.value.inferred_type(self.model).is_some_and(|ty| {
+                    matches!(
+                        ty.data(),
+                        ty_python_semantic::types::TypeData::SpecialForm(
+                            SpecialFormType::Annotated
+                        )
+                    )
+                }) =>
             {
                 self.visit_expr(subscript.value.as_ref());
                 self.visit_annotated_arguments(subscript.slice.as_ref());
