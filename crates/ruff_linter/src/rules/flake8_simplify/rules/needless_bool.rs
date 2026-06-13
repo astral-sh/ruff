@@ -1,7 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::traversal;
-use ruff_python_ast::{self as ast, Arguments, ElifElseClause, Expr, ExprContext, Stmt};
+use ruff_python_ast::{self as ast, Arguments, BoolOp, ElifElseClause, Expr, ExprContext, Stmt};
 use ruff_python_semantic::analyze::typing::{is_sys_version_block, is_type_checking_block};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -98,6 +99,119 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         elif_else_clauses,
         ..
     } = stmt_if;
+
+    // Extract an `if`/`elif` chain followed by an `else`, in which every
+    // non-`else` branch returns the same boolean and the `else` returns the
+    // opposite boolean.
+    if let Some((last_clause, elif_clauses)) = elif_else_clauses.split_last() {
+        if let ElifElseClause {
+            body: else_body,
+            test: None,
+            ..
+        } = last_clause
+        {
+            if !elif_clauses.is_empty() {
+                let mut tests = vec![if_test.as_ref()];
+                let mut returns = vec![is_one_line_return_bool(if_body)];
+
+                for clause in elif_clauses {
+                    let ElifElseClause {
+                        body,
+                        test: Some(test),
+                        ..
+                    } = clause
+                    else {
+                        tests.clear();
+                        break;
+                    };
+                    tests.push(test);
+                    returns.push(is_one_line_return_bool(body));
+                }
+
+                let else_return = is_one_line_return_bool(else_body);
+                if let (true, Some(else_return)) = (
+                    returns.iter().all(Option::is_some) && tests.len() > 1,
+                    else_return,
+                ) {
+                    let branch_return = returns[0].unwrap();
+                    if returns
+                        .iter()
+                        .all(|return_value| *return_value == Some(branch_return))
+                        && branch_return != else_return
+                        && !is_sys_version_block(stmt_if, checker.semantic())
+                        && !is_type_checking_block(stmt_if, checker.semantic())
+                    {
+                        let range = stmt_if.range();
+                        let condition = if checker
+                            .comment_ranges()
+                            .has_comments(&range, checker.source())
+                        {
+                            None
+                        } else {
+                            let combined_condition = common_conjunction_over_complementary_tests(
+                                &tests,
+                            )
+                            .unwrap_or_else(|| {
+                                Expr::BoolOp(ast::ExprBoolOp {
+                                    op: BoolOp::Or,
+                                    values: tests.iter().map(|test| (*test).clone()).collect(),
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                })
+                            });
+                            let combined_condition_is_boolean =
+                                is_boolean_expression(&combined_condition);
+
+                            if branch_return == Bool::False {
+                                Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                                    op: ast::UnaryOp::Not,
+                                    operand: Box::new(combined_condition),
+                                    range: TextRange::default(),
+                                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                                }))
+                            } else if combined_condition_is_boolean {
+                                Some(combined_condition)
+                            } else if checker.semantic().has_builtin_binding("bool") {
+                                Some(bool_call(combined_condition))
+                            } else {
+                                None
+                            }
+                        };
+
+                        let replacement = condition.as_ref().map(|expr| {
+                            Stmt::Return(ast::StmtReturn {
+                                value: Some(Box::new(expr.clone())),
+                                range: TextRange::default(),
+                                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                            })
+                        });
+
+                        let replacement = replacement
+                            .as_ref()
+                            .map(|stmt| checker.generator().stmt(stmt));
+                        let condition = condition
+                            .as_ref()
+                            .map(|expr| checker.generator().expr(expr));
+
+                        let mut diagnostic = checker.report_diagnostic(
+                            NeedlessBool {
+                                condition: condition.map(SourceCodeSnippet::new),
+                                negate: branch_return == Bool::False,
+                            },
+                            range,
+                        );
+                        if let Some(replacement) = replacement {
+                            diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
+                                replacement,
+                                range,
+                            )));
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+    }
 
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
     let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
@@ -274,24 +388,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             Some(if_test.clone())
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
-            let func_node = ast::ExprName {
-                id: Name::new_static("bool"),
-                ctx: ExprContext::Load,
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            };
-            let call_node = ast::ExprCall {
-                func: Box::new(func_node.into()),
-                arguments: Arguments {
-                    args: Box::from([if_test.clone()]),
-                    keywords: Box::from([]),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                },
-                range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            };
-            Some(Expr::Call(call_node))
+            Some(bool_call(if_test.clone()))
         } else {
             None
         }
@@ -357,4 +454,131 @@ fn is_one_line_return_bool(stmts: &[Stmt]) -> Option<Bool> {
         return None;
     };
     Some((*value).into())
+}
+
+fn common_conjunction_over_complementary_tests(tests: &[&Expr]) -> Option<Expr> {
+    let [left, right] = tests else {
+        return None;
+    };
+
+    let left_conjuncts = split_conjuncts(left);
+    let right_conjuncts = split_conjuncts(right);
+
+    let mut right_common = vec![false; right_conjuncts.len()];
+    let mut common = Vec::new();
+    let mut left_remainder = Vec::new();
+
+    for left_conjunct in left_conjuncts {
+        if let Some((index, _)) =
+            right_conjuncts
+                .iter()
+                .enumerate()
+                .find(|(index, right_conjunct)| {
+                    !right_common[*index]
+                        && ComparableExpr::from(left_conjunct)
+                            == ComparableExpr::from(**right_conjunct)
+                })
+        {
+            right_common[index] = true;
+            common.push(left_conjunct.clone());
+        } else {
+            left_remainder.push(left_conjunct);
+        }
+    }
+
+    let right_remainder: Vec<&Expr> = right_conjuncts
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, conjunct)| (!right_common[index]).then_some(conjunct))
+        .collect();
+
+    let [left_remainder] = left_remainder.as_slice() else {
+        return None;
+    };
+    let [right_remainder] = right_remainder.as_slice() else {
+        return None;
+    };
+
+    if common.is_empty() || !are_complementary_tests(left_remainder, right_remainder) {
+        return None;
+    }
+
+    Some(if common.len() == 1 {
+        common.pop().unwrap()
+    } else {
+        Expr::BoolOp(ast::ExprBoolOp {
+            op: BoolOp::And,
+            values: common,
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        })
+    })
+}
+
+fn split_conjuncts(expr: &Expr) -> Vec<&Expr> {
+    if let Expr::BoolOp(ast::ExprBoolOp {
+        op: BoolOp::And,
+        values,
+        ..
+    }) = expr
+    {
+        values.iter().collect()
+    } else {
+        vec![expr]
+    }
+}
+
+fn are_complementary_tests(left: &Expr, right: &Expr) -> bool {
+    if let Expr::UnaryOp(ast::ExprUnaryOp {
+        op: ast::UnaryOp::Not,
+        operand,
+        ..
+    }) = left
+    {
+        return ComparableExpr::from(operand.as_ref()) == ComparableExpr::from(right);
+    }
+
+    if let Expr::UnaryOp(ast::ExprUnaryOp {
+        op: ast::UnaryOp::Not,
+        operand,
+        ..
+    }) = right
+    {
+        return ComparableExpr::from(left) == ComparableExpr::from(operand.as_ref());
+    }
+
+    false
+}
+
+fn bool_call(expr: Expr) -> Expr {
+    let func_node = ast::ExprName {
+        id: Name::new_static("bool"),
+        ctx: ExprContext::Load,
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    };
+    let call_node = ast::ExprCall {
+        func: Box::new(func_node.into()),
+        arguments: Arguments {
+            args: Box::from([expr]),
+            keywords: Box::from([]),
+            range: TextRange::default(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+        },
+        range: TextRange::default(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+    };
+    Expr::Call(call_node)
+}
+
+fn is_boolean_expression(expr: &Expr) -> bool {
+    match expr {
+        Expr::Compare(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            ..
+        }) => true,
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => values.iter().all(is_boolean_expression),
+        _ => false,
+    }
 }
