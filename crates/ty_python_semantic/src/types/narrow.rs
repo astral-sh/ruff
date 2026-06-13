@@ -1424,6 +1424,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<Type<'db>> {
         if let Type::TypedDict(typed_dict) = subject_ty.resolve_type_alias(self.db) {
             let key_ty = key_ty.resolve_type_alias(self.db);
+            let typed_dict_key_ty = typed_dict.key_type(self.db);
+            if typed_dict_key_ty.is_never()
+                || !could_compare_equal(self.db, typed_dict_key_ty, key_ty)
+            {
+                return None;
+            }
             if let Some(key) = key_ty.as_string_literal() {
                 return typed_dict
                     .item(self.db, key.value(self.db))
@@ -1443,6 +1449,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return Some(Type::unknown());
         };
 
+        if mapping_key_ty.is_never() {
+            return None;
+        }
         could_compare_equal(self.db, mapping_key_ty, key_ty).then_some(mapping_value_ty)
     }
 

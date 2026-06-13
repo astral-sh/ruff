@@ -609,6 +609,21 @@ def test_match_builtin_match_self(
             reveal_type(contents)  # revealed: dict[str, int]
         case int(contents):
             reveal_type(contents)  # revealed: int
+
+class OverlapCaptureA: ...
+
+class OverlapCaptureB:
+    member: int
+
+class OverlapCaptureC(OverlapCaptureA, OverlapCaptureB): ...
+
+def test_match_class_capture_preserves_possible_multiple_inheritance(
+    value: OverlapCaptureA,
+) -> None:
+    match value:
+        case OverlapCaptureB(member=item) as whole:
+            reveal_type(item)  # revealed: int
+            reveal_type(whole)  # revealed: OverlapCaptureA & OverlapCaptureB
 ```
 
 Mapping patterns use the mapping's key and value types. A successful keyed pattern can filter union
@@ -617,6 +632,7 @@ arms, while `**rest` is always a new `dict` containing the unmatched items.
 ```py
 from collections.abc import Mapping
 from typing import Literal, TypeVar
+from typing_extensions import Never
 
 MappingValueT = TypeVar("MappingValueT")
 
@@ -652,6 +668,13 @@ def test_match_mapping_nested_sequence(
         case {"pair": [number, text]}:
             reveal_type(number)  # revealed: int
             reveal_type(text)  # revealed: str
+
+def test_match_mapping_rejects_empty_key_domain(
+    value: dict[Never, int],
+) -> None:
+    match value:
+        case {"item": item}:
+            reveal_type(item)  # revealed: Never
 ```
 
 For a `TypedDict`, a literal key uses the declared field type. Closed dictionaries can rule out
@@ -689,6 +712,16 @@ class ClosedStrPayload(TypedDict, closed=True):
 class ClosedBoolPayload(TypedDict, closed=True):
     tag: Literal["bool"]
     value: bool
+
+class ClosedPayload(TypedDict, closed=True):
+    x: int
+
+def test_match_closed_typed_dict_rejects_non_string_key(
+    value: ClosedPayload,
+) -> None:
+    match value:
+        case {1: item}:
+            reveal_type(item)  # revealed: Never
 
 def test_match_closed_typed_dict_rest(value: ClosedIntPayload) -> None:
     match value:
