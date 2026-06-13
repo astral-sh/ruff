@@ -2793,21 +2793,6 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
         if !is_positive {
-            if let dynamic @ Type::Dynamic(_) = class_type {
-                // TODO: Align this legacy negative `Any` constraint with the successful-pattern
-                // analysis used for positive narrowing.
-                if !matches!(
-                    pattern,
-                    PatternPredicateKind::Class(kind) if kind.is_argumentless()
-                ) {
-                    return None;
-                }
-                return Some(NarrowingConstraints::from_iter([(
-                    place,
-                    NarrowingConstraint::intersection(dynamic),
-                )]));
-            }
-
             let subject_ty =
                 infer_same_file_expression_type(self.db, subject, TypeContext::default());
             let definitely_matched =
