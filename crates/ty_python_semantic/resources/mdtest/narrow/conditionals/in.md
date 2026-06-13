@@ -268,6 +268,29 @@ def empty_domain(x: Payload | Literal["missing"], values: tuple[()]):
         reveal_type(x)  # revealed: Payload | Literal["missing"]
 ```
 
+## Custom containment methods
+
+Python calls `__contains__` before falling back to iteration, and a custom method does not have to
+compare its argument against the values produced by iteration. Membership narrowing currently uses
+the iterable element type either way. This can narrow too far, but is an accepted limitation for
+now:
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContainsEverything(tuple[Literal["missing"], ...]):
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+    if x in values:
+        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
+        reveal_type(x)  # revealed: Literal["missing"]
+```
+
 ## No present-key narrowing without a `TypedDict`
 
 We only synthesize a key-access protocol for string membership tests on right-hand-side values that

@@ -1174,6 +1174,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
+        // TODO: Python calls a custom `__contains__` before falling back to iteration. Narrowing
+        // currently uses the iterable element type either way, which can over-narrow when
+        // `__contains__` implements different semantics.
         if is_union_of_single_valued(self.db, lhs_ty) {
             rhs_ty
                 .try_iterate(self.db)
