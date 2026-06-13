@@ -97,3 +97,17 @@ def f():
 
     cast(typ=int, val=3.0)  # TC006
     cast(val=3.0, typ=int)  # TC006
+
+
+def f():
+    # Regression test for #22131 (the quoted fix would introduce an escape sequence)
+    from typing import Literal, cast
+
+    cast(Literal["'"], "'")  # TC006
+
+
+def f():
+    # Regression test for #22131 (double-quote variant)
+    from typing import Literal, cast
+
+    cast(Literal['"'], '"')  # TC006

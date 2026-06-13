@@ -40,8 +40,12 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is safe as long as the type expression doesn't span multiple
-/// lines and includes comments on any of the lines apart from the last one.
+/// This fix is marked unsafe when the type expression contains a comment, since
+/// quoting it would drop the comment.
+///
+/// The fix is also marked unsafe when quoting would introduce an escape sequence
+/// (for example, `cast(Literal["'"], ...)`). Type checkers reject forward
+/// references containing escape sequences.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct RuntimeCastValue;
@@ -71,7 +75,10 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
         checker.locator(),
         checker.default_string_flags(),
     );
-    if checker.comment_ranges().intersects(type_expr.range()) {
+    // A quoted forward reference containing an escape sequence (e.g. an inner quote
+    // colliding with the outer quote) is rejected by type checkers, so mark it unsafe.
+    let has_escape = edit.content().is_some_and(|content| content.contains('\\'));
+    if has_escape || checker.comment_ranges().intersects(type_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
         diagnostic.set_fix(Fix::safe_edit(edit));
