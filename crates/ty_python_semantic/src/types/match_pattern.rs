@@ -9,9 +9,9 @@ use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, IntersectionBuilder, KnownClass, MemberLookupPolicy,
-    Parameter, Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType, binding_type,
-    equality_truthiness, infer_same_file_expression_type,
+    CallableType, ClassBase, ClassLiteral, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, Type, TypeContext, UnionType, binding_type, equality_truthiness,
+    infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -59,10 +59,7 @@ pub(crate) fn class_match_args_type<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> ClassMatchArgs<'db> {
-    match class
-        .class_member(db, "__match_args__", MemberLookupPolicy::default())
-        .place
-    {
+    match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
             place @ DefinedPlace {
                 ty,

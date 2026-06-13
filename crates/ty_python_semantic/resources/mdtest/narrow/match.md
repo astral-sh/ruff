@@ -646,9 +646,9 @@ def test_match_dataclass_positional_capture(dataclass_box: DataclassBox[T]) -> N
             reveal_type(item)  # revealed: T@test_match_dataclass_positional_capture
 ```
 
-`__match_args__` is read from the pattern class and must identify literal attribute names. A
-metaclass member is not used by the runtime class pattern, while an explicit widened annotation does
-not tell us which attribute a positional pattern extracts.
+`__match_args__` is read through the pattern class and must identify literal attribute names. This
+includes attributes provided by a metaclass. An explicit widened annotation does not tell us which
+attribute a positional pattern extracts.
 
 ```py
 class MatchArgsMeta(type):
@@ -657,10 +657,10 @@ class MatchArgsMeta(type):
 class MetaclassMatchArgs(metaclass=MatchArgsMeta):
     value: int
 
-def test_metaclass_match_args_is_not_used(value: MetaclassMatchArgs) -> None:
+def test_metaclass_match_args(value: MetaclassMatchArgs) -> None:
     match value:
         case MetaclassMatchArgs(item):
-            reveal_type(item)  # revealed: Unknown
+            reveal_type(item)  # revealed: int
 
 class WidenedMatchArgs:
     __match_args__: tuple[str, ...] = ("value",)
