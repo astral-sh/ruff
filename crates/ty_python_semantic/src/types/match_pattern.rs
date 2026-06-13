@@ -42,7 +42,7 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
-pub(crate) enum ClassMatchArgs<'db> {
+enum ClassMatchArgs<'db> {
     Undefined,
     Defined(Type<'db>),
     PossiblyUndefined,
@@ -55,10 +55,7 @@ pub(crate) enum ClassPatternPositionalSource {
     Unknown,
 }
 
-pub(crate) fn class_match_args_type<'db>(
-    db: &'db dyn Db,
-    class: ClassLiteral<'db>,
-) -> ClassMatchArgs<'db> {
+fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
     match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
             place @ DefinedPlace {
@@ -79,7 +76,7 @@ pub(crate) fn class_match_args_type<'db>(
     }
 }
 
-pub(crate) fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
