@@ -32,6 +32,19 @@ pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
     Type::Callable(CallableType::unknown(db)).top_materialization(db)
 }
 
+/// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
+///
+/// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
+/// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
+/// `Mapping()`, and `MutableMapping()`.
+pub(crate) fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    let Some(dict) = KnownClass::Dict.to_class_literal(db).as_class_literal() else {
+        return false;
+    };
+    Type::instance(db, dict.top_materialization(db))
+        .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
+}
+
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
     IntersectionBuilder::new(db)
         .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
