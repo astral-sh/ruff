@@ -17,8 +17,7 @@ use crate::types::{
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, definite_match_pattern_type,
     definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
-    starred_sequence_pattern_type,
+    mapping_pattern_type, singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
@@ -1223,7 +1222,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Value(value) => {
                 let value_ty =
                     infer_same_file_expression_type(self.db, *value, TypeContext::default());
-                self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, true)
+                self.evaluate_expr_compare_op(subject_ty, value_ty, None, ast::CmpOp::Eq, true)
                     .map(|constraint| self.intersect_types(subject_ty, constraint))
                     .unwrap_or(subject_ty)
             }
