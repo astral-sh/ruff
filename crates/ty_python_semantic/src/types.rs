@@ -1229,9 +1229,9 @@ impl<'db> Type<'db> {
     /// Construct a transparent cycle marker for a finite value type.
     ///
     /// This is the only supported constructor for [`Type::CycleMarked`]. It keeps markers out of
-    /// signature cycles and non-value-like types, folds structurally recursive inners into
-    /// [`Type::Recursive`], erases duplicate markers for the same binder, and canonicalizes nested
-    /// marker order for stable fixed-point convergence.
+    /// signature cycles and non-value-like types, leaves single-valued types unmarked, folds
+    /// structurally recursive inners into [`Type::Recursive`], erases duplicate markers for the
+    /// same binder, and canonicalizes nested marker order for stable fixed-point convergence.
     pub(crate) fn cycle_marked(db: &'db dyn Db, binder_id: salsa::Id, inner: Type<'db>) -> Self {
         if matches!(inner, Type::FunctionLiteral(_))
             || inner.is_signature_cycle_body_for_cycle_recovery(db)
@@ -8027,6 +8027,16 @@ impl DivergentType {
     }
 }
 
+/// A transparent marker for a finite value reached through cycle recovery.
+///
+/// `CycleMarked<T>` is semantically equivalent to `T`; it is not a new runtime type and must not
+/// change subtype, assignability, truthiness, member lookup, or call semantics. Its purpose is to
+/// keep the cycle binder visible to later fixed-point recovery after normal operations have already
+/// learned a finite shape such as `int`.
+///
+/// Use [`Type::cycle_marked`] to construct this type. The constructor decides when preserving a
+/// marker is useful and when the inner type should instead remain unmarked or become a
+/// [`Type::Recursive`].
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CycleMarkedType<'db> {
     /// The Salsa cycle head whose recovery marker must be preserved.

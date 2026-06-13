@@ -252,6 +252,8 @@ impl<'db> CycleFusionSummary<'db> {
     }
 
     fn is_finite_cycle_fusion_target(&self) -> bool {
+        // Lazy attributes can trigger queries, so this summary is intentionally
+        // conservative: aliases and recursive types are not expanded in cycle recovery.
         self.divergent_id.get().is_none() && !self.has_recursive.get() && !self.has_type_alias.get()
     }
 }
@@ -271,6 +273,12 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
     }
 }
 
+/// Overlay a finite candidate onto a marker-tainted candidate during cycle recovery.
+///
+/// For example, `tuple[Divergent(a), int]` overlaid with `tuple[str, int]` becomes
+/// `CycleMarked(a, tuple[str, int])`. This is intentionally limited to the
+/// cycle-recovery path: all markers must belong to one binder, and the finite side
+/// must already be available without expanding aliases or recursive types.
 struct CycleFusionOverlay {
     divergent_id: Cell<Option<salsa::Id>>,
     has_multiple_divergent_ids: Cell<bool>,
@@ -329,6 +337,8 @@ impl CycleFusionOverlay {
         match marker {
             Type::Divergent(divergent) => {
                 self.add_divergent_id(divergent.id());
+                // A marker leaf can be replaced only by a finite shape that is
+                // already available without expanding aliases or recursive types.
                 CycleFusionSummary::collect(db, finite)
                     .is_finite_cycle_fusion_target()
                     .then_some(finite)
@@ -354,6 +364,8 @@ impl CycleFusionOverlay {
                     return Some(overlaid_tuple);
                 }
 
+                // If both sides are finite, keep both possibilities. The enclosing
+                // `CycleMarked` carries the cycle information rather than either branch.
                 let marker_summary = CycleFusionSummary::collect(db, marker);
                 let finite_summary = CycleFusionSummary::collect(db, finite);
                 if marker_summary.is_finite_cycle_fusion_target()
@@ -1067,6 +1079,8 @@ impl<'db> UnionBuilder<'db> {
         preferred: Type<'db>,
         other: Type<'db>,
     ) -> bool {
+        // `CycleMarked<T>` and `T` are equivalent, but the marked representative
+        // must survive so later cycle recovery can still see the binder.
         preferred.contains_cycle_marked(db)
             && !other.contains_cycle_marked(db)
             && preferred.erase_cycle_marks(db) == other.erase_cycle_marks(db)
