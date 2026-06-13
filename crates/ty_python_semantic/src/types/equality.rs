@@ -164,22 +164,24 @@ pub(super) fn may_compare_equal<'db>(db: &'db dyn Db, left: Type<'db>, right: Ty
     let left = left.resolve_type_alias(db);
     let right = right.resolve_type_alias(db);
 
+    if left.is_never() || right.is_never() {
+        return false;
+    }
+
     // Decompose unions before checking for overlap so compatibility probes can short-circuit
     // without first comparing every pair of union elements.
     match (left, right) {
         (Type::Union(union), other) => {
-            let elements = union.elements(db);
-            return elements.is_empty()
-                || elements
-                    .iter()
-                    .any(|element| may_compare_equal(db, *element, other));
+            return union
+                .elements(db)
+                .iter()
+                .any(|element| may_compare_equal(db, *element, other));
         }
         (other, Type::Union(union)) => {
-            let elements = union.elements(db);
-            return elements.is_empty()
-                || elements
-                    .iter()
-                    .any(|element| may_compare_equal(db, other, *element));
+            return union
+                .elements(db)
+                .iter()
+                .any(|element| may_compare_equal(db, other, *element));
         }
         _ => {}
     }

@@ -260,6 +260,12 @@ def custom_equality(x: AlwaysEqual | Literal[1]):
         reveal_type(x)  # revealed: Literal[1] | AlwaysEqual
     else:
         reveal_type(x)  # revealed: AlwaysEqual
+
+def empty_domain(x: Payload | Literal["missing"], values: tuple[()]):
+    if x in values:
+        reveal_type(x)  # revealed: Never
+    else:
+        reveal_type(x)  # revealed: Payload | Literal["missing"]
 ```
 
 ## No present-key narrowing without a `TypedDict`
