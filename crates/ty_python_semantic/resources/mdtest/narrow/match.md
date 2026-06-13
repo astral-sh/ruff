@@ -451,6 +451,16 @@ def test_incompatible_declared_star_capture(subject: tuple[int, int]) -> None:
         case [*rest]:  # error: [invalid-assignment]
             reveal_type(rest)  # revealed: list[str]
 
+def test_incompatible_declared_or_capture(subject: int | str) -> None:
+    item: int
+    match subject:
+        # TODO: Report one error for the logical OR-pattern binding instead of validating each
+        # syntactic definition separately.
+        # error: [invalid-assignment]
+        # error: [invalid-assignment]
+        case (int() as item) | (str() as item):
+            reveal_type(item)  # revealed: int
+
 def test_compatible_declared_alias(subject: object) -> None:
     item: int
     match subject:
