@@ -71,11 +71,8 @@ impl TypeMixinMemberBehavior {
     fn from_mixin(db: &dyn Db, mixin_type: Type<'_>, value_form: EnumMemberValueForm) -> Self {
         match value_form {
             EnumMemberValueForm::Explicit => Self::UnknownMembers,
-            EnumMemberValueForm::Generated => match {
-                let __ty_view_value = mixin_type;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class))) => {
+            EnumMemberValueForm::Generated => match mixin_type.data() {
+                crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class)) => {
                     match class.known(db) {
                         Some(KnownClass::Int) => Self::Precise,
                         Some(KnownClass::Str | KnownClass::Bytes | KnownClass::Float) => {
@@ -84,7 +81,7 @@ impl TypeMixinMemberBehavior {
                         _ => Self::UnknownMembers,
                     }
                 }
-                (_, _) => Self::UnknownMembers,
+                _ => Self::UnknownMembers,
             },
         }
     }
@@ -255,10 +252,8 @@ fn apply_generated_type_mixin_member_values<'db>(
     mixin_type: Type<'_>,
     members: Vec<(Name, Type<'db>)>,
 ) -> Option<Vec<(Name, Type<'db>)>> {
-    let (_, crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class))) = ({
-        let __ty_view_value = mixin_type;
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::ClassLiteral(ClassLiteral::Static(class)) = mixin_type.data()
+    else {
         return None;
     };
 

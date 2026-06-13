@@ -1303,21 +1303,11 @@ impl<'db> Constraint<'db> {
         //
         // In the comments below, we use brackets to indicate which typevar is "earlier", and
         // therefore the typevar that the constraint applies to.
-        match (
-            ({
-                let __ty_view_value = effective_lower;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            ({
-                let __ty_view_value = effective_upper;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-        ) {
+        match (effective_lower.data(), effective_upper.data()) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
-            (
-                (_, crate::types::TypeData::TypeVar(lower)),
-                (_, crate::types::TypeData::TypeVar(upper)),
-            ) if lower.is_same_typevar_as(db, upper) => {
+            (crate::types::TypeData::TypeVar(lower), crate::types::TypeData::TypeVar(upper))
+                if lower.is_same_typevar_as(db, upper) =>
+            {
                 let (bound, typevar) = if lower.can_be_bound_for(db, builder, typevar) {
                     (lower, typevar)
                 } else {
@@ -1337,11 +1327,9 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
-            (
-                (_, crate::types::TypeData::TypeVar(lower)),
-                (_, crate::types::TypeData::TypeVar(upper)),
-            ) if typevar.can_be_bound_for(db, builder, lower)
-                && typevar.can_be_bound_for(db, builder, upper) =>
+            (crate::types::TypeData::TypeVar(lower), crate::types::TypeData::TypeVar(upper))
+                if typevar.can_be_bound_for(db, builder, lower)
+                    && typevar.can_be_bound_for(db, builder, upper) =>
             {
                 let lower = Node::new_constraint(
                     builder,
@@ -1369,7 +1357,7 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            ((_, crate::types::TypeData::TypeVar(lower)), (_, _))
+            (crate::types::TypeData::TypeVar(lower), _)
                 if typevar.can_be_bound_for(db, builder, lower) =>
             {
                 let lower = Node::new_constraint(
@@ -1392,7 +1380,7 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            ((_, _), (_, crate::types::TypeData::TypeVar(upper)))
+            (_, crate::types::TypeData::TypeVar(upper))
                 if typevar.can_be_bound_for(db, builder, upper) =>
             {
                 let lower = if lower.is_none() {
@@ -2408,17 +2396,8 @@ impl NodeId {
         // these types are coming in from arbitrary subtyping checks that the caller might want to
         // perform. So we have to take the appropriate materialization when translating the check
         // into a constraint.
-        let constraint = match (
-            ({
-                let __ty_view_value = lhs;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            ({
-                let __ty_view_value = rhs;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-        ) {
-            ((_, crate::types::TypeData::TypeVar(bound_typevar)), (_, _)) => {
+        let constraint = match (lhs.data(), rhs.data()) {
+            (crate::types::TypeData::TypeVar(bound_typevar), _) => {
                 Constraint::new_node_with_bounds(
                     db,
                     builder,
@@ -2427,7 +2406,7 @@ impl NodeId {
                     Some(rhs.bottom_materialization(db)),
                 )
             }
-            ((_, _), (_, crate::types::TypeData::TypeVar(bound_typevar))) => {
+            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
                 Constraint::new_node_with_bounds(
                     db,
                     builder,
@@ -3174,10 +3153,7 @@ impl<'db> PathBounds<'db> {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_lower(db, lower);
 
-                    if let (_, crate::types::TypeData::TypeVar(lower_bound_typevar)) = {
-                        let __ty_view_value = lower;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    if let crate::types::TypeData::TypeVar(lower_bound_typevar) = lower.data() {
                         let bounds = mappings.entry(lower_bound_typevar).or_default();
                         bounds.add_upper(db, Type::TypeVar(typevar));
                     }
@@ -3187,10 +3163,7 @@ impl<'db> PathBounds<'db> {
                     let bounds = mappings.entry(typevar).or_default();
                     bounds.add_upper(db, upper);
 
-                    if let (_, crate::types::TypeData::TypeVar(upper_bound_typevar)) = {
-                        let __ty_view_value = upper;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    if let crate::types::TypeData::TypeVar(upper_bound_typevar) = upper.data() {
                         let bounds = mappings.entry(upper_bound_typevar).or_default();
                         bounds.add_lower(db, Type::TypeVar(typevar));
                     }
@@ -3555,14 +3528,9 @@ impl InteriorNode {
         drop(storage);
 
         let mut path = self.path_assignments(builder);
-        let mentions_typevar = |ty: Type<'db>| match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeVar(haystack)) => {
-                haystack.identity(db) == bound_typevar
-            }
-            (_, _) => false,
+        let mentions_typevar = |ty: Type<'db>| match ty.data() {
+            crate::types::TypeData::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            _ => false,
         };
         let result = self.abstract_one_inner(
             db,
@@ -4518,10 +4486,7 @@ impl ConstraintAssignment {
                     // If this typevar is equivalent to another, output the constraint in a
                     // consistent alphabetical order, regardless of the salsa ordering that we are
                     // using the in BDD.
-                    if let (_, crate::types::TypeData::TypeVar(bound)) = {
-                        let __ty_view_value = lower;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    if let crate::types::TypeData::TypeVar(bound) = lower.data() {
                         let bound = bound.identity(self.db).display(self.db).to_string();
                         let typevar = typevar.identity(self.db).display(self.db).to_string();
                         let (smaller, larger) = if bound < typevar {

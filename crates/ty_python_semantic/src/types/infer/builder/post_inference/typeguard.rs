@@ -10,10 +10,7 @@ pub(crate) fn check_type_guard_definition<'db>(
     ty: Type<'db>,
     node: &ast::StmtFunctionDef,
 ) {
-    let (_, crate::types::TypeData::FunctionLiteral(function)) = ({
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::FunctionLiteral(function) = ty.data() else {
         return;
     };
 
@@ -24,15 +21,10 @@ pub(crate) fn check_type_guard_definition<'db>(
         let return_ty = signature.return_ty;
 
         // Check if this is a `TypeIs` or `TypeGuard` return type.
-        let (type_guard_form_name, narrowed_type) = match {
-            let __ty_view_value = return_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeIs(type_is)) => {
-                ("TypeIs", Some(type_is.return_type(db)))
-            }
-            (_, crate::types::TypeData::TypeGuard(_)) => ("TypeGuard", None),
-            (_, _) => continue,
+        let (type_guard_form_name, narrowed_type) = match return_ty.data() {
+            crate::types::TypeData::TypeIs(type_is) => ("TypeIs", Some(type_is.return_type(db))),
+            crate::types::TypeData::TypeGuard(_) => ("TypeGuard", None),
+            _ => continue,
         };
 
         // The return type annotation must exist since we matched `TypeIs`/`TypeGuard`.

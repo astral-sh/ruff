@@ -123,26 +123,17 @@ impl<'db, Tag> TypeTransformer<'db, Tag> {
             return true;
         }
 
-        match (
-            ({
-                let __ty_view_value = left;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            ({
-                let __ty_view_value = right;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-        ) {
+        match (left.data(), right.data()) {
             // We can create a self-referential function type: e.g. `def f(x: "TypeOf[f]"): reveal_type(x)`
             // To avoid the difficulty of equality checking for function types containing this, we simply use `literal` for equality checking.
             (
-                (_, crate::types::TypeData::FunctionLiteral(left)),
-                (_, crate::types::TypeData::FunctionLiteral(right)),
+                crate::types::TypeData::FunctionLiteral(left),
+                crate::types::TypeData::FunctionLiteral(right),
             ) => left.literal(db) == right.literal(db),
             // Similarly, we can create a self-referential NewType: e.g. `T = NewType("T", list["T"])`
             (
-                (_, crate::types::TypeData::NewTypeInstance(left)),
-                (_, crate::types::TypeData::NewTypeInstance(right)),
+                crate::types::TypeData::NewTypeInstance(left),
+                crate::types::TypeData::NewTypeInstance(right),
             ) => left.definition(db) == right.definition(db),
             _ => false,
         }

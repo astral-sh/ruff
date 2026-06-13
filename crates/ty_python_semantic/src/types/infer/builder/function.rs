@@ -73,10 +73,7 @@ impl<'db> ExpectedReturnType<'db> {
     ) -> Self {
         /// Normalizes special return annotations to the type actually returned by expressions.
         fn normalize<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            match ty.view() {
                 (_, crate::types::TypeData::TypeIs(_) | crate::types::TypeData::TypeGuard(_)) => {
                     KnownClass::Bool.to_instance(db)
                 }
@@ -256,10 +253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .iter()
                 .copied()
                 .filter_map(|ty_range| {
-                    match {
-                        let __ty_view_value = ty_range.ty;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    match ty_range.ty.view() {
                         // We skip `is_assignable_to` checks for `NotImplemented`,
                         // so we remove it beforehand.
                         (_, crate::types::TypeData::Union(union)) => Some(TypeAndRange {
@@ -347,11 +341,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 FunctionDecorators::from_decorator_type(db, decorator_type);
             function_decorators |= decorator_function_decorator;
 
-            match {
-                let __ty_view_value = decorator_type;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::FunctionLiteral(function)) => {
+            match decorator_type.data() {
+                crate::types::TypeData::FunctionLiteral(function) => {
                     match function.known(db) {
                         Some(KnownFunction::NoTypeCheck) => {
                             // If the function is decorated with the `no_type_check` decorator,
@@ -366,10 +357,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         _ => {}
                     }
                 }
-                (_, crate::types::TypeData::DataclassTransformer(params)) => {
+                crate::types::TypeData::DataclassTransformer(params) => {
                     dataclass_transformer_params = Some(params);
                 }
-                (_, _) => {}
+                _ => {}
             }
             if !decorator_function_decorator.is_empty() {
                 continue;
@@ -463,16 +454,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = if let (
-                _,
-                crate::types::TypeData::KnownInstance(KnownInstanceType::Deprecated(deprecated)),
-            ) = ({
-                let __ty_view_value = decorator_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) && let (_, crate::types::TypeData::FunctionLiteral(function)) = ({
-                let __ty_view_value = inferred_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) {
+            inferred_ty = if let crate::types::TypeData::KnownInstance(
+                KnownInstanceType::Deprecated(deprecated),
+            ) = decorator_ty.data()
+                && let crate::types::TypeData::FunctionLiteral(function) = inferred_ty.data()
+            {
                 Type::FunctionLiteral(function.with_deprecated(db, deprecated))
             } else {
                 self.apply_decorator(*decorator_ty, inferred_ty, decorator_node)
@@ -529,10 +515,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .replace(InferenceFlags::IN_NO_TYPE_CHECK, true);
         for decorator in &function.decorator_list {
             let decorator_type = self.infer_decorator(decorator);
-            if let (_, crate::types::TypeData::FunctionLiteral(function)) = ({
-                let __ty_view_value = decorator_type;
-                (__ty_view_value, __ty_view_value.data())
-            }) && let Some(KnownFunction::NoTypeCheck) = function.known(db)
+            if let crate::types::TypeData::FunctionLiteral(function) = decorator_type.data()
+                && let Some(KnownFunction::NoTypeCheck) = function.known(db)
             {
                 // If the function is decorated with the `no_type_check` decorator,
                 // we need to suppress any errors that come after the decorators.
@@ -823,10 +807,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // P.args and P.kwargs are only valid as annotations on *args and **kwargs,
             // not on regular parameters.
-            if let (_, crate::types::TypeData::TypeVar(typevar)) = ({
-                let __ty_view_value = declared_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) && typevar.is_paramspec(db)
+            if let crate::types::TypeData::TypeVar(typevar) = declared_ty.data()
+                && typevar.is_paramspec(db)
                 && let Some(attr) = typevar.paramspec_attr(db)
             {
                 let name = typevar.name(db);
@@ -916,10 +898,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                if let (_, crate::types::TypeData::TypeVar(typevar)) = ({
-                    let __ty_view_value = annotated_type;
-                    (__ty_view_value, __ty_view_value.data())
-                }) && typevar.is_paramspec(db)
+                if let crate::types::TypeData::TypeVar(typevar) = annotated_type.data()
+                    && typevar.is_paramspec(db)
                 {
                     match typevar.paramspec_attr(db) {
                         // `*args: P.args`
@@ -1052,10 +1032,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(annotation) = parameter.annotation() {
             let annotated_type = self.file_expression_type(annotation);
-            let ty = if let (_, crate::types::TypeData::TypeVar(typevar)) = ({
-                let __ty_view_value = annotated_type;
-                (__ty_view_value, __ty_view_value.data())
-            }) && typevar.is_paramspec(db)
+            let ty = if let crate::types::TypeData::TypeVar(typevar) = annotated_type.data()
+                && typevar.is_paramspec(db)
             {
                 match typevar.paramspec_attr(db) {
                     // `**kwargs: P.args`

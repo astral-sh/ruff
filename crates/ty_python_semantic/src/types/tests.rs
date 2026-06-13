@@ -367,15 +367,9 @@ fn type_alias_variance() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> PEP695TypeAliasType<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
-        let (
-            _,
-            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
-                TypeAliasType::PEP695(type_alias),
-            )),
-        ) = ({
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        })
+        let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(type_alias),
+        )) = ty.data()
         else {
             panic!("Expected `{name}` to be a type alias");
         };
@@ -529,15 +523,9 @@ fn eager_expansion() {
     fn get_type_alias<'db>(db: &'db TestDb, name: &str) -> Type<'db> {
         let module = ruff_db::files::system_path_to_file(db, "/src/a.py").unwrap();
         let ty = global_symbol(db, module, name).place.expect_type();
-        let (
-            _,
-            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
-                TypeAliasType::PEP695(type_alias),
-            )),
-        ) = ({
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        })
+        let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(type_alias),
+        )) = ty.data()
         else {
             panic!("Expected `{name}` to be a type alias");
         };

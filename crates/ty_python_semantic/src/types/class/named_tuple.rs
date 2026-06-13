@@ -449,16 +449,11 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
                 .expect("Expected `NamedTuple` definition to be an assignment")
                 .as_call_expr()
                 .expect("Expected `NamedTuple` definition r.h.s. to be a call expression");
-            match {
-                let __ty_view_value =
-                    definition_expression_type(db, definition, &node.arguments.args[1]);
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (
-                    _,
-                    crate::types::TypeData::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)),
-                ) => spec,
-                (_, _) => NamedTupleSpec::unknown(db),
+            match definition_expression_type(db, definition, &node.arguments.args[1]).data() {
+                crate::types::TypeData::KnownInstance(KnownInstanceType::NamedTupleSpec(spec)) => {
+                    spec
+                }
+                _ => NamedTupleSpec::unknown(db),
             }
         }
 

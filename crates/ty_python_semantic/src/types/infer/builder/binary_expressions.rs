@@ -134,15 +134,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // `__or__`/`__ror__` method on the TypedDict side.
         if op == ast::Operator::BitOr && matches!(left, ast::Expr::Dict(_)) {
             let right_ty = self.infer_expression(right, operand_tcx(right));
-            if let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
-                let __ty_view_value = right_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) && let Some(ty) = self.try_typed_dict_pep_584_dunder(
-                left,
-                typed_dict.to_partial(self.db()),
-                typed_dict,
-                "__ror__",
-            ) {
+            if let crate::types::TypeData::TypedDict(typed_dict) = right_ty.data()
+                && let Some(ty) = self.try_typed_dict_pep_584_dunder(
+                    left,
+                    typed_dict.to_partial(self.db()),
+                    typed_dict,
+                    "__ror__",
+                )
+            {
                 return BinaryExpressionOperandTypes::TypedDictResult(ty);
             }
 
@@ -156,10 +155,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let left_ty = self.infer_expression(left, operand_tcx(left));
         if op == ast::Operator::BitOr
-            && let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
-                let __ty_view_value = left_ty;
-                (__ty_view_value, __ty_view_value.data())
-            })
+            && let crate::types::TypeData::TypedDict(typed_dict) = left_ty.data()
             && matches!(right, ast::Expr::Dict(_))
             && let Some(ty) = self.try_typed_dict_pep_584_dunder(
                 right,
@@ -220,10 +216,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return None;
         }
 
-        let (_, crate::types::TypeData::TypedDict(typed_dict)) = ({
-            let __ty_view_value = target_type;
-            (__ty_view_value, __ty_view_value.data())
-        }) else {
+        let crate::types::TypeData::TypedDict(typed_dict) = target_type.data() else {
             return None;
         };
 
@@ -327,17 +320,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
         }
 
-        match (
-            ({
-                let __ty_view_value = left_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            ({
-                let __ty_view_value = right_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            op,
-        ) {
+        match (left_ty.view(), right_ty.view(), op) {
             ((_, crate::types::TypeData::Union(lhs_union)), (rhs, _), _) => {
                 lhs_union.try_map(db, |lhs_element| {
                     self.infer_binary_expression_type_impl(
@@ -914,16 +897,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     _ => Type::try_call_bin_op_return_type(db, left_ty, op, right_ty),
                 };
 
-                result.map(|result| {
-                    match {
-                        let __ty_view_value = result;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
-                        (_, crate::types::TypeData::LiteralValue(literal)) => Type::LiteralValue(
-                            literal.with_recursively_defined(recursively_defined),
-                        ),
-                        (_, _) => result,
+                result.map(|result| match result.data() {
+                    crate::types::TypeData::LiteralValue(literal) => {
+                        Type::LiteralValue(literal.with_recursively_defined(recursively_defined))
                     }
+                    _ => result,
                 })
             }
 
@@ -1156,21 +1134,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         left: Type<'db>,
     ) -> bool {
         let db = self.db();
-        match {
-            let __ty_view_value = left;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::LiteralValue(literal))
+        match left.data() {
+            crate::types::TypeData::LiteralValue(literal)
                 if matches!(
                     literal.kind(),
                     LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
                 ) => {}
-            (_, crate::types::TypeData::NominalInstance(instance))
+            crate::types::TypeData::NominalInstance(instance)
                 if matches!(
                     instance.known_class(db),
                     Some(KnownClass::Float | KnownClass::Int | KnownClass::Bool)
                 ) => {}
-            (_, _) => return false,
+            _ => return false,
         }
 
         let (op, by_zero) = match op {

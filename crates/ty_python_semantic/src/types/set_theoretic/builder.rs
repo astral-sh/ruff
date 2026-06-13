@@ -61,10 +61,7 @@ fn split_truthiness_guarded_intersection<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
 ) -> Option<(Type<'db>, Type<'db>)> {
-    let (_, crate::types::TypeData::Intersection(intersection)) = ({
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::Intersection(intersection) = ty.data() else {
         return None;
     };
     let falsy = Type::AlwaysTruthy.negate(db);
@@ -149,10 +146,8 @@ fn merge_truthiness_guarded_pair<'db>(
 /// ```
 fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'db>>) -> bool {
     for complement_index in 0..types.len() {
-        let (_, crate::types::TypeData::EnumComplement(complement)) = ({
-            let __ty_view_value = types[complement_index];
-            (__ty_view_value, __ty_view_value.data())
-        }) else {
+        let crate::types::TypeData::EnumComplement(complement) = types[complement_index].data()
+        else {
             continue;
         };
         let enum_class = complement.enum_class(db);
@@ -166,10 +161,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
                 continue;
             }
 
-            if let (_, crate::types::TypeData::EnumComplement(other_complement)) = {
-                let __ty_view_value = *ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::EnumComplement(other_complement) = (*ty).data() {
                 if other_complement.enum_class(db) == enum_class
                     && other_complement.rest(db) == complement.rest(db)
                 {
@@ -239,13 +231,7 @@ enum LiteralKind<'db> {
 impl<'db> Type<'db> {
     /// Return `true` if this type can be a supertype of some literals of `kind` and not others.
     fn splits_literals(self, db: &'db dyn Db, kind: LiteralKind) -> bool {
-        match (
-            ({
-                let __ty_view_value = self;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            kind,
-        ) {
+        match (self.data(), kind) {
             // Note that as of 2026-01-04, `AlwaysFalsy` and `AlwaysTruthy` never split
             // enum literals, but that could change in the future. `Literal[Foo.X]` could
             // plausibly be understood by ty as a subtype of `AlwaysFalsy` in the following
@@ -257,12 +243,8 @@ impl<'db> Type<'db> {
             //     X = 0
             //     Y = 1
             // ```
-            (
-                (_, crate::types::TypeData::AlwaysFalsy | crate::types::TypeData::AlwaysTruthy),
-                _,
-            ) => true,
-            ((_, crate::types::TypeData::LiteralValue(literal)), _) => match (literal.kind(), kind)
-            {
+            (crate::types::TypeData::AlwaysFalsy | crate::types::TypeData::AlwaysTruthy, _) => true,
+            (crate::types::TypeData::LiteralValue(literal), _) => match (literal.kind(), kind) {
                 (LiteralValueTypeKind::String(_), LiteralKind::String) => true,
                 (LiteralValueTypeKind::Bytes(_), LiteralKind::Bytes) => true,
                 (LiteralValueTypeKind::Int(_), LiteralKind::Int) => true,
@@ -271,7 +253,7 @@ impl<'db> Type<'db> {
                 }
                 _ => false,
             },
-            ((_, crate::types::TypeData::Intersection(intersection)), _) => {
+            (crate::types::TypeData::Intersection(intersection), _) => {
                 intersection
                     .positive(db)
                     .iter()
@@ -281,12 +263,12 @@ impl<'db> Type<'db> {
                         .iter()
                         .any(|ty| ty.splits_literals(db, kind))
             }
-            ((_, crate::types::TypeData::Union(union)), _) => union
+            (crate::types::TypeData::Union(union), _) => union
                 .elements(db)
                 .iter()
                 .any(|ty| ty.splits_literals(db, kind)),
             (
-                (_, crate::types::TypeData::EnumComplement(complement)),
+                crate::types::TypeData::EnumComplement(complement),
                 LiteralKind::Enum { enum_class },
             ) => complement.enum_class(db) == enum_class,
             _ => false,
@@ -971,13 +953,7 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if should_simplify_full
-                && !matches!(
-                    {
-                        let __ty_view_value = element_type;
-                        (__ty_view_value, __ty_view_value.data())
-                    },
-                    (_, crate::types::TypeData::TypeAlias(_))
-                )
+                && !matches!(element_type.data(), crate::types::TypeData::TypeAlias(_))
             {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
@@ -1125,11 +1101,8 @@ impl<'db> IntersectionBuilder<'db> {
         ty: Type<'db>,
         seen_aliases: &mut Vec<Type<'db>>,
     ) -> Self {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
+        match ty.data() {
+            crate::types::TypeData::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1141,7 +1114,7 @@ impl<'db> IntersectionBuilder<'db> {
                 let value_type = alias.value_type(self.db);
                 self.add_positive_impl(value_type, seen_aliases)
             }
-            (_, crate::types::TypeData::Union(union)) => {
+            crate::types::TypeData::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
                 // of those sub-intersections in it. E.g. if `self` is a simple intersection `T1 & T2`
@@ -1160,7 +1133,7 @@ impl<'db> IntersectionBuilder<'db> {
                     })
             }
             // `(A & B & ~C) & (D & E & ~F)` -> `A & B & D & E & ~C & ~F`
-            (_, crate::types::TypeData::Intersection(other)) => {
+            crate::types::TypeData::Intersection(other) => {
                 let db = self.db;
                 for pos in other.positive(db) {
                     self = self.add_positive_impl(*pos, seen_aliases);
@@ -1170,11 +1143,11 @@ impl<'db> IntersectionBuilder<'db> {
                 }
                 self
             }
-            (_, crate::types::TypeData::EnumComplement(complement)) => {
+            crate::types::TypeData::EnumComplement(complement) => {
                 let db = self.db;
                 self.add_positive_impl(complement.to_intersection(db), seen_aliases)
             }
-            (_, _) => {
+            _ => {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
                 for inner in &mut self.intersections {
@@ -1195,11 +1168,8 @@ impl<'db> IntersectionBuilder<'db> {
         seen_aliases: &mut Vec<Type<'db>>,
     ) -> Self {
         // See comments above in `add_positive`; this is just the negated version.
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
+        match ty.data() {
+            crate::types::TypeData::TypeAlias(alias) => {
                 if seen_aliases.contains(&ty) {
                     // Recursive alias, add it without expanding to avoid infinite recursion.
                     for inner in &mut self.intersections {
@@ -1211,13 +1181,13 @@ impl<'db> IntersectionBuilder<'db> {
                 let value_type = alias.value_type(self.db);
                 self.add_negative_impl(value_type, seen_aliases)
             }
-            (_, crate::types::TypeData::Union(union)) => {
+            crate::types::TypeData::Union(union) => {
                 for elem in union.elements(self.db) {
                     self = self.add_negative_impl(*elem, seen_aliases);
                 }
                 self
             }
-            (_, crate::types::TypeData::Intersection(intersection)) => {
+            crate::types::TypeData::Intersection(intersection) => {
                 // (A | B) & ~(C & ~D)
                 // -> (A | B) & (~C | D)
                 // -> ((A | B) & ~C) | ((A | B) & D)
@@ -1251,11 +1221,11 @@ impl<'db> IntersectionBuilder<'db> {
                     },
                 )
             }
-            (_, crate::types::TypeData::EnumComplement(complement)) => {
+            crate::types::TypeData::EnumComplement(complement) => {
                 let db = self.db;
                 self.add_negative_impl(complement.to_intersection(db), seen_aliases)
             }
-            (_, _) => {
+            _ => {
                 for inner in &mut self.intersections {
                     inner.add_negative(self.db, ty);
                 }
@@ -1310,10 +1280,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
     /// ```
     fn has_empty_enum_complement(&self, db: &'db dyn Db) -> bool {
         for positive in &self.positive {
-            let (_, crate::types::TypeData::NominalInstance(instance)) = ({
-                let __ty_view_value = positive;
-                (__ty_view_value, __ty_view_value.data())
-            }) else {
+            let crate::types::TypeData::NominalInstance(instance) = positive.data() else {
                 continue;
             };
 
@@ -1381,11 +1348,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // A runtime class value of `TypeForm[T]` has type `type[T]`.
-        match {
-            let __ty_view_value = new_positive;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeForm(typeform)) => {
+        match new_positive.data() {
+            crate::types::TypeData::TypeForm(typeform) => {
                 if let Some(narrowed) = SubclassOfType::try_from_instance(
                     db,
                     typeform.type_argument(db).resolve_type_alias(db),
@@ -1394,54 +1358,46 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     new_positive = narrowed;
                 }
             }
-            (_, crate::types::TypeData::NominalInstance(instance))
+            crate::types::TypeData::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::Type) =>
             {
                 if let Some((index, narrowed)) =
                     self.positive
                         .iter()
                         .enumerate()
-                        .find_map(|(index, positive)| {
-                            match {
-                                let __ty_view_value = positive;
-                                (__ty_view_value, __ty_view_value.data())
-                            } {
-                                (_, crate::types::TypeData::TypeForm(typeform)) => {
-                                    SubclassOfType::try_from_instance(
-                                        db,
-                                        typeform.type_argument(db).resolve_type_alias(db),
-                                    )
-                                    .map(|narrowed| (index, narrowed))
-                                }
-                                (_, _) => None,
+                        .find_map(|(index, positive)| match positive.data() {
+                            crate::types::TypeData::TypeForm(typeform) => {
+                                SubclassOfType::try_from_instance(
+                                    db,
+                                    typeform.type_argument(db).resolve_type_alias(db),
+                                )
+                                .map(|narrowed| (index, narrowed))
                             }
+                            _ => None,
                         })
                 {
                     self.positive.swap_remove_index(index);
                     new_positive = narrowed;
                 }
             }
-            (_, _) => {}
+            _ => {}
         }
 
-        match {
-            let __ty_view_value = new_positive;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match new_positive.data() {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
-            (_, crate::types::TypeData::AlwaysTruthy)
+            crate::types::TypeData::AlwaysTruthy
                 if self.positive.contains(&Type::literal_string()) =>
             {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             // `LiteralString & AlwaysFalsy` -> `Literal[""]`
-            (_, crate::types::TypeData::AlwaysFalsy)
+            crate::types::TypeData::AlwaysFalsy
                 if self.positive.swap_remove(&Type::literal_string()) =>
             {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `AlwaysTruthy & LiteralString` -> `LiteralString & ~Literal[""]`
-            (_, crate::types::TypeData::LiteralValue(literal))
+            crate::types::TypeData::LiteralValue(literal)
                 if literal.is_literal_string()
                     && self.positive.swap_remove(&Type::AlwaysTruthy) =>
             {
@@ -1449,27 +1405,27 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             // `AlwaysFalsy & LiteralString` -> `Literal[""]`
-            (_, crate::types::TypeData::LiteralValue(literal))
+            crate::types::TypeData::LiteralValue(literal)
                 if literal.is_literal_string() && self.positive.swap_remove(&Type::AlwaysFalsy) =>
             {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & AlwaysFalsy` -> `Literal[""]`
-            (_, crate::types::TypeData::LiteralValue(literal))
+            crate::types::TypeData::LiteralValue(literal)
                 if literal.is_literal_string()
                     && self.negative.swap_remove(&Type::AlwaysTruthy) =>
             {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
-            (_, crate::types::TypeData::LiteralValue(literal))
+            crate::types::TypeData::LiteralValue(literal)
                 if literal.is_literal_string() && self.negative.swap_remove(&Type::AlwaysFalsy) =>
             {
                 self.add_positive(db, Type::literal_string());
                 self.add_negative(db, Type::string_literal(db, ""));
             }
 
-            (_, _) => {
+            _ => {
                 let positive_as_instance = new_positive.as_nominal_instance();
 
                 if let Some(instance) = positive_as_instance
@@ -1483,37 +1439,31 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     .is_some_and(|instance| instance.has_known_class(db, KnownClass::Bool));
 
                 for (index, existing_positive) in self.positive.iter().enumerate() {
-                    match {
-                        let __ty_view_value = existing_positive;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    match existing_positive.data() {
                         // `AlwaysTruthy & bool` -> `Literal[True]`
-                        (_, crate::types::TypeData::AlwaysTruthy) if addition_is_bool_instance => {
+                        crate::types::TypeData::AlwaysTruthy if addition_is_bool_instance => {
                             new_positive = Type::bool_literal(true);
                         }
                         // `AlwaysFalsy & bool` -> `Literal[False]`
-                        (_, crate::types::TypeData::AlwaysFalsy) if addition_is_bool_instance => {
+                        crate::types::TypeData::AlwaysFalsy if addition_is_bool_instance => {
                             new_positive = Type::bool_literal(false);
                         }
-                        (_, crate::types::TypeData::NominalInstance(instance))
+                        crate::types::TypeData::NominalInstance(instance)
                             if instance.has_known_class(db, KnownClass::Bool) =>
                         {
-                            match {
-                                let __ty_view_value = new_positive;
-                                (__ty_view_value, __ty_view_value.data())
-                            } {
+                            match new_positive.data() {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
-                                (_, crate::types::TypeData::AlwaysTruthy) => {
+                                crate::types::TypeData::AlwaysTruthy => {
                                     new_positive = Type::bool_literal(true);
                                 }
                                 // `bool & AlwaysFalsy` -> `Literal[False]`
-                                (_, crate::types::TypeData::AlwaysFalsy) => {
+                                crate::types::TypeData::AlwaysFalsy => {
                                     new_positive = Type::bool_literal(false);
                                 }
-                                (_, _) => continue,
+                                _ => continue,
                             }
                         }
-                        (_, _) => continue,
+                        _ => continue,
                     }
                     self.positive.swap_remove_index(index);
                     break;
@@ -1521,29 +1471,24 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
                 if addition_is_bool_instance {
                     for (index, existing_negative) in self.negative.iter().enumerate() {
-                        match {
-                            let __ty_view_value = existing_negative;
-                            (__ty_view_value, __ty_view_value.data())
-                        } {
+                        match existing_negative.data() {
                             // `bool & ~Literal[False]` -> `Literal[True]`
                             // `bool & ~Literal[True]` -> `Literal[False]`
-                            (_, crate::types::TypeData::LiteralValue(literal)) => {
-                                match literal.kind() {
-                                    LiteralValueTypeKind::Bool(bool_value) => {
-                                        new_positive = Type::bool_literal(!bool_value);
-                                    }
-                                    _ => continue,
+                            crate::types::TypeData::LiteralValue(literal) => match literal.kind() {
+                                LiteralValueTypeKind::Bool(bool_value) => {
+                                    new_positive = Type::bool_literal(!bool_value);
                                 }
-                            }
+                                _ => continue,
+                            },
                             // `bool & ~AlwaysTruthy` -> `Literal[False]`
-                            (_, crate::types::TypeData::AlwaysTruthy) => {
+                            crate::types::TypeData::AlwaysTruthy => {
                                 new_positive = Type::bool_literal(false);
                             }
                             // `bool & ~AlwaysFalsy` -> `Literal[True]`
-                            (_, crate::types::TypeData::AlwaysFalsy) => {
+                            crate::types::TypeData::AlwaysFalsy => {
                                 new_positive = Type::bool_literal(true);
                             }
-                            (_, _) => continue,
+                            _ => continue,
                         }
                         self.negative.swap_remove_index(index);
                         break;
@@ -1620,10 +1565,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .any(KnownClass::is_bool)
         };
 
-        match {
-            let __ty_view_value = new_negative;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match new_negative.view() {
             (_, crate::types::TypeData::Intersection(inter)) => {
                 for pos in inter.positive(db) {
                     self.add_negative(db, *pos);
@@ -1762,10 +1704,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         let mut to_add = SmallVec::<[Type<'db>; 1]>::new();
 
         for ty in &self.positive {
-            let (_, crate::types::TypeData::TypeVar(bound_typevar)) = ({
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) else {
+            let crate::types::TypeData::TypeVar(bound_typevar) = ty.data() else {
                 continue;
             };
             let Some(TypeVarBoundOrConstraints::Constraints(constraints)) =
@@ -1828,14 +1767,8 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // to `Never`.
         if self.positive.iter().any(|ty| {
             matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (
-                    _,
-                    crate::types::TypeData::TypeVar(_) | crate::types::TypeData::NewTypeInstance(_)
-                )
+                ty.data(),
+                crate::types::TypeData::TypeVar(_) | crate::types::TypeData::NewTypeInstance(_)
             )
         }) {
             let speculative =
@@ -1944,15 +1877,9 @@ mod tests {
 
         let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
         let alias_ty = global_symbol(&db, module, "Alias").place.expect_type();
-        let (
-            _,
-            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
-                TypeAliasType::PEP695(alias),
-            )),
-        ) = ({
-            let __ty_view_value = alias_ty;
-            (__ty_view_value, __ty_view_value.data())
-        })
+        let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::PEP695(alias),
+        )) = alias_ty.data()
         else {
             panic!("Expected `Alias` to be a type alias");
         };

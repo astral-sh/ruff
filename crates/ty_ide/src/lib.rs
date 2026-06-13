@@ -281,10 +281,7 @@ pub trait HasNavigationTargets {
 
 impl HasNavigationTargets for Type<'_> {
     fn navigation_targets(&self, db: &dyn Db) -> NavigationTargets {
-        match {
-            let __ty_view_value = self;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match self.view() {
             (_, ty_python_semantic::types::TypeData::Union(union)) => union
                 .elements(db)
                 .iter()

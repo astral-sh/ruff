@@ -70,24 +70,21 @@ impl<'db> NewType<'db> {
         let Some(second_arg) = call_expr.arguments.args.get(1) else {
             return object_fallback;
         };
-        match {
-            let __ty_view_value = definition_expression_type(db, definition, second_arg);
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::NominalInstance(nominal_instance_type)) => {
+        match definition_expression_type(db, definition, second_arg).data() {
+            crate::types::TypeData::NominalInstance(nominal_instance_type) => {
                 NewTypeBase::ClassType(nominal_instance_type.class(db))
             }
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => NewTypeBase::NewType(newtype),
+            crate::types::TypeData::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
             // There are exactly two union types allowed as bases for NewType: `int | float` and
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
             // or explicit, so the explicit version is also allowed.
-            (_, crate::types::TypeData::Union(union_type)) => match union_type.known(db) {
+            crate::types::TypeData::Union(union_type) => match union_type.known(db) {
                 Some(KnownUnion::Float) => NewTypeBase::Float,
                 Some(KnownUnion::Complex) => NewTypeBase::Complex,
                 _ => object_fallback,
             },
-            (_, _) => object_fallback,
+            _ => object_fallback,
         }
     }
 

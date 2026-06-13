@@ -313,22 +313,19 @@ fn enum_literal_subject_names<'db>(
     let mut enum_class = None;
     let mut names = FxHashSet::default();
 
-    match {
-        let __ty_view_value = subject_ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::LiteralValue(_)) => {
+    match subject_ty.data() {
+        crate::types::TypeData::LiteralValue(_) => {
             add_enum_literal(db, &mut enum_class, &mut names, subject_ty)?;
         }
-        (_, crate::types::TypeData::Union(union)) => {
+        crate::types::TypeData::Union(union) => {
             for element in union.elements(db) {
                 add_enum_literal(db, &mut enum_class, &mut names, *element)?;
             }
         }
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             return enum_literal_subject_names(db, alias.value_type(db));
         }
-        (_, _) => return None,
+        _ => return None,
     }
 
     Some((enum_class?, names))
@@ -1033,20 +1030,18 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = match {
-                let __ty_view_value =
-                    infer_same_file_expression_type(db, *class_expr, TypeContext::default());
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::ClassLiteral(class)) => {
-                    Some(Type::instance(db, class.top_materialization(db)))
-                }
-                (
-                    _,
-                    crate::types::TypeData::SpecialForm(SpecialFormType::CollectionsAbcCallable),
-                ) => Some(callable_pattern_type(db)),
-                (_, _) => None,
-            };
+            let class_ty =
+                match infer_same_file_expression_type(db, *class_expr, TypeContext::default())
+                    .data()
+                {
+                    crate::types::TypeData::ClassLiteral(class) => {
+                        Some(Type::instance(db, class.top_materialization(db)))
+                    }
+                    crate::types::TypeData::SpecialForm(
+                        SpecialFormType::CollectionsAbcCallable,
+                    ) => Some(callable_pattern_type(db)),
+                    _ => None,
+                };
 
             class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                 if subject_ty.is_subtype_of(db, class_ty) {
@@ -1131,13 +1126,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // very few dynamic types, in which case Salsa's sharding the locks by value
             // doesn't help much.
             // See <https://github.com/astral-sh/ty/issues/968>.
-            if matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::Dynamic(_))
-            ) {
+            if matches!(ty.data(), crate::types::TypeData::Dynamic(_)) {
                 return Truthiness::AlwaysTrue.negate_if(!predicate.is_positive);
             }
 

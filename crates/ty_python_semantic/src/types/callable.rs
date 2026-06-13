@@ -81,41 +81,35 @@ impl<'db> Type<'db> {
             return fallback.try_upcast_to_callable_with_policy_and_context(db, policy, context);
         }
 
-        match {
-            let __ty_view_value = self;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Callable(callable)) => Some(CallableTypes::one(callable)),
+        match self.data() {
+            crate::types::TypeData::Callable(callable) => Some(CallableTypes::one(callable)),
 
-            (_, crate::types::TypeData::Dynamic(_)) => Some(CallableTypes::one(
+            crate::types::TypeData::Dynamic(_) => Some(CallableTypes::one(
                 CallableType::function_like(db, Signature::dynamic(self)),
             )),
-            (_, crate::types::TypeData::Divergent(_)) => Some(CallableTypes::one(
+            crate::types::TypeData::Divergent(_) => Some(CallableTypes::one(
                 CallableType::function_like(db, Signature::dynamic(self)),
             )),
 
-            (_, crate::types::TypeData::FunctionLiteral(function_literal))
+            crate::types::TypeData::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            (_, crate::types::TypeData::FunctionLiteral(function_literal)) => {
+            crate::types::TypeData::FunctionLiteral(function_literal) => {
                 Some(CallableTypes::one(function_literal.into_callable_type(db)))
             }
-            (_, crate::types::TypeData::BoundMethod(bound_method))
+            crate::types::TypeData::BoundMethod(bound_method)
                 if context.is_recursive_reference(db, bound_method.function(db)) =>
             {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
-            (_, crate::types::TypeData::BoundMethod(bound_method)) => {
+            crate::types::TypeData::BoundMethod(bound_method) => {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
-            (
-                _,
-                crate::types::TypeData::NominalInstance(_)
-                | crate::types::TypeData::ProtocolInstance(_),
-            ) => {
+            crate::types::TypeData::NominalInstance(_)
+            | crate::types::TypeData::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
                         db,
@@ -134,21 +128,19 @@ impl<'db> Type<'db> {
                     None
                 }
             }
-            (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
+            crate::types::TypeData::ClassLiteral(class_literal) => {
                 Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
-            (_, crate::types::TypeData::GenericAlias(alias)) => {
+            crate::types::TypeData::GenericAlias(alias) => {
                 Some(ClassType::Generic(alias).into_callable(db))
             }
 
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => newtype
+            crate::types::TypeData::NewTypeInstance(newtype) => newtype
                 .concrete_base_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
 
-            (_, crate::types::TypeData::SubclassOf(subclass_of_ty))
-                if policy == UpcastPolicy::Sound =>
-            {
+            crate::types::TypeData::SubclassOf(subclass_of_ty) if policy == UpcastPolicy::Sound => {
                 Some(CallableTypes::one(CallableType::function_like(
                     db,
                     Signature::new(Parameters::top(), subclass_of_ty.to_instance(db)),
@@ -156,63 +148,67 @@ impl<'db> Type<'db> {
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
-            (_, crate::types::TypeData::SubclassOf(subclass_of_ty)) => match subclass_of_ty
-                .subclass_of()
-            {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        let upcast_callables = bound
-                            .to_meta_type(db)
-                            .try_upcast_to_callable_with_policy_and_context(db, policy, context)?;
-                        Some(upcast_callables.map(|callable| {
-                            let signatures = callable
-                                .signatures(db)
-                                .into_iter()
-                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                            CallableType::new(
-                                db,
-                                CallableSignature::from_overloads(signatures),
-                                callable.kind(db),
-                                callable.provenance(db),
-                            )
-                        }))
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        let mut callables = SmallVec::new();
-                        for constraint in constraints.elements(db) {
-                            let element_upcast = constraint
-                                .to_meta_type(db)
-                                .try_upcast_to_callable_with_policy_and_context(
-                                    db, policy, context,
-                                )?;
-                            for callable in element_upcast.into_inner() {
-                                let signatures = callable
-                                    .signatures(db)
-                                    .into_iter()
-                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
-                                callables.push(CallableType::new(
-                                    db,
-                                    CallableSignature::from_overloads(signatures),
-                                    callable.kind(db),
-                                    callable.provenance(db),
-                                ));
+            crate::types::TypeData::SubclassOf(subclass_of_ty) => {
+                match subclass_of_ty.subclass_of() {
+                    SubclassOfInner::Class(class) => Some(class.into_callable(db)),
+                    SubclassOfInner::TypeVar(tvar) => {
+                        match tvar.typevar(db).bound_or_constraints(db) {
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                let upcast_callables = bound
+                                    .to_meta_type(db)
+                                    .try_upcast_to_callable_with_policy_and_context(
+                                        db, policy, context,
+                                    )?;
+                                Some(upcast_callables.map(|callable| {
+                                    let signatures =
+                                        callable.signatures(db).into_iter().map(|sig| {
+                                            sig.clone().with_return_type(Type::TypeVar(tvar))
+                                        });
+                                    CallableType::new(
+                                        db,
+                                        CallableSignature::from_overloads(signatures),
+                                        callable.kind(db),
+                                        callable.provenance(db),
+                                    )
+                                }))
                             }
+                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                let mut callables = SmallVec::new();
+                                for constraint in constraints.elements(db) {
+                                    let element_upcast = constraint
+                                        .to_meta_type(db)
+                                        .try_upcast_to_callable_with_policy_and_context(
+                                            db, policy, context,
+                                        )?;
+                                    for callable in element_upcast.into_inner() {
+                                        let signatures =
+                                            callable.signatures(db).into_iter().map(|sig| {
+                                                sig.clone().with_return_type(Type::TypeVar(tvar))
+                                            });
+                                        callables.push(CallableType::new(
+                                            db,
+                                            CallableSignature::from_overloads(signatures),
+                                            callable.kind(db),
+                                            callable.provenance(db),
+                                        ));
+                                    }
+                                }
+                                Some(CallableTypes::new(callables))
+                            }
+                            None => Some(CallableTypes::one(CallableType::single(
+                                db,
+                                Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                            ))),
                         }
-                        Some(CallableTypes::new(callables))
                     }
-                    None => Some(CallableTypes::one(CallableType::single(
+                    SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
                     ))),
-                },
-                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
-                    db,
-                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
-                ))),
-            },
+                }
+            }
 
-            (_, crate::types::TypeData::Union(union)) => {
+            crate::types::TypeData::Union(union) => {
                 let mut callables = SmallVec::new();
                 for element in union.elements(db) {
                     let element_callable = element
@@ -222,27 +218,24 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::new(callables))
             }
 
-            (_, crate::types::TypeData::LiteralValue(literal)) => match literal.kind() {
+            crate::types::TypeData::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
                     .try_upcast_to_callable_with_policy_and_context(db, policy, context),
                 _ => None,
             },
 
-            (_, crate::types::TypeData::TypeAlias(alias)) => alias
+            crate::types::TypeData::TypeAlias(alias) => alias
                 .value_type(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
 
-            (
-                _,
-                crate::types::TypeData::KnownBoundMethod(
-                    KnownBoundMethodType::FunctionTypeDunderCall(function),
-                ),
+            crate::types::TypeData::KnownBoundMethod(
+                KnownBoundMethodType::FunctionTypeDunderCall(function),
             ) if context.is_recursive_reference(db, function) => {
                 Some(CallableTypes::one(CallableType::bottom(db)))
             }
 
-            (_, crate::types::TypeData::KnownBoundMethod(method)) => {
+            crate::types::TypeData::KnownBoundMethod(method) => {
                 Some(CallableTypes::one(CallableType::new(
                     db,
                     CallableSignature::from_overloads(method.signatures(db)),
@@ -251,7 +244,7 @@ impl<'db> Type<'db> {
                 )))
             }
 
-            (_, crate::types::TypeData::WrapperDescriptor(wrapper_descriptor)) => {
+            crate::types::TypeData::WrapperDescriptor(wrapper_descriptor) => {
                 Some(CallableTypes::one(CallableType::new(
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
@@ -260,7 +253,7 @@ impl<'db> Type<'db> {
                 )))
             }
 
-            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype))) => {
+            crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype)) => {
                 Some(CallableTypes::one(CallableType::single(
                     db,
                     Signature::new(
@@ -274,44 +267,37 @@ impl<'db> Type<'db> {
                 )))
             }
 
-            (
-                _,
-                crate::types::TypeData::Never
-                | crate::types::TypeData::DataclassTransformer(_)
-                | crate::types::TypeData::AlwaysTruthy
-                | crate::types::TypeData::AlwaysFalsy
-                | crate::types::TypeData::TypeIs(_)
-                | crate::types::TypeData::TypeGuard(_)
-                | crate::types::TypeData::TypeForm(_)
-                | crate::types::TypeData::TypedDict(_),
-            ) => None,
+            crate::types::TypeData::Never
+            | crate::types::TypeData::DataclassTransformer(_)
+            | crate::types::TypeData::AlwaysTruthy
+            | crate::types::TypeData::AlwaysFalsy
+            | crate::types::TypeData::TypeIs(_)
+            | crate::types::TypeData::TypeGuard(_)
+            | crate::types::TypeData::TypeForm(_)
+            | crate::types::TypeData::TypedDict(_) => None,
 
-            (
-                _,
-                crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)),
-            ) => Some(CallableTypes::one(partial.partial(db))),
+            crate::types::TypeData::KnownInstance(KnownInstanceType::FunctoolsPartial(partial)) => {
+                Some(CallableTypes::one(partial.partial(db)))
+            }
 
-            (_, crate::types::TypeData::Intersection(intersection)) => intersection
+            crate::types::TypeData::Intersection(intersection) => intersection
                 .finite_alternative_union(db)
                 .and_then(|alternatives| {
                     alternatives.try_upcast_to_callable_with_policy(db, policy)
                 }),
 
-            (_, crate::types::TypeData::EnumComplement(complement)) => complement
+            crate::types::TypeData::EnumComplement(complement) => complement
                 .remaining_literal_union(db)
                 .try_upcast_to_callable_with_policy_and_context(db, policy, context),
 
             // TODO
-            (
-                _,
-                crate::types::TypeData::DataclassDecorator(_)
-                | crate::types::TypeData::ModuleLiteral(_)
-                | crate::types::TypeData::SpecialForm(_)
-                | crate::types::TypeData::KnownInstance(_)
-                | crate::types::TypeData::PropertyInstance(_)
-                | crate::types::TypeData::TypeVar(_)
-                | crate::types::TypeData::BoundSuper(_),
-            ) => None,
+            crate::types::TypeData::DataclassDecorator(_)
+            | crate::types::TypeData::ModuleLiteral(_)
+            | crate::types::TypeData::SpecialForm(_)
+            | crate::types::TypeData::KnownInstance(_)
+            | crate::types::TypeData::PropertyInstance(_)
+            | crate::types::TypeData::TypeVar(_)
+            | crate::types::TypeData::BoundSuper(_) => None,
         }
     }
 }

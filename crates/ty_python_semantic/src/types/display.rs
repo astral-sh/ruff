@@ -567,35 +567,27 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
     }
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::ClassLiteral(class)) => self.record_class(db, class),
-            (_, crate::types::TypeData::LiteralValue(literal)) => {
+        match ty.data() {
+            crate::types::TypeData::ClassLiteral(class) => self.record_class(db, class),
+            crate::types::TypeData::LiteralValue(literal) => {
                 if let LiteralValueTypeKind::Enum(literal) = literal.kind() {
                     self.record_class(db, literal.enum_class(db));
                 }
             }
-            (_, crate::types::TypeData::GenericAlias(alias)) => {
+            crate::types::TypeData::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
-            (_, crate::types::TypeData::TypeAlias(type_alias)) => {
-                self.record_type_alias(db, type_alias)
-            }
+            crate::types::TypeData::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
-            (
-                _,
-                crate::types::TypeData::ProtocolInstance(ProtocolInstanceType {
-                    inner: Protocol::FromClass(class),
-                    ..
-                }),
-            ) => return self.visit_type(db, Type::from(class)),
+            crate::types::TypeData::ProtocolInstance(ProtocolInstanceType {
+                inner: Protocol::FromClass(class),
+                ..
+            }) => return self.visit_type(db, Type::from(class)),
             // no need to recurse into TypeVar bounds/constraints
-            (_, crate::types::TypeData::TypeVar(_)) => return,
-            (_, _) => {}
+            crate::types::TypeData::TypeVar(_) => return,
+            _ => {}
         }
 
         if let visitor::TypeKind::NonAtomic(t) = visitor::TypeKind::from(ty) {
@@ -956,21 +948,16 @@ impl Display for DisplayRepresentation<'_> {
 
 impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        match {
-            let __ty_view_value = self.ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Dynamic(dynamic)) => {
+        match self.ty.data() {
+            crate::types::TypeData::Dynamic(dynamic) => {
                 if dynamic.is_todo() {
                     f.set_invalid_type_annotation();
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            (_, crate::types::TypeData::Divergent(_)) => {
-                f.with_type(self.ty).write_str("Divergent")
-            }
-            (_, crate::types::TypeData::Never) => f.with_type(self.ty).write_str("Never"),
-            (_, crate::types::TypeData::NominalInstance(instance)) => {
+            crate::types::TypeData::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
+            crate::types::TypeData::Never => f.with_type(self.ty).write_str("Never"),
+            crate::types::TypeData::NominalInstance(instance) => {
                 let class = instance.class(self.db);
 
                 match (class, class.known(self.db)) {
@@ -988,7 +975,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
-            (_, crate::types::TypeData::ProtocolInstance(protocol)) => match protocol.inner {
+            crate::types::TypeData::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => match *class {
                     ClassType::NonGeneric(class) => class
                         .display_with(self.db, self.settings.clone())
@@ -1016,10 +1003,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char('>')
                 }
             },
-            (_, crate::types::TypeData::PropertyInstance(property)) => f
+            crate::types::TypeData::PropertyInstance(property) => f
                 .with_type(self.ty)
                 .write_str(property_display_name(self.db, property)),
-            (_, crate::types::TypeData::ModuleLiteral(module)) => {
+            crate::types::TypeData::ModuleLiteral(module) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
                 f.with_type(KnownClass::ModuleType.to_class_literal(self.db))
@@ -1029,7 +1016,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .write_str(module.module(self.db).name(self.db))?;
                 f.write_str("'>")
             }
-            (_, crate::types::TypeData::ClassLiteral(class)) => {
+            crate::types::TypeData::ClassLiteral(class) => {
                 f.set_invalid_type_annotation();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
@@ -1038,7 +1025,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
-            (_, crate::types::TypeData::GenericAlias(generic)) => {
+            crate::types::TypeData::GenericAlias(generic) => {
                 f.set_invalid_type_annotation();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
@@ -1047,7 +1034,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(&mut f)?;
                 f.write_str("'>")
             }
-            (_, crate::types::TypeData::SubclassOf(subclass_of_ty)) => {
+            crate::types::TypeData::SubclassOf(subclass_of_ty) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
                         f.with_type(KnownClass::Type.to_class_literal(self.db))
@@ -1090,20 +1077,20 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 }
             }
-            (_, crate::types::TypeData::SpecialForm(special_form)) => {
+            crate::types::TypeData::SpecialForm(special_form) => {
                 f.set_invalid_type_annotation();
                 write!(f.with_type(self.ty), "<special-form '{special_form}'>")
             }
-            (_, crate::types::TypeData::KnownInstance(known_instance)) => known_instance
+            crate::types::TypeData::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            (_, crate::types::TypeData::FunctionLiteral(function)) => function
+            crate::types::TypeData::FunctionLiteral(function) => function
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            (_, crate::types::TypeData::Callable(callable)) => callable
+            crate::types::TypeData::Callable(callable) => callable
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            (_, crate::types::TypeData::BoundMethod(bound_method)) => {
+            crate::types::TypeData::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db);
                 let self_ty = bound_method.self_instance(self.db);
                 let bound_signatures = bound_method.bound_signatures(self.db);
@@ -1153,7 +1140,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     }
                 }
             }
-            (_, crate::types::TypeData::KnownBoundMethod(method_type)) => {
+            crate::types::TypeData::KnownBoundMethod(method_type) => {
                 f.set_invalid_type_annotation();
                 let (cls, member_name, cls_name, ty, ty_name) = match method_type {
                     KnownBoundMethodType::FunctionTypeDunderGet(function) => (
@@ -1255,7 +1242,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_str("' object>")
                 }
             }
-            (_, crate::types::TypeData::WrapperDescriptor(kind)) => {
+            crate::types::TypeData::WrapperDescriptor(kind) => {
                 f.set_invalid_type_annotation();
                 let (method, object, cls) = match kind {
                     WrapperDescriptorKind::FunctionTypeDunderGet => {
@@ -1281,21 +1268,21 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .write_str(object)?;
                 f.write_str("' objects>")
             }
-            (_, crate::types::TypeData::DataclassDecorator(_)) => {
+            crate::types::TypeData::DataclassDecorator(_) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<decorator produced by dataclass-like function>")
             }
-            (_, crate::types::TypeData::DataclassTransformer(_)) => {
+            crate::types::TypeData::DataclassTransformer(_) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<decorator produced by typing.dataclass_transform>")
             }
-            (_, crate::types::TypeData::Union(union)) => union
+            crate::types::TypeData::Union(union) => union
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            (_, crate::types::TypeData::Intersection(intersection)) => intersection
+            crate::types::TypeData::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            (_, crate::types::TypeData::EnumComplement(complement)) => {
+            crate::types::TypeData::EnumComplement(complement) => {
                 if let Some(literals) =
                     complement.remaining_literal_types_for_display(self.db, LITERAL_POLICY.max)
                 {
@@ -1312,7 +1299,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f)
                 }
             }
-            (_, crate::types::TypeData::LiteralValue(literal)) => match literal.kind() {
+            crate::types::TypeData::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
                 LiteralValueTypeKind::Bool(boolean) => {
                     f.with_type(self.ty)
@@ -1355,7 +1342,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )
                 }
             },
-            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
+            crate::types::TypeData::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
                 write!(
                     f,
@@ -1365,13 +1352,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .display_with(self.db, self.settings.clone())
                 )
             }
-            (_, crate::types::TypeData::AlwaysTruthy) => {
-                f.with_type(self.ty).write_str("AlwaysTruthy")
-            }
-            (_, crate::types::TypeData::AlwaysFalsy) => {
-                f.with_type(self.ty).write_str("AlwaysFalsy")
-            }
-            (_, crate::types::TypeData::BoundSuper(bound_super)) => {
+            crate::types::TypeData::AlwaysTruthy => f.with_type(self.ty).write_str("AlwaysTruthy"),
+            crate::types::TypeData::AlwaysFalsy => f.with_type(self.ty).write_str("AlwaysFalsy"),
+            crate::types::TypeData::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
                 Type::from(bound_super.pivot_class(self.db))
@@ -1385,13 +1368,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            (_, crate::types::TypeData::TypeIs(type_is)) => {
+            crate::types::TypeData::TypeIs(type_is) => {
                 fmt_type_guard_like(self.db, type_is, &self.settings, f)
             }
-            (_, crate::types::TypeData::TypeGuard(type_guard)) => {
+            crate::types::TypeData::TypeGuard(type_guard) => {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)
             }
-            (_, crate::types::TypeData::TypeForm(typeform)) => {
+            crate::types::TypeData::TypeForm(typeform) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::TypeForm))
                     .write_str("TypeForm")?;
                 f.write_char('[')?;
@@ -1401,7 +1384,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_char(']')
             }
-            (_, crate::types::TypeData::TypedDict(TypedDictType::Class(defining_class))) => {
+            crate::types::TypeData::TypedDict(TypedDictType::Class(defining_class)) => {
                 match defining_class {
                     ClassType::NonGeneric(class) => class
                         .display_with(self.db, self.settings.clone())
@@ -1411,7 +1394,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f),
                 }
             }
-            (_, crate::types::TypeData::TypedDict(TypedDictType::Synthesized(synthesized))) => {
+            crate::types::TypeData::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;
                 f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
@@ -1427,7 +1410,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 f.write_char('>')
             }
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
+            crate::types::TypeData::TypeAlias(alias) => {
                 alias
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f)?;
@@ -1438,7 +1421,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f),
                 }
             }
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
+            crate::types::TypeData::NewTypeInstance(newtype) => {
                 f.with_type(self.ty).write_str(newtype.name(self.db))
             }
         }
@@ -2461,11 +2444,8 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 } else {
                     f.write_str("=")?;
                 }
-                match {
-                    let __ty_view_value = default_type;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::LiteralValue(literal))
+                match default_type.data() {
+                    crate::types::TypeData::LiteralValue(literal)
                         if matches!(
                             literal.kind(),
                             LiteralValueTypeKind::Int(_)
@@ -2480,7 +2460,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                             default_type.representation(self.db, self.settings.clone());
                         representation.fmt_detailed(f)?;
                     }
-                    (_, crate::types::TypeData::NominalInstance(instance)) => {
+                    crate::types::TypeData::NominalInstance(instance) => {
                         // Some key default types like `None` are worth showing
                         let class = instance.class(self.db);
 
@@ -2494,7 +2474,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                             _ => f.write_str("...")?,
                         }
                     }
-                    (_, _) => f.write_str("...")?,
+                    _ => f.write_str("...")?,
                 }
             }
         } else {
@@ -2605,11 +2585,8 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
         /// # Color excluding RED displays through the literal-group path for BLUE.
         /// ```
         fn condensable_literals<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::LiteralValue(literal))
+            match ty.data() {
+                crate::types::TypeData::LiteralValue(literal)
                     if matches!(
                         literal.kind(),
                         LiteralValueTypeKind::Int(_)
@@ -2621,13 +2598,13 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                 {
                     Some(vec![ty])
                 }
-                (_, crate::types::TypeData::EnumComplement(complement)) => {
+                crate::types::TypeData::EnumComplement(complement) => {
                     complement.remaining_literal_types_for_display(db, LITERAL_POLICY.max)
                 }
-                (_, crate::types::TypeData::Intersection(intersection)) => {
+                crate::types::TypeData::Intersection(intersection) => {
                     intersection.finite_alternatives_for_display(db, LITERAL_POLICY.max)
                 }
-                (_, _) => None,
+                _ => None,
             }
         }
 
@@ -2674,10 +2651,7 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
                         condensed_types.push(literal);
                     }
                 }
-            } else if let (_, crate::types::TypeData::SubclassOf(subclass_of)) = {
-                let __ty_view_value = element;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            } else if let crate::types::TypeData::SubclassOf(subclass_of) = element.data() {
                 subclass_of_types.push(subclass_of);
             }
         }
@@ -2966,10 +2940,7 @@ impl Display for DisplayMaybeNegatedType<'_> {
 /// - Overloaded callables, which display as `Overload[...]` (already unambiguous)
 /// - Callables with top-materialization parameters, which display as `Top[...]` (already unambiguous)
 fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
-    if let (_, crate::types::TypeData::Callable(callable)) = {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
+    if let crate::types::TypeData::Callable(callable) = ty.data() {
         let overloads = &callable.signatures(db).overloads;
         overloads.len() == 1 && !overloads[0].parameters().is_top()
     } else {
@@ -2993,10 +2964,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
                 .fmt_detailed(f)?;
             f.write_char(')')
         };
-        match {
-            let __ty_view_value = self.ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match self.ty.view() {
             (ty, _) if should_parenthesize_callable_type(ty, self.db) => write_parentheses(f),
             (
                 _,

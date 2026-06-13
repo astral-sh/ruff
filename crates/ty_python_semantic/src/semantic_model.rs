@@ -519,11 +519,8 @@ impl<'db> SemanticModel<'db> {
             ty: Type<'db>,
             visitor: &StringLiteralCandidatesVisitor<'db>,
         ) -> Vec<ExpectedStringLiteralCompletion<'db>> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::LiteralValue(literal)) => literal
+            match ty.data() {
+                crate::types::TypeData::LiteralValue(literal) => literal
                     .as_string()
                     .map(|string_literal| {
                         let value = string_literal.value(db).to_string();
@@ -533,20 +530,20 @@ impl<'db> SemanticModel<'db> {
                         }]
                     })
                     .unwrap_or_default(),
-                (_, crate::types::TypeData::Union(union)) => union
+                crate::types::TypeData::Union(union) => union
                     .elements(db)
                     .iter()
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
-                (_, crate::types::TypeData::Intersection(intersection)) => intersection
+                crate::types::TypeData::Intersection(intersection) => intersection
                     .positive(db)
                     .iter()
                     .flat_map(|element| collect(db, *element, visitor))
                     .collect(),
-                (_, crate::types::TypeData::TypeAlias(alias)) => {
+                crate::types::TypeData::TypeAlias(alias) => {
                     visitor.visit(ty, || collect(db, alias.value_type(db), visitor))
                 }
-                (_, _) => Vec::new(),
+                _ => Vec::new(),
             }
         }
 

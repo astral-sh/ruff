@@ -83,10 +83,9 @@ impl<'db> DunderAllNamesCollector<'db> {
                 if attr != "__all__" {
                     return false;
                 }
-                let (_, crate::types::TypeData::ModuleLiteral(module_literal)) = ({
-                    let __ty_view_value = self.standalone_expression_type(value);
-                    (__ty_view_value, __ty_view_value.data())
-                }) else {
+                let crate::types::TypeData::ModuleLiteral(module_literal) =
+                    self.standalone_expression_type(value).data()
+                else {
                     return false;
                 };
                 let Some(module_dunder_all_names) = module_literal

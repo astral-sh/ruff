@@ -455,18 +455,12 @@ impl<'db> CompletionBuilder<'db> {
             if ctx.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
-                        {
-                            let __ty_view_value = ty;
-                            (__ty_view_value, __ty_view_value.data())
-                        },
-                        (
-                            _,
-                            ty_python_semantic::types::TypeData::SpecialForm(
-                                SpecialFormType::Protocol
-                                    | SpecialFormType::Generic
-                                    | SpecialFormType::TypedDict
-                                    | SpecialFormType::NamedTuple
-                            )
+                        ty.data(),
+                        ty_python_semantic::types::TypeData::SpecialForm(
+                            SpecialFormType::Protocol
+                                | SpecialFormType::Generic
+                                | SpecialFormType::TypedDict
+                                | SpecialFormType::NamedTuple
                         )
                     );
             }
@@ -2824,86 +2818,53 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
         ty: Type<'db>,
         visitor: &CompletionKindVisitor<'db>,
     ) -> Option<CompletionKind> {
-        Some(
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::FunctionLiteral(_)
-                    | ty_python_semantic::types::TypeData::DataclassDecorator(_)
-                    | ty_python_semantic::types::TypeData::WrapperDescriptor(_)
-                    | ty_python_semantic::types::TypeData::DataclassTransformer(_)
-                    | ty_python_semantic::types::TypeData::Callable(_),
-                ) => CompletionKind::Function,
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::BoundMethod(_)
-                    | ty_python_semantic::types::TypeData::KnownBoundMethod(_),
-                ) => CompletionKind::Method,
-                (_, ty_python_semantic::types::TypeData::ModuleLiteral(_)) => {
-                    CompletionKind::Module
-                }
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::ClassLiteral(_)
-                    | ty_python_semantic::types::TypeData::GenericAlias(_)
-                    | ty_python_semantic::types::TypeData::SubclassOf(_),
-                ) => CompletionKind::Class,
-                // This is a little weird for "struct." I'm mostly interpreting
-                // "struct" here as a more general "object." ---AG
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::NominalInstance(_)
-                    | ty_python_semantic::types::TypeData::PropertyInstance(_)
-                    | ty_python_semantic::types::TypeData::BoundSuper(_)
-                    | ty_python_semantic::types::TypeData::TypedDict(_)
-                    | ty_python_semantic::types::TypeData::NewTypeInstance(_)
-                    | ty_python_semantic::types::TypeData::EnumComplement(_),
-                ) => CompletionKind::Struct,
-                (_, ty_python_semantic::types::TypeData::LiteralValue(literal))
-                    if literal.is_enum() =>
-                {
-                    CompletionKind::Enum
-                }
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::LiteralValue(_)
-                    | ty_python_semantic::types::TypeData::TypeIs(_)
-                    | ty_python_semantic::types::TypeData::TypeGuard(_)
-                    | ty_python_semantic::types::TypeData::TypeForm(_),
-                ) => CompletionKind::Value,
-                (_, ty_python_semantic::types::TypeData::ProtocolInstance(_)) => {
-                    CompletionKind::Interface
-                }
-                (_, ty_python_semantic::types::TypeData::TypeVar(_)) => {
-                    CompletionKind::TypeParameter
-                }
-                (_, ty_python_semantic::types::TypeData::Union(union)) => union
-                    .elements(db)
-                    .iter()
-                    .find_map(|&ty| imp(db, ty, visitor))?,
-                (_, ty_python_semantic::types::TypeData::Intersection(intersection)) => {
-                    intersection
-                        .iter_positive(db)
-                        .find_map(|ty| imp(db, ty, visitor))?
-                }
-                (
-                    _,
-                    ty_python_semantic::types::TypeData::Dynamic(_)
-                    | ty_python_semantic::types::TypeData::Divergent(_)
-                    | ty_python_semantic::types::TypeData::Never
-                    | ty_python_semantic::types::TypeData::SpecialForm(_)
-                    | ty_python_semantic::types::TypeData::KnownInstance(_)
-                    | ty_python_semantic::types::TypeData::AlwaysTruthy
-                    | ty_python_semantic::types::TypeData::AlwaysFalsy,
-                ) => return None,
-                (_, ty_python_semantic::types::TypeData::TypeAlias(alias)) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
-                }
-            },
-        )
+        Some(match ty.data() {
+            ty_python_semantic::types::TypeData::FunctionLiteral(_)
+            | ty_python_semantic::types::TypeData::DataclassDecorator(_)
+            | ty_python_semantic::types::TypeData::WrapperDescriptor(_)
+            | ty_python_semantic::types::TypeData::DataclassTransformer(_)
+            | ty_python_semantic::types::TypeData::Callable(_) => CompletionKind::Function,
+            ty_python_semantic::types::TypeData::BoundMethod(_)
+            | ty_python_semantic::types::TypeData::KnownBoundMethod(_) => CompletionKind::Method,
+            ty_python_semantic::types::TypeData::ModuleLiteral(_) => CompletionKind::Module,
+            ty_python_semantic::types::TypeData::ClassLiteral(_)
+            | ty_python_semantic::types::TypeData::GenericAlias(_)
+            | ty_python_semantic::types::TypeData::SubclassOf(_) => CompletionKind::Class,
+            // This is a little weird for "struct." I'm mostly interpreting
+            // "struct" here as a more general "object." ---AG
+            ty_python_semantic::types::TypeData::NominalInstance(_)
+            | ty_python_semantic::types::TypeData::PropertyInstance(_)
+            | ty_python_semantic::types::TypeData::BoundSuper(_)
+            | ty_python_semantic::types::TypeData::TypedDict(_)
+            | ty_python_semantic::types::TypeData::NewTypeInstance(_)
+            | ty_python_semantic::types::TypeData::EnumComplement(_) => CompletionKind::Struct,
+            ty_python_semantic::types::TypeData::LiteralValue(literal) if literal.is_enum() => {
+                CompletionKind::Enum
+            }
+            ty_python_semantic::types::TypeData::LiteralValue(_)
+            | ty_python_semantic::types::TypeData::TypeIs(_)
+            | ty_python_semantic::types::TypeData::TypeGuard(_)
+            | ty_python_semantic::types::TypeData::TypeForm(_) => CompletionKind::Value,
+            ty_python_semantic::types::TypeData::ProtocolInstance(_) => CompletionKind::Interface,
+            ty_python_semantic::types::TypeData::TypeVar(_) => CompletionKind::TypeParameter,
+            ty_python_semantic::types::TypeData::Union(union) => union
+                .elements(db)
+                .iter()
+                .find_map(|&ty| imp(db, ty, visitor))?,
+            ty_python_semantic::types::TypeData::Intersection(intersection) => intersection
+                .iter_positive(db)
+                .find_map(|ty| imp(db, ty, visitor))?,
+            ty_python_semantic::types::TypeData::Dynamic(_)
+            | ty_python_semantic::types::TypeData::Divergent(_)
+            | ty_python_semantic::types::TypeData::Never
+            | ty_python_semantic::types::TypeData::SpecialForm(_)
+            | ty_python_semantic::types::TypeData::KnownInstance(_)
+            | ty_python_semantic::types::TypeData::AlwaysTruthy
+            | ty_python_semantic::types::TypeData::AlwaysFalsy => return None,
+            ty_python_semantic::types::TypeData::TypeAlias(alias) => {
+                visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+            }
+        })
     }
     imp(db, ty, &CompletionKindVisitor::default())
 }

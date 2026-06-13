@@ -37,13 +37,7 @@ impl<'db> Type<'db> {
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
-            matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::TypeVar(_))
-            )
+            matches!(ty.data(), crate::types::TypeData::TypeVar(_))
         })
     }
 
@@ -52,19 +46,14 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         typevar_id: TypeVarIdentity<'db>,
     ) -> bool {
-        any_over_type(db, self, false, |ty| {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
-                    typevar_id == bound_typevar.typevar(db).identity(db)
-                }
-                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) => {
-                    typevar_id == typevar.identity(db)
-                }
-                (_, _) => false,
+        any_over_type(db, self, false, |ty| match ty.data() {
+            crate::types::TypeData::TypeVar(bound_typevar) => {
+                typevar_id == bound_typevar.typevar(db).identity(db)
             }
+            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar_id == typevar.identity(db)
+            }
+            _ => false,
         })
     }
 
@@ -73,22 +62,16 @@ impl<'db> Type<'db> {
             db,
             self,
             false,
-            |ty| matches!( { let __ty_view_value = ty; (__ty_view_value, __ty_view_value.data()) } , (_, crate::types::TypeData::TypeVar(tv)) if !tv.typevar(db).is_self(db)),
+            |ty| matches!( ty.data() , crate::types::TypeData::TypeVar(tv) if !tv.typevar(db).is_self(db)),
         )
     }
 
     pub(crate) fn has_typevar_or_typevar_instance(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
             matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (
-                    _,
-                    crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(_))
-                        | crate::types::TypeData::TypeVar(_)
-                )
+                ty.data(),
+                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(_))
+                    | crate::types::TypeData::TypeVar(_)
             )
         })
     }
@@ -96,14 +79,8 @@ impl<'db> Type<'db> {
     pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
             matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (
-                    _,
-                    crate::types::TypeData::Dynamic(DynamicType::UnspecializedTypeVar)
-                )
+                ty.data(),
+                crate::types::TypeData::Dynamic(DynamicType::UnspecializedTypeVar)
             )
         })
     }
@@ -427,33 +404,24 @@ impl<'db> TypeVarInstance<'db> {
             ty: Type<'db>,
             self_identity: TypeVarIdentity<'db>,
         ) -> bool {
-            any_over_type(state.db, ty, false, |inner_ty| {
-                match {
-                    let __ty_view_value = inner_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
-                        typevar_default_is_self_referential(
-                            state,
-                            bound_typevar.typevar(state.db),
-                            self_identity,
-                        )
-                    }
-                    (
-                        _,
-                        crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)),
-                    ) => typevar_default_is_self_referential(state, typevar, self_identity),
-                    (_, crate::types::TypeData::TypeAlias(alias)) => {
-                        type_alias_is_self_referential(state, alias, self_identity)
-                    }
-                    (
-                        _,
-                        crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
-                            alias,
-                        )),
-                    ) => type_alias_is_self_referential(state, alias, self_identity),
-                    (_, _) => false,
+            any_over_type(state.db, ty, false, |inner_ty| match inner_ty.data() {
+                crate::types::TypeData::TypeVar(bound_typevar) => {
+                    typevar_default_is_self_referential(
+                        state,
+                        bound_typevar.typevar(state.db),
+                        self_identity,
+                    )
                 }
+                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    typevar_default_is_self_referential(state, typevar, self_identity)
+                }
+                crate::types::TypeData::TypeAlias(alias) => {
+                    type_alias_is_self_referential(state, alias, self_identity)
+                }
+                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+                    type_alias_is_self_referential(state, alias, self_identity)
+                }
+                _ => false,
             })
         }
 
@@ -572,16 +540,13 @@ impl<'db> TypeVarInstance<'db> {
     #[salsa::tracked(cycle_initial=|_, id, _| Some(Type::divergent(id)), cycle_fn=lazy_default_cycle_recover, heap_size=ruff_memory_usage::heap_size)]
     fn lazy_default_unchecked(self, db: &'db dyn Db) -> Option<Type<'db>> {
         fn convert_type_to_paramspec_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-            let parameters = match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::NominalInstance(nominal_instance))
+            let parameters = match ty.data() {
+                crate::types::TypeData::NominalInstance(nominal_instance)
                     if nominal_instance.has_known_class(db, KnownClass::EllipsisType) =>
                 {
                     Parameters::gradual_form()
                 }
-                (_, crate::types::TypeData::NominalInstance(nominal_instance)) => nominal_instance
+                crate::types::TypeData::NominalInstance(nominal_instance) => nominal_instance
                     .own_tuple_spec(db)
                     .map_or_else(Parameters::unknown, |tuple_spec| {
                         Parameters::new(
@@ -591,7 +556,7 @@ impl<'db> TypeVarInstance<'db> {
                                 .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
                         )
                     }),
-                (_, crate::types::TypeData::Dynamic(dynamic)) => match dynamic {
+                crate::types::TypeData::Dynamic(dynamic) => match dynamic {
                     DynamicType::Todo(_)
                     | DynamicType::TodoUnpack
                     | DynamicType::TodoStarredExpression
@@ -603,16 +568,16 @@ impl<'db> TypeVarInstance<'db> {
                     | DynamicType::InvalidConcatenateUnknown
                     | DynamicType::AmbiguousOverload => Parameters::unknown(),
                 },
-                (_, crate::types::TypeData::Divergent(_)) => Parameters::unknown(),
-                (_, crate::types::TypeData::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+                crate::types::TypeData::Divergent(_) => Parameters::unknown(),
+                crate::types::TypeData::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     return ty;
                 }
-                (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)))
+                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))
                     if typevar.is_paramspec(db) =>
                 {
                     return ty;
                 }
-                (_, _) => Parameters::unknown(),
+                _ => Parameters::unknown(),
             };
             Type::paramspec_value_callable(db, parameters)
         }
@@ -1088,10 +1053,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 };
                 specialization.get(db, typevar).map(|ty| {
                     if let Some(attr) = self.paramspec_attr(db)
-                        && let (_, crate::types::TypeData::TypeVar(typevar)) = ({
-                            let __ty_view_value = ty;
-                            (__ty_view_value, __ty_view_value.data())
-                        })
+                        && let crate::types::TypeData::TypeVar(typevar) = ty.data()
                         && typevar.is_paramspec(db)
                     {
                         return Type::TypeVar(typevar.with_paramspec_attr(db, attr));

@@ -80,16 +80,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
-        let inferred_type_hover_content = match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (
-                _,
-                ty_python_semantic::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(
-                    typevar,
-                )),
-            ) => typevar.bind_pep695(db).map_or(
+        let inferred_type_hover_content = match ty.data() {
+            ty_python_semantic::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(
+                typevar,
+            )) => typevar.bind_pep695(db).map_or(
                 HoverContent::Type {
                     ty,
                     variance: None,
@@ -101,13 +95,10 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
                     qualifiers,
                 },
             ),
-            (
-                _,
-                ty_python_semantic::types::TypeData::KnownInstance(
-                    KnownInstanceType::TypeAliasType(alias),
-                )
-                | ty_python_semantic::types::TypeData::TypeAlias(alias),
-            ) => {
+            ty_python_semantic::types::TypeData::KnownInstance(
+                KnownInstanceType::TypeAliasType(alias),
+            )
+            | ty_python_semantic::types::TypeData::TypeAlias(alias) => {
                 let value_ty = alias.value_type(db);
 
                 alias_docstring = Definitions::from_ty(db, ty)
@@ -118,12 +109,12 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
 
                 HoverContent::TypeAlias { alias, qualifiers }
             }
-            (_, ty_python_semantic::types::TypeData::TypeVar(typevar)) => HoverContent::Type {
+            ty_python_semantic::types::TypeData::TypeVar(typevar) => HoverContent::Type {
                 ty,
                 variance: Some(typevar.variance(db)),
                 qualifiers,
             },
-            (_, _) => HoverContent::Type {
+            _ => HoverContent::Type {
                 ty,
                 variance: None,
                 qualifiers,

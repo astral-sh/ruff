@@ -41,10 +41,7 @@ pub(crate) fn check_overloaded_function<'db>(
     // Collect all the unique overloaded function places in this scope. This requires a set
     // because an overloaded function uses the same place for each of the overloads and the
     // implementation.
-    let (_, crate::types::TypeData::FunctionLiteral(function)) = ({
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::FunctionLiteral(function) = ty.data() else {
         return;
     };
 

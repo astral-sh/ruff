@@ -1348,7 +1348,7 @@ impl<'db> Type<'db> {
             SpecialFormType::Protocol => result.detail[0] = PackedSpecialFormTag::Protocol as u8,
             SpecialFormType::Generic => result.detail[0] = PackedSpecialFormTag::Generic as u8,
             SpecialFormType::NamedTuple => {
-                result.detail[0] = PackedSpecialFormTag::NamedTuple as u8
+                result.detail[0] = PackedSpecialFormTag::NamedTuple as u8;
             }
         }
         result
@@ -1833,6 +1833,15 @@ impl<'db> Type<'db> {
                 ..Self::without_payload(TypeTag::LiteralValue)
             },
         }
+    }
+
+    /// Returns both the packed type and its decoded representation.
+    ///
+    /// This supports matches that need to retain the original packed value in
+    /// some arms while inspecting its representation in others.
+    #[inline]
+    pub fn view(self) -> (Self, TypeData<'db>) {
+        (self, self.data())
     }
 
     pub fn data(self) -> TypeData<'db> {

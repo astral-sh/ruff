@@ -209,12 +209,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // if we manually map over the union and call `try_iterate` on each union element.
                 // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
                 // for more discussion.
-                let unpack_types = match {
-                    let __ty_view_value = value_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::Union(union_ty)) => union_ty.elements(self.db()),
-                    (_, _) => std::slice::from_ref(&value_ty),
+                let unpack_types = match value_ty.data() {
+                    crate::types::TypeData::Union(union_ty) => union_ty.elements(self.db()),
+                    _ => std::slice::from_ref(&value_ty),
                 };
 
                 for ty in unpack_types.iter().copied() {

@@ -186,11 +186,8 @@ impl get_size2::GetSize for FunctionDecorators {}
 
 impl FunctionDecorators {
     pub(super) fn from_decorator_type(db: &dyn Db, decorator_type: Type) -> Self {
-        match {
-            let __ty_view_value = decorator_type;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::FunctionLiteral(function)) => match function.known(db) {
+        match decorator_type.data() {
+            crate::types::TypeData::FunctionLiteral(function) => match function.known(db) {
                 Some(KnownFunction::NoTypeCheck) => FunctionDecorators::NO_TYPE_CHECK,
                 Some(KnownFunction::Overload) => FunctionDecorators::OVERLOAD,
                 Some(KnownFunction::AbstractMethod) => FunctionDecorators::ABSTRACT_METHOD,
@@ -199,12 +196,12 @@ impl FunctionDecorators {
                 Some(KnownFunction::TypeCheckOnly) => FunctionDecorators::TYPE_CHECK_ONLY,
                 _ => FunctionDecorators::empty(),
             },
-            (_, crate::types::TypeData::ClassLiteral(class)) => match class.known(db) {
+            crate::types::TypeData::ClassLiteral(class) => match class.known(db) {
                 Some(KnownClass::Classmethod) => FunctionDecorators::CLASSMETHOD,
                 Some(KnownClass::Staticmethod) => FunctionDecorators::STATICMETHOD,
                 _ => FunctionDecorators::empty(),
             },
-            (_, _) => FunctionDecorators::empty(),
+            _ => FunctionDecorators::empty(),
         }
     }
 }
@@ -1577,11 +1574,8 @@ fn check_classinfo_in_isinstance<'db>(
     classinfo: Type<'db>,
     classinfo_expr: Option<&ast::Expr>,
 ) {
-    match {
-        let __ty_view_value = classinfo;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::ClassLiteral(class)) => {
+    match classinfo.data() {
+        crate::types::TypeData::ClassLiteral(class) => {
             if class.is_typed_dict(db) {
                 report_runtime_check_against_typed_dict(context, call_expression, class, function);
             } else if let Some(protocol_class) = class.into_protocol_class(db) {
@@ -1605,7 +1599,7 @@ fn check_classinfo_in_isinstance<'db>(
                 }
             }
         }
-        (_, crate::types::TypeData::SpecialForm(SpecialFormType::Any))
+        crate::types::TypeData::SpecialForm(SpecialFormType::Any)
             if function == KnownFunction::IsInstance =>
         {
             let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
@@ -1616,7 +1610,7 @@ fn check_classinfo_in_isinstance<'db>(
             ));
             diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
         }
-        (_, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(_))) => {
+        crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(_)) => {
             report_invalid_union_type_elements(
                 db,
                 context,
@@ -1626,7 +1620,7 @@ fn check_classinfo_in_isinstance<'db>(
                 classinfo_expr,
             );
         }
-        (_, crate::types::TypeData::NominalInstance(nominal)) => {
+        crate::types::TypeData::NominalInstance(nominal) => {
             if let Some(tuple_spec) = nominal.tuple_spec(db) {
                 let element_exprs = match classinfo_expr {
                     Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
@@ -1645,7 +1639,7 @@ fn check_classinfo_in_isinstance<'db>(
                 }
             }
         }
-        (_, _) => {}
+        _ => {}
     }
 }
 
@@ -1665,19 +1659,16 @@ fn report_invalid_union_type_elements<'db>(
         ty: Type<'db>,
         invalid_elements: &mut Vec<Type<'db>>,
     ) {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::ClassLiteral(_)) => {}
-            (_, crate::types::TypeData::NominalInstance(instance))
+        match ty.data() {
+            crate::types::TypeData::ClassLiteral(_) => {}
+            crate::types::TypeData::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) => {}
-            (_, crate::types::TypeData::SpecialForm(special_form))
+            crate::types::TypeData::SpecialForm(special_form)
                 if special_form.is_valid_isinstance_target() => {}
             // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
-            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Any))
+            crate::types::TypeData::SpecialForm(SpecialFormType::Any)
                 if function == KnownFunction::IsSubclass => {}
-            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 match instance.value_expression_types(db) {
                     Ok(value_expression_types) => {
                         for element in value_expression_types {
@@ -1689,7 +1680,7 @@ fn report_invalid_union_type_elements<'db>(
                     }
                 }
             }
-            (_, _) => invalid_elements.push(ty),
+            _ => invalid_elements.push(ty),
         }
     }
 
@@ -1722,20 +1713,13 @@ fn report_invalid_union_type_elements<'db>(
 
     // When we have a secondary annotation pointing at the UnionType expression,
     // "the union" is unambiguous. Otherwise, spell out the union type in the message.
-    let union_suffix = match (
-        &union_type_expr,
-        ({
-            let __ty_view_value = union_type;
-            (__ty_view_value, __ty_view_value.data())
-        }),
-    ) {
-        (
-            None,
-            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance))),
-        ) => match instance.union_type(db) {
-            Ok(ty) => format!(" `{}`", ty.display(db)),
-            Err(_) => String::new(),
-        },
+    let union_suffix = match (&union_type_expr, union_type.data()) {
+        (None, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            match instance.union_type(db) {
+                Ok(ty) => format!(" `{}`", ty.display(db)),
+                Err(_) => String::new(),
+            }
+        }
         _ => String::new(),
     };
 
@@ -1779,11 +1763,8 @@ fn is_instance_truthiness<'db>(
         }
     };
 
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::Union(..)) => {
+    match ty.data() {
+        crate::types::TypeData::Union(..) => {
             // We do not handle unions specifically here, because something like `A | SubclassOfA` would
             // have been simplified to `A` anyway
             Truthiness::Ambiguous
@@ -1793,17 +1774,14 @@ fn is_instance_truthiness<'db>(
         // and evaluate the truthiness of the `isinstance()` check with that type.
         // Along the way, short-circuit to `AlwaysTrue` if we find any positive element
         // that is always true.
-        (_, crate::types::TypeData::Intersection(intersection)) => {
+        crate::types::TypeData::Intersection(intersection) => {
             let mut effective = IntersectionBuilder::new(db);
             let mut found_tvars_or_newtypes = false;
 
             for &positive in intersection.positive(db) {
                 if is_instance_truthiness(db, positive, class).is_always_true() {
                     return Truthiness::AlwaysTrue;
-                } else if let (_, crate::types::TypeData::TypeVar(tvar)) = {
-                    let __ty_view_value = positive;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
+                } else if let crate::types::TypeData::TypeVar(tvar) = positive.data() {
                     match tvar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             effective = effective.add_positive(bound);
@@ -1816,10 +1794,7 @@ fn is_instance_truthiness<'db>(
                         None => {}
                     }
                     found_tvars_or_newtypes = true;
-                } else if let (_, crate::types::TypeData::NewTypeInstance(newtype)) = {
-                    let __ty_view_value = positive;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
+                } else if let crate::types::TypeData::NewTypeInstance(newtype) = positive.data() {
                     found_tvars_or_newtypes = true;
                     effective = effective.add_positive(newtype.concrete_base_type(db));
                 } else {
@@ -1847,36 +1822,33 @@ fn is_instance_truthiness<'db>(
             }
         }
 
-        (_, crate::types::TypeData::EnumComplement(complement)) => {
+        crate::types::TypeData::EnumComplement(complement) => {
             is_instance_truthiness(db, complement.to_intersection(db), class)
         }
 
-        (_, crate::types::TypeData::NominalInstance(..)) => always_true_if(is_instance(&ty)),
+        crate::types::TypeData::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
-        (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
+        crate::types::TypeData::NewTypeInstance(newtype) => {
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
         }
 
-        (
-            _,
-            crate::types::TypeData::LiteralValue(..)
-            | crate::types::TypeData::ModuleLiteral(..)
-            | crate::types::TypeData::FunctionLiteral(..),
-        ) => always_true_if(
+        crate::types::TypeData::LiteralValue(..)
+        | crate::types::TypeData::ModuleLiteral(..)
+        | crate::types::TypeData::FunctionLiteral(..) => always_true_if(
             ty.literal_fallback_instance(db)
                 .as_ref()
                 .is_some_and(is_instance),
         ),
 
-        (_, crate::types::TypeData::ClassLiteral(..)) => {
+        crate::types::TypeData::ClassLiteral(..) => {
             always_true_if(is_instance(&KnownClass::Type.to_instance(db)))
         }
 
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             is_instance_truthiness(db, alias.value_type(db), class)
         }
 
-        (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
+        crate::types::TypeData::TypeVar(bound_typevar) => {
             match bound_typevar.typevar(db).bound_or_constraints(db) {
                 None => is_instance_truthiness(db, Type::object(), class),
                 Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
@@ -1891,31 +1863,28 @@ fn is_instance_truthiness<'db>(
             }
         }
 
-        (
-            _,
-            crate::types::TypeData::BoundMethod(..)
-            | crate::types::TypeData::KnownBoundMethod(..)
-            | crate::types::TypeData::WrapperDescriptor(..)
-            | crate::types::TypeData::DataclassDecorator(..)
-            | crate::types::TypeData::DataclassTransformer(..)
-            | crate::types::TypeData::GenericAlias(..)
-            | crate::types::TypeData::SubclassOf(..)
-            | crate::types::TypeData::ProtocolInstance(..)
-            | crate::types::TypeData::SpecialForm(..)
-            | crate::types::TypeData::KnownInstance(..)
-            | crate::types::TypeData::PropertyInstance(..)
-            | crate::types::TypeData::AlwaysTruthy
-            | crate::types::TypeData::AlwaysFalsy
-            | crate::types::TypeData::BoundSuper(..)
-            | crate::types::TypeData::TypeIs(..)
-            | crate::types::TypeData::TypeGuard(..)
-            | crate::types::TypeData::TypeForm(..)
-            | crate::types::TypeData::Callable(..)
-            | crate::types::TypeData::Dynamic(..)
-            | crate::types::TypeData::Divergent(_)
-            | crate::types::TypeData::Never
-            | crate::types::TypeData::TypedDict(_),
-        ) => {
+        crate::types::TypeData::BoundMethod(..)
+        | crate::types::TypeData::KnownBoundMethod(..)
+        | crate::types::TypeData::WrapperDescriptor(..)
+        | crate::types::TypeData::DataclassDecorator(..)
+        | crate::types::TypeData::DataclassTransformer(..)
+        | crate::types::TypeData::GenericAlias(..)
+        | crate::types::TypeData::SubclassOf(..)
+        | crate::types::TypeData::ProtocolInstance(..)
+        | crate::types::TypeData::SpecialForm(..)
+        | crate::types::TypeData::KnownInstance(..)
+        | crate::types::TypeData::PropertyInstance(..)
+        | crate::types::TypeData::AlwaysTruthy
+        | crate::types::TypeData::AlwaysFalsy
+        | crate::types::TypeData::BoundSuper(..)
+        | crate::types::TypeData::TypeIs(..)
+        | crate::types::TypeData::TypeGuard(..)
+        | crate::types::TypeData::TypeForm(..)
+        | crate::types::TypeData::Callable(..)
+        | crate::types::TypeData::Dynamic(..)
+        | crate::types::TypeData::Divergent(_)
+        | crate::types::TypeData::Never
+        | crate::types::TypeData::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear
             // if it's worth the effort.
             Truthiness::Ambiguous
@@ -2406,13 +2375,7 @@ impl KnownFunction {
                 let casted_type = casted_type.project_type_form(db);
                 let contains_unknown_or_todo = |ty: Type<'_>| {
                     ty.is_dynamic()
-                        && !matches!(
-                            {
-                                let __ty_view_value = ty;
-                                (__ty_view_value, __ty_view_value.data())
-                            },
-                            (_, crate::types::TypeData::Dynamic(DynamicType::Any))
-                        )
+                        && !matches!(ty.data(), crate::types::TypeData::Dynamic(DynamicType::Any))
                 };
                 if source_type.is_equivalent_to(db, casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
@@ -2506,31 +2469,25 @@ impl KnownFunction {
                     return;
                 };
                 let mut good_argument = true;
-                let classes = match {
-                    let __ty_view_value = param_type;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::ClassLiteral(class)) => {
+                let classes = match param_type.data() {
+                    crate::types::TypeData::ClassLiteral(class) => {
                         vec![ClassType::NonGeneric(class)]
                     }
-                    (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
+                    crate::types::TypeData::GenericAlias(generic_alias) => {
                         vec![ClassType::Generic(generic_alias)]
                     }
-                    (_, crate::types::TypeData::Union(union)) => {
+                    crate::types::TypeData::Union(union) => {
                         let elements = union.elements(db);
                         let mut classes = Vec::with_capacity(elements.len());
                         for element in elements {
-                            match {
-                                let __ty_view_value = element;
-                                (__ty_view_value, __ty_view_value.data())
-                            } {
-                                (_, crate::types::TypeData::ClassLiteral(class)) => {
+                            match element.data() {
+                                crate::types::TypeData::ClassLiteral(class) => {
                                     classes.push(ClassType::NonGeneric(class));
                                 }
-                                (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
+                                crate::types::TypeData::GenericAlias(generic_alias) => {
                                     classes.push(ClassType::Generic(generic_alias));
                                 }
-                                (_, _) => {
+                                _ => {
                                     good_argument = false;
                                     break;
                                 }
@@ -2538,7 +2495,7 @@ impl KnownFunction {
                         }
                         classes
                     }
-                    (_, _) => {
+                    _ => {
                         good_argument = false;
                         vec![]
                     }
@@ -2616,10 +2573,8 @@ impl KnownFunction {
                     call_expression.arguments.args.get(1),
                 );
 
-                if let (_, crate::types::TypeData::ClassLiteral(class)) = ({
-                    let __ty_view_value = second_argument;
-                    (__ty_view_value, __ty_view_value.data())
-                }) && self == KnownFunction::IsInstance
+                if let crate::types::TypeData::ClassLiteral(class) = second_argument.data()
+                    && self == KnownFunction::IsInstance
                 {
                     overload.set_return_type(Type::from_truthiness(
                         db,
@@ -2667,17 +2622,10 @@ impl KnownFunction {
                     return;
                 };
 
-                let class = match {
-                    let __ty_view_value = class_type;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::ClassLiteral(class)) => {
-                        ClassType::NonGeneric(class)
-                    }
-                    (_, crate::types::TypeData::GenericAlias(generic)) => {
-                        ClassType::Generic(generic)
-                    }
-                    (_, _) => return,
+                let class = match class_type.data() {
+                    crate::types::TypeData::ClassLiteral(class) => ClassType::NonGeneric(class),
+                    crate::types::TypeData::GenericAlias(generic) => ClassType::Generic(generic),
+                    _ => return,
                 };
 
                 if !class.has_ordering_method_in_mro(db) {

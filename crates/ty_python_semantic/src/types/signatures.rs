@@ -273,11 +273,8 @@ impl<'db> CallableSignature<'db> {
             tcx: TypeContext<'db>,
             visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Option<CallableSignature<'db>> {
-            match {
-                let __ty_view_value = paramspec_value;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+            match paramspec_value.data() {
+                crate::types::TypeData::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     Some(CallableSignature::single(Signature {
                         generic_context: self_signature.generic_context.map(|context| {
                             type_mapping.update_signature_generic_context(db, context)
@@ -311,7 +308,7 @@ impl<'db> CallableSignature<'db> {
                         ),
                     }))
                 }
-                (_, crate::types::TypeData::Callable(callable))
+                crate::types::TypeData::Callable(callable)
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
                     Some(CallableSignature::from_overloads(
@@ -351,7 +348,7 @@ impl<'db> CallableSignature<'db> {
                         }),
                     ))
                 }
-                (_, _) => None,
+                _ => None,
             }
         }
 
@@ -944,13 +941,10 @@ impl<'db> Signature<'db> {
             // signature's generic context, too. (The generic context should include any synthetic
             // typevars created for `typing.Self`, even if the `typing.Self` annotation was added
             // implicitly.)
-            let self_typevar = match {
-                let __ty_view_value = self_type;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::TypeVar(self_typevar)) => Some(self_typevar),
-                (_, crate::types::TypeData::SubclassOf(subclass_of)) => subclass_of.into_type_var(),
-                (_, _) => None,
+            let self_typevar = match self_type.data() {
+                crate::types::TypeData::TypeVar(self_typevar) => Some(self_typevar),
+                crate::types::TypeData::SubclassOf(subclass_of) => subclass_of.into_type_var(),
+                _ => None,
             };
 
             if let Some(self_typevar) = self_typevar {
@@ -1527,11 +1521,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Broader overload-set assignability (non-union unary domains, higher arity,
         // typevars/dynamic interactions) needs dedicated relation logic.
         if !matches!(
-            {
-                let __ty_view_value = other_parameter_type;
-                (__ty_view_value, __ty_view_value.data())
-            },
-            (_, crate::types::TypeData::Union(_))
+            other_parameter_type.data(),
+            crate::types::TypeData::Union(_)
         ) || !is_unary_overload_aggregate_candidate_type(other_parameter_type)
             || !is_unary_overload_aggregate_candidate_type(target_signature.return_ty)
         {
@@ -1973,16 +1964,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                                source_ty: Type<'db>,
                                target_name: Option<&Name>,
                                target_index: usize| {
-            match (
-                ({
-                    let __ty_view_value = target_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                }),
-                ({
-                    let __ty_view_value = source_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                }),
-            ) {
+            match (target_ty.data(), source_ty.data()) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
                 // position.
@@ -1990,8 +1972,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // `ParamSpec` type variables can only occur in parameter lists so this special case
                 // is present here instead of in `TypeRelationChecker::check_type_pair`.
                 (
-                    (_, crate::types::TypeData::TypeVar(typevar1)),
-                    (_, crate::types::TypeData::TypeVar(typevar2)),
+                    crate::types::TypeData::TypeVar(typevar1),
+                    crate::types::TypeData::TypeVar(typevar2),
                 ) if typevar1.paramspec_attr(db).is_some()
                     && typevar1.paramspec_attr(db) == typevar2.paramspec_attr(db)
                     && typevar1
@@ -3304,16 +3286,7 @@ impl<'db> Parameters<'db> {
                 .get(variadic_index + 1..keyword_variadic_index)
                 .unwrap_or(&[]);
 
-            match (
-                ({
-                    let __ty_view_value = variadic_type;
-                    (__ty_view_value, __ty_view_value.data())
-                }),
-                ({
-                    let __ty_view_value = keyword_variadic_type;
-                    (__ty_view_value, __ty_view_value.data())
-                }),
-            ) {
+            match (variadic_type.data(), keyword_variadic_type.data()) {
                 // > If the input signature in a function definition includes both a `*args` and
                 // > `**kwargs` parameter and both are typed as Any (explicitly or implicitly
                 // > because it has no annotation), a type checker should treat this as the
@@ -3321,10 +3294,7 @@ impl<'db> Parameters<'db> {
                 // > are retained as part of the signature.
                 //
                 // https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
-                (
-                    (_, crate::types::TypeData::Dynamic(_)),
-                    (_, crate::types::TypeData::Dynamic(_)),
-                ) => {
+                (crate::types::TypeData::Dynamic(_), crate::types::TypeData::Dynamic(_)) => {
                     if keyword_only_params.is_empty()
                         && !prefix_params.is_empty()
                         && prefix_params.iter().all(Parameter::is_positional_only)
@@ -3342,8 +3312,8 @@ impl<'db> Parameters<'db> {
                 //
                 // https://typing.python.org/en/latest/spec/generics.html#id5
                 (
-                    (_, crate::types::TypeData::TypeVar(variadic_typevar)),
-                    (_, crate::types::TypeData::TypeVar(keyword_variadic_typevar)),
+                    crate::types::TypeData::TypeVar(variadic_typevar),
+                    crate::types::TypeData::TypeVar(keyword_variadic_typevar),
                 ) if keyword_only_params.is_empty() => {
                     if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
                         variadic_typevar.paramspec_attr(db),
@@ -3787,10 +3757,8 @@ impl<'db> Parameters<'db> {
                 continue;
             }
 
-            let (_, crate::types::TypeData::Callable(callable)) = ({
-                let __ty_view_value = parameter.annotated_type();
-                (__ty_view_value, __ty_view_value.data())
-            }) else {
+            let crate::types::TypeData::Callable(callable) = parameter.annotated_type().data()
+            else {
                 continue;
             };
             if callable.kind(db) != CallableTypeKind::ParamSpecValue {
@@ -3816,10 +3784,9 @@ impl<'db> Parameters<'db> {
             return self.clone();
         }
 
-        let (_, crate::types::TypeData::Callable(keyword_callable)) = ({
-            let __ty_view_value = keyword_variadic.annotated_type();
-            (__ty_view_value, __ty_view_value.data())
-        }) else {
+        let crate::types::TypeData::Callable(keyword_callable) =
+            keyword_variadic.annotated_type().data()
+        else {
             return self.clone();
         };
         if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue

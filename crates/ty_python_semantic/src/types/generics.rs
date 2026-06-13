@@ -551,11 +551,8 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::TypeVar(node) => {
                 let definition = index.expect_single_definition(node);
                 let declared = inferred_declaration(db, definition).declared()?;
-                let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) =
-                    ({
-                        let __ty_view_value = declared.inner_type();
-                        (__ty_view_value, __ty_view_value.data())
-                    })
+                let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declared.inner_type().data()
                 else {
                     return None;
                 };
@@ -564,11 +561,8 @@ impl<'db> GenericContext<'db> {
             ast::TypeParam::ParamSpec(node) => {
                 let definition = index.expect_single_definition(node);
                 let declared = inferred_declaration(db, definition).declared()?;
-                let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) =
-                    ({
-                        let __ty_view_value = declared.inner_type();
-                        (__ty_view_value, __ty_view_value.data())
-                    })
+                let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declared.inner_type().data()
                 else {
                     return None;
                 };
@@ -1639,19 +1633,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             // return `self.always()` from that branch, as that leads to union
             // simplification, which means that we lose track of type variables
             // without recording the constraints under which the relation holds.
-            if matches!(
-                {
-                    let __ty_view_value = target;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::TypeVar(_))
-            ) || matches!(
-                {
-                    let __ty_view_value = source;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::TypeVar(_))
-            ) {
+            if matches!(target.data(), crate::types::TypeData::TypeVar(_))
+                || matches!(source.data(), crate::types::TypeData::TypeVar(_))
+            {
                 return self.always();
             }
 
@@ -2044,27 +2028,22 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         identity: BoundTypeVarIdentity<'db>,
         ty: Type<'db>,
     ) -> bool {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match ty.data() {
             // A bare `T = U` edge only replaces one typevar with another; it does not wrap the
             // replacement in additional structure and therefore cannot grow during repeated
             // specialization.
-            (_, crate::types::TypeData::TypeVar(_)) => false,
+            crate::types::TypeData::TypeVar(_) => false,
             // Unions and intersections are flattened and deduplicated as they are constructed.
             // A cyclic reference directly inside one can add elements but cannot create
             // unbounded nesting. Keep looking inside its elements for a genuinely embedded edge.
-            (_, crate::types::TypeData::Union(union)) => {
-                union.elements(self.db).iter().any(|element| {
-                    self.has_expanding_cycle(generic_context, types, identity, *element)
-                })
-            }
-            (_, crate::types::TypeData::Intersection(intersection)) => intersection
+            crate::types::TypeData::Union(union) => union.elements(self.db).iter().any(|element| {
+                self.has_expanding_cycle(generic_context, types, identity, *element)
+            }),
+            crate::types::TypeData::Intersection(intersection) => intersection
                 .iter_positive(self.db)
                 .chain(intersection.iter_negative(self.db))
                 .any(|element| self.has_expanding_cycle(generic_context, types, identity, element)),
-            (_, _) => any_over_type(self.db, ty, false, |nested| {
+            _ => any_over_type(self.db, ty, false, |nested| {
                 nested.as_typevar().is_some_and(|dependency| {
                     let dependency = dependency.identity(self.db);
                     dependency != identity
@@ -2156,11 +2135,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union))
+        match ty.data() {
+            crate::types::TypeData::Union(union)
                 if union.elements(self.db).iter().any(|element| {
                     !self.is_inferable_typevar_artifact(generic_context, *element)
                 }) =>
@@ -2169,7 +2145,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     !self.is_inferable_typevar_artifact(generic_context, *element)
                 })
             }
-            (_, _) => ty,
+            _ => ty,
         }
     }
 
@@ -2178,11 +2154,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         generic_context: GenericContext<'db>,
         ty: Type<'db>,
     ) -> Type<'db> {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Intersection(intersection))
+        match ty.data() {
+            crate::types::TypeData::Intersection(intersection)
                 if intersection.iter_positive(self.db).any(|element| {
                     !self.is_inferable_typevar_artifact(generic_context, element)
                 }) =>
@@ -2195,7 +2168,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     }
                 })
             }
-            (_, _) => ty,
+            _ => ty,
         }
     }
 
@@ -2351,15 +2324,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 return *result;
             }
 
-            let result = match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::TypedDict(_)) => {
+            let result = match ty.data() {
+                crate::types::TypeData::TypedDict(_) => {
                     typed_dicts.insert(ty);
                     true
                 }
-                (_, crate::types::TypeData::Union(union)) => {
+                crate::types::TypeData::Union(union) => {
                     if !resolving.insert(ty) {
                         return false;
                     }
@@ -2369,7 +2339,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                     resolving.remove(&ty);
                     result
                 }
-                (_, _) => false,
+                _ => false,
             };
             completed.insert(ty, result);
             result
@@ -2503,16 +2473,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
         let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
         let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
 
-        match (
-            ({
-                let __ty_view_value = formal;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            ({
-                let __ty_view_value = actual;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-        ) {
+        match (formal.view(), actual.view()) {
             // Expand PEP 695 type aliases in the formal type.
             // This is necessary for solving generics like `def head[T](my_list: MyList[T]) -> T`.
             ((_, crate::types::TypeData::TypeAlias(alias)), (_, _)) => {
@@ -2644,10 +2605,8 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 // partial mappings from non-matching elements. For example, while comparing
                 // `ClassSelector[T]` with `ClassSelector[CT | None]`, descending into `None`
                 // would map `T` to `None` before `CT` is solved from another argument.
-                if let (_, crate::types::TypeData::TypeVar(actual_typevar)) = ({
-                    let __ty_view_value = actual;
-                    (__ty_view_value, __ty_view_value.data())
-                }) && actual_typevar.is_inferable(self.db, self.inferable)
+                if let crate::types::TypeData::TypeVar(actual_typevar) = actual.data()
+                    && actual_typevar.is_inferable(self.db, self.inferable)
                     && matches!(polarity, TypeVarVariance::Invariant)
                 {
                     self.add_type_mapping(actual_typevar, formal, polarity);
@@ -2774,11 +2733,9 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         // that is a strict subtype (e.g. `bool` vs `int`) would allow
                         // the callee to return a widened type that violates the caller's
                         // constraint.
-                        if let (_, crate::types::TypeData::TypeVar(actual_typevar)) = ({
-                            let __ty_view_value = ty;
-                            (__ty_view_value, __ty_view_value.data())
-                        }) && let Some(actual_constraints) =
-                            actual_typevar.typevar(self.db).constraints(self.db)
+                        if let crate::types::TypeData::TypeVar(actual_typevar) = ty.data()
+                            && let Some(actual_constraints) =
+                                actual_typevar.typevar(self.db).constraints(self.db)
                         {
                             let all_satisfied =
                                 actual_constraints.iter().all(|actual_constraint| {
@@ -2949,15 +2906,12 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                 }
 
                 // Extract formal_alias if this is a generic class
-                let formal_alias = match {
-                    let __ty_view_value = formal;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::NominalInstance(formal_nominal)) => {
+                let formal_alias = match formal.data() {
+                    crate::types::TypeData::NominalInstance(formal_nominal) => {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
 
-                    (_, crate::types::TypeData::ProtocolInstance(_)) => {
+                    crate::types::TypeData::ProtocolInstance(_) => {
                         // TODO: For protocols, we use the new constraint set implementation, which
                         // will handle implicitly implemented protocols and generic protocols. We
                         // eventually want this logic to be used for _all_ nominal instances
@@ -2976,7 +2930,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         return Ok(());
                     }
 
-                    (_, _) => None,
+                    _ => None,
                 };
 
                 if let Some(formal_alias) = formal_alias {

@@ -71,11 +71,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ty: Type<'db>,
             visitor: &TypedDictKeyExpectedTypeVisitor<'db>,
         ) -> Option<Type<'db>> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::TypedDict(typed_dict)) => {
+            match ty.data() {
+                crate::types::TypeData::TypedDict(typed_dict) => {
                     if typed_dict.explicit_extra_items(db).is_some() {
                         return Some(KnownClass::Str.to_instance(db));
                     }
@@ -86,7 +83,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
-                (_, crate::types::TypeData::Union(union)) => {
+                crate::types::TypeData::Union(union) => {
                     let keys = union
                         .elements(db)
                         .iter()
@@ -94,7 +91,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
-                (_, crate::types::TypeData::Intersection(intersection)) => {
+                crate::types::TypeData::Intersection(intersection) => {
                     let keys = intersection
                         .positive(db)
                         .iter()
@@ -102,10 +99,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .collect_vec();
                     (!keys.is_empty()).then(|| UnionType::from_elements(db, keys))
                 }
-                (_, crate::types::TypeData::TypeAlias(alias)) => {
+                crate::types::TypeData::TypeAlias(alias) => {
                     visitor.visit(ty, || imp(db, alias.value_type(db), visitor))
                 }
-                (_, _) => None,
+                _ => None,
             }
         }
 
@@ -215,11 +212,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::from(tuple.to_class_type(db))
         };
 
-        match {
-            let __ty_view_value = value_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::ClassLiteral(class)) => {
+        match value_ty.data() {
+            crate::types::TypeData::ClassLiteral(class) => {
                 // HACK ALERT: If we are subscripting a generic class, short-circuit the rest of the
                 // subscript inference logic and treat this as an explicit specialization.
                 // TODO: Move this logic into a custom callable, and update `find_name_in_mro` to return
@@ -246,12 +240,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            (
-                _,
-                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(_),
-                )),
-            ) => {
+            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(
+                TypeAliasType::ManualPEP695(_),
+            )) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
@@ -262,10 +253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let generic_context = GenericContext::from_typevar_instances(db, variables);
                 return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
             }
-            (
-                _,
-                crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)),
-            ) => {
+            crate::types::TypeData::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(db) {
                     return self.infer_explicit_type_alias_type_specialization(
                         subscript,
@@ -275,7 +263,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            (_, crate::types::TypeData::SpecialForm(special_form)) => match special_form {
+            crate::types::TypeData::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Tuple => {
                     return tuple_generic_alias(db, self.infer_tuple_type_expression(subscript));
                 }
@@ -416,18 +404,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => {}
             },
 
-            (
-                _,
-                crate::types::TypeData::KnownInstance(
-                    KnownInstanceType::UnionType(_)
-                    | KnownInstanceType::Annotated(_)
-                    | KnownInstanceType::Callable(_)
-                    | KnownInstanceType::TypeGenericAlias(_),
-                ),
+            crate::types::TypeData::KnownInstance(
+                KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Annotated(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::TypeGenericAlias(_),
             ) => {
                 return self.infer_explicit_type_alias_specialization(subscript, value_ty, false);
             }
-            (_, crate::types::TypeData::Dynamic(DynamicType::Unknown)) => {
+            crate::types::TypeData::Dynamic(DynamicType::Unknown) => {
                 let slice_ty = self.infer_expression(slice, TypeContext::default());
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
@@ -438,7 +423,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let generic_context = GenericContext::from_typevar_instances(db, variables);
                 return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
             }
-            (_, _) => {}
+            _ => {}
         }
 
         let slice_ty = self.infer_expression(slice, TypeContext::default());
@@ -644,8 +629,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .inference_flags()
                         .contains(InferenceFlags::IN_KWARG_ANNOTATION)
                     && !matches!(
-                        { let __ty_view_value = value_ty; (__ty_view_value, __ty_view_value.data()) } ,
-                        (_, crate::types::TypeData::GenericAlias(alias))
+                        value_ty.data() ,
+                        crate::types::TypeData::GenericAlias(alias)
                             if alias
                                 .specialization(db)
                                 .types(db)
@@ -716,10 +701,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // A ParamSpec cannot be used to specialize a regular TypeVar.
                     if !typevar.is_paramspec(db)
-                        && let (_, crate::types::TypeData::TypeVar(tv)) = ({
-                            let __ty_view_value = provided_type;
-                            (__ty_view_value, __ty_view_value.data())
-                        })
+                        && let crate::types::TypeData::TypeVar(tv) = provided_type.data()
                         && tv.is_paramspec(db)
                     {
                         if let Some(builder) = self
@@ -863,13 +845,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if let (_, crate::types::TypeData::GenericAlias(alias)) = ({
-                let __ty_view_value = value_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }) && alias
-                .specialization(db)
-                .types(db)
-                .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
+            if let crate::types::TypeData::GenericAlias(alias) = value_ty.data()
+                && alias
+                    .specialization(db)
+                    .types(db)
+                    .contains(&Type::Dynamic(DynamicType::TodoTypeVarTuple))
             {
                 // Avoid false-positive errors when specializing a class
                 // that's generic over a legacy TypeVarTuple
@@ -880,20 +860,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         "Cannot subscript non-generic type `{}`",
                         value_ty.display(db)
                     ));
-                    let already_specialized = match {
-                        let __ty_view_value = value_ty;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
-                        (_, crate::types::TypeData::GenericAlias(_)) => true,
-                        (
-                            _,
-                            crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(
-                                union,
-                            )),
-                        ) => union
+                    let already_specialized = match value_ty.data() {
+                        crate::types::TypeData::GenericAlias(_) => true,
+                        crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(
+                            union,
+                        )) => union
                             .value_expression_types(db)
                             .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
-                        (_, _) => false,
+                        _ => false,
                     };
                     if already_specialized {
                         diagnostic.annotate(
@@ -1036,14 +1010,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let value_ty = self.infer_expression(&subscript.value, TypeContext::default());
 
                 if matches!(
-                    {
-                        let __ty_view_value = value_ty;
-                        (__ty_view_value, __ty_view_value.data())
-                    },
-                    (
-                        _,
-                        crate::types::TypeData::SpecialForm(SpecialFormType::Concatenate)
-                    )
+                    value_ty.data(),
+                    crate::types::TypeData::SpecialForm(SpecialFormType::Concatenate)
                 ) {
                     return Ok(Type::paramspec_value_callable(
                         db,
@@ -1070,18 +1038,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     previous_concatenate_context,
                 );
 
-                match {
-                    let __ty_view_value = param_type;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::TypeVar(typevar)) if typevar.is_paramspec(db) => {
+                match param_type.data() {
+                    crate::types::TypeData::TypeVar(typevar) if typevar.is_paramspec(db) => {
                         return Ok(param_type);
                     }
 
-                    (
-                        _,
-                        crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)),
-                    ) if typevar.is_paramspec(db) => {
+                    crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_paramspec(db) =>
+                    {
                         if let Some(diagnostic_builder) =
                             self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr)
                         {
@@ -1102,7 +1066,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //
                     // Foo[ParamSpec]  # P: (ParamSpec, /)
                     // ```
-                    (_, crate::types::TypeData::NominalInstance(nominal))
+                    crate::types::TypeData::NominalInstance(nominal)
                         if nominal.has_known_class(db, KnownClass::ParamSpec) =>
                     {
                         return Ok(Type::paramspec_value_callable(
@@ -1117,7 +1081,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ));
                     }
 
-                    (_, _) if exactly_one_paramspec => {
+                    _ if exactly_one_paramspec => {
                         // Square brackets are optional when `ParamSpec` is the only type variable
                         // being specialized. This means that a single name expression represents a
                         // parameter list with a single parameter. For example,
@@ -1156,7 +1120,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //
                     // Foo[Any, int]  # P: (Any, /), T: int
                     // ```
-                    (_, crate::types::TypeData::Dynamic(DynamicType::Any)) => {
+                    crate::types::TypeData::Dynamic(DynamicType::Any) => {
                         return Ok(Type::paramspec_value_callable(
                             db,
                             Parameters::gradual_form(),
@@ -1165,11 +1129,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     // If we ended up with an `Unknown` type here, it almost certainly means
                     // that we already emitted an error elsewhere
-                    (_, crate::types::TypeData::Dynamic(_)) => {
+                    crate::types::TypeData::Dynamic(_) => {
                         return Ok(Type::paramspec_value_callable(db, Parameters::unknown()));
                     }
 
-                    (_, _) => {}
+                    _ => {}
                 }
             }
 
@@ -1198,11 +1162,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Special typing forms for which subscriptions are context-dependent are parsed here,
         // outside of `Type::subscript`, which is a pure function that doesn't depend on the
         // semantic index or any context-dependent state.
-        let subscript_result = match {
-            let __ty_view_value = value_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Generic)) => {
+        let subscript_result = match value_ty.data() {
+            crate::types::TypeData::SpecialForm(SpecialFormType::Generic) => {
                 infer_legacy_generic_subscript(
                     db,
                     self.index,
@@ -1213,7 +1174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownInstanceType::SubscriptedGeneric,
                 )
             }
-            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Protocol)) => {
+            crate::types::TypeData::SpecialForm(SpecialFormType::Protocol) => {
                 infer_legacy_generic_subscript(
                     db,
                     self.index,
@@ -1224,7 +1185,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     KnownInstanceType::SubscriptedProtocol,
                 )
             }
-            (_, crate::types::TypeData::SpecialForm(SpecialFormType::Concatenate)) => {
+            crate::types::TypeData::SpecialForm(SpecialFormType::Concatenate) => {
                 // TODO: Add proper support for `Concatenate`
                 let mut variables = FxOrderSet::default();
                 slice_ty.bind_and_find_all_legacy_typevars(
@@ -1235,7 +1196,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let generic_context = GenericContext::from_typevar_instances(db, variables);
                 Ok(Type::Dynamic(DynamicType::UnknownGeneric(generic_context)))
             }
-            (_, _) => value_ty.subscript(db, slice_ty, expr_context),
+            _ => value_ty.subscript(db, slice_ty, expr_context),
         };
 
         subscript_result.unwrap_or_else(|e| {
@@ -1400,11 +1361,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        match {
-            let __ty_view_value = object_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union)) => {
+        match object_ty.data() {
+            crate::types::TypeData::Union(union) => {
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
 
@@ -1431,7 +1389,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 valid
             }
 
-            (_, crate::types::TypeData::Intersection(intersection)) => {
+            crate::types::TypeData::Intersection(intersection) => {
                 let mut infer_slice_ty = MultiInferenceGuard::new(infer_slice_ty);
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
 
@@ -1471,7 +1429,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 valid
             }
 
-            (_, crate::types::TypeData::EnumComplement(complement)) => self
+            crate::types::TypeData::EnumComplement(complement) => self
                 .validate_subscript_assignment_impl(
                     target,
                     full_object_ty,
@@ -1482,7 +1440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     emit_diagnostic,
                 ),
 
-            (_, crate::types::TypeData::TypedDict(typed_dict)) => {
+            crate::types::TypeData::TypedDict(typed_dict) => {
                 // As an optimization, prevent calling `__setitem__` on (unions of) large `TypedDict`s, and
                 // validate the assignment ourselves. This also allows us to emit better diagnostics.
 
@@ -1601,7 +1559,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 valid
             }
 
-            (_, _) => {
+            _ => {
                 let ast_arguments = [
                     ArgOrKeyword::Arg(&target.slice),
                     ArgOrKeyword::Arg(rhs_value_node),
@@ -1819,11 +1777,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        match {
-            let __ty_view_value = object_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union)) => {
+        match object_ty.data() {
+            crate::types::TypeData::Union(union) => {
                 for element_ty in union.elements(db) {
                     self.validate_subscript_deletion_impl(
                         target,
@@ -1834,7 +1789,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            (_, crate::types::TypeData::Intersection(intersection)) => {
+            crate::types::TypeData::Intersection(intersection) => {
                 // Check if any positive element supports deletion
                 let mut any_valid = false;
                 for element_ty in intersection.positive(db) {
@@ -1855,7 +1810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            (_, crate::types::TypeData::EnumComplement(complement)) => self
+            crate::types::TypeData::EnumComplement(complement) => self
                 .validate_subscript_deletion_impl(
                     target,
                     full_object_ty,
@@ -1863,11 +1818,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     slice_ty,
                 ),
 
-            (_, _) => {
-                if let (_, crate::types::TypeData::TypedDict(typed_dict)) = {
-                    let __ty_view_value = object_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
+            _ => {
+                if let crate::types::TypeData::TypedDict(typed_dict) = object_ty.data() {
                     // Known undeclared keys can only refer to explicit extra items, so they can be
                     // deleted whenever those items are mutable. An arbitrary string key could
                     // instead refer to any declared field, so deletion is only safe when all
@@ -2170,10 +2122,9 @@ fn legacy_generic_class_context<'db>(
     let mut validated_typevars = FxOrderSet::default();
     for ty in typevars {
         let argument_ty = *ty;
-        if let (_, crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar))) = {
-            let __ty_view_value = argument_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        if let crate::types::TypeData::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+            argument_ty.data()
+        {
             let bound = bind_typevar(db, index, file_scope_id, typevar_binding_context, typevar)
                 .ok_or(LegacyGenericContextError::InvalidArgument(argument_ty))?;
             if !validated_typevars.insert(bound) {
@@ -2181,28 +2132,18 @@ fn legacy_generic_class_context<'db>(
                     typevar.name(db),
                 ));
             }
-        } else if let (_, crate::types::TypeData::NominalInstance(instance)) = ({
-            let __ty_view_value = argument_ty;
-            (__ty_view_value, __ty_view_value.data())
-        }) && instance.has_known_class(db, KnownClass::TypeVarTuple)
+        } else if let crate::types::TypeData::NominalInstance(instance) = argument_ty.data()
+            && instance.has_known_class(db, KnownClass::TypeVarTuple)
         {
             return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
-        } else if any_over_type(db, argument_ty, true, |inner_ty| {
-            match {
-                let __ty_view_value = inner_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (
-                    _,
-                    crate::types::TypeData::Dynamic(
-                        DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
-                    ),
-                ) => true,
-                (_, crate::types::TypeData::NominalInstance(nominal)) => {
-                    nominal.has_known_class(db, KnownClass::TypeVarTuple)
-                }
-                (_, _) => false,
+        } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty.data() {
+            crate::types::TypeData::Dynamic(
+                DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
+            ) => true,
+            crate::types::TypeData::NominalInstance(nominal) => {
+                nominal.has_known_class(db, KnownClass::TypeVarTuple)
             }
+            _ => false,
         }) {
             return Err(LegacyGenericContextError::NotYetSupported);
         } else {

@@ -133,18 +133,12 @@ impl<'db> Mro<'db> {
             [single_base]
                 if !class.has_pep_695_type_params(db)
                     && !matches!(
-                        {
-                            let __ty_view_value = single_base;
-                            (__ty_view_value, __ty_view_value.data())
-                        },
-                        (
-                            _,
-                            crate::types::TypeData::GenericAlias(_)
-                                | crate::types::TypeData::KnownInstance(
-                                    KnownInstanceType::SubscriptedGeneric(_)
-                                        | KnownInstanceType::SubscriptedProtocol(_)
-                                )
-                        )
+                        single_base.data(),
+                        crate::types::TypeData::GenericAlias(_)
+                            | crate::types::TypeData::KnownInstance(
+                                KnownInstanceType::SubscriptedGeneric(_)
+                                    | KnownInstanceType::SubscriptedProtocol(_)
+                            )
                     ) =>
             {
                 ClassBase::try_from_type(
@@ -186,15 +180,10 @@ impl<'db> Mro<'db> {
                     // (see `infer::TypeInferenceBuilder::check_class_definitions`),
                     // which is why we only care about `KnownInstanceType::Generic(Some(_))`,
                     // not `KnownInstanceType::Generic(None)`.
-                    if let (
-                        _,
-                        crate::types::TypeData::KnownInstance(
-                            KnownInstanceType::SubscriptedGeneric(_),
-                        ),
-                    ) = {
-                        let __ty_view_value = base;
-                        (__ty_view_value, __ty_view_value.data())
-                    } {
+                    if let crate::types::TypeData::KnownInstance(
+                        KnownInstanceType::SubscriptedGeneric(_),
+                    ) = base.data()
+                    {
                         maybe_add_generic(
                             &mut resolved_bases,
                             original_bases,
@@ -250,16 +239,10 @@ impl<'db> Mro<'db> {
                 if class.has_pep_695_type_params(db)
                     && original_bases.iter().any(|base| {
                         matches!(
-                            {
-                                let __ty_view_value = base;
-                                (__ty_view_value, __ty_view_value.data())
-                            },
-                            (
-                                _,
-                                crate::types::TypeData::KnownInstance(
-                                    KnownInstanceType::SubscriptedGeneric(_)
-                                ) | crate::types::TypeData::SpecialForm(SpecialFormType::Generic)
-                            )
+                            base.data(),
+                            crate::types::TypeData::KnownInstance(
+                                KnownInstanceType::SubscriptedGeneric(_)
+                            ) | crate::types::TypeData::SpecialForm(SpecialFormType::Generic)
                         )
                     })
                 {
@@ -859,14 +842,8 @@ fn check_generic_reorder_fixes_mro<'db>(
         .enumerate()
         .filter_map(|(i, base)| {
             matches!(
-                {
-                    let __ty_view_value = base;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (
-                    _,
-                    crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
-                )
+                base.data(),
+                crate::types::TypeData::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
             )
             .then_some(i)
         })

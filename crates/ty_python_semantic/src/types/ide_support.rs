@@ -230,36 +230,25 @@ pub fn definitions_for_attribute<'db>(
         return resolved;
     };
 
-    let tys = match {
-        let __ty_view_value = lhs_ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::Union(union)) => union.elements(model.db()),
-        (_, _) => std::slice::from_ref(&lhs_ty),
+    let tys = match lhs_ty.data() {
+        crate::types::TypeData::Union(union) => union.elements(model.db()),
+        _ => std::slice::from_ref(&lhs_ty),
     };
 
     // Expand intersections for each subtype into their components
     let expanded_tys = tys
         .iter()
-        .flat_map(|ty| {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::Intersection(intersection)) => {
-                    Either::Left(intersection.positive(db).iter())
-                }
-                (_, _) => Either::Right(std::iter::once(ty)),
+        .flat_map(|ty| match ty.data() {
+            crate::types::TypeData::Intersection(intersection) => {
+                Either::Left(intersection.positive(db).iter())
             }
+            _ => Either::Right(std::iter::once(ty)),
         })
         .copied();
 
     for ty in expanded_tys {
         // Handle modules
-        if let (_, crate::types::TypeData::ModuleLiteral(module_literal)) = {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        if let crate::types::TypeData::ModuleLiteral(module_literal) = ty.data() {
             if let Some(module_file) = module_literal.module(db).file(db) {
                 let module_scope = global_scope(db, module_file);
                 for def in find_symbol_in_scope(db, module_scope, name_str) {
@@ -275,38 +264,23 @@ pub fn definitions_for_attribute<'db>(
         }
 
         // Prevent lookup on BoundSuper proxy object
-        if matches!(
-            {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            },
-            (_, crate::types::TypeData::BoundSuper(_))
-        ) {
+        if matches!(ty.data(), crate::types::TypeData::BoundSuper(_)) {
             continue;
         }
 
         let meta_type = ty.to_meta_type(db);
 
         // Look up the attribute first on the meta-type, unless it's already a class-like type.
-        let lookup_type = match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (
-                _,
-                crate::types::TypeData::ClassLiteral(_)
-                | crate::types::TypeData::SubclassOf(_)
-                | crate::types::TypeData::GenericAlias(_),
-            ) => ty,
-            (_, _) => meta_type,
+        let lookup_type = match ty.data() {
+            crate::types::TypeData::ClassLiteral(_)
+            | crate::types::TypeData::SubclassOf(_)
+            | crate::types::TypeData::GenericAlias(_) => ty,
+            _ => meta_type,
         };
 
-        let class_literal = match {
-            let __ty_view_value = lookup_type;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::ClassLiteral(class_literal)) => class_literal,
-            (_, crate::types::TypeData::SubclassOf(subclass)) => {
+        let class_literal = match lookup_type.data() {
+            crate::types::TypeData::ClassLiteral(class_literal) => class_literal,
+            crate::types::TypeData::SubclassOf(subclass) => {
                 match subclass.subclass_of().into_class(db) {
                     Some(cls) => match cls.static_class_literal(db) {
                         Some((lit, _)) => ClassLiteral::Static(lit),
@@ -315,7 +289,7 @@ pub fn definitions_for_attribute<'db>(
                     None => continue,
                 }
             }
-            (_, _) => continue,
+            _ => continue,
         };
 
         resolved.extend(definitions_for_attribute_in_class_hierarchy(
@@ -330,12 +304,9 @@ pub fn definitions_for_attribute<'db>(
         // Only look up definitions on the metaclass if the type is a class object to begin with in
         // order to prevent looking up instance members on the class metaclass
         if resolved.is_empty() && meta_type != lookup_type {
-            let class_literal = match {
-                let __ty_view_value = meta_type;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::ClassLiteral(class_literal)) => class_literal,
-                (_, crate::types::TypeData::SubclassOf(subclass)) => {
+            let class_literal = match meta_type.data() {
+                crate::types::TypeData::ClassLiteral(class_literal) => class_literal,
+                crate::types::TypeData::SubclassOf(subclass) => {
                     match subclass.subclass_of().into_class(db) {
                         Some(cls) => match cls.static_class_literal(db) {
                             Some((lit, _)) => ClassLiteral::Static(lit),
@@ -344,7 +315,7 @@ pub fn definitions_for_attribute<'db>(
                         None => continue,
                     }
                 }
-                (_, _) => continue,
+                _ => continue,
             };
 
             resolved.extend(definitions_for_attribute_in_class_hierarchy(
@@ -909,21 +880,18 @@ fn full_type_bindings_for_call<'db>(
 // values, while aliases, unions, intersections, and specialized generics require more context.
 // `TypeForm(...)` also bypasses callable bindings and needs separate handling.
 fn known_type_form_parameter_index(db: &dyn Db, callable_type: Type<'_>) -> Option<usize> {
-    match {
-        let __ty_view_value = callable_type;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::FunctionLiteral(function)) => match function.known(db) {
+    match callable_type.data() {
+        crate::types::TypeData::FunctionLiteral(function) => match function.known(db) {
             Some(KnownFunction::Cast) => Some(0),
             Some(KnownFunction::AssertType) => Some(1),
             _ => None,
         },
-        (_, crate::types::TypeData::ClassLiteral(class))
+        crate::types::TypeData::ClassLiteral(class)
             if class.is_known(db, KnownClass::TypeAliasType) =>
         {
             Some(1)
         }
-        (_, _) => None,
+        _ => None,
     }
 }
 
@@ -1146,27 +1114,19 @@ pub fn definitions_for_unary_op<'db>(
 ///
 /// This is so that we show e.g. `int.__add__` instead of `Literal[4].__add__`.
 fn promote_for_self<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
+    match ty.view() {
         (_, crate::types::TypeData::BoundMethod(method)) => {
             Type::BoundMethod(method.map_self_type(db, |self_ty| {
                 self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
             }))
         }
-        (_, crate::types::TypeData::Union(elements)) => elements.map(db, |ty| {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::BoundMethod(method)) => {
-                    Type::BoundMethod(method.map_self_type(db, |self_ty| {
-                        self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
-                    }))
-                }
-                (_, _) => *ty,
+        (_, crate::types::TypeData::Union(elements)) => elements.map(db, |ty| match ty.data() {
+            crate::types::TypeData::BoundMethod(method) => {
+                Type::BoundMethod(method.map_self_type(db, |self_ty| {
+                    self_ty.literal_fallback_instance(db).unwrap_or(self_ty)
+                }))
             }
+            _ => *ty,
         }),
         (ty, _) => ty,
     }
@@ -2117,12 +2077,9 @@ pub fn type_hierarchy_subtypes(db: &dyn Db, ty: Type<'_>) -> Vec<TypeHierarchyCl
 
 /// Extract a `ClassLiteral` from a `Type`, handling various type forms.
 fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::ClassLiteral(class_literal)) => Some(class_literal),
-        (_, crate::types::TypeData::SubclassOf(subclass_of)) => {
+    match ty.data() {
+        crate::types::TypeData::ClassLiteral(class_literal) => Some(class_literal),
+        crate::types::TypeData::SubclassOf(subclass_of) => {
             let inner = subclass_of.subclass_of();
             match inner {
                 crate::types::SubclassOfInner::Class(class_type) => {
@@ -2132,18 +2089,18 @@ fn extract_class_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLit
                 | crate::types::SubclassOfInner::TypeVar(_) => None,
             }
         }
-        (_, crate::types::TypeData::GenericAlias(generic_alias)) => {
+        crate::types::TypeData::GenericAlias(generic_alias) => {
             Some(ClassLiteral::Static(generic_alias.origin(db)))
         }
-        (_, crate::types::TypeData::NominalInstance(instance)) => {
+        crate::types::TypeData::NominalInstance(instance) => {
             Some(instance.class(db).class_literal(db))
         }
-        (_, crate::types::TypeData::Union(union)) => union
+        crate::types::TypeData::Union(union) => union
             .elements(db)
             .iter()
             .find_map(|elem| extract_class_literal(db, *elem)),
 
-        (_, _) => None,
+        _ => None,
     }
 }
 

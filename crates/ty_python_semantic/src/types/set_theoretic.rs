@@ -204,15 +204,7 @@ impl<'db> UnionType<'db> {
         let mut iter = elements.iter().enumerate();
         while let Some((i, ty)) = iter.next() {
             let new_ty = transform_fn(ty)?;
-            if &new_ty != ty
-                || matches!(
-                    {
-                        let __ty_view_value = new_ty;
-                        (__ty_view_value, __ty_view_value.data())
-                    },
-                    (_, crate::types::TypeData::TypeAlias(_))
-                )
-            {
+            if &new_ty != ty || matches!(new_ty.data(), crate::types::TypeData::TypeAlias(_)) {
                 let mut builder = elements[..i]
                     .iter()
                     .copied()
@@ -969,11 +961,8 @@ fn expand_intersection_typevars_and_newtypes<'db>(
 ) -> Type<'db> {
     let mut builder = IntersectionBuilder::new(db);
     for &element in positive {
-        match {
-            let __ty_view_value = element;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeVar(tvar)) => {
+        match element.data() {
+            crate::types::TypeData::TypeVar(tvar) => {
                 match tvar.typevar(db).bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         builder = builder.add_positive(bound);
@@ -986,10 +975,10 @@ fn expand_intersection_typevars_and_newtypes<'db>(
                     None => {}
                 }
             }
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
+            crate::types::TypeData::NewTypeInstance(newtype) => {
                 builder = builder.add_positive(newtype.concrete_base_type(db));
             }
-            (_, _) => builder = builder.add_positive(element),
+            _ => builder = builder.add_positive(element),
         }
     }
 

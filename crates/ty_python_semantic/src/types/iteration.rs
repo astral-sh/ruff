@@ -104,15 +104,15 @@ impl<'db> Type<'db> {
             // or bytes literals, and creating long heterogeneous tuple specs has a performance cost.
             const MAX_TUPLE_LENGTH: usize = 128;
 
-            match { let __ty_view_value = ty; (__ty_view_value, __ty_view_value.data()) }  {
-                (_, crate::types::TypeData::NominalInstance(nominal)) => nominal.tuple_spec(db),
-                (_, crate::types::TypeData::NewTypeInstance(newtype)) => non_async_special_case(db, newtype.concrete_base_type(db)),
-                (_, crate::types::TypeData::GenericAlias(alias)) if alias.origin(db).is_tuple(db) => {
+            match ty.data()  {
+                crate::types::TypeData::NominalInstance(nominal) => nominal.tuple_spec(db),
+                crate::types::TypeData::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
+                crate::types::TypeData::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
                     ))))
                 }
-                (_, crate::types::TypeData::LiteralValue(literal)) => match literal.kind() {
+                crate::types::TypeData::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bytes(bytes) => {
                         let bytes_literal = bytes.value(db);
                         let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
@@ -145,7 +145,7 @@ impl<'db> Type<'db> {
                     }
                     _ => None
                 }
-                (_, crate::types::TypeData::Never) => {
+                crate::types::TypeData::Never => {
                     // The dunder logic below would have us return `tuple[Never, ...]`, which eagerly
                     // simplifies to `tuple[()]`. That will will cause us to emit false positives if we
                     // index into the tuple. Using `tuple[Unknown, ...]` avoids these false positives.
@@ -153,16 +153,16 @@ impl<'db> Type<'db> {
                     // diagnostic in unreachable code.
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
                 }
-                (_, crate::types::TypeData::TypeAlias(alias)) => {
+                crate::types::TypeData::TypeAlias(alias) => {
                     non_async_special_case(db, alias.value_type(db))
                 }
-                (_, crate::types::TypeData::TypeVar(tvar)) => match tvar.typevar(db).bound_or_constraints(db)? {
+                crate::types::TypeData::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         non_async_special_case(db, bound)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => non_async_special_case(db, constraints.as_type(db)),
                 },
-                (_, crate::types::TypeData::Union(union)) => {
+                crate::types::TypeData::Union(union) => {
                     let elements = union.elements(db);
                     if elements.len() < MAX_TUPLE_LENGTH {
                         let mut elements_iter = elements.iter();
@@ -176,7 +176,7 @@ impl<'db> Type<'db> {
                         None
                     }
                 }
-                (_, crate::types::TypeData::Intersection(intersection)) => {
+                crate::types::TypeData::Intersection(intersection) => {
                     // For intersections containing TypeVars with union bounds, we need to
                     // flatten the TypeVars first. This distributes the intersection over
                     // the union and simplifies, e.g.:
@@ -214,14 +214,14 @@ impl<'db> Type<'db> {
                     // Flattening changed the type; recursively iterate the flattened result.
                     flattened.try_iterate(db).ok()
                 }
-                (_, crate::types::TypeData::EnumComplement(complement)) => {
+                crate::types::TypeData::EnumComplement(complement) => {
                     non_async_special_case(db, complement.remaining_literal_union(db))
                 }
                 // N.B. This special case isn't strictly necessary, it's just an obvious optimization
-                (_, crate::types::TypeData::Dynamic(_)) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
-                (_, crate::types::TypeData::Divergent(_)) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                crate::types::TypeData::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
+                crate::types::TypeData::Divergent(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
-                (_, crate::types::TypeData::FunctionLiteral(_)
+                crate::types::TypeData::FunctionLiteral(_)
                 | crate::types::TypeData::GenericAlias(_)
                 | crate::types::TypeData::BoundMethod(_)
                 | crate::types::TypeData::KnownBoundMethod(_)
@@ -246,15 +246,12 @@ impl<'db> Type<'db> {
                 | crate::types::TypeData::TypeIs(_)
                 | crate::types::TypeData::TypeGuard(_)
                 | crate::types::TypeData::TypeForm(_)
-                | crate::types::TypeData::TypedDict(_)) => None
+                | crate::types::TypeData::TypedDict(_) => None
             }
         }
 
         if mode.is_async() {
-            if let (_, crate::types::TypeData::Intersection(_)) = {
-                let __ty_view_value = self;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::Intersection(_) = self.data() {
                 let flattened = self.flatten_typevars(db);
                 if flattened != self {
                     return flattened.try_iterate_with_mode(db, mode);

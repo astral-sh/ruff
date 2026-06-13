@@ -53,18 +53,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 } else {
                     self.infer_expression(base, TypeContext::default())
                 };
-                is_typed_dict |= match {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::SpecialForm(SpecialFormType::TypedDict)) => true,
-                    (_, crate::types::TypeData::ClassLiteral(class)) => {
-                        class.is_typed_dict(self.db())
-                    }
-                    (_, crate::types::TypeData::GenericAlias(alias)) => {
-                        alias.is_typed_dict(self.db())
-                    }
-                    (_, _) => false,
+                is_typed_dict |= match ty.data() {
+                    crate::types::TypeData::SpecialForm(SpecialFormType::TypedDict) => true,
+                    crate::types::TypeData::ClassLiteral(class) => class.is_typed_dict(self.db()),
+                    crate::types::TypeData::GenericAlias(alias) => alias.is_typed_dict(self.db()),
+                    _ => false,
                 };
             }
 
@@ -201,10 +194,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if let (_, crate::types::TypeData::DataclassDecorator(params)) = {
-                let __ty_view_value = decorator_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::DataclassDecorator(params) = decorator_ty.data() {
                 dataclass_params = Some(params);
                 continue;
             }
@@ -219,15 +209,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if let (
-                _,
-                crate::types::TypeData::KnownInstance(KnownInstanceType::Deprecated(
-                    deprecated_inst,
-                )),
-            ) = {
-                let __ty_view_value = decorator_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::KnownInstance(KnownInstanceType::Deprecated(
+                deprecated_inst,
+            )) = decorator_ty.data()
+            {
                 deprecated = Some(deprecated_inst);
                 continue;
             }
@@ -254,10 +239,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if let (_, crate::types::TypeData::FunctionLiteral(f)) = {
-                let __ty_view_value = decorator_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::FunctionLiteral(f) = decorator_ty.data() {
                 // We do not yet detect or flag `@dataclass_transform` applied to more than one
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
@@ -281,10 +263,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
-            if let (_, crate::types::TypeData::DataclassTransformer(params)) = {
-                let __ty_view_value = decorator_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let crate::types::TypeData::DataclassTransformer(params) = decorator_ty.data() {
                 dataclass_transformer_params = Some(params);
                 continue;
             }
@@ -353,10 +332,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     bindings.return_type(db)
                 }
             };
-            let decorated_ty = match {
-                let __ty_view_value = decorated_ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            let decorated_ty = match decorated_ty.view() {
                 (
                     _,
                     crate::types::TypeData::DataclassDecorator(_)
@@ -506,40 +482,32 @@ fn class_decorator_preserves_class_binding<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    let (_, crate::types::TypeData::ClassLiteral(original_literal)) = ({
-        let __ty_view_value = original_class;
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::ClassLiteral(original_literal) = original_class.data() else {
         return false;
     };
 
-    match {
-        let __ty_view_value = decorated_class;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::ClassLiteral(decorated_literal)) => {
+    match decorated_class.data() {
+        crate::types::TypeData::ClassLiteral(decorated_literal) => {
             let decorated_definition = decorated_literal.definition(db);
             decorated_literal == original_literal
                 || decorated_definition.is_some()
                     && decorated_definition == original_literal.definition(db)
         }
-        (_, crate::types::TypeData::SubclassOf(subclass_of)) => subclass_of
+        crate::types::TypeData::SubclassOf(subclass_of) => subclass_of
             .subclass_of()
             .into_class(db)
             .is_some_and(|class| class == original_literal.default_specialization(db)),
-        (_, crate::types::TypeData::Divergent(_)) => true,
-        (_, crate::types::TypeData::Union(union)) => union
+        crate::types::TypeData::Divergent(_) => true,
+        crate::types::TypeData::Union(union) => union
             .elements(db)
             .iter()
             .all(|element| class_decorator_preserves_class_binding(db, original_class, *element)),
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             class_decorator_preserves_class_binding(db, original_class, alias.value_type(db))
         }
-        (_, _) => {
-            SubclassOfType::try_from_type(db, original_class).is_some_and(|original_meta_type| {
-                decorated_class.is_equivalent_to(db, original_meta_type)
-            })
-        }
+        _ => SubclassOfType::try_from_type(db, original_class).is_some_and(|original_meta_type| {
+            decorated_class.is_equivalent_to(db, original_meta_type)
+        }),
     }
 }
 
@@ -550,22 +518,19 @@ fn type_retains_original_class<'db>(
     original_class: Type<'db>,
     decorated_class: Type<'db>,
 ) -> bool {
-    match {
-        let __ty_view_value = decorated_class;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::Intersection(intersection)) => intersection
+    match decorated_class.data() {
+        crate::types::TypeData::Intersection(intersection) => intersection
             .positive(db)
             .iter()
             .any(|element| type_retains_original_class(db, original_class, *element)),
-        (_, crate::types::TypeData::Union(union)) => union
+        crate::types::TypeData::Union(union) => union
             .elements(db)
             .iter()
             .all(|element| type_retains_original_class(db, original_class, *element)),
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             type_retains_original_class(db, original_class, alias.value_type(db))
         }
-        (_, _) => class_decorator_preserves_class_binding(db, original_class, decorated_class),
+        _ => class_decorator_preserves_class_binding(db, original_class, decorated_class),
     }
 }
 
@@ -620,10 +585,7 @@ fn is_unknown_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bo
 /// class C: ...
 /// ```
 fn is_unknown_class_object_decorator_result<'db>(db: &'db dyn crate::Db, ty: Type<'db>) -> bool {
-    let (_, crate::types::TypeData::SubclassOf(subclass_of)) = ({
-        let __ty_view_value = ty.resolve_type_alias(db);
-        (__ty_view_value, __ty_view_value.data())
-    }) else {
+    let crate::types::TypeData::SubclassOf(subclass_of) = ty.resolve_type_alias(db).data() else {
         return false;
     };
 
@@ -688,29 +650,23 @@ impl ClassDecoratorUnknownResultPolicy {
         decorator_ty: Type<'db>,
         decorator_result_ty: Type<'db>,
     ) -> Option<Self> {
-        match {
-            let __ty_view_value = decorator_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::FunctionLiteral(function)) => {
+        match decorator_ty.data() {
+            crate::types::TypeData::FunctionLiteral(function) => {
                 Some(if function.has_explicit_return_annotation(db) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
                 })
             }
-            (_, crate::types::TypeData::BoundMethod(method)) => {
+            crate::types::TypeData::BoundMethod(method) => {
                 Some(if method.function(db).has_explicit_return_annotation(db) {
                     Self::ReplaceBinding
                 } else {
                     Self::PreserveBinding
                 })
             }
-            (
-                _,
-                crate::types::TypeData::NominalInstance(_)
-                | crate::types::TypeData::ProtocolInstance(_),
-            ) => {
+            crate::types::TypeData::NominalInstance(_)
+            | crate::types::TypeData::ProtocolInstance(_) => {
                 let call_symbol = decorator_ty
                     .member_lookup_with_policy(
                         db,
@@ -730,7 +686,7 @@ impl ClassDecoratorUnknownResultPolicy {
                     Some(Self::ReplaceBinding)
                 }
             }
-            (_, crate::types::TypeData::Union(union)) => Some(
+            crate::types::TypeData::Union(union) => Some(
                 if union.elements(db).iter().all(|element| {
                     Self::known_from_decorator(db, *element, decorator_result_ty)
                         == Some(Self::PreserveBinding)
@@ -740,11 +696,11 @@ impl ClassDecoratorUnknownResultPolicy {
                     Self::ReplaceBinding
                 },
             ),
-            (_, crate::types::TypeData::TypeAlias(alias)) => Some(
+            crate::types::TypeData::TypeAlias(alias) => Some(
                 Self::known_from_decorator(db, alias.value_type(db), decorator_result_ty)
                     .unwrap_or(Self::ReplaceBinding),
             ),
-            (_, crate::types::TypeData::Callable(callable)) => {
+            crate::types::TypeData::Callable(callable) => {
                 Some(match callable.provenance(db) {
                     // An unannotated function preserves the class binding when applying it loses the
                     // concrete return type:
@@ -787,7 +743,7 @@ impl ClassDecoratorUnknownResultPolicy {
                     CallableFunctionProvenance::None => Self::ReplaceBinding,
                 })
             }
-            (_, _) => None,
+            _ => None,
         }
     }
 }

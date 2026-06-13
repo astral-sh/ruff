@@ -288,14 +288,11 @@ fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {
             "Expected a global symbol for `{name}` in the property test module, but it was not found"
         );
     };
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype))) => {
+    match ty.data() {
+        crate::types::TypeData::KnownInstance(KnownInstanceType::NewType(newtype)) => {
             Type::NewTypeInstance(newtype)
         }
-        (_, _) => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
+        _ => panic!("Expected NewType symbol for `{name}`, got {ty:?}"),
     }
 }
 

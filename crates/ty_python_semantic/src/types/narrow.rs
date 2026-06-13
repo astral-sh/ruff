@@ -96,25 +96,22 @@ fn finite_single_valued_union_alternatives<'db>(
 ) -> Option<Vec<Type<'db>>> {
     let ty = ty.resolve_type_alias(db);
 
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::EnumComplement(complement)) => complement
+    match ty.data() {
+        crate::types::TypeData::EnumComplement(complement) => complement
             .has_finite_single_valued_alternatives(db)
             .then(|| complement.remaining_literal_types(db)),
-        (_, crate::types::TypeData::Intersection(intersection)) => {
+        crate::types::TypeData::Intersection(intersection) => {
             let complement = intersection.enum_complement(db)?;
             complement
                 .has_finite_single_valued_alternatives(db)
                 .then(|| complement.remaining_literal_types(db))
         }
-        (_, crate::types::TypeData::NominalInstance(instance))
+        crate::types::TypeData::NominalInstance(instance)
             if instance.has_known_class(db, KnownClass::Bool) =>
         {
             Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
         }
-        (_, crate::types::TypeData::NominalInstance(instance))
+        crate::types::TypeData::NominalInstance(instance)
             if enum_metadata(db, instance.class_literal(db)).is_some()
                 && !ty.overrides_equality(db) =>
         {
@@ -124,7 +121,7 @@ fn finite_single_valued_union_alternatives<'db>(
                     .collect(),
             )
         }
-        (_, _) => None,
+        _ => None,
     }
 }
 
@@ -135,29 +132,26 @@ fn finite_single_valued_union_alternatives<'db>(
 fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
 
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::EnumComplement(complement)) => {
+    match ty.data() {
+        crate::types::TypeData::EnumComplement(complement) => {
             complement.has_finite_single_valued_alternatives(db)
         }
-        (_, crate::types::TypeData::Intersection(intersection)) => intersection
+        crate::types::TypeData::Intersection(intersection) => intersection
             .enum_complement(db)
             .is_some_and(|complement| complement.has_finite_single_valued_alternatives(db)),
-        (_, crate::types::TypeData::NominalInstance(instance))
+        crate::types::TypeData::NominalInstance(instance)
             if instance.has_known_class(db, KnownClass::Bool) =>
         {
             true
         }
-        (_, crate::types::TypeData::NominalInstance(instance))
+        crate::types::TypeData::NominalInstance(instance)
             if enum_metadata(db, instance.class_literal(db))
                 .is_some_and(|metadata| !metadata.members.is_empty())
                 && !ty.overrides_equality(db) =>
         {
             true
         }
-        (_, _) => false,
+        _ => false,
     }
 }
 
@@ -304,17 +298,14 @@ impl ClassInfoConstraintFunction {
             }
         };
 
-        match {
-            let __ty_view_value = classinfo;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
+        match classinfo.data() {
+            crate::types::TypeData::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
             }
-            (_, crate::types::TypeData::ClassLiteral(class_literal)) => {
+            crate::types::TypeData::ClassLiteral(class_literal) => {
                 Some(constraint_from_class_literal(class_literal))
             }
-            (_, crate::types::TypeData::SubclassOf(subclass_of_ty)) => {
+            crate::types::TypeData::SubclassOf(subclass_of_ty) => {
                 // We can't narrow negatively from a `SubclassOf` type. `if !isinstance(x, y)`
                 // where `y: type[A]` doesn't ensure that `x` is not an instance of `A`, because
                 // `y` could be some subclass of `A`.
@@ -338,10 +329,10 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            (_, crate::types::TypeData::Dynamic(_) | crate::types::TypeData::Divergent(_)) => {
+            crate::types::TypeData::Dynamic(_) | crate::types::TypeData::Divergent(_) => {
                 Some(classinfo)
             }
-            (_, crate::types::TypeData::Intersection(intersection)) => {
+            crate::types::TypeData::Intersection(intersection) => {
                 if intersection.negative(db).is_empty() {
                     let mut builder = IntersectionBuilder::new(db);
                     for element in intersection.positive(db) {
@@ -357,10 +348,10 @@ impl ClassInfoConstraintFunction {
                     None
                 }
             }
-            (_, crate::types::TypeData::Union(union)) => union.try_map(db, |element| {
+            crate::types::TypeData::Union(union) => union.try_map(db, |element| {
                 self.generate_constraint(db, *element, is_positive)
             }),
-            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
+            crate::types::TypeData::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
                         self.generate_constraint(db, bound, is_positive)
@@ -373,9 +364,9 @@ impl ClassInfoConstraintFunction {
 
             // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
             // e.g. `isinstance(x, list[int])` fails at runtime.
-            (_, crate::types::TypeData::GenericAlias(_)) => None,
+            crate::types::TypeData::GenericAlias(_) => None,
 
-            (_, crate::types::TypeData::NominalInstance(nominal)) => {
+            crate::types::TypeData::NominalInstance(nominal) => {
                 nominal.tuple_spec(db).and_then(|tuple| {
                     UnionType::try_from_elements(
                         db,
@@ -386,7 +377,7 @@ impl ClassInfoConstraintFunction {
                 })
             }
 
-            (_, crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            crate::types::TypeData::KnownInstance(KnownInstanceType::UnionType(instance)) => {
                 UnionType::try_from_elements(
                     db,
                     instance.value_expression_types(db).ok()?.map(|element| {
@@ -407,7 +398,7 @@ impl ClassInfoConstraintFunction {
                 )
             }
 
-            (_, crate::types::TypeData::SpecialForm(form)) => match form {
+            crate::types::TypeData::SpecialForm(form) => match form {
                 SpecialFormType::LegacyStdlibAlias(alias) => self.generate_constraint(
                     db,
                     alias.aliased_class().to_class_literal(db),
@@ -436,31 +427,28 @@ impl ClassInfoConstraintFunction {
                 _ => None,
             },
 
-            (
-                _,
-                crate::types::TypeData::AlwaysFalsy
-                | crate::types::TypeData::AlwaysTruthy
-                | crate::types::TypeData::EnumComplement(_)
-                | crate::types::TypeData::LiteralValue(_)
-                | crate::types::TypeData::BoundMethod(_)
-                | crate::types::TypeData::BoundSuper(_)
-                | crate::types::TypeData::Callable(_)
-                | crate::types::TypeData::DataclassDecorator(_)
-                | crate::types::TypeData::Never
-                | crate::types::TypeData::KnownBoundMethod(_)
-                | crate::types::TypeData::ModuleLiteral(_)
-                | crate::types::TypeData::FunctionLiteral(_)
-                | crate::types::TypeData::ProtocolInstance(_)
-                | crate::types::TypeData::PropertyInstance(_)
-                | crate::types::TypeData::KnownInstance(_)
-                | crate::types::TypeData::TypeIs(_)
-                | crate::types::TypeData::TypeGuard(_)
-                | crate::types::TypeData::TypeForm(_)
-                | crate::types::TypeData::WrapperDescriptor(_)
-                | crate::types::TypeData::DataclassTransformer(_)
-                | crate::types::TypeData::TypedDict(_)
-                | crate::types::TypeData::NewTypeInstance(_),
-            ) => None,
+            crate::types::TypeData::AlwaysFalsy
+            | crate::types::TypeData::AlwaysTruthy
+            | crate::types::TypeData::EnumComplement(_)
+            | crate::types::TypeData::LiteralValue(_)
+            | crate::types::TypeData::BoundMethod(_)
+            | crate::types::TypeData::BoundSuper(_)
+            | crate::types::TypeData::Callable(_)
+            | crate::types::TypeData::DataclassDecorator(_)
+            | crate::types::TypeData::Never
+            | crate::types::TypeData::KnownBoundMethod(_)
+            | crate::types::TypeData::ModuleLiteral(_)
+            | crate::types::TypeData::FunctionLiteral(_)
+            | crate::types::TypeData::ProtocolInstance(_)
+            | crate::types::TypeData::PropertyInstance(_)
+            | crate::types::TypeData::KnownInstance(_)
+            | crate::types::TypeData::TypeIs(_)
+            | crate::types::TypeData::TypeGuard(_)
+            | crate::types::TypeData::TypeForm(_)
+            | crate::types::TypeData::WrapperDescriptor(_)
+            | crate::types::TypeData::DataclassTransformer(_)
+            | crate::types::TypeData::TypedDict(_)
+            | crate::types::TypeData::NewTypeInstance(_) => None,
         }
     }
 }
@@ -790,29 +778,20 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
             .any(|ty| could_compare_equal(db, left_ty, ty));
     }
 
-    match (
-        ({
-            let __ty_view_value = left_ty;
-            (__ty_view_value, __ty_view_value.data())
-        }),
-        ({
-            let __ty_view_value = right_ty;
-            (__ty_view_value, __ty_view_value.data())
-        }),
-    ) {
+    match (left_ty.data(), right_ty.data()) {
         // In order to be sure a union type cannot compare equal to another type, it
         // must be true that no element of the union can compare equal to that type.
-        ((_, crate::types::TypeData::Union(union)), (_, _)) => union
+        (crate::types::TypeData::Union(union), _) => union
             .elements(db)
             .iter()
             .any(|ty| could_compare_equal(db, *ty, right_ty)),
-        ((_, _), (_, crate::types::TypeData::Union(union))) => union
+        (_, crate::types::TypeData::Union(union)) => union
             .elements(db)
             .iter()
             .any(|ty| could_compare_equal(db, left_ty, *ty)),
         (
-            (_, crate::types::TypeData::LiteralValue(left)),
-            (_, crate::types::TypeData::LiteralValue(right)),
+            crate::types::TypeData::LiteralValue(left),
+            crate::types::TypeData::LiteralValue(right),
         ) => {
             match (left.kind(), right.kind()) {
                 // Boolean literals and int literals are disjoint, and single valued, and yet
@@ -826,12 +805,12 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         }
         // We assume that tuples use `tuple.__eq__` which only returns True
         // for other tuples, so they cannot compare equal to non-tuple types.
-        ((_, crate::types::TypeData::NominalInstance(instance)), (_, _))
+        (crate::types::TypeData::NominalInstance(instance), _)
             if instance.tuple_spec(db).is_some() =>
         {
             false
         }
-        ((_, _), (_, crate::types::TypeData::NominalInstance(instance)))
+        (_, crate::types::TypeData::NominalInstance(instance))
             if instance.tuple_spec(db).is_some() =>
         {
             false
@@ -1106,16 +1085,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     /// - Arbitrary user types that return `Literal` types from both `__len__` and `__bool__`,
     ///   where the returned `Literal` types are mutually consistent in their truthiness.
     fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::NominalInstance(instance))
+        match ty.data() {
+            crate::types::TypeData::NominalInstance(instance)
                 if instance.tuple_spec(db).is_some() =>
             {
                 true
             }
-            (_, crate::types::TypeData::LiteralValue(literal))
+            crate::types::TypeData::LiteralValue(literal)
                 if matches!(
                     literal.kind(),
                     LiteralValueTypeKind::String(_)
@@ -1125,7 +1101,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 true
             }
-            (_, _) => ty.len(db).is_some_and(|len_ty| {
+            _ => ty.len(db).is_some_and(|len_ty| {
                 let len_ty_bool = len_ty.bool(db);
                 len_ty_bool != Truthiness::Ambiguous && len_ty_bool == ty.bool(db)
             }),
@@ -1139,11 +1115,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ///
     /// Returns `None` if no part of the type is narrowable.
     fn narrow_type_by_len(db: &'db dyn Db, ty: Type<'db>, is_positive: bool) -> Option<Type<'db>> {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union)) => {
+        match ty.data() {
+            crate::types::TypeData::Union(union) => {
                 let mut has_narrowable = false;
                 let narrowed_elements: Vec<_> = union
                     .elements(db)
@@ -1166,7 +1139,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            (_, crate::types::TypeData::Intersection(intersection)) => {
+            crate::types::TypeData::Intersection(intersection) => {
                 // For intersections, check if any positive element is narrowable.
                 let positive = intersection.positive(db);
                 let has_narrowable = positive
@@ -1186,7 +1159,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            (_, _) if Self::is_base_type_narrowable_by_len(db, ty) => {
+            _ if Self::is_base_type_narrowable_by_len(db, ty) => {
                 let mut builder = IntersectionBuilder::new(db).add_positive(ty);
                 if is_positive {
                     builder = builder.add_negative(Type::AlwaysFalsy);
@@ -1195,7 +1168,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 Some(builder.build())
             }
-            (_, _) => None,
+            _ => None,
         }
     }
 
@@ -1212,18 +1185,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let resolved = ty.resolve_type_alias(db);
 
-        let narrowed = match {
-            let __ty_view_value = resolved;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union)) => union.map(db, |element| {
+        let narrowed = match resolved.data() {
+            crate::types::TypeData::Union(union) => union.map(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
             }),
-            (_, crate::types::TypeData::Intersection(intersection)) => intersection
+            crate::types::TypeData::Intersection(intersection) => intersection
                 .map_positive(db, |element| {
                     Self::narrow_type_by_exact_len(db, *element, length, is_equality)
                 }),
-            (_, _) => {
+            _ => {
                 if is_equality && let Some(tuple) = resolved.exact_tuple_instance_spec(db) {
                     match tuple.resize(db, TupleLength::Fixed(length)) {
                         Ok(tuple) => Type::tuple(TupleType::new(db, &tuple)),
@@ -1242,17 +1212,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     };
                     let comparison_possible = resolved
                         .len(db)
-                        .map(|length_type| {
-                            match {
-                                let __ty_view_value = length_type;
-                                (__ty_view_value, __ty_view_value.data())
-                            } {
-                                (_, crate::types::TypeData::Union(union)) => union
-                                    .elements(db)
-                                    .iter()
-                                    .any(|element| satisfies_comparison(*element)),
-                                (_, _) => satisfies_comparison(length_type),
-                            }
+                        .map(|length_type| match length_type.data() {
+                            crate::types::TypeData::Union(union) => union
+                                .elements(db)
+                                .iter()
+                                .any(|element| satisfies_comparison(*element)),
+                            _ => satisfies_comparison(length_type),
                         })
                         .or_else(|| {
                             tuple_length
@@ -1336,10 +1301,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 lhs_ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> bool {
-                if let (_, crate::types::TypeData::Union(union)) = {
-                    let __ty_view_value = lhs_ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
+                if let crate::types::TypeData::Union(union) = lhs_ty.data() {
                     return union
                         .elements(db)
                         .iter()
@@ -1368,10 +1330,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 ty: Type<'db>,
                 rhs_ty: Type<'db>,
             ) -> Type<'db> {
-                if let (_, crate::types::TypeData::Union(union)) = {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
+                if let crate::types::TypeData::Union(union) = ty.data() {
                     return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
                 }
 
@@ -1402,15 +1361,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        match (
-            ({
-                let __ty_view_value = lhs_ty;
-                (__ty_view_value, __ty_view_value.data())
-            }),
-            rhs_ty.as_literal_value_kind(),
-        ) {
+        match (lhs_ty.data(), rhs_ty.as_literal_value_kind()) {
             (
-                (_, crate::types::TypeData::NominalInstance(instance)),
+                crate::types::TypeData::NominalInstance(instance),
                 Some(LiteralValueTypeKind::Int(i)),
             ) if instance.has_known_class(self.db, KnownClass::Bool) => {
                 if i.as_i64() == 0 {
@@ -1421,7 +1374,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            ((_, _), Some(LiteralValueTypeKind::Bool(b))) => Some(
+            (_, Some(LiteralValueTypeKind::Bool(b))) => Some(
                 UnionType::from_two_elements(self.db, rhs_ty, Type::int_literal(i64::from(b)))
                     .negate(self.db),
             ),
@@ -1589,12 +1542,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         /// bound to `type[Y[int]]`, and type aliases where the underlying value is a
         /// generic class.
         fn find_underlying_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<ClassLiteral<'db>> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::ClassLiteral(class)) => Some(class),
-                (_, crate::types::TypeData::SubclassOf(subclass_of)) => {
+            match ty.data() {
+                crate::types::TypeData::ClassLiteral(class) => Some(class),
+                crate::types::TypeData::SubclassOf(subclass_of) => {
                     match subclass_of.subclass_of().with_transposed_type_var(db) {
                         SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(class),
                         SubclassOfInner::Class(ClassType::Generic(_))
@@ -1604,13 +1554,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         }
                     }
                 }
-                (_, crate::types::TypeData::TypeVar(tvar)) => {
+                crate::types::TypeData::TypeVar(tvar) => {
                     find_underlying_class(db, tvar.typevar(db).upper_bound(db)?)
                 }
-                (_, crate::types::TypeData::TypeAlias(alias)) => {
+                crate::types::TypeData::TypeAlias(alias) => {
                     find_underlying_class(db, alias.value_type(db))
                 }
-                (_, _) => None,
+                _ => None,
             }
         }
 
@@ -1631,10 +1581,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }) => {
                     if keywords.is_empty()
                         && let [single_argument] = &**args
-                        && let (_, crate::types::TypeData::ClassLiteral(called_class)) = ({
-                            let __ty_view_value = inference.expression_type(func);
-                            (__ty_view_value, __ty_view_value.data())
-                        })
+                        && let crate::types::TypeData::ClassLiteral(called_class) =
+                            inference.expression_type(func).data()
                         && called_class.is_known(db, KnownClass::Type)
                     {
                         Some(single_argument)
@@ -1690,12 +1638,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //             reveal_type(t)  # tuple[int, int]
         if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
             && let ast::Expr::Subscript(subscript) = left.expression_value()
-            && let (_, crate::types::TypeData::Union(union)) = ({
-                let __ty_view_value = inference
-                    .expression_type(&*subscript.value)
-                    .resolve_type_alias(self.db);
-                (__ty_view_value, __ty_view_value.data())
-            })
+            && let crate::types::TypeData::Union(union) = inference
+                .expression_type(&*subscript.value)
+                .resolve_type_alias(self.db)
+                .data()
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Some(index) = inference
                 .expression_type(&*subscript.slice)
@@ -1743,10 +1689,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let is_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
 
             let mut narrow_len_call = |call: &ast::ExprCall, length_type: Type<'db>| {
-                let (_, crate::types::TypeData::FunctionLiteral(function_type)) = ({
-                    let __ty_view_value = inference.expression_type(&*call.func);
-                    (__ty_view_value, __ty_view_value.data())
-                }) else {
+                let crate::types::TypeData::FunctionLiteral(function_type) =
+                    inference.expression_type(&*call.func).data()
+                else {
                     return;
                 };
                 if function_type.known(self.db) != Some(KnownFunction::Len)
@@ -1897,18 +1842,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 let resolved_rhs_type = rhs_type.resolve_type_alias(self.db);
 
-                let narrowed = match {
-                    let __ty_view_value = resolved_rhs_type;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::TypedDict(td)) => {
+                let narrowed = match resolved_rhs_type.data() {
+                    crate::types::TypeData::TypedDict(td) => {
                         if requires_key(td) {
                             Type::Never
                         } else {
                             resolved_rhs_type
                         }
                     }
-                    (_, crate::types::TypeData::Intersection(intersection)) => {
+                    crate::types::TypeData::Intersection(intersection) => {
                         if intersection
                             .positive(self.db)
                             .iter()
@@ -1921,27 +1863,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             resolved_rhs_type
                         }
                     }
-                    (_, crate::types::TypeData::Union(union)) => {
+                    crate::types::TypeData::Union(union) => {
                         // remove all members of the union that would require the key
-                        union.filter(self.db, |ty| {
-                            match {
-                                let __ty_view_value = ty;
-                                (__ty_view_value, __ty_view_value.data())
-                            } {
-                                (_, crate::types::TypeData::TypedDict(td)) => !requires_key(td),
-                                (_, crate::types::TypeData::Intersection(intersection)) => {
-                                    !intersection
-                                        .positive(self.db)
-                                        .iter()
-                                        .copied()
-                                        .filter_map(Type::as_typed_dict)
-                                        .any(requires_key)
-                                }
-                                (_, _) => true,
-                            }
+                        union.filter(self.db, |ty| match ty.data() {
+                            crate::types::TypeData::TypedDict(td) => !requires_key(td),
+                            crate::types::TypeData::Intersection(intersection) => !intersection
+                                .positive(self.db)
+                                .iter()
+                                .copied()
+                                .filter_map(Type::as_typed_dict)
+                                .any(requires_key),
+                            _ => true,
                         })
                     }
-                    (_, _) => resolved_rhs_type,
+                    _ => resolved_rhs_type,
                 };
 
                 if narrowed != resolved_rhs_type {
@@ -2075,15 +2010,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let callable_ty = inference.expression_type(&*expr_call.func);
 
-        match {
-            let __ty_view_value = callable_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match callable_ty.data() {
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
             // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
             // (str, list, etc.) are kept unchanged.
-            (_, crate::types::TypeData::FunctionLiteral(function_type))
+            crate::types::TypeData::FunctionLiteral(function_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
                     && function_type.known(self.db) == Some(KnownFunction::Len) =>
@@ -2103,7 +2035,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None
                 }
             }
-            (_, crate::types::TypeData::FunctionLiteral(function_type))
+            crate::types::TypeData::FunctionLiteral(function_type)
                 if expr_call.arguments.keywords.is_empty() =>
             {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
@@ -2152,7 +2084,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     })
             }
             // for the expression `bool(E)`, we further narrow the type based on `E`
-            (_, crate::types::TypeData::ClassLiteral(class_type))
+            crate::types::TypeData::ClassLiteral(class_type)
                 if expr_call.arguments.args.len() == 1
                     && expr_call.arguments.keywords.is_empty()
                     && class_type.is_known(self.db, KnownClass::Bool) =>
@@ -2163,7 +2095,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     is_positive,
                 )
             }
-            (_, _) => None,
+            _ => None,
         }
     }
 
@@ -2177,11 +2109,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let return_ty = inference.expression_type(expr_call);
 
-        let place_and_constraint = match {
-            let __ty_view_value = return_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeIs(type_is)) => {
+        let place_and_constraint = match return_ty.data() {
+            crate::types::TypeData::TypeIs(type_is) => {
                 let (_, place) = type_is.place_info(self.db)?;
                 Some((
                     place,
@@ -2193,14 +2122,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 ))
             }
             // TypeGuard only narrows in the positive case
-            (_, crate::types::TypeData::TypeGuard(type_guard)) if is_positive => {
+            crate::types::TypeData::TypeGuard(type_guard) if is_positive => {
                 let (_, place) = type_guard.place_info(self.db)?;
                 Some((
                     place,
                     NarrowingConstraint::replacement(type_guard.return_type(self.db)),
                 ))
             }
-            (_, _) => None,
+            _ => None,
         }?;
 
         Some(NarrowingConstraints::from_iter([place_and_constraint]))
@@ -2242,10 +2171,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
 
-        let narrowed_type = match {
-            let __ty_view_value = class_type;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        let narrowed_type = match class_type.view() {
             (_, crate::types::TypeData::ClassLiteral(class)) => {
                 Type::instance(self.db, class.top_materialization(self.db))
                     .negate_if(self.db, !is_positive)
@@ -2313,21 +2239,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 singleton_pattern_type(self.db, *singleton)
             }
             PatternPredicateKind::Class(cls, _) => {
-                match {
-                    let __ty_view_value =
-                        infer_same_file_expression_type(self.db, *cls, TypeContext::default());
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::ClassLiteral(class)) => {
+                match infer_same_file_expression_type(self.db, *cls, TypeContext::default()).data()
+                {
+                    crate::types::TypeData::ClassLiteral(class) => {
                         Type::instance(self.db, class.top_materialization(self.db))
                     }
-                    (
-                        _,
-                        crate::types::TypeData::SpecialForm(
-                            SpecialFormType::CollectionsAbcCallable,
-                        ),
+                    crate::types::TypeData::SpecialForm(
+                        SpecialFormType::CollectionsAbcCallable,
                     ) => callable_pattern_type(self.db),
-                    (_, _) => Type::object(),
+                    _ => Type::object(),
                 }
             }
             PatternPredicateKind::Mapping(_) => mapping_pattern_type(self.db),
@@ -2730,10 +2650,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             IntersectionType::from_two_elements(db, ty, key_presence_constraint)
         };
 
-        match {
-            let __ty_view_value = ty.resolve_type_alias(self.db);
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match ty.resolve_type_alias(self.db).view() {
             (_, crate::types::TypeData::Union(union)) => union.map(self.db, |element| {
                 self.narrow_with_present_key(*element, key)
             }),
@@ -2771,10 +2688,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
         // We need a union type for narrowing to be useful.
-        let (_, crate::types::TypeData::Union(union)) = ({
-            let __ty_view_value = subscript_value_type.resolve_type_alias(self.db);
-            (__ty_view_value, __ty_view_value.data())
-        }) else {
+        let crate::types::TypeData::Union(union) =
+            subscript_value_type.resolve_type_alias(self.db).data()
+        else {
             return None;
         };
 
@@ -2834,10 +2750,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         rhs_type: Type<'db>,
         is_equality: bool,
     ) -> Option<(ScopedPlaceId, NarrowingConstraint<'db>)> {
-        let (_, crate::types::TypeData::Union(union)) = ({
-            let __ty_view_value = attribute_value_type.resolve_type_alias(self.db);
-            (__ty_view_value, __ty_view_value.data())
-        }) else {
+        let crate::types::TypeData::Union(union) =
+            attribute_value_type.resolve_type_alias(self.db).data()
+        else {
             return None;
         };
         if !is_supported_tag_literal(rhs_type) {
@@ -2868,78 +2783,67 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 // Return true if the given type is a `TypedDict` or a union or intersection that includes at least
 // one `TypedDict` (even if other types are also present), or a type alias to such a type.
 fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::TypedDict(_)) => true,
-        (_, crate::types::TypeData::Intersection(intersection)) => intersection
+    match ty.data() {
+        crate::types::TypeData::TypedDict(_) => true,
+        crate::types::TypeData::Intersection(intersection) => intersection
             .positive(db)
             .iter()
             .any(|intersection_element_ty| is_or_contains_typeddict(db, *intersection_element_ty)),
-        (_, crate::types::TypeData::Union(union)) => union
+        crate::types::TypeData::Union(union) => union
             .elements(db)
             .iter()
             .any(|union_member_ty| is_or_contains_typeddict(db, *union_member_ty)),
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             is_or_contains_typeddict(db, alias.value_type(db))
         }
 
-        (
-            _,
-            crate::types::TypeData::Dynamic(_)
-            | crate::types::TypeData::Divergent(_)
-            | crate::types::TypeData::Never
-            | crate::types::TypeData::EnumComplement(_)
-            | crate::types::TypeData::FunctionLiteral(_)
-            | crate::types::TypeData::BoundMethod(_)
-            | crate::types::TypeData::KnownBoundMethod(_)
-            | crate::types::TypeData::WrapperDescriptor(_)
-            | crate::types::TypeData::DataclassDecorator(_)
-            | crate::types::TypeData::DataclassTransformer(_)
-            | crate::types::TypeData::Callable(_)
-            | crate::types::TypeData::ModuleLiteral(_)
-            | crate::types::TypeData::ClassLiteral(_)
-            | crate::types::TypeData::GenericAlias(_)
-            | crate::types::TypeData::SubclassOf(_)
-            | crate::types::TypeData::NominalInstance(_)
-            | crate::types::TypeData::ProtocolInstance(_)
-            | crate::types::TypeData::SpecialForm(_)
-            | crate::types::TypeData::KnownInstance(_)
-            | crate::types::TypeData::PropertyInstance(_)
-            | crate::types::TypeData::AlwaysTruthy
-            | crate::types::TypeData::AlwaysFalsy
-            | crate::types::TypeData::LiteralValue(_)
-            | crate::types::TypeData::TypeVar(_)
-            | crate::types::TypeData::BoundSuper(_)
-            | crate::types::TypeData::TypeIs(_)
-            | crate::types::TypeData::TypeGuard(_)
-            | crate::types::TypeData::TypeForm(_)
-            | crate::types::TypeData::NewTypeInstance(_),
-        ) => false,
+        crate::types::TypeData::Dynamic(_)
+        | crate::types::TypeData::Divergent(_)
+        | crate::types::TypeData::Never
+        | crate::types::TypeData::EnumComplement(_)
+        | crate::types::TypeData::FunctionLiteral(_)
+        | crate::types::TypeData::BoundMethod(_)
+        | crate::types::TypeData::KnownBoundMethod(_)
+        | crate::types::TypeData::WrapperDescriptor(_)
+        | crate::types::TypeData::DataclassDecorator(_)
+        | crate::types::TypeData::DataclassTransformer(_)
+        | crate::types::TypeData::Callable(_)
+        | crate::types::TypeData::ModuleLiteral(_)
+        | crate::types::TypeData::ClassLiteral(_)
+        | crate::types::TypeData::GenericAlias(_)
+        | crate::types::TypeData::SubclassOf(_)
+        | crate::types::TypeData::NominalInstance(_)
+        | crate::types::TypeData::ProtocolInstance(_)
+        | crate::types::TypeData::SpecialForm(_)
+        | crate::types::TypeData::KnownInstance(_)
+        | crate::types::TypeData::PropertyInstance(_)
+        | crate::types::TypeData::AlwaysTruthy
+        | crate::types::TypeData::AlwaysFalsy
+        | crate::types::TypeData::LiteralValue(_)
+        | crate::types::TypeData::TypeVar(_)
+        | crate::types::TypeData::BoundSuper(_)
+        | crate::types::TypeData::TypeIs(_)
+        | crate::types::TypeData::TypeGuard(_)
+        | crate::types::TypeData::TypeForm(_)
+        | crate::types::TypeData::NewTypeInstance(_) => false,
     }
 }
 
 fn typeddict_declares_key<'db>(db: &'db dyn Db, ty: Type<'db>, key: &str) -> bool {
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::TypedDict(typed_dict)) => {
-            typed_dict.items(db).contains_key(key)
-        }
-        (_, crate::types::TypeData::Intersection(intersection)) => intersection
+    match ty.data() {
+        crate::types::TypeData::TypedDict(typed_dict) => typed_dict.items(db).contains_key(key),
+        crate::types::TypeData::Intersection(intersection) => intersection
             .positive(db)
             .iter()
             .any(|element| typeddict_declares_key(db, *element, key)),
-        (_, crate::types::TypeData::Union(union)) => union
+        crate::types::TypeData::Union(union) => union
             .elements(db)
             .iter()
             .any(|element| typeddict_declares_key(db, *element, key)),
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+        crate::types::TypeData::TypeAlias(alias) => {
             typeddict_declares_key(db, alias.value_type(db), key)
         }
-        (_, _) => false,
+        _ => false,
     }
 }
 
@@ -3053,70 +2957,64 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
             .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };
 
-    match {
-        let __ty_view_value = ty;
-        (__ty_view_value, __ty_view_value.data())
-    } {
-        (_, crate::types::TypeData::TypedDict(td)) => matching_field_is_literal(&td),
-        (_, crate::types::TypeData::Union(union)) => {
-            union.elements(db).iter().all(|union_member_ty| {
-                !is_or_contains_typeddict(db, *union_member_ty)
-                    || all_matching_typeddict_fields_have_literal_types(
-                        db,
-                        *union_member_ty,
-                        field_name,
-                    )
-            })
-        }
-        (_, crate::types::TypeData::TypeAlias(alias)) => {
+    match ty.data() {
+        crate::types::TypeData::TypedDict(td) => matching_field_is_literal(&td),
+        crate::types::TypeData::Union(union) => union.elements(db).iter().all(|union_member_ty| {
+            !is_or_contains_typeddict(db, *union_member_ty)
+                || all_matching_typeddict_fields_have_literal_types(
+                    db,
+                    *union_member_ty,
+                    field_name,
+                )
+        }),
+        crate::types::TypeData::TypeAlias(alias) => {
             all_matching_typeddict_fields_have_literal_types(db, alias.value_type(db), field_name)
         }
-        (_, crate::types::TypeData::Intersection(intersection)) => intersection
-            .positive(db)
-            .iter()
-            .all(|intersection_member_ty| {
-                !is_or_contains_typeddict(db, *intersection_member_ty)
-                    || all_matching_typeddict_fields_have_literal_types(
-                        db,
-                        *intersection_member_ty,
-                        field_name,
-                    )
-            }),
+        crate::types::TypeData::Intersection(intersection) => {
+            intersection
+                .positive(db)
+                .iter()
+                .all(|intersection_member_ty| {
+                    !is_or_contains_typeddict(db, *intersection_member_ty)
+                        || all_matching_typeddict_fields_have_literal_types(
+                            db,
+                            *intersection_member_ty,
+                            field_name,
+                        )
+                })
+        }
 
         // Only the four variants above can pass `is_or_contains_typeddict`, and this function is
         // always guarded by that check.
-        (
-            _,
-            crate::types::TypeData::Dynamic(_)
-            | crate::types::TypeData::Divergent(_)
-            | crate::types::TypeData::Never
-            | crate::types::TypeData::EnumComplement(_)
-            | crate::types::TypeData::FunctionLiteral(_)
-            | crate::types::TypeData::BoundMethod(_)
-            | crate::types::TypeData::KnownBoundMethod(_)
-            | crate::types::TypeData::WrapperDescriptor(_)
-            | crate::types::TypeData::DataclassDecorator(_)
-            | crate::types::TypeData::DataclassTransformer(_)
-            | crate::types::TypeData::Callable(_)
-            | crate::types::TypeData::ModuleLiteral(_)
-            | crate::types::TypeData::ClassLiteral(_)
-            | crate::types::TypeData::GenericAlias(_)
-            | crate::types::TypeData::SubclassOf(_)
-            | crate::types::TypeData::NominalInstance(_)
-            | crate::types::TypeData::ProtocolInstance(_)
-            | crate::types::TypeData::SpecialForm(_)
-            | crate::types::TypeData::KnownInstance(_)
-            | crate::types::TypeData::PropertyInstance(_)
-            | crate::types::TypeData::AlwaysTruthy
-            | crate::types::TypeData::AlwaysFalsy
-            | crate::types::TypeData::LiteralValue(_)
-            | crate::types::TypeData::TypeVar(_)
-            | crate::types::TypeData::BoundSuper(_)
-            | crate::types::TypeData::TypeIs(_)
-            | crate::types::TypeData::TypeGuard(_)
-            | crate::types::TypeData::TypeForm(_)
-            | crate::types::TypeData::NewTypeInstance(_),
-        ) => {
+        crate::types::TypeData::Dynamic(_)
+        | crate::types::TypeData::Divergent(_)
+        | crate::types::TypeData::Never
+        | crate::types::TypeData::EnumComplement(_)
+        | crate::types::TypeData::FunctionLiteral(_)
+        | crate::types::TypeData::BoundMethod(_)
+        | crate::types::TypeData::KnownBoundMethod(_)
+        | crate::types::TypeData::WrapperDescriptor(_)
+        | crate::types::TypeData::DataclassDecorator(_)
+        | crate::types::TypeData::DataclassTransformer(_)
+        | crate::types::TypeData::Callable(_)
+        | crate::types::TypeData::ModuleLiteral(_)
+        | crate::types::TypeData::ClassLiteral(_)
+        | crate::types::TypeData::GenericAlias(_)
+        | crate::types::TypeData::SubclassOf(_)
+        | crate::types::TypeData::NominalInstance(_)
+        | crate::types::TypeData::ProtocolInstance(_)
+        | crate::types::TypeData::SpecialForm(_)
+        | crate::types::TypeData::KnownInstance(_)
+        | crate::types::TypeData::PropertyInstance(_)
+        | crate::types::TypeData::AlwaysTruthy
+        | crate::types::TypeData::AlwaysFalsy
+        | crate::types::TypeData::LiteralValue(_)
+        | crate::types::TypeData::TypeVar(_)
+        | crate::types::TypeData::BoundSuper(_)
+        | crate::types::TypeData::TypeIs(_)
+        | crate::types::TypeData::TypeGuard(_)
+        | crate::types::TypeData::TypeForm(_)
+        | crate::types::TypeData::NewTypeInstance(_) => {
             unreachable!(
                 "invalid type {} in all_matching_typeddict_fields_have_literal_types",
                 ty.display(db)

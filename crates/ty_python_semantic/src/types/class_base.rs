@@ -94,28 +94,25 @@ impl<'db> ClassBase<'db> {
         ty: Type<'db>,
         subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Dynamic(dynamic)) => Some(Self::Dynamic(dynamic)),
-            (_, crate::types::TypeData::Divergent(divergent)) => Some(Self::Divergent(divergent)),
-            (_, crate::types::TypeData::ClassLiteral(literal)) => {
+        match ty.data() {
+            crate::types::TypeData::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+            crate::types::TypeData::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            crate::types::TypeData::ClassLiteral(literal) => {
                 Some(Self::Class(literal.default_specialization(db)))
             }
-            (_, crate::types::TypeData::GenericAlias(generic)) => {
+            crate::types::TypeData::GenericAlias(generic) => {
                 Some(Self::Class(ClassType::Generic(generic)))
             }
-            (_, crate::types::TypeData::NominalInstance(instance))
+            crate::types::TypeData::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
-            (_, crate::types::TypeData::SubclassOf(subclass_of)) => subclass_of
+            crate::types::TypeData::SubclassOf(subclass_of) => subclass_of
                 .subclass_of()
                 .into_dynamic()
                 .map(ClassBase::Dynamic),
-            (_, crate::types::TypeData::Intersection(inter)) => {
+            crate::types::TypeData::Intersection(inter) => {
                 let valid_element = inter
                     .positive(db)
                     .iter()
@@ -127,7 +124,7 @@ impl<'db> ClassBase<'db> {
                     Some(valid_element)
                 }
             }
-            (_, crate::types::TypeData::Union(union)) => {
+            crate::types::TypeData::Union(union) => {
                 // We do not support full unions of MROs (yet). Until we do,
                 // support the cases where one of the types in the union is
                 // a dynamic type such as `Any` or `Unknown`, and all other
@@ -135,15 +132,13 @@ impl<'db> ClassBase<'db> {
                 // "fold" the other potential bases into the dynamic type,
                 // and return `Any`/`Unknown` as the class base to prevent
                 // invalid-base diagnostics and further downstream errors.
-                let Some(dynamic) = union.elements(db).iter().find_map(|elem| {
+                let dynamic = union.elements(db).iter().find_map(|elem| {
                     if let crate::types::TypeData::Dynamic(dynamic) = elem.data() {
                         Some(dynamic)
                     } else {
                         None
                     }
-                }) else {
-                    return None;
-                };
+                })?;
 
                 if union
                     .elements(db)
@@ -155,45 +150,42 @@ impl<'db> ClassBase<'db> {
                     None
                 }
             }
-            (_, crate::types::TypeData::NominalInstance(_)) => None, // TODO -- handle `__mro_entries__`?
+            crate::types::TypeData::NominalInstance(_) => None, // TODO -- handle `__mro_entries__`?
 
             // This likely means that we're in unreachable code,
             // in which case we want to treat `Never` in a forgiving way and silence diagnostics
-            (_, crate::types::TypeData::Never) => Some(ClassBase::unknown()),
+            crate::types::TypeData::Never => Some(ClassBase::unknown()),
 
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
+            crate::types::TypeData::TypeAlias(alias) => {
                 Self::try_from_type(db, alias.value_type(db), subclass)
             }
 
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
+            crate::types::TypeData::NewTypeInstance(newtype) => {
                 ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)
             }
 
-            (
-                _,
-                crate::types::TypeData::PropertyInstance(_)
-                | crate::types::TypeData::EnumComplement(_)
-                | crate::types::TypeData::LiteralValue(_)
-                | crate::types::TypeData::FunctionLiteral(_)
-                | crate::types::TypeData::Callable(..)
-                | crate::types::TypeData::BoundMethod(_)
-                | crate::types::TypeData::KnownBoundMethod(_)
-                | crate::types::TypeData::WrapperDescriptor(_)
-                | crate::types::TypeData::DataclassDecorator(_)
-                | crate::types::TypeData::DataclassTransformer(_)
-                | crate::types::TypeData::ModuleLiteral(_)
-                | crate::types::TypeData::TypeVar(_)
-                | crate::types::TypeData::BoundSuper(_)
-                | crate::types::TypeData::ProtocolInstance(_)
-                | crate::types::TypeData::AlwaysFalsy
-                | crate::types::TypeData::AlwaysTruthy
-                | crate::types::TypeData::TypeIs(_)
-                | crate::types::TypeData::TypeGuard(_)
-                | crate::types::TypeData::TypeForm(_)
-                | crate::types::TypeData::TypedDict(_),
-            ) => None,
+            crate::types::TypeData::PropertyInstance(_)
+            | crate::types::TypeData::EnumComplement(_)
+            | crate::types::TypeData::LiteralValue(_)
+            | crate::types::TypeData::FunctionLiteral(_)
+            | crate::types::TypeData::Callable(..)
+            | crate::types::TypeData::BoundMethod(_)
+            | crate::types::TypeData::KnownBoundMethod(_)
+            | crate::types::TypeData::WrapperDescriptor(_)
+            | crate::types::TypeData::DataclassDecorator(_)
+            | crate::types::TypeData::DataclassTransformer(_)
+            | crate::types::TypeData::ModuleLiteral(_)
+            | crate::types::TypeData::TypeVar(_)
+            | crate::types::TypeData::BoundSuper(_)
+            | crate::types::TypeData::ProtocolInstance(_)
+            | crate::types::TypeData::AlwaysFalsy
+            | crate::types::TypeData::AlwaysTruthy
+            | crate::types::TypeData::TypeIs(_)
+            | crate::types::TypeData::TypeGuard(_)
+            | crate::types::TypeData::TypeForm(_)
+            | crate::types::TypeData::TypedDict(_) => None,
 
-            (_, crate::types::TypeData::KnownInstance(known_instance)) => match known_instance {
+            crate::types::TypeData::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
                 KnownInstanceType::SubscriptedProtocol(_) => Some(Self::Protocol),
                 KnownInstanceType::TypeAliasType(_)
@@ -229,7 +221,7 @@ impl<'db> ClassBase<'db> {
                 }
             },
 
-            (_, crate::types::TypeData::SpecialForm(special_form)) => match special_form {
+            crate::types::TypeData::SpecialForm(special_form) => match special_form {
                 SpecialFormType::TypeQualifier(_) => None,
 
                 SpecialFormType::Annotated

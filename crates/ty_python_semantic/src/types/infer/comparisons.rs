@@ -169,7 +169,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
         }
     };
 
-    let comparison_result = match (({ let __ty_view_value = left; (__ty_view_value, __ty_view_value.data()) }), ({ let __ty_view_value = right; (__ty_view_value, __ty_view_value.data()) })) {
+    let comparison_result = match (left.view(), right.view()) {
         ((_, crate::types::TypeData::EnumComplement(complement)), (right, _)) => Some(infer_binary_type_comparison(
             context,
             complement.remaining_literal_union(db),
@@ -619,7 +619,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                             )
                             .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
 
-                            match { let __ty_view_value = eq_result; (__ty_view_value, __ty_view_value.data()) }  {
+                            match eq_result.view()  {
                                 (todo, crate::types::TypeData::Dynamic(DynamicType::Todo(_))) => return Ok(todo),
                                 // It's okay to ignore errors here because Python doesn't call `__bool__`
                                 // for different union variants. Instead, this is just for us to
@@ -648,7 +648,7 @@ pub(super) fn infer_binary_type_comparison<'db>(
                                 "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
                             );
 
-                        Ok(match { let __ty_view_value = eq_result; (__ty_view_value, __ty_view_value.data()) }  {
+                        Ok(match eq_result.view()  {
                             (todo, crate::types::TypeData::Dynamic(DynamicType::Todo(_))) => todo,
                             // It's okay to ignore errors here because Python doesn't call `__bool__`
                             // for `is` and `is not` comparisons. This is an implementation detail
@@ -933,11 +933,8 @@ fn infer_membership_test_comparison<'db>(
     compare_result_opt
         .map(|ty| {
             if matches!(
-                {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::Dynamic(DynamicType::Todo(_)))
+                ty.data(),
+                crate::types::TypeData::Dynamic(DynamicType::Todo(_))
             ) {
                 return ty;
             }

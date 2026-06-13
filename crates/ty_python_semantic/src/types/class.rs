@@ -1097,17 +1097,14 @@ impl<'db> ClassType<'db> {
             ty: Type<'db>,
             defining_class: ClassType<'db>,
         ) -> Option<AbstractMethodKind> {
-            match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::FunctionLiteral(function)) => {
+            match ty.data() {
+                crate::types::TypeData::FunctionLiteral(function) => {
                     function.as_abstract_method(db, defining_class)
                 }
-                (_, crate::types::TypeData::BoundMethod(method)) => {
+                crate::types::TypeData::BoundMethod(method) => {
                     method.function(db).as_abstract_method(db, defining_class)
                 }
-                (_, crate::types::TypeData::PropertyInstance(property)) => {
+                crate::types::TypeData::PropertyInstance(property) => {
                     // A property is abstract if any of its accessors is abstract.
                     property
                         .getter(db)
@@ -1123,7 +1120,7 @@ impl<'db> ClassType<'db> {
                             })
                         })
                 }
-                (_, _) => None,
+                _ => None,
             }
         }
 
@@ -1932,19 +1929,10 @@ impl<'db> ClassType<'db> {
 
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
-            .and_then(|ty| {
-                match {
-                    let __ty_view_value = ty;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::FunctionLiteral(function)) => {
-                        Some(function.signature(db))
-                    }
-                    (_, crate::types::TypeData::Callable(callable)) => {
-                        Some(callable.signatures(db))
-                    }
-                    (_, _) => None,
-                }
+            .and_then(|ty| match ty.data() {
+                crate::types::TypeData::FunctionLiteral(function) => Some(function.signature(db)),
+                crate::types::TypeData::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
             });
 
         let dunder_new_function = if let Some(dunder_new_signature) = dunder_new_signature {
@@ -1992,15 +1980,12 @@ impl<'db> ClassType<'db> {
         let synthesized_dunder_init_callable = if let Place::Defined(DefinedPlace { ty, .. }) =
             dunder_init_function_symbol
         {
-            let signature = match {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (_, crate::types::TypeData::FunctionLiteral(dunder_init_function)) => {
+            let signature = match ty.data() {
+                crate::types::TypeData::FunctionLiteral(dunder_init_function) => {
                     Some(dunder_init_function.signature(db))
                 }
-                (_, crate::types::TypeData::Callable(callable)) => Some(callable.signatures(db)),
-                (_, _) => None,
+                crate::types::TypeData::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
             };
 
             if let Some(signature) = signature {
@@ -2804,12 +2789,9 @@ impl SlotsKind {
             return Self::Dynamic;
         }
 
-        match {
-            let __ty_view_value = slots_ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
+        match slots_ty.data() {
             // __slots__ = ("a", "b")
-            (_, crate::types::TypeData::NominalInstance(nominal)) => match nominal
+            crate::types::TypeData::NominalInstance(nominal) => match nominal
                 .tuple_spec(db)
                 .and_then(|spec| spec.len().into_fixed_length())
             {
@@ -2819,11 +2801,9 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            (_, crate::types::TypeData::LiteralValue(literal)) if literal.is_string() => {
-                Self::NotEmpty
-            }
+            crate::types::TypeData::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
 
-            (_, _) => Self::Dynamic,
+            _ => Self::Dynamic,
         }
     }
 }
