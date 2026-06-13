@@ -486,7 +486,7 @@ impl<'src> Parser<'src> {
                     }
                 }
                 '?' => {
-                    let mut question_count = 1u32;
+                    let mut question_count = 1;
                     while matches!(chars.peek(), Some('?')) {
                         chars.next();
                         question_count += 1;
@@ -502,10 +502,7 @@ impl<'src> Parser<'src> {
                         || value.chars().last().is_none_or(is_python_whitespace)
                         || !matches!(chars.peek(), None | Some('\n' | '\r'))
                     {
-                        value.reserve(question_count as usize);
-                        for _ in 0..question_count {
-                            value.push('?');
-                        }
+                        value.extend(std::iter::repeat_n('?', question_count));
                         continue;
                     }
 

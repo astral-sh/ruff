@@ -109,6 +109,13 @@ fn number_values() {
 }
 
 #[test]
+fn malformed_radix_literals() {
+    for source in ["0x", "0o", "0b", "0x_", "0x__1"] {
+        assert!(parse_expression(source).is_err(), "source: {source:?}");
+    }
+}
+
+#[test]
 fn interpolated_string_escaped_brace_values() {
     let cases = [
         (r"f'\{{1}}'", r"\{1}"),
@@ -119,6 +126,8 @@ fn interpolated_string_escaped_brace_values() {
         (r"t'\}}'", r"\}"),
         (r"t'\\{{1}}'", r"\{1}"),
         (r"t'\\\{{1}}'", r"\\{1}"),
+        (r"rf'\{{1}}'", r"\{1}"),
+        (r"rt'\{{1}}'", r"\{1}"),
     ];
 
     for (source, expected) in cases {
@@ -148,6 +157,8 @@ fn ipython_escape_command_values() {
         ("%%foo???", IpyEscapeKind::Magic2, "foo???"),
         ("!pwd?", IpyEscapeKind::Shell, "pwd?"),
         ("?? \\\n    foo?", IpyEscapeKind::Help, "foo"),
+        ("?? \\\r    foo?", IpyEscapeKind::Help, "foo"),
+        ("?? \\\r\n    foo?", IpyEscapeKind::Help, "foo"),
     ];
 
     for (source, expected_kind, expected_value) in cases {
