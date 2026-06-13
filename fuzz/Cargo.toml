@@ -33,7 +33,7 @@ ty_site_packages = { path = "../crates/ty_site_packages" }
 ty_python_core = { path = "../crates/ty_python_core" }
 
 libfuzzer-sys = { git = "https://github.com/rust-fuzz/libfuzzer", default-features = false }
-salsa = { version = "0.27.0", default-features = false, features = [
+salsa = { git = "https://github.com/charliermarsh/salsa.git", rev = "467dfde88fc25ae9975903585d7da8b1d589b849", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",

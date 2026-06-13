@@ -1402,15 +1402,6 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-version = "0.16.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "841d1cc9bed7f9236f321df977030373f4a4163ae1a7dbfe1a51a2c1a51d9100"
-dependencies = [
- "foldhash 0.2.0",
-]
-
-[[package]]
-name = "hashbrown"
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
@@ -1422,11 +1413,11 @@ dependencies = [
 
 [[package]]
 name = "hashlink"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea0b22561a9c04a7cb1a302c013e0259cd3b4bb619f145b32f72b8b4bcbed230"
+checksum = "a5081f264ed7adee96ea4b4778b6bb9da0a7228b084587aa3bd3ff05da7c5a3b"
 dependencies = [
- "hashbrown 0.16.1",
+ "hashbrown 0.17.1",
 ]
 
 [[package]]
@@ -3715,8 +3706,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "adfc1e32b8d1a486e3a45a5480fb5dca7912f49262a8916a67378064da4fe1ab"
+source = "git+https://github.com/charliermarsh/salsa.git?rev=467dfde88fc25ae9975903585d7da8b1d589b849#467dfde88fc25ae9975903585d7da8b1d589b849"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3742,14 +3732,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67dad477a3e3a484a7c2311c1d25160fb270214981be24022de7de8a206a3300"
+source = "git+https://github.com/charliermarsh/salsa.git?rev=467dfde88fc25ae9975903585d7da8b1d589b849#467dfde88fc25ae9975903585d7da8b1d589b849"
 
 [[package]]
 name = "salsa-macros"
 version = "0.27.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "943f70e101fb3bd599960e79e719e70d85142730e5b45f3269246086ed218562"
+source = "git+https://github.com/charliermarsh/salsa.git?rev=467dfde88fc25ae9975903585d7da8b1d589b849#467dfde88fc25ae9975903585d7da8b1d589b849"
 dependencies = [
  "proc-macro2",
  "quote",
