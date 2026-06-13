@@ -1218,10 +1218,7 @@ fn known_literal_equality<'db>(
 fn enum_literal_value<'db>(db: &'db dyn Db, literal: EnumLiteralType<'db>) -> Option<Type<'db>> {
     let metadata = enum_metadata(db, literal.enum_class(db))?;
     let name = metadata.resolve_member(literal.name(db))?;
-    if metadata.init_function.is_some()
-        || metadata.new_function.is_some()
-        || metadata.custom_enum_metaclass_new
-    {
+    if metadata.member_value_may_be_transformed(name) {
         return None;
     }
     if metadata.auto_members.contains(name) {

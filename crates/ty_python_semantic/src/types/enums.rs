@@ -188,13 +188,7 @@ impl<'db> EnumMetadata<'db> {
         }
         if let Some(annotation) = self.value_annotation {
             Some(annotation)
-        } else if self.init_function.is_some()
-            || self.new_function.is_some()
-            || self.opaque_init
-            || self.opaque_new
-            || self.custom_enum_metaclass_hooks
-            || (self.opaque_generate_next_value && self.auto_members.contains(member_name))
-        {
+        } else if self.member_value_may_be_transformed(member_name) {
             Some(Type::Dynamic(DynamicType::Any))
         } else if let Some(func_ty) = self.generate_next_value_function
             && self.auto_members.contains(member_name)
@@ -203,6 +197,18 @@ impl<'db> EnumMetadata<'db> {
         } else {
             self.members.get(member_name).copied()
         }
+    }
+
+    /// Return whether enum construction may replace the value declared for `member_name`.
+    ///
+    /// An opaque `_generate_next_value_` only affects members declared with `auto()`.
+    pub(crate) fn member_value_may_be_transformed(&self, member_name: &Name) -> bool {
+        self.init_function.is_some()
+            || self.new_function.is_some()
+            || self.opaque_init
+            || self.opaque_new
+            || self.custom_enum_metaclass_hooks
+            || (self.opaque_generate_next_value && self.auto_members.contains(member_name))
     }
 
     /// Returns the type of `.name`/`._name_` for a given enum member.
