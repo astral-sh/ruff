@@ -300,20 +300,22 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 /// The types produced when a match pattern succeeds.
 ///
 /// This positive structural analysis is shared by binding inference and subject narrowing. It
-/// records the type entering the top-level pattern, the subject type after assuming success, and
-/// the type of each supported name bound inside the pattern. Definite-match analysis, which is used
-/// for negative narrowing and exhaustiveness, intentionally remains separate.
+/// records the subject's positive narrowing constraint and the type of each supported name bound
+/// inside the pattern. Binding types account for values excluded by earlier case arms. The subject
+/// constraint does not, because those exclusions are combined separately by the control-flow
+/// analysis. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
+/// intentionally remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PatternSuccessTypes<'db> {
-    incoming_subject_ty: Type<'db>,
+    match_subject_ty: Type<'db>,
     matched_subject_ty: Type<'db>,
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     missing_binding_ty: Type<'db>,
 }
 
 impl<'db> PatternSuccessTypes<'db> {
-    pub(crate) fn incoming_subject_type(&self) -> Type<'db> {
-        self.incoming_subject_ty
+    pub(crate) fn match_subject_type(&self) -> Type<'db> {
+        self.match_subject_ty
     }
 
     pub(crate) fn matched_subject_type(&self) -> Type<'db> {
@@ -336,7 +338,7 @@ impl<'db> PatternSuccessTypes<'db> {
 
     fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
-            incoming_subject_ty: cycle_recovery,
+            match_subject_ty: cycle_recovery,
             matched_subject_ty: cycle_recovery,
             bindings: FrozenMap::default(),
             missing_binding_ty: cycle_recovery,
@@ -344,9 +346,9 @@ impl<'db> PatternSuccessTypes<'db> {
     }
 
     fn cycle_normalized(mut self, db: &'db dyn Db, previous: &Self, cycle: &salsa::Cycle) -> Self {
-        self.incoming_subject_ty =
-            self.incoming_subject_ty
-                .cycle_normalized(db, previous.incoming_subject_ty, cycle);
+        self.match_subject_ty =
+            self.match_subject_ty
+                .cycle_normalized(db, previous.match_subject_ty, cycle);
         self.matched_subject_ty =
             self.matched_subject_ty
                 .cycle_normalized(db, previous.matched_subject_ty, cycle);
@@ -406,13 +408,18 @@ pub(crate) fn pattern_success_types<'db>(
     pattern: PatternPredicate<'db>,
 ) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
-    let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
-    let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
+    let match_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
+    let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, match_subject_ty);
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
+    let matched_subject_ty = if incoming_subject_ty.is_equivalent_to(db, match_subject_ty) {
+        result.matched_subject_ty
+    } else {
+        analyzer.match_pattern_subject_type(pattern.kind(db), match_subject_ty)
+    };
     PatternSuccessTypes {
-        incoming_subject_ty,
-        matched_subject_ty: result.matched_subject_ty,
+        match_subject_ty,
+        matched_subject_ty,
         bindings: FrozenMap::from(result.bindings),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
@@ -1192,25 +1199,33 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let kind = pattern.kind(self.db);
         let subject = pattern.subject(self.db);
-        if is_positive
-            && PatternSuccessAnalyzer::new(self.db, self.scope())
-                .uses_successful_subject_analysis(kind)
-            && let Some(subject) =
-                PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))
-        {
-            let analysis = pattern_success_types(self.db, pattern);
-            let narrowed = analysis.matched_subject_type();
-            if narrowed.is_equivalent_to(self.db, analysis.incoming_subject_type()) {
-                return None;
-            }
-            return Some(NarrowingConstraints::from_iter([(
-                self.expect_place(&subject),
-                NarrowingConstraint::replacement(narrowed),
-            )]));
+        let subject_node = subject.node_ref(self.db).node(self.module);
+        let expression_constraints = self
+            .evaluate_pattern_predicate_kind(kind, subject, is_positive)
+            .into_constraints();
+        if !is_positive {
+            return expression_constraints;
         }
 
-        self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
-            .into_constraints()
+        let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
+            return expression_constraints;
+        };
+        let place = self.expect_place(&subject_place);
+        let analysis = pattern_success_types(self.db, pattern);
+        // Keep constraints propagated from the subject expression to related places, but use the
+        // shared successful-pattern result as the positive type of the subject itself.
+        let mut constraints = expression_constraints.unwrap_or_default();
+        constraints.remove(&place);
+        if !analysis
+            .matched_subject_type()
+            .is_equivalent_to(self.db, analysis.match_subject_type())
+        {
+            constraints.insert(
+                place,
+                NarrowingConstraint::intersection(analysis.matched_subject_type()),
+            );
+        }
+        (!constraints.is_empty()).then_some(constraints)
     }
 }
 
@@ -1242,34 +1257,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     ) {
         for (place, ty) in from {
             self.merge_binding(into, place, ty);
-        }
-    }
-
-    fn uses_successful_subject_analysis(&self, pattern: &PatternPredicateKind<'db>) -> bool {
-        match pattern {
-            PatternPredicateKind::Class(kind) => {
-                !kind.is_argumentless()
-                    || matches!(
-                        infer_same_file_expression_type(
-                            self.db,
-                            kind.class,
-                            TypeContext::default()
-                        ),
-                        Type::Dynamic(_)
-                    )
-            }
-            PatternPredicateKind::Mapping(kind) => !kind.entries.is_empty(),
-            PatternPredicateKind::Sequence(kind) => kind
-                .patterns
-                .iter()
-                .any(|pattern| self.uses_successful_subject_analysis(pattern)),
-            PatternPredicateKind::Or(patterns) => patterns
-                .iter()
-                .any(|pattern| self.uses_successful_subject_analysis(pattern)),
-            PatternPredicateKind::As(Some(pattern), _) => {
-                self.uses_successful_subject_analysis(pattern)
-            }
-            _ => false,
         }
     }
 
@@ -1331,7 +1318,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                         .build();
                     let alternative =
                         self.analyze_successful_pattern(pattern, remaining_subject_ty);
-                    matched_subject_types.add_in_place(alternative.matched_subject_ty);
+                    // The earlier alternatives affect which bindings this alternative can produce,
+                    // but not the set matched by the OR pattern as a whole.
+                    matched_subject_types
+                        .add_in_place(self.match_pattern_subject_type(pattern, subject_ty));
                     self.merge_bindings(&mut bindings, alternative.bindings);
                     previous_pattern = pattern;
                 }
@@ -1437,6 +1427,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             Type::Union(union) => union.map(self.db, |element| {
                 self.filter_class_pattern_subject_type(class, class_ty, *element)
             }),
+            Type::Intersection(intersection) if intersection.positive(self.db).is_empty() => {
+                self.intersect_types(subject_ty, class_ty)
+            }
             Type::Intersection(intersection) => intersection.map_positive(self.db, |positive| {
                 self.filter_class_pattern_subject_type(class, class_ty, *positive)
             }),
