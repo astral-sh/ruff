@@ -271,7 +271,7 @@ impl ResolvedClientCapabilities {
                     matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText)
                 })
             })
-            .map_or(false, |first_supported| {
+            .is_some_and(|first_supported| {
                 matches!(first_supported, MarkupKind::Markdown)
             })
         {
@@ -287,7 +287,7 @@ impl ResolvedClientCapabilities {
                     matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText)
                 })
             })
-            .map_or(false, |first_supported| {
+            .is_some_and(|first_supported| {
                 matches!(first_supported, MarkupKind::Markdown)
             })
         {

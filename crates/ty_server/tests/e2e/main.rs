@@ -1363,7 +1363,10 @@ impl TestServerBuilder {
     }
 
     /// Set the completion documentation format preference for the client
-    pub(crate) fn with_completion_documentation_format(mut self, formats: Vec<lsp_types::MarkupKind>) -> Self {
+    pub(crate) fn with_completion_documentation_format(
+        mut self,
+        formats: Vec<lsp_types::MarkupKind>,
+    ) -> Self {
         self.client_capabilities
             .text_document
             .get_or_insert_default()
