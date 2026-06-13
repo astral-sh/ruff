@@ -1226,6 +1226,12 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    /// Construct a transparent cycle marker for a finite value type.
+    ///
+    /// This is the only supported constructor for [`Type::CycleMarked`]. It keeps markers out of
+    /// signature cycles and non-value-like types, folds structurally recursive inners into
+    /// [`Type::Recursive`], erases duplicate markers for the same binder, and canonicalizes nested
+    /// marker order for stable fixed-point convergence.
     pub(crate) fn cycle_marked(db: &'db dyn Db, binder_id: salsa::Id, inner: Type<'db>) -> Self {
         if matches!(inner, Type::FunctionLiteral(_))
             || inner.is_signature_cycle_body_for_cycle_recovery(db)
@@ -8023,10 +8029,17 @@ impl DivergentType {
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct CycleMarkedType<'db> {
+    /// The Salsa cycle head whose recovery marker must be preserved.
     pub(crate) binder: recursive::BinderId,
+    /// The finite type that normal operations should see.
     pub(crate) inner: Type<'db>,
 }
 
+/// Result types that can carry a transparent [`CycleMarkedType`] through a type operation.
+///
+/// Implement this for operation results that contain inferred value types. Do not preserve the
+/// marker for pure observations such as `bool` or `()`: those do not feed a recovered type back
+/// into the fixed-point iteration.
 pub(crate) trait CycleMarkable<'db>: Sized {
     fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self;
 }
@@ -8036,6 +8049,11 @@ impl<'db> CycleMarkedType<'db> {
         self.binder(db).into_id()
     }
 
+    /// Run a type operation on the inner type, then re-apply this cycle marker to the result.
+    ///
+    /// Use this from `Type::CycleMarked` match arms for operations that conceptually preserve the
+    /// operated value type. This keeps `CycleMarked<T>` transparent to the operation while ensuring
+    /// that a type-bearing result remains visible to cycle recovery.
     pub(crate) fn map<F: CycleMarkable<'db>>(
         self,
         db: &'db dyn Db,

@@ -16,6 +16,55 @@
 //! the recursive body. Transformations that operate under the μ-binder, such as
 //! type mappings, instead transform the body while keeping the binder marker
 //! bound.
+//!
+//! Cycle recovery also uses [`Type::CycleMarked`] for values that have converged
+//! to a finite type but still come from a query participating in the current
+//! Salsa cycle. `CycleMarked<T>` is value-equivalent to `T`; it is not a new
+//! runtime type and must not change subtype, assignability, truthiness, member
+//! lookup, or call semantics. Its only purpose is to keep a transparent marker
+//! alive for later cycle recovery. For example, after an early iteration sees
+//! `Divergent | int`, normalization may reveal that the current value behaves
+//! like `int`, but the query must still remember that this `int` was reached
+//! through the recursive cycle. `CycleMarked<int>` records that fact without
+//! exposing `Divergent` to normal type operations.
+//!
+//! `CycleMarked` is deliberately narrower than [`RecursiveType`]. A recursive
+//! type describes recursive value structure, such as `mu a. list[a]`.
+//! A cycle-marked type describes a finite value that must remain visible to the
+//! fixed-point recovery machinery. Because of that, construction goes through
+//! `Type::cycle_marked` rather than directly interning
+//! [`CycleMarkedType`](crate::types::CycleMarkedType).
+//! That constructor:
+//!
+//! - leaves function-signature cycles in `Divergent` form, because signature
+//!   recovery has separate rules;
+//! - skips non-value-like type objects and single-valued types, where keeping a
+//!   transparent cycle marker would only create oscillation or display noise;
+//! - erases an existing marker for the same binder before wrapping, so repeated
+//!   recovery does not accumulate nested copies of the same marker;
+//! - folds to [`RecursiveType`] instead if the inner type still contains the
+//!   binder's `Divergent` marker structurally;
+//! - canonicalizes nested cycle markers by binder id, which keeps equality and
+//!   Salsa fixed-point checks stable.
+//!
+//! Operations that preserve the type result must preserve `CycleMarked` via
+//! [`CycleMarkedType::map`](crate::types::CycleMarkedType::map) and
+//! [`CycleMarkable`](crate::types::CycleMarkable), just as operations on
+//! [`RecursiveType`] should use the `Foldable` path. This keeps normal
+//! operation implementations local: the `CycleMarked` arm unwraps the inner
+//! type, runs the operation, then re-applies the marker to any type-bearing
+//! result. `()` and boolean-like results intentionally do not preserve the
+//! marker because they are observations rather than new inferred value types.
+//!
+//! Set-theoretic builders treat `CycleMarked<T>` as equivalent to `T` but prefer
+//! the marked representative when both are present. This is what makes
+//! `list[CycleMarked<T>] | list[T]` simplify to `list[CycleMarked<T>]` rather
+//! than dropping the recovery marker. Intersection simplification similarly
+//! strips the marker while simplifying the inner type, then re-applies it to the
+//! simplified result. Cycle recovery may also overlay a finite current value
+//! onto a previous marker-tainted shape, preserving the binder while replacing
+//! `Divergent` leaves with the finite structure that later iterations have
+//! discovered.
 
 use crate::Db;
 use crate::place::PlaceAndQualifiers;
