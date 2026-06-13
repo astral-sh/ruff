@@ -42,7 +42,7 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::tuple::Tuple;
 use crate::types::visitor::{self, TypeVisitor};
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
+    BytesLiteralType, ClassLiteral, CycleMarkedType, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
     SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
 };
@@ -226,7 +226,6 @@ struct CycleFusionSummary<'db> {
     recursion_guard: visitor::TypeCollector<'db>,
     divergent_id: Cell<Option<salsa::Id>>,
     has_multiple_divergent_ids: Cell<bool>,
-    has_cycle_marked: Cell<bool>,
     has_recursive: Cell<bool>,
     has_type_alias: Cell<bool>,
 }
@@ -237,7 +236,6 @@ impl<'db> CycleFusionSummary<'db> {
             recursion_guard: visitor::TypeCollector::default(),
             divergent_id: Cell::new(None),
             has_multiple_divergent_ids: Cell::new(false),
-            has_cycle_marked: Cell::new(false),
             has_recursive: Cell::new(false),
             has_type_alias: Cell::new(false),
         };
@@ -254,10 +252,7 @@ impl<'db> CycleFusionSummary<'db> {
     }
 
     fn is_finite_cycle_fusion_target(&self) -> bool {
-        self.divergent_id.get().is_none()
-            && !self.has_cycle_marked.get()
-            && !self.has_recursive.get()
-            && !self.has_type_alias.get()
+        self.divergent_id.get().is_none() && !self.has_recursive.get() && !self.has_type_alias.get()
     }
 }
 
@@ -269,7 +264,6 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::Divergent(divergent) => self.add_divergent_id(divergent.id()),
-            Type::CycleMarked(_) => self.has_cycle_marked.set(true),
             Type::Recursive(_) => self.has_recursive.set(true),
             Type::TypeAlias(_) => self.has_type_alias.set(true),
             _ => visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard),
@@ -293,9 +287,6 @@ impl CycleFusionOverlay {
             has_multiple_divergent_ids: Cell::new(false),
         };
         let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate)?;
-        if !overlaid.supports_cycle_marked_recovery(db) {
-            return None;
-        }
         let marker_id = overlay.single_divergent_id()?;
         Some(Type::cycle_marked(db, marker_id, overlaid))
     }
@@ -346,9 +337,7 @@ impl CycleFusionOverlay {
                 let mut elements = Vec::with_capacity(union.elements(db).len() + 1);
                 for element in union.elements(db) {
                     let summary = CycleFusionSummary::collect(db, *element);
-                    if summary.divergent_id.get().is_some()
-                        || matches!(element, Type::CycleMarked(_))
-                    {
+                    if summary.divergent_id.get().is_some() {
                         elements.push(self.overlay_type(db, *element, finite)?);
                     } else if summary.is_finite_cycle_fusion_target() {
                         elements.push(*element);
@@ -1337,6 +1326,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
+    cycle_markers: FxOrderSet<CycleMarkedType<'db>>,
     db: &'db dyn Db,
 }
 
@@ -1345,6 +1335,7 @@ impl<'db> IntersectionBuilder<'db> {
         Self {
             db,
             intersections: vec![InnerIntersectionBuilder::default()],
+            cycle_markers: FxOrderSet::default(),
         }
     }
 
@@ -1352,6 +1343,7 @@ impl<'db> IntersectionBuilder<'db> {
         Self {
             db,
             intersections: vec![],
+            cycle_markers: FxOrderSet::default(),
         }
     }
 
@@ -1385,6 +1377,11 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_positive_impl(body, seen_recursive_binders)
             }
+            Type::CycleMarked(marked) => {
+                self.cycle_markers.insert(marked);
+                let inner = marked.inner(self.db);
+                self.add_positive_impl(inner, seen_recursive_binders)
+            }
             Type::Union(union) => {
                 // Distribute ourself over this union: for each union element, clone ourself and
                 // intersect with that union element, then create a new union-of-intersections with all
@@ -1403,6 +1400,7 @@ impl<'db> IntersectionBuilder<'db> {
                     })
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
+                        builder.cycle_markers.extend(sub.cycle_markers);
                         builder
                     })
             }
@@ -1457,6 +1455,11 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_negative_impl(body, seen_recursive_binders)
             }
+            Type::CycleMarked(marked) => {
+                self.cycle_markers.insert(marked);
+                let inner = marked.inner(self.db);
+                self.add_negative_impl(inner, seen_recursive_binders)
+            }
             Type::Union(union) => {
                 for elem in union.elements(self.db) {
                     self = self.add_negative_impl(*elem, seen_recursive_binders);
@@ -1493,6 +1496,7 @@ impl<'db> IntersectionBuilder<'db> {
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
+                        builder.cycle_markers.extend(sub.cycle_markers);
                         builder
                     },
                 )
@@ -1522,11 +1526,16 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
+        let cycle_markers = self.cycle_markers;
         UnionType::from_elements(
             self.db,
-            self.intersections
-                .into_iter()
-                .map(|inner| inner.build(self.db)),
+            self.intersections.into_iter().map(|inner| {
+                cycle_markers
+                    .iter()
+                    .fold(inner.build(self.db), |ty, marked| {
+                        Type::cycle_marked(self.db, marked.binder_id(self.db), ty)
+                    })
+            }),
         )
     }
 }

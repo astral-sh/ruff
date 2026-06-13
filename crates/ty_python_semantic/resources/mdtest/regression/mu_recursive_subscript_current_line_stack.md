@@ -13,7 +13,7 @@ class TextFile:
     def gen_error(self, line=None):
         if line is None:
             line = self.current_line
-        reveal_type(line)  # revealed: (Unknown & ~None) | int | list[int]
+        reveal_type(line)  # revealed: (Unknown & ~None) | list[int] | int
 
     def readline(self, line: str | None, buildup_line: str):
         while True:

@@ -1227,13 +1227,39 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn cycle_marked(db: &'db dyn Db, binder_id: salsa::Id, inner: Type<'db>) -> Self {
+        if matches!(inner, Type::FunctionLiteral(_))
+            || inner.is_signature_cycle_body_for_cycle_recovery(db)
+        {
+            return inner;
+        }
+
+        if !inner.is_recursion_value_like(db) {
+            return inner;
+        }
+
+        if inner.is_single_valued(db) {
+            return inner;
+        }
+
         let marker = Type::divergent(binder_id);
+        let inner = inner.apply_type_mapping(
+            db,
+            &TypeMapping::EraseCycleMark {
+                binder_id: recursive::BinderId::new(binder_id),
+            },
+            TypeContext::default(),
+        );
         if RecursiveTypeNormalization::new(marker).contains_marker(db, inner) {
             return Type::implicit_recursive(db, binder_id, inner);
         }
 
         match inner {
             Type::CycleMarked(marked) if marked.binder(db).into_id() == binder_id => inner,
+            Type::CycleMarked(marked) if marked.binder_id(db) < binder_id => Type::cycle_marked(
+                db,
+                marked.binder_id(db),
+                Type::cycle_marked(db, binder_id, marked.inner(db)),
+            ),
             _ => Self::CycleMarked(CycleMarkedType::new(
                 db,
                 recursive::BinderId::new(binder_id),
@@ -1399,29 +1425,6 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn supports_cycle_marked_recovery(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::NominalInstance(instance) => matches!(
-                instance.known_class(db),
-                Some(
-                    KnownClass::List
-                        | KnownClass::Tuple
-                        | KnownClass::Set
-                        | KnownClass::FrozenSet
-                        | KnownClass::Dict
-                        | KnownClass::DefaultDict
-                        | KnownClass::Deque
-                        | KnownClass::OrderedDict
-                )
-            ),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|element| element.supports_cycle_marked_recovery(db)),
-            _ => false,
-        }
-    }
-
     pub const fn is_unknown(&self) -> bool {
         matches!(
             self,
@@ -1534,7 +1537,9 @@ impl<'db> Type<'db> {
             // result directly. We still ensure monotonicity after the first couple iterations, which
             // still ensures convergence in cases that are prone to oscillation.
             if cycle.iteration() <= crate::TAINTED_CYCLES {
-                if let Some(overlaid) = overlay_cycle_marker(db, self, previous) {
+                if matches!(self, Type::CycleMarked(_)) && self.is_subtype_of(db, previous) {
+                    self
+                } else if let Some(overlaid) = overlay_cycle_marker(db, self, previous) {
                     overlaid
                 } else {
                     let self_degraded_by_overload =
@@ -6769,6 +6774,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::EraseCycleMarks |
+                TypeMapping::EraseCycleMark { .. } |
                 TypeMapping::RescopeReturnCallables(_) |
                 TypeMapping::Promote(PromotionMode::Off, _) |
                 TypeMapping::Promote(PromotionMode::On, PromotionKind::SingletonsOnly) => self,
@@ -6788,6 +6794,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ReplaceRecursiveOrigin { .. } |
                 TypeMapping::ReplaceDivergent { .. } |
                 TypeMapping::EraseCycleMarks |
+                TypeMapping::EraseCycleMark { .. } |
                 TypeMapping::RescopeReturnCallables(_) => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -6826,7 +6833,9 @@ impl<'db> Type<'db> {
                 let inner = marked
                     .inner(db)
                     .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
-                if matches!(type_mapping, TypeMapping::EraseCycleMarks) {
+                if matches!(type_mapping, TypeMapping::EraseCycleMarks)
+                    || matches!(type_mapping, TypeMapping::EraseCycleMark { binder_id } if *binder_id == marked.binder(db))
+                {
                     inner
                 } else if inner == marked.inner(db) {
                     self
@@ -7875,6 +7884,8 @@ pub enum TypeMapping<'a, 'db> {
 
     /// Remove `Type::CycleMarked` wrappers while preserving their inner types.
     EraseCycleMarks,
+    /// Remove `Type::CycleMarked` wrappers for a single binder.
+    EraseCycleMark { binder_id: recursive::BinderId },
 
     /// Updates any `Callable` types in a function signature return type to be generic if possible.
     RescopeReturnCallables(&'a FxHashMap<CallableType<'db>, CallableType<'db>>),
@@ -7925,6 +7936,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveOrigin { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::EraseCycleMarks
+            | TypeMapping::EraseCycleMark { .. }
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
                 if binding.binding_context().is_some() {
@@ -7974,6 +7986,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceRecursiveOrigin { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::EraseCycleMarks
+            | TypeMapping::EraseCycleMark { .. }
             | TypeMapping::RescopeReturnCallables(_) => self.clone(),
         }
     }

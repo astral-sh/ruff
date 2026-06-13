@@ -286,6 +286,44 @@ fn cycle_marked_type_folds_marker_containing_inner_to_recursive() {
 }
 
 #[test]
+fn cycle_marked_type_has_stable_nested_order() {
+    let db = setup_db();
+    let a = Id::from_bits(1);
+    let b = Id::from_bits(2);
+    let int = KnownClass::Int.to_instance(&db);
+
+    assert_eq!(
+        Type::cycle_marked(&db, a, Type::cycle_marked(&db, b, int)),
+        Type::cycle_marked(&db, b, Type::cycle_marked(&db, a, int))
+    );
+}
+
+#[test]
+fn cycle_marked_type_skips_single_valued_inner() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let literal = Type::int_literal(1);
+
+    assert_eq!(Type::cycle_marked(&db, binder_id, literal), literal);
+}
+
+#[test]
+fn intersection_builder_preserves_cycle_markers_through_simplification() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let optional_int = UnionType::from_two_elements(&db, int, Type::none(&db));
+
+    assert_eq!(
+        IntersectionBuilder::new(&db)
+            .add_positive(Type::cycle_marked(&db, binder_id, optional_int))
+            .add_negative(Type::none(&db))
+            .build(),
+        Type::cycle_marked(&db, binder_id, int)
+    );
+}
+
+#[test]
 fn recursive_type_folds_same_binder_nesting() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
@@ -353,7 +391,26 @@ fn cycle_recovery_overlays_cycle_marked_counterpart() {
 }
 
 #[test]
-fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() {
+fn cycle_recovery_fuses_cycle_marked_subtype_with_supertype() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let bool = KnownClass::Bool.to_instance(&db);
+    let marked_int = Type::cycle_marked(&db, binder_id, int);
+    let marked_bool = Type::cycle_marked(&db, binder_id, bool);
+
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [marked_bool, marked_int]),
+        marked_int
+    );
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [marked_int, marked_bool]),
+        marked_int
+    );
+}
+
+#[test]
+fn top_level_union_cycle_normalization_cycle_marks_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let marker = Type::divergent(binder_id);
@@ -364,7 +421,7 @@ fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() 
 
     assert_eq!(
         union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker)),
-        Some(int)
+        Some(Type::cycle_marked(&db, binder_id, int))
     );
 }
 

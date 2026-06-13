@@ -1117,6 +1117,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             | TypeMapping::ReplaceRecursiveOrigin { .. }
             | TypeMapping::ReplaceDivergent { .. }
             | TypeMapping::EraseCycleMarks
+            | TypeMapping::EraseCycleMark { .. }
             | TypeMapping::RescopeReturnCallables(_) => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
                 Type::TypeVar(self.materialize_impl(db, *materialization_kind, visitor))

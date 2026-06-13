@@ -131,13 +131,13 @@ class C:
         # revealed: (positional=...) -> Unknown | (positional=...) -> Divergent
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=...) -> Unknown | Divergent
+        # revealed: (*, kw_only=...) -> Unknown
         reveal_type(self.b)
 
-        # revealed: (positional_only=..., /) -> Unknown | Divergent
+        # revealed: (positional_only=..., /) -> Unknown
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=...) -> Unknown | Divergent
+        # revealed: (*, kw_only=...) -> Unknown
         reveal_type(self.d)
 ```
 

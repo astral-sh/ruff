@@ -404,7 +404,6 @@ impl<'db> UnionType<'db> {
         let ty = builder.build();
         if let Some(marker_id) = top_level_marker_id
             && !ty.same_divergent_marker(normalization.marker())
-            && ty.supports_cycle_marked_recovery(db)
         {
             Some(Type::cycle_marked(db, marker_id, ty))
         } else {

@@ -7864,7 +7864,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(self.db())
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !annotated_type.is_unknown()
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter
@@ -7881,7 +7883,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .replace_parameter_defaults(self.db())
                         }));
 
-                    if let Some(annotated_type) = parameter_types.next() {
+                    if let Some(annotated_type) = parameter_types.next()
+                        && !annotated_type.is_unknown()
+                    {
                         parameter.with_annotated_type(annotated_type)
                     } else {
                         parameter
