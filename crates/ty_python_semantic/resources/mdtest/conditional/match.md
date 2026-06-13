@@ -229,6 +229,14 @@ def _(target: int | str):
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
+
+def _(target: int):
+    match target:
+        case DynamicClass(real=0):
+            pass
+        case _:
+            reveal_type(target)  # revealed: int
+            target.missing  # error: [unresolved-attribute]
 ```
 
 ### Subclass-of type
