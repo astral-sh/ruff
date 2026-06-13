@@ -1,7 +1,10 @@
 use itertools::Either;
 use ruff_db::files::File;
+use ruff_db::parsed::parsed_module;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::visitor::{Visitor, walk_expr};
+use ruff_python_ast::{self as ast};
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
@@ -18,16 +21,18 @@ use crate::types::{
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 use ty_python_core::definition::{Definition, DefinitionKind, DefinitionState};
 use ty_python_core::narrowing_constraints::ScopedNarrowingConstraint;
-use ty_python_core::place::ScopedPlaceId;
-use ty_python_core::predicate::{Predicate, ScopedPredicateId};
+use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
+use ty_python_core::predicate::{
+    CallableAndCallExpr, PatternPredicateKind, Predicate, PredicateNode, ScopedPredicateId,
+};
 use ty_python_core::reachability_constraints::{
     ReachabilityConstraints, ScopedReachabilityConstraintId,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{
     BindingWithConstraints, BindingWithConstraintsIterator, BoundnessAnalysis,
-    DeclarationWithConstraint, DeclarationsIterator, Truthiness, get_loop_header, global_scope,
-    place_table, use_def_map,
+    DeclarationWithConstraint, DeclarationsIterator, Truthiness, UseDefMap, expression::Expression,
+    get_loop_header, global_scope, place_table, use_def_map,
 };
 
 pub(crate) use implicit_globals::{
@@ -1337,6 +1342,202 @@ fn symbol_impl<'db>(
         .unwrap_or_default()
 }
 
+struct TypeDependentPlaceReadVisitor<'a> {
+    places: &'a PlaceTable,
+    target: ScopedPlaceId,
+    type_dependent_depth: usize,
+    found: bool,
+}
+
+impl<'a> TypeDependentPlaceReadVisitor<'a> {
+    fn new(places: &'a PlaceTable, target: ScopedPlaceId) -> Self {
+        Self {
+            places,
+            target,
+            type_dependent_depth: 0,
+            found: false,
+        }
+    }
+
+    fn expr_is_target_place(&self, expr: &ast::Expr) -> bool {
+        let place_expr = match expr {
+            ast::Expr::Name(name) if name.ctx == ast::ExprContext::Load => {
+                PlaceExpr::try_from_expr(expr)
+            }
+            ast::Expr::Attribute(attribute) if attribute.ctx == ast::ExprContext::Load => {
+                PlaceExpr::try_from_expr(expr)
+            }
+            ast::Expr::Subscript(subscript) if subscript.ctx == ast::ExprContext::Load => {
+                PlaceExpr::try_from_expr(expr)
+            }
+            _ => None,
+        };
+
+        place_expr
+            .as_ref()
+            .and_then(|place_expr| self.places.place_id(place_expr))
+            == Some(self.target)
+    }
+
+    fn expr_is_builtin_type_predicate_call(expr: &ast::Expr) -> bool {
+        let ast::Expr::Call(call) = expr else {
+            return false;
+        };
+
+        call.func
+            .as_name_expr()
+            .is_some_and(|name| matches!(name.id.as_str(), "isinstance" | "issubclass"))
+    }
+}
+
+impl<'a> Visitor<'a> for TypeDependentPlaceReadVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a ast::Expr) {
+        if self.found {
+            return;
+        }
+        if self.type_dependent_depth > 0 && self.expr_is_target_place(expr) {
+            self.found = true;
+            return;
+        }
+
+        let type_dependent_context = match expr {
+            ast::Expr::Call(_) if Self::expr_is_builtin_type_predicate_call(expr) => false,
+            ast::Expr::Attribute(_)
+            | ast::Expr::BinOp(_)
+            | ast::Expr::Call(_)
+            | ast::Expr::Subscript(_) => true,
+            _ => false,
+        };
+        if type_dependent_context {
+            self.type_dependent_depth += 1;
+        }
+        walk_expr(self, expr);
+        if type_dependent_context {
+            self.type_dependent_depth -= 1;
+        }
+    }
+}
+
+fn expression_has_type_dependent_place_read<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    expression: Expression<'db>,
+    place: ScopedPlaceId,
+) -> bool {
+    if expression.scope(db) != scope {
+        return false;
+    }
+
+    let module = parsed_module(db, expression.file(db)).load(db);
+    let mut visitor = TypeDependentPlaceReadVisitor::new(place_table(db, scope), place);
+    visitor.visit_expr(expression.node_ref(db).node(&module));
+    visitor.found
+}
+
+fn pattern_kind_has_type_dependent_place_read<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    kind: &PatternPredicateKind<'db>,
+    place: ScopedPlaceId,
+) -> bool {
+    match kind {
+        PatternPredicateKind::Value(expression) => {
+            expression_has_type_dependent_place_read(db, scope, *expression, place)
+        }
+        PatternPredicateKind::Or(patterns) => patterns
+            .iter()
+            .any(|pattern| pattern_kind_has_type_dependent_place_read(db, scope, pattern, place)),
+        PatternPredicateKind::As(Some(pattern), _) => {
+            pattern_kind_has_type_dependent_place_read(db, scope, pattern, place)
+        }
+        PatternPredicateKind::Class(expression, _) => {
+            expression_has_type_dependent_place_read(db, scope, *expression, place)
+        }
+        PatternPredicateKind::Sequence(sequence) => sequence
+            .patterns
+            .iter()
+            .any(|pattern| pattern_kind_has_type_dependent_place_read(db, scope, pattern, place)),
+        PatternPredicateKind::Singleton(_)
+        | PatternPredicateKind::Mapping(_)
+        | PatternPredicateKind::As(None, _)
+        | PatternPredicateKind::MatchStar => false,
+    }
+}
+
+fn predicate_has_type_dependent_place_read<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    predicate: Predicate<'db>,
+    place: ScopedPlaceId,
+) -> bool {
+    match predicate.node {
+        PredicateNode::Expression(expression) => {
+            expression_has_type_dependent_place_read(db, scope, expression, place)
+        }
+        PredicateNode::IsNonTerminalCall(CallableAndCallExpr {
+            callable,
+            call_expr,
+            is_await: _,
+        }) => {
+            expression_has_type_dependent_place_read(db, scope, callable, place)
+                || expression_has_type_dependent_place_read(db, scope, call_expr, place)
+        }
+        PredicateNode::Pattern(pattern) => {
+            expression_has_type_dependent_place_read(db, scope, pattern.subject(db), place)
+                || pattern_kind_has_type_dependent_place_read(db, scope, pattern.kind(db), place)
+        }
+        PredicateNode::SubjectElementPattern(subject_element) => {
+            let pattern = subject_element.pattern;
+            expression_has_type_dependent_place_read(db, scope, pattern.subject(db), place)
+                || pattern_kind_has_type_dependent_place_read(db, scope, pattern.kind(db), place)
+        }
+        PredicateNode::StarImportPlaceholder(_) => false,
+    }
+}
+
+/// Return `true` if evaluating this constraint can re-enter a type-dependent expression that
+/// reads the loop-carried place. Direct predicates like `while i == 0` stay exact.
+fn reachability_constraint_has_type_dependent_place_read<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    use_def: &UseDefMap<'db>,
+    mut id: ScopedReachabilityConstraintId,
+    place: ScopedPlaceId,
+) -> bool {
+    let constraints = use_def.reachability_constraints();
+    let predicates = use_def.predicates();
+    let mut pending = Vec::new();
+    let mut seen = FxIndexSet::default();
+
+    loop {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE
+            | ScopedReachabilityConstraintId::AMBIGUOUS
+            | ScopedReachabilityConstraintId::ALWAYS_FALSE => {}
+            _ if seen.insert(id) => {
+                let node = constraints.get_interior_node(id);
+                if predicate_has_type_dependent_place_read(
+                    db,
+                    scope,
+                    predicates[node.atom()],
+                    place,
+                ) {
+                    return true;
+                }
+                pending.push(node.if_true());
+                pending.push(node.if_ambiguous());
+                pending.push(node.if_false());
+            }
+            _ => {}
+        }
+
+        let Some(next) = pending.pop() else {
+            return false;
+        };
+        id = next;
+    }
+}
+
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
@@ -1387,12 +1588,20 @@ fn loop_header_reachability_impl<'db>(
     for live_binding in live_bindings {
         let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
-        } else if use_exact_reachability {
-            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
         } else if live_binding.reachability_constraint()
             == ScopedReachabilityConstraintId::ALWAYS_FALSE
         {
             Truthiness::AlwaysFalse
+        } else if use_exact_reachability
+            && !reachability_constraint_has_type_dependent_place_read(
+                db,
+                scope,
+                use_def,
+                live_binding.reachability_constraint(),
+                place,
+            )
+        {
+            evaluate_reachability(db, use_def, live_binding.reachability_constraint())
         } else {
             Truthiness::Ambiguous
         };

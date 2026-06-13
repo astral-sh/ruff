@@ -68,3 +68,34 @@ class XarrayTreeNode:
                 current_node = child
         return current_node
 ```
+
+This is minimized from a SymPy ecosystem failure. Exact loop-header reachability should not
+re-enter inference of a type-dependent predicate that reads the same loop-carried value, such as
+`len(q2)` or `values[b]`.
+
+```py
+def sympy_recurrence_vector_like(values):
+    q1 = [0]
+    q2 = [1]
+    b, z = 0, len(values) >> 1
+    while len(q2) <= z:
+        while values[b] == 0:
+            b += 1
+            if b == len(values):
+                return q2
+        scale = 1 / values[b]
+        next_values = [scale]
+        for k in range(b + 1, len(values)):
+            next_values.append(
+                -sum(values[j + 1] * next_values[b - j - 1] for j in range(b, k)) * scale
+            )
+        values, next_values = next_values, [0] * max(len(q2), b + len(q1))
+        for k, q in enumerate(q2):
+            next_values[k] = scale * q
+        for k, q in enumerate(q1):
+            next_values[k + b] += q
+        while next_values[-1] == 0:
+            next_values.pop()
+        q1, q2, b = q2, next_values, 1
+    return [0]
+```
