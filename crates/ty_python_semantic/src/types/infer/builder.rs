@@ -2469,13 +2469,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     node_index: _,
                     keys,
                     patterns,
-                    rest: _,
+                    rest,
                 } = match_mapping;
                 for key in keys {
                     self.infer_expression(key, TypeContext::default());
                 }
                 for pattern in patterns {
                     self.infer_nested_match_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.infer_definition(rest);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -2498,13 +2501,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(pattern) = &match_as.pattern {
                     self.infer_nested_match_pattern(pattern);
                 }
+                if let Some(name) = &match_as.name {
+                    self.infer_definition(name);
+                }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
                     self.infer_nested_match_pattern(pattern);
                 }
             }
-            ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
+            ast::Pattern::MatchStar(match_star) => {
+                if let Some(name) = &match_star.name {
+                    self.infer_definition(name);
+                }
+            }
+            ast::Pattern::MatchSingleton(_) => {}
         }
     }
 
