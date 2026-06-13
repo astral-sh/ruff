@@ -1,6 +1,7 @@
 use std::iter::{Enumerate, Peekable};
 
 use compact_str::{CompactString, ToCompactString};
+use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
 use ruff_text_size::{TextRange, TextSize};
@@ -20,8 +21,8 @@ impl Docstring {
     }
 
     /// Returns the parameter documentation that we were able to recognize in a docstring.
-    pub(super) fn parameter_documentation(&self) -> Vec<super::ParameterDocumentation> {
-        let mut parameters = Vec::new();
+    pub(super) fn parameter_documentation(&self) -> IndexMap<String, String> {
+        let mut parameters = IndexMap::new();
 
         for field_list in &self.field_lists {
             for field in &field_list.fields {
@@ -38,10 +39,7 @@ impl Docstring {
                     continue;
                 }
 
-                parameters.push(super::ParameterDocumentation {
-                    name: lookup_name.clone(),
-                    description: description.clone(),
-                });
+                parameters.insert(lookup_name.clone(), description.clone());
             }
         }
 
@@ -968,15 +966,15 @@ Section::
         let parameters = Docstring::parse(docstring).parameter_documentation();
         let mut rendered = String::new();
 
-        for parameter in parameters {
+        for (name, description) in parameters {
             if !rendered.is_empty() {
                 rendered.push('\n');
             }
 
-            rendered.push_str(parameter.name.as_str());
+            rendered.push_str(name.as_str());
             rendered.push_str(": ");
 
-            let mut lines = parameter.description.lines();
+            let mut lines = description.lines();
             let Some(first_line) = lines.next() else {
                 continue;
             };
