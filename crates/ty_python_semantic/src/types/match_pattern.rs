@@ -1,14 +1,17 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
-use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKind};
+use ty_python_core::predicate::{
+    ClassPatternPredicateKind, PatternPredicateKind, SequencePatternPredicateKind,
+};
 
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
-use crate::types::tuple::TupleType;
+use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::{
-    CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
-    SpecialFormType, Type, TypeContext, UnionType, infer_same_file_expression_type,
+    CallableType, ClassLiteral, IntersectionBuilder, KnownClass, MemberLookupPolicy, Parameter,
+    Parameters, Signature, SpecialFormType, Type, TypeContext, UnionType,
+    infer_same_file_expression_type,
 };
 
 pub(crate) fn singleton_pattern_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
@@ -37,6 +40,199 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Str.to_instance(db))
         .add_negative(KnownClass::Bytes.to_instance(db))
         .add_negative(KnownClass::Bytearray.to_instance(db))
+}
+
+/// A resolved target for one subpattern inside a class pattern.
+///
+/// The target captures what the subpattern is matched against after applying class-pattern
+/// semantics: either the subject itself for match-self builtins like `int(x)`, or an attribute
+/// selected by `__match_args__` / an explicit keyword. It stores a subpattern id rather than
+/// borrowing the pattern so narrowing and inference can both map the target back to their own
+/// class-pattern representation.
+#[derive(Debug)]
+pub(crate) enum ClassPatternSubpatternTarget {
+    /// A subpattern matched directly against the match subject itself, as in `case int(x)`.
+    Subject {
+        subpattern: ClassPatternSubpatternId,
+    },
+    /// A subpattern matched against an attribute of the match subject.
+    ///
+    /// The attribute name comes either from `__match_args__` for positional subpatterns, or from
+    /// the explicit keyword name in the pattern.
+    Attribute {
+        name: Name,
+        subpattern: ClassPatternSubpatternId,
+    },
+}
+
+/// Identifies the source slot of a class-pattern subpattern.
+///
+/// Positional ids index the class pattern's positional subpatterns, and keyword ids index its
+/// keyword subpatterns. Callers use the id to retrieve the concrete pattern node or predicate that
+/// corresponds to a [`ClassPatternSubpatternTarget`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum ClassPatternSubpatternId {
+    /// A subpattern from the positional pattern list.
+    Positional(usize),
+    /// A subpattern from the keyword pattern list.
+    Keyword(usize),
+}
+
+/// Return the semantic target for each subpattern in a class pattern.
+///
+/// ```text
+/// case Point(0, y=1)
+///            ^  ^
+///            |  +-- targets subject.y
+///            +----- targets the attribute named by Point.__match_args__[0]
+///
+/// case int(x)
+///          ^
+///          +-- targets the match subject itself
+/// ```
+pub(crate) fn class_pattern_targets<'db>(
+    db: &'db dyn Db,
+    class_pattern: &ClassPatternPredicateKind<'db>,
+    class_type: Type<'db>,
+) -> Vec<ClassPatternSubpatternTarget> {
+    class_pattern_targets_from_parts(
+        db,
+        class_type,
+        class_pattern.positional_patterns.len(),
+        class_pattern
+            .keyword_patterns
+            .iter()
+            .enumerate()
+            .map(|(index, keyword)| (index, keyword.name.clone())),
+    )
+}
+
+pub(crate) fn class_pattern_targets_from_parts<'db>(
+    db: &'db dyn Db,
+    class_type: Type<'db>,
+    positional_count: usize,
+    keyword_patterns: impl IntoIterator<Item = (usize, Name)>,
+) -> Vec<ClassPatternSubpatternTarget> {
+    let mut positional_targets = class_pattern_positional_targets(db, class_type, positional_count);
+
+    let keyword_targets = class_pattern_keyword_targets(keyword_patterns);
+
+    positional_targets.extend(keyword_targets);
+    positional_targets
+}
+
+/// Return the targets for a set of keyword sub-patterns.
+///
+/// Targets are resolved just via attribute name.
+fn class_pattern_keyword_targets(
+    keyword_patterns: impl IntoIterator<Item = (usize, Name)>,
+) -> Vec<ClassPatternSubpatternTarget> {
+    keyword_patterns
+        .into_iter()
+        .map(|(index, name)| ClassPatternSubpatternTarget::Attribute {
+            name,
+            subpattern: ClassPatternSubpatternId::Keyword(index),
+        })
+        .collect()
+}
+
+/// Return the target(s) for a set of positional sub-patterns
+///
+/// The targets are determined in 2 different ways:
+/// 1. If there is a `__match_args__` class member defined with a tuple of strings referencing
+///    attribute names, those are returned.
+/// 2. If the class is a builtin (ie `int`, `str`, etc), the target is `self`.
+///    From the PEP: "a single positional sub-pattern is allowed to be passed to the call.
+///    Rather than being matched against any particular attribute on the subject,
+///    it is instead matched against the subject itself".
+fn class_pattern_positional_targets<'db>(
+    db: &'db dyn Db,
+    class_type: Type<'db>,
+    positional_count: usize,
+) -> Vec<ClassPatternSubpatternTarget> {
+    if positional_count == 0 {
+        return Vec::new();
+    }
+
+    let Type::ClassLiteral(class) = class_type else {
+        return Vec::new();
+    };
+
+    if let Some(match_args_ty) = class
+        .class_member(db, "__match_args__", MemberLookupPolicy::default())
+        .ignore_possibly_undefined()
+    {
+        let Some(names) = match_args_attribute_names(db, match_args_ty, positional_count) else {
+            return Vec::new();
+        };
+
+        return names
+            .into_iter()
+            .enumerate()
+            .map(|(index, name)| ClassPatternSubpatternTarget::Attribute {
+                name,
+                subpattern: ClassPatternSubpatternId::Positional(index),
+            })
+            .collect();
+    }
+
+    if is_match_self_class(db, class) && positional_count == 1 {
+        return vec![ClassPatternSubpatternTarget::Subject {
+            subpattern: ClassPatternSubpatternId::Positional(0),
+        }];
+    }
+
+    Vec::new()
+}
+
+fn match_args_attribute_names<'db>(
+    db: &'db dyn Db,
+    match_args_ty: Type<'db>,
+    positional_count: usize,
+) -> Option<Vec<Name>> {
+    let tuple_spec = match_args_ty.exact_tuple_instance_spec(db)?;
+    let TupleSpec::Fixed(match_args) = tuple_spec.as_ref() else {
+        return None;
+    };
+    if match_args.len() < positional_count {
+        return None;
+    }
+
+    match_args
+        .elements_slice()
+        .iter()
+        .take(positional_count)
+        .map(|element| {
+            element
+                .as_string_literal()
+                .map(|literal| Name::new(literal.value(db)))
+        })
+        .collect()
+}
+
+fn is_match_self_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    let class_instance = Type::instance(db, class.default_specialization(db));
+
+    [
+        KnownClass::Bool,
+        KnownClass::Bytearray,
+        KnownClass::Bytes,
+        KnownClass::Dict,
+        KnownClass::Float,
+        KnownClass::FrozenSet,
+        KnownClass::Int,
+        KnownClass::List,
+        KnownClass::Set,
+        KnownClass::Str,
+        KnownClass::Tuple,
+    ]
+    .into_iter()
+    .any(|known_class| {
+        known_class
+            .to_class_literal(db)
+            .to_class_type(db)
+            .is_some_and(|target| class_instance.is_subtype_of(db, Type::instance(db, target)))
+    })
 }
 
 fn sequence_pattern_getitem_method<'db>(
@@ -182,9 +378,13 @@ pub(crate) fn definite_match_pattern_type<'db>(
                 Type::Never
             }
         }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
+        PatternPredicateKind::Class(class_pattern) => {
+            if class_pattern.kind.is_irrefutable() {
+                match infer_same_file_expression_type(
+                    db,
+                    class_pattern.class,
+                    TypeContext::default(),
+                ) {
                     Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                         callable_pattern_type(db)
