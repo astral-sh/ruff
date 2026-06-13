@@ -28,6 +28,34 @@ reveal_type(generic_context(identity2))
 reveal_type(identity2(identity))
 ```
 
+Callable-owned type variables are abstracted away during inference rather than escaping into the
+caller's specialization. This also applies to generic callables returned by decorators, whose
+signatures no longer have source definitions:
+
+```py
+from typing import Callable, TypeVar, cast
+
+T_result = TypeVar("T_result")
+U_return = TypeVar("U_return")
+
+def get_result(fn: Callable[[], T_result]) -> T_result:
+    return fn()
+
+def generic() -> U_return:
+    return cast(U_return, 0)
+
+reveal_type(get_result(generic))  # revealed: Unknown
+
+def returns_generic(fn: Callable[..., object]) -> Callable[[], U_return]:
+    raise NotImplementedError
+
+@returns_generic
+def decorated() -> int:
+    raise NotImplementedError
+
+reveal_type(get_result(decorated))  # revealed: Unknown
+```
+
 Generic classes are another example, since you invoke the class to instantiate it:
 
 ```py
@@ -67,6 +95,48 @@ reveal_type(into_regular_callable(C))
 reveal_type(generic_context(into_regular_callable(C)))
 # revealed: C[int]
 reveal_type(into_regular_callable(C)(1))
+```
+
+## `ParamSpec` captures callable-owned type variables
+
+Callable-owned type variables are still abstracted away when a `ParamSpec` captures the callable's
+parameters:
+
+```py
+from typing import Callable, ParamSpec, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+V = TypeVar("V")
+
+def get_result(fn: Callable[P, T]) -> T:
+    raise NotImplementedError
+
+def generic(x: U) -> U:
+    return x
+
+reveal_type(get_result(generic))  # revealed: Unknown
+
+def identity(fn: Callable[P, T]) -> Callable[P, T]:
+    return fn
+
+generic_callable = identity(generic)
+reveal_type(generic_callable)  # revealed: [U](x: U) -> U
+reveal_type(get_result(generic_callable))  # revealed: Unknown
+
+def generic_zero() -> U:
+    raise NotImplementedError
+
+def generic_with_mixed_result(value: U) -> tuple[U, V]:
+    raise NotImplementedError
+
+def invoke(fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs) -> T:
+    return fn(*args, **kwargs)
+
+reveal_type(invoke(generic_zero))  # revealed: Unknown
+reveal_type(invoke(generic, 1))  # revealed: Literal[1]
+reveal_type(invoke(generic_with_mixed_result, 1))  # revealed: tuple[Literal[1], Unknown]
 ```
 
 ## Naming a generic `Callable`: type aliases
