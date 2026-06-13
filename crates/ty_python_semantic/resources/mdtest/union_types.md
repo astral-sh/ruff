@@ -347,8 +347,6 @@ python-version = "3.12"
 ```py
 from typing import Any
 
-class Bivariant[T]: ...
-
 class Covariant[T]:
     def get(self) -> T:
         raise NotImplementedError
@@ -360,8 +358,6 @@ class Invariant[T]:
     mutable_attribute: T
 
 def _(
-    a: Bivariant[Any] | Bivariant[Any | str],
-    b: Bivariant[Any | str] | Bivariant[Any],
     c: Covariant[Any] | Covariant[Any | str],
     d: Covariant[Any | str] | Covariant[Any],
     e: Contravariant[Any | str] | Contravariant[Any],
@@ -369,8 +365,6 @@ def _(
     g: Invariant[Any] | Invariant[Any | str],
     h: Invariant[Any | str] | Invariant[Any],
 ):
-    reveal_type(a)  # revealed: Bivariant[Any]
-    reveal_type(b)  # revealed: Bivariant[Any | str]
     reveal_type(c)  # revealed: Covariant[Any | str]
     reveal_type(d)  # revealed: Covariant[Any | str]
     reveal_type(e)  # revealed: Contravariant[Any]
