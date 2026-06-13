@@ -1472,6 +1472,18 @@ def literal_attribute_subpattern_is_exhaustive(value: LiteralAttribute) -> int:
         case LiteralAttribute(x=1):
             return 1
 
+# Ty's static member model treats an attribute declaration as definitely bound, even when the
+# class body does not initialize it. Class-pattern exhaustiveness follows that model.
+class DeclaredLiteralAttribute:
+    x: Literal[1]
+
+def declared_literal_attribute_subpattern_is_exhaustive(
+    value: DeclaredLiteralAttribute,
+) -> int:
+    match value:
+        case DeclaredLiteralAttribute(x=1):
+            return 1
+
 class OtherClass: ...
 
 def keyword_class_pattern_preserves_direct_fallback(
