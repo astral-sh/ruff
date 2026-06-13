@@ -260,25 +260,46 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
         reveal_type(x)  # revealed: Never
 ```
 
-## Custom containment methods
+## Custom containment methods on non-tuple types
 
 Python uses `__contains__` when a class defines it. The method can return `True` for values that the
-class would never produce during iteration, but ty currently narrows membership tests from the
-iterable element type. The result below is therefore too narrow and documents a known limitation:
+class would never produce during iteration. We therefore retain every member of the subject's union
+unless we know that membership searches the values described by the iterable element type.
 
 ```py
-from typing import Literal, TypedDict
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
 
 class Payload(TypedDict):
     value: int
 
-class ContainsEverything(tuple[Literal["missing"], ...]):
+class ContainsEverything:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
     def __contains__(self, value: object) -> bool:
         return True
 
 def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
     if x in values:
-        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+
+class IteratesMissing:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def open_iterable(x: Payload | Literal["missing"], values: IteratesMissing):
+    if x in values:
+        # A runtime subclass could introduce a custom `__contains__` implementation.
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+
+@final
+class FinalIterable:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
+    if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
 ```
 
