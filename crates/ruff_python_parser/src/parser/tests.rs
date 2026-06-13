@@ -1,4 +1,4 @@
-use ruff_python_ast::{Expr, IpyEscapeKind, Number, Stmt};
+use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -105,6 +105,34 @@ fn number_values() {
         };
 
         assert_eq!(number.value, expected, "source: {source:?}");
+    }
+}
+
+#[test]
+fn interpolated_string_escaped_brace_values() {
+    let cases = [
+        (r"f'\{{1}}'", r"\{1}"),
+        (r"f'\}}'", r"\}"),
+        (r"f'\\{{1}}'", r"\{1}"),
+        (r"f'\\\{{1}}'", r"\\{1}"),
+        (r"t'\{{1}}'", r"\{1}"),
+        (r"t'\}}'", r"\}"),
+        (r"t'\\{{1}}'", r"\{1}"),
+        (r"t'\\\{{1}}'", r"\\{1}"),
+    ];
+
+    for (source, expected) in cases {
+        let parsed = parse_expression(source).unwrap();
+        let elements = match parsed.expr() {
+            Expr::FString(string) => &string.as_single_part_fstring().unwrap().elements,
+            Expr::TString(string) => &string.as_single_part_tstring().unwrap().elements,
+            expression => panic!("expected interpolated string for {source:?}, got {expression:?}"),
+        };
+        let [InterpolatedStringElement::Literal(literal)] = &**elements else {
+            panic!("expected one literal element for {source:?}");
+        };
+
+        assert_eq!(&*literal.value, expected, "source: {source:?}");
     }
 }
 

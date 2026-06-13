@@ -330,12 +330,19 @@ impl<'src> StringParser<'src> {
                 // be supported in the future, refer to point 3: https://peps.python.org/pep-0701/#rejected-ideas
                 b'\\' => {
                     if !self.flags.is_raw_string() && self.peek_byte().is_some() {
-                        match self.parse_escaped_char()? {
-                            None => {}
-                            Some(EscapedChar::Literal(c)) => value.push(c),
-                            Some(EscapedChar::Escape(c)) => {
-                                value.push('\\');
-                                value.push(c);
+                        if let Some(brace @ (b'{' | b'}')) = self.peek_byte()
+                            && self.source.as_bytes().get(self.cursor + 1).copied() == Some(brace)
+                        {
+                            // Leave the doubled brace for the next iteration to collapse.
+                            value.push('\\');
+                        } else {
+                            match self.parse_escaped_char()? {
+                                None => {}
+                                Some(EscapedChar::Literal(c)) => value.push(c),
+                                Some(EscapedChar::Escape(c)) => {
+                                    value.push('\\');
+                                    value.push(c);
+                                }
                             }
                         }
                     } else {
@@ -512,7 +519,6 @@ pub(crate) fn parse_string_literal(
     StringParser::new(source, flags, range.start() + flags.opener_len(), range).parse()
 }
 
-// TODO(dhruvmanila): Move this to the new parser
 pub(crate) fn parse_interpolated_string_literal_element(
     source: &str,
     flags: AnyStringFlags,
