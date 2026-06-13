@@ -211,9 +211,6 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // for more discussion.
                 let unpack_types = match value_ty {
                     Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
-                    Type::Recursive(rec) if rec.is_non_contractive(self.db()) => {
-                        vec![Type::Never]
-                    }
                     Type::Recursive(rec) => rec.map(self.db(), |unfolded| match unfolded {
                         Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
                         ty => vec![ty],
