@@ -4780,6 +4780,7 @@ quux.<CURSOR>
         __le__ :: bound method Quux.__le__(value: tuple[int | str, ...], /) -> bool
         __len__ :: () -> Literal[2]
         __lt__ :: bound method Quux.__lt__(value: tuple[int | str, ...], /) -> bool
+        __match_args__ :: tuple[str, ...]
         __module__ :: str
         __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
