@@ -497,9 +497,9 @@ mod tests {
         ---
         This is such a great func!!<HB>
         <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        ## Parameters<HB>
+        `a`: first for a reason<HB>
+        `b`: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:11:1
@@ -550,9 +550,9 @@ mod tests {
         ---
         This is such a great func!!<HB>
         <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        ## Parameters<HB>
+        `a`: first for a reason<HB>
+        `b`: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:5
@@ -1579,9 +1579,9 @@ mod tests {
         ---
         This is such a great func!!<HB>
         <HB>
-        Args:<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;a: first for a reason<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;b: coming for `a`'s title
+        ## Parameters<HB>
+        `a`: first for a reason<HB>
+        `b`: coming for `a`'s title
         ---------------------------------------------
         info[hover]: Hovered content is
           --> main.py:25:3
