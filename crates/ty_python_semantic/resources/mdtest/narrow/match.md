@@ -905,6 +905,30 @@ def match_tuple_expression_guard_rebinding(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
+## Named-expression subjects
+
+A named expression creates a new binding for the subject. The successful pattern narrows that
+binding just like it narrows a subject that was already bound.
+
+```py
+class NamedSubject: ...
+
+class NamedSubjectChild(NamedSubject):
+    child: int
+
+def match_named_expression_subject(value: NamedSubject) -> None:
+    match subject := value:
+        case NamedSubjectChild():
+            reveal_type(subject)  # revealed: NamedSubjectChild
+            reveal_type(subject.child)  # revealed: int
+
+def match_named_expression_subject_capture(value: tuple[int]) -> None:
+    match subject := value:
+        case [subject]:
+            # The capture shadows the named-expression binding and receives the element type.
+            reveal_type(subject)  # revealed: int
+```
+
 ## Cycles in pattern binding types
 
 Pattern captures can affect the type of a later match subject, including through a loop or a

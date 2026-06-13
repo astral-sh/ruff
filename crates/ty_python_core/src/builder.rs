@@ -60,8 +60,8 @@ use crate::statement::StatementInner;
 use crate::symbol::{ScopedSymbolId, Symbol};
 use crate::unpack::{Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, PreviousDefinitions, ScopedDefinitionId,
-    ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, LiveBinding, PreviousDefinitions,
+    ScopedDefinitionId, ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
 use crate::{Db, Statement, StatementNodeKey};
 use crate::{
@@ -2038,7 +2038,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_pattern_narrowing_constraint(
         &mut self,
         pattern_predicate: PatternPredicate<'db>,
-        subject_targets: &[(ScopedPlaceId, ScopedUseId)],
+        subject_targets: &[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>)],
         sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
         is_catchall: bool,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
@@ -2057,9 +2057,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ScopedPredicateId::ALWAYS_TRUE
         } else {
             let predicate_id = self.add_predicate(predicate);
-            for &(place, use_id) in subject_targets {
+            for (place, bindings) in subject_targets {
                 self.current_use_def_map_mut()
-                    .record_narrowing_constraint_for_bindings_at_use(predicate_id, place, use_id);
+                    .record_narrowing_constraint_for_bindings(predicate_id, *place, bindings);
             }
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
@@ -3412,14 +3412,31 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // that case predicates constrain those values rather than later rebindings.
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
-                let mut subject_targets = SmallVec::<[(ScopedPlaceId, ScopedUseId); 2]>::new();
+                let mut subject_targets =
+                    SmallVec::<[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>); 2]>::new();
                 for expression in match_subject_place_expressions(subject) {
-                    if let Some((place, use_id)) = PlaceExpr::try_from_expr(expression)
+                    let Some(place) = PlaceExpr::try_from_expr(expression)
                         .and_then(|place| places.place_id((&place).into()))
-                        .zip(ast_ids.try_use_id(expression))
-                    {
-                        subject_targets.push((place, use_id));
-                    }
+                    else {
+                        continue;
+                    };
+                    let bindings = ast_ids.try_use_id(expression).map_or_else(
+                        || {
+                            // A named-expression subject creates its target binding instead of
+                            // reading one, so snapshot the binding that was just created.
+                            self.current_use_def_map()
+                                .loop_back_bindings(place)
+                                .map(|binding| LiveBinding::binding(&binding))
+                                .collect()
+                        },
+                        |use_id| {
+                            self.current_use_def_map()
+                                .bindings_at_use(use_id)
+                                .map(LiveBinding::binding)
+                                .collect()
+                        },
+                    );
+                    subject_targets.push((place, bindings));
                 }
                 let mut sequence_subject_targets =
                     SmallVec::<[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey); 2]>::new();
