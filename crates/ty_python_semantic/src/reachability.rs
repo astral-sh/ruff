@@ -1027,21 +1027,24 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 });
             truthiness
         }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty =
-                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Some(Type::instance(db, class.top_materialization(db)))
-                    }
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Some(callable_pattern_type(db))
-                    }
-                    _ => None,
-                };
+        PatternPredicateKind::Class(class_pattern) => {
+            let class_ty = match infer_same_file_expression_type(
+                db,
+                class_pattern.class,
+                TypeContext::default(),
+            ) {
+                Type::ClassLiteral(class) => {
+                    Some(Type::instance(db, class.top_materialization(db)))
+                }
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                    Some(callable_pattern_type(db))
+                }
+                _ => None,
+            };
 
             class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                 if subject_ty.is_subtype_of(db, class_ty) {
-                    if kind.is_irrefutable() {
+                    if class_pattern.kind.is_irrefutable() {
                         Truthiness::AlwaysTrue
                     } else {
                         // A class pattern like `case Point(x=0, y=0)` is not irrefutable,

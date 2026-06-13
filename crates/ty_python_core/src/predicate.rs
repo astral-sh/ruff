@@ -157,6 +157,21 @@ impl ClassPatternKind {
     }
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternKeywordPredicate<'db> {
+    pub name: Name,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
+/// Structural details for class patterns that affect narrowing and reachability.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternPredicateKind<'db> {
+    pub class: Expression<'db>,
+    pub kind: ClassPatternKind,
+    pub positional_patterns: Box<[PatternPredicateKind<'db>]>,
+    pub keyword_patterns: Box<[ClassPatternKeywordPredicate<'db>]>,
+}
+
 /// Structural details for sequence patterns that affect narrowing and reachability.
 ///
 /// `patterns` stores one predicate per syntactic element, with a starred element
@@ -202,7 +217,7 @@ pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
-    Class(Expression<'db>, ClassPatternKind),
+    Class(ClassPatternPredicateKind<'db>),
     Mapping(ClassPatternKind),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),

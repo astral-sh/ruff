@@ -40,9 +40,10 @@ use crate::frozen::{FrozenMap, FrozenSet};
 use crate::member::MemberExprBuilder;
 use crate::place::{PlaceExpr, PlaceTableBuilder, PossiblyNarrowedPlacesBuilder, ScopedPlaceId};
 use crate::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, SequencePatternPredicateKind,
-    StarImportPlaceholderPredicate, SubjectElementPatternPredicate,
+    CallableAndCallExpr, ClassPatternKeywordPredicate, ClassPatternKind, ClassPatternPredicateKind,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, PredicateOrLiteral,
+    ScopedPredicateId, SequencePatternPredicateKind, StarImportPlaceholderPredicate,
+    SubjectElementPatternPredicate,
 };
 use crate::program::Program;
 use crate::re_exports::exported_names;
@@ -1934,31 +1935,50 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 PatternPredicateKind::Singleton(singleton.value)
             }
             ast::Pattern::MatchClass(pattern) => {
-                let cls = self.add_standalone_expression(&pattern.cls);
+                let class = self.add_standalone_expression(&pattern.cls);
 
                 // TODO: A class pattern with only irrefutable subpatterns can still fail if
                 // extracting an attribute named by `__match_args__` or a keyword fails. We retain
                 // this existing approximation because treating all class patterns with arguments
                 // as refutable caused a large ecosystem change. Follow-up work should determine
                 // irrefutability by analyzing the class's attributes and `__match_args__`.
-                PatternPredicateKind::Class(
-                    cls,
-                    if pattern
+                let kind = if pattern
+                    .arguments
+                    .patterns
+                    .iter()
+                    .all(ast::Pattern::is_irrefutable)
+                    && pattern
                         .arguments
-                        .patterns
+                        .keywords
                         .iter()
-                        .all(ast::Pattern::is_irrefutable)
-                        && pattern
-                            .arguments
-                            .keywords
-                            .iter()
-                            .all(|kw| kw.pattern.is_irrefutable())
-                    {
-                        ClassPatternKind::Irrefutable
-                    } else {
-                        ClassPatternKind::Refutable
-                    },
-                )
+                        .all(|kw| kw.pattern.is_irrefutable())
+                {
+                    ClassPatternKind::Irrefutable
+                } else {
+                    ClassPatternKind::Refutable
+                };
+                let positional_patterns = pattern
+                    .arguments
+                    .patterns
+                    .iter()
+                    .map(|pattern| self.predicate_kind(pattern))
+                    .collect();
+                let keyword_patterns = pattern
+                    .arguments
+                    .keywords
+                    .iter()
+                    .map(|keyword| ClassPatternKeywordPredicate {
+                        name: keyword.attr.id.clone(),
+                        pattern: self.predicate_kind(&keyword.pattern),
+                    })
+                    .collect();
+
+                PatternPredicateKind::Class(ClassPatternPredicateKind {
+                    class,
+                    kind,
+                    positional_patterns,
+                    keyword_patterns,
+                })
             }
             ast::Pattern::MatchMapping(pattern) => {
                 // `case {}` and `case {**rest}` match every mapping, while keyed mapping
