@@ -360,6 +360,40 @@ pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathI
     db.search_paths().iter(db, resolve_mode)
 }
 
+/// Returns the search paths that may contain a top-level stub package, preserving their
+/// resolution order.
+#[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
+fn stub_package_search_paths(db: &dyn Db) -> Box<[SearchPath]> {
+    search_paths(db, ModuleResolveMode::StubsAllowed)
+        .filter(|search_path| search_path_may_contain_stub_package(db, search_path))
+        .cloned()
+        .collect()
+}
+
+fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -> bool {
+    if search_path.is_standard_library() {
+        return false;
+    }
+
+    let Some(path) = search_path.as_system_path() else {
+        return false;
+    };
+
+    // Register a dependency on structural changes within this search path.
+    db.files().expect_root(db, path).revision(db);
+
+    db.system().read_directory(path).is_ok_and(|entries| {
+        entries.filter_map(Result::ok).any(|entry| {
+            entry.path().file_name().is_some_and(|name| {
+                name.strip_suffix(".pyi")
+                    .or_else(|| name.strip_suffix(".py"))
+                    .unwrap_or(name)
+                    .ends_with("-stubs")
+            })
+        })
+    })
+}
+
 /// Get the search-paths for desperate resolution of absolute imports in this file.
 ///
 /// Currently this is "all ancestor directories that don't contain an `__init__.py(i)`"
@@ -1065,7 +1099,12 @@ struct ModuleNameIngredient<'db> {
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
     let search_paths = search_paths(db, mode);
-    resolve_name_impl(db, name, mode, search_paths)
+    let stub_search_paths: &[SearchPath] = if mode.stubs_allowed() {
+        stub_package_search_paths(db)
+    } else {
+        &[]
+    };
+    resolve_name_impl(db, name, mode, search_paths, stub_search_paths)
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1079,7 +1118,21 @@ fn desperately_resolve_name(
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file);
-    resolve_name_impl(db, name, mode, search_paths.iter().flatten())
+    let stub_search_paths = search_paths
+        .iter()
+        .flatten()
+        .filter(|search_path| {
+            mode.stubs_allowed() && search_path_may_contain_stub_package(db, search_path)
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    resolve_name_impl(
+        db,
+        name,
+        mode,
+        search_paths.iter().flatten(),
+        &stub_search_paths,
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1095,12 +1148,17 @@ struct ModuleResolutionCandidate {
     path: ModulePath,
     module: ResolvedModule,
     py_typed: PyTyped,
-    /// Whether this candidate originated from a stub package. Stub packages
-    /// have priority over runtime packages regardless of search path ordering.
-    is_stub_package: bool,
 }
 
 impl ModuleResolutionCandidate {
+    fn root(search_path: &SearchPath) -> Self {
+        Self {
+            path: search_path.to_module_path(),
+            module: ResolvedModule::NamespacePackage,
+            py_typed: PyTyped::Untyped,
+        }
+    }
+
     // Is this some kind of namespace package?
     fn is_any_namespace_package(&self) -> bool {
         match self.module {
@@ -1191,12 +1249,11 @@ fn resolve_name_impl<'a>(
     name: &ModuleName,
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
+    stub_search_paths: &[SearchPath],
 ) -> Option<ResolvedNames> {
     let python_version = db.python_version();
     let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
-    let mut stub_name = None;
-
     let mut cur_candidates = search_paths
         .filter_map(|search_path| {
             // When a builtin module is imported, standard module resolution is bypassed:
@@ -1208,12 +1265,7 @@ fn resolve_name_impl<'a>(
                 return None;
             }
 
-            Some(ModuleResolutionCandidate {
-                path: search_path.to_module_path(),
-                module: ResolvedModule::NamespacePackage,
-                py_typed: PyTyped::Untyped,
-                is_stub_package: false,
-            })
+            Some(ModuleResolutionCandidate::root(search_path))
         })
         .collect::<Vec<_>>();
     let mut next_candidates = vec![];
@@ -1224,44 +1276,33 @@ fn resolve_name_impl<'a>(
     // reduced down to a single candidate, so maybe meh?
     let mut is_root = true;
     for component in name.components() {
-        // Search for the next component in every search-path
-        for mut candidate in cur_candidates.drain(..) {
-            // On the first iteration, look for `mypackage-stubs` as well
-            // Optimization: stdlib never has these `-stubs`
-            let stubs_allowed = is_root
-                && context.mode.stubs_allowed()
-                && !candidate.path.search_path().is_standard_library();
-            if stubs_allowed {
-                let stub_name = stub_name.get_or_insert_with(|| format!("{component}-stubs"));
-                let mut stub_candidate = candidate.clone();
-                if resolve_name_in_search_path(&context, &mut stub_candidate, stub_name).is_ok() {
-                    // `mypackage-stubs.py(i)` is not a valid result
-                    if matches!(stub_candidate.module, ResolvedModule::Module(_)) {
-                        tracing::trace!(
-                            "Search path `{}` contains a module \
-                            named `{stub_name}` but a standalone module isn't a valid stub.",
-                            candidate.path.search_path()
-                        );
-                    } else {
-                        stub_candidate.is_stub_package = true;
-                        next_candidates.push(stub_candidate);
-                        // Don't break here: we always need to process the non-stub
-                        // candidate for the same search path, because sub-packages
-                        // within the stubs may override py_typed to partial and fall
-                        // through to the runtime package.
-                    }
+        // Stub packages have global priority over runtime packages. Search the ordered subset of
+        // paths that can contain one first so the runtime pass can stop at its first terminal
+        // candidate.
+        if is_root && !is_non_shadowable && !stub_search_paths.is_empty() {
+            let stub_name = format!("{component}-stubs");
+            for search_path in stub_search_paths {
+                let mut stub_candidate = ModuleResolutionCandidate::root(search_path);
+                if resolve_name_in_search_path(&context, &mut stub_candidate, &stub_name).is_err() {
+                    continue;
+                }
+
+                // `mypackage-stubs.py(i)` is not a valid result.
+                if matches!(stub_candidate.module, ResolvedModule::Module(_)) {
+                    tracing::trace!(
+                        "Search path `{search_path}` contains a module named `{stub_name}` but a \
+                         standalone module isn't a valid stub."
+                    );
+                } else {
+                    next_candidates.push(stub_candidate);
                 }
             }
+        }
 
-            // On the root iteration when stubs are allowed, we can't break
-            // early because a stub package in a later search path has
-            // priority over a runtime package regardless of search path
-            // ordering. stdlib candidates are exempt since stub packages
-            // don't apply to stdlib modules. Thus, the `break`s below are
-            // guarded by `!stubs_allowed`.
-
+        // Search for the next component in every search-path
+        for mut candidate in cur_candidates.drain(..) {
             if resolve_name_in_search_path(&context, &mut candidate, component).is_err() {
-                if candidate.missing_submodule_is_terminal() && !stubs_allowed {
+                if candidate.missing_submodule_is_terminal() {
                     // Everything after this package should be shadowed out by
                     // this failure But the previous results are still in play
                     // because they would have shadowed this one out anyway.
@@ -1271,7 +1312,7 @@ fn resolve_name_impl<'a>(
             }
             let shadows_all = candidate.missing_submodule_is_terminal();
             next_candidates.push(candidate);
-            if shadows_all && !stubs_allowed {
+            if shadows_all {
                 break;
             }
         }
@@ -1329,9 +1370,6 @@ fn resolve_name_impl<'a>(
             true
         });
 
-        // Stub packages have priority over runtime packages regardless of
-        // search path ordering.
-        next_candidates.sort_by_key(|c| !c.is_stub_package);
         if next_candidates.is_empty() {
             return None;
         }
@@ -1817,6 +1855,65 @@ mod tests {
             Some(foo_module),
             path_to_module(&db, &FilePath::from(expected_foo_path))
         );
+    }
+
+    #[test]
+    fn stub_package_paths_preserve_resolution_order() {
+        let TestCase {
+            db,
+            src,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(&[("foo-stubs.pyi", "")])
+            .with_site_packages_files(&[("bar-stubs/__init__.pyi", "")])
+            .build();
+
+        let paths = stub_package_search_paths(&db)
+            .iter()
+            .filter_map(SearchPath::as_system_path)
+            .collect::<Vec<_>>();
+
+        assert_eq!(paths, [src.as_path(), site_packages.as_path()]);
+    }
+
+    #[test]
+    fn adding_stub_package_to_stub_search_path_invalidates_resolution() -> anyhow::Result<()> {
+        let TestCase {
+            mut db,
+            src,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_src_files(&[("foo/__init__.py", "")])
+            .with_site_packages_files(&[("bar-stubs/__init__.pyi", "")])
+            .build();
+
+        let foo_name = ModuleName::new_static("foo").unwrap();
+        let foo = resolve_module_confident(&db, &foo_name).unwrap();
+        assert_eq!(
+            foo.file(&db).unwrap().path(&db),
+            &src.join("foo/__init__.py")
+        );
+
+        let stub_init = site_packages.join("foo-stubs/__init__.pyi");
+        db.write_file(&stub_init, "")?;
+        let foo = resolve_module_confident(&db, &foo_name).unwrap();
+        assert_eq!(foo.file(&db).unwrap().path(&db), &stub_init);
+
+        db.memory_file_system().remove_file(&stub_init)?;
+        db.memory_file_system()
+            .remove_directory(stub_init.parent().unwrap())?;
+        File::sync_path(&mut db, &stub_init);
+        File::sync_path(&mut db, stub_init.parent().unwrap());
+
+        let foo = resolve_module_confident(&db, &foo_name).unwrap();
+        assert_eq!(
+            foo.file(&db).unwrap().path(&db),
+            &src.join("foo/__init__.py")
+        );
+
+        Ok(())
     }
 
     #[test]
@@ -2356,9 +2453,9 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_unrelated_file_doesnt_change_module_resolution() {
+    fn deleting_file_from_different_directory_doesnt_change_module_resolution() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("foo.py", "x = 1"), ("bar.py", "x = 2")])
+            .with_src_files(&[("foo.py", "x = 1"), ("other/bar.py", "x = 2")])
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -2372,7 +2469,7 @@ mod tests {
             foo_module.kind(&db),
         );
 
-        let bar_path = src.join("bar.py");
+        let bar_path = src.join("other/bar.py");
         let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
@@ -2381,8 +2478,8 @@ mod tests {
         db.memory_file_system().remove_file(&bar_path).unwrap();
         bar.sync(&mut db);
 
-        // Re-query the foo module. The foo module should still be cached
-        // because `bar.py` isn't relevant for resolving `foo`.
+        // Re-query the foo module. The foo module should still be cached because the changed
+        // directory isn't relevant for resolving `foo`.
 
         let foo_module2 = resolve_module_confident(&db, &foo_module_name);
         let foo_pieces2 = foo_module2.map(|foo_module2| {
@@ -2395,10 +2492,12 @@ mod tests {
             )
         });
 
-        assert!(
-            !db.take_salsa_events()
-                .iter()
-                .any(|event| { matches!(event.kind, salsa::EventKind::WillExecute { .. }) })
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            resolve_module_query,
+            ModuleNameIngredient::new(&db, foo_module_name, ModuleResolveMode::StubsAllowed),
+            &events,
         );
 
         assert_eq!(Some(foo_pieces), foo_pieces2);
