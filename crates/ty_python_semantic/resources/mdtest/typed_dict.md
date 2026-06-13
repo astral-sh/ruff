@@ -4071,7 +4071,7 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("name", "Alice"))  # revealed: str
 
     # __contains__
-    reveal_type("name" in p)  # revealed: bool
+    reveal_type("name" in p)  # revealed: Literal[True]
 
     # __setitem__
     p["name"] = "Alice"
@@ -4091,6 +4091,8 @@ from typing import TypedDict
 Partial = TypedDict("Partial", {"name": str, "extra": int}, total=False)
 
 def _(p: Partial) -> None:
+    reveal_type("name" in p)  # revealed: bool
+    reveal_type("unknown" in p)  # revealed: bool
     reveal_type(p.get("name"))  # revealed: str | None
     reveal_type(p.get("name", "default"))  # revealed: str
     reveal_type(p.pop("name"))  # revealed: str
@@ -4864,7 +4866,8 @@ the key, because "extra items" are allowed by default. For example, even though 
 define a `"foo"` field, it could be _assigned to_ with another `TypedDict` that does:
 
 ```py
-from typing_extensions import Literal
+from collections.abc import Mapping
+from typing_extensions import Literal, NotRequired, TypeGuard, TypeIs
 
 class Foo(TypedDict):
     foo: int
@@ -4875,14 +4878,14 @@ class Bar(TypedDict):
 def disappointment(u: Foo | Bar, v: Literal["foo"]):
     if "foo" in u:
         # We don't narrow to just `Foo` here...
-        reveal_type(u)  # revealed: Foo | (Bar & <TypedDict with items 'foo'>)
+        reveal_type(u)  # revealed: Foo | (Bar & <Protocol with members '__contains__', '__getitem__'>)
         reveal_type(u["foo"])  # revealed: object
     else:
         # ...(even though we *can* narrow it here)...
         reveal_type(u)  # revealed: Bar
 
     if v in u:
-        reveal_type(u)  # revealed: Foo | (Bar & <TypedDict with items 'foo'>)
+        reveal_type(u)  # revealed: Foo | (Bar & <Protocol with members '__contains__', '__getitem__'>)
         reveal_type(u["foo"])  # revealed: object
     else:
         reveal_type(u)  # revealed: Bar
@@ -4897,13 +4900,119 @@ static_assert(is_assignable_to(FooBar, Bar))
 
 def dictionary_union(u: Foo | dict[Literal["a", "b"], int]):
     if "c" in u:
-        # TODO: This should stop erroring if we prove that the `dict` arm cannot contain `"c"`.
-        # error: [invalid-argument-type]
         reveal_type(u["c"])  # revealed: object
+
+def mapping_union(u: Foo | Mapping[Literal["a", "b"], int]):
+    if "c" in u:
+        reveal_type(u["c"])  # revealed: object
+
+def mapping_only(
+    mapping: Mapping[Literal["a", "b"], int],
+    broad_mapping: Mapping[str, int],
+):
+    if "c" in mapping:
+        reveal_type(mapping["c"])  # revealed: object
+    if "c" in broad_mapping:
+        reveal_type(broad_mapping["c"])  # revealed: int
+
+def multiple_membership_tests(u: Foo | Bar):
+    has_foo = "foo" in u
+    has_bar = "bar" in u
+    if has_foo and has_bar:
+        reveal_type(u["foo"])  # revealed: object
+        reveal_type(u["bar"])  # revealed: object
+
+def nested_membership_tests(u: Foo | Bar):
+    if "foo" in u:
+        if "bar" in u:
+            reveal_type(u["foo"])  # revealed: object
+            reveal_type(u["bar"])  # revealed: object
+
+def multiple_mapping_membership_tests(mapping: Mapping[Literal["a", "b"], int]):
+    has_c = "c" in mapping
+    has_d = "d" in mapping
+    if has_c and has_d:
+        reveal_type(mapping["c"])  # revealed: object
+        reveal_type(mapping["d"])  # revealed: object
+
+def guard_object(value: object) -> TypeGuard[object]:
+    return True
+
+def no_op_membership_and_typeguard(value: Foo):
+    has_foo = "foo" in value
+    if guard_object(value) and has_foo:
+        reveal_type(value)  # revealed: object
+
+def guard_bar(value: object) -> TypeGuard[Bar]:
+    return True
+
+def membership_applies_to_typeguard_replacement(value: Foo | Literal["abc"]):
+    has_z = "z" in value
+    if guard_bar(value) and has_z:
+        reveal_type(value["z"])  # revealed: object
+
+class OptionalKey(TypedDict):
+    x: NotRequired[int]
+
+def optional_membership_applies_to_typeguard_replacement(value: OptionalKey):
+    has_x = "x" in value
+    if guard_bar(value) and has_x:
+        reveal_type(value["x"])  # revealed: object
+
+def is_mapping(
+    value: Foo | Mapping[Literal["a", "b"], int],
+) -> TypeIs[Mapping[Literal["a", "b"], int]]:
+    return True
+
+def mapping_membership_remains_true(u: Foo | Mapping[Literal["a", "b"], int]):
+    has_x = "x" in u
+    if has_x and is_mapping(u):
+        if "x" not in u:
+            reveal_type(u)  # revealed: Never
+
+def mapping_membership_disjunction(mapping: Mapping[Literal["a"], int]):
+    if "c" in mapping or "d" in mapping:
+        if "c" not in mapping:
+            reveal_type(mapping["d"])  # revealed: object
+
+class AlwaysContains(Mapping[str, int]):
+    def __contains__(self, key: object, /) -> Literal[True]:
+        return True
+
+class SometimesContains(Mapping[str, int]): ...
+
+class Target:
+    target: int
+
+def guard_target(value: object) -> TypeGuard[Target]:
+    return True
+
+def absent_membership_preserves_typeguard(value: AlwaysContains | SometimesContains):
+    lacks_x = "x" not in value
+    if guard_target(value) and lacks_x:
+        reveal_type(value)  # revealed: Target
+        reveal_type(value.target)  # revealed: int
+
+def guard_always_or_target(value: object) -> TypeGuard[AlwaysContains | Target]:
+    return True
+
+def absent_membership_applies_to_typeguard(value: SometimesContains):
+    lacks_x = "x" not in value
+    if guard_always_or_target(value) and lacks_x:
+        reveal_type(value)  # revealed: Target
+
+def membership_and_typeguard(u: Foo | Mapping[Literal["a", "b"], int]):
+    has_c = "c" in u
+    if guard_object(u) and has_c:
+        reveal_type(u["c"])  # revealed: object
+    if has_c and guard_object(u):
+        reveal_type(u)  # revealed: object
+    if "c" in u and guard_object(u):
+        reveal_type(u)  # revealed: object
 
 def literal_union(u: Foo | Literal["abc"]):
     if "a" in u:
-        # revealed: (Foo & <TypedDict with items 'a'>) | (Literal["abc"] & <Protocol with members '__contains__'>)
+        # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | (Literal["abc"] & <Protocol with members '__contains__'>)
         reveal_type(u)
 
 def literal_union_key_access(obj: Foo | Literal["a"]):
@@ -4911,6 +5020,51 @@ def literal_union_key_access(obj: Foo | Literal["a"]):
         # Membership in a string does not imply that the string supports subscripting with that key.
         # error: [invalid-argument-type]
         reveal_type(obj["a"])  # revealed: object
+```
+
+Present-key constraints retain union-arm correlation when multiple membership tests are combined.
+This example also guards against constructing the Cartesian product of the eight union arms for each
+of the six predicates:
+
+```py
+from typing import TypedDict
+
+class Membership0(TypedDict):
+    item0: int
+
+class Membership1(TypedDict):
+    item1: int
+
+class Membership2(TypedDict):
+    item2: int
+
+class Membership3(TypedDict):
+    item3: int
+
+class Membership4(TypedDict):
+    item4: int
+
+class Membership5(TypedDict):
+    item5: int
+
+class Membership6(TypedDict):
+    item6: int
+
+class Membership7(TypedDict):
+    item7: int
+
+def multiple_union_membership_tests(
+    u: Membership0 | Membership1 | Membership2 | Membership3 | Membership4 | Membership5 | Membership6 | Membership7,
+):
+    has_key0 = "key0" in u
+    has_key1 = "key1" in u
+    has_key2 = "key2" in u
+    has_key3 = "key3" in u
+    has_key4 = "key4" in u
+    has_key5 = "key5" in u
+    if has_key0 and has_key1 and has_key2 and has_key3 and has_key4 and has_key5:
+        reveal_type(u["key0"])  # revealed: object
+        reveal_type(u["key5"])  # revealed: object
 ```
 
 This still accepts guarded key access in the branch, without pretending that an open `TypedDict`
@@ -4952,9 +5106,8 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if "bar" not in u:
         reveal_type(u)  # revealed: Foo
     else:
-        # TODO: This should simplify to `Foo | (Bar & Any)`, since `Foo` is a
-        # subtype of the synthesized protocol.
-        reveal_type(u)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
+        # `Foo` is open, so it may contain an undeclared `"bar"` key.
+        reveal_type(u)  # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | (Bar & Any)
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -4964,12 +5117,12 @@ def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Lit
     if w not in u:
         reveal_type(u)  # revealed: Foo
     else:
-        reveal_type(u)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
+        reveal_type(u)  # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | (Bar & Any)
 
     if "bar" not in (u2 := u):
         reveal_type(u2)  # revealed: Foo
     else:
-        reveal_type(u2)  # revealed: (Foo & <TypedDict with items 'bar'>) | (Bar & Any)
+        reveal_type(u2)  # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | (Bar & Any)
 ```
 
 With `closed=True`, the narrowing that we couldn't do above becomes possible, because a [closed]
@@ -4986,12 +5139,14 @@ class ClosedBar(TypedDict, closed=True):
 
 def _(u: ClosedFoo | ClosedBar, v: Literal["foo"]):
     if "foo" in u:
-        reveal_type(u)  # revealed: ClosedFoo
+        # TODO: should be `ClosedFoo`
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <Protocol with members '__contains__', '__getitem__'>)
     else:
         reveal_type(u)  # revealed: ClosedBar
 
     if v in u:
-        reveal_type(u)  # revealed: ClosedFoo
+        # TODO: should be `ClosedFoo`
+        reveal_type(u)  # revealed: ClosedFoo | (ClosedBar & <Protocol with members '__contains__', '__getitem__'>)
     else:
         reveal_type(u)  # revealed: ClosedBar
 ```
@@ -5011,7 +5166,8 @@ def _(
     if "bar" not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        reveal_type(u)  # revealed: ClosedBar & Any
+        # TODO: should be `ClosedBar & Any`
+        reveal_type(u)  # revealed: (ClosedFoo & <Protocol with members '__contains__', '__getitem__'>) | (ClosedBar & Any)
 
     if "bar" not in v:
         reveal_type(v)  # revealed: Never
@@ -5021,7 +5177,8 @@ def _(
     if w not in u:
         reveal_type(u)  # revealed: ClosedFoo
     else:
-        reveal_type(u)  # revealed: ClosedBar & Any
+        # TODO: should be `ClosedBar & Any`
+        reveal_type(u)  # revealed: (ClosedFoo & <Protocol with members '__contains__', '__getitem__'>) | (ClosedBar & Any)
 ```
 
 ## Narrowing tagged unions of `TypedDict`s with `match` statements
@@ -5179,7 +5336,7 @@ def test_in(x: ThingWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: (Foo & <TypedDict with items 'baz'>) | Baz
+        reveal_type(x)  # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | Baz
 ```
 
 Nested PEP 695 type aliases (an alias referring to another alias) also work:
@@ -5208,7 +5365,7 @@ def test_nested_in(x: OuterWithBaz):
     if "baz" not in x:
         reveal_type(x)  # revealed: Foo
     else:
-        reveal_type(x)  # revealed: (Foo & <TypedDict with items 'baz'>) | Baz
+        reveal_type(x)  # revealed: (Foo & <Protocol with members '__contains__', '__getitem__'>) | Baz
 ```
 
 ## Only annotated declarations are allowed in the class body
