@@ -1044,6 +1044,17 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .fmt_detailed(f)?;
                     f.write_char(']')
                 }
+                SubclassOfInner::Class(ClassType::Generic(alias))
+                    if alias.origin(self.db).is_final(self.db) =>
+                {
+                    f.set_invalid_type_annotation();
+                    let mut f = f.with_type(self.ty);
+                    f.write_str("<class '")?;
+                    alias
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(&mut f)?;
+                    f.write_str("'>")
+                }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;

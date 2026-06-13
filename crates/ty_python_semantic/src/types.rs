@@ -2473,10 +2473,10 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::SubclassOf(..) => {
-                // TODO: Same comment as above for `is_singleton`
-                false
-            }
+            Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
+                SubclassOfInner::Class(class) => class.is_final(db),
+                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => false,
+            },
 
             Type::NominalInstance(instance) => instance.is_single_valued(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),

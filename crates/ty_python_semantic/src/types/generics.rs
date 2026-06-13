@@ -880,12 +880,49 @@ impl<'db> GenericContext<'db> {
     }
 
     pub(crate) fn unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
-        match self.len(db) {
-            0 => self.specialize(db, &[]),
-            1 => self.specialize(db, &[Type::unknown(); 1]),
-            2 => self.specialize(db, &[Type::unknown(); 2]),
-            len => self.specialize(db, vec![Type::unknown(); len]),
-        }
+        self.specialize(
+            db,
+            self.variables(db)
+                .map(|typevar| {
+                    if typevar.is_paramspec(db) {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    } else {
+                        Type::unknown()
+                    }
+                })
+                .collect::<Vec<_>>(),
+        )
+    }
+
+    /// Returns an unknown specialization that preserves the bounds of variant type variables.
+    ///
+    /// Invariant variables remain `Unknown` because their range is represented by the enclosing
+    /// `Top[]` materialization.
+    pub(crate) fn bounded_unknown_specialization(self, db: &'db dyn Db) -> Specialization<'db> {
+        self.specialize_from_types_recursive(
+            db,
+            self.variables(db)
+                .map(|typevar| {
+                    if typevar.is_paramspec(db) {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    } else if matches!(
+                        specialization_variance(db, typevar),
+                        TypeVarVariance::Covariant | TypeVarVariance::Contravariant
+                    ) {
+                        IntersectionType::from_two_elements(
+                            db,
+                            Type::unknown(),
+                            typevar
+                                .typevar(db)
+                                .require_bound_or_constraints(db)
+                                .as_type(db),
+                        )
+                    } else {
+                        Type::unknown()
+                    }
+                })
+                .collect(),
+        )
     }
 
     pub(crate) fn is_subset_of(self, db: &'db dyn Db, other: GenericContext<'db>) -> bool {

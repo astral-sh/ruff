@@ -427,13 +427,16 @@ impl<'db> StaticClassLiteral<'db> {
 
     pub(crate) fn top_materialization(self, db: &'db dyn Db) -> ClassType<'db> {
         self.apply_specialization(db, |generic_context| {
-            generic_context
-                .default_specialization(db, self.known(db))
-                .materialize_impl(
-                    db,
-                    MaterializationKind::Top,
-                    &ApplyTypeMappingVisitor::default(),
-                )
+            let specialization = if self.known(db) == Some(KnownClass::Tuple) {
+                generic_context.default_specialization(db, self.known(db))
+            } else {
+                generic_context.bounded_unknown_specialization(db)
+            };
+            specialization.materialize_impl(
+                db,
+                MaterializationKind::Top,
+                &ApplyTypeMappingVisitor::default(),
+            )
         })
     }
 

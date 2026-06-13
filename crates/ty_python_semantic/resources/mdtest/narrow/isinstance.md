@@ -444,6 +444,101 @@ def _(x: object, y: type[int]):
         reveal_type(x)  # revealed: int
 ```
 
+Generic `type[]` types are narrowed using the top materialization of the instance type. This also
+applies to the result of `type(y)`, which is a runtime class object rather than a generic alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Invariant[T]:
+    def push(self, x: T) -> None: ...
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object, cls: type[Invariant[int]], y: Invariant[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[Invariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+```
+
+Constrained type variables retain their constraints for both forms of runtime class object:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T", int, str)
+
+class Constrained(Generic[T]):
+    value: T
+    def set(self, value: T) -> None: ...
+
+def _(x: object, cls: type[Constrained[int]], y: Constrained[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[Constrained[Unknown]]
+        reveal_type(x.value)  # revealed: int | str
+        x.set(1)  # error: [invalid-argument-type]
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[Constrained[Unknown]]
+        reveal_type(x.value)  # revealed: int | str
+        x.set("value")  # error: [invalid-argument-type]
+```
+
+ParamSpec specializations likewise produce an unknown callable parameter list instead of leaking the
+ParamSpec from the class definition:
+
+```py
+from typing import Generic, ParamSpec
+
+P = ParamSpec("P")
+
+class WithParamSpec(Generic[P]):
+    def invoke(self, *args: P.args, **kwargs: P.kwargs) -> int:
+        return 1
+
+def _(x: object, cls: type[WithParamSpec[[int]]], y: WithParamSpec[[str, int]]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[WithParamSpec[(...)]]
+        x.invoke("anything", keyword=True)
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[WithParamSpec[(...)]]
+        x.invoke()
+```
+
+The same applies to final generic classes. Their `type[]` types still describe runtime class
+objects, even though they cannot have subclasses:
+
+```py
+from typing import final
+
+@final
+class FinalInvariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+    def push(self, value: T) -> None: ...
+
+def _(x: object, cls: type[FinalInvariant[int]], y: FinalInvariant[str]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[FinalInvariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[FinalInvariant[Unknown]]
+        reveal_type(x.get())  # revealed: object
+
+    # A direct generic alias is still not a valid `classinfo` argument.
+    if isinstance(x, FinalInvariant[int]):
+        reveal_type(x)  # revealed: object
+```
+
 Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
 
 ```py
@@ -615,6 +710,19 @@ def _(x: object):
         reveal_type(x.get())  # revealed: object
 ```
 
+The upper bound is retained for bounded covariant type parameters:
+
+```py
+class BoundedCovariant[T: BaseException]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def _(x: object):
+    if isinstance(x, BoundedCovariant):
+        reveal_type(x)  # revealed: BoundedCovariant[BaseException]
+        reveal_type(x.get())  # revealed: BaseException
+```
+
 Similarly, contravariant type parameters use their lower bound of `Never`:
 
 ```py
@@ -676,8 +784,25 @@ class InvariantWithAny[T: int]:
 def _(x: object):
     if isinstance(x, InvariantWithAny):
         reveal_type(x)  # revealed: Top[InvariantWithAny[Unknown]]
-        reveal_type(x.a)  # revealed: object
+        reveal_type(x.a)  # revealed: int
         reveal_type(x.b)  # revealed: Any
+```
+
+The bound is also retained when the runtime class comes from a generic `type[]` value:
+
+```py
+def takes_exception(exc: BaseException) -> None: ...
+
+class InvariantException[T: BaseException]:
+    def get(self) -> T:
+        raise NotImplementedError
+    def put(self, value: T) -> None: ...
+
+def _(x: object, cls: type[InvariantException[ValueError]]):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[InvariantException[Unknown]]
+        takes_exception(x.get())
+        x.put(BaseException())  # error: [invalid-argument-type]
 ```
 
 The same applies in contravariant positions: `Any` in a parameter type that isn't tied to the
@@ -728,6 +853,54 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
 ```
 
+Bounds from generic standard-library classes are also retained. This prevents the top
+materialization from violating the class's own method bounds.
+
+```py
+import sys
+from collections.abc import AsyncIterator
+from contextlib import AbstractAsyncContextManager
+from io import TextIOWrapper
+
+def takes_group(group: BaseExceptionGroup[BaseException]) -> None: ...
+def exception_group(exc: BaseException) -> None:
+    if isinstance(exc, BaseExceptionGroup):
+        reveal_type(exc)  # revealed: BaseExceptionGroup[BaseException]
+        takes_group(exc)
+
+def text_wrapper() -> None:
+    if isinstance(sys.stdout, TextIOWrapper):
+        sys.stdout.reconfigure(encoding="utf-8")
+
+async def async_context_manager(
+    ctx: AbstractAsyncContextManager[None] | AsyncIterator[None],
+) -> None:
+    if isinstance(ctx, AbstractAsyncContextManager):
+        # revealed: AbstractAsyncContextManager[None, bool | None] | (AsyncIterator[None] & AbstractAsyncContextManager[object, bool | None])
+        reveal_type(ctx)
+        await ctx.__aenter__()
+```
+
+When an iterable arm survives earlier narrowing, its element type remains available while narrowing
+each element. The initial check must still retain the possible overlap between an arbitrary iterable
+and a differently specialized `memoryview`.
+
+```py
+from collections.abc import Iterable
+
+type Data = str | bytes | bytearray | memoryview[int]
+
+def send(data: bytes | bytearray | memoryview[int]) -> None: ...
+def send_message(message: Data | Iterable[Data]) -> None:
+    if isinstance(message, (bytes, bytearray, memoryview)):
+        # error: [invalid-argument-type]
+        send(message)
+    elif isinstance(message, Iterable):
+        for chunk in message:
+            if isinstance(chunk, (bytes, bytearray, memoryview)):
+                send(chunk)
+```
+
 ## Narrowing generic defaults in Python 3.13
 
 When a type parameter has a bare `Any` default, narrowing still materializes the substituted
@@ -763,6 +936,27 @@ class WithAliasDefault[T = A]:
 def _(x: object):
     if isinstance(x, WithAliasDefault):
         reveal_type(x.y)  # revealed: tuple[A, object]
+```
+
+Concrete defaults are also ignored. A runtime class object does not retain the specialization used
+to construct an instance, so a check against the unspecialized class can match any specialization:
+
+```py
+class WithConcreteDefault[T = int]:
+    y: T
+
+def _(
+    x: object,
+    cls: type[WithConcreteDefault[int]],
+    y: WithConcreteDefault[str],
+):
+    if isinstance(x, cls):
+        reveal_type(x)  # revealed: Top[WithConcreteDefault[Unknown]]
+        reveal_type(x.y)  # revealed: object
+
+    if isinstance(x, type(y)):
+        reveal_type(x)  # revealed: Top[WithConcreteDefault[Unknown]]
+        reveal_type(x.y)  # revealed: object
 ```
 
 ## Narrowing generic `classmethod`
