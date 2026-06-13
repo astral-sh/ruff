@@ -332,10 +332,10 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         PatternPredicateKind::Class(kind) => {
             let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
             match class_ty {
-                Type::ClassLiteral(class)
-                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) =>
-                {
-                    return subject_ty;
+                Type::ClassLiteral(class) => {
+                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
+                        return subject_ty;
+                    }
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
                     if kind.is_argumentless()
@@ -365,9 +365,16 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         _ => {}
     }
 
+    let subject_independent_ty = definite_match_pattern_type(db, kind);
+    // The subject-aware checks above can reject an otherwise exhaustive-looking pattern. Do not
+    // let the less precise fallback reintroduce that conclusion.
+    if subject_ty.is_subtype_of(db, subject_independent_ty) {
+        return Type::Never;
+    }
+
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_positive(definite_match_pattern_type(db, kind))
+        .add_positive(subject_independent_ty)
         .build()
 }
 
@@ -528,7 +535,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class) if kind.is_argumentless() && !class.is_protocol(db) => {
+                Type::ClassLiteral(class) if kind.is_argumentless() => {
                     Type::instance(db, class.top_materialization(db))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
