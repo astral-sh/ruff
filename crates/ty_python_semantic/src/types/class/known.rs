@@ -1065,17 +1065,12 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<StaticClassLiteral<'_>> {
-        #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
-        struct KnownClassArgument {
+        #[salsa::tracked(cycle_initial=|_, _, _, _| None, heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_class_literal(
+            db: &dyn Db,
+            _program: Program,
             class: KnownClass,
-        }
-
-        #[salsa::tracked(cycle_initial=|_, _, _| None, heap_size=ruff_memory_usage::heap_size)]
-        fn known_class_to_class_literal<'db>(
-            db: &'db dyn Db,
-            class: KnownClassArgument<'db>,
-        ) -> Option<StaticClassLiteral<'db>> {
-            let class = class.class(db);
+        ) -> Option<StaticClassLiteral<'_>> {
             class
                 .try_to_class_literal_without_logging(db)
                 .or_else(|lookup_error| {
@@ -1102,7 +1097,7 @@ impl KnownClass {
                 .ok()
         }
 
-        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
+        known_class_to_class_literal(db, Program::get(db), self)
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
