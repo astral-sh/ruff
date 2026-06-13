@@ -478,6 +478,29 @@ def _(x: A | B):
         reveal_type(x)  # revealed: A
 ```
 
+Enum literals are also supported as attribute tags:
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Tag(Enum):
+    A = 1
+    B = 2
+
+class A:
+    tag: Literal[Tag.A]
+
+class B:
+    tag: Literal[Tag.B]
+
+def _(x: A | B):
+    if x.tag == Tag.A:
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+```
+
 Non-literal tag arms are preserved during positive narrowing:
 
 ```py
