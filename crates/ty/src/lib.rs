@@ -6,8 +6,8 @@ mod rule;
 mod version;
 
 use std::fmt::Write;
-use std::process::{ExitCode, Termination};
-use std::sync::Mutex;
+use std::process::{Command as ProcessCommand, ExitCode, Termination};
+use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
 use anyhow::{Context, anyhow};
@@ -20,15 +20,19 @@ use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
 use ruff_db::files::File;
-use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
+use ruff_db::system::{OsSystem, System, SystemPath, SystemPathBuf};
 use ruff_db::{STACK_SIZE, max_parallelism};
 use ruff_diagnostics::Applicability;
 use salsa::Database;
+use ty_project::dependency_metadata::{
+    enrich_dependency_metadata_with_editables, parse_uv_workspace_metadata,
+};
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_python_semantic::{fix_all_diagnostics, suppress_all_diagnostics};
 use ty_server::run_server;
 use ty_static::EnvVars;
@@ -134,6 +138,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .iter()
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
+    let dependency_metadata_path = args
+        .dependency_metadata
+        .as_ref()
+        .map(|path| SystemPath::absolute(path, &cwd));
 
     let mode = if args.fix {
         MainLoopMode::Fix(FixMode::ApplyFixes)
@@ -146,6 +154,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let dependency_metadata = match dependency_metadata_path.as_deref() {
+        Some(path) => Some(load_dependency_metadata(&system, path)?),
+        None => load_dependency_metadata_from_uv(&system, &project_path),
+    };
     let config_file = args
         .config_file
         .as_ref()
@@ -166,16 +178,24 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::fallible(project_metadata, system)?;
     let project = db.project();
+    let dependency_metadata = dependency_metadata.map(Arc::new);
+    let enriched_dependency_metadata =
+        enrich_dependency_metadata(&db, dependency_metadata.as_ref());
 
     project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     project.set_force_exclude(&mut db, force_exclude);
+    project.set_dependency_metadata(&mut db, enriched_dependency_metadata.as_ref());
 
     if !check_paths.is_empty() {
         project.set_included_paths(&mut db, check_paths);
     }
 
-    let (main_loop, main_loop_cancellation_token) =
-        MainLoop::new(mode, project_options_overrides, printer);
+    let (main_loop, main_loop_cancellation_token) = MainLoop::new(
+        mode,
+        project_options_overrides,
+        dependency_metadata,
+        printer,
+    );
 
     // Listen to Ctrl+C and abort the watch mode.
     let main_loop_cancellation_token = Mutex::new(Some(main_loop_cancellation_token));
@@ -213,6 +233,79 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     } else {
         Ok(exit_status)
     }
+}
+
+fn load_dependency_metadata(system: &dyn System, path: &SystemPath) -> Result<DependencyMetadata> {
+    let source = system
+        .read_to_string(path)
+        .with_context(|| format!("Failed to read dependency metadata `{path}`"))?;
+
+    let metadata = parse_uv_workspace_metadata(&source)
+        .with_context(|| format!("Failed to load dependency metadata `{path}`"))?;
+
+    Ok(metadata)
+}
+
+fn load_dependency_metadata_from_uv(
+    system: &dyn System,
+    project_path: &SystemPath,
+) -> Option<DependencyMetadata> {
+    let workspace_root = project_path
+        .ancestors()
+        .find(|ancestor| system.is_file(&ancestor.join("uv.lock")))?;
+
+    let output = match ProcessCommand::new("uv")
+        .args(["workspace", "metadata", "--locked", "--sync"])
+        .current_dir(workspace_root.as_std_path())
+        .output()
+    {
+        Ok(output) => output,
+        Err(error) => {
+            tracing::debug!("Failed to run `uv workspace metadata --locked --sync`: {error}");
+            return None;
+        }
+    };
+
+    if !output.status.success() {
+        tracing::debug!(
+            "`uv workspace metadata --locked --sync` failed with exit code {:?}: {}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        return None;
+    }
+
+    let source = match std::str::from_utf8(&output.stdout) {
+        Ok(source) => source,
+        Err(error) => {
+            tracing::debug!(
+                "`uv workspace metadata --locked --sync` returned non-UTF-8 output: {error}"
+            );
+            return None;
+        }
+    };
+
+    match parse_uv_workspace_metadata(source) {
+        Ok(metadata) => Some(metadata),
+        Err(error) => {
+            tracing::debug!(
+                "Failed to parse `uv workspace metadata --locked --sync` output: {error:#}"
+            );
+            None
+        }
+    }
+}
+
+fn enrich_dependency_metadata(
+    db: &ProjectDatabase,
+    dependency_metadata: Option<&Arc<DependencyMetadata>>,
+) -> Option<Arc<DependencyMetadata>> {
+    dependency_metadata.map(|metadata| {
+        Arc::new(enrich_dependency_metadata_with_editables(
+            db,
+            (**metadata).clone(),
+        ))
+    })
 }
 
 #[derive(Copy, Clone)]
@@ -260,6 +353,8 @@ struct MainLoop {
 
     project_options_overrides: ProjectOptionsOverrides,
 
+    dependency_metadata: Option<Arc<DependencyMetadata>>,
+
     /// Cancellation token that gets set by Ctrl+C.
     /// Used for long-running operations on the main thread. Operations on background threads
     /// use Salsa's cancellation mechanism.
@@ -270,6 +365,7 @@ impl MainLoop {
     fn new(
         mode: MainLoopMode,
         project_options_overrides: ProjectOptionsOverrides,
+        dependency_metadata: Option<Arc<DependencyMetadata>>,
         printer: Printer,
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
@@ -284,6 +380,7 @@ impl MainLoop {
                 receiver,
                 watcher: None,
                 project_options_overrides,
+                dependency_metadata,
                 printer,
                 cancellation_token,
             },
@@ -457,6 +554,10 @@ impl MainLoop {
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(&changes, Some(&self.project_options_overrides));
+                    let dependency_metadata =
+                        enrich_dependency_metadata(db, self.dependency_metadata.as_ref());
+                    db.project()
+                        .set_dependency_metadata(db, dependency_metadata.as_ref());
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
