@@ -241,6 +241,7 @@
 
 use std::collections::hash_map::Entry;
 use std::ops::{Index, Range};
+use std::sync::Arc;
 
 use ruff_index::{FrozenIndexVec, Idx, IndexSlice, IndexVec, newtype_index};
 use ruff_text_size::TextRange;
@@ -1128,8 +1129,10 @@ struct ReachableDefinitions {
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
-    symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
-    member_states: IndexVec<ScopedMemberId, PlaceState>,
+    // A condition snapshot is commonly cloned for its truthy and falsy branches. Share the
+    // potentially large place-state arrays until a branch restores or merges them.
+    symbol_states: Arc<IndexVec<ScopedSymbolId, PlaceState>>,
+    member_states: Arc<IndexVec<ScopedMemberId, PlaceState>>,
     reachability: ScopedReachabilityConstraintId,
 }
 
@@ -1858,8 +1861,8 @@ impl<'db> UseDefMapBuilder<'db> {
     /// Take a snapshot of the current visible-places state.
     pub(super) fn snapshot(&self) -> FlowSnapshot {
         FlowSnapshot {
-            symbol_states: self.symbol_states.clone(),
-            member_states: self.member_states.clone(),
+            symbol_states: Arc::new(self.symbol_states.clone()),
+            member_states: Arc::new(self.member_states.clone()),
             reachability: self.reachability,
         }
     }
@@ -1889,8 +1892,8 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(num_symbols >= snapshot.symbol_states.len());
 
         // Restore the current visible-definitions state to the given snapshot.
-        self.symbol_states = snapshot.symbol_states;
-        self.member_states = snapshot.member_states;
+        self.symbol_states = Arc::unwrap_or_clone(snapshot.symbol_states);
+        self.member_states = Arc::unwrap_or_clone(snapshot.member_states);
         self.reachability = snapshot.reachability;
 
         // If the snapshot we are restoring is missing some places we've recorded since, we need
@@ -1928,7 +1931,8 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert!(self.symbol_states.len() >= snapshot.symbol_states.len());
         debug_assert!(self.member_states.len() >= snapshot.member_states.len());
 
-        let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
+        let mut snapshot_definitions_iter =
+            Arc::unwrap_or_clone(snapshot.symbol_states).into_iter();
         for current in &mut self.symbol_states {
             let branch = snapshot_definitions_iter
                 .next()
@@ -1941,7 +1945,8 @@ impl<'db> UseDefMapBuilder<'db> {
             );
         }
 
-        let mut snapshot_definitions_iter = snapshot.member_states.into_iter();
+        let mut snapshot_definitions_iter =
+            Arc::unwrap_or_clone(snapshot.member_states).into_iter();
         for current in &mut self.member_states {
             let branch = snapshot_definitions_iter
                 .next()
