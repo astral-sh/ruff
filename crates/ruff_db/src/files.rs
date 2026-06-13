@@ -3,6 +3,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
+pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -16,10 +17,13 @@ use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
 use crate::source::SourceText;
-use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
+use crate::system::{
+    SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf, deduplicate_nested_paths,
+};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
 
+mod directory;
 mod file_root;
 mod path;
 
@@ -58,6 +62,9 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
+    /// Lookup table that maps system directories to Salsa inputs.
+    directories: directory::Directories,
+
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
@@ -75,6 +82,12 @@ struct FilesInner {
 }
 
 impl Files {
+    /// Returns the Salsa input for the system directory at `path`.
+    fn directory(&self, db: &dyn Db, path: &SystemPath) -> directory::Directory {
+        let absolute = SystemPath::absolute(path, db.system().current_directory());
+        self.inner.directories.get_or_create(db, absolute)
+    }
+
     /// Looks up a file by its `path`.
     ///
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
@@ -204,17 +217,6 @@ impl Files {
         roots.at(&absolute)
     }
 
-    /// The same as [`Self::root`] but panics if no root is found.
-    #[track_caller]
-    pub fn expect_root(&self, db: &dyn Db, path: &SystemPath) -> FileRoot {
-        if let Some(root) = self.root(db, path) {
-            return root;
-        }
-
-        let roots = self.inner.roots.read().unwrap();
-        panic!("No root found for path '{path}'. Known roots: {roots:#?}");
-    }
-
     /// Adds a new root for `path` and returns the root.
     ///
     /// The root isn't added nor is the file root's kind updated if a root for `path` already exists.
@@ -223,13 +225,6 @@ impl Files {
 
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         roots.try_add(db, absolute, kind)
-    }
-
-    /// Updates the revision of the root for `path`.
-    pub fn touch_root(db: &mut dyn Db, path: &SystemPath) {
-        if let Some(root) = db.files().root(db, path) {
-            root.set_revision(db).to(FileRevision::now());
-        }
     }
 
     /// Refreshes the state of all known files under `paths` recursively.
@@ -246,10 +241,12 @@ impl Files {
         I: IntoIterator<Item = P>,
     {
         let current_directory = db.system().current_directory();
-        let paths = paths
-            .into_iter()
-            .map(|path| SystemPath::absolute(path.as_ref(), current_directory))
-            .collect::<BTreeSet<_>>();
+        let paths = deduplicate_nested_paths(
+            paths
+                .into_iter()
+                .map(|path| SystemPath::absolute(path.as_ref(), current_directory)),
+        )
+        .collect::<BTreeSet<_>>();
 
         if paths.is_empty() {
             return;
@@ -267,18 +264,7 @@ impl Files {
             }
         }
 
-        let roots = inner.roots.read().unwrap();
-
-        for root in roots.all() {
-            let root_path = root.path(db);
-            if paths
-                .range(root_path.to_path_buf()..)
-                .next()
-                .is_some_and(|path| path.starts_with(root_path))
-            {
-                root.set_revision(db).to(FileRevision::now());
-            }
-        }
+        inner.directories.touch_recursive(db, &paths);
     }
 
     /// Refreshes the state of all known files.
@@ -296,11 +282,7 @@ impl Files {
             File::sync_system_path(db, entry.key(), Some(*entry.value()));
         }
 
-        let roots = inner.roots.read().unwrap();
-
-        for root in roots.all() {
-            root.set_revision(db).to(FileRevision::now());
-        }
+        inner.directories.touch_all(db);
     }
 }
 
@@ -315,6 +297,7 @@ impl fmt::Debug for Files {
             map.finish()
         } else {
             f.debug_struct("Files")
+                .field("directories", &self.inner.directories.len())
                 .field("system_by_path", &self.inner.system_by_path.len())
                 .field(
                     "system_virtual_by_path",
@@ -371,6 +354,11 @@ pub struct File {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for File {}
 
+struct SyncPathResult {
+    status_changed: bool,
+    is_directory: bool,
+}
+
 impl File {
     /// Reads the content of the file into a [`String`].
     ///
@@ -425,19 +413,17 @@ impl File {
 
     /// Refreshes the file metadata by querying the file system if needed.
     ///
-    /// This also "touches" the file root associated with the given path.
-    /// This means that any Salsa queries that depend on the corresponding
-    /// root's revision will become invalidated.
+    /// Directory listings are invalidated if the path's file status changed, its prior status is
+    /// unknown, or if `path` is itself a directory.
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
-        Files::touch_root(db, &absolute);
-        Self::sync_system_path(db, &absolute, None);
+        let result = Self::sync_system_path(db, &absolute, None);
+        Self::touch_directories_after_sync(db, &absolute, result);
     }
 
     /// Refreshes *only* the file metadata by querying the file system if needed.
     ///
-    /// This specifically does not touch any file root associated with the
-    /// given file path.
+    /// This specifically does not invalidate any directory listings.
     pub fn sync_path_only(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         Self::sync_system_path(db, &absolute, None);
@@ -456,8 +442,8 @@ impl File {
 
         match path {
             FilePath::System(system) => {
-                Files::touch_root(db, &system);
-                Self::sync_system_path(db, &system, Some(self));
+                let result = Self::sync_system_path(db, &system, Some(self));
+                Self::touch_directories_after_sync(db, &system, result);
             }
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
@@ -470,9 +456,12 @@ impl File {
 
     /// Private method providing the implementation for [`Self::sync_path`] and [`Self::sync`] for
     /// system paths.
-    fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) {
+    fn sync_system_path(db: &mut dyn Db, path: &SystemPath, file: Option<File>) -> SyncPathResult {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
-            return;
+            return SyncPathResult {
+                status_changed: true,
+                is_directory: true,
+            };
         };
 
         let (status, revision, permission) = match db.system().path_metadata(path) {
@@ -489,7 +478,10 @@ impl File {
 
         let mut clear_override = false;
 
-        if file.status(db) != status {
+        let old_status = file.status(db);
+        let status_changed = old_status != status;
+
+        if status_changed {
             tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
             clear_override = true;
@@ -508,6 +500,25 @@ impl File {
 
         if clear_override && file.source_text_override(db).is_some() {
             file.set_source_text_override(db).to(None);
+        }
+
+        SyncPathResult {
+            status_changed,
+            is_directory: old_status == FileStatus::IsADirectory
+                || status == FileStatus::IsADirectory,
+        }
+    }
+
+    fn touch_directories_after_sync(db: &mut dyn Db, path: &SystemPath, result: SyncPathResult) {
+        let inner = Arc::clone(&db.files().inner);
+
+        if result.status_changed || result.is_directory {
+            inner.directories.touch(db, path);
+        }
+        if result.status_changed
+            && let Some(parent) = path.parent()
+        {
+            inner.directories.touch(db, parent);
         }
     }
 
