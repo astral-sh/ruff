@@ -42,7 +42,7 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    SubclassOfType, Type, TypeTag, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -607,11 +607,9 @@ impl<'db> UnionBuilder<'db> {
         let mut ty_negated_cache = None;
         let mut ty_negated = || *ty_negated_cache.get_or_insert_with(|| ty.negate(self.db));
 
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::Union(union)) => {
+        match ty.tag {
+            TypeTag::Union => {
+                let union = ty.as_union().unwrap();
                 let new_elements = union.elements(self.db);
                 self.elements.reserve(new_elements.len());
                 for element in new_elements {
@@ -634,8 +632,9 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `Never` to a union is a no-op.
-            (_, crate::types::TypeData::Never) => {}
-            (_, crate::types::TypeData::TypeAlias(alias)) if self.unpack_aliases => {
+            TypeTag::Never => {}
+            TypeTag::TypeAlias if self.unpack_aliases => {
+                let alias = ty.as_lazy_type_alias().unwrap();
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
@@ -644,7 +643,8 @@ impl<'db> UnionBuilder<'db> {
                     self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
                 }
             }
-            (_, crate::types::TypeData::LiteralValue(literal)) => {
+            TypeTag::LiteralValue => {
+                let literal = ty.as_literal_value().unwrap();
                 self.recursively_defined =
                     self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
@@ -901,8 +901,8 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Adding `object` to a union results in `object`.
-            (ty, _) if ty.is_object() => self.collapse_to_object(),
-            (_, _) => self.push_type(ty, seen_aliases),
+            _ if ty.is_object() => self.collapse_to_object(),
+            _ => self.push_type(ty, seen_aliases),
         }
     }
 
@@ -919,13 +919,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(
-            {
-                let __ty_view_value = ty;
-                (__ty_view_value, __ty_view_value.data())
-            },
-            (_, crate::types::TypeData::TypeAlias(_))
-        ) && !self.cycle_recovery;
+        let should_simplify_full = ty.as_lazy_type_alias().is_none() && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();

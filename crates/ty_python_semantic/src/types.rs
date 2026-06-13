@@ -2226,14 +2226,14 @@ impl<'db> Type<'db> {
     /// behave as: `object` for top-materialized, `Never` for bottom-materialized.
     /// Returns `None` if `self` is not `Divergent` or has not been materialized.
     fn materialized_divergent_fallback(self) -> Option<Type<'db>> {
-        let TypeData::Divergent(divergent) = (self).data() else {
+        if self.tag != TypeTag::Divergent {
             return None;
-        };
+        }
 
-        match divergent.materialization_kind() {
-            Some(MaterializationKind::Top) => Some(Type::object()),
-            Some(MaterializationKind::Bottom) => Some(Type::Never),
-            None => None,
+        match self.detail[0] {
+            1 => Some(Type::object()),
+            2 => Some(Type::Never),
+            _ => None,
         }
     }
 
@@ -2433,7 +2433,7 @@ impl<'db> Type<'db> {
     }
 
     pub fn is_generic_alias(&self) -> bool {
-        matches!((self).data(), TypeData::GenericAlias(_))
+        self.tag == TypeTag::GenericAlias
     }
 
     /// Returns whether this type represents a specialization of a generic type.
@@ -2701,19 +2701,55 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn as_type_alias(self) -> Option<TypeAliasType<'db>> {
-        match (self).data() {
-            TypeData::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
-                Some(type_alias)
+        if self.tag != TypeTag::KnownInstance
+            || self.detail[0] != PackedKnownInstanceTag::TypeAliasType as u8
+        {
+            return None;
+        }
+
+        match self.detail[1] {
+            x if x == PackedTypeAliasTag::Pep695 as u8 => {
+                Some(TypeAliasType::PEP695(self.payload()))
+            }
+            x if x == PackedTypeAliasTag::ManualPep695 as u8 => {
+                Some(TypeAliasType::ManualPEP695(self.payload()))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub(crate) fn as_legacy_generic_context(self) -> Option<GenericContext<'db>> {
+        if self.tag != TypeTag::KnownInstance {
+            return None;
+        }
+        match self.detail[0] {
+            x if x == PackedKnownInstanceTag::SubscriptedGeneric as u8
+                || x == PackedKnownInstanceTag::SubscriptedProtocol as u8 =>
+            {
+                Some(self.payload())
             }
             _ => None,
         }
+    }
+
+    pub(crate) fn as_lazy_type_alias(self) -> Option<TypeAliasType<'db>> {
+        if self.tag != TypeTag::TypeAlias {
+            return None;
+        }
+        Some(match self.detail[0] {
+            x if x == PackedTypeAliasTag::Pep695 as u8 => TypeAliasType::PEP695(self.payload()),
+            x if x == PackedTypeAliasTag::ManualPep695 as u8 => {
+                TypeAliasType::ManualPEP695(self.payload())
+            }
+            _ => unreachable!(),
+        })
     }
 
     /// If this type is a `Type::TypeAlias`, recursively resolves it to its
     /// underlying value type. Otherwise, returns `self` unchanged.
     pub(crate) fn resolve_type_alias(self, db: &'db dyn Db) -> Type<'db> {
         let mut ty = self;
-        while let TypeData::TypeAlias(alias) = (ty).data() {
+        while let Some(alias) = ty.as_lazy_type_alias() {
             ty = alias.value_type(db);
         }
         ty
@@ -2770,17 +2806,36 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn as_literal_value(self) -> Option<LiteralValueType<'db>> {
-        match (self).data() {
-            TypeData::LiteralValue(literal) => Some(literal),
-            _ => None,
+        use set_theoretic::RecursivelyDefined;
+
+        if self.tag != TypeTag::LiteralValue {
+            return None;
         }
+
+        let kind = match self.detail[0] {
+            x if x == PackedLiteralTag::Int as u8 => LiteralValueTypeKind::Int(self.payload()),
+            x if x == PackedLiteralTag::Bool as u8 => LiteralValueTypeKind::Bool(self.payload()),
+            x if x == PackedLiteralTag::String as u8 => {
+                LiteralValueTypeKind::String(self.payload())
+            }
+            x if x == PackedLiteralTag::Enum as u8 => LiteralValueTypeKind::Enum(self.payload()),
+            x if x == PackedLiteralTag::Bytes as u8 => LiteralValueTypeKind::Bytes(self.payload()),
+            x if x == PackedLiteralTag::LiteralString as u8 => LiteralValueTypeKind::LiteralString,
+            _ => unreachable!(),
+        };
+        Some(
+            LiteralValueType::new(kind, self.detail[1] & 1 != 0).with_recursively_defined(
+                if self.detail[1] & 2 != 0 {
+                    RecursivelyDefined::Yes
+                } else {
+                    RecursivelyDefined::No
+                },
+            ),
+        )
     }
 
     pub(crate) fn as_literal_value_kind(self) -> Option<LiteralValueTypeKind<'db>> {
-        match (self).data() {
-            TypeData::LiteralValue(literal) => Some(literal.kind()),
-            _ => None,
-        }
+        self.as_literal_value().map(LiteralValueType::kind)
     }
 
     pub(crate) fn is_typed_dict(&self) -> bool {
@@ -2822,14 +2877,11 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union(self) -> bool {
-        matches!((self).data(), TypeData::Union(_))
+        self.tag == TypeTag::Union
     }
 
     pub fn as_union(self) -> Option<UnionType<'db>> {
-        match (self).data() {
-            TypeData::Union(union_type) => Some(union_type),
-            _ => None,
-        }
+        (self.tag == TypeTag::Union).then(|| self.payload())
     }
 
     #[track_caller]
@@ -2838,7 +2890,7 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_intersection(self) -> bool {
-        matches!((self).data(), TypeData::Intersection(_))
+        self.tag == TypeTag::Intersection
     }
 
     /// Returns whether this is a "real" intersection type. (Negated types are represented by an
@@ -2853,9 +2905,9 @@ impl<'db> Type<'db> {
 
     /// Returns the number of union clauses in this type. If the type is not a union, returns 1.
     pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
-        match (self).data() {
-            TypeData::Union(union_type) => union_type.elements(db).len(),
-            TypeData::Never => 0,
+        match self.tag {
+            TypeTag::Union => self.payload::<UnionType<'db>>().elements(db).len(),
+            TypeTag::Never => 0,
             _ => 1,
         }
     }
@@ -2864,11 +2916,13 @@ impl<'db> Type<'db> {
     /// the maximum of the `intersection_size` of each union element. If the type is not a union
     /// nor an intersection, returns 1.
     pub(crate) fn intersection_size(self, db: &'db dyn Db) -> usize {
-        match (self).data() {
-            TypeData::Intersection(intersection) => {
+        match self.tag {
+            TypeTag::Intersection => {
+                let intersection = self.payload::<IntersectionType<'db>>();
                 intersection.positive(db).len() + intersection.negative(db).len()
             }
-            TypeData::Union(union_type) => union_type
+            TypeTag::Union => self
+                .payload::<UnionType<'db>>()
                 .elements(db)
                 .iter()
                 .map(|element| element.intersection_size(db))
@@ -2879,10 +2933,7 @@ impl<'db> Type<'db> {
     }
 
     pub fn as_function_literal(self) -> Option<FunctionType<'db>> {
-        match (self).data() {
-            TypeData::FunctionLiteral(function_type) => Some(function_type),
-            _ => None,
-        }
+        (self.tag == TypeTag::FunctionLiteral).then(|| self.payload())
     }
 
     #[cfg(test)]
@@ -3269,11 +3320,18 @@ impl<'db> Type<'db> {
 
     /// Like [`Type::promote`], but does not recurse into nested types.
     fn promote_impl(self, db: &'db dyn Db) -> Type<'db> {
-        match (self).data() {
-            TypeData::LiteralValue(literal) if literal.is_promotable() => {
-                literal.fallback_instance(db)
+        match self.tag {
+            TypeTag::LiteralValue => {
+                let literal = self.as_literal_value().unwrap();
+                if literal.is_promotable() {
+                    literal.fallback_instance(db)
+                } else {
+                    self
+                }
             }
-            TypeData::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            TypeTag::FunctionLiteral => {
+                Type::Callable(self.payload::<FunctionType<'db>>().into_callable_type(db))
+            }
             _ => self,
         }
     }

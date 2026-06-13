@@ -306,21 +306,9 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        self.explicit_bases(db).iter().find_map(|base| {
-            match {
-                let __ty_view_value = base;
-                (__ty_view_value, __ty_view_value.data())
-            } {
-                (
-                    _,
-                    crate::types::TypeData::KnownInstance(
-                        KnownInstanceType::SubscriptedGeneric(generic_context)
-                        | KnownInstanceType::SubscriptedProtocol(generic_context),
-                    ),
-                ) => Some(generic_context),
-                (_, _) => None,
-            }
-        })
+        self.explicit_bases(db)
+            .iter()
+            .find_map(|base| base.as_legacy_generic_context())
     }
 
     pub(crate) fn inherited_legacy_generic_context(
@@ -338,15 +326,11 @@ impl<'db> StaticClassLiteral<'db> {
             GenericContext::from_base_classes(
                 db,
                 class.definition(db),
-                class.explicit_bases(db).iter().copied().filter(|ty| {
-                    matches!(
-                        {
-                            let __ty_view_value = ty;
-                            (__ty_view_value, __ty_view_value.data())
-                        },
-                        (_, crate::types::TypeData::GenericAlias(_))
-                    )
-                }),
+                class
+                    .explicit_bases(db)
+                    .iter()
+                    .copied()
+                    .filter(|ty| ty.is_generic_alias()),
             )
         }
 

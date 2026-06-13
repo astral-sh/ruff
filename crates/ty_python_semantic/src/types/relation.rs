@@ -19,7 +19,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
     MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, SubclassOfInner,
-    SubclassOfType, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
+    SubclassOfType, TypeTag, TypeVarBoundOrConstraints, UnionType, UpcastPolicy,
 };
 use crate::{
     Db,
@@ -1058,10 +1058,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // constraint set. If the typevar has an upper bound or constraints, then the relation
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
-            if let (_, crate::types::TypeData::TypeVar(bound_typevar)) = {
-                let __ty_view_value = source;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            if let Some(bound_typevar) = source.as_typevar() {
                 let upper = if self.relation.is_subtyping() {
                     target.bottom_materialization(db)
                 } else {
@@ -1073,10 +1070,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     bound_typevar,
                     upper,
                 );
-            } else if let (_, crate::types::TypeData::TypeVar(bound_typevar)) = {
-                let __ty_view_value = target;
-                (__ty_view_value, __ty_view_value.data())
-            } {
+            } else if let Some(bound_typevar) = target.as_typevar() {
                 let lower = if self.relation.is_subtyping() {
                     source.top_materialization(db)
                 } else {
@@ -1091,21 +1085,41 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
         }
 
+        if source.tag == TypeTag::Never {
+            return self.always();
+        }
+
+        if let Some(source_alias) = source.as_lazy_type_alias() {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source_alias.value_type(db), target)
+            });
+        }
+        if let Some(target_alias) = target.as_lazy_type_alias() {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, target_alias.value_type(db))
+            });
+        }
+
+        if let Some(union) = target.as_union()
+            && union.has_aliases(db)
+        {
+            return self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, union.expand_aliases(db))
+            });
+        }
+
         let should_expand_intersection = |intersection: IntersectionType<'db>| {
-            intersection.positive(db).iter().any(|element| {
-                match {
-                    let __ty_view_value = element;
-                    (__ty_view_value, __ty_view_value.data())
-                } {
-                    (_, crate::types::TypeData::TypeVar(tvar)) => {
-                        !tvar.is_inferable(db, self.inferable)
-                    }
-                    (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
-                        newtype.concrete_base_type(db).is_union()
-                    }
-                    (_, _) => false,
-                }
-            })
+            intersection
+                .positive(db)
+                .iter()
+                .any(|element| match element.as_typevar() {
+                    Some(tvar) => !tvar.is_inferable(db, self.inferable),
+                    None if element.tag == TypeTag::NewTypeInstance => element
+                        .payload::<crate::types::NewType<'db>>()
+                        .concrete_base_type(db)
+                        .is_union(),
+                    None => false,
+                })
         };
 
         match (
@@ -2668,6 +2682,29 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
 
         if let Some(right) = right.materialized_divergent_fallback() {
             return self.check_type_pair(db, left, right);
+        }
+
+        if left.tag == TypeTag::Never || right.tag == TypeTag::Never {
+            return self.always();
+        }
+        if left.tag == TypeTag::Dynamic
+            || right.tag == TypeTag::Dynamic
+            || left.tag == TypeTag::Divergent
+            || right.tag == TypeTag::Divergent
+        {
+            return self.never();
+        }
+        if let Some(alias) = left.as_lazy_type_alias() {
+            let left_alias_ty = alias.value_type(db);
+            return self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, left_alias_ty, right)
+            });
+        }
+        if let Some(alias) = right.as_lazy_type_alias() {
+            let right_alias_ty = alias.value_type(db);
+            return self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, left, right_alias_ty)
+            });
         }
 
         match (

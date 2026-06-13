@@ -14,7 +14,7 @@ use crate::{
     types::{
         ApplySpecialization, ApplyTypeMappingVisitor, CycleDetector, DynamicType, GenericContext,
         KnownClass, KnownInstanceType, MaterializationKind, Parameter, Parameters, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        TypeAliasType, TypeContext, TypeMapping, TypeTag, TypeVarVariance, UnionBuilder, UnionType,
         any_over_type, binding_type, definition_expression_type,
         tuple::Tuple,
         variance::VarianceInferable,
@@ -28,23 +28,11 @@ use ty_python_core::{
 
 impl<'db> Type<'db> {
     pub(crate) fn is_type_var(self) -> bool {
-        matches!(
-            {
-                let __ty_view_value = self;
-                (__ty_view_value, __ty_view_value.data())
-            },
-            (_, crate::types::TypeData::TypeVar(_))
-        )
+        self.tag == TypeTag::TypeVar
     }
 
     pub(crate) fn as_typevar(self) -> Option<BoundTypeVarInstance<'db>> {
-        match {
-            let __ty_view_value = self;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (_, crate::types::TypeData::TypeVar(bound_typevar)) => Some(bound_typevar),
-            (_, _) => None,
-        }
+        (self.tag == TypeTag::TypeVar).then(|| self.payload())
     }
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {

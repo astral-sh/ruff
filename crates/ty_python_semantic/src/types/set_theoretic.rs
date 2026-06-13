@@ -95,15 +95,9 @@ impl<'db> UnionType<'db> {
 
     /// Returns `true` if any direct element of this union is a type alias.
     pub(crate) fn has_aliases(self, db: &'db dyn Db) -> bool {
-        self.elements(db).iter().any(|element| {
-            matches!(
-                {
-                    let __ty_view_value = element;
-                    (__ty_view_value, __ty_view_value.data())
-                },
-                (_, crate::types::TypeData::TypeAlias(_))
-            )
-        })
+        self.elements(db)
+            .iter()
+            .any(|element| element.as_lazy_type_alias().is_some())
     }
 
     /// Recursively expands aliases that expose top-level union elements.

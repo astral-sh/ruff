@@ -6,7 +6,7 @@ use crate::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
         GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
         NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypeTag, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -165,90 +165,82 @@ pub(super) enum TypeKind<'db> {
 
 impl<'db> From<Type<'db>> for TypeKind<'db> {
     fn from(ty: Type<'db>) -> Self {
-        match {
-            let __ty_view_value = ty;
-            (__ty_view_value, __ty_view_value.data())
-        } {
-            (
-                _,
-                crate::types::TypeData::AlwaysFalsy
-                | crate::types::TypeData::AlwaysTruthy
-                | crate::types::TypeData::Never
-                | crate::types::TypeData::LiteralValue(_)
-                | crate::types::TypeData::DataclassDecorator(_)
-                | crate::types::TypeData::DataclassTransformer(_)
-                | crate::types::TypeData::WrapperDescriptor(_)
-                | crate::types::TypeData::ModuleLiteral(_)
-                | crate::types::TypeData::ClassLiteral(_)
-                | crate::types::TypeData::SpecialForm(_)
-                | crate::types::TypeData::Divergent(_)
-                | crate::types::TypeData::Dynamic(_),
-            ) => TypeKind::Atomic,
+        match ty.tag {
+            TypeTag::AlwaysFalsy
+            | TypeTag::AlwaysTruthy
+            | TypeTag::Never
+            | TypeTag::LiteralValue
+            | TypeTag::DataclassDecorator
+            | TypeTag::DataclassTransformer
+            | TypeTag::WrapperDescriptor
+            | TypeTag::ModuleLiteral
+            | TypeTag::ClassLiteral
+            | TypeTag::SpecialForm
+            | TypeTag::Divergent
+            | TypeTag::Dynamic => TypeKind::Atomic,
 
             // Non-atomic types
-            (_, crate::types::TypeData::FunctionLiteral(function)) => {
-                TypeKind::NonAtomic(NonAtomicType::FunctionLiteral(function))
+            TypeTag::FunctionLiteral => {
+                TypeKind::NonAtomic(NonAtomicType::FunctionLiteral(ty.payload()))
             }
-            (_, crate::types::TypeData::Intersection(intersection)) => {
-                TypeKind::NonAtomic(NonAtomicType::Intersection(intersection))
+            TypeTag::Intersection => TypeKind::NonAtomic(NonAtomicType::Intersection(ty.payload())),
+            TypeTag::EnumComplement => {
+                TypeKind::NonAtomic(NonAtomicType::EnumComplement(ty.payload()))
             }
-            (_, crate::types::TypeData::EnumComplement(complement)) => {
-                TypeKind::NonAtomic(NonAtomicType::EnumComplement(complement))
+            TypeTag::Union => TypeKind::NonAtomic(NonAtomicType::Union(ty.payload())),
+            TypeTag::BoundMethod => TypeKind::NonAtomic(NonAtomicType::BoundMethod(ty.payload())),
+            TypeTag::BoundSuper => TypeKind::NonAtomic(NonAtomicType::BoundSuper(ty.payload())),
+            TypeTag::Callable => TypeKind::NonAtomic(NonAtomicType::Callable(ty.payload())),
+            TypeTag::GenericAlias => TypeKind::NonAtomic(NonAtomicType::GenericAlias(ty.payload())),
+            TypeTag::PropertyInstance => {
+                TypeKind::NonAtomic(NonAtomicType::PropertyInstance(ty.payload()))
             }
-            (_, crate::types::TypeData::Union(union)) => {
-                TypeKind::NonAtomic(NonAtomicType::Union(union))
+            TypeTag::TypeVar => TypeKind::NonAtomic(NonAtomicType::TypeVar(ty.payload())),
+            TypeTag::TypeIs => TypeKind::NonAtomic(NonAtomicType::TypeIs(ty.payload())),
+            TypeTag::TypeGuard => TypeKind::NonAtomic(NonAtomicType::TypeGuard(ty.payload())),
+            TypeTag::TypeForm => TypeKind::NonAtomic(NonAtomicType::TypeForm(ty.payload())),
+            TypeTag::TypeAlias => {
+                TypeKind::NonAtomic(NonAtomicType::TypeAlias(ty.as_lazy_type_alias().unwrap()))
             }
-            (_, crate::types::TypeData::BoundMethod(method)) => {
-                TypeKind::NonAtomic(NonAtomicType::BoundMethod(method))
+            TypeTag::NewTypeInstance => {
+                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(ty.payload()))
             }
-            (_, crate::types::TypeData::BoundSuper(bound_super)) => {
-                TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
-            }
-            (_, crate::types::TypeData::KnownBoundMethod(method_wrapper)) => {
-                TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
-            }
-            (_, crate::types::TypeData::Callable(callable)) => {
-                TypeKind::NonAtomic(NonAtomicType::Callable(callable))
-            }
-            (_, crate::types::TypeData::GenericAlias(alias)) => {
-                TypeKind::NonAtomic(NonAtomicType::GenericAlias(alias))
-            }
-            (_, crate::types::TypeData::KnownInstance(known_instance)) => {
-                TypeKind::NonAtomic(NonAtomicType::KnownInstance(known_instance))
-            }
-            (_, crate::types::TypeData::SubclassOf(subclass_of)) => {
-                TypeKind::NonAtomic(NonAtomicType::SubclassOf(subclass_of))
-            }
-            (_, crate::types::TypeData::NominalInstance(nominal)) => {
-                TypeKind::NonAtomic(NonAtomicType::NominalInstance(nominal))
-            }
-            (_, crate::types::TypeData::ProtocolInstance(protocol)) => {
-                TypeKind::NonAtomic(NonAtomicType::ProtocolInstance(protocol))
-            }
-            (_, crate::types::TypeData::PropertyInstance(property)) => {
-                TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
-            }
-            (_, crate::types::TypeData::TypeVar(bound_typevar)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
-            }
-            (_, crate::types::TypeData::TypeIs(type_is)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is))
-            }
-            (_, crate::types::TypeData::TypeGuard(type_guard)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
-            }
-            (_, crate::types::TypeData::TypeForm(typeform)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypeForm(typeform))
-            }
-            (_, crate::types::TypeData::TypedDict(typed_dict)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
-            }
-            (_, crate::types::TypeData::TypeAlias(alias)) => {
-                TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias))
-            }
-            (_, crate::types::TypeData::NewTypeInstance(newtype)) => {
-                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
-            }
+            TypeTag::KnownBoundMethod => match ty.data() {
+                crate::types::TypeData::KnownBoundMethod(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::MethodWrapper(value))
+                }
+                _ => unreachable!(),
+            },
+            TypeTag::KnownInstance => match ty.data() {
+                crate::types::TypeData::KnownInstance(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::KnownInstance(value))
+                }
+                _ => unreachable!(),
+            },
+            TypeTag::SubclassOf => match ty.data() {
+                crate::types::TypeData::SubclassOf(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::SubclassOf(value))
+                }
+                _ => unreachable!(),
+            },
+            TypeTag::NominalInstance => match ty.data() {
+                crate::types::TypeData::NominalInstance(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::NominalInstance(value))
+                }
+                _ => unreachable!(),
+            },
+            TypeTag::ProtocolInstance => match ty.data() {
+                crate::types::TypeData::ProtocolInstance(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::ProtocolInstance(value))
+                }
+                _ => unreachable!(),
+            },
+            TypeTag::TypedDict => match ty.data() {
+                crate::types::TypeData::TypedDict(value) => {
+                    TypeKind::NonAtomic(NonAtomicType::TypedDict(value))
+                }
+                _ => unreachable!(),
+            },
         }
     }
 }
