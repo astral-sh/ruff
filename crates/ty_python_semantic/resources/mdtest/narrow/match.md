@@ -1177,6 +1177,7 @@ nested pattern consumes that attribute's full static type. Positional patterns f
 `__match_args__`, including attributes supplied by a metaclass.
 
 ```py
+from collections.abc import Mapping, MutableMapping
 from typing import Literal, Protocol, TypedDict, final, runtime_checkable
 
 def builtin_match_self_patterns_are_exhaustive(
@@ -1216,6 +1217,16 @@ class Movie(TypedDict):
 def typed_dict_argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case dict():
+            return 1
+
+def typed_dict_mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case Mapping():
+            return 1
+
+def typed_dict_mutable_mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case MutableMapping():
             return 1
 
 def typed_dict_match_self_pattern_is_exhaustive(value: Movie) -> int:

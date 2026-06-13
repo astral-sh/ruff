@@ -80,11 +80,9 @@ fn class_pattern_is_exhaustive(
     kind: &ClassPatternPredicateKind<'_>,
 ) -> bool {
     let class_instance_ty = Type::instance(db, class.top_materialization(db));
-    // Typed dictionaries are runtime dictionaries, even though they are not nominal subtypes of
-    // `dict` in the static type system.
-    let is_typed_dict_matching_dict =
-        matches!(subject_ty, Type::TypedDict(_)) && class.known(db) == Some(KnownClass::Dict);
-    if !is_typed_dict_matching_dict && !subject_ty.is_subtype_of(db, class_instance_ty) {
+    let is_typed_dict_match =
+        matches!(subject_ty, Type::TypedDict(_)) && typed_dict_matches_class_pattern(db, class);
+    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
         return false;
     }
 
@@ -93,7 +91,7 @@ fn class_pattern_is_exhaustive(
         return true;
     }
 
-    let is_proper_non_final_subtype = if is_typed_dict_matching_dict {
+    let is_proper_non_final_subtype = if is_typed_dict_match {
         false
     } else {
         let Some(subject_class) = subject_ty.nominal_class(db) else {
