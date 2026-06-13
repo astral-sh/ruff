@@ -425,12 +425,11 @@ enum ReduceResult<'db> {
 /// resulting in faster convergence of the fixed-point iteration.
 const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
-/// so in principle we can have as many literal elements as we want,
-/// but to avoid unintended huge computational loads, we limit it to 256.
-const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
-/// However, we set a much larger limit for enum literals than for other kinds of literals.
-/// Huge enums are not uncommon (especially in generated code), and it's annoying
+/// so in principle we can have as many literal elements as we want.
+/// We set a large limit for union and enum literals.
+/// Huge enums and string literal sets are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
+const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 8192;
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -1813,6 +1812,36 @@ mod tests {
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
+    }
+
+    #[test]
+    fn union_common_literal_fallback_instance() {
+        let db = setup_db();
+
+        let str_union = UnionType::from_elements(
+            &db,
+            [
+                Type::string_literal(&db, "a"),
+                Type::string_literal(&db, "b"),
+            ],
+        )
+        .expect_union();
+        assert_eq!(
+            str_union.common_literal_fallback_instance(&db),
+            Some(KnownClass::Str.to_instance(&db))
+        );
+
+        let int_union = UnionType::from_elements(&db, [Type::int_literal(1), Type::int_literal(2)])
+            .expect_union();
+        assert_eq!(
+            int_union.common_literal_fallback_instance(&db),
+            Some(KnownClass::Int.to_instance(&db))
+        );
+
+        let mixed_union =
+            UnionType::from_elements(&db, [Type::string_literal(&db, "a"), Type::int_literal(1)])
+                .expect_union();
+        assert_eq!(mixed_union.common_literal_fallback_instance(&db), None);
     }
 
     fn map_marker<'db>(ty: &Type<'db>, marker: Type<'db>, replacement: Type<'db>) -> Type<'db> {
