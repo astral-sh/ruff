@@ -216,6 +216,11 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 unfolded.try_bool_impl(db, allow_short_circuit, visitor)
             })?,
+            Type::CycleMarked(marked) => visitor.visit(*self, || {
+                marked
+                    .inner(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)
+            })?,
 
             // `Divergent` is the recursive α-leaf. A non-contractive `Recursive` has no structure
             // to inspect, so both are `Ambiguous`, like `Dynamic`.

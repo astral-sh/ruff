@@ -297,6 +297,9 @@ impl ClassInfoConstraintFunction {
             Type::Recursive(_) => {
                 self.generate_constraint(db, classinfo.unwrap_recursive(db), is_positive)
             }
+            Type::CycleMarked(marked) => {
+                self.generate_constraint(db, marked.inner(db), is_positive)
+            }
             Type::TypeAlias(alias) => {
                 self.generate_constraint(db, alias.value_type(db), is_positive)
             }
@@ -2598,6 +2601,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Recursive(rec) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| is_or_contains_typeddict(db, unfolded))
         }
+        Type::CycleMarked(marked) => is_or_contains_typeddict(db, marked.inner(db)),
 
         Type::Dynamic(_)
         | Type::Divergent(_)
@@ -2777,6 +2781,9 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             all_matching_typeddict_fields_have_literal_types(db, unfolded, field_name)
         }),
+        Type::CycleMarked(marked) => {
+            all_matching_typeddict_fields_have_literal_types(db, marked.inner(db), field_name)
+        }
         Type::Intersection(intersection) => {
             intersection
                 .positive(db)

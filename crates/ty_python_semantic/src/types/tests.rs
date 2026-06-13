@@ -250,6 +250,48 @@ fn divergent_type() {
 }
 
 #[test]
+fn cycle_marked_type_is_transparent_but_preferred_in_unions() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let marked_int = Type::cycle_marked(&db, binder_id, int);
+
+    assert!(marked_int.is_equivalent_to(&db, int));
+    assert!(int.is_equivalent_to(&db, marked_int));
+
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let list_marked_int = KnownClass::List.to_specialized_instance(&db, &[marked_int]);
+
+    assert_eq!(
+        UnionType::from_elements(&db, [list_int, list_marked_int]),
+        list_marked_int
+    );
+    assert_eq!(
+        UnionType::from_elements(&db, [list_marked_int, list_int]),
+        list_marked_int
+    );
+}
+
+#[test]
+fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let marker_tuple = Type::heterogeneous_tuple(&db, [Type::divergent(binder_id), int]);
+    let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
+    let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
+
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [marker_tuple, finite_tuple]),
+        marked_finite_tuple
+    );
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [finite_tuple, marker_tuple]),
+        marked_finite_tuple
+    );
+}
+
+#[test]
 fn top_level_union_cycle_normalization_drops_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);

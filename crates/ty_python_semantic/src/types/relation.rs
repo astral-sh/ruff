@@ -283,6 +283,7 @@ impl<'db> Type<'db> {
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_) => true,
             Type::Dynamic(_)
+            | Type::CycleMarked(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -1137,6 +1138,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, source, target)
             }
+            (Type::CycleMarked(marked), _) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, marked.inner(db), target)
+            }),
+            (_, Type::CycleMarked(marked)) => self.with_recursion_guard(source, target, || {
+                self.check_type_pair(db, source, marked.inner(db))
+            }),
 
             (Type::Recursive(_), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source.unwrap_recursive(db), target)
@@ -2570,6 +2577,12 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, left, right)
             }
+            (Type::CycleMarked(marked), _) => self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, marked.inner(db), right)
+            }),
+            (_, Type::CycleMarked(marked)) => self.with_recursion_guard(left, right, || {
+                self.check_type_pair(db, left, marked.inner(db))
+            }),
 
             (Type::Recursive(_), _) => self.with_recursion_guard(left, right, || {
                 self.check_type_pair(db, left.unwrap_recursive(db), right)

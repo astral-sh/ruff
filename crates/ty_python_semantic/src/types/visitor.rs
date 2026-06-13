@@ -3,10 +3,11 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     types::{
-        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, EnumComplementType,
-        GenericAlias, IntersectionType, KnownBoundMethodType, KnownInstanceType,
-        NominalInstanceType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeFormType, TypeGuardType, TypeIsType, TypedDictType, UnionType,
+        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, CycleMarkedType,
+        EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType,
+        KnownInstanceType, NominalInstanceType, PropertyInstanceType, ProtocolInstanceType,
+        SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
+        TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         callable::walk_callable_type,
         class::walk_generic_alias,
@@ -22,7 +23,7 @@ use crate::{
         type_form::walk_typeform_type,
         typed_dict::walk_typed_dict_type,
         typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-        walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
+        walk_cycle_marked_type, walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
     },
 };
 use std::cell::{Cell, RefCell};
@@ -133,6 +134,10 @@ pub(crate) trait TypeVisitor<'db> {
     }
 
     fn visit_recursive_type(&self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) {}
+
+    fn visit_cycle_marked_type(&self, db: &'db dyn Db, marked: CycleMarkedType<'db>) {
+        walk_cycle_marked_type(db, marked, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -160,6 +165,7 @@ pub(super) enum NonAtomicType<'db> {
     TypeAlias(TypeAliasType<'db>),
     NewTypeInstance(NewType<'db>),
     Recursive(RecursiveType<'db>),
+    CycleMarked(CycleMarkedType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -234,6 +240,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
             Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
+            Type::CycleMarked(marked) => TypeKind::NonAtomic(NonAtomicType::CycleMarked(marked)),
         }
     }
 }
@@ -284,6 +291,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_newtype_instance_type(db, newtype);
         }
         NonAtomicType::Recursive(recursive) => visitor.visit_recursive_type(db, recursive),
+        NonAtomicType::CycleMarked(marked) => visitor.visit_cycle_marked_type(db, marked),
     }
 }
 

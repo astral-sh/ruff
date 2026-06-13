@@ -380,6 +380,7 @@ impl<'db> KnownInstanceType<'db> {
                 | TypeMapping::EagerExpansion
                 | TypeMapping::ReplaceRecursiveOrigin { .. }
                 | TypeMapping::ReplaceDivergent { .. }
+                | TypeMapping::EraseCycleMarks
                 | TypeMapping::RescopeReturnCallables(_) => Type::KnownInstance(self),
             },
             KnownInstanceType::UnionType(instance) => {

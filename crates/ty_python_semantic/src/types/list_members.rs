@@ -275,6 +275,9 @@ impl<'db> AllMembers<'db> {
             Type::Recursive(rec) => {
                 rec.map(db, |unfolded| self.extend_with_type(db, unfolded));
             }
+            Type::CycleMarked(marked) => {
+                self.extend_with_type(db, marked.inner(db));
+            }
 
             Type::Dynamic(_)
             | Type::Divergent(_)

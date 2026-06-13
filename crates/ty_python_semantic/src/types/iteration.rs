@@ -152,6 +152,7 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::Never)))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, alias.value_type(db)),
+                Type::CycleMarked(marked) => non_async_special_case(db, marked.inner(db)),
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => non_async_special_case(db, bound),
                     TypeVarBoundOrConstraints::Constraints(constraints) => {

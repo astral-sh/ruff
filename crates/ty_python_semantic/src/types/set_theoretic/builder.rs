@@ -39,6 +39,8 @@
 use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
+use crate::types::tuple::Tuple;
+use crate::types::visitor::{self, TypeVisitor};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
@@ -47,6 +49,7 @@ use crate::types::{
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
+use std::cell::Cell;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -217,6 +220,178 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
     }
 
     false
+}
+
+struct CycleFusionSummary<'db> {
+    recursion_guard: visitor::TypeCollector<'db>,
+    divergent_id: Cell<Option<salsa::Id>>,
+    has_multiple_divergent_ids: Cell<bool>,
+    has_cycle_marked: Cell<bool>,
+    has_recursive: Cell<bool>,
+    has_type_alias: Cell<bool>,
+}
+
+impl<'db> CycleFusionSummary<'db> {
+    fn collect(db: &'db dyn Db, ty: Type<'db>) -> Self {
+        let summary = Self {
+            recursion_guard: visitor::TypeCollector::default(),
+            divergent_id: Cell::new(None),
+            has_multiple_divergent_ids: Cell::new(false),
+            has_cycle_marked: Cell::new(false),
+            has_recursive: Cell::new(false),
+            has_type_alias: Cell::new(false),
+        };
+        summary.visit_type(db, ty);
+        summary
+    }
+
+    fn add_divergent_id(&self, id: salsa::Id) {
+        match self.divergent_id.get() {
+            Some(existing) if existing != id => self.has_multiple_divergent_ids.set(true),
+            Some(_) => {}
+            None => self.divergent_id.set(Some(id)),
+        }
+    }
+
+    fn is_finite_cycle_fusion_target(&self) -> bool {
+        self.divergent_id.get().is_none()
+            && !self.has_cycle_marked.get()
+            && !self.has_recursive.get()
+            && !self.has_type_alias.get()
+    }
+}
+
+impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
+    fn should_visit_lazy_type_attributes(&self) -> bool {
+        false
+    }
+
+    fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        match ty {
+            Type::Divergent(divergent) => self.add_divergent_id(divergent.id()),
+            Type::CycleMarked(_) => self.has_cycle_marked.set(true),
+            Type::Recursive(_) => self.has_recursive.set(true),
+            Type::TypeAlias(_) => self.has_type_alias.set(true),
+            _ => visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard),
+        }
+    }
+}
+
+struct CycleFusionOverlay {
+    divergent_id: Cell<Option<salsa::Id>>,
+    has_multiple_divergent_ids: Cell<bool>,
+}
+
+impl CycleFusionOverlay {
+    fn build<'db>(
+        db: &'db dyn Db,
+        marker_candidate: Type<'db>,
+        finite_candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let overlay = Self {
+            divergent_id: Cell::new(None),
+            has_multiple_divergent_ids: Cell::new(false),
+        };
+        let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate)?;
+        if !overlaid.supports_cycle_marked_recovery(db) {
+            return None;
+        }
+        let marker_id = overlay.single_divergent_id()?;
+        Some(Type::cycle_marked(db, marker_id, overlaid))
+    }
+
+    fn add_divergent_id(&self, id: salsa::Id) {
+        match self.divergent_id.get() {
+            Some(existing) if existing != id => self.has_multiple_divergent_ids.set(true),
+            Some(_) => {}
+            None => self.divergent_id.set(Some(id)),
+        }
+    }
+
+    fn single_divergent_id(&self) -> Option<salsa::Id> {
+        if self.has_multiple_divergent_ids.get() {
+            return None;
+        }
+        self.divergent_id.get()
+    }
+
+    fn overlay_type<'db>(
+        &self,
+        db: &'db dyn Db,
+        marker: Type<'db>,
+        finite: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if marker == finite {
+            return Some(marker);
+        }
+
+        match marker {
+            Type::Divergent(divergent) => {
+                self.add_divergent_id(divergent.id());
+                CycleFusionSummary::collect(db, finite)
+                    .is_finite_cycle_fusion_target()
+                    .then_some(finite)
+            }
+            Type::Union(union) => {
+                let mut elements = Vec::with_capacity(union.elements(db).len() + 1);
+                for element in union.elements(db) {
+                    let summary = CycleFusionSummary::collect(db, *element);
+                    if summary.divergent_id.get().is_some() {
+                        elements.push(self.overlay_type(db, *element, finite)?);
+                    } else if summary.is_finite_cycle_fusion_target() {
+                        elements.push(*element);
+                    } else {
+                        return None;
+                    }
+                }
+                elements.push(finite);
+                Some(UnionType::from_elements(db, elements))
+            }
+            Type::CycleMarked(_) | Type::Recursive(_) | Type::TypeAlias(_) => None,
+            _ => {
+                if let Some(overlaid_tuple) = self.overlay_tuple(db, marker, finite) {
+                    return Some(overlaid_tuple);
+                }
+
+                let marker_summary = CycleFusionSummary::collect(db, marker);
+                let finite_summary = CycleFusionSummary::collect(db, finite);
+                if marker_summary.is_finite_cycle_fusion_target()
+                    && finite_summary.is_finite_cycle_fusion_target()
+                {
+                    Some(UnionType::from_elements(db, [marker, finite]))
+                } else {
+                    None
+                }
+            }
+        }
+    }
+
+    fn overlay_tuple<'db>(
+        &self,
+        db: &'db dyn Db,
+        marker: Type<'db>,
+        finite: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let marker_tuple = marker.tuple_instance_spec(db)?;
+        let finite_tuple = finite.tuple_instance_spec(db)?;
+
+        let (Tuple::Fixed(marker), Tuple::Fixed(finite)) =
+            (marker_tuple.as_ref(), finite_tuple.as_ref())
+        else {
+            return None;
+        };
+
+        if marker.len() != finite.len() {
+            return None;
+        }
+
+        let elements = marker
+            .iter_all_elements()
+            .zip(finite.iter_all_elements())
+            .map(|(marker, finite)| self.overlay_type(db, marker, finite))
+            .collect::<Option<Vec<_>>>()?;
+        Some(Type::heterogeneous_tuple(db, elements))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -877,6 +1052,29 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
+    fn cycle_marked_represents_same_type(
+        db: &'db dyn Db,
+        preferred: Type<'db>,
+        other: Type<'db>,
+    ) -> bool {
+        preferred.contains_cycle_marked(db)
+            && !other.contains_cycle_marked(db)
+            && preferred.erase_cycle_marks(db) == other.erase_cycle_marks(db)
+    }
+
+    fn cycle_fusion_candidate(
+        db: &'db dyn Db,
+        cycle_recovery: bool,
+        marker_candidate: Type<'db>,
+        finite_candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if !cycle_recovery {
+            return None;
+        }
+
+        CycleFusionOverlay::build(db, marker_candidate, finite_candidate)
+    }
+
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let mut ty = ty;
         let bool_pair = |ty: Type<'db>| {
@@ -914,6 +1112,31 @@ impl<'db> UnionBuilder<'db> {
             };
 
             if ty == element_type {
+                return;
+            }
+
+            if let Some(fused) =
+                Self::cycle_fusion_candidate(self.db, self.cycle_recovery, ty, element_type)
+            {
+                to_remove.push(i);
+                ty = fused;
+                continue;
+            }
+
+            if let Some(fused) =
+                Self::cycle_fusion_candidate(self.db, self.cycle_recovery, element_type, ty)
+            {
+                to_remove.push(i);
+                ty = fused;
+                continue;
+            }
+
+            if Self::cycle_marked_represents_same_type(self.db, ty, element_type) {
+                to_remove.push(i);
+                continue;
+            }
+
+            if Self::cycle_marked_represents_same_type(self.db, element_type, ty) {
                 return;
             }
 

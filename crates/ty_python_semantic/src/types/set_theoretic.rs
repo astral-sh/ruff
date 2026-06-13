@@ -365,6 +365,7 @@ impl<'db> UnionType<'db> {
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
         let mut empty = true;
+        let mut top_level_marker_id = None;
         for ty in self.elements(db) {
             if normalization.is_nested() {
                 // list[T | Divergent] => list[Divergent]
@@ -381,7 +382,16 @@ impl<'db> UnionType<'db> {
                 // Top-level cycle markers in a union do not mean true divergence, so we skip
                 // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
                 if ty.is_top_level_cycle_marker(db, normalization.marker()) {
+                    top_level_marker_id = normalization.marker_id();
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
+                    continue;
+                }
+                if let Type::CycleMarked(marked) = ty
+                    && normalization.matches_cycle_marked_marker(db, marked)
+                {
+                    top_level_marker_id = Some(marked.binder_id(db));
+                    builder = builder.add(marked.inner(db));
+                    empty = false;
                     continue;
                 }
                 builder = builder.add(ty);
@@ -391,7 +401,15 @@ impl<'db> UnionType<'db> {
         if empty {
             builder = builder.add(normalization.marker());
         }
-        Some(builder.build())
+        let ty = builder.build();
+        if let Some(marker_id) = top_level_marker_id
+            && !ty.same_divergent_marker(normalization.marker())
+            && ty.supports_cycle_marked_recovery(db)
+        {
+            Some(Type::cycle_marked(db, marker_id, ty))
+        } else {
+            Some(ty)
+        }
     }
 
     /// Identify some specific unions of known classes, currently the ones that `float` and

@@ -601,6 +601,12 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
+            (Type::CycleMarked(marked), _) => {
+                Some(marked.inner(db).subscript(db, slice_ty, expr_context))
+            }
+            (_, Type::CycleMarked(marked)) => {
+                Some(value_ty.subscript(db, marked.inner(db), expr_context))
+            }
             // `Divergent` is the recursive α-leaf (reached after a `Type::Recursive` unfold, or a
             // cycle mid-iteration provisional), not a standalone type — subscripting it yields
             // itself, like `Dynamic`. Generic cycle *results* are wrapped in `Type::Recursive`.

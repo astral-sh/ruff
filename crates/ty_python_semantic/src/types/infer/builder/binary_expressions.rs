@@ -321,6 +321,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
+            (Type::CycleMarked(marked), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    marked.inner(db),
+                    rhs,
+                    op,
+                    visitor,
+                )
+            }),
+            (lhs, Type::CycleMarked(marked), _) => visitor.visit((left_ty, op, right_ty), || {
+                self.infer_binary_expression_type_impl(
+                    node,
+                    emitted_division_by_zero_diagnostic,
+                    lhs,
+                    marked.inner(db),
+                    op,
+                    visitor,
+                )
+            }),
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(
                     node,

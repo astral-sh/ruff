@@ -1899,6 +1899,9 @@ pub(crate) fn extract_unpacked_typed_dict_from_value_type<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             extract_unpacked_typed_dict_from_value_type(db, unfolded)
         }),
+        Type::CycleMarked(marked) => {
+            extract_unpacked_typed_dict_from_value_type(db, marked.inner(db))
+        }
         // All other types cannot contain a TypedDict
         Type::Dynamic(_)
         | Type::Divergent(_)

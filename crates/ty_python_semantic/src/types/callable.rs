@@ -95,6 +95,9 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            Type::CycleMarked(marked) => marked
+                .inner(db)
+                .try_upcast_to_callable_with_policy_and_context(db, policy, context),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
