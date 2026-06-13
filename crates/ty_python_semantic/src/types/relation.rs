@@ -1786,6 +1786,26 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 | Type::ModuleLiteral(_),
             ) => self.never(),
 
+            (Type::FunctionLiteral(source_function), Type::Callable(target_callable)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_callable_signature_source_pair(
+                        db,
+                        source_function.signature(db),
+                        source_function.callable_type_kind(db),
+                        target_callable,
+                    )
+                }),
+
+            (Type::BoundMethod(source_method), Type::Callable(target_callable)) => self
+                .with_recursion_guard(source, target, || {
+                    self.check_callable_signature_source_pair(
+                        db,
+                        &source_method.bound_signatures(db),
+                        CallableTypeKind::FunctionLike,
+                        target_callable,
+                    )
+                }),
+
             (Type::Callable(source_callable), Type::Callable(target_callable)) => self
                 .with_recursion_guard(source, target, || {
                     self.check_callable_pair(db, source_callable, target_callable)
