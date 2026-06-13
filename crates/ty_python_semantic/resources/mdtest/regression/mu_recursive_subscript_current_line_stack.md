@@ -31,6 +31,43 @@ class TextFile:
                     self.current_line = self.current_line + 1
 ```
 
+The line state can also include `None` on some paths. If the attribute enters a list state inside
+the loop and then returns to the element type through a subscript read, checking the assignment
+should terminate and report the invalid attribute assignment.
+
+```py
+class SetuptoolsCurrentLineState:
+    def __init__(self) -> None:
+        self.current_line = 0
+        self.current_line = None
+
+    def update(self) -> None:
+        while True:
+            if not isinstance(self.current_line, list):
+                self.current_line = [self.current_line, self.current_line]  # error: [invalid-assignment]
+
+            if isinstance(self.current_line, list):
+                self.current_line = self.current_line[1]
+```
+
+Assigning a member to itself in the same loop does not add new type information and should not
+force the member to be inferred from its own binding.
+
+```py
+class MemberSelfAssignmentNoOp:
+    def __init__(self) -> None:
+        self.current_line = 0
+        self.current_line = None
+
+    def update(self) -> None:
+        while True:
+            if not isinstance(self.current_line, list):
+                self.current_line = [self.current_line, self.current_line]
+
+            if isinstance(self.current_line, list):
+                self.current_line = self.current_line
+```
+
 This is minimized from a Tanjun ecosystem failure. The recursive tree alias can flow through a
 loop-carried local, be read with a subscript, and then be used for a member lookup. Cycle recovery
 should not preserve markers on dynamic fallback values produced by the subscript operation.

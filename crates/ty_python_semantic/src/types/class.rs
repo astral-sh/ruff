@@ -730,8 +730,20 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, specialization, name, MemberLookupPolicy::default())
+    }
+
+    pub(crate) fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
-            Self::Static(class) => class.instance_member(db, specialization, name),
+            Self::Static(class) => {
+                class.instance_member_with_policy(db, specialization, name, policy)
+            }
             Self::Dynamic(class) => class.instance_member(db, name),
             Self::DynamicNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
             Self::DynamicTypedDict(_) => PlaceAndQualifiers::default(),
@@ -1796,6 +1808,15 @@ impl<'db> ClassType<'db> {
     ///
     /// See [`Type::instance_member`] for more details.
     pub(super) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    pub(super) fn instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(class)) => class.instance_member(db, name),
             Self::NonGeneric(ClassLiteral::DynamicNamedTuple(namedtuple)) => {
@@ -1809,7 +1830,7 @@ impl<'db> ClassType<'db> {
                 if class.is_typed_dict(db) {
                     return Place::Undefined.into();
                 }
-                class.instance_member(db, None, name)
+                class.instance_member_with_policy(db, None, name, policy)
             }
             Self::Generic(generic) => {
                 let class_literal = generic.origin(db);
@@ -1820,7 +1841,7 @@ impl<'db> ClassType<'db> {
                 }
 
                 class_literal
-                    .instance_member(db, specialization, name)
+                    .instance_member_with_policy(db, specialization, name, policy)
                     .map_type(|ty| ty.apply_optional_specialization(db, specialization))
             }
         }
@@ -1851,7 +1872,12 @@ impl<'db> ClassType<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> Member<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Dynamic(dynamic)) => {
                 dynamic.own_instance_member(db, name)
@@ -1864,13 +1890,13 @@ impl<'db> ClassType<'db> {
                 enum_lit.own_instance_member(db, name)
             }
             Self::NonGeneric(ClassLiteral::Static(class_literal)) => {
-                class_literal.own_instance_member(db, name)
+                class_literal.own_instance_member_with_policy(db, name, policy)
             }
             Self::Generic(generic) => {
                 let specialization = generic.specialization(db);
                 generic
                     .origin(db)
-                    .own_instance_member(db, name)
+                    .own_instance_member_with_policy(db, name, policy)
                     .map_type(|ty| ty.apply_optional_specialization(db, Some(specialization)))
             }
         }
@@ -2451,7 +2477,11 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
     ///
     /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
     /// allowing the caller to handle this case specially.
-    pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+    pub(super) fn instance_member(
+        self,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> InstanceMemberResult<'db> {
         let db = self.db;
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
@@ -2480,7 +2510,9 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                                 ..
                             }),
                         qualifiers,
-                    } = class.own_instance_member(db, name).inner
+                    } = class
+                        .own_instance_member_with_policy(db, name, policy)
+                        .inner
                     {
                         if boundness == Definedness::AlwaysDefined {
                             if origin.is_declared() {

@@ -2119,17 +2119,18 @@ impl<'db> StaticClassLiteral<'db> {
     /// Look up an instance attribute (available in `__dict__`) of the given name.
     ///
     /// See [`Type::instance_member`] for more details.
-    pub(super) fn instance_member(
+    pub(super) fn instance_member_with_policy(
         self,
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         name: &str,
+        policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         if self.is_typed_dict(db) {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, self.iter_mro(db, specialization)).instance_member(name) {
+        match MroLookup::new(db, self.iter_mro(db, specialization)).instance_member(name, policy) {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db)
@@ -2505,6 +2506,15 @@ impl<'db> StaticClassLiteral<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        self.own_instance_member_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    pub(super) fn own_instance_member_with_policy(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> Member<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
@@ -2550,8 +2560,9 @@ impl<'db> StaticClassLiteral<'db> {
                     if qualifiers.contains(TypeQualifiers::INIT_VAR) {
                         // We ignore `InitVar` declarations on the class body, unless that attribute is overwritten
                         // by an implicit assignment in a method
-                        if Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                            .is_undefined()
+                        if policy.no_implicit_instance_attributes()
+                            || Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                                .is_undefined()
                         {
                             return Member::unbound();
                         }
@@ -2575,13 +2586,19 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        let implicit =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-                        if let Place::Defined(DefinedPlace {
-                            ty: implicit_ty,
-                            provenance: implicit_provenance,
-                            ..
-                        }) = implicit.inner.place
+                        if !policy.no_implicit_instance_attributes()
+                            && let Place::Defined(DefinedPlace {
+                                ty: implicit_ty,
+                                provenance: implicit_provenance,
+                                ..
+                            }) = Self::implicit_attribute(
+                                db,
+                                body_scope,
+                                name,
+                                MethodDecorator::None,
+                            )
+                            .inner
+                            .place
                         {
                             if declaredness == Definedness::AlwaysDefined {
                                 // If a symbol is definitely declared, and we see
@@ -2644,8 +2661,8 @@ impl<'db> StaticClassLiteral<'db> {
                             Member {
                                 inner: declared.with_qualifiers(qualifiers),
                             }
-                        } else {
-                            if let Place::Defined(DefinedPlace {
+                        } else if !policy.no_implicit_instance_attributes()
+                            && let Place::Defined(DefinedPlace {
                                 ty: implicit_ty,
                                 provenance: implicit_provenance,
                                 ..
@@ -2657,25 +2674,20 @@ impl<'db> StaticClassLiteral<'db> {
                             )
                             .inner
                             .place
-                            {
-                                Member {
-                                    inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_two_elements(
-                                            db,
-                                            declared_ty,
-                                            implicit_ty,
-                                        ),
-                                        origin: TypeOrigin::Declared,
-                                        definedness: declaredness,
-                                        public_type_policy: PublicTypePolicy::Raw,
-                                        provenance: implicit_provenance.or(declared_provenance),
-                                    })
-                                    .with_qualifiers(qualifiers),
-                                }
-                            } else {
-                                Member {
-                                    inner: declared.with_qualifiers(qualifiers),
-                                }
+                        {
+                            Member {
+                                inner: Place::Defined(DefinedPlace {
+                                    ty: UnionType::from_two_elements(db, declared_ty, implicit_ty),
+                                    origin: TypeOrigin::Declared,
+                                    definedness: declaredness,
+                                    public_type_policy: PublicTypePolicy::Raw,
+                                    provenance: implicit_provenance.or(declared_provenance),
+                                })
+                                .with_qualifiers(qualifiers),
+                            }
+                        } else {
+                            Member {
+                                inner: declared.with_qualifiers(qualifiers),
                             }
                         }
                     }
@@ -2688,14 +2700,22 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    if policy.no_implicit_instance_attributes() {
+                        Member::unbound()
+                    } else {
+                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+                    }
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            if policy.no_implicit_instance_attributes() {
+                Member::unbound()
+            } else {
+                Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
+            }
         }
     }
 

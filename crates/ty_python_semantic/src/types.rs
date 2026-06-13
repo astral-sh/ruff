@@ -473,6 +473,9 @@ bitflags! {
 
         /// Do not call `__getattr__` during member lookup.
         const NO_GETATTR_LOOKUP = 1 << 4;
+
+        /// Do not use instance attributes synthesized from assignments in methods.
+        const NO_IMPLICIT_INSTANCE_ATTRIBUTES = 1 << 5;
     }
 }
 
@@ -504,6 +507,11 @@ impl MemberLookupPolicy {
     /// Do not call `__getattr__` during member lookup.
     pub(crate) const fn no_getattr_lookup(self) -> bool {
         self.contains(Self::NO_GETATTR_LOOKUP)
+    }
+
+    /// Do not use instance attributes synthesized from assignments in methods.
+    pub(crate) const fn no_implicit_instance_attributes(self) -> bool {
+        self.contains(Self::NO_IMPLICIT_INSTANCE_ATTRIBUTES)
     }
 }
 
@@ -3313,7 +3321,7 @@ impl<'db> Type<'db> {
         let Some(metaclass_instance) = self.to_meta_type(db).to_instance(db) else {
             return class_attr;
         };
-        let metaclass_attr = metaclass_instance.instance_member(db, name);
+        let metaclass_attr = metaclass_instance.instance_member_with_policy(db, name, policy);
 
         if own_declaration_definedness.is_some() {
             // A conditionally-declared attribute is a contract only on paths where that
@@ -3341,17 +3349,26 @@ impl<'db> Type<'db> {
     ///         self.b: str = "a"
     /// ```
     fn instance_member(&self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        self.instance_member_with_policy(db, name, MemberLookupPolicy::default())
+    }
+
+    fn instance_member_with_policy(
+        &self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
         match self {
-            Type::Union(union) => {
-                union.map_with_boundness_and_qualifiers(db, |elem| elem.instance_member(db, name))
-            }
+            Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
+                elem.instance_member_with_policy(db, name, policy)
+            }),
 
             Type::Intersection(intersection) => {
                 if let Some(complement) = intersection.enum_complement(db) {
                     enums::instance_member_for_enum_complement(db, complement, name)
                 } else {
                     intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                        elem.instance_member(db, name)
+                        elem.instance_member_with_policy(db, name, policy)
                     })
                 }
             }
@@ -3362,73 +3379,84 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
             Type::Recursive(rec) if rec.is_non_contractive(db) => Place::bound(self).into(),
-            Type::Recursive(rec) => rec.map(db, |unfolded| unfolded.instance_member(db, name)),
-            Type::CycleMarked(marked) => marked.map(db, |inner| inner.instance_member(db, name)),
-            Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
-            Type::NewTypeInstance(newtype) => {
-                newtype.concrete_base_type(db).instance_member(db, name)
-            }
+            Type::Recursive(rec) => rec.map(db, |unfolded| {
+                unfolded.instance_member_with_policy(db, name, policy)
+            }),
+            Type::CycleMarked(marked) => marked.map(db, |inner| {
+                inner.instance_member_with_policy(db, name, policy)
+            }),
+            Type::NominalInstance(instance) => instance
+                .class(db)
+                .instance_member_with_policy(db, name, policy),
+            Type::NewTypeInstance(newtype) => newtype
+                .concrete_base_type(db)
+                .instance_member_with_policy(db, name, policy),
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
             Type::FunctionLiteral(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .instance_member(db, name),
+                .instance_member_with_policy(db, name, policy),
 
             Type::BoundMethod(_) => KnownClass::MethodType
                 .to_instance(db)
-                .instance_member(db, name),
-            Type::KnownBoundMethod(method) => {
-                method.class().to_instance(db).instance_member(db, name)
-            }
+                .instance_member_with_policy(db, name, policy),
+            Type::KnownBoundMethod(method) => method
+                .class()
+                .to_instance(db)
+                .instance_member_with_policy(db, name, policy),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                 .to_instance(db)
-                .instance_member(db, name),
+                .instance_member_with_policy(db, name, policy),
             Type::DataclassDecorator(_) => KnownClass::FunctionType
                 .to_instance(db)
-                .instance_member(db, name),
+                .instance_member_with_policy(db, name, policy),
             Type::Callable(_) | Type::DataclassTransformer(_) => {
-                Type::object().instance_member(db, name)
+                Type::object().instance_member_with_policy(db, name, policy)
             }
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => Type::object().instance_member(db, name),
+                    None => Type::object().instance_member_with_policy(db, name, policy),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.instance_member(db, name)
+                        bound.instance_member_with_policy(db, name, policy)
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
                         .map_with_boundness_and_qualifiers(db, |constraint| {
-                            constraint.instance_member(db, name)
+                            constraint.instance_member_with_policy(db, name, policy)
                         }),
                 }
             }
 
-            Type::TypeIs(_) | Type::TypeGuard(_) => {
-                KnownClass::Bool.to_instance(db).instance_member(db, name)
-            }
+            Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool
+                .to_instance(db)
+                .instance_member_with_policy(db, name, policy),
 
-            Type::LiteralValue(literal) => literal.fallback_instance(db).instance_member(db, name),
+            Type::LiteralValue(literal) => literal
+                .fallback_instance(db)
+                .instance_member_with_policy(db, name, policy),
 
             Type::AlwaysTruthy | Type::AlwaysFalsy | Type::TypeForm(_) => {
-                Type::object().instance_member(db, name)
+                Type::object().instance_member_with_policy(db, name, policy)
             }
             Type::ModuleLiteral(_) => KnownClass::ModuleType
                 .to_instance(db)
-                .instance_member(db, name),
+                .instance_member_with_policy(db, name, policy),
 
             Type::SpecialForm(_) | Type::KnownInstance(_) => Place::Undefined.into(),
 
-            Type::PropertyInstance(property) => {
-                property.instance_fallback(db).instance_member(db, name)
-            }
+            Type::PropertyInstance(property) => property
+                .instance_fallback(db)
+                .instance_member_with_policy(db, name, policy),
 
             // Note: `super(pivot, owner).__dict__` refers to the `__dict__` of the `builtins.super` instance,
             // not that of the owner.
             // This means we should only look up instance members defined on the `builtins.super()` instance itself.
             // If you want to look up a member in the MRO of the `super`'s owner,
             // refer to [`Type::member`] instead.
-            Type::BoundSuper(_) => KnownClass::Super.to_instance(db).instance_member(db, name),
+            Type::BoundSuper(_) => KnownClass::Super
+                .to_instance(db)
+                .instance_member_with_policy(db, name, policy),
 
             // TODO: we currently don't model the fact that class literals and subclass-of types have
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
@@ -3440,7 +3468,9 @@ impl<'db> Type<'db> {
 
             Type::TypedDict(_) => Place::Undefined.into(),
 
-            Type::TypeAlias(alias) => alias.value_type(db).instance_member(db, name),
+            Type::TypeAlias(alias) => alias
+                .value_type(db)
+                .instance_member_with_policy(db, name, policy),
         }
     }
 
@@ -4365,7 +4395,7 @@ impl<'db> Type<'db> {
                         .into();
                     }
 
-                    let fallback = this.instance_member(db, name_str);
+                    let fallback = this.instance_member_with_policy(db, name_str, policy);
 
                     let result = this.invoke_descriptor_protocol(
                         db,

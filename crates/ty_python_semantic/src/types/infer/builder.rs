@@ -7,6 +7,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::source_text;
 use ruff_python_ast::helpers::is_dotted_name;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::visitor::{self as ast_visitor, Visitor};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ArgOrKeyword, ArgumentsSourceOrder, ExprContext, HasNodeIndex,
     PythonVersion,
@@ -1223,6 +1224,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         node: AnyNodeRef<'a>,
         binding: Definition<'db>,
     ) -> AddBinding<'db, 'a> {
+        self.add_binding_with_member_lookup_policy(node, binding, MemberLookupPolicy::default())
+    }
+
+    fn add_binding_with_member_lookup_policy<'a>(
+        &mut self,
+        node: AnyNodeRef<'a>,
+        binding: Definition<'db>,
+        member_lookup_policy: MemberLookupPolicy,
+    ) -> AddBinding<'db, 'a> {
         let db = self.db();
         debug_assert!(
             binding
@@ -1292,7 +1302,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } = place_and_quals;
 
         let declared_ty = if resolved_place.is_undefined() && !place.is_symbol() {
-            self.fallback_member_declared_type(node)
+            self.fallback_member_declared_type(node, member_lookup_policy)
         } else {
             None
         }
@@ -1309,7 +1319,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// For a member binding without a live place declaration, obtain its declared type from
     /// normal attribute or subscript lookup on its receiver.
-    fn fallback_member_declared_type(&mut self, node: AnyNodeRef<'_>) -> Option<Type<'db>> {
+    fn fallback_member_declared_type(
+        &mut self,
+        node: AnyNodeRef<'_>,
+        member_lookup_policy: MemberLookupPolicy,
+    ) -> Option<Type<'db>> {
         let db = self.db();
 
         if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
@@ -1318,7 +1332,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ty,
                 definedness: Definedness::AlwaysDefined,
                 ..
-            }) = value_type.member(db, attr).place
+            }) = value_type
+                .member_lookup_with_policy(db, attr.as_str().into(), member_lookup_policy)
+                .place
             {
                 // TODO: also consider qualifiers on the attribute
                 Some(ty)
@@ -3715,8 +3731,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let target = assignment.target(self.module());
+        let value = assignment.value(self.module());
+        let member_lookup_policy = if Self::value_contains_member_place(target, value) {
+            MemberLookupPolicy::NO_IMPLICIT_INSTANCE_ATTRIBUTES
+        } else {
+            MemberLookupPolicy::default()
+        };
 
-        let add = self.add_binding(target.into(), definition);
+        let add = self.add_binding_with_member_lookup_policy(
+            target.into(),
+            definition,
+            member_lookup_policy,
+        );
         let target_ty =
             self.infer_assignment_definition_impl(assignment, definition, add.type_context());
         self.store_expression_type(target, target_ty);
@@ -3752,6 +3778,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
+                if Self::is_member_self_assignment(target, value) {
+                    return tcx.annotation.unwrap_or(Type::unknown());
+                }
+
                 // This could be an implicit type alias (OptionalList = list[T] | None). Use the definition
                 // of `OptionalList` as the binding context while inferring the RHS (`list[T] | None`), in
                 // order to bind `T` to `OptionalList`.
@@ -3869,6 +3899,59 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         target_ty
+    }
+
+    fn is_member_self_assignment(target: &ast::Expr, value: &ast::Expr) -> bool {
+        let Some(target_place) = PlaceExpr::try_from_expr(target) else {
+            return false;
+        };
+
+        if !matches!(target_place, PlaceExpr::Member(_)) {
+            return false;
+        }
+
+        PlaceExpr::try_from_expr(value).is_some_and(|value_place| value_place == target_place)
+    }
+
+    fn value_contains_member_place(target: &ast::Expr, value: &ast::Expr) -> bool {
+        let Some(target_place) = PlaceExpr::try_from_expr(target) else {
+            return false;
+        };
+
+        if !matches!(target_place, PlaceExpr::Member(_)) {
+            return false;
+        }
+
+        struct ContainsMemberPlace<'a> {
+            target: &'a PlaceExpr,
+            found: bool,
+        }
+
+        impl<'a> Visitor<'a> for ContainsMemberPlace<'_> {
+            fn visit_expr(&mut self, expr: &'a ast::Expr) {
+                if self.found {
+                    return;
+                }
+
+                if PlaceExpr::try_from_expr(expr).is_some_and(|place| place == *self.target) {
+                    self.found = true;
+                    return;
+                }
+
+                if matches!(expr, ast::Expr::Lambda(_)) {
+                    return;
+                }
+
+                ast_visitor::walk_expr(self, expr);
+            }
+        }
+
+        let mut visitor = ContainsMemberPlace {
+            target: &target_place,
+            found: false,
+        };
+        visitor.visit_expr(value);
+        visitor.found
     }
 
     fn infer_newtype_expression(
@@ -4531,7 +4614,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let node = target.into();
             let add = AddBinding {
-                declared_ty: self.fallback_member_declared_type(node),
+                declared_ty: self
+                    .fallback_member_declared_type(node, MemberLookupPolicy::default()),
                 binding: definition,
                 node,
                 qualifiers: TypeQualifiers::empty(),

@@ -371,7 +371,9 @@ impl<'db> DynamicClassLiteral<'db> {
 
     /// Look up an instance member by iterating through the MRO.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
-        match MroLookup::new(db, self.iter_mro(db)).instance_member(name) {
+        match MroLookup::new(db, self.iter_mro(db))
+            .instance_member(name, MemberLookupPolicy::default())
+        {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => {
                 // Simplified `TypedDict` handling without type mapping.
