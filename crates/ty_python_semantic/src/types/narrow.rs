@@ -1169,8 +1169,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         builder.try_build()
     }
 
-    // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
-    // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
+    // TODO: Share more of this implementation with equality narrowing once we can prove that
+    // containment uses element-wise equality rather than a custom `__contains__` method.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
