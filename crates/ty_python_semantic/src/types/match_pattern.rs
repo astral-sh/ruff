@@ -318,8 +318,9 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    if !pattern_requires_subject_type(kind) {
-        return definite_match_pattern_type(db, kind);
+    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
+    {
+        return subject_independent_ty;
     }
 
     let resolved_subject_ty = subject_ty.resolve_type_alias(db);
@@ -351,10 +352,15 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
                 _ => {}
             }
         }
-        PatternPredicateKind::Sequence(kind)
-            if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) =>
-        {
-            return subject_ty;
+        PatternPredicateKind::Sequence(kind) => {
+            return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
+                subject_ty
+            } else {
+                // A nested subject-dependent pattern rejected the context-free approximation.
+                // Reusing that approximation for the surrounding sequence would reintroduce the
+                // values that the recursive analysis deliberately excluded.
+                Type::Never
+            };
         }
         PatternPredicateKind::Or(patterns) => {
             return UnionType::from_elements(
@@ -367,7 +373,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         PatternPredicateKind::As(Some(pattern), _) => {
             return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
         }
-        _ => {}
+        _ => return Type::Never,
     }
 
     let subject_independent_ty = definite_match_pattern_type(db, kind);
@@ -383,16 +389,48 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
         .build()
 }
 
-/// Return whether exhaustiveness can differ based on the current subject type.
-fn pattern_requires_subject_type(kind: &PatternPredicateKind<'_>) -> bool {
+/// Return the definite-match type when it does not depend on the current subject type.
+///
+/// `None` means that callers must use subject-aware analysis instead of falling back to the
+/// context-free approximation. In particular, protocol and attribute class patterns can be
+/// refutable for a proper non-final subtype even when static subtyping says otherwise.
+fn subject_independent_definite_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Type<'db>> {
     match kind {
-        PatternPredicateKind::Class(_) => true,
-        PatternPredicateKind::Sequence(kind) => {
-            kind.patterns.iter().any(pattern_requires_subject_type)
+        PatternPredicateKind::Class(kind) => {
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class)
+                    if kind.is_argumentless()
+                        && !class.is_protocol(db)
+                        && !typed_dict_matches_class_pattern(db, class) =>
+                {
+                    Some(Type::instance(db, class.top_materialization(db)))
+                }
+                Type::ClassLiteral(_) => None,
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless() =>
+                {
+                    Some(callable_pattern_type(db))
+                }
+                _ => Some(Type::Never),
+            }
         }
-        PatternPredicateKind::Or(patterns) => patterns.iter().any(pattern_requires_subject_type),
-        PatternPredicateKind::As(Some(pattern), _) => pattern_requires_subject_type(pattern),
-        _ => false,
+        PatternPredicateKind::Sequence(kind) => kind
+            .patterns
+            .iter()
+            .all(|pattern| subject_independent_definite_match_pattern_type(db, pattern).is_some())
+            .then(|| definite_sequence_pattern_type(db, kind)),
+        PatternPredicateKind::Or(patterns) => patterns
+            .iter()
+            .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
+            .collect::<Option<Vec<_>>>()
+            .map(|types| UnionType::from_elements(db, types)),
+        PatternPredicateKind::As(Some(pattern), _) => {
+            subject_independent_definite_match_pattern_type(db, pattern)
+        }
+        _ => Some(definite_match_pattern_type(db, kind)),
     }
 }
 fn sequence_pattern_getitem_method<'db>(
