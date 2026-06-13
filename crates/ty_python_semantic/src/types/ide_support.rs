@@ -402,6 +402,41 @@ pub fn implementation_definitions_for_method<'db>(
     implementation_definitions_for_class_family(db, root, method_name)
 }
 
+/// Returns definitions for the implementation family of a class declaration.
+///
+/// ```py
+/// class Animal:
+///       ^^^^^^
+///     pass
+///
+/// class Dog(Animal): ...
+/// class Cat(Animal): ...
+/// ```
+///
+/// The clicked class is the root and is returned first, followed by its known transitive
+/// subclasses such as `Dog` and `Cat`. This walks down the hierarchy only: clicking a subclass
+/// returns that class and its own subclasses, not its parents.
+pub fn implementation_definitions_for_class<'db>(
+    model: &SemanticModel<'db>,
+    class: &ast::StmtClassDef,
+) -> Vec<ResolvedDefinition<'db>> {
+    let db = model.db();
+    let Some(root) = extract_class_literal(db, binding_type(db, class.definition(model))) else {
+        return Vec::new();
+    };
+
+    let mut definitions = Vec::new();
+    for class_literal in std::iter::once(root).chain(transitive_subtypes(db, root)) {
+        if let Some(definition) = class_literal.definition(db) {
+            let resolved = ResolvedDefinition::Definition(definition);
+            if !definitions.contains(&resolved) {
+                definitions.push(resolved);
+            }
+        }
+    }
+    definitions
+}
+
 /// Returns the descriptor object type for an attribute expression `x.y`, without invoking the
 /// descriptor protocol. This corresponds to `inspect.getattr_static(x, "y")` at the type level.
 pub fn static_member_type_for_attribute<'db>(

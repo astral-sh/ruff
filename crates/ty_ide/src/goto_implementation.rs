@@ -4,7 +4,8 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use ty_python_semantic::{
-    SemanticModel, implementation_definitions_for_attribute, implementation_definitions_for_method,
+    SemanticModel, implementation_definitions_for_attribute, implementation_definitions_for_class,
+    implementation_definitions_for_method,
 };
 
 /// Navigate from an attribute access or method declaration to that method and known subclass overrides.
@@ -25,6 +26,15 @@ use ty_python_semantic::{
 ///     def speak(self): ...
 ///         ^^^^^
 /// ```
+///
+/// For a class declaration, this uses the class as the root and returns it along with its known
+/// transitive subclasses:
+///
+/// ```py
+/// class Animal:
+///       ^^^^^^
+///     pass
+/// ```
 pub fn goto_implementation(
     db: &dyn Db,
     file: File,
@@ -43,6 +53,7 @@ pub fn goto_implementation(
         GotoTarget::FunctionDef(function) => {
             implementation_definitions_for_method(&model, function)
         }
+        GotoTarget::ClassDef(class) => implementation_definitions_for_class(&model, class),
         _ => return None,
     };
 
@@ -651,6 +662,443 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_class_family() {
+        let test = cursor_test(
+            r#"
+            class Anim<CURSOR>al:
+                pass
+
+            class Dog(Animal):
+                pass
+
+            class Cat(Animal):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 3 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Dog(Animal):
+          |       ---
+        6 |     pass
+        7 |
+        8 | class Cat(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_no_subclasses() {
+        let test = cursor_test(
+            r#"
+            class Wid<CURSOR>get:
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Widget:
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 1 implementation
+         --> main.py:2:7
+          |
+        2 | class Widget:
+          |       ------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_transitive_subclasses() {
+        let test = cursor_test(
+            r#"
+            class Anim<CURSOR>al:
+                pass
+
+            class Mammal(Animal):
+                pass
+
+            class Dog(Mammal):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 3 implementations
+         --> main.py:2:7
+          |
+        2 | class Animal:
+          |       ------
+        3 |     pass
+        4 |
+        5 | class Mammal(Animal):
+          |       ------
+        6 |     pass
+        7 |
+        8 | class Dog(Mammal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_intermediate_root() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Mam<CURSOR>mal(Animal):
+                pass
+
+            class Dog(Mammal):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:5:7
+          |
+        5 | class Mammal(Animal):
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:5:7
+          |
+        5 | class Mammal(Animal):
+          |       ------
+        6 |     pass
+        7 |
+        8 | class Dog(Mammal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_multiple_inheritance() {
+        let test = cursor_test(
+            r#"
+            class Walk<CURSOR>er:
+                pass
+
+            class Swimmer:
+                pass
+
+            class Amphibian(Walker, Swimmer):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Walker:
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Walker:
+          |       ------
+          |
+         ::: main.py:8:7
+          |
+        8 | class Amphibian(Walker, Swimmer):
+          |       ---------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_diamond_dedup() {
+        let test = cursor_test(
+            r#"
+            class Ba<CURSOR>se:
+                pass
+
+            class Left(Base):
+                pass
+
+            class Right(Base):
+                pass
+
+            class Diamond(Left, Right):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Base:
+          |       ^^^^ Clicking here
+          |
+        info: Found 4 implementations
+          --> main.py:2:7
+           |
+         2 | class Base:
+           |       ----
+         3 |     pass
+         4 |
+         5 | class Left(Base):
+           |       ----
+         6 |     pass
+         7 |
+         8 | class Right(Base):
+           |       -----
+         9 |     pass
+        10 |
+        11 | class Diamond(Left, Right):
+           |       -------
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_subclass_through_import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "base.py",
+                r#"
+                class Ba<CURSOR>se:
+                    pass
+                "#,
+            )
+            .source(
+                "aliases.py",
+                r#"
+                from base import Base as B
+                "#,
+            )
+            .source(
+                "child.py",
+                r#"
+                from aliases import B
+
+                class Child(B):
+                    pass
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> base.py:2:7
+          |
+        2 | class Base:
+          |       ^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> base.py:2:7
+          |
+        2 | class Base:
+          |       ----
+          |
+         ::: child.py:4:7
+          |
+        4 | class Child(B):
+          |       -----
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_generic_base() {
+        let test = cursor_test(
+            r#"
+            class Contai<CURSOR>ner[T]:
+                pass
+
+            class IntContainer(Container[int]):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Container[T]:
+          |       ^^^^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Container[T]:
+          |       ---------
+        3 |     pass
+        4 |
+        5 | class IntContainer(Container[int]):
+          |       ------------
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_abstract_base_included() {
+        let test = cursor_test(
+            r#"
+            from abc import ABC
+
+            class Anim<CURSOR>al(ABC):
+                pass
+
+            class Dog(Animal):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:7
+          |
+        4 | class Animal(ABC):
+          |       ^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:4:7
+          |
+        4 | class Animal(ABC):
+          |       ------
+        5 |     pass
+        6 |
+        7 | class Dog(Animal):
+          |       ---
+          |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_protocol_nominal_only() {
+        let test = cursor_test(
+            r#"
+            from typing import Protocol
+
+            class Spea<CURSOR>ker(Protocol):
+                def speak(self) -> None: ...
+
+            class Dog:
+                def speak(self) -> None: ...
+
+            class Cat(Speaker):
+                def speak(self) -> None: ...
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:4:7
+          |
+        4 | class Speaker(Protocol):
+          |       ^^^^^^^ Clicking here
+          |
+        info: Found 2 implementations
+          --> main.py:4:7
+           |
+         4 | class Speaker(Protocol):
+           |       -------
+           |
+          ::: main.py:10:7
+           |
+        10 | class Cat(Speaker):
+           |       ---
+           |
+        ");
+    }
+
+    #[test]
+    fn implementation_class_reference_is_unsupported() {
+        let test = cursor_test(
+            r#"
+            class Animal:
+                pass
+
+            class Dog(Anim<CURSOR>al):
+                pass
+            "#,
+        );
+
+        assert_snapshot!(test.goto_implementation(), @"No goto target found");
+    }
+
+    #[test]
+    fn implementation_class_stub_mapped_subclass() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Ba<CURSOR>se:
+                    pass
+                "#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+                from main import Base
+
+                class Derived(Base):
+                    pass
+                "#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+                from main import Base
+
+                class Derived(Base): ...
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_implementation(), @"
+        info[goto-implementation]: Go to implementation
+         --> main.py:2:7
+          |
+        2 | class Base:
+          |       ^^^^ Clicking here
+          |
+        info: Found 2 implementations
+         --> main.py:2:7
+          |
+        2 | class Base:
+          |       ----
+          |
+         ::: mymodule.py:4:7
+          |
+        4 | class Derived(Base):
+          |       -------
+          |
+        ");
     }
 
     impl CursorTest {
