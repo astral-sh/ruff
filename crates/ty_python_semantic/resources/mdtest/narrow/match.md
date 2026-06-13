@@ -1117,7 +1117,6 @@ Sequence patterns also contribute to negative narrowing and exhaustiveness. Exac
 make a match exhaustive.
 
 ```py
-from typing import Literal, final
 from typing_extensions import assert_never
 
 def test_match_exact_tuple_sequence(subj: tuple[int | str, int | str]) -> None:
@@ -1316,18 +1315,24 @@ def possibly_bound_match_args_is_not_exhaustive(
         case PossiblyBoundMatchArgs(_):
             return 1
 
-# Static exhaustiveness treats a definitely-bound member as sufficient, even though descriptor
-# access can still raise `AttributeError` at runtime.
+# This is intentional: static exhaustiveness follows ty's member model, even though descriptor
+# access can still raise `AttributeError` at runtime. This applies to nested patterns as well as
+# wildcard captures.
 class FallibleProperty:
     __match_args__ = ("x",)
 
     @property
-    def x(self) -> int:
+    def x(self) -> Literal[1]:
         raise AttributeError
 
 def direct_fallible_property_is_statically_exhaustive(value: FallibleProperty) -> int:
     match value:
         case FallibleProperty(_):
+            return 1
+
+def nested_fallible_property_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(x=1):
             return 1
 
 class BaseWithX:

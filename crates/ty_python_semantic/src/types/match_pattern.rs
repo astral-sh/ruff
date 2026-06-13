@@ -92,6 +92,9 @@ fn class_pattern_is_exhaustive(
         return false;
     };
     let subject_class_literal = subject_class.class_literal(db);
+    // TODO: A non-final subject class also admits subclasses that can override attribute access.
+    // Decide whether it should remain exhaustive under the static member model or be treated like
+    // a proper non-final subtype.
     if subject_class_literal != class && !subject_class_literal.is_final(db) {
         return false;
     }
