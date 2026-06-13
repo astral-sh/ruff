@@ -44,11 +44,37 @@ pub(super) fn walk_bound_method_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> BoundMethodType<'db> {
+    /// Returns the type used for the implicit `self` or `cls` argument when calling this method.
+    pub(crate) fn binding_self_type(self, db: &'db dyn Db) -> Type<'db> {
+        let self_instance = self.self_instance(db);
+        // The class generic context is attached during bare classmethod lookup. Requiring its
+        // presence on every overload avoids introducing free class type variables for bound
+        // methods created through other paths.
+        if self.function(db).is_classmethod(db)
+            && let Type::ClassLiteral(class) = self_instance
+            && let Some(class_generic_context) = class.generic_context(db)
+            && self
+                .function(db)
+                .signature(db)
+                .overloads
+                .iter()
+                .all(|signature| {
+                    signature
+                        .generic_context
+                        .is_some_and(|context| class_generic_context.is_subset_of(db, context))
+                })
+        {
+            Type::from(class.identity_specialization(db))
+        } else {
+            self_instance
+        }
+    }
+
     /// Returns the type that replaces any `typing.Self` annotations in the bound method signature.
     /// This is normally the bound-instance type (the type of `self` or `cls`), but if the bound method is
     /// a `@classmethod`, then it should be an instance of that bound-instance type.
     pub(crate) fn typing_self_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut self_instance = self.self_instance(db);
+        let mut self_instance = self.binding_self_type(db);
         if self.function(db).is_classmethod(db) {
             self_instance = self_instance.to_instance(db).unwrap_or_else(Type::unknown);
         }

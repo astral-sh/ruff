@@ -1045,6 +1045,24 @@ impl<'db> StaticClassLiteral<'db> {
         name: &str,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        fn is_class_or_static_method(db: &dyn Db, name: &str, ty: Type<'_>) -> bool {
+            match ty {
+                Type::FunctionLiteral(function) => {
+                    function.is_classmethod(db)
+                        || (name != "__new__" && function.is_staticmethod(db))
+                }
+                Type::Callable(callable) => {
+                    callable.is_classmethod_like(db)
+                        || (name != "__new__" && callable.is_staticmethod_like(db))
+                }
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .all(|element| is_class_or_static_method(db, name, *element)),
+                ty => name != "__new__" && ty.is_instance_of(db, KnownClass::Staticmethod),
+            }
+        }
+
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
                 Type::Callable(callable_ty) => Type::Callable(CallableType::new(
@@ -1063,6 +1081,22 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let mut member = self.class_member_inner(db, None, name, policy);
+        // A class or static method on a bare generic class acts like a generic function: its
+        // arguments can determine the specialization of the class on which it was accessed.
+        if let Some(generic_context) = self.generic_context(db)
+            && member
+                .ignore_possibly_undefined()
+                .is_some_and(|ty| is_class_or_static_method(db, name, ty))
+        {
+            member = self
+                .class_member_inner(
+                    db,
+                    Some(generic_context.identity_specialization(db)),
+                    name,
+                    policy,
+                )
+                .map_type(|ty| ty.with_inherited_generic_context(db, generic_context));
+        }
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
         // See `callables_as_descriptors.md` for more details.
@@ -1171,13 +1205,6 @@ impl<'db> StaticClassLiteral<'db> {
             // specially: they inherit the generic context of their class. That lets us treat them
             // as generic functions when constructing the class, and infer the specialization of
             // the class from the arguments that are passed in.
-            //
-            // We might decide to handle other class methods the same way, having them inherit the
-            // class's generic context, and performing type inference on calls to them to determine
-            // the specialization of the class. If we do that, we would update this to also apply
-            // to any method with a `@classmethod` decorator. (`__init__` would remain a special
-            // case, since it's an _instance_ method where we don't yet know the generic class's
-            // specialization.)
             match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
