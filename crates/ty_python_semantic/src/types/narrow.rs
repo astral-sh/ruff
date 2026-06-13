@@ -2794,6 +2794,8 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
 
         if !is_positive {
             if let dynamic @ Type::Dynamic(_) = class_type {
+                // TODO: Align this legacy negative `Any` constraint with the successful-pattern
+                // analysis used for positive narrowing.
                 if !matches!(
                     pattern,
                     PatternPredicateKind::Class(kind) if kind.is_argumentless()

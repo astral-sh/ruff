@@ -298,9 +298,11 @@ fn sequence_pattern_is_exhaustive_for_subject(
 /// Return the subset of `subject_ty` that is statically guaranteed to match `kind`.
 ///
 /// This is an under-approximation used for negative narrowing and ordered alternatives: callers
-/// may safely subtract the result. Class patterns need the current subject type because a proper
-/// non-final subtype is conservative, while an exact or final subtype can make member extraction
-/// exhaustive. The same rule is propagated through nested sequence, `or`, and `as` patterns.
+/// may subtract the result under ty's static member model. Class patterns need the current subject
+/// type because a proper non-final subtype is conservative, while an exact or final subtype can
+/// make member extraction exhaustive. This treats access to a definitely bound descriptor as
+/// successful even though the descriptor could raise at runtime. The same rule is propagated
+/// through nested sequence, `or`, and `as` patterns.
 ///
 /// ```python
 /// # For a `tuple[Child]` subject, this evaluates the class pattern against `Child`, not `Base`.
