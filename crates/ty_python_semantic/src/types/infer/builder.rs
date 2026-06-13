@@ -10571,6 +10571,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     None => peer_types = Some(UnionAccumulator::new(ty)),
                                 }
                             }
+                            if ty.contains_cycle_recovery_marker(db) {
+                                // The short-circuit truthiness guard is a control-flow fact, not
+                                // a stable refinement of a cycle-recovery approximation.
+                                return ty;
+                            }
                             IntersectionBuilder::new(db)
                                 .add_positive(ty)
                                 .add_negative(match op {
