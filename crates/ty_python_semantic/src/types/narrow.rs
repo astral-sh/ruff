@@ -3088,8 +3088,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
                 callable_pattern_type(self.db)
             }
-            dynamic @ Type::Dynamic(_) if is_positive => dynamic,
-            Type::Dynamic(_) => return None,
+            dynamic @ Type::Dynamic(_) => dynamic,
             _ => return None,
         };
 
