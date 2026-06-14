@@ -7225,9 +7225,14 @@ fn self_typevar_owner_class_literal<'db>(
 /// whose truthiness is unknown. Similarly, a synthesized protocol produced by `hasattr` only
 /// describes the current value and must not become part of the `Self` specialization.
 ///
-/// Nominal and declared protocol constraints are preserved because they describe the receiver's
-/// static subtype. Type aliases are preserved unless projection changes their value.
-fn self_type_projection<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+/// Nominal constraints are preserved because they describe the receiver's concrete subtype. A
+/// protocol constraint is preserved only when it owns `Self` or is implied by the remaining
+/// receiver type. Type aliases are preserved unless projection changes their value.
+fn self_type_projection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    owner_class: Option<ClassLiteral<'db>>,
+) -> Type<'db> {
     struct SelfTypeProjection;
     struct NegativeSelfTypeProjection;
 
@@ -7240,25 +7245,25 @@ fn self_type_projection<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
     fn transform<'db>(
         db: &'db dyn Db,
         ty: Type<'db>,
+        owner_class: Option<ClassLiteral<'db>>,
         visitors: &ProjectionVisitors<'db>,
     ) -> Type<'db> {
         match ty {
             Type::TypeAlias(alias) => visitors.positive.visit_type(db, ty, || {
                 let value_type = alias.value_type(db);
-                let transformed = transform(db, value_type, visitors);
+                let transformed = transform(db, value_type, owner_class, visitors);
                 if transformed == value_type {
                     ty
                 } else {
                     transformed
                 }
             }),
-            Type::Union(union) => {
-                union.map_leave_aliases(db, |element| transform(db, *element, visitors))
-            }
+            Type::Union(union) => union
+                .map_leave_aliases(db, |element| transform(db, *element, owner_class, visitors)),
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
-                    builder = builder.add_positive(transform(db, *positive, visitors));
+                    builder = builder.add_positive(transform(db, *positive, owner_class, visitors));
                 }
                 for negative in intersection.negative(db) {
                     if let Some(negative) = transform_negative(db, *negative, visitors) {
@@ -7268,17 +7273,36 @@ fn self_type_projection<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
                 builder.build()
             }
             Type::EnumComplement(complement) => {
-                transform(db, complement.to_intersection(db), visitors)
+                transform(db, complement.to_intersection(db), owner_class, visitors)
             }
             Type::LiteralValue(literal) => literal.fallback_instance(db),
-            Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
-                ..
-            })
-            | Type::AlwaysTruthy
-            | Type::AlwaysFalsy => Type::object(),
+            Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_some() => {
+                Type::homogeneous_tuple(db, Type::object())
+            }
+            Type::ProtocolInstance(protocol) => {
+                if protocol_is_owner(db, protocol, owner_class) {
+                    ty
+                } else {
+                    Type::object()
+                }
+            }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(),
             _ => ty,
         }
+    }
+
+    fn protocol_is_owner<'db>(
+        db: &'db dyn Db,
+        protocol: ProtocolInstanceType<'db>,
+        owner_class: Option<ClassLiteral<'db>>,
+    ) -> bool {
+        owner_class.is_some_and(|owner_class| {
+            protocol.to_nominal_instance().is_some_and(|instance| {
+                instance
+                    .class(db)
+                    .is_subtype_of_class_literal(db, owner_class)
+            })
+        })
     }
 
     fn transform_negative<'db>(
@@ -7314,19 +7338,17 @@ fn self_type_projection<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
                 .chain(intersection.negative(db))
                 .all(|element| transform_negative(db, *element, visitors) == Some(*element))
                 .then_some(ty),
+            Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_some() => None,
             Type::EnumComplement(_)
             | Type::LiteralValue(_)
-            | Type::ProtocolInstance(ProtocolInstanceType {
-                inner: Protocol::Synthesized(_),
-                ..
-            })
+            | Type::ProtocolInstance(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy => None,
             _ => Some(ty),
         }
     }
 
-    transform(db, ty, &ProjectionVisitors::default())
+    transform(db, ty, owner_class, &ProjectionVisitors::default())
 }
 
 /// Information needed to bind `Self` typevars to a concrete type.
@@ -7367,7 +7389,7 @@ impl<'db> SelfBinding<'db> {
         }
 
         let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
-        let self_type = self_type_projection(db, self.ty);
+        let self_type = self_type_projection(db, self.ty, owner_class);
 
         // Fast path for the common method-signature case where the bound `Self`
         // carries the same binding context as this mapping.

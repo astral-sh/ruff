@@ -575,23 +575,23 @@ def compound_negative(
 ```
 
 Value-level refinements and synthesized structural refinements are removed from `Self` bindings,
-while nominal constraints, declared protocols, and generic specializations are preserved.
+while nominal constraints, class-wide protocol constraints, and generic specializations are
+preserved.
 
 ```py
-from collections.abc import Callable, Iterable
+from collections import defaultdict
+from collections.abc import Iterable
 from enum import Enum
-from typing import Self
-from ty_extensions import Intersection
+from typing import Protocol, Self, runtime_checkable
+from ty_extensions import Intersection, Not, Top
 
-def declared_protocol(
-    value: Intersection[Child, Iterable[str | type | None]],
-    other: Intersection[Child, Iterable[str | type | None]],
+def class_wide_protocol(
+    value: Intersection[
+        Iterable[str | type | None],
+        Top[defaultdict[str | type | None, object]],
+    ],
 ) -> None:
-    reveal_type(value.values)  # revealed: list[Child & Iterable[str | type | None]]
-    reveal_type(value.copy())  # revealed: Child & Iterable[str | type | None]
-    reveal_type(Base.copy(value))  # revealed: Child & Iterable[str | type | None]
-    value.replace(other)
-    callback: Callable[[Child], None] = value.replace  # error: [invalid-assignment]
+    copied: Iterable[str | type | None] = value.copy()
 
 def attribute_refinement(value: Child) -> None:
     if hasattr(value, "name"):
@@ -599,6 +599,29 @@ def attribute_refinement(value: Child) -> None:
         reveal_type(value.values)  # revealed: list[Child]
         reveal_type(value.copy())  # revealed: Child
         reveal_type(Base.copy(value))  # revealed: Child
+
+@runtime_checkable
+class HasName(Protocol):
+    name: str
+
+def runtime_protocol_refinement(value: Child) -> None:
+    if isinstance(value, HasName):
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(Base.copy(value))  # revealed: Child
+        value.replace(Child())
+        narrowed: HasName = value.copy()  # error: [invalid-assignment]
+    else:
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(Base.copy(value))  # revealed: Child
+
+class Copier(Protocol):
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def protocol_owner(value: Copier) -> None:
+    reveal_type(value.copy())  # revealed: Copier
+    reveal_type(Copier.copy(value))  # revealed: Copier
 
 class Box[T]:
     def copy(self) -> Self:
@@ -621,6 +644,23 @@ reveal_type(Color.copy(Color.RED))  # revealed: Color
 def enum_complement(value: Color) -> None:
     if value is not Color.RED:
         reveal_type(value.copy())  # revealed: Color
+
+class TupleChild(tuple[int | str, ...]):
+    other: Self
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def exact_tuple_refinement(value: Intersection[TupleChild, tuple[int, int]]) -> None:
+    reveal_type(value.copy())  # revealed: TupleChild
+    reveal_type(TupleChild.copy(value))  # revealed: TupleChild
+    reveal_type(value.other)  # revealed: TupleChild
+    exact: tuple[int, int] = value.copy()  # error: [invalid-assignment]
+
+def negative_exact_tuple_refinement(
+    value: Intersection[TupleChild, Not[tuple[int, int]]],
+) -> None:
+    reveal_type(value.copy())  # revealed: TupleChild
 ```
 
 Self from class body annotations and method signatures represent the same logical type variable.
