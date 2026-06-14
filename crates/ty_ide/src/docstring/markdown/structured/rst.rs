@@ -1,4 +1,4 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
 
 use crate::docstring::document::rst;
@@ -10,15 +10,9 @@ use super::{Section, SectionItem, SectionKind};
 pub(super) fn structured_sections(source: &str) -> Vec<Section> {
     let mut sections = Vec::new();
 
-    for field_list in rst::field_lists(source) {
-        if field_list.indent() != TextSize::default()
-            || !starts_at_block_boundary(source, field_list.range().start())
-        {
-            continue;
-        }
-
+    for field_list in rst::top_level_field_lists(source) {
         let Some(section) = RenderPlan::from_fields(field_list.fields())
-            .and_then(|plan| Section::new(field_list.range(), plan.items()))
+            .and_then(|plan| Section::new(field_list.range(), plan.to_items()))
         else {
             continue;
         };
@@ -29,20 +23,10 @@ pub(super) fn structured_sections(source: &str) -> Vec<Section> {
     sections
 }
 
-fn starts_at_block_boundary(source: &str, start: TextSize) -> bool {
-    source.get(..start.to_usize()).is_some_and(|prefix| {
-        prefix
-            .lines()
-            .next_back()
-            .is_none_or(|line| line.trim().is_empty())
-    })
-}
-
 /// Validates a reST field list and stores cross-field metadata needed while rendering.
 struct RenderPlan<'a> {
     fields: &'a [rst::Field],
     parameter_types: SupplementalTypeFields<'a>,
-    keyword_types: SupplementalTypeFields<'a>,
     attribute_types: SupplementalTypeFields<'a>,
     return_type: Option<&'a str>,
     has_returns: bool,
@@ -58,7 +42,6 @@ impl<'a> RenderPlan<'a> {
     fn from_fields(fields: &'a [rst::Field]) -> Option<Self> {
         let mut has_returns = false;
         let mut parameter_types = SupplementalTypeFields::default();
-        let mut keyword_types = SupplementalTypeFields::default();
         let mut attribute_types = SupplementalTypeFields::default();
         let mut return_type = None;
 
@@ -69,20 +52,14 @@ impl<'a> RenderPlan<'a> {
                 } => {
                     parameter_types.record_value_field(lookup_name.as_str(), ty.is_some());
                 }
-                rst::Field::Keyword {
-                    lookup_name, ty, ..
-                } => {
-                    keyword_types.record_value_field(lookup_name.as_str(), ty.is_some());
-                }
                 rst::Field::Attribute { name, ty, .. } => {
                     attribute_types.record_value_field(name.as_str(), ty.is_some());
                 }
                 rst::Field::Returns { .. } => {
                     has_returns = true;
                 }
-                rst::Field::Raises { .. } => {}
-                rst::Field::ParameterType { .. }
-                | rst::Field::KeywordType { .. }
+                rst::Field::Raises { .. }
+                | rst::Field::ParameterType { .. }
                 | rst::Field::AttributeType { .. } => {}
                 rst::Field::ReturnType { ty } => {
                     let ty = ty.as_str();
@@ -102,22 +79,13 @@ impl<'a> RenderPlan<'a> {
             }
         }
 
+        // Resolve supplemental types in a second pass so their matching value fields are known
+        // even when the type fields appear first.
         for field in fields {
             match field {
                 rst::Field::ParameterType { lookup_name, ty } => {
                     let name = lookup_name.as_str();
-                    let destination = match (
-                        parameter_types.accepts_separate_type(name),
-                        keyword_types.accepts_separate_type(name),
-                    ) {
-                        (true, false) => &mut parameter_types,
-                        (false, true) => &mut keyword_types,
-                        _ => return None,
-                    };
-                    destination.record_type_field(name, ty.as_str())?;
-                }
-                rst::Field::KeywordType { lookup_name, ty } => {
-                    keyword_types.record_type_field(lookup_name.as_str(), ty.as_str())?;
+                    parameter_types.record_type_field(name, ty.as_str())?;
                 }
                 rst::Field::AttributeType { name, ty } => {
                     attribute_types.record_type_field(name.as_str(), ty.as_str())?;
@@ -129,14 +97,13 @@ impl<'a> RenderPlan<'a> {
         Some(Self {
             fields,
             parameter_types,
-            keyword_types,
             attribute_types,
             return_type,
             has_returns,
         })
     }
 
-    fn items(&self) -> Vec<SectionItem> {
+    fn to_items(&self) -> Vec<SectionItem> {
         let mut items = Vec::new();
 
         for field in self.fields {
@@ -150,18 +117,6 @@ impl<'a> RenderPlan<'a> {
                     SectionKind::Parameters,
                     Some(display_name.as_str()),
                     self.parameter_types
-                        .type_for_value_field(lookup_name.as_str(), ty.as_deref()),
-                    description.as_str(),
-                )),
-                rst::Field::Keyword {
-                    display_name,
-                    lookup_name,
-                    ty,
-                    description,
-                } => items.push(SectionItem::new(
-                    SectionKind::KeywordArguments,
-                    Some(display_name.as_str()),
-                    self.keyword_types
                         .type_for_value_field(lookup_name.as_str(), ty.as_deref()),
                     description.as_str(),
                 )),
@@ -202,11 +157,17 @@ impl<'a> RenderPlan<'a> {
                     }
                 }
                 rst::Field::ParameterType { .. }
-                | rst::Field::KeywordType { .. }
                 | rst::Field::AttributeType { .. }
-                | rst::Field::ReturnType { .. }
-                | rst::Field::Metadata { .. }
-                | rst::Field::Unknown { .. } => {}
+                | rst::Field::ReturnType { .. } => {
+                    // Supplemental types render with their value fields.
+                }
+                rst::Field::Metadata { .. } => {
+                    // Metadata is omitted because it isn't user-facing.
+                }
+                rst::Field::Unknown { .. } => {
+                    // Required for exhaustiveness. `RenderPlan::from_fields` rejects this
+                    // variant before constructing `Self`.
+                }
             }
         }
 
@@ -292,9 +253,11 @@ Summary.
         Summary.
 
         ## Parameters
-        **value** `str`: The value.
+        **value**: `str`  
+        The value.
 
-        **other** `int`: Another value.
+        **other**: `int`  
+        Another value.
         ");
     }
 
@@ -312,7 +275,8 @@ Summary.
         Summary.
 
         ## Returns
-        `bool`: Whether validation passed.
+        `bool`  
+        Whether validation passed.
         ");
     }
 
@@ -333,7 +297,8 @@ Summary.
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**: The first sentence wraps<HB>
+        **value**<HB>
+        The first sentence wraps<HB>
         before the directive.
 
         **Changed in version 2.0:**<HB>
@@ -354,9 +319,11 @@ Summary.
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**: Stale description.
+        **value**  
+        Stale description.
 
-        **value**: Corrected description.
+        **value**  
+        Corrected description.
         ");
     }
 
@@ -374,7 +341,8 @@ Summary.
         Summary.
 
         ## Parameters
-        **value**: The value.
+        **value**  
+        The value.
 
         ## Returns
         `str`
@@ -414,7 +382,8 @@ This is a function description.
         :class:`Foo` instances can be passed here.
 
         ## Parameters
-        **value**: The value.
+        **value**<HB>
+        The value.
         ");
     }
 
@@ -440,7 +409,8 @@ Trailing prose.
         Leading prose.
 
         ## Parameters
-        **value**: The value.
+        **value**  
+        The value.
 
         ## Returns
         The result.
@@ -467,17 +437,42 @@ Trailing prose.
 
         assert_snapshot!(rendered, @r"
         ## Parameters
-        **param** `int`: The parameter description.
+        **param**: `int`  
+        The parameter description.
 
-        **\*args** `tuple[str, ...]`: Extra positional arguments.
+        **retries**: `int`  
+        Retry attempts.
 
-        **\*\*kwargs** `dict[str, object]`: Extra keyword arguments.
+        **timeout**: `float`  
+        Timeout in seconds.
 
-        ## Keyword Arguments
-        **retries** `int`: Retry attempts.
+        **\*args**: `tuple[str, ...]`  
+        Extra positional arguments.
 
-        **timeout** `float`: Timeout in seconds.
+        **\*\*kwargs**: `dict[str, object]`  
+        Extra keyword arguments.
         ");
+    }
+
+    #[test]
+    fn render_field_names_case_insensitively() {
+        let docstring = "\
+:Param value: The value.
+:TYPE value: str
+:KeY option: The option.
+:TyPe option: int
+:KwPaRaM retries: Retry attempts.
+:KwTyPe retries: int
+:VaR state: Current state.
+:VaRtYpE state: bool
+:ReTuRnS: Whether validation passed.
+:RTyPe: bool
+:RaIsEs ValueError: If validation fails.
+:MeTa private:
+";
+        let rendered = render_docstring(docstring);
+
+        assert_snapshot!(rendered);
     }
 
     #[test]
@@ -495,13 +490,17 @@ Trailing prose.
 
         assert_snapshot!(rendered, @"
         ## Attributes
-        **cache** `dict[str, object]`: Cached data.
+        **cache**: `dict[str, object]`  
+        Cached data.
 
-        **state**: Instance state.
+        **state**  
+        Instance state.
 
-        **title** `str`: Display title.
+        **title**: `str`  
+        Display title.
 
-        **VERSION** `str`: Package version.
+        **VERSION**: `str`  
+        Package version.
         ");
     }
 
@@ -517,12 +516,15 @@ Trailing prose.
 
         assert_snapshot!(rendered, @"
         ## Returns
-        **baz** `dict[str, int]`: The return value description
+        **baz**: `dict[str, int]`  
+        The return value description
 
         ## Raises
-        `ValueError`: If the value is invalid.
+        `ValueError`  
+        If the value is invalid.
 
-        `RuntimeError`: If the system is unavailable.
+        `RuntimeError`  
+        If the system is unavailable.
         ");
     }
 
@@ -693,22 +695,26 @@ Literal block::
         ```````````
 
         ## Parameters
-        **quoted**: Example:
+        **quoted**<HB>
+        Example:
 
-        **sample**: This is sample input
+        **sample**<HB>
+        This is sample input
 
-        **second**: Options:
+        **second**<HB>
+        Options:
 
         - First option.<HB>
             - Nested detail.<HB>
         - Second option.
 
-        **third**:
+        **third**
 
         1. Validate the input.<HB>
         2. Return the result.
 
-        **done**: Whether work is done.
+        **done**<HB>
+        Whether work is done.
 
         ## Returns
         This is still sample input
@@ -733,11 +739,14 @@ Summary.
         Summary.
 
         ## Parameters
-        **quoted**: Example:
+        **quoted**  
+        Example:
 
-        **sample**: This is sample input.
+        **sample**  
+        This is sample input.
 
-        **real**: Real parameter.
+        **real**  
+        Real parameter.
 
         ## Returns
         This is still sample input.
@@ -758,13 +767,15 @@ Summary.
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **quoted**: Example:
+        **quoted**<HB>
+        Example:
 
         !param sample: This is sample input.<HB>
         !returns: This is still sample input.
 
         ## Parameters
-        **real**: Real parameter.
+        **real**<HB>
+        Real parameter.
         ");
     }
 
@@ -793,13 +804,15 @@ Summary.
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **first**: Example:
+        **first**  
+        Example:
 
         ```````````python
         ```
         ```````````
 
-        **second**: Visible parameter.
+        **second**  
+        Visible parameter.
         ");
     }
 

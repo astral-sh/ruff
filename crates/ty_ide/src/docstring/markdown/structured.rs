@@ -208,7 +208,7 @@ impl SectionItem {
 
         if let Some(ty) = self.ty.as_deref() {
             if has_label {
-                output.push(' ');
+                output.push_str(": ");
                 render_type_code_span_into(output, ty);
             } else {
                 render_type_code_span_into(output, ty);
@@ -224,14 +224,14 @@ impl SectionItem {
             match block_start {
                 Some(0) => {
                     if has_label {
-                        output.push_str(":\n\n");
+                        output.push_str("\n\n");
                     }
                     output.push_str(&description);
                 }
                 Some(block_start) => {
                     let before_block = description[..block_start].trim_end();
                     if has_label {
-                        output.push_str(": ");
+                        output.push_str("  \n");
                         output.push_str(before_block);
                     } else {
                         output.push_str(before_block);
@@ -241,7 +241,7 @@ impl SectionItem {
                 }
                 None => {
                     if has_label {
-                        output.push_str(": ");
+                        output.push_str("  \n");
                         output.push_str(&description);
                     } else {
                         output.push_str(&description);
@@ -517,25 +517,32 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **value** `str`: The value.
+        **value**: `str`  
+        The value.
 
         ## Keyword Arguments
-        **limit** `int`: Maximum result count.
+        **limit**: `int`  
+        Maximum result count.
 
         ## Other Parameters
-        **kw\_only** `str`: Less common option.
+        **kw\_only**: `str`  
+        Less common option.
 
         ## Attributes
-        **cache** `dict[str, object]`: Cached data.
+        **cache**: `dict[str, object]`  
+        Cached data.
 
         ## Returns
-        `bool`: Whether validation passed.
+        `bool`  
+        Whether validation passed.
 
         ## Yields
-        **item** `Iterator[int]`: Generated values.
+        **item**: `Iterator[int]`  
+        Generated values.
 
         ## Raises
-        `ValueError`: Invalid value.
+        `ValueError`  
+        Invalid value.
         ");
     }
 
@@ -587,11 +594,14 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @r"
         ## Parameters
-        **\*args**: Escaped name.
+        **\*args**  
+        Escaped name.
 
-        **\_\_value\_\_**: Escaped name.
+        **\_\_value\_\_**  
+        Escaped name.
 
-        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**: Escaped name.
+        **&lt;value&gt; &amp; \[docs\](target) \| \~deleted\~**  
+        Escaped name.
         ");
     }
 
@@ -621,17 +631,18 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @"
         ## Parameters
-        **paragraphs**: First paragraph.
+        **paragraphs**<HB>
+        First paragraph.
 
         Second paragraph.
 
-        **indented**:
+        **indented**
 
             code<HB>
         <HB>
         trailing
 
-        **nested**:
+        **nested**
 
         - parent<HB>
           - child
@@ -650,7 +661,8 @@ mod tests {
 
         assert_snapshot!(render_markdown(&section), @"
         ## Parameters
-        **ordered**: Introduction.<HB>
+        **ordered**<HB>
+        Introduction.<HB>
         2. Continuation.
         ");
     }
@@ -671,7 +683,7 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**:
+        **value**
 
         1. First option.
 
@@ -685,7 +697,8 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**: Value.
+        **value**  
+        Value.
 
         After.
         ");
@@ -697,7 +710,7 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**:
+        **value**
 
         ```````````python
         >>> value
@@ -714,7 +727,7 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**:
+        **value**
 
         ```python
         value = 1
@@ -784,10 +797,12 @@ mod tests {
 
         assert_snapshot!(rendered, @"
         ## Parameters
-        **value**: The value.
+        **value**  
+        The value.
 
         ## Returns
-        `bool`: The result.
+        `bool`  
+        The result.
         ");
     }
 
