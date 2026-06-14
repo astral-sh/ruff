@@ -426,6 +426,9 @@ def dynamic_eq(eq: bool):
 @dataclass
 @dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 class InvalidStackedOrder: ...
+
+@dataclass(order=True, eq=False, unexpected=True)  # error: [no-matching-overload]
+class InvalidArguments: ...
 ```
 
 Comparisons are only allowed for `WithOrder` instances:
@@ -1278,6 +1281,12 @@ class InvalidWeakrefSlot: ...
 def dynamic_slots(slots: bool):
     @dataclass(weakref_slot=True, slots=slots)
     class PossiblyValidWeakrefSlot: ...
+
+invalid_weakref_slot = dataclass(weakref_slot=True)
+
+class AppliedWeakrefSlotLater: ...
+
+invalid_weakref_slot(AppliedWeakrefSlotLater)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
 ```
 
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
@@ -1950,6 +1959,15 @@ class C:
     x: int
 
 C(1) < C(2)  # ok
+
+invalid_order = dataclass(order=True, eq=False)
+
+class AppliedLater: ...
+
+invalid_order(AppliedLater)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+
+@invalid_order  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class IndirectDecorator: ...
 ```
 
 ### Using `dataclass` as a function
@@ -1966,6 +1984,10 @@ dataclass(Point)()  # error: [missing-argument]
 dataclass(Point)("one")  # error: [invalid-argument-type]
 
 reveal_type(dataclass(Point)(1).x)  # revealed: int
+
+class InvalidDirectApplication: ...
+
+dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 ```
 
 Options can be passed in the same call:

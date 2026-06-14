@@ -4,6 +4,7 @@ use crate::types::{
     SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
     call::CallError,
     callable::CallableFunctionProvenance,
+    diagnostic::report_invalid_dataclass_arguments,
     function::KnownFunction,
     infer::{
         TypeInferenceBuilder,
@@ -195,6 +196,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             if let Type::DataclassDecorator(params) = decorator_ty {
+                report_invalid_dataclass_arguments(
+                    &self.context,
+                    decorator.into(),
+                    params.invalid_arguments(db),
+                );
                 dataclass_params = Some(params);
                 continue;
             }

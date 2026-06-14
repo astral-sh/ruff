@@ -14,8 +14,8 @@ use crate::{
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
-        LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
-        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
+        StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -57,48 +57,6 @@ use crate::{attribute_assignments, types::diagnostic::abstract_method_span};
 use ty_python_core::{
     SemanticIndex, attribute_scopes, definition::DefinitionKind, scope::ScopeId, semantic_index,
 };
-
-fn check_dataclass_decorator_arguments<'db>(
-    context: &InferContext<'db, '_>,
-    decorator: &ast::Decorator,
-    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
-) {
-    let ast::Expr::Call(call) = &decorator.expression else {
-        return;
-    };
-
-    let bool_argument = |name, default| {
-        if let Some(keyword) = call.arguments.find_keyword(name) {
-            match file_expression_type(&keyword.value).as_literal_value_kind() {
-                Some(LiteralValueTypeKind::Bool(value)) => Some(value),
-                _ => None,
-            }
-        } else if call
-            .arguments
-            .keywords
-            .iter()
-            .any(|keyword| keyword.arg.is_none())
-        {
-            None
-        } else {
-            Some(default)
-        }
-    };
-
-    if bool_argument("order", false) == Some(true)
-        && bool_argument("eq", true) == Some(false)
-        && let Some(builder) = context.report_lint(&INVALID_DATACLASS, decorator)
-    {
-        builder.into_diagnostic("`order=True` requires `eq=True`");
-    }
-
-    if bool_argument("weakref_slot", false) == Some(true)
-        && bool_argument("slots", false) == Some(false)
-        && let Some(builder) = context.report_lint(&INVALID_DATACLASS, decorator)
-    {
-        builder.into_diagnostic("`weakref_slot=True` requires `slots=True`");
-    }
-}
 
 /// Iterate over all static class definitions (created using `class` statements) to check that
 /// the definition is semantically valid and will not cause an exception to be raised at runtime.
@@ -216,16 +174,6 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check for invalid `@dataclass` applications.
     let dataclass_params = class.dataclass_params(db);
-    for decorator in &class_node.decorator_list {
-        if let ast::Expr::Call(call) = &decorator.expression
-            && file_expression_type(&call.func)
-                .as_function_literal()
-                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
-        {
-            check_dataclass_decorator_arguments(context, decorator, file_expression_type);
-        }
-    }
-
     if dataclass_params.is_some() {
         if class.has_named_tuple_class_in_mro(db) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
