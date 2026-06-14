@@ -423,8 +423,8 @@ def test_match_sequence_as_pattern_excludes_previous_cases(
             reveal_type(item)  # revealed: Literal[2]
 ```
 
-An earlier OR alternative must only be removed when every value of its type is certain to match.
-A protocol class pattern can still fail if a declared member is absent at runtime, so the later
+An earlier OR alternative must only be removed when every value of its type is certain to match. A
+protocol class pattern can still fail if a declared member is absent at runtime, so the later
 sequence alternative remains possible:
 
 ```py
@@ -588,8 +588,8 @@ def test_match_class_alias_preserves_recursive_containers(
 
 ## Class pattern alias intersections
 
-Class patterns retain intersections that can exist through multiple inheritance, but discard
-classes that are known to be disjoint.
+Class patterns retain intersections that can exist through multiple inheritance, but discard classes
+that are known to be disjoint.
 
 ```py
 from typing import final
