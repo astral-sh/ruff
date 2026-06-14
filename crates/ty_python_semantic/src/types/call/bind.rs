@@ -1242,15 +1242,11 @@ impl<'db> Bindings<'db> {
         call_arguments: &CallArguments<'_, 'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) {
-        let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
-            if let Some(ty) = ty
-                && let Some(LiteralValueTypeKind::Bool(value)) = ty.as_literal_value_kind()
-            {
-                value
-            } else {
-                // TODO: emit a diagnostic if we receive `bool`
-                default
-            }
+        let to_bool = |ty: &Option<Type<'_>>, default| {
+            ty.map_or(Some(default), |ty| match ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(value)) => Some(value),
+                _ => None,
+            })
         };
 
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
@@ -2227,38 +2223,31 @@ impl<'db> Bindings<'db> {
                                 versioned_parameters @ ..,
                             ] = dataclass_parameter_types
                             {
-                                let statically_known_bool = |ty: &Option<Type<'_>>, default| {
-                                    ty.map_or(Some(default), |ty| {
-                                        match ty.as_literal_value_kind() {
-                                            Some(LiteralValueTypeKind::Bool(value)) => Some(value),
-                                            _ => None,
-                                        }
-                                    })
-                                };
-
                                 let mut flags = DataclassFlags::empty();
                                 let mut invalid_arguments = InvalidDataclassArguments::empty();
 
-                                if to_bool(init, true) {
+                                // TODO: Emit a diagnostic if a dataclass flag is not statically
+                                // known.
+                                if to_bool(init, true).unwrap_or(true) {
                                     flags |= DataclassFlags::INIT;
                                 }
-                                if to_bool(repr, true) {
+                                if to_bool(repr, true).unwrap_or(true) {
                                     flags |= DataclassFlags::REPR;
                                 }
-                                if to_bool(eq, true) {
+                                if to_bool(eq, true).unwrap_or(true) {
                                     flags |= DataclassFlags::EQ;
                                 }
-                                if to_bool(order, false) {
+                                if to_bool(order, false).unwrap_or(false) {
                                     flags |= DataclassFlags::ORDER;
                                 }
-                                if to_bool(unsafe_hash, false) {
+                                if to_bool(unsafe_hash, false).unwrap_or(false) {
                                     flags |= DataclassFlags::UNSAFE_HASH;
                                 }
-                                if to_bool(frozen, false) {
+                                if to_bool(frozen, false).unwrap_or(false) {
                                     flags |= DataclassFlags::FROZEN;
                                 }
-                                if statically_known_bool(order, false) == Some(true)
-                                    && statically_known_bool(eq, true) == Some(false)
+                                if to_bool(order, false) == Some(true)
+                                    && to_bool(eq, true) == Some(false)
                                 {
                                     invalid_arguments |=
                                         InvalidDataclassArguments::ORDER_REQUIRES_EQ;
@@ -2269,32 +2258,32 @@ impl<'db> Bindings<'db> {
                                     [] => {}
                                     // Python 3.10.
                                     [match_args, kw_only, slots] => {
-                                        if to_bool(match_args, true) {
+                                        if to_bool(match_args, true).unwrap_or(true) {
                                             flags |= DataclassFlags::MATCH_ARGS;
                                         }
-                                        if to_bool(kw_only, false) {
+                                        if to_bool(kw_only, false).unwrap_or(false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
+                                        if to_bool(slots, false).unwrap_or(false) {
                                             flags |= DataclassFlags::SLOTS;
                                         }
                                     }
                                     // Python >= 3.11.
                                     [match_args, kw_only, slots, weakref_slot] => {
-                                        if to_bool(match_args, true) {
+                                        if to_bool(match_args, true).unwrap_or(true) {
                                             flags |= DataclassFlags::MATCH_ARGS;
                                         }
-                                        if to_bool(kw_only, false) {
+                                        if to_bool(kw_only, false).unwrap_or(false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
+                                        if to_bool(slots, false).unwrap_or(false) {
                                             flags |= DataclassFlags::SLOTS;
                                         }
-                                        if to_bool(weakref_slot, false) {
+                                        if to_bool(weakref_slot, false).unwrap_or(false) {
                                             flags |= DataclassFlags::WEAKREF_SLOT;
                                         }
-                                        if statically_known_bool(weakref_slot, false) == Some(true)
-                                            && statically_known_bool(slots, false) == Some(false)
+                                        if to_bool(weakref_slot, false) == Some(true)
+                                            && to_bool(slots, false) == Some(false)
                                         {
                                             invalid_arguments |=
                                                 InvalidDataclassArguments::WEAKREF_SLOT_REQUIRES_SLOTS;
@@ -2362,16 +2351,16 @@ impl<'db> Bindings<'db> {
                                 .ok()
                                 .flatten();
 
-                            if to_bool(&eq_default, true) {
+                            if to_bool(&eq_default, true).unwrap_or(true) {
                                 flags |= DataclassTransformerFlags::EQ_DEFAULT;
                             }
-                            if to_bool(&order_default, false) {
+                            if to_bool(&order_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::ORDER_DEFAULT;
                             }
-                            if to_bool(&kw_only_default, false) {
+                            if to_bool(&kw_only_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
                             }
-                            if to_bool(&frozen_default, false) {
+                            if to_bool(&frozen_default, false).unwrap_or(false) {
                                 flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
                             }
 

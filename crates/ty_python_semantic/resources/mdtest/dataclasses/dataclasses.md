@@ -328,6 +328,21 @@ reveal_type(repr(alice))  # revealed: str
 reveal_type(alice == alice)  # revealed: bool
 ```
 
+A class is still treated as a dataclass when arguments are unpacked into the decorator:
+
+```py
+from dataclasses import dataclass
+
+SLOTS = {"slots": True}
+
+@dataclass(frozen=True, **SLOTS)
+class C:
+    x: int
+
+reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+C(1)
+```
+
 If `init` is set to `False`, no `__init__` method is generated:
 
 ```py
