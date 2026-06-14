@@ -1233,9 +1233,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut previous_pattern = first_pattern;
 
                 for pattern in patterns {
+                    let definitely_matched_ty = if Self::contains_class_pattern(previous_pattern) {
+                        // A class pattern can fail after its runtime type check, for example when
+                        // a protocol member is only declared but is absent at runtime. Without the
+                        // subject type, `definite_match_pattern_type` cannot distinguish those
+                        // cases, so leave the later alternative intact.
+                        Type::Never
+                    } else {
+                        definite_match_pattern_type(self.db, previous_pattern)
+                    };
                     remaining_subject_ty = IntersectionBuilder::new(self.db)
                         .add_positive(remaining_subject_ty)
-                        .add_negative(definite_match_pattern_type(self.db, previous_pattern))
+                        .add_negative(definitely_matched_ty)
                         .build();
                     let alternative =
                         self.analyze_successful_pattern(pattern, remaining_subject_ty);
@@ -1286,6 +1295,20 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 matched_subject_ty: self.match_pattern_subject_type(pattern, subject_ty),
                 bindings: BTreeMap::new(),
             },
+        }
+    }
+
+    fn contains_class_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
+        match pattern {
+            PatternPredicateKind::Class(..) => true,
+            PatternPredicateKind::Sequence(kind) => {
+                kind.patterns.iter().any(Self::contains_class_pattern)
+            }
+            PatternPredicateKind::Or(patterns) => {
+                patterns.iter().any(Self::contains_class_pattern)
+            }
+            PatternPredicateKind::As(Some(pattern), _) => Self::contains_class_pattern(pattern),
+            _ => false,
         }
     }
 
