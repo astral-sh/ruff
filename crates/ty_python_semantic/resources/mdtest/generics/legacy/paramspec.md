@@ -751,23 +751,23 @@ any behavior specific to the legacy `ParamSpec` implementation.
 
 ### Binding contexts
 
-A `ParamSpec` bound by an enclosing definition cannot be inferred again by a nested definition:
+A nested definition can use a `ParamSpec` from an enclosing class or function without adding it to
+its own generic context:
 
 ```py
-from typing import Callable, Generic, ParamSpec, overload
+from typing import Callable, Generic, ParamSpec
+from ty_extensions import generic_context
 
 P = ParamSpec("P")
 
 class C(Generic[P]):
-    @overload
-    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
-    def f(self: "C[P]", *args: P.args, **kwargs: P.kwargs): ...
-    @overload
-    def f(self: "C[P]"): ...
-    def f(self: "C[P]"): ...
+    def method(self, *args: P.args, **kwargs: P.kwargs): ...
+
+# revealed: ty_extensions.GenericContext[Self@method]
+reveal_type(generic_context(C.method))
 
 def outer(_: Callable[P, None]):
     def inner(_: Callable[P, None]): ...
 
-    inner(lambda: None)  # error: [invalid-argument-type]
+    reveal_type(generic_context(inner))  # revealed: None
 ```
