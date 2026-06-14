@@ -31,7 +31,7 @@ use crate::{
         },
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
-        list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        list_members::{Member, MemberWithDefinition, all_end_of_scope_members, all_members},
         tuple::Tuple,
     },
 };
@@ -135,60 +135,49 @@ fn check_inherited_method_conflicts<'db>(
 
     let class_instance = Type::instance(db, class_specialized);
     let has_enum_semantics = is_enum_class_by_inheritance(db, class);
-    let mut reported_members = FxHashSet::default();
+    let member_names = member_names_in_direct_bases(db, &direct_bases);
 
-    // Members from the first base win unless the class defines its own override. Compare that
-    // effective member against the contracts contributed by every later direct base.
-    for base in direct_bases.iter().skip(1) {
-        let base_instance = Type::instance(db, *base);
+    'members: for member in member_names {
+        let member_name = member.as_str();
+        // Enum data-type mixins inherit incompatible dunder methods from the data type and
+        // `Enum`, but class creation resolves them using special enum semantics.
+        if member_name == "_"
+            || (has_enum_semantics && is_dunder(member_name))
+            || is_mangled_private(member_name)
+            || is_constructor_like_method(member_name)
+        {
+            continue;
+        }
 
-        for member in method_names_in_mro(db, *base) {
-            let member_name = member.as_str();
-            // Dunder methods commonly have intentionally different signatures across mixins. For
-            // example, enum data-type mixins inherit incompatible `__format__` methods from the
-            // data type and `Enum`, but class creation resolves them using special enum semantics.
-            if member_name == "_"
-                || (has_enum_semantics && is_dunder(member_name))
-                || is_mangled_private(member_name)
-                || reported_members.contains(&member)
-            {
-                continue;
-            }
+        let Some(override_owner) = defining_class_for_member(db, class_specialized, &member) else {
+            continue;
+        };
 
+        // Methods defined by the class itself are handled by the normal override pass.
+        if override_owner.class_literal(db) == ClassLiteral::Static(class) {
+            continue;
+        }
+
+        let Some(override_type) = class_instance
+            .member(db, &member)
+            .place
+            .ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        if override_type.try_upcast_to_callable(db).is_none() {
+            continue;
+        }
+
+        for base in &direct_bases {
+            let base_instance = Type::instance(db, *base);
             let Some(overridden_owner) = defining_class_for_member(db, *base, &member) else {
                 continue;
             };
-            let Some(override_owner) = defining_class_for_member(db, class_specialized, &member)
-            else {
-                continue;
-            };
-
-            // There is no conflict if both MRO paths resolve to the same definition. If the
-            // subclass defines the winning member, the normal override pass reports any error. A
-            // violation inherited from a subclass of the later base is likewise reported where
-            // that invalid override is originally defined.
-            if override_owner.class_literal(db) == overridden_owner.class_literal(db)
-                || override_owner.class_literal(db) == ClassLiteral::Static(class)
-                || override_owner.is_subclass_of(db, overridden_owner)
-            {
+            if override_owner.class_literal(db) == overridden_owner.class_literal(db) {
                 continue;
             }
 
-            let Some(override_definition) = method_definition(db, override_owner, &member) else {
-                continue;
-            };
-            let Some(overridden_definition) = method_definition(db, overridden_owner, &member)
-            else {
-                continue;
-            };
-
-            let Some(override_type) = class_instance
-                .member(db, &member)
-                .place
-                .ignore_possibly_undefined()
-            else {
-                continue;
-            };
             let Some(overridden_type) = base_instance
                 .member_lookup_with_policy_and_receiver(
                     db,
@@ -204,51 +193,52 @@ fn check_inherited_method_conflicts<'db>(
             let Some(overridden_callable) = overridden_type.try_upcast_to_callable(db) else {
                 continue;
             };
-            if override_type.try_upcast_to_callable(db).is_none() {
-                continue;
-            }
 
             let overridden_callable_type = overridden_callable.into_type(db);
             if override_type.is_assignable_to(db, overridden_callable_type) {
                 continue;
             }
 
-            reported_members.insert(member.clone());
+            // If the winning method was already incompatible with this ancestor on its defining
+            // class, the normal override checks reported the violation there. Repeat the check
+            // with that class as the receiver rather than assuming that nominal ancestry is
+            // sufficient: receiver-specific overloads can introduce a new conflict only on this
+            // subclass.
+            if inherited_conflict_already_reported(db, &member, override_owner, overridden_owner) {
+                continue;
+            }
+
             report_incompatible_base_method(
                 context,
                 class,
                 &member,
-                (override_owner, override_definition),
-                (overridden_owner, overridden_definition),
+                (
+                    override_owner,
+                    method_definition(db, override_owner, &member),
+                ),
+                (
+                    overridden_owner,
+                    method_definition(db, overridden_owner, &member),
+                ),
                 || override_type.assignability_error_context(db, overridden_callable_type),
             );
+            continue 'members;
         }
     }
 }
 
-/// Returns the sorted names of source-defined methods available through a class's MRO.
-fn method_names_in_mro<'db>(db: &'db dyn Db, class: ClassType<'db>) -> Vec<Name> {
-    let mut names = FxHashSet::default();
-
-    for superclass in class.iter_mro(db).filter_map(ClassBase::into_class) {
-        let Some((class_literal, _)) = superclass.static_class_literal(db) else {
-            continue;
-        };
-        let scope = class_literal.body_scope(db);
-        let table = place_table(db, scope);
-
-        for member in all_end_of_scope_members(db, scope) {
-            if table
-                .symbol_id(&member.member.name)
-                .is_some_and(|symbol| is_function_definition(db, scope, symbol))
-            {
-                names.insert(member.member.name);
-            }
-        }
-    }
-
-    let mut names: Vec<_> = names.into_iter().collect();
+/// Returns the sorted names of members available through any direct base.
+fn member_names_in_direct_bases<'db>(
+    db: &'db dyn Db,
+    direct_bases: &[ClassType<'db>],
+) -> Vec<Name> {
+    let mut names: Vec<_> = direct_bases
+        .iter()
+        .flat_map(|base| all_members(db, Type::instance(db, *base)))
+        .map(|member| member.name)
+        .collect();
     names.sort_unstable();
+    names.dedup();
     names
 }
 
@@ -277,6 +267,56 @@ fn method_definition<'db>(
         return None;
     }
     symbol_definition(db, scope, symbol)
+}
+
+/// Returns `true` if the winning method was already incompatible with the overridden method on
+/// the class that defines it.
+fn inherited_conflict_already_reported<'db>(
+    db: &'db dyn Db,
+    name: &Name,
+    override_owner: ClassType<'db>,
+    overridden_owner: ClassType<'db>,
+) -> bool {
+    if !override_owner.is_subclass_of(db, overridden_owner) {
+        return false;
+    }
+
+    let Some(overridden_ancestor) = override_owner
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|ancestor| ancestor.class_literal(db) == overridden_owner.class_literal(db))
+    else {
+        return false;
+    };
+
+    let owner_instance = Type::instance(db, override_owner);
+    let Some(override_type) = owner_instance
+        .member(db, name)
+        .place
+        .ignore_possibly_undefined()
+    else {
+        return false;
+    };
+    if override_type.try_upcast_to_callable(db).is_none() {
+        return false;
+    }
+    let Some(overridden_type) = Type::instance(db, overridden_ancestor)
+        .member_lookup_with_policy_and_receiver(
+            db,
+            name.clone(),
+            MemberLookupPolicy::default(),
+            Some(owner_instance),
+        )
+        .place
+        .ignore_possibly_undefined()
+    else {
+        return false;
+    };
+    let Some(overridden_callable) = overridden_type.try_upcast_to_callable(db) else {
+        return false;
+    };
+
+    !override_type.is_assignable_to(db, overridden_callable.into_type(db))
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.

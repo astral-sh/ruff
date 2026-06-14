@@ -625,7 +625,8 @@ participate according to their position in the MRO: a leading dynamic base obscu
 wins, but a later dynamic base does not erase a known conflict.
 
 ```pyi
-from typing import Any, Generic, TypeVar
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, overload
 from typing_extensions import Self
 
 T = TypeVar("T")
@@ -650,6 +651,20 @@ class InheritedSelf(IntMethod, SelfMethod): ...
 class ExplicitSelf(IntMethod, SelfMethod):
     def method(self, other: int) -> Self: ...
 
+class ReceiverOverloads:
+    @overload
+    def selected(self: FinalReceiver) -> int: ...
+    @overload
+    def selected(self) -> str: ...
+
+class ReceiverOverride(ReceiverOverloads):
+    def selected(self) -> str: ...
+
+class OtherReceiverPath(ReceiverOverloads): ...
+
+# The receiver-specific overload only applies after the two paths meet again.
+class FinalReceiver(ReceiverOverride, OtherReceiverPath): ...  # error: [invalid-method-override]
+
 class BrokenIntReturn(IntReturn):
     def method(self) -> str: ...  # error: [invalid-method-override]
 
@@ -665,10 +680,19 @@ class LaterDynamicBase(StrReturn, Any, IntReturn): ...  # error: [invalid-method
 class AttributeMask:
     method = lambda: ""
 
-class MaskedMethod(AttributeMask, IntReturn): ...
+class CallableAttributeMethod(AttributeMask, IntReturn): ...  # error: [invalid-method-override]
+
+class CallableDescriptor:
+    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
+
+class DescriptorMethod:
+    method = CallableDescriptor()
+
+class DescriptorConflict(DescriptorMethod, StrReturn): ...  # error: [invalid-method-override]
 ```
 
-Synthesized members also mask source methods later in the MRO:
+Synthesized methods participate in the contract from each base, regardless of which method wins in
+the MRO:
 
 ```pyi
 from typing import NamedTuple
@@ -679,7 +703,31 @@ class GeneratedMake(NamedTuple):
 class SourceMake:
     def _make(self) -> int: ...
 
-class MaskedBySynthesizedMember(GeneratedMake, SourceMake): ...
+class SynthesizedMethodWins(GeneratedMake, SourceMake): ...  # error: [invalid-method-override]
+class SourceMethodWins(SourceMake, GeneratedMake): ...  # error: [invalid-method-override]
+```
+
+### Synthesized methods from both bases
+
+The same applies when both methods are synthesized:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class IntData:
+    value: int
+
+@dataclass
+class StrData:
+    value: str
+
+class SynthesizedDataclassConflict(IntData, StrData): ...  # error: [invalid-method-override]
 ```
 
 ### Dataclasses

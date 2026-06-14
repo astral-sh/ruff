@@ -6146,8 +6146,8 @@ pub(super) fn report_incompatible_base_method<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     member: &str,
-    override_method: (ClassType<'db>, Definition<'db>),
-    overridden_method: (ClassType<'db>, Definition<'db>),
+    override_method: (ClassType<'db>, Option<Definition<'db>>),
+    overridden_method: (ClassType<'db>, Option<Definition<'db>>),
     error_context: impl FnOnce() -> ErrorContextTree<'db>,
 ) {
     let db = context.db();
@@ -6175,6 +6175,9 @@ pub(super) fn report_incompatible_base_method<'db>(
         (override_definition, override_method),
         (overridden_definition, overridden_method),
     ] {
+        let Some(definition) = definition else {
+            continue;
+        };
         let file = definition.file(db);
         let module = parsed_module(db, file).load(db);
         diagnostic.annotate(
