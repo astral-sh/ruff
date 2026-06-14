@@ -4,31 +4,40 @@ use compact_str::{CompactString, ToCompactString};
 use indexmap::IndexMap;
 use ruff_python_trivia::leading_indentation;
 use ruff_source_file::{Line as SourceLine, UniversalNewlineIterator, UniversalNewlines};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use super::preformatted::PreformattedBlockScanner;
 
 /// Parses all reST field lists in a docstring.
-pub(in crate::docstring) fn field_lists(raw: &str) -> Vec<FieldList> {
+fn field_lists(raw: &str) -> Vec<FieldList> {
     FieldList::parse_all(raw)
+}
+
+/// Returns top-level field lists that begin at a reST block boundary.
+///
+/// `source` must have already undergone PEP-257 trimming and universal newline
+/// normalization (typically via `docstring::documentation_trim`).
+pub(in crate::docstring) fn top_level_field_lists(
+    source: &str,
+) -> impl Iterator<Item = FieldList> + '_ {
+    field_lists(source).into_iter().filter(|field_list| {
+        field_list.indent == TextSize::default()
+            && starts_at_block_boundary(source, field_list.range.start())
+    })
 }
 
 /// Returns the parameter documentation recognized in a reST docstring.
 pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
     let mut parameters = IndexMap::new();
+    let source = crate::docstring::documentation_trim(raw);
 
-    for field_list in field_lists(raw) {
+    for field_list in top_level_field_lists(&source) {
         for field in field_list.fields {
-            let (Field::Parameter {
+            let Field::Parameter {
                 lookup_name,
                 description,
                 ..
-            }
-            | Field::Keyword {
-                lookup_name,
-                description,
-                ..
-            }) = field
+            } = field
             else {
                 continue;
             };
@@ -42,6 +51,15 @@ pub(super) fn parameter_documentation(raw: &str) -> IndexMap<String, String> {
     }
 
     parameters
+}
+
+fn starts_at_block_boundary(source: &str, start: TextSize) -> bool {
+    source.get(..start.to_usize()).is_some_and(|prefix| {
+        prefix
+            .lines()
+            .next_back()
+            .is_none_or(|line| line.trim().is_empty())
+    })
 }
 
 /// Cursor over docstring lines and their line numbers.
@@ -102,14 +120,6 @@ pub(in crate::docstring) struct FieldList {
 }
 
 impl FieldList {
-    pub(in crate::docstring) fn range(&self) -> TextRange {
-        self.range
-    }
-
-    pub(in crate::docstring) fn indent(&self) -> TextSize {
-        self.indent
-    }
-
     pub(in crate::docstring) fn fields(&self) -> &[Field] {
         &self.fields
     }
@@ -250,6 +260,12 @@ impl FieldList {
     }
 }
 
+impl Ranged for FieldList {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// Constructs new instances of the model for a reST field.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct FieldBuilder<'a> {
@@ -283,21 +299,7 @@ impl<'a> FieldBuilder<'a> {
                 ty: ty.map(|ty| ty.to_compact_string()),
                 description: body,
             },
-            FieldKind::Keyword {
-                display_name,
-                lookup_name,
-                ty,
-            } => Field::Keyword {
-                display_name: display_name.to_compact_string(),
-                lookup_name: lookup_name.to_string(),
-                ty: ty.map(|ty| ty.to_compact_string()),
-                description: body,
-            },
             FieldKind::ParameterType { lookup_name } => Field::ParameterType {
-                lookup_name: lookup_name.to_compact_string(),
-                ty: body,
-            },
-            FieldKind::KeywordType { lookup_name } => Field::KeywordType {
                 lookup_name: lookup_name.to_compact_string(),
                 ty: body,
             },
@@ -490,15 +492,7 @@ enum FieldKind<'a> {
         lookup_name: &'a str,
         ty: Option<&'a str>,
     },
-    Keyword {
-        display_name: &'a str,
-        lookup_name: &'a str,
-        ty: Option<&'a str>,
-    },
     ParameterType {
-        lookup_name: &'a str,
-    },
-    KeywordType {
         lookup_name: &'a str,
     },
     Attribute {
@@ -530,28 +524,18 @@ impl<'a> FieldKind<'a> {
 
     /// Categorizes a supported field, returning `None` only for an unknown field name.
     fn parse_supported(name: &'a str, argument: &'a str) -> Option<Self> {
-        let kind = match name {
-            "param" | "parameter" | "arg" | "argument" => Self::parse_parameter_argument(argument)
+        let normalized_name = name.to_ascii_lowercase();
+        let kind = match normalized_name.as_str() {
+            "param" | "parameter" | "arg" | "argument" | "key" | "keyword" | "kwarg"
+            | "kwparam" => Self::parse_parameter_argument(argument)
                 .map(|(ty, name)| Self::Parameter {
                     display_name: name.display,
                     lookup_name: name.lookup,
                     ty,
                 })
                 .unwrap_or(Self::Unknown { name, argument }),
-            "key" | "keyword" | "kwarg" | "kwparam" => Self::parse_parameter_argument(argument)
-                .map(|(ty, name)| Self::Keyword {
-                    display_name: name.display,
-                    lookup_name: name.lookup,
-                    ty,
-                })
-                .unwrap_or(Self::Unknown { name, argument }),
-            "type" | "paramtype" => Self::parse_parameter_name(argument)
+            "type" | "paramtype" | "kwtype" => Self::parse_parameter_name(argument)
                 .map(|name| Self::ParameterType {
-                    lookup_name: name.lookup,
-                })
-                .unwrap_or(Self::Unknown { name, argument }),
-            "kwtype" => Self::parse_parameter_name(argument)
-                .map(|name| Self::KeywordType {
                     lookup_name: name.lookup,
                 })
                 .unwrap_or(Self::Unknown { name, argument }),
@@ -641,17 +625,7 @@ pub(in crate::docstring) enum Field {
         ty: Option<CompactString>,
         description: String,
     },
-    Keyword {
-        display_name: CompactString,
-        lookup_name: String,
-        ty: Option<CompactString>,
-        description: String,
-    },
     ParameterType {
-        lookup_name: CompactString,
-        ty: String,
-    },
-    KeywordType {
         lookup_name: CompactString,
         ty: String,
     },
@@ -702,7 +676,10 @@ mod tests {
 
     use insta::{assert_debug_snapshot, assert_snapshot};
 
-    use super::{Field, FieldList, Lines, field_lists};
+    use super::{
+        Field, FieldList, Lines, field_lists,
+        parameter_documentation as extract_parameter_documentation,
+    };
 
     #[test]
     fn parameter_documentation_extracts_rest_parameters() {
@@ -723,6 +700,42 @@ mod tests {
           This is a continuation of param2 description.
         kwargs: Extra keyword arguments.
         ");
+    }
+
+    #[test]
+    fn parameter_documentation_ignores_fields_in_block_quotes() {
+        let parameters = extract_parameter_documentation(
+            "\
+Summary.
+
+    :param example: Quoted example.
+
+:param real: Real parameter.",
+        );
+
+        assert!(!parameters.contains_key("example"));
+        assert_eq!(
+            parameters.get("real").map(String::as_str),
+            Some("Real parameter.")
+        );
+    }
+
+    #[test]
+    fn parameter_documentation_ignores_fields_continuing_paragraphs() {
+        let parameters = extract_parameter_documentation(
+            "\
+Summary.
+:param example: Paragraph text.
+Continuation.
+
+:param real: Real parameter.",
+        );
+
+        assert!(!parameters.contains_key("example"));
+        assert_eq!(
+            parameters.get("real").map(String::as_str),
+            Some("Real parameter.")
+        );
     }
 
     #[test]
@@ -1088,10 +1101,7 @@ Section::
 
         let param_docs = parameter_documentation(docstring);
 
-        assert_snapshot!(param_docs, @r"
-        value: Value parameter.
-        next: Next parameter.
-        ");
+        assert_snapshot!(param_docs, @"next: Next parameter.");
     }
 
     #[test]

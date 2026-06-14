@@ -84,6 +84,36 @@ impl Docstring {
     }
 }
 
+/// Text extracted from within a larger docstring.
+///
+/// Unlike a complete docstring, a fragment has already had its surrounding indentation removed.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct DocstringFragment(String);
+
+impl DocstringFragment {
+    pub fn new(raw: &str) -> Self {
+        Self(documentation_fragment_trim(raw))
+    }
+
+    pub fn render(&self, kind: MarkupKind) -> String {
+        match kind {
+            MarkupKind::PlainText => self.0.clone(),
+            MarkupKind::Markdown => self.render_markdown(),
+        }
+    }
+}
+
+/// Normalizes an extracted docstring fragment without removing meaningful relative indentation.
+fn documentation_fragment_trim(docs: &str) -> String {
+    let expanded = docs.trim_end().replace('\t', "        ");
+    let mut output = String::with_capacity(expanded.len());
+    for line in expanded.universal_newlines() {
+        output.push_str(line.as_str().trim_whitespace_end());
+        output.push('\n');
+    }
+    output
+}
+
 /// Normalizes tabs and trims a docstring as specified in PEP-0257
 ///
 /// See: <https://peps.python.org/pep-0257/#handling-docstring-indentation>
@@ -1575,7 +1605,8 @@ mod tests {
 
         assert_snapshot!(docstring.render_markdown(), @"
         ## Parameters
-        **value**: First line.
+        **value**<HB>
+        First line.
 
         Second line.
         ");
@@ -1627,15 +1658,19 @@ mod tests {
         This is a function description.
 
         ## Parameters
-        **param1** `str`: The first parameter description
+        **param1**: `str`<HB>
+        The first parameter description
 
-        **param2** `int`: The second parameter description<HB>
+        **param2**: `int`<HB>
+        The second parameter description<HB>
         This is a continuation of param2 description.
 
-        **param3**: A parameter without type annotation
+        **param3**<HB>
+        A parameter without type annotation
 
         ## Returns
-        `str`: The return value description
+        `str`<HB>
+        The return value description
         ");
     }
 
@@ -1707,9 +1742,11 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Google-style duplicate parameter
 
         ## Parameters
-        **param2** `int`: reST-style parameter
+        **param2**: `int`<HB>
+        reST-style parameter
 
-        **param3**: Another reST-style parameter
+        **param3**<HB>
+        Another reST-style parameter
 
         Parameters<HB>
         ----------<HB>
