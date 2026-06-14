@@ -40,16 +40,10 @@ pub(crate) fn check_function_definition<'db>(
     if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
         return;
     }
-    let lexical_signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
-    check_pep695_function_legacy_typevars(
-        context,
-        last_definition,
-        &lexical_signature,
-        file_expression_type,
-    );
+    check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
 }
@@ -58,7 +52,6 @@ pub(crate) fn check_function_definition<'db>(
 fn check_pep695_function_legacy_typevars<'db>(
     context: &InferContext<'db, '_>,
     last_definition: OverloadLiteral<'db>,
-    signature: &Signature<'db>,
     file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
 ) {
     let db = context.db();
@@ -92,6 +85,7 @@ fn check_pep695_function_legacy_typevars<'db>(
         return;
     }
 
+    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
     let Some(definition) = signature.definition() else {
         return;
     };

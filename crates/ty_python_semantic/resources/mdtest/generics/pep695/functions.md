@@ -45,6 +45,9 @@ from typing import TypeVar
 
 K = TypeVar("K")
 
+def identity(value: K) -> K:
+    return value
+
 class C[V]:
     def legacy(self, value: V, other: K) -> V | K:
         raise NotImplementedError
