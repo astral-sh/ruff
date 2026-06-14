@@ -16,8 +16,8 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, MemberLookupPolicy,
-        Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
+        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -138,10 +138,9 @@ fn check_inherited_method_conflicts<'db>(
 
     let class_instance = Type::instance(db, class_specialized);
     let has_enum_semantics = is_enum_class_by_inheritance(db, class)
-        || class.explicit_bases(db).iter().any(|base| {
-            base.to_class_type(db)
-                .is_some_and(|base| is_stdlib_enum_class(db, base.class_literal(db)))
-        });
+        || direct_bases
+            .iter()
+            .any(|base| is_stdlib_enum_class(db, base.class_literal(db)));
     let member_candidates = member_candidates_in_direct_bases(db, &direct_bases);
 
     'members: for (member, base_indices) in member_candidates {
@@ -173,10 +172,9 @@ fn check_inherited_method_conflicts<'db>(
             .filter_map(|base_index| {
                 let base = direct_bases[base_index];
                 let overridden_owner = defining_class_for_member(db, base, &member)?;
-                if has_dynamic_member_contract(db, overridden_owner, &member) {
-                    return None;
-                }
-                (override_owner != overridden_owner).then_some((base, overridden_owner))
+                (!has_dynamic_member_contract(db, overridden_owner, &member)
+                    && override_owner != overridden_owner)
+                    .then_some((base, overridden_owner))
             })
             .collect();
 
@@ -258,25 +256,17 @@ fn member_with_receiver_if_needed<'db>(
     name: &Name,
 ) -> PlaceAndQualifiers<'db> {
     let member = instance.member(db, name);
-    let Some(raw_member_type) = owner
+    if owner
         .own_class_member(db, None, name)
         .inner
         .place
         .raw_type()
-    else {
-        return member;
-    };
-
-    if !raw_member_requires_receiver_aware_lookup(db, raw_member_type) {
-        return member;
+        .is_some_and(|ty| raw_member_requires_receiver_aware_lookup(db, ty))
+    {
+        instance.member_lookup_with_receiver(db, name.clone(), receiver)
+    } else {
+        member
     }
-
-    instance.member_lookup_with_policy_and_receiver(
-        db,
-        name.clone(),
-        MemberLookupPolicy::default(),
-        Some(receiver),
-    )
 }
 
 fn raw_member_requires_receiver_aware_lookup<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
@@ -363,8 +353,9 @@ fn is_enum_rewritten_method<'db>(
 
 fn class_has_repr_enum_base<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     class.explicit_bases(db).iter().any(|base| {
-        base.to_class_type(db)
-            .is_some_and(|base| is_stdlib_enum_class_named(db, base.class_literal(db), "ReprEnum"))
+        base.to_class_type(db).is_some_and(|base| {
+            base.name(db) == "ReprEnum" && is_stdlib_enum_class(db, base.class_literal(db))
+        })
     })
 }
 
@@ -389,10 +380,6 @@ fn is_stdlib_enum_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool 
                         db.system().is_same_file(left, right).unwrap_or(false)
                     })
         })
-}
-
-fn is_stdlib_enum_class_named<'db>(db: &'db dyn Db, class: ClassLiteral<'db>, name: &str) -> bool {
-    class.name(db) == name && is_stdlib_enum_class(db, class)
 }
 
 /// Returns the data type selected by `EnumType` for `class`.
@@ -502,9 +489,6 @@ fn inherited_conflict_exists_on_owner<'db>(
     override_owner: ClassType<'db>,
     overridden_owner: ClassType<'db>,
 ) -> bool {
-    if !override_owner.is_subtype_of_class_literal(db, overridden_owner.class_literal(db)) {
-        return false;
-    }
     if method_definition(db, override_owner, name).is_none()
         || overridden_owner.static_class_literal(db).is_none()
     {
@@ -546,24 +530,6 @@ fn inherited_conflict_exists_on_owner<'db>(
     };
 
     !override_type.is_assignable_to(db, overridden_callable.into_type(db))
-}
-
-/// Returns the source function when the normal override pass checks this member.
-fn checked_override_function<'db>(
-    class_kind: Option<CodeGeneratorKind<'db>>,
-    name: &Name,
-    ty: Type<'db>,
-) -> Option<FunctionType<'db>> {
-    let Type::FunctionLiteral(function) = ty else {
-        return None;
-    };
-    if is_constructor_like_method(name)
-        || (name == "__replace__"
-            && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_))))
-    {
-        return None;
-    }
-    Some(function)
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
@@ -1017,11 +983,15 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Some(subclass_function) =
-                checked_override_function(class_kind, &member.name, member.ty)
-            else {
+            let Type::FunctionLiteral(subclass_function) = member.ty else {
                 continue;
             };
+            if is_constructor_like_method(&member.name)
+                || (&member.name == "__replace__"
+                    && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_))))
+            {
+                continue;
+            }
 
             let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
             else {

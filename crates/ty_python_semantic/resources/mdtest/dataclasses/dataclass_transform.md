@@ -2127,13 +2127,10 @@ class ConverterWithDefault:
     incorrect2: int = field(default="0")
 ```
 
-We currently assume that the presence of a converter also implies that the this converter function
-will be called when using `replace` (this is how `attrs` behaves):
+We assume that `replace` calls field converters, matching `attrs`. The generated `__replace__`
+method therefore accepts the converter input type:
 
 ```py
-basic = Basic("1", "2")
-
-# __replace__ uses the converter input type (str):
 reveal_type(Basic.__replace__)  # revealed: (self: Self, *, a: str = ..., b: str = ...) -> Self
 ```
 

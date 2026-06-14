@@ -24,7 +24,7 @@ reveal_type(t)  # revealed: time
 
 ### Dataclasses
 
-Dataclasses support the `__replace__` protocol:
+Dataclasses synthesize a `__replace__` method whose receiver and return type are `Self`:
 
 ```py
 from dataclasses import dataclass

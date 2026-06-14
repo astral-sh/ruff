@@ -924,8 +924,8 @@ class MyMapping(MutableMapping[KT, VT]):
         raise NotImplementedError
     def update(self, arg: MapOrItems[KT, VT] = (), /, **kw: VT) -> None: ...
 
-# The `DeferredChild1`-specific overload applies to this subclass, so its override cannot remove
-# the `extra` parameter.
+# An explicit receiver annotation can make an overload apply to one subclass but not another.
+# The `DeferredChild1`-specific overload applies here, so this override must accept `extra`.
 class DeferredBase:
     @overload
     def method(self) -> None: ...
@@ -936,9 +936,6 @@ class DeferredBase:
 class DeferredChild1(DeferredBase):
     def method(self) -> None: ...  # error: [invalid-method-override]
 
-# TODO: A strict Liskov check would emit an `invalid-method-override`
-# diagnostic here too. A subclass could inherit from both `DeferredChild1`
-# and `DeferredChild2`, making the receiver-specific overload applicable.
 class DeferredChild2(DeferredBase):
     def method(self) -> None: ...
 ```

@@ -462,7 +462,7 @@ impl<'db> DynamicNamedTupleLiteral<'db> {
         }
     }
 
-    pub(crate) fn fields(self, db: &'db dyn Db) -> &'db [NamedTupleField<'db>] {
+    pub(in crate::types) fn fields(self, db: &'db dyn Db) -> &'db [NamedTupleField<'db>] {
         self.spec(db).fields(db)
     }
 

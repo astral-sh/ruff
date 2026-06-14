@@ -588,333 +588,6 @@ class MultipleInheritanceSubclass(InstanceBase, ClassVarBase):
     attr: int
 ```
 
-### Inherited methods from multiple bases
-
-The method selected by the MRO must satisfy every direct base class. A class therefore cannot
-inherit incompatible methods from separate bases without defining a compatible override itself:
-
-```pyi
-from collections.abc import Callable, Iterator
-from enum import Enum
-
-class StrReturn:
-    def method(self) -> str: ...
-
-class IntReturn:
-    def method(self) -> int: ...
-
-class BoolReturn:
-    def method(self) -> bool: ...
-
-class IncompatibleReturns(StrReturn, IntReturn): ...  # error: [invalid-method-override]
-
-# `bool` is a subtype of `int`, so this order is compatible.
-class CompatibleCovariantReturn(BoolReturn, IntReturn): ...
-
-class IntIterator:
-    def __iter__(self) -> Iterator[int]: ...
-
-class StrIterator:
-    def __iter__(self) -> Iterator[str]: ...
-
-class IncompatibleIterators(IntIterator, StrIterator): ...  # error: [invalid-method-override]
-class EnumIteratorConflict(IntIterator, StrIterator, Enum): ...  # error: [invalid-method-override]
-class StringEnum(str, Enum): ...
-
-class StrEnumMethod:
-    def __str__(self, value: int = 0) -> str: ...
-
-class IntEnumMethod:
-    def __str__(self, value: str = "") -> str: ...
-
-class EnumMethodConflict(StrEnumMethod, IntEnumMethod, Enum): ...  # error: [invalid-method-override]
-
-class IntStrDescriptor:
-    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
-
-class IntStrMixin:
-    __str__ = IntStrDescriptor()
-
-class StringEnumMethodConflict(IntStrMixin, str, Enum): ...  # error: [invalid-method-override]
-
-class StrUnderscore:
-    def _(self) -> str: ...
-
-class IntUnderscore:
-    def _(self) -> int: ...
-
-class IncompatibleUnderscore(StrUnderscore, IntUnderscore): ...  # error: [invalid-method-override]
-```
-
-`Flag` creation rewrites its bitwise operators on Python 3.11 and newer, but ordinary `Enum`
-creation does not:
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```pyi
-from collections.abc import Callable
-from enum import Enum, Flag, ReprEnum
-
-class StrOr:
-    def __or__(self, other: object) -> str: ...
-
-class IntOr:
-    def __or__(self, other: object) -> int: ...
-
-class RewrittenFlagOr(StrOr, IntOr, Flag): ...
-class EnumOrConflict(StrOr, IntOr, Enum): ...  # error: [invalid-method-override]
-
-class ReprEnumStrDescriptor:
-    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
-
-class ReprEnumStrMixin:
-    __str__ = ReprEnumStrDescriptor()
-
-class RewrittenReprEnumStr(ReprEnumStrMixin, str, ReprEnum): ...
-```
-
-The check follows inherited methods through intermediate bases, applies generic specializations, and
-avoids repeating violations already reported on a base class or explicit override. Dynamic bases
-participate according to their position in the MRO: a leading dynamic base obscures which method
-wins, but a later dynamic base does not erase a known conflict.
-
-```pyi
-from collections.abc import Callable, Coroutine
-from typing import Any, Concatenate, Generic, NamedTuple, ParamSpec, TypeVar, overload
-from typing_extensions import Self
-
-T = TypeVar("T")
-P = ParamSpec("P")
-Owner = TypeVar("Owner")
-
-class Intermediate(StrReturn): ...
-class IndirectConflict(Intermediate, IntReturn): ...  # error: [invalid-method-override]
-
-class GenericReturn(Generic[T]):
-    def method(self) -> T: ...
-
-class GenericConflict(StrReturn, GenericReturn[int]): ...  # error: [invalid-method-override]
-
-class IntMethod(int):
-    def method(self, other: int) -> Self: ...
-
-class SelfMethod:
-    def method(self, other: Self) -> Self: ...
-
-# `Self` in `SelfMethod.method` specializes to the subclass, which is an `int`.
-class InheritedSelf(IntMethod, SelfMethod): ...
-
-class ExplicitSelf(IntMethod, SelfMethod):
-    def method(self, other: int) -> Self: ...
-
-class ReceiverOverloads:
-    @overload
-    def selected(self: FinalReceiver) -> int: ...
-    @overload
-    def selected(self) -> str: ...
-
-class ReceiverOverride(ReceiverOverloads):
-    def selected(self) -> str: ...
-
-class OtherReceiverPath(ReceiverOverloads): ...
-
-# The receiver-specific overload only applies after the two paths meet again.
-class FinalReceiver(ReceiverOverride, OtherReceiverPath): ...  # error: [invalid-method-override]
-
-condition: bool
-
-class ConditionalSelfMethod:
-    if condition:
-        def copy(self) -> Self: ...
-
-    else:
-        def copy(self) -> Self: ...
-
-class ConditionalSelfOverride(ConditionalSelfMethod):
-    def copy(self) -> ConditionalSelfMethod: ...  # error: [invalid-method-override]
-
-class BrokenIntReturn(IntReturn):
-    def method(self) -> str: ...  # error: [invalid-method-override]
-
-# The violation is defined on `BrokenIntReturn`; this class should not repeat it.
-class RedundantDirectBase(BrokenIntReturn, IntReturn): ...
-
-def async_decorator(
-    function: Callable[Concatenate[Owner, P], Coroutine[Any, Any, Any]],
-) -> Callable[Concatenate[Owner, P], Coroutine[Any, Any, None]]: ...
-
-class AsyncContract:
-    async def async_method(self, **kwargs: Any) -> None: ...
-
-class DecoratedAsyncOverride(AsyncContract):
-    @async_decorator
-    async def async_method(self, **kwargs: Any) -> None: ...
-
-class OtherAsyncPath(AsyncContract): ...
-
-# The decorated method's public callable type already differs from `AsyncContract` on the class
-# that defines it. Meeting the same contract through a second path does not introduce a new
-# conflict on this subclass.
-class DecoratedAsyncDiamond(DecoratedAsyncOverride, OtherAsyncPath): ...
-
-class ExplicitOverride(StrReturn, IntReturn):
-    def method(self) -> str: ...  # error: [invalid-method-override]
-
-class LeadingDynamicBase(Any, StrReturn, IntReturn): ...
-class LaterDynamicBase(StrReturn, Any, IntReturn): ...  # error: [invalid-method-override]
-
-class AttributeMask:
-    method = lambda: ""
-
-class CallableAttributeMethod(AttributeMask, IntReturn): ...  # error: [invalid-method-override]
-
-class CallableDescriptor:
-    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
-
-class DescriptorMethod:
-    method = CallableDescriptor()
-
-class DescriptorConflict(DescriptorMethod, StrReturn): ...  # error: [invalid-method-override]
-
-class ReceiverSensitiveDescriptor:
-    @overload
-    def __get__(self, instance: DescriptorReceiver, owner: type[DescriptorReceiver]) -> Callable[[], int]: ...
-    @overload
-    def __get__(self, instance: object, owner: type[object]) -> int: ...
-
-class DescriptorContract:
-    method = ReceiverSensitiveDescriptor()
-
-class DescriptorReceiver(StrReturn, DescriptorContract): ...  # error: [invalid-method-override]
-
-DynamicStrReturn = type("DynamicStrReturn", (), {"method": lambda self: ""})
-DynamicIntReturn = type("DynamicIntReturn", (), {"method": lambda self: 1})
-
-class DynamicClassConflict(DynamicStrReturn, DynamicIntReturn): ...  # error: [invalid-method-override]
-
-CallableNamedTuple = NamedTuple("CallableNamedTuple", [("method", Callable[[], int])])
-
-class DynamicNamedTupleConflict(CallableNamedTuple, StrReturn): ...  # error: [invalid-method-override]
-```
-
-### Standard-library Enum construction
-
-The same Enum rewrites apply while checking the standard-library Enum classes themselves. This
-requires a fallback because resolving `enum.Enum` from within `enum.pyi` can be cyclic:
-
-```toml
-[environment]
-python-version = "3.13"
-typeshed = "/src/typeshed"
-```
-
-`/src/typeshed/stdlib/builtins.pyi`:
-
-```pyi
-class object: ...
-class type(object): ...
-class str(object): ...
-class tuple: ...
-```
-
-`/src/typeshed/stdlib/enum.pyi`:
-
-```pyi
-class Enum:
-    def __format__(self, format_spec: str) -> str: ...
-
-class ReprEnum(Enum): ...
-class Flag(Enum): ...
-
-class DataType:
-    def __new__(cls) -> DataType: ...
-    def __format__(self, format_spec: str, /) -> str: ...
-
-class IntEnum(DataType, ReprEnum): ...
-class StrEnum(DataType, ReprEnum): ...
-class IntFlag(DataType, ReprEnum, Flag): ...
-```
-
-### Class members assigned in class methods
-
-These members also participate in inherited method checks:
-
-```py
-class ImplicitIntMethod:
-    @classmethod
-    def initialize(cls) -> None:
-        cls.implicit_method = lambda self: 1
-
-class ImplicitStrMethod:
-    @classmethod
-    def initialize(cls) -> None:
-        cls.implicit_method = lambda self: ""
-
-class ImplicitMethodConflict(ImplicitIntMethod, ImplicitStrMethod): ...  # error: [invalid-method-override]
-```
-
-### Synthesized inherited methods
-
-Synthesized methods participate in the contract from each base, regardless of which method wins in
-the MRO:
-
-```pyi
-from typing import NamedTuple
-
-class GeneratedMake(NamedTuple):
-    value: int
-
-class SourceMake:
-    def _make(self) -> int: ...
-
-class SynthesizedMethodWins(GeneratedMake, SourceMake): ...  # error: [invalid-method-override]
-class SourceMethodWins(SourceMake, GeneratedMake): ...  # error: [invalid-method-override]
-class GeneratedMakeChild(GeneratedMake): ...
-class InheritedSynthesizedMethodWins(GeneratedMakeChild, SourceMake): ...  # error: [invalid-method-override]
-```
-
-### Synthesized methods from both bases
-
-The same applies when both methods are synthesized:
-
-```toml
-[environment]
-python-version = "3.13"
-```
-
-```py
-from dataclasses import dataclass
-
-@dataclass
-class IntData:
-    value: int
-
-@dataclass
-class StrData:
-    value: str
-
-class SynthesizedDataclassConflict(IntData, StrData): ...  # error: [invalid-method-override]
-
-@dataclass
-class OtherIntData:
-    value: int
-
-class CompatibleSynthesizedDataclasses(IntData, OtherIntData): ...
-
-class ReplaceContract:
-    def __replace__(self, *, value: str = "") -> "ReplaceContract":
-        raise NotImplementedError
-
-@dataclass
-class GeneratedReplace(ReplaceContract):
-    value: int
-
-class SynthesizedCascade(GeneratedReplace, ReplaceContract): ...  # error: [invalid-method-override]
-```
-
 ### Dataclasses
 
 Dataclass fields are instance variables, even though they are usually declared in the class body.
@@ -960,6 +633,403 @@ class ProtocolImpl(ProtocolBase):
 class ProtocolWithClassVarImpl(ProtocolBase):
     class_attr = 0
     instance_attr = 0
+```
+
+## Inherited methods from multiple bases
+
+When several direct bases provide the same method, Python selects the first definition in the MRO.
+That method must also be compatible with the method required by every other direct base.
+
+### Basic compatibility
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class ReturnsBool:
+    def method(self) -> bool: ...
+
+class IncompatibleReturns(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+
+# `bool` is a subtype of `int`, so the selected method satisfies both bases.
+class CompatibleReturns(ReturnsBool, ReturnsInt): ...
+```
+
+```snapshot
+error[invalid-method-override]: Base classes for class `IncompatibleReturns` define method `method` incompatibly
+  --> src/mdtest_snippet.pyi:2:9
+   |
+ 2 |     def method(self) -> str: ...
+   |         ------ `ReturnsStr.method` defined here
+ 3 |
+ 4 | class ReturnsInt:
+ 5 |     def method(self) -> int: ...
+   |         ------ `ReturnsInt.method` defined here
+ 6 |
+ 7 | class ReturnsBool:
+ 8 |     def method(self) -> bool: ...
+ 9 |
+10 | class IncompatibleReturns(ReturnsStr, ReturnsInt): ...  # snapshot: invalid-method-override
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `ReturnsStr.method` is incompatible with `ReturnsInt.method`
+   |
+info: incompatible return types: `str` is not assignable to `int`
+info: This violates the Liskov Substitution Principle
+```
+
+A method found through an indirect base is still checked. Type arguments supplied to a generic base
+also affect the comparison:
+
+```pyi
+from typing import Any, Generic, TypeVar
+
+T = TypeVar("T")
+
+class IntermediateReturnsStr(ReturnsStr): ...
+class IndirectConflict(IntermediateReturnsStr, ReturnsInt): ...  # error: [invalid-method-override]
+
+class GenericReturn(Generic[T]):
+    def method(self) -> T: ...
+
+class GenericConflict(ReturnsStr, GenericReturn[int]): ...  # error: [invalid-method-override]
+```
+
+A leading base of type `Any` can provide the selected method, so no definite conflict is known. An
+`Any` base later in the MRO does not hide a conflict between the known bases:
+
+```pyi
+class AnyFirst(Any, ReturnsStr, ReturnsInt): ...
+class AnyAfterSelectedMethod(ReturnsStr, Any, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+### Special methods and `Enum` classes
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Dunder methods and a method named `_` are checked like other methods. `Enum` class creation only
+exempts methods that Python replaces:
+
+```pyi
+from collections.abc import Iterator
+from enum import Enum, Flag, ReprEnum
+
+class IteratesInts:
+    def __iter__(self) -> Iterator[int]: ...
+
+class IteratesStrings:
+    def __iter__(self) -> Iterator[str]: ...
+
+# error: [invalid-method-override] "define method `__iter__` incompatibly"
+class IncompatibleIterators(IteratesInts, IteratesStrings): ...
+
+class UnderscoreReturnsStr:
+    def _(self) -> str: ...
+
+class UnderscoreReturnsInt:
+    def _(self) -> int: ...
+
+# error: [invalid-method-override] "define method `_` incompatibly"
+class IncompatibleUnderscore(UnderscoreReturnsStr, UnderscoreReturnsInt): ...
+
+# error: [invalid-method-override] "define method `__iter__` incompatibly"
+class EnumIteratorConflict(IteratesInts, IteratesStrings, Enum): ...
+class ValidStringEnum(str, Enum): ...
+```
+
+`Flag` class creation replaces inherited bitwise operators. Ordinary `Enum` class creation does not:
+
+```pyi
+class OrReturnsStr:
+    def __or__(self, other: object) -> str: ...
+
+class OrReturnsInt:
+    def __or__(self, other: object) -> int: ...
+
+class FlagUsesGeneratedOr(OrReturnsStr, OrReturnsInt, Flag): ...
+
+# error: [invalid-method-override] "define method `__or__` incompatibly"
+class EnumOrConflict(OrReturnsStr, OrReturnsInt, Enum): ...
+```
+
+An unrelated mixin's `__str__` method is still checked for a regular `Enum`, while `ReprEnum`
+selects the string data type's implementation. The lambda keeps this test focused on the inherited
+conflict instead of reporting an explicit override on the mixin itself:
+
+```pyi
+class IntStrMixin:
+    __str__ = lambda self: 1
+
+class EnumStrConflict(IntStrMixin, str, Enum): ...  # error: [invalid-method-override] "define method `__str__` incompatibly"
+class ReprEnumUsesDataTypeStr(IntStrMixin, str, ReprEnum): ...
+```
+
+### Binding methods to the subclass
+
+`Self` is resolved using the subclass whose bases are being checked. Here, `Self` becomes
+`InheritedSelf`, which is a subtype of `int`:
+
+```pyi
+from collections.abc import Callable
+from typing import overload
+from typing_extensions import Self
+
+class IntMethod(int):
+    def method(self, other: int) -> Self: ...
+
+class SelfMethod:
+    def method(self, other: Self) -> Self: ...
+
+class InheritedSelf(IntMethod, SelfMethod): ...
+```
+
+The same binding is used when the subclass defines an explicit override:
+
+```pyi
+class ExplicitSelf(IntMethod, SelfMethod):
+    def method(self, other: int) -> Self: ...
+```
+
+An explicit receiver annotation can select an overload only after the method is bound to the final
+subclass:
+
+```pyi
+class ReceiverOverloads:
+    @overload
+    def selected(self: FinalReceiver) -> int: ...
+    @overload
+    def selected(self) -> str: ...
+
+class ReceiverOverride(ReceiverOverloads):
+    def selected(self) -> str: ...
+
+class OtherReceiverBase(ReceiverOverloads): ...
+
+# error: [invalid-method-override] "define method `selected` incompatibly"
+class FinalReceiver(ReceiverOverride, OtherReceiverBase): ...
+```
+
+A conditionally defined method can contain more than one function type, but each definition still
+binds `Self` to the subclass:
+
+```pyi
+condition: bool
+
+class ConditionalSelfMethod:
+    if condition:
+        def copy(self) -> Self: ...
+
+    else:
+        def copy(self) -> Self: ...
+
+class ConditionalSelfOverride(ConditionalSelfMethod):
+    def copy(self) -> ConditionalSelfMethod: ...  # error: [invalid-method-override]
+```
+
+Descriptors can also choose a different result for the final subclass:
+
+```pyi
+class StringMethod:
+    def method(self) -> str: ...
+
+class OverloadedDescriptor:
+    @overload
+    def __get__(self, instance: DescriptorConflict, owner: type[DescriptorConflict]) -> Callable[[], int]: ...
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> int: ...
+
+class DescriptorBase:
+    method = OverloadedDescriptor()
+
+# error: [invalid-method-override] "define method `method` incompatibly"
+class DescriptorConflict(StringMethod, DescriptorBase): ...
+```
+
+### Callable and generated methods
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+A callable class attribute can provide the selected method even when it was not written with `def`:
+
+```py
+from collections.abc import Callable
+from dataclasses import dataclass
+from typing import NamedTuple
+
+class ReturnsInt:
+    def method(self) -> int:
+        raise NotImplementedError
+
+class ReturnsStr:
+    def method(self) -> str:
+        raise NotImplementedError
+
+class LambdaMethod:
+    method = lambda self: ""
+
+class LambdaMethodConflict(LambdaMethod, ReturnsInt): ...  # error: [invalid-method-override]
+```
+
+The same rule applies to classes created with `type()` and to the functional `NamedTuple` syntax:
+
+```py
+TypeCallStrMethod = type("TypeCallStrMethod", (), {"method": lambda self: ""})
+TypeCallIntMethod = type("TypeCallIntMethod", (), {"method": lambda self: 1})
+
+class TypeCallConflict(TypeCallStrMethod, TypeCallIntMethod): ...  # error: [invalid-method-override]
+
+CallableNamedTuple = NamedTuple("CallableNamedTuple", [("method", Callable[[], int])])
+
+class FunctionalNamedTupleConflict(CallableNamedTuple, ReturnsStr): ...  # error: [invalid-method-override]
+```
+
+A callable assigned through `cls` in a classmethod must also be considered:
+
+```py
+class AssignsIntMethod:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.method = lambda self: 1
+
+class AssignsStrMethod:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.method = lambda self: ""
+
+class AssignedThroughClsConflict(AssignsIntMethod, AssignsStrMethod): ...  # error: [invalid-method-override]
+```
+
+Methods generated by `NamedTuple` and `@dataclass` are checked like methods written in source. Both
+base orders matter because either the generated method or the source method can be selected:
+
+```py
+class GeneratedMake(NamedTuple):
+    value: int
+
+class SourceMake:
+    def _make(self) -> int:
+        raise NotImplementedError
+
+# error: [invalid-method-override] "define method `_make` incompatibly"
+class GeneratedMethodFirst(GeneratedMake, SourceMake): ...
+class SourceMethodFirst(SourceMake, GeneratedMake): ...  # error: [invalid-method-override] "define method `_make` incompatibly"
+class GeneratedMakeChild(GeneratedMake): ...
+
+# error: [invalid-method-override] "define method `_make` incompatibly"
+class InheritedGeneratedMethodFirst(GeneratedMakeChild, SourceMake): ...
+```
+
+Generated methods from two dataclasses can be incompatible, but equivalent generated methods are
+accepted:
+
+```py
+@dataclass
+class IntData:
+    value: int
+
+@dataclass
+class StrData:
+    value: str
+
+# error: [invalid-method-override] "define method `__replace__` incompatibly"
+class GeneratedDataclassConflict(IntData, StrData): ...
+
+@dataclass
+class OtherIntData:
+    value: int
+
+class CompatibleGeneratedDataclasses(IntData, OtherIntData): ...
+```
+
+A generated method is also checked when its class inherited the conflicting source method:
+
+```py
+class ReplaceBase:
+    def __replace__(self, *, value: str = "") -> "ReplaceBase":
+        raise NotImplementedError
+
+@dataclass
+class GeneratedReplace(ReplaceBase):
+    value: int
+
+# error: [invalid-method-override] "define method `__replace__` incompatibly"
+class GeneratedReplaceConflict(GeneratedReplace, ReplaceBase): ...
+```
+
+### Existing errors are not repeated
+
+If the selected method was already incompatible with an ancestor on the class that defined it, a
+subclass inheriting the same ancestor through another base should not report the error again:
+
+```pyi
+from collections.abc import Callable
+from typing import Generic, TypeVar
+
+class ReturnsInt:
+    def method(self) -> int: ...
+
+class BrokenReturn(ReturnsInt):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class InheritsBrokenReturn(BrokenReturn, ReturnsInt): ...
+```
+
+A method defined directly on the subclass should likewise produce one ordinary override error, not a
+second inherited-method error:
+
+```pyi
+class ReturnsStr:
+    def method(self) -> str: ...
+
+class DefinesOwnMethod(ReturnsStr, ReturnsInt):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+```
+
+A decorator can change the type of a method on the class that defines it. Inheriting the original
+base again through another base should not repeat that incompatibility:
+
+```pyi
+Owner = TypeVar("Owner")
+
+def changes_return_type(
+    method: Callable[[Owner], int],
+) -> Callable[[Owner], str]: ...
+
+class Contract:
+    def method(self) -> int: ...
+
+class DecoratedOverride(Contract):
+    @changes_return_type
+    def method(self) -> int: ...
+
+class OtherContractBase(Contract): ...
+class DecoratedDiamond(DecoratedOverride, OtherContractBase): ...
+```
+
+Using a generic base without type arguments does not change this rule. Neither a child override nor
+listing the generic ancestor as another direct base should repeat the parent's error:
+
+```pyi
+T = TypeVar("T")
+
+class GenericGrandparent(Generic[T]):
+    def method(self, original: int) -> None: ...
+
+class RawGenericParent(GenericGrandparent):  # error: [missing-type-argument]
+    def method(self, renamed: int) -> None: ...  # error: [invalid-method-override]
+
+class RawGenericChild(RawGenericParent):
+    def method(self, renamed: int) -> None: ...
+
+class RawGenericDiamond(RawGenericParent, GenericGrandparent):  # error: [missing-type-argument]
+    ...
 ```
 
 ## The entire class hierarchy is checked
@@ -1109,28 +1179,6 @@ error[invalid-method-override]: Invalid override of method `method`
    |
 info: parameter `x` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
-```
-
-Cascade suppression follows nominal ancestry even when the parent uses a raw generic base:
-
-`raw_generic.pyi`:
-
-```pyi
-from typing import Generic, TypeVar
-
-T = TypeVar("T")
-
-class GenericGrandparent(Generic[T]):
-    def method(self, original: int) -> None: ...
-
-class RawGenericParent(GenericGrandparent):  # error: [missing-type-argument]
-    def method(self, renamed: int) -> None: ...  # error: [invalid-method-override]
-
-class RawGenericChild(RawGenericParent):
-    def method(self, renamed: int) -> None: ...
-
-class RawGenericDiamond(RawGenericParent, GenericGrandparent):  # error: [missing-type-argument]
-    ...
 ```
 
 `other_stub.pyi`:

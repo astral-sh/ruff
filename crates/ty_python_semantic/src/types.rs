@@ -453,10 +453,6 @@ struct DescriptorBinding<'db> {
 }
 
 impl<'db> MemberLookupContext<'db> {
-    fn from_receiver(receiver: Option<Type<'db>>) -> Self {
-        receiver.map_or(Self::Default, Self::Explicit)
-    }
-
     fn for_intersection(self, intersection: Type<'db>) -> Self {
         match self {
             Self::Default => Self::Intersection(intersection),
@@ -3490,26 +3486,22 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        self.member_lookup_with_policy_and_receiver(db, name, policy, None)
+        self.member_lookup_with_policy_in_context(db, name, policy, MemberLookupContext::Default)
     }
 
-    /// Perform member lookup while optionally binding descriptors and `Self` to a more precise
-    /// receiver than the type whose members are being searched.
-    ///
-    /// Intersection member lookup searches each positive element separately, but the resulting
-    /// attribute is still bound to the full intersection.
-    fn member_lookup_with_policy_and_receiver(
+    /// Perform member lookup while binding descriptors and `Self` to a more precise receiver than
+    /// the type whose members are being searched.
+    fn member_lookup_with_receiver(
         self,
         db: &'db dyn Db,
         name: Name,
-        policy: MemberLookupPolicy,
-        receiver: Option<Type<'db>>,
+        receiver: Type<'db>,
     ) -> PlaceAndQualifiers<'db> {
         self.member_lookup_with_policy_in_context(
             db,
             name,
-            policy,
-            MemberLookupContext::from_receiver(receiver),
+            MemberLookupPolicy::default(),
+            MemberLookupContext::Explicit(receiver),
         )
     }
 

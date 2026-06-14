@@ -6159,21 +6159,21 @@ pub(super) fn report_incompatible_base_method<'db>(
     let (override_owner, override_definition) = override_method;
     let (overridden_owner, overridden_definition) = overridden_method;
     let class_name = class.name(db);
-    let override_method = format!("{}.{member}", override_owner.name(db));
-    let overridden_method = format!("{}.{member}", overridden_owner.name(db));
+    let override_owner_name = override_owner.name(db);
+    let overridden_owner_name = overridden_owner.name(db);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Base classes for class `{class_name}` define method `{member}` incompatibly"
     ));
     diagnostic.set_primary_message(format_args!(
-        "`{override_method}` is incompatible with `{overridden_method}`"
+        "`{override_owner_name}.{member}` is incompatible with `{overridden_owner_name}.{member}`"
     ));
 
     error_context().attach_to(db, &mut diagnostic);
     diagnostic.info("This violates the Liskov Substitution Principle");
 
-    for (definition, method) in [
-        (override_definition, override_method),
-        (overridden_definition, overridden_method),
+    for (definition, owner_name) in [
+        (override_definition, override_owner_name),
+        (overridden_definition, overridden_owner_name),
     ] {
         let Some(definition) = definition else {
             continue;
@@ -6182,7 +6182,7 @@ pub(super) fn report_incompatible_base_method<'db>(
         let module = parsed_module(db, file).load(db);
         diagnostic.annotate(
             Annotation::secondary(Span::from(definition.focus_range(db, &module)))
-                .message(format_args!("`{method}` defined here")),
+                .message(format_args!("`{owner_name}.{member}` defined here")),
         );
     }
 }

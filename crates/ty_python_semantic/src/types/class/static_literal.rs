@@ -3143,7 +3143,7 @@ fn explicit_bases_cycle_fn<'db>(
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn implicit_attribute_names<'db>(
+pub(in crate::types) fn implicit_attribute_names<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
 ) -> Box<[Name]> {

@@ -9,9 +9,9 @@ use self::named_tuple::synthesize_namedtuple_class_member;
 pub(super) use self::named_tuple::{
     DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, NamedTupleField, NamedTupleSpec,
 };
+pub(in crate::types) use self::static_literal::implicit_attribute_names;
 pub(crate) use self::static_literal::{
     ExpandedClassBaseEntry, StaticClassLiteral, expanded_class_base_entries,
-    implicit_attribute_names,
 };
 pub(super) use self::typed_dict::{DynamicTypedDictAnchor, DynamicTypedDictLiteral};
 use super::{
