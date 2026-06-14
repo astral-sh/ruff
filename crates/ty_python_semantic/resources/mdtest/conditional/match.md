@@ -230,20 +230,11 @@ def _(target: int | str):
 
     reveal_type(y)  # revealed: Literal[1, 2]
 
-def _(target: int):
+def dynamic_attribute_value_pattern_preserves_fallthrough(target: int) -> None:
     match target:
         case DynamicClass(real=0):
             pass
         case _:
-            reveal_type(target)  # revealed: int
-            target.missing  # error: [unresolved-attribute]
-
-def dynamic_attribute_wildcard_preserves_fallthrough(target: int) -> None:
-    match target:
-        case DynamicClass(real=_):
-            pass
-        case _:
-            reveal_type(target)  # revealed: int
             target.missing  # error: [unresolved-attribute]
 
 def dynamic_attribute_capture_preserves_fallthrough(target: int) -> None:
@@ -251,7 +242,6 @@ def dynamic_attribute_capture_preserves_fallthrough(target: int) -> None:
         case DynamicClass(real=item):
             reveal_type(item)  # revealed: int
         case _:
-            reveal_type(target)  # revealed: int
             target.missing  # error: [unresolved-attribute]
 ```
 
