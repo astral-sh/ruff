@@ -211,6 +211,7 @@ impl SemanticSyntaxChecker {
             }) => {
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
+                    Self::type_parameter_default_order(type_params, ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
@@ -725,6 +726,7 @@ impl SemanticSyntaxChecker {
                 // test_err type_parameter_default_order
                 // class C[T = int, U]: ...
                 // class C[T1, T2 = int, T3, T4]: ...
+                // def f[T = int, U](): ...
                 // type Alias[T = int, U] = ...
                 Self::add_error(
                     ctx,
