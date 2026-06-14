@@ -1,0 +1,57 @@
+[
+    {
+        "name": "mypy",
+        "url": "https://github.com/python/mypy.git",
+        "branch": "master"
+    },
+    {
+        "name": "pandas",
+        "url": "https://github.com/pandas-dev/pandas.git",
+        "branch": "main"
+    },
+    {
+        "name": "django",
+        "url": "https://github.com/django/django.git",
+        "branch": "main"
+    },
+    {
+        "name": "openstack",
+        "url": "https://opendev.org/openstack/nova.git",
+        "branch": "master"
+    },
+    {
+        "name": "polars",
+        "url": "https://github.com/pola-rs/polars.git",
+        "branch": "main"
+    },
+    {
+        "name": "pytorch",
+        "url": "https://github.com/pytorch/pytorch.git",
+        "branch": "main"
+    },
+    {
+        "name": "cpython",
+        "url": "https://github.com/python/cpython.git",
+        "branch": "main"
+    },
+    {
+        "name": "zulip",
+        "url": "https://github.com/zulip/zulip.git",
+        "branch": "main"
+    },
+    {
+        "name": "matplotlib",
+        "url": "https://github.com/matplotlib/matplotlib.git",
+        "branch": "main"
+    },
+    {
+        "name": "core",
+        "url": "https://github.com/home-assistant/core.git",
+        "branch": "master"
+    },
+    {
+        "name": "fastapi",
+        "url": "https://github.com/fastapi/fastapi.git",
+        "branch": "master"
+    }
+]
