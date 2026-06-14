@@ -1306,6 +1306,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern => {
                 f.write_str("multiple starred names in sequence pattern")
             }
+            SemanticSyntaxErrorKind::InvalidMatchPatternTarget => {
+                f.write_str("cannot use '_' as a target")
+            }
             SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
                 // These error messages are taken from CPython's syntax errors
                 IrrefutablePatternKind::Name(name) => {
@@ -1537,6 +1540,17 @@ pub enum SemanticSyntaxErrorKind {
     ///     case [*head, middle, *tail]: ...
     /// ```
     MultipleStarredNamesInSequencePattern,
+
+    /// Represents the use of `_` as a binding target in a match pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match value:
+    ///     case 1 as _: ...
+    ///     case {**_}: ...
+    /// ```
+    InvalidMatchPatternTarget,
 
     /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
     ///
@@ -2317,9 +2331,24 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         }
     }
 
-    /// Add an identifier to the set of visited names in `self` and emit a [`SemanticSyntaxError`]
-    /// if `ident` has already been seen.
+    /// Validate a match-pattern binding and add it to the set of visited names in `self`.
+    ///
+    /// Emits a [`SemanticSyntaxError`] if the binding is `_` or has already been seen.
     fn insert(&mut self, ident: &'a ast::Identifier) {
+        // test_err invalid_match_pattern_target
+        // match value:
+        //     case 1 as _: ...
+        //     case {**_}: ...
+        // after = 1
+        if ident.is_valid() && ident.id == "_" {
+            SemanticSyntaxChecker::add_error(
+                self.ctx,
+                SemanticSyntaxErrorKind::InvalidMatchPatternTarget,
+                ident.range(),
+            );
+            return;
+        }
+
         if !self.names.insert(&ident.id) {
             SemanticSyntaxChecker::add_error(
                 self.ctx,
