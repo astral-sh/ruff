@@ -5922,17 +5922,23 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
+    is_paramspec: bool,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
+    let typevar_kind = if is_paramspec {
+        "ParamSpec"
+    } else {
+        "type variable"
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
@@ -5945,9 +5951,15 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "Type variable `{typevar_name}` is bound in this enclosing scope",
-    )));
+    if other_typevar.is_paramspec(db) {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "ParamSpec `{typevar_name}` is bound in this enclosing scope"
+        )));
+    } else {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "Type variable `{typevar_name}` is bound in this enclosing scope"
+        )));
+    }
 }
 
 // I tried refactoring this function to placate Clippy,

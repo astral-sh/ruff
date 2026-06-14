@@ -440,6 +440,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "function",
                             &function.name.id,
                             function.name.range(),
+                            matches!(type_param, ast::TypeParam::ParamSpec(_)),
                             other_typevar,
                         );
                     }

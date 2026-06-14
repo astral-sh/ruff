@@ -362,6 +362,14 @@ impl<'db> StaticClassLiteral<'db> {
                 self.typevars.borrow_mut().insert(bound_typevar);
             }
 
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                // The generic context contains the base class's formal type parameters, not type
+                // variables referenced by this class's base expression.
+                for ty in alias.specialization(db).types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
