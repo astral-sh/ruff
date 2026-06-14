@@ -682,11 +682,13 @@ participate according to their position in the MRO: a leading dynamic base obscu
 wins, but a later dynamic base does not erase a known conflict.
 
 ```pyi
-from collections.abc import Callable
-from typing import Any, Generic, NamedTuple, TypeVar, overload
+from collections.abc import Callable, Coroutine
+from typing import Any, Concatenate, Generic, NamedTuple, ParamSpec, TypeVar, overload
 from typing_extensions import Self
 
 T = TypeVar("T")
+P = ParamSpec("P")
+Owner = TypeVar("Owner")
 
 class Intermediate(StrReturn): ...
 class IndirectConflict(Intermediate, IntReturn): ...  # error: [invalid-method-override]
@@ -739,6 +741,24 @@ class BrokenIntReturn(IntReturn):
 
 # The violation is defined on `BrokenIntReturn`; this class should not repeat it.
 class RedundantDirectBase(BrokenIntReturn, IntReturn): ...
+
+def async_decorator(
+    function: Callable[Concatenate[Owner, P], Coroutine[Any, Any, Any]],
+) -> Callable[Concatenate[Owner, P], Coroutine[Any, Any, None]]: ...
+
+class AsyncContract:
+    async def async_method(self, **kwargs: Any) -> None: ...
+
+class DecoratedAsyncOverride(AsyncContract):
+    @async_decorator
+    async def async_method(self, **kwargs: Any) -> None: ...
+
+class OtherAsyncPath(AsyncContract): ...
+
+# The decorated method's public callable type already differs from `AsyncContract` on the class
+# that defines it. Meeting the same contract through a second path does not introduce a new
+# conflict on this subclass.
+class DecoratedAsyncDiamond(DecoratedAsyncOverride, OtherAsyncPath): ...
 
 class ExplicitOverride(StrReturn, IntReturn):
     def method(self) -> str: ...  # error: [invalid-method-override]

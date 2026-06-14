@@ -218,12 +218,12 @@ fn check_inherited_method_conflicts<'db>(
                 continue;
             }
 
-            // If the winning method was already incompatible with this ancestor on its defining
-            // class, the normal override checks reported the violation there. Repeat the check
-            // with that class as the receiver rather than assuming that nominal ancestry is
-            // sufficient: receiver-specific overloads can introduce a new conflict only on this
-            // subclass.
-            if inherited_conflict_already_reported(db, &member, override_owner, overridden_owner) {
+            // If the winning source method was already incompatible with this ancestor on its
+            // defining class, meeting the same contract through another path does not introduce a
+            // new conflict here. Repeat the check with that class as the receiver rather than
+            // assuming that nominal ancestry is sufficient: receiver-specific overloads can
+            // introduce a new conflict only on this subclass.
+            if inherited_conflict_exists_on_owner(db, &member, override_owner, overridden_owner) {
                 continue;
             }
 
@@ -494,9 +494,9 @@ fn method_definition<'db>(
     symbol_definition(db, scope, symbol)
 }
 
-/// Returns `true` if the winning method was already incompatible with the overridden method on
-/// the class that defines it.
-fn inherited_conflict_already_reported<'db>(
+/// Returns `true` if the winning source method was already incompatible with the overridden method
+/// on the class that defines it.
+fn inherited_conflict_exists_on_owner<'db>(
     db: &'db dyn Db,
     name: &Name,
     override_owner: ClassType<'db>,
@@ -505,7 +505,7 @@ fn inherited_conflict_already_reported<'db>(
     if !override_owner.is_subtype_of_class_literal(db, overridden_owner.class_literal(db)) {
         return false;
     }
-    if !normal_override_check_covers_member(db, override_owner, name)
+    if method_definition(db, override_owner, name).is_none()
         || overridden_owner.static_class_literal(db).is_none()
     {
         return false;
@@ -546,23 +546,6 @@ fn inherited_conflict_already_reported<'db>(
     };
 
     !override_type.is_assignable_to(db, overridden_callable.into_type(db))
-}
-
-/// Returns `true` if the normal override pass checks `owner`'s definition of `name`.
-fn normal_override_check_covers_member<'db>(
-    db: &'db dyn Db,
-    owner: ClassType<'db>,
-    name: &Name,
-) -> bool {
-    let Some((owner_literal, _)) = owner.static_class_literal(db) else {
-        return false;
-    };
-    let class_kind = CodeGeneratorKind::from_class(db, owner_literal.into());
-
-    all_end_of_scope_members(db, owner_literal.body_scope(db)).any(|member| {
-        member.member.name == *name
-            && checked_override_function(class_kind, name, member.member.ty).is_some()
-    })
 }
 
 /// Returns the source function when the normal override pass checks this member.
