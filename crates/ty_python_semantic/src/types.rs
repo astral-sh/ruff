@@ -1317,6 +1317,15 @@ impl<'db> Type<'db> {
         matches!(self, Type::Divergent(_))
     }
 
+    pub(crate) fn is_cycle_recovery_placeholder(self, db: &'db dyn Db) -> bool {
+        matches!(self, Type::Divergent(_))
+            || matches!(self, Type::Recursive(recursive) if recursive.is_non_contractive(db))
+    }
+
+    pub(crate) fn contains_type(self, db: &'db dyn Db, needle: Type<'db>) -> bool {
+        any_over_type(db, self, false, |ty| ty == needle)
+    }
+
     /// Returns `true` if both `self` and `other` are `Divergent` types originating from the
     /// same cycle (i.e., sharing the same query ID), regardless of materialization state.
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
@@ -1364,6 +1373,60 @@ impl<'db> Type<'db> {
         };
         visitor::TypeVisitor::visit_type(&visitor, db, self);
         visitor.found.get()
+    }
+
+    pub(crate) fn lazy_typevar_attribute_cycle_recovered(
+        self,
+        db: &'db dyn Db,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        // Lazy TypeVar attributes are themselves used while resolving generic class bases. Keep
+        // recovery structural so it cannot force another lazy attribute query in the same cycle.
+        struct FreeDivergentCollector<'db> {
+            recursion_guard: visitor::TypeCollector<'db>,
+            ids: std::cell::RefCell<Vec<salsa::Id>>,
+        }
+
+        impl<'db> visitor::TypeVisitor<'db> for FreeDivergentCollector<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                if let Type::Divergent(divergent) = ty {
+                    let mut ids = self.ids.borrow_mut();
+                    if !ids.contains(&divergent.id()) {
+                        ids.push(divergent.id());
+                    }
+                    return;
+                }
+
+                visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let collector = FreeDivergentCollector {
+            recursion_guard: visitor::TypeCollector::default(),
+            ids: std::cell::RefCell::new(Vec::new()),
+        };
+        visitor::TypeVisitor::visit_type(&collector, db, self);
+
+        let recovered = collector
+            .ids
+            .into_inner()
+            .into_iter()
+            .fold(self, |ty, divergent_id| {
+                Type::implicit_recursive(db, divergent_id, ty)
+            });
+
+        cycle.head_ids().fold(recovered, |ty, head_id| {
+            let binder_id = recursive::BinderId::new(head_id);
+            ty.apply_type_mapping(
+                db,
+                &TypeMapping::EraseCycleMark { binder_id },
+                TypeContext::default(),
+            )
+        })
     }
 
     /// Construct a `Type::Recursive` with the given μ-binder id, origin, and body.

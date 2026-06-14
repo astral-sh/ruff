@@ -1285,6 +1285,48 @@ impl<'db> TypeVarIdentity<'db> {
 }
 
 #[expect(clippy::ref_option)]
+fn typevar_attribute_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Option<Type<'db>>,
+    current: Option<Type<'db>>,
+) -> Option<Type<'db>> {
+    let current = current?;
+    let recovered = current.lazy_typevar_attribute_cycle_recovered(db, cycle);
+    if let Some(previous) = previous
+        && !previous.is_cycle_recovery_placeholder(db)
+    {
+        if recovered.contains_type(db, *previous) {
+            Some(*previous)
+        } else {
+            Some(UnionType::from_elements_cycle_recovery(
+                db,
+                [*previous, recovered],
+            ))
+        }
+    } else {
+        Some(recovered)
+    }
+}
+
+fn references_binding_context_type_alias<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    binding_context: BindingContext<'db>,
+) -> bool {
+    let BindingContext::Definition(definition) = binding_context else {
+        return false;
+    };
+
+    any_over_type(db, ty, false, |ty| match ty {
+        Type::TypeAlias(alias) | Type::KnownInstance(KnownInstanceType::TypeAliasType(alias)) => {
+            alias.definition(db) == definition
+        }
+        _ => false,
+    })
+}
+
+#[expect(clippy::ref_option)]
 fn lazy_bound_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -1292,12 +1334,7 @@ fn lazy_bound_cycle_recover<'db>(
     current: Option<Type<'db>>,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    match (previous, current) {
-        (_, Some(current)) if current.contains_recursive_type(db) => *previous,
-        (Some(prev), Some(current)) => Some(current.cycle_normalized(db, Some(*prev), cycle)),
-        (None, Some(current)) => Some(current.cycle_normalized(db, None, cycle)),
-        (_, None) => None,
-    }
+    typevar_attribute_cycle_recover(db, cycle, previous, current)
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
@@ -1325,12 +1362,7 @@ fn lazy_default_cycle_recover<'db>(
     default: Option<Type<'db>>,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    // Normalize the default to ensure cycle convergence.
-    match (previous_default, default) {
-        (Some(prev), Some(default)) => Some(default.cycle_normalized(db, Some(*prev), cycle)),
-        (None, Some(default)) => Some(default.cycle_normalized(db, None, cycle)),
-        (_, None) => None,
-    }
+    typevar_attribute_cycle_recover(db, cycle, previous_default, default)
 }
 
 /// Where a type variable is bound and usable.
@@ -1437,13 +1469,20 @@ fn bound_typevar_default_type<'db>(
 
 #[expect(clippy::ref_option)]
 fn bound_typevar_default_type_cycle_recover<'db>(
-    _db: &'db dyn Db,
-    _cycle: &salsa::Cycle,
-    _previous_default: &Option<Type<'db>>,
-    _default: Option<Type<'db>>,
-    _bound_typevar: BoundTypeVarInstance<'db>,
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_default: &Option<Type<'db>>,
+    default: Option<Type<'db>>,
+    bound_typevar: BoundTypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
-    None
+    // `type A[T = A] = ...` is rejected by treating the self-referential default as absent.
+    if default.is_some_and(|ty| {
+        references_binding_context_type_alias(db, ty, bound_typevar.binding_context(db))
+    }) {
+        return None;
+    }
+
+    typevar_attribute_cycle_recover(db, cycle, previous_default, default)
 }
 
 /// Whether a typevar default is eagerly specified or lazily evaluated.
