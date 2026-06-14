@@ -770,6 +770,18 @@ def test_match_class_capture_filters_union_arms(
             reveal_type(item)  # revealed: int
             reveal_type(whole)  # revealed: TaggedPayload[Literal["int"], int]
 
+class ImpossibleClassPattern:
+    __match_args__ = ("first", "second")
+    first: str
+    second: str
+
+def test_later_class_pattern_failure_rejects_earlier_capture(
+    value: ImpossibleClassPattern,
+) -> None:
+    match value:
+        case ImpossibleClassPattern(item, int()):
+            reveal_type(item)  # revealed: Never
+
 def test_match_class_or_pattern_filters_union_arms(
     value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool],
 ) -> None:
@@ -902,6 +914,14 @@ def test_match_mapping_nested_sequence(
         case {"pair": [number, text]}:
             reveal_type(number)  # revealed: int
             reveal_type(text)  # revealed: str
+
+def test_later_mapping_pattern_failure_rejects_bindings(
+    value: Mapping[str, str],
+) -> None:
+    match value:
+        case {"first": item, "second": int(), **rest}:
+            reveal_type(item)  # revealed: Never
+            reveal_type(rest)  # revealed: Never
 
 def test_match_mapping_rejects_empty_key_domain(
     value: dict[Never, int],
