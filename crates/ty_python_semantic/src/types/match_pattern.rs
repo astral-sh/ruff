@@ -4,12 +4,13 @@ use ty_python_core::Truthiness;
 use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKind};
 
 use crate::Db;
+use crate::place::{DefinedPlace, Place};
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    CallableType, IntersectionBuilder, KnownClass, Parameter, Parameters, Signature,
-    SpecialFormType, Type, TypeContext, UnionType, equality_truthiness,
+    CallableType, ClassBase, ClassLiteral, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, Type, TypeContext, UnionType, binding_type, equality_truthiness,
     infer_same_file_expression_type,
 };
 
@@ -31,6 +32,19 @@ pub(crate) fn callable_pattern_type(db: &dyn Db) -> Type<'_> {
     Type::Callable(CallableType::unknown(db)).top_materialization(db)
 }
 
+/// Return whether every runtime value represented by a `TypedDict` satisfies `class`.
+///
+/// `TypedDict` is not a nominal subtype of `dict` in the static type system, but every runtime
+/// value is a dictionary. A `TypedDict` therefore matches class patterns such as `dict()`,
+/// `Mapping()`, and `MutableMapping()`.
+pub(crate) fn typed_dict_matches_class_pattern(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    let Some(dict) = KnownClass::Dict.to_class_literal(db).as_class_literal() else {
+        return false;
+    };
+    Type::instance(db, dict.top_materialization(db))
+        .is_subtype_of(db, Type::instance(db, class.top_materialization(db)))
+}
+
 pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<'_> {
     IntersectionBuilder::new(db)
         .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
@@ -39,6 +53,92 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Str.to_instance(db))
         .add_negative(KnownClass::Bytes.to_instance(db))
         .add_negative(KnownClass::Bytearray.to_instance(db))
+}
+
+enum ClassMatchArgs<'db> {
+    Undefined,
+    Defined(Type<'db>),
+    PossiblyUndefined,
+}
+
+#[derive(Clone)]
+pub(crate) enum ClassPatternPositionalSource {
+    MatchSelf,
+    Attribute(Name),
+    Unknown,
+}
+
+fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
+    match Type::ClassLiteral(class).member(db, "__match_args__").place {
+        Place::Defined(
+            place @ DefinedPlace {
+                ty,
+                origin,
+                provenance,
+                ..
+            },
+        ) if place.is_definitely_defined() => ClassMatchArgs::Defined(if origin.is_declared() {
+            ty
+        } else {
+            provenance
+                .definition()
+                .map_or(ty, |definition| binding_type(db, definition))
+        }),
+        Place::Defined(_) => ClassMatchArgs::PossiblyUndefined,
+        Place::Undefined => ClassMatchArgs::Undefined,
+    }
+}
+
+fn class_has_match_self_flag(db: &dyn Db, class: ClassLiteral<'_>) -> bool {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .any(|base| {
+            base.class_literal(db)
+                .known(db)
+                .is_some_and(KnownClass::has_match_self_flag)
+        })
+}
+
+pub(crate) fn class_pattern_positional_sources(
+    db: &dyn Db,
+    class: Option<ClassLiteral<'_>>,
+    positional_count: usize,
+) -> Vec<ClassPatternPositionalSource> {
+    let Some(class) = class else {
+        return vec![ClassPatternPositionalSource::Unknown; positional_count];
+    };
+
+    let fixed = match class_match_args_type(db, class) {
+        ClassMatchArgs::Undefined if class_has_match_self_flag(db, class) => {
+            return (0..positional_count)
+                .map(|index| {
+                    if index == 0 {
+                        ClassPatternPositionalSource::MatchSelf
+                    } else {
+                        ClassPatternPositionalSource::Unknown
+                    }
+                })
+                .collect();
+        }
+        ClassMatchArgs::Defined(match_args) => match_args
+            .exact_tuple_instance_spec(db)
+            .and_then(|tuple| tuple.as_fixed_length().cloned()),
+        ClassMatchArgs::Undefined | ClassMatchArgs::PossiblyUndefined => None,
+    };
+
+    (0..positional_count)
+        .map(|index| {
+            fixed
+                .as_ref()
+                .and_then(|tuple| tuple.elements_slice().get(index))
+                .and_then(|ty| ty.as_string_literal())
+                .map(|literal| {
+                    ClassPatternPositionalSource::Attribute(Name::new(literal.value(db)))
+                })
+                .unwrap_or(ClassPatternPositionalSource::Unknown)
+        })
+        .collect()
 }
 
 fn sequence_pattern_getitem_method<'db>(
@@ -184,17 +284,30 @@ pub(crate) fn definite_match_pattern_type<'db>(
                 Type::Never
             }
         }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
-                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(db)
-                    }
-                    _ => Type::Never,
+        PatternPredicateKind::Class(kind) => {
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class)
+                    if kind.is_argumentless()
+                        || (kind.kind().is_irrefutable()
+                            && kind.keywords.is_empty()
+                            && class_pattern_positional_sources(
+                                db,
+                                Some(class),
+                                kind.positional.len(),
+                            )
+                            .iter()
+                            .all(|source| {
+                                matches!(source, ClassPatternPositionalSource::MatchSelf)
+                            })) =>
+                {
+                    Type::instance(db, class.top_materialization(db))
                 }
-            } else {
-                Type::Never
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless() =>
+                {
+                    callable_pattern_type(db)
+                }
+                _ => Type::Never,
             }
         }
         PatternPredicateKind::Mapping(kind) => {

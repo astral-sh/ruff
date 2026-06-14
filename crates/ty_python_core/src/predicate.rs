@@ -183,17 +183,93 @@ impl<'db> SequencePatternPredicateKind<'db> {
     }
 }
 
+/// Structural details for a class pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternPredicateKind<'db> {
+    pub class: Expression<'db>,
+    pub positional: Box<[PatternPredicateKind<'db>]>,
+    pub keywords: Box<[ClassPatternKeywordPredicateKind<'db>]>,
+}
+
+impl ClassPatternPredicateKind<'_> {
+    pub fn is_argumentless(&self) -> bool {
+        self.positional.is_empty() && self.keywords.is_empty()
+    }
+
+    pub fn kind(&self) -> ClassPatternKind {
+        if self
+            .positional
+            .iter()
+            .chain(self.keywords.iter().map(|keyword| &keyword.pattern))
+            .all(PatternPredicateKind::is_syntactically_irrefutable)
+        {
+            ClassPatternKind::Irrefutable
+        } else {
+            ClassPatternKind::Refutable
+        }
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct ClassPatternKeywordPredicateKind<'db> {
+    pub attr: Name,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
+/// Structural details for a mapping pattern.
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct MappingPatternPredicateKind<'db> {
+    pub entries: Box<[MappingPatternEntryPredicateKind<'db>]>,
+    pub rest: Option<Name>,
+}
+
+impl MappingPatternPredicateKind<'_> {
+    pub fn is_irrefutable(&self) -> bool {
+        self.entries.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct MappingPatternEntryPredicateKind<'db> {
+    pub key: Expression<'db>,
+    pub pattern: PatternPredicateKind<'db>,
+}
+
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
 pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Box<[PatternPredicateKind<'db>]>),
-    Class(Expression<'db>, ClassPatternKind),
-    Mapping(ClassPatternKind),
+    Class(ClassPatternPredicateKind<'db>),
+    Mapping(MappingPatternPredicateKind<'db>),
     Sequence(SequencePatternPredicateKind<'db>),
     As(Option<Box<PatternPredicateKind<'db>>>, Option<Name>),
     Star(Option<Name>),
+}
+
+impl PatternPredicateKind<'_> {
+    /// Return whether this pattern contains a syntactic alternative that accepts every value.
+    ///
+    /// Captures and star patterns accept the value they receive without another runtime test. An
+    /// `or` pattern is therefore irrefutable when any alternative is irrefutable:
+    ///
+    /// ```python
+    /// match value:
+    ///     case (1 as item) | item:
+    ///         ...
+    /// ```
+    ///
+    /// This only describes the nested pattern syntax. A surrounding class, mapping, or sequence
+    /// pattern can still fail while selecting the value passed to this pattern.
+    fn is_syntactically_irrefutable(&self) -> bool {
+        match self {
+            Self::Or(patterns) => patterns.iter().any(Self::is_syntactically_irrefutable),
+            Self::As(Some(pattern), _) => pattern.is_syntactically_irrefutable(),
+            Self::As(None, _) | Self::Star(_) => true,
+            _ => false,
+        }
+    }
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
