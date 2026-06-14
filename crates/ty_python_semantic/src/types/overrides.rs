@@ -762,7 +762,9 @@ fn check_class_declaration<'db>(
             // since the child cannot fix the violation without contradicting its immediate parent's contract.
             // See: https://github.com/astral-sh/ty/issues/2000
             if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-                if immediate_parent != superclass && immediate_parent.is_subclass_of(db, superclass)
+                if immediate_parent != superclass
+                    && immediate_parent
+                        .is_subtype_of_class_literal(db, superclass.class_literal(db))
                 {
                     // The immediate parent already defines this method and is different from the
                     // current ancestor we're checking. Check if the immediate parent's method is

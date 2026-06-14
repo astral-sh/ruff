@@ -868,6 +868,25 @@ info: parameter `x` has an incompatible type: `int` is not assignable to `str`
 info: This violates the Liskov Substitution Principle
 ```
 
+Cascade suppression follows nominal ancestry even when the parent uses a raw generic base:
+
+`raw_generic.pyi`:
+
+```pyi
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class GenericGrandparent(Generic[T]):
+    def method(self, original: int) -> None: ...
+
+class RawGenericParent(GenericGrandparent):  # error: [missing-type-argument]
+    def method(self, renamed: int) -> None: ...  # error: [invalid-method-override]
+
+class RawGenericChild(RawGenericParent):
+    def method(self, renamed: int) -> None: ...
+```
+
 `other_stub.pyi`:
 
 ```pyi
