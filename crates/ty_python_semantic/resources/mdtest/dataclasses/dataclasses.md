@@ -418,6 +418,10 @@ from dataclasses import dataclass
 
 @dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 class InvalidOrder: ...
+
+def dynamic_eq(eq: bool):
+    @dataclass(order=True, eq=eq)
+    class PossiblyValidOrder: ...
 ```
 
 Comparisons are only allowed for `WithOrder` instances:
@@ -1266,6 +1270,10 @@ from dataclasses import dataclass
 
 @dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
 class InvalidWeakrefSlot: ...
+
+def dynamic_slots(slots: bool):
+    @dataclass(weakref_slot=True, slots=slots)
+    class PossiblyValidWeakrefSlot: ...
 ```
 
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
