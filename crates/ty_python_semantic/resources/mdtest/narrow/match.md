@@ -829,10 +829,11 @@ def match_tuple_expression_starred_pattern(
             reveal_type(b)  # revealed: TupleSubjectB1
 ```
 
-## Subject-time bindings in display subjects
+## Bindings used in match subjects
 
-Each element constraint applies to the binding read while that subject element was evaluated. It
-does not constrain a binding introduced by a later subject element, pattern capture, or guard.
+Each element is narrowed using the binding that Python read when it evaluated that part of the
+subject. A later assignment in another element, pattern capture, or guard does not change which
+binding the earlier element referred to.
 
 ```py
 from typing import final
