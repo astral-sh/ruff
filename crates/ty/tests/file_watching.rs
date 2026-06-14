@@ -555,6 +555,52 @@ fn new_file() -> anyhow::Result<()> {
 }
 
 #[test]
+fn new_directory_with_python_files() -> anyhow::Result<()> {
+    let mut case = setup([("bar.py", "")])?;
+    let bar_path = case.project_path("bar.py");
+    let bar_file = case.system_file(&bar_path).unwrap();
+    let package_path = case.project_path("package");
+    let init_path = package_path.join("__init__.py");
+    let module_path = package_path.join("module.py");
+
+    case.assert_indexed_project_files([bar_file]);
+    assert!(
+        resolve_module_confident(
+            case.db(),
+            &ModuleName::new_static("package.module").unwrap()
+        )
+        .is_none()
+    );
+
+    std::fs::create_dir(package_path.as_std_path())?;
+    std::fs::write(init_path.as_std_path(), "")?;
+    std::fs::write(module_path.as_std_path(), "")?;
+
+    let changes = case.stop_watch(|event: &ChangeEvent| {
+        matches!(
+            event.file_name(),
+            Some("package" | "__init__.py" | "module.py")
+        )
+    });
+
+    case.apply_changes(&changes, None);
+
+    let init = case.system_file(&init_path).expect("__init__.py to exist");
+    let module = case.system_file(&module_path).expect("module.py to exist");
+
+    case.assert_indexed_project_files([bar_file, init, module]);
+    assert!(
+        resolve_module_confident(
+            case.db(),
+            &ModuleName::new_static("package.module").unwrap()
+        )
+        .is_some()
+    );
+
+    Ok(())
+}
+
+#[test]
 fn new_non_python_file_is_not_indexed() -> anyhow::Result<()> {
     let mut case = setup([("bar.py", "")])?;
     let bar_path = case.project_path("bar.py");
@@ -880,6 +926,7 @@ fn deleted_file() -> anyhow::Result<()> {
     let foo = case.system_file(&foo_path)?;
 
     assert!(foo.exists(case.db()));
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_some());
     case.assert_indexed_project_files([foo]);
 
     std::fs::remove_file(foo_path.as_std_path())?;
@@ -889,6 +936,7 @@ fn deleted_file() -> anyhow::Result<()> {
     case.apply_changes(&changes, None);
 
     assert!(!foo.exists(case.db()));
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("foo").unwrap()).is_none());
     case.assert_indexed_project_files([]);
 
     Ok(())

@@ -246,6 +246,11 @@ impl Files {
             return;
         }
 
+        let parents = paths
+            .iter()
+            .filter_map(|path| path.parent().map(SystemPath::to_path_buf))
+            .collect::<BTreeSet<_>>();
+
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
             let path = entry.key();
@@ -253,9 +258,7 @@ impl Files {
                 .range(..=path.to_path_buf())
                 .next_back()
                 .is_some_and(|candidate| path.starts_with(candidate.as_path()))
-                || paths
-                    .iter()
-                    .any(|candidate| candidate.parent() == Some(path.as_path()))
+                || parents.contains(path)
             {
                 File::sync_system_path(db, path, Some(*entry.value()));
             }
@@ -409,7 +412,7 @@ impl File {
     pub fn sync_path(db: &mut dyn Db, path: &SystemPath) {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
         let result = Self::sync_system_path(db, &absolute, None);
-        Self::touch_directories_after_sync(db, &absolute, result);
+        Self::touch_parent_directory_after_sync(db, &absolute, result);
     }
 
     /// Refreshes *only* the file metadata by querying the file system if needed.
@@ -434,7 +437,7 @@ impl File {
         match path {
             FilePath::System(system) => {
                 let result = Self::sync_system_path(db, &system, Some(self));
-                Self::touch_directories_after_sync(db, &system, result);
+                Self::touch_parent_directory_after_sync(db, &system, result);
             }
             FilePath::Vendored(_) => {
                 // Readonly, can never be out of date.
@@ -497,7 +500,11 @@ impl File {
         SyncPathResult { status_changed }
     }
 
-    fn touch_directories_after_sync(db: &mut dyn Db, path: &SystemPath, result: SyncPathResult) {
+    fn touch_parent_directory_after_sync(
+        db: &mut dyn Db,
+        path: &SystemPath,
+        result: SyncPathResult,
+    ) {
         if result.status_changed
             && let Some(parent) = path.parent()
         {

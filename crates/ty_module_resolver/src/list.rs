@@ -394,9 +394,10 @@ mod tests {
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
-    use ruff_db::testing::assert_function_query_was_not_run;
+    use ruff_db::testing::{
+        assert_function_query_was_not_run, assert_function_query_was_not_run_by_name,
+    };
     use ruff_python_ast::PythonVersion;
-    use salsa::Database as _;
     use salsa::plumbing::AsId as _;
 
     use crate::db::{Db, tests::TestDb};
@@ -409,24 +410,6 @@ mod tests {
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::list_modules;
-
-    fn assert_query_was_not_run(
-        db: &TestDb,
-        query_name: &str,
-        input: Option<salsa::Id>,
-        events: &[salsa::Event],
-    ) {
-        assert!(
-            !events.iter().any(|event| {
-                let salsa::EventKind::WillExecute { database_key } = event.kind else {
-                    return false;
-                };
-                db.ingredient_debug_name(database_key.ingredient_index()) == query_name
-                    && input.is_none_or(|input| database_key.key_index() == input)
-            }),
-            "Expected {query_name} not to run:\n{events:#?}"
-        );
-    }
 
     struct ModuleDebugSnapshot<'db> {
         db: &'db dyn Db,
@@ -1076,7 +1059,7 @@ mod tests {
         list_modules(&db);
 
         let events = db.take_salsa_events();
-        assert_query_was_not_run(&db, "list_modules_in", None, &events);
+        assert_function_query_was_not_run_by_name(&db, "list_modules_in", None, &events);
 
         Ok(())
     }
@@ -1107,7 +1090,7 @@ mod tests {
         package.all_submodules(&db);
 
         let events = db.take_salsa_events();
-        assert_query_was_not_run(
+        assert_function_query_was_not_run_by_name(
             &db,
             "all_submodule_names_for_package",
             Some(package_id),
@@ -1685,8 +1668,9 @@ not_a_directory
         db.write_file(src.join("main.py"), "print('Hy')")
             .context("Failed to write `main.py`")?;
 
-        // Directory listings preserve the source entry's casing even though resolving the symlink
-        // for `a/__init__.py` results in `a-package/__init__.py`.
+        // The symlink triggers the slow-path in the `OsSystem`'s
+        // `exists_path_case_sensitive` code because canonicalizing the path
+        // for `a/__init__.py` results in `a-package/__init__.py`
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 

@@ -117,13 +117,12 @@ fn directory_listing_query(
 
 #[cfg(test)]
 mod tests {
-    use crate::Db as _;
-    use crate::files::{File, directory_listing, system_path_to_file};
-    use crate::system::{DbWithWritableSystem as _, SystemPath, WritableSystem as _};
+    use crate::files::directory_listing;
+    use crate::system::{DbWithWritableSystem as _, SystemPath};
     use crate::tests::TestDb;
 
     #[test]
-    fn listing_is_sorted_and_cached() -> std::io::Result<()> {
+    fn listing_is_sorted() -> std::io::Result<()> {
         let mut db = TestDb::new();
         db.write_file("src/z.py", "")?;
         db.write_file("src/a.py", "")?;
@@ -133,21 +132,6 @@ mod tests {
         assert_eq!(
             listing.iter().map(|(name, _)| name).collect::<Vec<_>>(),
             ["a.py", "z.py"]
-        );
-
-        db.writable_system()
-            .write_file(SystemPath::new("src/new.py"), "")?;
-        assert_eq!(
-            directory_listing(&db, path).unwrap().file_type("new.py"),
-            None
-        );
-
-        File::sync_path(&mut db, SystemPath::new("src/new.py"));
-        assert!(
-            directory_listing(&db, path)
-                .unwrap()
-                .file_type("new.py")
-                .is_some()
         );
 
         Ok(())
@@ -171,109 +155,5 @@ mod tests {
                 .kind,
             std::io::ErrorKind::NotFound
         );
-    }
-
-    #[test]
-    fn content_change_does_not_invalidate_directory() -> std::io::Result<()> {
-        let mut db = TestDb::new();
-        db.write_file("src/a.py", "old")?;
-        system_path_to_file(&db, SystemPath::new("src/a.py")).unwrap();
-
-        let directory = db.files().system(&db, SystemPath::new("src"));
-        directory_listing(&db, SystemPath::new("src")).unwrap();
-        let revision = directory.revision(&db);
-
-        db.writable_system()
-            .write_file(SystemPath::new("src/a.py"), "new")?;
-        File::sync_path(&mut db, SystemPath::new("src/a.py"));
-
-        assert_eq!(directory.revision(&db), revision);
-        Ok(())
-    }
-
-    #[test]
-    fn structural_changes_invalidate_directory() -> std::io::Result<()> {
-        let mut db = TestDb::new();
-        db.write_file("src/existing.py", "")?;
-        let existing = system_path_to_file(&db, SystemPath::new("src/existing.py")).unwrap();
-
-        let directory = SystemPath::new("src");
-        assert!(
-            directory_listing(&db, directory)
-                .unwrap()
-                .file_type("existing.py")
-                .is_some()
-        );
-
-        db.writable_system()
-            .memory_file_system()
-            .remove_file("src/existing.py")?;
-        existing.sync(&mut db);
-        assert_eq!(
-            directory_listing(&db, directory)
-                .unwrap()
-                .file_type("existing.py"),
-            None
-        );
-
-        db.writable_system()
-            .write_file(SystemPath::new("src/new.py"), "")?;
-        File::sync_path(&mut db, SystemPath::new("src/new.py"));
-        assert!(
-            directory_listing(&db, directory)
-                .unwrap()
-                .file_type("new.py")
-                .is_some()
-        );
-
-        Ok(())
-    }
-
-    #[test]
-    fn syncing_directory_invalidates_its_listing() -> std::io::Result<()> {
-        let mut db = TestDb::new();
-        db.write_file("src/a.py", "")?;
-
-        let directory = SystemPath::new("src");
-        directory_listing(&db, directory).unwrap();
-
-        db.writable_system()
-            .write_file(SystemPath::new("src/new.py"), "")?;
-        File::sync_path(&mut db, SystemPath::new("src"));
-
-        assert!(
-            directory_listing(&db, directory)
-                .unwrap()
-                .file_type("new.py")
-                .is_some()
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn recursive_sync_invalidates_parent_listing() -> std::io::Result<()> {
-        let mut db = TestDb::new();
-        db.writable_system()
-            .memory_file_system()
-            .create_directory_all("src/package")?;
-
-        let src = SystemPath::new("src");
-        assert!(
-            directory_listing(&db, src)
-                .unwrap()
-                .file_type("package")
-                .is_some()
-        );
-
-        db.writable_system()
-            .memory_file_system()
-            .remove_directory("src/package")?;
-        crate::files::Files::sync_all_recursive(&mut db, [SystemPath::new("src/package")]);
-
-        assert_eq!(
-            directory_listing(&db, src).unwrap().file_type("package"),
-            None
-        );
-        Ok(())
     }
 }

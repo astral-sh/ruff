@@ -197,14 +197,9 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = self.normalize_path(path.as_ref());
-        let existed = matches!(by_path.get(&normalized), Some(Entry::File(_)));
-
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.as_ref().to_vec().into_boxed_slice();
         file.last_modified = file_time_now();
-        if !existed && let Some(parent) = normalized.parent() {
-            touch_directory(&mut by_path, parent);
-        }
 
         Ok(())
     }
@@ -527,16 +522,24 @@ fn get_or_create_file<'a>(
         }
     }
 
-    let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
-        Entry::File(File {
-            content: Box::default(),
-            last_modified: file_time_now(),
-        })
-    });
+    if !paths.contains_key(normalized) {
+        if let Some(parent) = normalized.parent().map(Utf8Path::to_path_buf) {
+            touch_directory(paths, &parent);
+        }
 
-    match entry {
-        Entry::File(file) => Ok(file),
-        Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
+        paths.insert(
+            normalized.to_path_buf(),
+            Entry::File(File {
+                content: Box::default(),
+                last_modified: file_time_now(),
+            }),
+        );
+    }
+
+    match paths.get_mut(normalized) {
+        Some(Entry::File(file)) => Ok(file),
+        Some(Entry::Directory(_)) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
+        None => Err(not_found()),
     }
 }
 
@@ -807,6 +810,24 @@ mod tests {
         let timestamp2 = fs.metadata(path)?.revision();
 
         assert_ne!(timestamp1, timestamp2);
+
+        Ok(())
+    }
+
+    #[test]
+    fn touch_new_file_updates_parent_directory() -> Result<()> {
+        let fs = MemoryFileSystem::new();
+        let directory = SystemPath::new("src");
+        fs.create_directory_all(directory)?;
+        let before = fs.metadata(directory)?.revision();
+
+        // Sleep to ensure that the timestamp changes
+        std::thread::sleep(Duration::from_millis(1));
+
+        fs.touch(SystemPath::new("src/new.py"))?;
+        let after = fs.metadata(directory)?.revision();
+
+        assert_ne!(before, after);
 
         Ok(())
     }

@@ -38,7 +38,7 @@ use std::iter::FusedIterator;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
-use ruff_db::source::{SourceText, source_text};
+use ruff_db::source::source_text;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
@@ -843,64 +843,68 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // The Python documentation specifies that `.pth` files in `site-packages`
         // are processed in alphabetical order. `DirectoryListing` is already sorted.
         // https://docs.python.org/3/library/site.html#module-site
-        let all_pth_files = listing
-            .iter()
-            .filter(|(name, file_type)| {
-                !file_type.is_directory() && SystemPath::new(name).extension() == Some("pth")
-            })
-            .filter_map(|(name, _)| {
-                let path = site_packages_dir.join(name);
-                // Track each `.pth` file independently so content changes invalidate this query.
-                let file = system_path_to_file(db, &path)
-                    .inspect_err(|error| {
-                        tracing::warn!("Failed to open .pth file `{path}`: {error}");
-                    })
-                    .ok()?;
-                let contents = source_text(db, file);
-                if let Some(error) = contents.read_error() {
-                    tracing::warn!("Failed to read .pth file `{path}`: {error}");
+        let pth_files = listing.iter().filter(|(name, file_type)| {
+            !file_type.is_directory() && SystemPath::new(name).extension() == Some("pth")
+        });
+
+        for (name, _) in pth_files {
+            let path = site_packages_dir.join(name);
+            // Track each `.pth` file independently so content changes invalidate this query.
+            let Ok(file) = system_path_to_file(db, &path).inspect_err(|error| {
+                tracing::warn!("Failed to open .pth file `{path}`: {error}");
+            }) else {
+                continue;
+            };
+            let contents = source_text(db, file);
+            if let Some(error) = contents.read_error() {
+                tracing::warn!("Failed to read .pth file `{path}`: {error}");
+                continue;
+            }
+
+            let installations = contents.lines().filter_map(|line| {
+                let line = line.trim_end();
+                if line.is_empty()
+                    || line.starts_with('#')
+                    || line.starts_with("import ")
+                    || line.starts_with("import\t")
+                {
                     return None;
                 }
 
-                Some(PthFile {
-                    contents,
-                    site_packages: site_packages_dir,
-                })
-            })
-            .collect::<Vec<_>>();
+                Some(SystemPath::absolute(line, site_packages_dir))
+            });
 
-        let installations = all_pth_files.iter().flat_map(PthFile::items);
+            for installation in installations {
+                let installation = system
+                    .canonicalize_path(&installation)
+                    .unwrap_or(installation);
 
-        for installation in installations {
-            let installation = system
-                .canonicalize_path(&installation)
-                .unwrap_or(installation);
+                if existing_paths.insert(Cow::Owned(installation.clone())) {
+                    match SearchPath::editable(system, installation.clone()) {
+                        Ok(search_path) => {
+                            tracing::debug!(
+                                "Adding editable installation to module resolution path {path}",
+                                path = installation
+                            );
 
-            if existing_paths.insert(Cow::Owned(installation.clone())) {
-                match SearchPath::editable(system, installation.clone()) {
-                    Ok(search_path) => {
-                        tracing::debug!(
-                            "Adding editable installation to module resolution path {path}",
-                            path = installation
-                        );
-
-                        // Register a file root for editable installs that are outside any other root
-                        // (Most importantly, don't register a root for editable installations from the project
-                        // directory as that would change the durability of files within those folders).
-                        // Not having an exact file root for editable installs just means that
-                        // some queries (like `list_modules_in`) will run slightly more frequently
-                        // than they would otherwise.
-                        if let Some(dynamic_path) = search_path.as_system_path() {
-                            if files.root(db, dynamic_path).is_none() {
-                                files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
+                            // Register a file root for editable installs that are outside any other root
+                            // (Most importantly, don't register a root for editable installations from the project
+                            // directory as that would change the durability of files within those folders).
+                            // Not having an exact file root for editable installs just means that
+                            // some queries (like `list_modules_in`) will run slightly more frequently
+                            // than they would otherwise.
+                            if let Some(dynamic_path) = search_path.as_system_path() {
+                                if files.root(db, dynamic_path).is_none() {
+                                    files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
+                                }
                             }
+
+                            dynamic_paths.push(search_path);
                         }
 
-                        dynamic_paths.push(search_path);
-                    }
-
-                    Err(error) => {
-                        tracing::debug!("Skipping editable installation: {error}");
+                        Err(error) => {
+                            tracing::debug!("Skipping editable installation: {error}");
+                        }
                     }
                 }
             }
@@ -949,42 +953,6 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 }
 
 impl FusedIterator for SearchPathIterator<'_> {}
-
-/// Represents a single `.pth` file in a `site-packages` directory.
-/// One or more lines in a `.pth` file may be a (relative or absolute)
-/// path that represents an editable installation of a package.
-struct PthFile<'db> {
-    contents: SourceText,
-    site_packages: &'db SystemPath,
-}
-
-impl<'db> PthFile<'db> {
-    /// Yield paths in this `.pth` file that appear to represent editable installations,
-    /// and should therefore be added as module-resolution search paths.
-    fn items(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
-        let PthFile {
-            contents,
-            site_packages,
-        } = self;
-
-        // Empty lines or lines starting with '#' are ignored by the Python interpreter.
-        // Lines that start with "import " or "import\t" do not represent editable installs at all;
-        // instead, these are lines that are executed by Python at startup.
-        // https://docs.python.org/3/library/site.html#module-site
-        contents.lines().filter_map(move |line| {
-            let line = line.trim_end();
-            if line.is_empty()
-                || line.starts_with('#')
-                || line.starts_with("import ")
-                || line.starts_with("import\t")
-            {
-                return None;
-            }
-
-            Some(SystemPath::absolute(line, site_packages))
-        })
-    }
-}
 
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
