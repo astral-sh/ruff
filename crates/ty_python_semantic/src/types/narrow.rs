@@ -9,10 +9,10 @@ use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
-    SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature,
+    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
+    TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
     exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
     sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
 };
@@ -57,6 +57,81 @@ fn is_union_with_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             .iter()
             .any(|ty| is_single_valued_union_component(db, *ty))
     }) || is_single_valued_union_component(db, ty)
+}
+
+/// Return whether an expression constructs a value with exact builtin membership semantics.
+fn has_exact_builtin_membership_semantics(expr: &ast::Expr) -> bool {
+    matches!(
+        expr,
+        ast::Expr::StringLiteral(_)
+            | ast::Expr::FString(_)
+            | ast::Expr::Tuple(_)
+            | ast::Expr::List(_)
+            | ast::Expr::Set(_)
+            | ast::Expr::Dict(_)
+            | ast::Expr::Generator(_)
+            | ast::Expr::ListComp(_)
+            | ast::Expr::SetComp(_)
+            | ast::Expr::DictComp(_)
+    )
+}
+
+/// Return whether the iterable type can be used to filter broad membership union arms.
+///
+/// Tuple subclasses are assumed to preserve tuple containment semantics, just as they are assumed
+/// to preserve tuple equality semantics. Other nominal types must be final, and an inherited
+/// built-in `__contains__` method cannot be paired with an overridden iterator whose element type
+/// no longer describes the values searched by containment.
+fn can_filter_membership_union_arms<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    let ty = ty.resolve_type_alias(db);
+
+    match ty {
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|element| can_filter_membership_union_arms(db, *element)),
+        Type::LiteralValue(literal) => matches!(
+            literal.kind(),
+            LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString
+        ),
+        Type::TypedDict(_) => true,
+        Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
+        Type::NominalInstance(instance) if instance.class(db).is_final(db) => {
+            // Walk the MRO to preserve the identity of the class that defines `__contains__`;
+            // normal member lookup specializes inherited method signatures for the subclass.
+            let mut overrides_iteration = false;
+            for base in instance.class(db).iter_mro(db) {
+                let class = match base {
+                    ClassBase::Class(class) => class,
+                    ClassBase::Generic | ClassBase::Protocol => continue,
+                    ClassBase::Dynamic(_) | ClassBase::Divergent(_) | ClassBase::TypedDict => {
+                        return false;
+                    }
+                };
+                if class
+                    .own_class_member(db, None, "__contains__")
+                    .is_undefined()
+                {
+                    overrides_iteration |=
+                        !class.own_class_member(db, None, "__iter__").is_undefined();
+                    continue;
+                }
+                return !overrides_iteration
+                    && matches!(
+                        class.known(db),
+                        Some(
+                            KnownClass::Str
+                                | KnownClass::List
+                                | KnownClass::Set
+                                | KnownClass::FrozenSet
+                                | KnownClass::Dict
+                        )
+                    );
+            }
+            true
+        }
+        _ => false,
+    }
 }
 
 /// Return `true` if this type can participate in single-valued-union narrowing.
@@ -1171,12 +1246,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     // TODO: Share more of this implementation with equality narrowing once we can prove that
     // containment uses element-wise equality rather than a custom `__contains__` method.
-    fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+    fn evaluate_expr_in(
+        &mut self,
+        lhs_ty: Type<'db>,
+        rhs_ty: Type<'db>,
+        rhs_expr: Option<&ast::Expr>,
+    ) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
-        // TODO: Python calls a custom `__contains__` before falling back to iteration. Narrowing
-        // currently uses the iterable element type either way, which can over-narrow when
-        // `__contains__` implements different semantics.
         if is_union_of_single_valued(self.db, lhs_ty) {
             rhs_ty
                 .try_iterate(self.db)
@@ -1187,6 +1264,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .try_iterate(self.db)
                 .ok()?
                 .homogeneous_element_type(self.db);
+            let can_filter_broad_arms = rhs_expr
+                .is_some_and(has_exact_builtin_membership_semantics)
+                || can_filter_membership_union_arms(self.db, rhs_ty);
 
             let mut builder = UnionBuilder::new(self.db);
 
@@ -1199,8 +1279,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     if is_single_valued_union_component(self.db, *element) {
                         continue;
                     }
-                    // Skip types that cannot compare equal to any RHS value.
-                    if !may_compare_equal(self.db, *element, rhs_values) {
+                    // Only use equality to remove broader arms when membership is known to compare
+                    // the subject against the iterable values.
+                    if can_filter_broad_arms && !may_compare_equal(self.db, *element, rhs_values) {
                         continue;
                     }
                     builder = builder.add(*element);
@@ -1259,6 +1340,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         lhs_ty: Type<'db>,
         rhs_ty: Type<'db>,
+        rhs_expr: Option<&ast::Expr>,
         op: ast::CmpOp,
         is_positive: bool,
     ) -> Option<Type<'db>> {
@@ -1281,7 +1363,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             ast::CmpOp::Is => Some(rhs_ty),
-            ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty),
+            ast::CmpOp::In => self.evaluate_expr_in(lhs_ty, rhs_ty, rhs_expr),
             ast::CmpOp::NotIn => self.evaluate_expr_not_in(lhs_ty, rhs_ty),
             _ => None,
         }
@@ -1725,7 +1807,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+                && let Some(ty) =
+                    self.evaluate_expr_compare_op(lhs_ty, rhs_ty, Some(right), *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -1747,7 +1830,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
                 && narrowable_ast(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
-                && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                && let Some(ty) =
+                    self.evaluate_expr_compare_op(rhs_ty, lhs_ty, Some(left), *op, is_positive)
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -2218,7 +2302,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
 
         let mut constraints = self
-            .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
+            .evaluate_expr_compare_op(subject_ty, value_ty, None, ast::CmpOp::Eq, is_positive)
             .map(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
             })

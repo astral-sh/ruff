@@ -262,9 +262,143 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
 
 ## Custom containment methods
 
-Python uses `__contains__` when a class defines it. The method can return `True` for values that the
-class would never produce during iteration, but ty currently narrows membership tests from the
-iterable element type. The result below is therefore too narrow and documents a known limitation:
+A custom `__contains__` method can return `True` for values that the class would never produce
+during iteration. We therefore retain broader members of the subject's union:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContainsEverything:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+
+def custom_contains_literal_domain(
+    x: Literal["present", "missing"],
+    values: ContainsEverything,
+):
+    if x in values:
+        # TODO: `x` can still be `Literal["present"]` because `values.__contains__` always
+        # returns `True`. The pre-existing finite-domain narrowing still uses the iterator type.
+        reveal_type(x)  # revealed: Literal["missing"]
+```
+
+## Final and non-final iterable classes
+
+An instance of a non-final class might be an instance of a subclass that defines `__contains__`. For
+a final class without `__contains__`, we know that membership falls back to iteration, so we can use
+the iterable element type to narrow the subject. A final class with its own `__contains__` method
+remains conservative:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+class IteratesMissing:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def non_final_iterable(x: Payload | Literal["missing"], values: IteratesMissing):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+
+@final
+class FinalIterable:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"]
+
+@final
+class FinalContainsEverything:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def final_custom_contains(
+    x: Payload | Literal["missing"],
+    values: FinalContainsEverything,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+```
+
+## Built-in containment with overridden iteration
+
+`list.__contains__` searches the values stored in the list. Overriding `__iter__` does not change
+which values membership can find:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+@final
+class OverridesBuiltinIteration(list[object]):
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+def inherited_builtin_contains(
+    x: Payload | Literal["missing"],
+    values: OverridesBuiltinIteration,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
+```
+
+## Byte containment
+
+Unlike ordinary element-wise containment, `bytes` and `bytearray` accept objects with an `__index__`
+method as well as byte subsequences. Their iterator element type therefore cannot be used to remove
+broader union members:
+
+```py
+from typing import Literal, final
+
+@final
+class ByteIndex:
+    def __index__(self) -> int:
+        return 97
+
+def bytes_literal_contains_index(value: ByteIndex | Literal[97]) -> None:
+    if value in b"abc":
+        reveal_type(value)  # revealed: Literal[97] | ByteIndex
+
+@final
+class FinalBytearray(bytearray): ...
+
+def bytearray_contains_index(
+    value: ByteIndex | Literal[97],
+    values: FinalBytearray,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[97] | ByteIndex
+```
+
+## Custom containment methods on tuple subclasses
+
+ty currently treats tuple subclasses like tuples when narrowing membership tests, even if the
+subclass overrides `__contains__`. The result below is therefore too narrow and documents a known
+limitation:
 
 ```py
 from typing import Literal, TypedDict
@@ -276,7 +410,7 @@ class ContainsEverything(tuple[Literal["missing"], ...]):
     def __contains__(self, value: object) -> bool:
         return True
 
-def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+def custom_tuple_contains(x: Payload | Literal["missing"], values: ContainsEverything):
     if x in values:
         # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
         reveal_type(x)  # revealed: Literal["missing"]
