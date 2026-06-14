@@ -2142,9 +2142,25 @@ impl<'src> Parser<'src> {
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
-        let arguments = self
-            .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments()));
+        // class Foo((base for base in bases)): ...
+        // class Foo(*(base for base in bases)): ...
+        let arguments = self.at(TokenKind::Lpar).then(|| {
+            let arguments = Box::new(self.parse_arguments());
+
+            if let [argument] = &*arguments.args
+                && let Some(generator) = argument.as_generator_expr()
+                && !generator.parenthesized
+            {
+                // test_err class_def_unparenthesized_generator_argument
+                // class Foo(base for base in bases): ...
+                self.add_error(
+                    ParseErrorType::UnparenthesizedGeneratorExpression,
+                    generator.range,
+                );
+            }
+
+            arguments
+        });
 
         self.expect(TokenKind::Colon);
 
