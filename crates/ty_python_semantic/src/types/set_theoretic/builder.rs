@@ -627,13 +627,56 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// Huge enums are not uncommon (especially in generated code), and it's annoying
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RelationSimplification {
+    /// Union construction may ask relation queries to remove redundant members.
+    Full,
+    /// Skip relation checks whose direct operands include a protocol instance.
+    ///
+    /// Alias-preserving annotation unions can be built while recovering a protocol
+    /// interface; opening another protocol interface from that path can form a Salsa
+    /// cycle inside the recovery function.
+    NoProtocolRelations,
+    /// Skip all relation checks.
+    ///
+    /// Cycle recovery must not introduce fresh query dependencies.
+    NoRelations,
+}
+
+impl RelationSimplification {
+    fn allows_relation<'db>(self, left: Type<'db>, right: Type<'db>) -> bool {
+        match self {
+            RelationSimplification::Full => true,
+            RelationSimplification::NoProtocolRelations => {
+                !Self::relation_may_query_protocol_interface(left, right)
+            }
+            RelationSimplification::NoRelations => false,
+        }
+    }
+
+    fn allows_try_reduce<'db>(self, ty: Type<'db>) -> bool {
+        match self {
+            RelationSimplification::Full => true,
+            RelationSimplification::NoProtocolRelations => !matches!(ty, Type::ProtocolInstance(_)),
+            RelationSimplification::NoRelations => false,
+        }
+    }
+
+    fn relation_may_query_protocol_interface<'db>(left: Type<'db>, right: Type<'db>) -> bool {
+        matches!(
+            (left, right),
+            (Type::ProtocolInstance(_), _) | (_, Type::ProtocolInstance(_))
+        )
+    }
+}
+
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
+    relation_simplification: RelationSimplification,
     /// This is enabled when joining types in a `cycle_recovery` function.
-    /// Since a cycle cannot be created within a `cycle_recovery` function,
-    /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
 }
 
@@ -699,6 +742,7 @@ impl<'db> UnionBuilder<'db> {
             db,
             elements: vec![],
             unpack_aliases: true,
+            relation_simplification: RelationSimplification::Full,
             cycle_recovery: false,
         }
     }
@@ -708,10 +752,26 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
+    fn with_relation_simplification(
+        mut self,
+        relation_simplification: RelationSimplification,
+    ) -> Self {
+        self.relation_simplification = relation_simplification;
+        self
+    }
+
+    pub(crate) fn without_protocol_relation_simplification(mut self) -> Self {
+        if self.relation_simplification != RelationSimplification::NoRelations {
+            self.relation_simplification = RelationSimplification::NoProtocolRelations;
+        }
+        self
+    }
+
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
             self.unpack_aliases = false;
+            self.relation_simplification = RelationSimplification::NoRelations;
         }
         self
     }
@@ -764,6 +824,7 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
+        let relation_simplification = self.relation_simplification;
         let should_widen = |literals| {
             if cycle_recovery {
                 literals >= MAX_CYCLE_RECOVERY_UNION_LITERALS
@@ -821,6 +882,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                        continue;
+                                    }
                                     // e.g. `existing` could be `Literal[""] & Any`,
                                     // and `ty` could be `Literal[""]`
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -868,6 +932,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -917,6 +984,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -999,6 +1069,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
+                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                        continue;
+                                    }
                                     if ty.is_redundant_with(self.db, *existing) {
                                         return;
                                     }
@@ -1086,6 +1159,7 @@ impl<'db> UnionBuilder<'db> {
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let mut ty = ty;
+        let relation_simplification = self.relation_simplification;
         let bool_pair = |ty: Type<'db>| {
             if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(!b))
@@ -1097,26 +1171,34 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_));
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
+        let should_try_reduce = relation_simplification.allows_try_reduce(ty);
 
         for (i, element) in self.elements.iter_mut().enumerate() {
-            let element_type = match element.try_reduce(self.db, ty) {
-                ReduceResult::KeepIf(keep) => {
-                    if !keep {
-                        to_remove.push(i);
-                    }
+            let element_type = if !should_try_reduce {
+                let UnionElement::Type(element_type) = element else {
                     continue;
-                }
-                ReduceResult::Type(ty) => ty,
-                ReduceResult::CollapseToObject => {
-                    self.collapse_to_object();
-                    return;
-                }
-                ReduceResult::Ignore => {
-                    return;
+                };
+                *element_type
+            } else {
+                match element.try_reduce(self.db, ty) {
+                    ReduceResult::KeepIf(keep) => {
+                        if !keep {
+                            to_remove.push(i);
+                        }
+                        continue;
+                    }
+                    ReduceResult::Type(ty) => ty,
+                    ReduceResult::CollapseToObject => {
+                        self.collapse_to_object();
+                        return;
+                    }
+                    ReduceResult::Ignore => {
+                        return;
+                    }
                 }
             };
 
@@ -1173,7 +1255,10 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full
+                && !matches!(element_type, Type::TypeAlias(_))
+                && relation_simplification.allows_relation(ty, element_type)
+            {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }
@@ -1230,6 +1315,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let relation_simplification = self.relation_simplification;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
@@ -1284,6 +1370,7 @@ impl<'db> UnionBuilder<'db> {
         if normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
+                .with_relation_simplification(relation_simplification)
                 .cycle_recovery(cycle_recovery);
             return types
                 .into_iter()

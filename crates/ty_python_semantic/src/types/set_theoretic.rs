@@ -85,7 +85,9 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
+                UnionBuilder::new(db)
+                    .unpack_aliases(false)
+                    .without_protocol_relation_simplification(),
                 |builder, element| builder.add(element.into()),
             )
             .build()

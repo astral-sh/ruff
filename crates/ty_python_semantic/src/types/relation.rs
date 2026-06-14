@@ -933,6 +933,12 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
         )
     }
 
+    /// Return `true` if `protocol` is a supertype of `object`.
+    ///
+    /// This indicates that the protocol represents the same set of possible runtime objects
+    /// as `object` (since `object` is the universal set of *all* possible runtime objects!).
+    /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
+    /// normalised to `object`.
     fn protocol_is_equivalent_to_object(
         &self,
         db: &'db dyn Db,
@@ -947,7 +953,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             context_tree: ErrorContextTree::disabled(),
             ..self.clone()
         };
-
         checker
             .with_recursion_guard(object, protocol_ty, || {
                 checker.check_type_satisfies_protocol(db, object, protocol)
