@@ -6380,7 +6380,12 @@ impl<'db> Type<'db> {
                 {
                     Some(*bound_typevar)
                 }
-                TypeVarKind::ParamSpec => {
+                TypeVarKind::ParamSpec
+                    if binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db)
+                            == BindingContext::Definition(binding_context)
+                    }) =>
+                {
                     // For `ParamSpec`, we're only interested in `P` itself, not `P.args` or
                     // `P.kwargs`.
                     Some(bound_typevar.without_paramspec_attr(db))

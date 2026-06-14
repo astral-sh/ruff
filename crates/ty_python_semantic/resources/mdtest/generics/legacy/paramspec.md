@@ -748,3 +748,26 @@ class ParamSpecWithDefault6(Generic[PAnother]):
 The semantics of `ParamSpec` are described in
 [the PEP 695 `ParamSpec` document](./../pep695/paramspec.md) to avoid duplication unless there are
 any behavior specific to the legacy `ParamSpec` implementation.
+
+### Binding contexts
+
+A `ParamSpec` bound by an enclosing definition cannot be inferred again by a nested definition:
+
+```py
+from typing import Callable, Generic, ParamSpec, overload
+
+P = ParamSpec("P")
+
+class C(Generic[P]):
+    @overload
+    # error: [invalid-overload] "Implementation does not accept all arguments of this overload"
+    def f(self: "C[P]", *args: P.args, **kwargs: P.kwargs): ...
+    @overload
+    def f(self: "C[P]"): ...
+    def f(self: "C[P]"): ...
+
+def outer(_: Callable[P, None]):
+    def inner(_: Callable[P, None]): ...
+
+    inner(lambda: None)  # error: [invalid-argument-type]
+```
