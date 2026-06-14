@@ -218,10 +218,12 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
-## Known equality semantics
+## Membership and equality
 
-Broad union arms can be excluded from the positive branch when their equality implementation is
-known and cannot compare equal to any right-hand-side value:
+When ty can prove that one member of a union cannot compare equal to any item in the container, it
+removes that member inside the `if` body. A `TypedDict` cannot compare equal to a string, and a
+final class with the default identity-based equality cannot compare equal to an integer. We retain
+types such as `int` and classes with custom equality when they might still match an item.
 
 ```py
 from typing import Literal, TypedDict, final
@@ -240,40 +242,29 @@ class AlwaysEqual:
 def typed_dict(x: Payload | Literal["missing"]):
     if x in ("missing",):
         reveal_type(x)  # revealed: Literal["missing"]
-    else:
-        reveal_type(x)  # revealed: Payload
 
-def identity_equality(x: Token | Literal[1]):
+def default_equality(x: Token | Literal[1]):
     if x in (1,):
         reveal_type(x)  # revealed: Literal[1]
-    else:
-        reveal_type(x)  # revealed: Token
 
 def overlapping_union_member(x: int | Literal["missing"]):
     if x in ("missing", 1):
         reveal_type(x)  # revealed: Literal["missing"] | int
-    else:
-        reveal_type(x)  # revealed: int
 
 def custom_equality(x: AlwaysEqual | Literal[1]):
     if x in (1,):
         reveal_type(x)  # revealed: Literal[1] | AlwaysEqual
-    else:
-        reveal_type(x)  # revealed: AlwaysEqual
 
-def empty_domain(x: Payload | Literal["missing"], values: tuple[()]):
+def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
     if x in values:
         reveal_type(x)  # revealed: Never
-    else:
-        reveal_type(x)  # revealed: Payload | Literal["missing"]
 ```
 
 ## Custom containment methods
 
-Python calls `__contains__` before falling back to iteration, and a custom method does not have to
-compare its argument against the values produced by iteration. Membership narrowing currently uses
-the iterable element type either way. This can narrow too far, but is an accepted limitation for
-now:
+Python uses `__contains__` when a class defines it. The method can return `True` for values that the
+class would never produce during iteration, but ty currently narrows membership tests from the
+iterable element type. The result below is therefore too narrow and documents a known limitation:
 
 ```py
 from typing import Literal, TypedDict
