@@ -1891,6 +1891,8 @@ impl<'db> StaticClassLiteral<'db> {
                             db,
                             use_def.end_of_scope_symbol_bindings(symbol_id),
                         );
+                        // CPython treats `__hash__ = None` as implicit when the class also defines
+                        // `__eq__`, allowing the dataclass decorator to replace it.
                         let is_implicit_hash = binding
                             .place
                             .ignore_possibly_undefined()
