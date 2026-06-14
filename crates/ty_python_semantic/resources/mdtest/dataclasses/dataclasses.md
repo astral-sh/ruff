@@ -605,6 +605,28 @@ class WithUnsafeHash:
 reveal_type(WithUnsafeHash.__hash__)  # revealed: (self: WithUnsafeHash) -> int
 ```
 
+Defining `__hash__` when `unsafe_hash=True` raises an error:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(unsafe_hash=True)
+class WithExplicitHash:
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__hash__` in dataclass `WithExplicitHash` with `unsafe_hash=True`"
+    def __hash__(self) -> int:
+        return 0
+
+@dataclass(unsafe_hash=True)
+class WithHashAssignment:
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__hash__` in dataclass `WithHashAssignment` with `unsafe_hash=True`"
+    __hash__ = None
+
+@dataclass
+class WithoutUnsafeHash:
+    def __hash__(self) -> int:
+        return 0
+```
+
 ### `frozen`
 
 If true (the default is False), assigning to fields will generate a diagnostic.
