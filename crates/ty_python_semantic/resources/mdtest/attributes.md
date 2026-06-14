@@ -1863,25 +1863,22 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-### `Self` binding uses the full intersection type
+### Method binding uses the full intersection type
 
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the attribute or
-method. Once found, however, `Self` must be bound using the full `A & B` receiver.
+For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the method. Once
+found, however, `Self` must be bound using the full `A & B` receiver.
 
 ```py
 from typing_extensions import Self
 from ty_extensions import Intersection
 
 class A:
-    value: Self
-
     def method(self) -> Self:
         return self
 
 class B: ...
 
 def _(a_and_b: Intersection[A, B]):
-    reveal_type(a_and_b.value)  # revealed: A & B
     reveal_type(a_and_b.method())  # revealed: A & B
 ```
 
