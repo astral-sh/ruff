@@ -67,6 +67,31 @@ fn check_pep695_function_legacy_typevars<'db>(
         return;
     }
 
+    let legacy_default = node
+        .type_params
+        .as_deref()
+        .into_iter()
+        .flatten()
+        .filter_map(ast::TypeParam::default)
+        .find_map(|default| {
+            find_over_type(db, file_expression_type(default), false, |ty| {
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                    && matches!(
+                        typevar.kind(db),
+                        TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+                    )
+                {
+                    Some((typevar, default.range()))
+                } else {
+                    None
+                }
+            })
+        });
+    if let Some((typevar, range)) = legacy_default {
+        report_pep695_function_legacy_typevar(context, typevar, range);
+        return;
+    }
+
     let Some(definition) = signature.definition() else {
         return;
     };
@@ -88,6 +113,15 @@ fn check_pep695_function_legacy_typevars<'db>(
     };
 
     let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
+    report_pep695_function_legacy_typevar(context, typevar, range);
+}
+
+fn report_pep695_function_legacy_typevar<'db>(
+    context: &InferContext<'db, '_>,
+    typevar: TypeVarInstance<'db>,
+    range: TextRange,
+) {
+    let db = context.db();
     if let Some(builder) = context.report_lint(&UNBOUND_TYPE_VARIABLE, range) {
         builder.into_diagnostic(format_args!(
             "Legacy type variable `{}` cannot be used in a function with PEP 695 type parameters",

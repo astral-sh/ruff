@@ -61,6 +61,21 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid[S = T]: ...
 ```
 
+Traditional type variables cannot be used as defaults for functions with PEP 695 type parameters:
+
+```py
+from typing import ParamSpec, TypeVar
+
+K = TypeVar("K")
+P = ParamSpec("P")
+
+# error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+def legacy_default[T = K](): ...
+
+# error: [unbound-type-variable] "Legacy type variable `P` cannot be used in a function with PEP 695 type parameters"
+def paramspec_default[**Q = P](): ...
+```
+
 ### Invalid defaults
 
 A TypeVar default must be compatible with its bound or constraints.
