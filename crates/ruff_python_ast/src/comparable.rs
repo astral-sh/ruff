@@ -1936,14 +1936,15 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
         fn as_hashable(expr: &Expr) -> ComparableExpr<'_> {
+            if let Some(value) = as_bool(expr) {
+                return ComparableExpr::BoolLiteral(ExprBoolLiteral { value });
+            }
+
             match expr {
                 Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
                     target: Box::new(ComparableExpr::from(&named.target)),
                     value: Box::new(as_hashable(&named.value)),
                 }),
-                Expr::NumberLiteral(number) => as_bool(number)
-                    .map(|value| ComparableExpr::BoolLiteral(ExprBoolLiteral { value }))
-                    .unwrap_or_else(|| ComparableExpr::from(expr)),
                 Expr::Tuple(tuple) => ComparableExpr::Tuple(ExprTuple {
                     elts: tuple.iter().map(as_hashable).collect(),
                 }),
@@ -1953,24 +1954,51 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
 
         /// Returns the `bool` value of the given expression, if it has an equivalent hash to
         /// `True` or `False`.
-        fn as_bool(number: &crate::ExprNumberLiteral) -> Option<bool> {
-            match &number.value {
-                Number::Int(int) => match int.as_u8() {
-                    Some(0) => Some(false),
-                    Some(1) => Some(true),
-                    _ => None,
+        fn as_bool(expr: &Expr) -> Option<bool> {
+            match expr {
+                Expr::NumberLiteral(number) => match &number.value {
+                    Number::Int(int) => match int.as_u8() {
+                        Some(0) => Some(false),
+                        Some(1) => Some(true),
+                        _ => None,
+                    },
+                    Number::Float(float) => match float {
+                        0.0 => Some(false),
+                        1.0 => Some(true),
+                        _ => None,
+                    },
+                    Number::Complex { real, imag } => match (real, imag) {
+                        (0.0, 0.0) => Some(false),
+                        (1.0, 0.0) => Some(true),
+                        _ => None,
+                    },
                 },
-                Number::Float(float) => match float {
-                    0.0 => Some(false),
-                    1.0 => Some(true),
-                    _ => None,
+                Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => match op {
+                    ast::UnaryOp::UAdd => as_bool(operand),
+                    ast::UnaryOp::USub => as_bool(operand).filter(|value| !value),
+                    ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
-                Number::Complex { real, imag } => match (real, imag) {
-                    (0.0, 0.0) => Some(false),
-                    (1.0, 0.0) => Some(true),
-                    _ => None,
-                },
+                Expr::BinOp(ast::ExprBinOp {
+                    left,
+                    op: ast::Operator::Add | ast::Operator::Sub,
+                    right,
+                    ..
+                }) if is_complex_zero(right) => as_bool(left),
+                _ => None,
             }
+        }
+
+        fn is_complex_zero(expr: &Expr) -> bool {
+            matches!(
+                expr,
+                Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: Number::Complex {
+                        real: 0.0,
+                        imag: 0.0,
+                    },
+                    ..
+                })
+            )
         }
 
         Self(as_hashable(expr))
