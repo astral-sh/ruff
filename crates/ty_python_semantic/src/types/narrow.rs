@@ -1291,32 +1291,34 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     bindings,
                 }
             }
-            _ => PatternSuccessResult {
-                matched_subject_ty: self.match_pattern_subject_type(pattern, subject_ty),
+            PatternPredicateKind::Value(value) => PatternSuccessResult {
+                matched_subject_ty: self.match_value_pattern_subject_type(*value, subject_ty),
                 bindings: BTreeMap::new(),
             },
+            PatternPredicateKind::Class(class_expr, _) => {
+                let class_ty = necessary_match_pattern_type(self.db, pattern);
+                let class =
+                    infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
+                        .as_class_literal();
+                PatternSuccessResult {
+                    matched_subject_ty: self
+                        .match_class_pattern_subject_type(class, class_ty, subject_ty, false),
+                    bindings: BTreeMap::new(),
+                }
+            }
+            PatternPredicateKind::Mapping(_) | PatternPredicateKind::Singleton(_) => {
+                PatternSuccessResult {
+                    matched_subject_ty: self.intersect_types(
+                        subject_ty,
+                        necessary_match_pattern_type(self.db, pattern),
+                    ),
+                    bindings: BTreeMap::new(),
+                }
+            }
         }
     }
 
-    fn contains_class_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
-        match pattern {
-            PatternPredicateKind::Class(..) => true,
-            PatternPredicateKind::Sequence(kind) => {
-                kind.patterns.iter().any(Self::contains_class_pattern)
-            }
-            PatternPredicateKind::Or(patterns) => {
-                patterns.iter().any(Self::contains_class_pattern)
-            }
-            PatternPredicateKind::As(Some(pattern), _) => Self::contains_class_pattern(pattern),
-            _ => false,
-        }
-    }
-
-    /// Return the type of the subject when `pattern` succeeds.
-    ///
-    /// This is the shared successful-match calculation used by bindings and structural pattern
-    /// analysis. It describes values that can match, not values that the pattern definitely
-    /// matches; negative narrowing and exhaustiveness use stricter analyses.
+    /// Return the type of the subject when a value pattern succeeds.
     ///
     /// A value pattern uses Python equality, so a successful match does not always narrow to the
     /// type of the value in the pattern:
@@ -1329,41 +1331,26 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// ```
     ///
     /// The `str` arm remains because a `str` subclass can compare equal to `1`.
-    fn match_pattern_subject_type(
+    fn match_value_pattern_subject_type(
         &mut self,
-        pattern: &PatternPredicateKind<'db>,
+        value: Expression<'db>,
         subject_ty: Type<'db>,
     ) -> Type<'db> {
+        let value_ty = infer_same_file_expression_type(self.db, value, TypeContext::default());
+        evaluate_type_equality(self.db, subject_ty, value_ty, true)
+            .map(|constraint| self.intersect_types(subject_ty, constraint))
+            .unwrap_or(subject_ty)
+    }
+
+    fn contains_class_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
         match pattern {
-            PatternPredicateKind::Value(value) => {
-                let value_ty =
-                    infer_same_file_expression_type(self.db, *value, TypeContext::default());
-                evaluate_type_equality(self.db, subject_ty, value_ty, true)
-                    .map(|constraint| self.intersect_types(subject_ty, constraint))
-                    .unwrap_or(subject_ty)
-            }
-            PatternPredicateKind::As(Some(pattern), _) => {
-                self.match_pattern_subject_type(pattern, subject_ty)
-            }
-            PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
-            PatternPredicateKind::Or(patterns) => UnionType::from_elements(
-                self.db,
-                patterns
-                    .iter()
-                    .map(|pattern| self.match_pattern_subject_type(pattern, subject_ty)),
-            ),
+            PatternPredicateKind::Class(..) => true,
             PatternPredicateKind::Sequence(kind) => {
-                self.analyze_successful_sequence_pattern(kind, subject_ty)
-                    .matched_subject_ty
+                kind.patterns.iter().any(Self::contains_class_pattern)
             }
-            PatternPredicateKind::Class(class_expr, _) => {
-                let class_ty = necessary_match_pattern_type(self.db, pattern);
-                let class =
-                    infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
-                        .as_class_literal();
-                self.match_class_pattern_subject_type(class, class_ty, subject_ty, false)
-            }
-            _ => self.intersect_types(subject_ty, necessary_match_pattern_type(self.db, pattern)),
+            PatternPredicateKind::Or(patterns) => patterns.iter().any(Self::contains_class_pattern),
+            PatternPredicateKind::As(Some(pattern), _) => Self::contains_class_pattern(pattern),
+            _ => false,
         }
     }
 
@@ -1373,9 +1360,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     /// broad `list` type:
     ///
     /// ```python
-    /// from typing import TypeAlias
-    ///
-    /// Node: TypeAlias = int | list["Node"]
+    /// type Node = int | list[Node]
     ///
     /// def visit(node: Node) -> None:
     ///     match node:
