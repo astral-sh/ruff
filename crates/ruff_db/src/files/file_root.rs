@@ -15,7 +15,7 @@ use crate::system::{SystemPath, SystemPathBuf};
 pub struct FileRoot {
     /// The path of a root is guaranteed to never change.
     #[returns(deref)]
-    pub path: SystemPathBuf,
+    pub path: Box<SystemPath>,
 
     /// The kind of the root at the time of its creation.
     pub kind_at_time_of_creation: FileRootKind,
@@ -77,7 +77,7 @@ impl FileRoots {
         let mut route = normalized_path.replace('{', "{{").replace('}', "}}");
 
         // Insert a new source root
-        let root = FileRoot::builder(path, kind)
+        let root = FileRoot::builder(path.into(), kind)
             .durability(Durability::HIGH)
             .new(db);
 

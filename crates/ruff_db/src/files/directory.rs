@@ -1,26 +1,13 @@
-use std::collections::BTreeSet;
-
 use compact_str::CompactString;
-use salsa::{Durability, Setter};
 
-use crate::file_revision::FileRevision;
-use crate::system::{FileType, SystemPath, SystemPathBuf};
-use crate::{Db, FxDashMap};
-
-/// A system directory whose direct children are tracked by Salsa.
-#[salsa::input(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(super) struct Directory {
-    /// The path of the directory (immutable).
-    #[returns(deref)]
-    path: Box<SystemPath>,
-
-    /// Changes whenever an entry is added, removed, or changes type.
-    revision: FileRevision,
-}
-
-impl get_size2::GetSize for Directory {}
+use super::private::FileStatus;
+use super::{File, FilePath};
+use crate::Db;
+use crate::system::{FileType, SystemPath};
 
 /// A cached snapshot of the direct children in a directory.
+///
+/// The entries are sorted by name for efficient lookups.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct DirectoryListing(Box<[(CompactString, FileType)]>);
 
@@ -67,24 +54,54 @@ impl From<std::io::Error> for DirectoryListingError {
     }
 }
 
+/// Interns a directory system path and returns a salsa `File` ingredient.
+///
+/// Returns `Err` if the path doesn't exist, isn't accessible, or if the path doesn't point to a directory.
+#[inline]
+pub fn system_path_to_directory(
+    db: &dyn Db,
+    path: impl AsRef<SystemPath>,
+) -> Result<File, DirectoryListingError> {
+    let file = db.files().system(db, path.as_ref());
+
+    match file.status(db) {
+        FileStatus::IsADirectory => Ok(file),
+        FileStatus::Exists => Err(std::io::Error::from(std::io::ErrorKind::NotADirectory).into()),
+        FileStatus::NotFound => Err(std::io::Error::from(std::io::ErrorKind::NotFound).into()),
+    }
+}
+
 #[inline]
 pub fn directory_listing<'db>(
     db: &'db dyn Db,
     path: &SystemPath,
-) -> Result<&'db DirectoryListing, &'db DirectoryListingError> {
-    directory_listing_query(db, db.files().directory(db, path))
+) -> Result<&'db DirectoryListing, DirectoryListingError> {
+    let directory = system_path_to_directory(db, path)?;
+    directory_listing_query(db, directory).map_err(Clone::clone)
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn directory_listing_query(
     db: &dyn Db,
-    directory: Directory,
+    directory: File,
 ) -> Result<DirectoryListing, DirectoryListingError> {
-    directory.revision(db);
+    let _ = directory.revision(db);
+    let _ = directory.permissions(db);
+
+    let path = match directory.path(db) {
+        FilePath::System(path) => path,
+        FilePath::Vendored(_) | FilePath::SystemVirtual(_) => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "directory listings are only supported for system paths",
+            )
+            .into());
+        }
+    };
 
     let mut entries = db
         .system()
-        .read_directory(directory.path(db))?
+        .read_directory(path)?
         .filter_map(|entry| {
             let entry = entry.ok()?;
             let file_type = entry.file_type();
@@ -96,74 +113,6 @@ fn directory_listing_query(
 
     entries.sort_unstable_by(|left, right| left.0.cmp(&right.0));
     Ok(DirectoryListing(entries.into_boxed_slice()))
-}
-
-#[derive(Default)]
-pub(super) struct Directories {
-    by_path: FxDashMap<SystemPathBuf, Directory>,
-}
-
-impl Directories {
-    pub(super) fn get_or_create(&self, db: &dyn Db, path: SystemPathBuf) -> Directory {
-        if let Some(directory) = self.by_path.get(&path) {
-            return *directory;
-        }
-
-        *self.by_path.entry(path.clone()).or_insert_with(|| {
-            let durability = db
-                .files()
-                .root(db, &path)
-                .map_or(Durability::default(), |root| root.durability(db));
-            let durability = Durability::MEDIUM.max(durability);
-
-            Directory::builder(Box::from(path), FileRevision::now())
-                .durability(durability)
-                .path_durability(Durability::HIGH)
-                .new(db)
-        })
-    }
-
-    pub(super) fn touch(&self, db: &mut dyn Db, path: &SystemPath) {
-        if let Some(directory) = self.by_path.get(path).map(|directory| *directory) {
-            directory.set_revision(db).to(FileRevision::now());
-        }
-    }
-
-    pub(super) fn touch_recursive(&self, db: &mut dyn Db, paths: &BTreeSet<SystemPathBuf>) {
-        let parents = paths
-            .iter()
-            .filter_map(|path| path.parent().map(SystemPath::to_path_buf))
-            .collect::<BTreeSet<_>>();
-        let directories = self
-            .by_path
-            .iter()
-            .filter(|entry| {
-                let path = entry.key();
-                parents.contains(path) || paths.iter().any(|candidate| path.starts_with(candidate))
-            })
-            .map(|entry| *entry.value())
-            .collect::<Vec<_>>();
-
-        for directory in directories {
-            directory.set_revision(db).to(FileRevision::now());
-        }
-    }
-
-    pub(super) fn touch_all(&self, db: &mut dyn Db) {
-        let directories = self
-            .by_path
-            .iter()
-            .map(|entry| *entry.value())
-            .collect::<Vec<_>>();
-
-        for directory in directories {
-            directory.set_revision(db).to(FileRevision::now());
-        }
-    }
-
-    pub(super) fn len(&self) -> usize {
-        self.by_path.len()
-    }
 }
 
 #[cfg(test)]
@@ -230,7 +179,7 @@ mod tests {
         db.write_file("src/a.py", "old")?;
         system_path_to_file(&db, SystemPath::new("src/a.py")).unwrap();
 
-        let directory = db.files().directory(&db, SystemPath::new("src"));
+        let directory = db.files().system(&db, SystemPath::new("src"));
         directory_listing(&db, SystemPath::new("src")).unwrap();
         let revision = directory.revision(&db);
 

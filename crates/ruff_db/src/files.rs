@@ -3,7 +3,9 @@ use std::fmt;
 use std::sync::Arc;
 
 use dashmap::mapref::entry::Entry;
-pub use directory::{DirectoryListing, DirectoryListingError, directory_listing};
+pub use directory::{
+    DirectoryListing, DirectoryListingError, directory_listing, system_path_to_directory,
+};
 pub use file_root::{FileRoot, FileRootKind};
 pub use path::FilePath;
 use ruff_notebook::{Notebook, NotebookError};
@@ -62,9 +64,6 @@ pub struct Files {
 
 #[derive(Default)]
 struct FilesInner {
-    /// Lookup table that maps system directories to Salsa inputs.
-    directories: directory::Directories,
-
     /// Lookup table that maps [`SystemPathBuf`]s to salsa interned [`File`] instances.
     ///
     /// The map also stores entries for files that don't exist on the file system. This is necessary
@@ -82,18 +81,12 @@ struct FilesInner {
 }
 
 impl Files {
-    /// Returns the Salsa input for the system directory at `path`.
-    fn directory(&self, db: &dyn Db, path: &SystemPath) -> directory::Directory {
-        let absolute = SystemPath::absolute(path, db.system().current_directory());
-        self.inner.directories.get_or_create(db, absolute)
-    }
-
     /// Looks up a file by its `path`.
     ///
     /// For a non-existing file, creates a new salsa [`File`] ingredient and stores it for future lookups.
     ///
     /// The operation always succeeds even if the path doesn't exist on disk, isn't accessible or if the path points to a directory.
-    /// In these cases, a file with status [`FileStatus::NotFound`] is returned.
+    /// In these cases, a file with the appropriate [`FileStatus`] is returned.
     fn system(&self, db: &dyn Db, path: &SystemPath) -> File {
         let absolute = SystemPath::absolute(path, db.system().current_directory());
 
@@ -123,9 +116,10 @@ impl Files {
                     Ok(metadata) if metadata.file_type().is_file() => builder
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
-                    Ok(metadata) if metadata.file_type().is_directory() => {
-                        builder.status(FileStatus::IsADirectory)
-                    }
+                    Ok(metadata) if metadata.file_type().is_directory() => builder
+                        .status(FileStatus::IsADirectory)
+                        .permissions(metadata.permissions())
+                        .revision(metadata.revision()),
                     _ => builder
                         .status(FileStatus::NotFound)
                         .status_durability(Durability::MEDIUM.max(durability)),
@@ -259,12 +253,13 @@ impl Files {
                 .range(..=path.to_path_buf())
                 .next_back()
                 .is_some_and(|candidate| path.starts_with(candidate.as_path()))
+                || paths
+                    .iter()
+                    .any(|candidate| candidate.parent() == Some(path.as_path()))
             {
                 File::sync_system_path(db, path, Some(*entry.value()));
             }
         }
-
-        inner.directories.touch_recursive(db, &paths);
     }
 
     /// Refreshes the state of all known files.
@@ -281,8 +276,6 @@ impl Files {
         for entry in inner.system_by_path.iter_mut() {
             File::sync_system_path(db, entry.key(), Some(*entry.value()));
         }
-
-        inner.directories.touch_all(db);
     }
 }
 
@@ -297,7 +290,6 @@ impl fmt::Debug for Files {
             map.finish()
         } else {
             f.debug_struct("Files")
-                .field("directories", &self.inner.directories.len())
                 .field("system_by_path", &self.inner.system_by_path.len())
                 .field(
                     "system_virtual_by_path",
@@ -311,7 +303,7 @@ impl fmt::Debug for Files {
 
 impl std::panic::RefUnwindSafe for Files {}
 
-/// A file that's either stored on the host system's file system or in the vendored file system.
+/// A file-system path that's either stored on the host system's file system or in the vendored file system.
 ///
 /// # Ordering
 /// Ordering is based on the file's salsa-assigned id and not on its values.
@@ -328,7 +320,7 @@ pub struct File {
     #[default]
     pub permissions: Option<u32>,
 
-    /// The file revision. A file has changed if the revisions don't compare equal.
+    /// The path revision. A file or directory has changed if the revisions don't compare equal.
     #[default]
     pub revision: FileRevision,
 
@@ -356,7 +348,6 @@ impl get_size2::GetSize for File {}
 
 struct SyncPathResult {
     status_changed: bool,
-    is_directory: bool,
 }
 
 impl File {
@@ -460,7 +451,6 @@ impl File {
         let Some(file) = file.or_else(|| db.files().try_system(db, path)) else {
             return SyncPathResult {
                 status_changed: true,
-                is_directory: true,
             };
         };
 
@@ -470,9 +460,11 @@ impl File {
                 metadata.revision(),
                 metadata.permissions(),
             ),
-            Ok(metadata) if metadata.file_type().is_directory() => {
-                (FileStatus::IsADirectory, FileRevision::zero(), None)
-            }
+            Ok(metadata) if metadata.file_type().is_directory() => (
+                FileStatus::IsADirectory,
+                metadata.revision(),
+                metadata.permissions(),
+            ),
             _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
@@ -502,23 +494,14 @@ impl File {
             file.set_source_text_override(db).to(None);
         }
 
-        SyncPathResult {
-            status_changed,
-            is_directory: old_status == FileStatus::IsADirectory
-                || status == FileStatus::IsADirectory,
-        }
+        SyncPathResult { status_changed }
     }
 
     fn touch_directories_after_sync(db: &mut dyn Db, path: &SystemPath, result: SyncPathResult) {
-        let inner = Arc::clone(&db.files().inner);
-
-        if result.status_changed || result.is_directory {
-            inner.directories.touch(db, path);
-        }
         if result.status_changed
             && let Some(parent) = path.parent()
         {
-            inner.directories.touch(db, parent);
+            Self::sync_system_path(db, parent, None);
         }
     }
 

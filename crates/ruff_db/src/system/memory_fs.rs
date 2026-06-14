@@ -168,10 +168,14 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
         match by_path.entry(normalized) {
             btree_map::Entry::Vacant(entry) => {
+                let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                 entry.insert(Entry::File(File {
                     content: Box::default(),
                     last_modified: file_time_now(),
                 }));
+                if let Some(parent) = parent {
+                    touch_directory(&mut by_path, &parent);
+                }
 
                 Ok(())
             }
@@ -193,10 +197,14 @@ impl MemoryFileSystem {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = self.normalize_path(path.as_ref());
+        let existed = matches!(by_path.get(&normalized), Some(Entry::File(_)));
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
         file.content = content.as_ref().to_vec().into_boxed_slice();
         file.last_modified = file_time_now();
+        if !existed && let Some(parent) = normalized.parent() {
+            touch_directory(&mut by_path, parent);
+        }
 
         Ok(())
     }
@@ -278,7 +286,11 @@ impl MemoryFileSystem {
             match by_path.entry(normalized) {
                 btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::File(_) => {
+                        let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                         entry.remove();
+                        if let Some(parent) = parent {
+                            touch_directory(&mut by_path, &parent);
+                        }
                         Ok(())
                     }
                     Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
@@ -345,7 +357,11 @@ impl MemoryFileSystem {
             match by_path.entry(normalized.clone()) {
                 btree_map::Entry::Occupied(entry) => match entry.get() {
                     Entry::Directory(_) => {
+                        let parent = entry.key().parent().map(Utf8Path::to_path_buf);
                         entry.remove();
+                        if let Some(parent) = parent {
+                            touch_directory(&mut by_path, &parent);
+                        }
                         Ok(())
                     }
                     Entry::File(_) => Err(io::Error::from(io::ErrorKind::NotADirectory)),
@@ -473,7 +489,9 @@ fn create_dir_all(
 
     for component in normalized.components() {
         path.push(component);
+        let mut inserted = false;
         let entry = paths.entry(path.clone()).or_insert_with(|| {
+            inserted = true;
             Entry::Directory(Directory {
                 last_modified: file_time_now(),
             })
@@ -482,9 +500,19 @@ fn create_dir_all(
         if entry.is_file() {
             return Err(io::Error::from(io::ErrorKind::NotADirectory));
         }
+
+        if inserted && let Some(parent) = path.parent().map(Utf8Path::to_path_buf) {
+            touch_directory(paths, &parent);
+        }
     }
 
     Ok(())
+}
+
+fn touch_directory(paths: &mut RwLockWriteGuard<BTreeMap<Utf8PathBuf, Entry>>, path: &Utf8Path) {
+    if let Some(Entry::Directory(directory)) = paths.get_mut(path) {
+        directory.last_modified = file_time_now();
+    }
 }
 
 fn get_or_create_file<'a>(
