@@ -33,7 +33,7 @@ use crate::{
         enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{
-            Member, MemberWithDefinition, all_class_member_names, all_end_of_scope_members,
+            Member, MemberWithDefinition, all_end_of_scope_members, own_class_member_names,
         },
         tuple::Tuple,
     },
@@ -110,17 +110,16 @@ fn check_inherited_method_conflicts<'db>(
     class_specialized: ClassType<'db>,
 ) {
     let db = context.db();
-    if class.try_mro(db, None).is_err() {
-        return;
-    }
-
-    let direct_bases: Vec<_> = class
+    let direct_bases: SmallVec<[_; 2]> = class
         .explicit_bases(db)
         .iter()
         .filter_map(|base| base.to_class_type(db))
         .collect();
 
     if direct_bases.len() < 2 {
+        return;
+    }
+    if class.try_mro(db, None).is_err() {
         return;
     }
 
@@ -137,24 +136,29 @@ fn check_inherited_method_conflicts<'db>(
     }
 
     let class_instance = Type::instance(db, class_specialized);
+    let member_candidates = member_candidates_in_direct_bases(db, &direct_bases);
+    if member_candidates.is_empty() {
+        return;
+    }
     let has_enum_semantics = is_enum_class_by_inheritance(db, class)
         || direct_bases
             .iter()
             .any(|base| is_stdlib_enum_class(db, base.class_literal(db)));
-    let member_candidates = member_candidates_in_direct_bases(db, &direct_bases);
 
-    'members: for (member, base_indices) in member_candidates {
+    'members: for member in member_candidates {
         let member_name = member.as_str();
         if is_mangled_private(member_name) || is_constructor_like_method(member_name) {
             continue;
         }
 
-        let Some(override_owner) = defining_class_for_member(db, class_specialized, &member) else {
+        let Some(override_member) = defining_class_for_member(db, class_specialized, &member)
+        else {
             continue;
         };
-        if has_dynamic_member_contract(db, override_owner, &member) {
+        if override_member.has_dynamic_contract() || !override_member.may_produce_callable(db) {
             continue;
         }
+        let override_owner = override_member.owner;
 
         // Enum data-type mixins inherit incompatible dunder methods from the data type and
         // `Enum`, but class creation resolves them using special enum semantics.
@@ -167,14 +171,15 @@ fn check_inherited_method_conflicts<'db>(
             continue;
         }
 
-        let overridden_bases: SmallVec<[_; 2]> = base_indices
-            .into_iter()
-            .filter_map(|base_index| {
-                let base = direct_bases[base_index];
-                let overridden_owner = defining_class_for_member(db, base, &member)?;
-                (!has_dynamic_member_contract(db, overridden_owner, &member)
-                    && override_owner != overridden_owner)
-                    .then_some((base, overridden_owner))
+        let overridden_bases: SmallVec<[_; 2]> = direct_bases
+            .iter()
+            .copied()
+            .filter_map(|base| {
+                let overridden_member = defining_class_for_member(db, base, &member)?;
+                (!overridden_member.has_dynamic_contract()
+                    && overridden_member.may_produce_callable(db)
+                    && override_owner != overridden_member.owner)
+                    .then_some((base, overridden_member.owner))
             })
             .collect();
 
@@ -284,29 +289,68 @@ fn raw_member_requires_receiver_aware_lookup<'db>(db: &'db dyn Db, ty: Type<'db>
     }
 }
 
-/// Returns the sorted member names exposed by at least two direct bases, together with the bases
-/// that expose each name.
+/// Returns the sorted member names exposed by at least two direct bases and defined on an MRO
+/// branch that is not shared by every direct base.
+///
+/// A conflict requires at least one distinct defining class. A name defined only by classes common
+/// to every base resolves to the same owner along every path and cannot conflict.
 fn member_candidates_in_direct_bases<'db>(
     db: &'db dyn Db,
     direct_bases: &[ClassType<'db>],
-) -> Vec<(Name, SmallVec<[usize; 2]>)> {
-    let mut candidate_bases: FxHashMap<Name, SmallVec<[usize; 2]>> = FxHashMap::default();
+) -> Vec<Name> {
+    let [first_base, remaining_bases @ ..] = direct_bases else {
+        return Vec::new();
+    };
 
-    for (base_index, base) in direct_bases.iter().enumerate() {
+    let mut common_classes: FxHashSet<_> = first_base
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .collect();
+
+    for base in remaining_bases {
+        let classes: FxHashSet<_> = base
+            .iter_mro(db)
+            .filter_map(ClassBase::into_class)
+            .collect();
+        common_classes.retain(|class| classes.contains(class));
+    }
+
+    let mut candidate_base_counts: FxHashMap<Name, (usize, bool)> = FxHashMap::default();
+    for base in direct_bases {
+        let mut base_names: FxHashMap<Name, bool> = FxHashMap::default();
+        for class in base.iter_mro(db).filter_map(ClassBase::into_class) {
+            let is_distinct_branch = !common_classes.contains(&class);
+
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "candidate names are sorted before diagnostics are emitted"
+            )]
+            for name in own_class_member_names(db, class) {
+                base_names
+                    .entry(name)
+                    .and_modify(|is_branch| *is_branch |= is_distinct_branch)
+                    .or_insert(is_distinct_branch);
+            }
+        }
+
         #[expect(
             clippy::iter_over_hash_type,
             reason = "candidate names are sorted before diagnostics are emitted"
         )]
-        for name in all_class_member_names(db, *base) {
-            candidate_bases.entry(name).or_default().push(base_index);
+        for (name, is_distinct_branch) in base_names {
+            let (base_count, has_distinct_branch) = candidate_base_counts.entry(name).or_default();
+            *base_count += 1;
+            *has_distinct_branch |= is_distinct_branch;
         }
     }
 
-    let mut candidates: Vec<_> = candidate_bases
+    let mut candidates: Vec<_> = candidate_base_counts
         .into_iter()
-        .filter(|(_, bases)| bases.len() > 1)
+        .filter_map(|(name, (base_count, has_distinct_branch))| {
+            (base_count > 1 && has_distinct_branch).then_some(name)
+        })
         .collect();
-    candidates.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    candidates.sort_unstable();
     candidates
 }
 
@@ -319,13 +363,12 @@ fn is_enum_rewritten_method<'db>(
 ) -> bool {
     let name_str = name.as_str();
 
-    if Program::get(db).python_version(db) >= PythonVersion::PY311
+    if matches!(
+        name_str,
+        "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
+    ) && Program::get(db).python_version(db) >= PythonVersion::PY311
         && Type::ClassLiteral(ClassLiteral::Static(class))
             .is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
-        && matches!(
-            name_str,
-            "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
-        )
     {
         return true;
     }
@@ -347,7 +390,8 @@ fn is_enum_rewritten_method<'db>(
     }
 
     data_type.is_some_and(|data_type| {
-        defining_class_for_member(db, data_type, name) == Some(override_owner)
+        defining_class_for_member(db, data_type, name)
+            .is_some_and(|member| member.owner == override_owner)
     })
 }
 
@@ -441,29 +485,51 @@ fn enum_data_type_in_base_mro<'db>(
     None
 }
 
-/// Returns the class that provides the effective class member with the given name.
+#[derive(Clone, Copy)]
+struct DefiningClassMember<'db> {
+    owner: ClassType<'db>,
+    raw_type: Option<Type<'db>>,
+}
+
+impl<'db> DefiningClassMember<'db> {
+    fn has_dynamic_contract(self) -> bool {
+        matches!(self.raw_type, Some(Type::Dynamic(_) | Type::Divergent(_)))
+    }
+
+    /// Returns `true` if descriptor binding could produce a callable member.
+    fn may_produce_callable(self, db: &'db dyn Db) -> bool {
+        let Some(raw_type) = self.raw_type else {
+            return true;
+        };
+
+        raw_type.try_upcast_to_callable(db).is_some()
+            || (!matches!(
+                raw_type,
+                Type::Dynamic(_) | Type::Divergent(_) | Type::Never
+            ) && !raw_type
+                .class_member(db, "__get__".into())
+                .place
+                .is_undefined())
+    }
+}
+
+/// Returns the class that provides the effective class member with the given name and the member's
+/// raw type before descriptor binding.
 fn defining_class_for_member<'db>(
     db: &'db dyn Db,
     class: ClassType<'db>,
     name: &Name,
-) -> Option<ClassType<'db>> {
+) -> Option<DefiningClassMember<'db>> {
     class
         .iter_mro(db)
         .filter_map(ClassBase::into_class)
-        .find(|candidate| !candidate.own_class_member(db, None, name).is_undefined())
-}
-
-/// Returns `true` when the defining class does not provide a statically known contract for
-/// `name`.
-fn has_dynamic_member_contract<'db>(db: &'db dyn Db, owner: ClassType<'db>, name: &Name) -> bool {
-    matches!(
-        owner
-            .own_class_member(db, None, name)
-            .inner
-            .place
-            .raw_type(),
-        Some(Type::Dynamic(_) | Type::Divergent(_))
-    )
+        .find_map(|owner| {
+            let member = owner.own_class_member(db, None, name);
+            (!member.is_undefined()).then(|| DefiningClassMember {
+                owner,
+                raw_type: member.inner.place.raw_type(),
+            })
+        })
 }
 
 /// Returns the source definition if `class` defines `name` as a method.
