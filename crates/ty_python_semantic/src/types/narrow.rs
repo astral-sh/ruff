@@ -301,12 +301,12 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
 /// pattern. Definite-match analysis, which is used for negative narrowing and exhaustiveness,
 /// intentionally remains separate.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct SuccessfulPatternAnalysis<'db> {
+pub(crate) struct PatternSuccessTypes<'db> {
     bindings: FrozenMap<ScopedPlaceId, Type<'db>>,
     missing_binding_ty: Type<'db>,
 }
 
-impl<'db> SuccessfulPatternAnalysis<'db> {
+impl<'db> PatternSuccessTypes<'db> {
     /// Return the inferred binding type.
     ///
     /// A missing entry is `Never` when the whole pattern cannot match and `Unknown` when the
@@ -339,11 +339,28 @@ impl<'db> SuccessfulPatternAnalysis<'db> {
     }
 }
 
-struct SuccessfulPatternNode<'db> {
+/// The types produced by one pattern node when that complete node succeeds.
+///
+/// Bindings are transactional:
+///
+/// ```python
+/// def f(value: tuple[str, str]) -> None:
+///     match value:
+///         case [item, int()]:
+///             ...
+/// ```
+///
+/// The pattern produces `Never` for the matched subject and commits no `item` binding, because the
+/// second element prevents the complete sequence pattern from matching.
+struct PatternSuccessResult<'db> {
     matched_subject_ty: Type<'db>,
     bindings: BTreeMap<ScopedPlaceId, Type<'db>>,
 }
 
+/// Computes the subject and binding types produced by successful match patterns.
+///
+/// Structural patterns pass the type of each extracted value to their child patterns. Results from
+/// a subject union are combined only after each complete union arm has been checked.
 struct PatternSuccessAnalyzer<'db> {
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -351,22 +368,22 @@ struct PatternSuccessAnalyzer<'db> {
 
 #[salsa::tracked(
     returns(ref),
-    cycle_initial=|_, id, _| SuccessfulPatternAnalysis::cycle_initial(Type::divergent(id)),
-    cycle_fn=|db, cycle, previous: &SuccessfulPatternAnalysis<'db>, result: SuccessfulPatternAnalysis<'db>, _| {
+    cycle_initial=|_, id, _| PatternSuccessTypes::cycle_initial(Type::divergent(id)),
+    cycle_fn=|db, cycle, previous: &PatternSuccessTypes<'db>, result: PatternSuccessTypes<'db>, _| {
         result.cycle_normalized(db, previous, cycle)
     },
     heap_size=ruff_memory_usage::heap_size
 )]
-pub(crate) fn successful_pattern_analysis<'db>(
+pub(crate) fn pattern_success_types<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> SuccessfulPatternAnalysis<'db> {
+) -> PatternSuccessTypes<'db> {
     let subject = pattern.subject(db);
     let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
     let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
     let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
-    SuccessfulPatternAnalysis {
+    PatternSuccessTypes {
         bindings: FrozenMap::from(result.bindings),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
@@ -1193,7 +1210,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         &mut self,
         pattern: &PatternPredicateKind<'db>,
         subject_ty: Type<'db>,
-    ) -> SuccessfulPatternNode<'db> {
+    ) -> PatternSuccessResult<'db> {
         match pattern {
             PatternPredicateKind::Sequence(kind) => {
                 self.analyze_successful_sequence_pattern(kind, subject_ty)
@@ -1201,7 +1218,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             PatternPredicateKind::Or(patterns) => {
                 let mut patterns = patterns.iter();
                 let Some(first_pattern) = patterns.next() else {
-                    return SuccessfulPatternNode {
+                    return PatternSuccessResult {
                         matched_subject_ty: Type::Never,
                         bindings: BTreeMap::new(),
                     };
@@ -1227,14 +1244,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     previous_pattern = pattern;
                 }
 
-                SuccessfulPatternNode {
+                PatternSuccessResult {
                     matched_subject_ty: matched_subject_types.build(),
                     bindings,
                 }
             }
             PatternPredicateKind::As(pattern, name) => {
                 let mut result = pattern.as_deref().map_or_else(
-                    || SuccessfulPatternNode {
+                    || PatternSuccessResult {
                         matched_subject_ty: subject_ty,
                         bindings: BTreeMap::new(),
                     },
@@ -1260,12 +1277,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 {
                     bindings.insert(place.into(), subject_ty);
                 }
-                SuccessfulPatternNode {
+                PatternSuccessResult {
                     matched_subject_ty: subject_ty,
                     bindings,
                 }
             }
-            _ => SuccessfulPatternNode {
+            _ => PatternSuccessResult {
                 matched_subject_ty: self.match_pattern_subject_type(pattern, subject_ty),
                 bindings: BTreeMap::new(),
             },
@@ -1420,7 +1437,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         &mut self,
         kind: &SequencePatternPredicateKind<'db>,
         subject_ty: Type<'db>,
-    ) -> SuccessfulPatternNode<'db> {
+    ) -> PatternSuccessResult<'db> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let subject_arms = self.sequence_pattern_subject_arms(subject_ty);
         let sequence_ty = necessary_sequence_pattern_type(self.db, kind);
@@ -1472,7 +1489,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             });
         }
 
-        SuccessfulPatternNode {
+        PatternSuccessResult {
             matched_subject_ty: matched_subject_types.build(),
             bindings,
         }
