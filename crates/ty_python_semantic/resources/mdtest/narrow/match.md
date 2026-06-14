@@ -557,24 +557,42 @@ def test_match_sequence_alias_preserves_element_narrowing(
             return 0
 ```
 
+## Recursive class pattern aliases
+
 The same rule applies outside sequence patterns. Preserving a recursive alias lets later code keep
 using the recursive relationship after a class pattern matches.
 
-```py
-from typing import TypeAlias, final
+```toml
+[environment]
+python-version = "3.12"
+```
 
-RecursiveContainer: TypeAlias = int | dict[str, "RecursiveContainer"] | list["RecursiveContainer"]
+```py
+type RecursiveContainer = int | dict[str, RecursiveContainer] | list[RecursiveContainer]
 
 def test_match_class_alias_preserves_recursive_containers(
     value: RecursiveContainer,
 ) -> None:
     match value:
         case dict() as mapping:
+            reveal_type(mapping)  # revealed: dict[str, RecursiveContainer]
+            mapping["bad"] = "bad"  # error: [invalid-assignment]
             for item in mapping.values():
                 test_match_class_alias_preserves_recursive_containers(item)
         case list() as sequence:
+            reveal_type(sequence)  # revealed: list[RecursiveContainer]
+            sequence.append("bad")  # error: [invalid-argument-type]
             for item in sequence:
                 test_match_class_alias_preserves_recursive_containers(item)
+```
+
+## Class pattern alias intersections
+
+Class patterns retain intersections that can exist through multiple inheritance, but discard
+classes that are known to be disjoint.
+
+```py
+from typing import final
 
 class OverlapA: ...
 class OverlapB: ...
