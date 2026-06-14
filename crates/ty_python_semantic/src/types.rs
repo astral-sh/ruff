@@ -7303,6 +7303,44 @@ fn class_mro_literals<'db>(
         .collect()
 }
 
+/// Returns whether `self_type` can be proven to inherit from `owner_class`.
+///
+/// Unlike [`Type::nominal_class`], this can prove inheritance through a union or a positive
+/// intersection element without choosing a single nominal class for the entire type.
+fn self_type_inherits_owner<'db>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    owner_class: ClassLiteral<'db>,
+) -> bool {
+    struct SelfTypeOwnerCheck;
+
+    fn check<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        owner_class: ClassLiteral<'db>,
+        visitor: &CycleDetector<SelfTypeOwnerCheck, Type<'db>, bool>,
+    ) -> bool {
+        if let Some(class) = ty.nominal_class(db) {
+            return class.is_subtype_of_class_literal(db, owner_class);
+        }
+
+        visitor.visit(ty, || match ty {
+            Type::TypeAlias(alias) => check(db, alias.value_type(db), owner_class, visitor),
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .all(|element| check(db, *element, owner_class, visitor)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| check(db, *element, owner_class, visitor)),
+            _ => false,
+        })
+    }
+
+    check(db, self_type, owner_class, &CycleDetector::new(false))
+}
+
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
 /// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
@@ -7359,13 +7397,20 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
-        self.class_literal.is_some_and(|class_literal| {
-            let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
-        })
+        // Check that the self type inherits from the Self typevar's owner class. The common case
+        // uses the single nominal class found when constructing this binding. For a union or
+        // intersection, inspect its elements without choosing one as the nominal class of the
+        // entire type.
+        match (
+            self.class_literal,
+            self_typevar_owner_class_literal(db, bound_typevar),
+        ) {
+            (Some(class_literal), owner_class) => owner_class.is_none_or(|owner_class| {
+                class_mro_literals(db, class_literal).contains(&owner_class)
+            }),
+            (None, Some(owner_class)) => self_type_inherits_owner(db, self.ty, owner_class),
+            (None, None) => false,
+        }
     }
 }
 
