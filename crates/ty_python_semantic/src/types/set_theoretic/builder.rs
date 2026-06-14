@@ -36,7 +36,6 @@
 //! shares exactly the same possible super-types, and none of them are subtypes of each other
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
-use super::RecursivelyDefined;
 use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::tuple::Tuple;
@@ -618,12 +617,11 @@ enum ReduceResult<'db> {
     Type(Type<'db>),
 }
 
-/// If the value ​​is defined recursively, widening is performed from fewer literal elements,
+/// During cycle recovery, widening is performed from fewer literal elements,
 /// resulting in faster convergence of the fixed-point iteration.
-const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
-/// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
-/// so in principle we can have as many literal elements as we want,
-/// but to avoid unintended huge computational loads, we limit it to 256.
+const MAX_CYCLE_RECOVERY_UNION_LITERALS: usize = 5;
+/// Outside cycle recovery, we avoid eagerly widening smaller literal unions.
+/// To avoid unintended huge computational loads, we still limit it to 256.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// However, we set a much larger limit for enum literals than for other kinds of literals.
 /// Huge enums are not uncommon (especially in generated code), and it's annoying
@@ -637,7 +635,6 @@ pub(crate) struct UnionBuilder<'db> {
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
-    recursively_defined: RecursivelyDefined,
 }
 
 /// Accumulates types into a union.
@@ -703,7 +700,6 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             cycle_recovery: false,
-            recursively_defined: RecursivelyDefined::No,
         }
     }
 
@@ -717,11 +713,6 @@ impl<'db> UnionBuilder<'db> {
         if self.cycle_recovery {
             self.unpack_aliases = false;
         }
-        self
-    }
-
-    pub(crate) fn recursively_defined(mut self, val: RecursivelyDefined) -> Self {
-        self.recursively_defined = val;
         self
     }
 
@@ -773,9 +764,9 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
         let cycle_recovery = self.cycle_recovery;
-        let should_widen = |literals, recursively_defined: RecursivelyDefined| {
-            if recursively_defined.is_yes() && cycle_recovery {
-                literals >= MAX_RECURSIVE_UNION_LITERALS
+        let should_widen = |literals| {
+            if cycle_recovery {
+                literals >= MAX_CYCLE_RECOVERY_UNION_LITERALS
             } else {
                 literals >= MAX_NON_RECURSIVE_UNION_LITERALS
             }
@@ -791,10 +782,7 @@ impl<'db> UnionBuilder<'db> {
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
                 }
-                self.recursively_defined = self
-                    .recursively_defined
-                    .or(union.recursively_defined(self.db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                if self.cycle_recovery {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
@@ -802,7 +790,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
                         UnionElement::Type(_) => acc,
                     });
-                    if should_widen(literals, self.recursively_defined) {
+                    if should_widen(literals) {
                         self.widen_literal_types(seen_aliases);
                     }
                 }
@@ -813,8 +801,6 @@ impl<'db> UnionBuilder<'db> {
                 self.add_in_place_impl(alias.value_type(self.db), seen_aliases);
             }
             Type::LiteralValue(literal) => {
-                self.recursively_defined =
-                    self.recursively_defined.or(literal.recursively_defined());
                 match literal.kind() {
                     // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
                     // add it to, or an existing element that is a super-type of string literals, which
@@ -826,7 +812,7 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::StringLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
+                                    if should_widen(literals.len()) {
                                         let replace_with = KnownClass::Str.to_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
@@ -873,7 +859,7 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::BytesLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
+                                    if should_widen(literals.len()) {
                                         let replace_with = KnownClass::Bytes.to_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
@@ -922,7 +908,7 @@ impl<'db> UnionBuilder<'db> {
                         for (index, element) in self.elements.iter_mut().enumerate() {
                             match element {
                                 UnionElement::IntLiterals(literals) => {
-                                    if should_widen(literals.len(), self.recursively_defined) {
+                                    if should_widen(literals.len()) {
                                         let replace_with = KnownClass::Int.to_instance(self.db);
                                         self.add_in_place_impl(replace_with, seen_aliases);
                                         return;
@@ -998,12 +984,11 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                     // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
                                     // for why we avoid using the `should_widen` closure here.
-                                    let enum_literals_limit =
-                                        if self.recursively_defined.is_yes() && cycle_recovery {
-                                            MAX_RECURSIVE_UNION_LITERALS
-                                        } else {
-                                            MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
-                                        };
+                                    let enum_literals_limit = if cycle_recovery {
+                                        MAX_CYCLE_RECOVERY_UNION_LITERALS
+                                    } else {
+                                        MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
+                                    };
                                     if literals.len() >= enum_literals_limit {
                                         let (literal, _) = literals.first().unwrap();
                                         let replace_with = literal.enum_class_instance(self.db);
@@ -1245,7 +1230,6 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
-        let recursively_defined = self.recursively_defined;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
         let mut types = Vec::with_capacity(type_count);
@@ -1253,34 +1237,22 @@ impl<'db> UnionBuilder<'db> {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(recursively_defined),
-                        )
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::StringLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(recursively_defined),
-                        )
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::BytesLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(recursively_defined),
-                        )
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(
-                            LiteralValueType::new(literal, promotable)
-                                .with_recursively_defined(recursively_defined),
-                        )
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
@@ -1312,8 +1284,7 @@ impl<'db> UnionBuilder<'db> {
         if normalize_enum_complement_unions(db, &mut types) {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
-                .cycle_recovery(cycle_recovery)
-                .recursively_defined(recursively_defined);
+                .cycle_recovery(cycle_recovery);
             return types
                 .into_iter()
                 .fold(builder, UnionBuilder::add)
@@ -1323,11 +1294,7 @@ impl<'db> UnionBuilder<'db> {
         match types.len() {
             0 => None,
             1 => Some(types[0]),
-            _ => Some(Type::Union(UnionType::new(
-                db,
-                types.into_boxed_slice(),
-                recursively_defined,
-            ))),
+            _ => Some(Type::Union(UnionType::new(db, types.into_boxed_slice()))),
         }
     }
 }

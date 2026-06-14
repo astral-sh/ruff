@@ -15,7 +15,6 @@ use crate::types::cyclic::PairVisitor;
 use crate::types::enums::is_single_member_enum;
 use crate::types::function::FunctionDecorators;
 use crate::types::recursive::RecursiveType;
-use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{ParametersKind, SignatureRelationVisitor};
 use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ClassType, CycleDetector,
@@ -1990,7 +1989,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             .iter()
                             .map(|c| Type::single_char_string_literal(db, *c))
                             .collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        Type::Union(UnionType::new(db, union_elements))
                     }
                 };
 
@@ -2037,7 +2036,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     _ => {
                         let union_elements: Box<[Type<'db>]> =
                             ints.iter().map(|int| Type::int_literal(*int)).collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                        Type::Union(UnionType::new(db, union_elements))
                     }
                 };
 

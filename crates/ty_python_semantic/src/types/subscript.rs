@@ -535,7 +535,6 @@ where
         }
     }
 
-    builder = builder.recursively_defined(union.recursively_defined(db));
     let result_ty = builder.build();
     if errors.is_empty() {
         Ok(result_ty)

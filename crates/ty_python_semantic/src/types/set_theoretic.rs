@@ -21,9 +21,6 @@ pub struct UnionType<'db> {
     /// The union type includes values in any of these types.
     #[returns(deref)]
     pub elements: Box<[Type<'db>]>,
-    /// Whether the value pointed to by this type is recursively defined.
-    /// If `Yes`, union literal widening is performed early.
-    pub(crate) recursively_defined: RecursivelyDefined,
 }
 
 pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -171,9 +168,7 @@ impl<'db> UnionType<'db> {
                 for (_, element) in iter {
                     builder = builder.add(transform_fn(element));
                 }
-                return builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build();
+                return builder.build();
             }
         }
 
@@ -214,9 +209,7 @@ impl<'db> UnionType<'db> {
                 for (_, element) in iter {
                     builder = builder.add(transform_fn(element)?);
                 }
-                return Ok(builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build());
+                return Ok(builder.build());
             }
         }
 
@@ -234,7 +227,7 @@ impl<'db> UnionType<'db> {
             [] => Type::Never,
             [single] => *single,
             _ if new.len() == current.len() => Type::Union(self),
-            _ => Type::Union(UnionType::new(db, new, self.recursively_defined(db))),
+            _ => Type::Union(UnionType::new(db, new)),
         }
     }
 
@@ -278,9 +271,7 @@ impl<'db> UnionType<'db> {
             Place::Undefined
         } else {
             Place::Defined(DefinedPlace {
-                ty: builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build(),
+                ty: builder.build(),
                 origin,
                 definedness: if possibly_unbound {
                     Definedness::PossiblyUndefined
@@ -338,9 +329,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined
             } else {
                 Place::Defined(DefinedPlace {
-                    ty: builder
-                        .recursively_defined(self.recursively_defined(db))
-                        .build(),
+                    ty: builder.build(),
                     origin,
                     definedness: if possibly_unbound {
                         Definedness::PossiblyUndefined
@@ -362,8 +351,7 @@ impl<'db> UnionType<'db> {
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
             .unpack_aliases(false)
-            .cycle_recovery(true)
-            .recursively_defined(self.recursively_defined(db));
+            .cycle_recovery(true);
         let mut empty = true;
         let mut top_level_marker_id = None;
         for ty in self.elements(db) {
@@ -383,7 +371,6 @@ impl<'db> UnionType<'db> {
                 // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
                 if ty.is_top_level_cycle_marker(db, normalization.marker()) {
                     top_level_marker_id = normalization.marker_id();
-                    builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }
                 if let Type::CycleMarked(marked) = ty
@@ -1003,23 +990,4 @@ fn expand_intersection_typevars_and_newtypes<'db>(
     }
 
     builder.build()
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub enum RecursivelyDefined {
-    Yes,
-    No,
-}
-
-impl RecursivelyDefined {
-    pub(crate) const fn is_yes(self) -> bool {
-        matches!(self, RecursivelyDefined::Yes)
-    }
-
-    const fn or(self, other: RecursivelyDefined) -> RecursivelyDefined {
-        match (self, other) {
-            (RecursivelyDefined::Yes, _) | (_, RecursivelyDefined::Yes) => RecursivelyDefined::Yes,
-            _ => RecursivelyDefined::No,
-        }
-    }
 }

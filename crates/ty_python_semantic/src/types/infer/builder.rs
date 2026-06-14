@@ -87,7 +87,6 @@ use crate::types::infer::{
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
 use crate::types::newtype::NewType;
-use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
 use crate::types::special_form::TypeQualifier;
 use crate::types::subclass_of::SubclassOfInner;
@@ -2212,7 +2211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let place = loop_header_kind.place();
 
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        let mut union = UnionBuilder::new(db);
 
         for reachable_binding in &loop_header.reachable_bindings {
             let binding_ty = binding_type(db, reachable_binding.definition);
@@ -2305,7 +2304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        let mut union = UnionBuilder::new(db);
         for declaration in visible_nested_declarations {
             assert!(
                 declaration.is_bound,

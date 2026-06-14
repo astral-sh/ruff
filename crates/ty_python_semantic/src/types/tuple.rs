@@ -27,7 +27,6 @@ use crate::types::RecursiveTypeNormalization;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
-use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleMarkable, CycleMarkedType, ErrorContext,
     FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder,
@@ -1560,7 +1559,7 @@ impl<'db> Tuple<Type<'db>> {
             // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
             // into other types where necessary. Here, however, we know that there are no duplicates
             // in this union, so it's probably more efficient to use `UnionType::new()` directly.
-            Type::Union(UnionType::new(db, elements, RecursivelyDefined::No))
+            Type::Union(UnionType::new(db, elements))
         };
 
         TupleSpec::heterogeneous([

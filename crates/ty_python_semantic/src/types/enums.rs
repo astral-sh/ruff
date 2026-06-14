@@ -15,10 +15,7 @@ use crate::{
         LiteralValueTypeKind, MemberLookupPolicy, NegativeIntersectionElements, StaticClassLiteral,
         Type, UnionType,
         function::FunctionType,
-        set_theoretic::{
-            RecursivelyDefined,
-            builder::{IntersectionBuilder, UnionBuilder},
-        },
+        set_theoretic::builder::{IntersectionBuilder, UnionBuilder},
     },
 };
 use ty_python_core::{definition::DefinitionKind, place_table, scope::ScopeId, use_def_map};
@@ -409,11 +406,7 @@ impl<'db> EnumComplementType<'db> {
             // Keep this exact. Routing these literals through `UnionBuilder` can widen very large
             // enum complements back to the original enum class, losing the excluded members that
             // made the compact complement useful in the first place.
-            _ => Type::Union(UnionType::new(
-                db,
-                alternatives.into_boxed_slice(),
-                RecursivelyDefined::No,
-            )),
+            _ => Type::Union(UnionType::new(db, alternatives.into_boxed_slice())),
         }
     }
 

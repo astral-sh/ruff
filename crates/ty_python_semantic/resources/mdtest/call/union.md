@@ -344,7 +344,7 @@ class RecursiveAttr3:
     def update(self):
         self.i = (self.i + 1) % 5
 
-# Going beyond the MAX_RECURSIVE_UNION_LITERALS limit:
+# Going beyond the MAX_CYCLE_RECOVERY_UNION_LITERALS limit:
 reveal_type(RecursiveAttr3().i)  # revealed: int
 ```
 

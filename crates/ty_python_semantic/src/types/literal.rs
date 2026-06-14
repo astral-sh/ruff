@@ -3,7 +3,6 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
-use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::{ClassLiteral, KnownClass, Type};
 use ty_python_core::definition::Definition;
 use ty_python_core::{place_table, use_def_map};
@@ -27,24 +26,22 @@ enum LiteralValueTypeInner<'db> {
 }
 
 bitflags! {
-    /// Bit-packed flags for promotability and recursive-definition status.
+    /// Bit-packed flags for promotability.
     ///
     /// Stored in each [`LiteralValueTypeInner`] variant, fitting into the
     /// discriminant's padding so that the enum size is unchanged.
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update)]
     struct LiteralFlags: u8 {
         const PROMOTABLE = 1 << 0;
-        const RECURSIVELY_DEFINED = 1 << 1;
     }
 }
 
 impl get_size2::GetSize for LiteralFlags {}
 
 impl LiteralFlags {
-    fn new(promotable: bool, recursively_defined: RecursivelyDefined) -> Self {
+    fn new(promotable: bool) -> Self {
         let mut flags = Self::empty();
         flags.set(Self::PROMOTABLE, promotable);
-        flags.set(Self::RECURSIVELY_DEFINED, recursively_defined.is_yes());
         flags
     }
 
@@ -52,21 +49,8 @@ impl LiteralFlags {
         self.intersects(Self::PROMOTABLE)
     }
 
-    const fn recursively_defined(self) -> RecursivelyDefined {
-        if self.intersects(Self::RECURSIVELY_DEFINED) {
-            RecursivelyDefined::Yes
-        } else {
-            RecursivelyDefined::No
-        }
-    }
-
     fn with_promotable(mut self, promotable: bool) -> Self {
         self.set(Self::PROMOTABLE, promotable);
-        self
-    }
-
-    fn with_recursively_defined(mut self, value: RecursivelyDefined) -> Self {
-        self.set(Self::RECURSIVELY_DEFINED, value.is_yes());
         self
     }
 }
@@ -124,17 +108,9 @@ impl<'db> LiteralValueType<'db> {
         })
     }
 
-    pub(crate) fn with_recursively_defined(self, value: RecursivelyDefined) -> Self {
-        self.map_flags(|f| f.with_recursively_defined(value))
-    }
-
-    pub(crate) fn recursively_defined(self) -> RecursivelyDefined {
-        self.flags().recursively_defined()
-    }
-
     /// Creates a literal value that may be promoted.
     pub(crate) fn promotable(kind: impl Into<LiteralValueTypeKind<'db>>) -> LiteralValueType<'db> {
-        let flags = LiteralFlags::new(true, RecursivelyDefined::No);
+        let flags = LiteralFlags::new(true);
         Self(match kind.into() {
             LiteralValueTypeKind::Int(v) => LiteralValueTypeInner::Int(v, flags),
             LiteralValueTypeKind::Bool(v) => LiteralValueTypeInner::Bool(v, flags),
@@ -149,7 +125,7 @@ impl<'db> LiteralValueType<'db> {
     pub(crate) fn unpromotable(
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
-        let flags = LiteralFlags::new(false, RecursivelyDefined::No);
+        let flags = LiteralFlags::new(false);
         Self(match kind.into() {
             LiteralValueTypeKind::Int(v) => LiteralValueTypeInner::Int(v, flags),
             LiteralValueTypeKind::Bool(v) => LiteralValueTypeInner::Bool(v, flags),
