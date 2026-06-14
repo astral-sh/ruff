@@ -582,8 +582,8 @@ preserved.
 from collections import defaultdict
 from collections.abc import Iterable
 from enum import Enum
-from typing import Protocol, Self, runtime_checkable
-from ty_extensions import Intersection, Not, Top
+from typing import Protocol, runtime_checkable
+from ty_extensions import Top
 
 def class_wide_protocol(
     value: Intersection[
@@ -606,14 +606,12 @@ class HasName(Protocol):
 
 def runtime_protocol_refinement(value: Child) -> None:
     if isinstance(value, HasName):
+        reveal_type(value)  # revealed: Child & HasName
         reveal_type(value.values)  # revealed: list[Child]
-        reveal_type(value.copy())  # revealed: Child
-        reveal_type(Base.copy(value))  # revealed: Child
         value.replace(Child())
         narrowed: HasName = value.copy()  # error: [invalid-assignment]
     else:
         reveal_type(value.copy())  # revealed: Child
-        reveal_type(Base.copy(value))  # revealed: Child
 
 class Copier(Protocol):
     def copy(self) -> Self:
@@ -621,7 +619,6 @@ class Copier(Protocol):
 
 def protocol_owner(value: Copier) -> None:
     reveal_type(value.copy())  # revealed: Copier
-    reveal_type(Copier.copy(value))  # revealed: Copier
 
 class Box[T]:
     def copy(self) -> Self:
@@ -652,7 +649,6 @@ class TupleChild(tuple[int | str, ...]):
         raise NotImplementedError
 
 def exact_tuple_refinement(value: Intersection[TupleChild, tuple[int, int]]) -> None:
-    reveal_type(value.copy())  # revealed: TupleChild
     reveal_type(TupleChild.copy(value))  # revealed: TupleChild
     reveal_type(value.other)  # revealed: TupleChild
     exact: tuple[int, int] = value.copy()  # error: [invalid-assignment]

@@ -6033,7 +6033,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            TypeMapping::BindSelf(binding) if self == binding.ty => return self,
             _ => {}
         }
 
@@ -7226,8 +7226,9 @@ fn self_typevar_owner_class_literal<'db>(
 /// describes the current value and must not become part of the `Self` specialization.
 ///
 /// Nominal constraints are preserved because they describe the receiver's concrete subtype. A
-/// protocol constraint is preserved only when it owns `Self` or is implied by the remaining
-/// receiver type. Type aliases are preserved unless projection changes their value.
+/// protocol constraint is preserved only when it owns `Self`; protocol behavior guaranteed by the
+/// nominal receiver is already represented there. Type aliases are preserved unless projection
+/// changes their value.
 fn self_type_projection<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -7279,30 +7280,16 @@ fn self_type_projection<'db>(
             Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_some() => {
                 Type::homogeneous_tuple(db, Type::object())
             }
-            Type::ProtocolInstance(protocol) => {
-                if protocol_is_owner(db, protocol, owner_class) {
-                    ty
-                } else {
-                    Type::object()
-                }
+            Type::ProtocolInstance(protocol)
+                if !protocol.to_nominal_instance().zip(owner_class).is_some_and(
+                    |(instance, owner)| instance.class(db).is_subtype_of_class_literal(db, owner),
+                ) =>
+            {
+                Type::object()
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(),
             _ => ty,
         }
-    }
-
-    fn protocol_is_owner<'db>(
-        db: &'db dyn Db,
-        protocol: ProtocolInstanceType<'db>,
-        owner_class: Option<ClassLiteral<'db>>,
-    ) -> bool {
-        owner_class.is_some_and(|owner_class| {
-            protocol.to_nominal_instance().is_some_and(|instance| {
-                instance
-                    .class(db)
-                    .is_subtype_of_class_literal(db, owner_class)
-            })
-        })
     }
 
     fn transform_negative<'db>(
@@ -7358,16 +7345,6 @@ fn self_type_projection<'db>(
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
     binding_context: Option<BindingContext<'db>>,
-}
-
-impl<'db> SelfBinding<'db> {
-    pub(crate) fn self_type(&self) -> Type<'db> {
-        self.ty
-    }
-
-    pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
-        self.binding_context
-    }
 }
 
 impl<'db> SelfBinding<'db> {
@@ -7498,8 +7475,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
-                if binding.binding_context().is_some() {
-                    context.remove_self(db, binding.binding_context())
+                if binding.binding_context.is_some() {
+                    context.remove_self(db, binding.binding_context)
                 } else {
                     context
                 }
