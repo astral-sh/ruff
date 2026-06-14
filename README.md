@@ -561,3 +561,6 @@ This repository is licensed under the [MIT License](https://github.com/astral-sh
     <img src="https://raw.githubusercontent.com/astral-sh/ruff/main/assets/svg/Astral.svg" alt="Made by Astral">
   </a>
 </div>
+
+---
+*Documentation maintained by the community. [Contribute](https://github.com/kognitur/genesis)*
