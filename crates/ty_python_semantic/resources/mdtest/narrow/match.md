@@ -581,6 +581,67 @@ def _(value: FinalPatternInt):
             reveal_type(value)  # revealed: FinalPatternInt
 ```
 
+Some precisely modeled objects compare equal to themselves, so an equivalent value pattern is
+exhaustive:
+
+```py
+from types import FunctionType
+from typing import NewType, TypeVar
+
+T = TypeVar("T")
+UserId = NewType("UserId", int)
+
+class ReflexivePatternValues:
+    LIST_INT = list[int]
+    TYPE_VAR = T
+    NEW_TYPE = UserId
+
+def generic_alias_value_pattern() -> int:
+    match list[int]:
+        case ReflexivePatternValues.LIST_INT:
+            return 1
+
+def type_var_value_pattern() -> int:
+    match T:
+        case ReflexivePatternValues.TYPE_VAR:
+            return 1
+
+def new_type_value_pattern() -> int:
+    match UserId:
+        case ReflexivePatternValues.NEW_TYPE:
+            return 1
+
+def helper() -> None: ...
+def wrapper_descriptor_value_pattern() -> int:
+    match FunctionType.__get__:
+        case FunctionType.__get__:
+            return 1
+
+def bound_method_value_pattern() -> int:
+    match helper.__get__:
+        case helper.__get__:
+            return 1
+```
+
+Two calls that construct equivalent objects need not produce equal values. For example, separate
+`partial` objects do not compare equal, so this match is not exhaustive:
+
+```py
+from functools import partial
+
+def target(value: int) -> int:
+    return value
+
+class PartialPatternValues:
+    VALUE = partial(target, 1)
+
+# error: [invalid-return-type]
+def partial_value_pattern() -> int:
+    match partial(target, 1):
+        case PartialPatternValues.VALUE:
+            return 1
+```
+
 ```py
 from typing import Literal
 

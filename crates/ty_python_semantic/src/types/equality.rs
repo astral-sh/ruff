@@ -3,8 +3,8 @@ use ruff_python_ast::name::Name;
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
-    EnumLiteralType, IntersectionBuilder, KnownClass, LiteralValueTypeKind, MemberLookupPolicy,
-    Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
+    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -308,6 +308,31 @@ fn comparison_result<'db>(
 
         (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
             operator.result_from_equality(left_module.module(db) == right_module.module(db))
+        }
+        (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias))
+            if left_alias == right_alias =>
+        {
+            operator.result_from_equality(true)
+        }
+        (Type::WrapperDescriptor(left_descriptor), Type::WrapperDescriptor(right_descriptor))
+            if left_descriptor == right_descriptor =>
+        {
+            operator.result_from_equality(true)
+        }
+        (
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left_function)),
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
+        )
+        | (
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
+        ) if left_function == right_function => operator.result_from_equality(true),
+        (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance))
+            if left_instance == right_instance
+                && left.is_single_valued(db)
+                && operator == ComparisonOperator::Equality =>
+        {
+            ComparisonResult::AlwaysTrue
         }
         (left, right)
             if has_known_identity_comparison_semantics(db, left, operator)
