@@ -559,8 +559,7 @@ impl<'a> LocalReferencesFinder<'a> {
             return;
         }
 
-        let Some(chain_name) =
-            dotted_name_with_attr(&attr_expr.value, attr_expr.attr.as_str())
+        let Some(chain_name) = dotted_name_with_attr(&attr_expr.value, attr_expr.attr.as_str())
         else {
             return;
         };
