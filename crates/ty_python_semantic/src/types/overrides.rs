@@ -5,17 +5,19 @@
 
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
-use ruff_python_ast::name::Name;
+use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
+use smallvec::SmallVec;
+use ty_module_resolver::{KnownModule, resolve_module_confident};
 
 use crate::{
-    Db,
+    Db, Program,
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, MemberLookupPolicy,
+        Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -24,12 +26,15 @@ use crate::{
             INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_OVERRIDE, INVALID_DATACLASS,
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             INVALID_NAMED_TUPLE_OVERRIDE, MISSING_OVERRIDE_DECORATOR, OVERRIDE_OF_FINAL_METHOD,
-            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
-            report_overridden_final_method, report_overridden_final_variable,
+            OVERRIDE_OF_FINAL_VARIABLE, report_incompatible_base_method,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
-        enums::{EnumMetadata, enum_metadata},
+        enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
-        list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        list_members::{
+            Member, MemberWithDefinition, all_class_member_names, all_end_of_scope_members,
+        },
         tuple::Tuple,
     },
 };
@@ -69,6 +74,10 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     }
 
     let class_specialized = class.identity_specialization(db);
+    if configuration.check_method_liskov_violations() {
+        check_inherited_method_conflicts(context, class, class_specialized);
+    }
+
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
     let enum_info = enum_metadata(db, class.into());
@@ -87,6 +96,474 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
             &member,
         );
     }
+}
+
+/// Checks that the method selected by the MRO is compatible with the contract of every direct
+/// base class.
+///
+/// The normal override checks only inspect members defined in the subclass itself. With multiple
+/// inheritance, however, a method inherited from an earlier base can override an incompatible
+/// method inherited from a later base.
+fn check_inherited_method_conflicts<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    class_specialized: ClassType<'db>,
+) {
+    let db = context.db();
+    if class.try_mro(db, None).is_err() {
+        return;
+    }
+
+    let direct_bases: Vec<_> = class
+        .explicit_bases(db)
+        .iter()
+        .filter_map(|base| base.to_class_type(db))
+        .collect();
+
+    if direct_bases.len() < 2 {
+        return;
+    }
+
+    // Avoid cascading diagnostics for class definitions that are already invalid because two of
+    // their bases cannot coexist in an MRO (for example, due to incompatible instance layouts or
+    // inheritance from a final class).
+    let constraints = ConstraintSetBuilder::new();
+    if direct_bases.iter().enumerate().any(|(index, left)| {
+        direct_bases[index + 1..]
+            .iter()
+            .any(|right| !left.could_coexist_in_mro_with(db, *right, &constraints))
+    }) {
+        return;
+    }
+
+    let class_instance = Type::instance(db, class_specialized);
+    let has_enum_semantics = is_enum_class_by_inheritance(db, class)
+        || class.explicit_bases(db).iter().any(|base| {
+            base.to_class_type(db)
+                .is_some_and(|base| is_stdlib_enum_class(db, base.class_literal(db)))
+        });
+    let member_candidates = member_candidates_in_direct_bases(db, &direct_bases);
+
+    'members: for (member, base_indices) in member_candidates {
+        let member_name = member.as_str();
+        if is_mangled_private(member_name) || is_constructor_like_method(member_name) {
+            continue;
+        }
+
+        let Some(override_owner) = defining_class_for_member(db, class_specialized, &member) else {
+            continue;
+        };
+        if has_dynamic_member_contract(db, override_owner, &member) {
+            continue;
+        }
+
+        // Enum data-type mixins inherit incompatible dunder methods from the data type and
+        // `Enum`, but class creation resolves them using special enum semantics.
+        if has_enum_semantics && is_enum_rewritten_method(db, class, override_owner, &member) {
+            continue;
+        }
+
+        // Methods defined by the class itself are handled by the normal override pass.
+        if override_owner.class_literal(db) == ClassLiteral::Static(class) {
+            continue;
+        }
+
+        let overridden_bases: SmallVec<[_; 2]> = base_indices
+            .into_iter()
+            .filter_map(|base_index| {
+                let base = direct_bases[base_index];
+                let overridden_owner = defining_class_for_member(db, base, &member)?;
+                if has_dynamic_member_contract(db, overridden_owner, &member) {
+                    return None;
+                }
+                (override_owner != overridden_owner).then_some((base, overridden_owner))
+            })
+            .collect();
+
+        if overridden_bases.is_empty() {
+            continue;
+        }
+
+        let Some(override_type) = class_instance
+            .member(db, &member)
+            .place
+            .ignore_possibly_undefined()
+        else {
+            continue;
+        };
+        if override_type.try_upcast_to_callable(db).is_none() {
+            continue;
+        }
+
+        for (base, overridden_owner) in overridden_bases {
+            let base_instance = Type::instance(db, base);
+
+            let Some(overridden_type) = member_with_receiver_if_needed(
+                db,
+                base_instance,
+                class_instance,
+                overridden_owner,
+                &member,
+            )
+            .place
+            .ignore_possibly_undefined() else {
+                continue;
+            };
+            let Some(overridden_callable) = overridden_type.try_upcast_to_callable(db) else {
+                continue;
+            };
+
+            let overridden_callable_type = overridden_callable.into_type(db);
+            if override_type.is_assignable_to(db, overridden_callable_type) {
+                continue;
+            }
+
+            // If the winning source method was already incompatible with this ancestor on its
+            // defining class, meeting the same contract through another path does not introduce a
+            // new conflict here. Repeat the check with that class as the receiver rather than
+            // assuming that nominal ancestry is sufficient: receiver-specific overloads can
+            // introduce a new conflict only on this subclass.
+            if inherited_conflict_exists_on_owner(db, &member, override_owner, overridden_owner) {
+                continue;
+            }
+
+            report_incompatible_base_method(
+                context,
+                class,
+                &member,
+                (
+                    override_owner,
+                    method_definition(db, override_owner, &member),
+                ),
+                (
+                    overridden_owner,
+                    method_definition(db, overridden_owner, &member),
+                ),
+                || override_type.assignability_error_context(db, overridden_callable_type),
+            );
+            continue 'members;
+        }
+    }
+}
+
+/// Looks up `name` on `instance`, binding receiver-sensitive signatures to `receiver`.
+///
+/// Most method signatures are independent of the concrete receiver. Reusing the ordinary member
+/// lookup for those methods avoids retaining a separate Salsa query result for every subclass.
+fn member_with_receiver_if_needed<'db>(
+    db: &'db dyn Db,
+    instance: Type<'db>,
+    receiver: Type<'db>,
+    owner: ClassType<'db>,
+    name: &Name,
+) -> PlaceAndQualifiers<'db> {
+    let member = instance.member(db, name);
+    let Some(raw_member_type) = owner
+        .own_class_member(db, None, name)
+        .inner
+        .place
+        .raw_type()
+    else {
+        return member;
+    };
+
+    if !raw_member_requires_receiver_aware_lookup(db, raw_member_type) {
+        return member;
+    }
+
+    instance.member_lookup_with_policy_and_receiver(
+        db,
+        name.clone(),
+        MemberLookupPolicy::default(),
+        Some(receiver),
+    )
+}
+
+fn raw_member_requires_receiver_aware_lookup<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::FunctionLiteral(function) => function.signature(db).is_receiver_sensitive(db),
+        Type::Callable(callable)
+            if callable.is_function_like(db)
+                || callable.is_classmethod_like(db)
+                || callable.is_staticmethod_like(db) =>
+        {
+            callable.signatures(db).is_receiver_sensitive(db)
+        }
+        Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+        _ => !ty.class_member(db, "__get__".into()).place.is_undefined(),
+    }
+}
+
+/// Returns the sorted member names exposed by at least two direct bases, together with the bases
+/// that expose each name.
+fn member_candidates_in_direct_bases<'db>(
+    db: &'db dyn Db,
+    direct_bases: &[ClassType<'db>],
+) -> Vec<(Name, SmallVec<[usize; 2]>)> {
+    let mut candidate_bases: FxHashMap<Name, SmallVec<[usize; 2]>> = FxHashMap::default();
+
+    for (base_index, base) in direct_bases.iter().enumerate() {
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "candidate names are sorted before diagnostics are emitted"
+        )]
+        for name in all_class_member_names(db, *base) {
+            candidate_bases.entry(name).or_default().push(base_index);
+        }
+    }
+
+    let mut candidates: Vec<_> = candidate_bases
+        .into_iter()
+        .filter(|(_, bases)| bases.len() > 1)
+        .collect();
+    candidates.sort_unstable_by(|(left, _), (right, _)| left.cmp(right));
+    candidates
+}
+
+/// Returns `true` for method names that `EnumType` replaces during class creation.
+fn is_enum_rewritten_method<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+    override_owner: ClassType<'db>,
+    name: &Name,
+) -> bool {
+    let name_str = name.as_str();
+
+    if Program::get(db).python_version(db) >= PythonVersion::PY311
+        && Type::ClassLiteral(ClassLiteral::Static(class))
+            .is_subtype_of(db, KnownClass::Flag.to_subclass_of(db))
+        && matches!(
+            name_str,
+            "__or__" | "__and__" | "__xor__" | "__ror__" | "__rand__" | "__rxor__" | "__invert__"
+        )
+    {
+        return true;
+    }
+
+    if !matches!(
+        name_str,
+        "__repr__" | "__str__" | "__format__" | "__reduce_ex__"
+    ) {
+        return false;
+    }
+
+    if override_owner.is_known(db, KnownClass::Object) {
+        return true;
+    }
+
+    let data_type = enum_data_type(db, class);
+    if matches!(name_str, "__str__" | "__format__") && class_has_repr_enum_base(db, class) {
+        return data_type.is_some();
+    }
+
+    data_type.is_some_and(|data_type| {
+        defining_class_for_member(db, data_type, name) == Some(override_owner)
+    })
+}
+
+fn class_has_repr_enum_base<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    class.explicit_bases(db).iter().any(|base| {
+        base.to_class_type(db)
+            .is_some_and(|base| is_stdlib_enum_class_named(db, base.class_literal(db), "ReprEnum"))
+    })
+}
+
+/// Returns `true` for a class defined by the standard-library `enum` module.
+///
+/// While checking `enum.pyi` itself, resolving `KnownClass::Enum` can be cyclic. Identifying these
+/// classes by their defining file lets the special Enum construction rules apply there as well.
+fn is_stdlib_enum_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    matches!(
+        class.name(db).as_str(),
+        "Enum" | "ReprEnum" | "IntEnum" | "StrEnum" | "Flag" | "IntFlag"
+    ) && resolve_module_confident(db, &KnownModule::Enum.name())
+        .and_then(|module| module.file(db))
+        .is_some_and(|file| {
+            let class_file = class.file(db);
+            file == class_file
+                || file
+                    .path(db)
+                    .as_system_path()
+                    .zip(class_file.path(db).as_system_path())
+                    .is_some_and(|(left, right)| {
+                        db.system().is_same_file(left, right).unwrap_or(false)
+                    })
+        })
+}
+
+fn is_stdlib_enum_class_named<'db>(db: &'db dyn Db, class: ClassLiteral<'db>, name: &str) -> bool {
+    class.name(db) == name && is_stdlib_enum_class(db, class)
+}
+
+/// Returns the data type selected by `EnumType` for `class`.
+fn enum_data_type<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> Option<ClassType<'db>> {
+    let mut data_type: Option<ClassType<'db>> = None;
+
+    for base in class.explicit_bases(db) {
+        let base = base.to_class_type(db)?;
+        let Some(candidate) = enum_data_type_in_base_mro(db, base) else {
+            continue;
+        };
+        match data_type {
+            Some(existing) if existing.class_literal(db) != candidate.class_literal(db) => {
+                return None;
+            }
+            Some(_) => {}
+            None => data_type = Some(candidate),
+        }
+    }
+
+    data_type
+}
+
+/// Returns the data type contributed by one direct Enum base and its MRO.
+fn enum_data_type_in_base_mro<'db>(
+    db: &'db dyn Db,
+    base: ClassType<'db>,
+) -> Option<ClassType<'db>> {
+    let mut candidate = None;
+
+    for class in base.iter_mro(db).filter_map(ClassBase::into_class) {
+        if class.is_known(db, KnownClass::Object) {
+            continue;
+        }
+
+        if Type::ClassLiteral(class.class_literal(db))
+            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+            || is_stdlib_enum_class(db, class.class_literal(db))
+        {
+            if let Some((enum_class, _)) = class.static_class_literal(db)
+                && let Some(data_type) = enum_data_type(db, enum_class)
+            {
+                return Some(data_type);
+            }
+            continue;
+        }
+
+        let defines_data_type = !class.own_class_member(db, None, "__new__").is_undefined()
+            || !class
+                .own_class_member(db, None, "__dataclass_fields__")
+                .is_undefined();
+        if defines_data_type {
+            return Some(candidate.unwrap_or(class));
+        }
+
+        candidate.get_or_insert(class);
+    }
+
+    None
+}
+
+/// Returns the class that provides the effective class member with the given name.
+fn defining_class_for_member<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    name: &Name,
+) -> Option<ClassType<'db>> {
+    class
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|candidate| !candidate.own_class_member(db, None, name).is_undefined())
+}
+
+/// Returns `true` when the defining class does not provide a statically known contract for
+/// `name`.
+fn has_dynamic_member_contract<'db>(db: &'db dyn Db, owner: ClassType<'db>, name: &Name) -> bool {
+    matches!(
+        owner
+            .own_class_member(db, None, name)
+            .inner
+            .place
+            .raw_type(),
+        Some(Type::Dynamic(_) | Type::Divergent(_))
+    )
+}
+
+/// Returns the source definition if `class` defines `name` as a method.
+fn method_definition<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+    name: &Name,
+) -> Option<Definition<'db>> {
+    let (class_literal, _) = class.static_class_literal(db)?;
+    let scope = class_literal.body_scope(db);
+    let symbol = place_table(db, scope).symbol_id(name)?;
+    if !is_function_definition(db, scope, symbol) {
+        return None;
+    }
+    symbol_definition(db, scope, symbol)
+}
+
+/// Returns `true` if the winning source method was already incompatible with the overridden method
+/// on the class that defines it.
+fn inherited_conflict_exists_on_owner<'db>(
+    db: &'db dyn Db,
+    name: &Name,
+    override_owner: ClassType<'db>,
+    overridden_owner: ClassType<'db>,
+) -> bool {
+    if !override_owner.is_subtype_of_class_literal(db, overridden_owner.class_literal(db)) {
+        return false;
+    }
+    if method_definition(db, override_owner, name).is_none()
+        || overridden_owner.static_class_literal(db).is_none()
+    {
+        return false;
+    }
+
+    let Some(overridden_ancestor) = override_owner
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .find(|ancestor| ancestor.class_literal(db) == overridden_owner.class_literal(db))
+    else {
+        return false;
+    };
+
+    let owner_instance = Type::instance(db, override_owner);
+    let Some(override_type) = owner_instance
+        .member(db, name)
+        .place
+        .ignore_possibly_undefined()
+    else {
+        return false;
+    };
+    if override_type.try_upcast_to_callable(db).is_none() {
+        return false;
+    }
+    let Some(overridden_type) = member_with_receiver_if_needed(
+        db,
+        Type::instance(db, overridden_ancestor),
+        owner_instance,
+        overridden_ancestor,
+        name,
+    )
+    .place
+    .ignore_possibly_undefined() else {
+        return false;
+    };
+    let Some(overridden_callable) = overridden_type.try_upcast_to_callable(db) else {
+        return false;
+    };
+
+    !override_type.is_assignable_to(db, overridden_callable.into_type(db))
+}
+
+/// Returns the source function when the normal override pass checks this member.
+fn checked_override_function<'db>(
+    class_kind: Option<CodeGeneratorKind<'db>>,
+    name: &Name,
+    ty: Type<'db>,
+) -> Option<FunctionType<'db>> {
+    let Type::FunctionLiteral(function) = ty else {
+        return None;
+    };
+    if is_constructor_like_method(name)
+        || (name == "__replace__"
+            && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_))))
+    {
+        return None;
+    }
+    Some(function)
 }
 
 /// Returns the first inherited `NamedTuple` field in the MRO for `field_name`.
@@ -370,8 +847,13 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member =
-                Type::instance(db, superclass).member(db, &member.name);
+            let superclass_instance_member = member_with_receiver_if_needed(
+                db,
+                Type::instance(db, superclass),
+                instance_of_class,
+                superclass,
+                &member.name,
+            );
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
@@ -535,21 +1017,11 @@ fn check_class_declaration<'db>(
                 continue;
             }
 
-            let Type::FunctionLiteral(subclass_function) = member.ty else {
+            let Some(subclass_function) =
+                checked_override_function(class_kind, &member.name, member.ty)
+            else {
                 continue;
             };
-
-            // Constructor methods are not checked for Liskov compliance
-            if is_constructor_like_method(&member.name) {
-                continue;
-            }
-
-            // Synthesized `__replace__` methods on dataclasses are not checked
-            if &member.name == "__replace__"
-                && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
-            {
-                continue;
-            }
 
             let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
             else {
@@ -568,10 +1040,14 @@ fn check_class_declaration<'db>(
             // since the child cannot fix the violation without contradicting its immediate parent's contract.
             // See: https://github.com/astral-sh/ty/issues/2000
             if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-                if immediate_parent != superclass {
+                if immediate_parent != superclass
+                    && immediate_parent
+                        .is_subtype_of_class_literal(db, superclass.class_literal(db))
+                {
                     // The immediate parent already defines this method and is different from the
-                    // current ancestor we're checking. Check if the immediate parent's method
-                    // is also incompatible with this ancestor.
+                    // current ancestor we're checking. Check if the immediate parent's method is
+                    // also incompatible with this ancestor. Unrelated bases must still be checked:
+                    // the subclass is required to satisfy both contracts.
                     if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
                         // The immediate parent already has an LSP violation with this ancestor.
                         // Don't report the same violation for the child.
