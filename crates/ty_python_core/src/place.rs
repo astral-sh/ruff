@@ -163,7 +163,7 @@ pub enum ScopedPlaceId {
     Member(ScopedMemberId),
 }
 
-#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Default, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub struct PlaceTable {
     symbols: SymbolTable,
     members: MemberTable,
@@ -248,6 +248,10 @@ impl PlaceTable {
 
     pub fn member_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
         self.members.place_id_by_instance_attribute_name(name)
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.symbols.is_empty() && self.members.is_empty()
     }
 }
 
@@ -341,17 +345,16 @@ impl PlaceTableBuilder {
             let member = self.member.member(id);
 
             // iterate over parents
-            for parent_id in
-                ParentPlaceIter::for_member(member.expression(), &self.symbols, &self.member)
-            {
-                match parent_id {
-                    ScopedPlaceId::Symbol(scoped_symbol_id) => {
-                        self.associated_symbol_members[scoped_symbol_id].push(id);
-                    }
-                    ScopedPlaceId::Member(scoped_member_id) => {
-                        self.associated_sub_members[scoped_member_id].push(id);
-                    }
+            let mut parent = member.expression().as_ref();
+            while let Some(parent_member) = parent.parent() {
+                if let Some(parent_id) = self.member.member_id(parent_member.clone()) {
+                    self.associated_sub_members[parent_id].push(id);
                 }
+                parent = parent_member;
+            }
+
+            if let Some(parent_id) = self.symbols.symbol_id(parent.symbol_name()) {
+                self.associated_symbol_members[parent_id].push(id);
             }
         }
 

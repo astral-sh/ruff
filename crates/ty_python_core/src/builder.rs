@@ -60,7 +60,7 @@ use crate::use_def::{
     EnclosingSnapshotKey, FlowSnapshot, FutureDefinitions, PreviousDefinitions, ScopedDefinitionId,
     ScopedEnclosingSnapshotId, UseDefMapBuilder,
 };
-use crate::{Db, Statement, StatementNodeKey};
+use crate::{Db, PlaceTable, Statement, StatementNodeKey};
 use crate::{
     DefinitionsByNode, EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken,
     NarrowingAliasPredicate, PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter,
@@ -2494,10 +2494,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         assert_eq!(&self.current_assignments, &[]);
 
+        let empty_place_table = Arc::new(PlaceTable::default());
         let mut place_tables: IndexVec<_, _> = self
             .place_tables
             .into_iter()
-            .map(|builder| Arc::new(builder.finish()))
+            .map(|builder| {
+                let table = builder.finish();
+                if table.is_empty() {
+                    Arc::clone(&empty_place_table)
+                } else {
+                    Arc::new(table)
+                }
+            })
             .collect();
 
         let mut use_def_maps: IndexVec<_, _> = self
@@ -2512,6 +2520,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place_tables.shrink_to_fit();
         use_def_maps.shrink_to_fit();
         self.scope_ids_by_scope.shrink_to_fit();
+        self.expressions_by_node.shrink_to_fit();
+        self.statements_by_node.shrink_to_fit();
+        self.scopes_by_node.shrink_to_fit();
         let mut semantic_syntax_errors = self.semantic_syntax_errors.into_inner();
         semantic_syntax_errors.shrink_to_fit();
         let uses_by_collection = FrozenMap::from_entries(

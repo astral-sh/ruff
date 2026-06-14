@@ -4,7 +4,6 @@ use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHasher;
 use std::hash::{Hash as _, Hasher as _};
-use std::ops::{Deref, DerefMut};
 
 /// Uniquely identifies a symbol in a given scope.
 #[newtype_index]
@@ -158,16 +157,98 @@ impl Symbol {
 ///
 /// Allows lookup by name and a symbol's ID.
 #[derive(Default, get_size2::GetSize)]
-pub(super) struct SymbolTable {
+pub(super) enum SymbolTable {
+    #[default]
+    Empty,
+    Single(Symbol),
+    Many {
+        symbols: IndexVec<ScopedSymbolId, Symbol>,
+
+        /// Map from symbol name to its ID.
+        ///
+        /// Uses a hash table to avoid storing the name twice.
+        lookup: hashbrown::HashTable<ScopedSymbolId>,
+    },
+}
+
+impl SymbolTable {
+    /// Look up a symbol by its ID.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this symbol table.
+    #[track_caller]
+    pub(crate) fn symbol(&self, id: ScopedSymbolId) -> &Symbol {
+        match self {
+            Self::Empty => panic!("Invalid symbol ID {id:?} for empty symbol table"),
+            Self::Single(symbol) if id == ScopedSymbolId::from_usize(0) => symbol,
+            Self::Single(_) => panic!("Invalid symbol ID {id:?} for single-entry symbol table"),
+            Self::Many { symbols, .. } => &symbols[id],
+        }
+    }
+
+    /// Look up the ID of a symbol by its name.
+    pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
+        match self {
+            Self::Empty => None,
+            Self::Single(symbol) => (symbol.name == name).then_some(ScopedSymbolId::from_usize(0)),
+            Self::Many { symbols, lookup } => lookup
+                .find(Self::hash_name(name), |id| symbols[*id].name == name)
+                .copied(),
+        }
+    }
+
+    /// Iterate over the symbols in this symbol table.
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Symbol> {
+        self.as_slice().iter()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    fn as_slice(&self) -> &[Symbol] {
+        match self {
+            Self::Empty => &[],
+            Self::Single(symbol) => std::slice::from_ref(symbol),
+            Self::Many { symbols, .. } => &symbols.raw,
+        }
+    }
+
+    fn hash_name(name: &str) -> u64 {
+        let mut h = FxHasher::default();
+        name.hash(&mut h);
+        h.finish()
+    }
+}
+
+impl PartialEq for SymbolTable {
+    fn eq(&self, other: &Self) -> bool {
+        // It's sufficient to compare the symbols as the map is only a reverse lookup.
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for SymbolTable {}
+
+impl std::fmt::Debug for SymbolTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("SymbolTable")
+            .field(&self.as_slice())
+            .finish()
+    }
+}
+
+#[derive(Debug, Default)]
+pub(super) struct SymbolTableBuilder {
     symbols: IndexVec<ScopedSymbolId, Symbol>,
 
     /// Map from symbol name to its ID.
     ///
     /// Uses a hash table to avoid storing the name twice.
-    map: hashbrown::HashTable<ScopedSymbolId>,
+    lookup: hashbrown::HashTable<ScopedSymbolId>,
 }
 
-impl SymbolTable {
+impl SymbolTableBuilder {
     /// Look up a symbol by its ID.
     ///
     /// ## Panics
@@ -188,8 +269,10 @@ impl SymbolTable {
 
     /// Look up the ID of a symbol by its name.
     pub(crate) fn symbol_id(&self, name: &str) -> Option<ScopedSymbolId> {
-        self.map
-            .find(Self::hash_name(name), |id| self.symbols[*id].name == name)
+        self.lookup
+            .find(SymbolTable::hash_name(name), |id| {
+                self.symbols[*id].name == name
+            })
             .copied()
     }
 
@@ -198,41 +281,13 @@ impl SymbolTable {
         self.symbols.iter()
     }
 
-    fn hash_name(name: &str) -> u64 {
-        let mut h = FxHasher::default();
-        name.hash(&mut h);
-        h.finish()
-    }
-}
-
-impl PartialEq for SymbolTable {
-    fn eq(&self, other: &Self) -> bool {
-        // It's sufficient to compare the symbols as the map is only a reverse lookup.
-        self.symbols == other.symbols
-    }
-}
-
-impl Eq for SymbolTable {}
-
-impl std::fmt::Debug for SymbolTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("SymbolTable").field(&self.symbols).finish()
-    }
-}
-
-#[derive(Debug, Default)]
-pub(super) struct SymbolTableBuilder {
-    table: SymbolTable,
-}
-
-impl SymbolTableBuilder {
     /// Add a new symbol to this scope or update the flags if a symbol with the same name already exists.
     pub(super) fn add(&mut self, mut symbol: Symbol) -> (ScopedSymbolId, bool) {
         let hash = SymbolTable::hash_name(symbol.name());
-        let entry = self.table.map.entry(
+        let entry = self.lookup.entry(
             hash,
-            |id| &self.table.symbols[*id].name == symbol.name(),
-            |id| SymbolTable::hash_name(&self.table.symbols[*id].name),
+            |id| &self.symbols[*id].name == symbol.name(),
+            |id| SymbolTable::hash_name(&self.symbols[*id].name),
         );
 
         match entry {
@@ -247,7 +302,7 @@ impl SymbolTableBuilder {
             }
             Entry::Vacant(entry) => {
                 symbol.name.shrink_to_fit();
-                let id = self.table.symbols.push(symbol);
+                let id = self.symbols.push(symbol);
                 entry.insert(id);
                 (id, true)
             }
@@ -255,25 +310,19 @@ impl SymbolTableBuilder {
     }
 
     pub(super) fn build(self) -> SymbolTable {
-        let mut table = self.table;
-        table.symbols.shrink_to_fit();
-        table
-            .map
-            .shrink_to_fit(|id| SymbolTable::hash_name(&table.symbols[*id].name));
-        table
-    }
-}
+        let Self {
+            mut symbols,
+            mut lookup,
+        } = self;
 
-impl Deref for SymbolTableBuilder {
-    type Target = SymbolTable;
-
-    fn deref(&self) -> &Self::Target {
-        &self.table
-    }
-}
-
-impl DerefMut for SymbolTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
+        match symbols.len() {
+            0 => SymbolTable::Empty,
+            1 => SymbolTable::Single(symbols.into_iter().next().unwrap()),
+            _ => {
+                symbols.shrink_to_fit();
+                lookup.shrink_to_fit(|id| SymbolTable::hash_name(&symbols[*id].name));
+                SymbolTable::Many { symbols, lookup }
+            }
+        }
     }
 }

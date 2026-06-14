@@ -9,7 +9,6 @@ use smallvec::SmallVec;
 
 use std::fmt::Write as _;
 use std::hash::{Hash, Hasher as _};
-use std::ops::{Deref, DerefMut};
 
 /// A member access, e.g. `x.y` or `x[1]` or `x["foo"]`.
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -421,16 +420,115 @@ pub struct ScopedMemberId;
 
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].
 #[derive(Default, get_size2::GetSize)]
-pub(super) struct MemberTable {
+pub(super) enum MemberTable {
+    #[default]
+    Empty,
+    Single(Member),
+    Many {
+        members: IndexVec<ScopedMemberId, Member>,
+
+        /// Map from member path to its ID.
+        ///
+        /// Uses a hash table to avoid storing the path twice.
+        lookup: hashbrown::HashTable<ScopedMemberId>,
+    },
+}
+
+impl MemberTable {
+    /// Returns the member with the given ID.
+    ///
+    /// ## Panics
+    /// If the ID is not valid for this table.
+    #[track_caller]
+    pub(crate) fn member(&self, id: ScopedMemberId) -> &Member {
+        match self {
+            Self::Empty => panic!("Invalid member ID {id:?} for empty member table"),
+            Self::Single(member) if id == ScopedMemberId::from_usize(0) => member,
+            Self::Single(_) => panic!("Invalid member ID {id:?} for single-entry member table"),
+            Self::Many { members, .. } => &members[id],
+        }
+    }
+
+    /// Returns an iterator over all members in the table.
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Member> {
+        self.as_slice().iter()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    fn as_slice(&self) -> &[Member] {
+        match self {
+            Self::Empty => &[],
+            Self::Single(member) => std::slice::from_ref(member),
+            Self::Many { members, .. } => &members.raw,
+        }
+    }
+
+    fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
+        hash_single(member)
+    }
+
+    /// Returns the ID of the member with the given expression, if it exists.
+    pub(crate) fn member_id<'a>(
+        &self,
+        member: impl Into<MemberExprRef<'a>>,
+    ) -> Option<ScopedMemberId> {
+        let member = member.into();
+        match self {
+            Self::Empty => None,
+            Self::Single(existing) => {
+                (existing.expression == member).then_some(ScopedMemberId::from_usize(0))
+            }
+            Self::Many { members, lookup } => {
+                let hash = Self::hash_member_expression_ref(&member);
+                lookup
+                    .find(hash, |id| members[*id].expression == member)
+                    .copied()
+            }
+        }
+    }
+
+    pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
+        for (index, member) in self.iter().enumerate() {
+            if member.is_instance_attribute_named(name) {
+                return Some(ScopedMemberId::from_usize(index));
+            }
+        }
+
+        None
+    }
+}
+
+impl PartialEq for MemberTable {
+    fn eq(&self, other: &Self) -> bool {
+        // It's sufficient to compare the members as the map is only a reverse lookup.
+        self.as_slice() == other.as_slice()
+    }
+}
+
+impl Eq for MemberTable {}
+
+impl std::fmt::Debug for MemberTable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("MemberTable")
+            .field(&self.as_slice())
+            .finish()
+    }
+}
+
+#[derive(Debug, Default)]
+pub(super) struct MemberTableBuilder {
     members: IndexVec<ScopedMemberId, Member>,
 
     /// Map from member path to its ID.
     ///
     /// Uses a hash table to avoid storing the path twice.
-    map: hashbrown::HashTable<ScopedMemberId>,
+    lookup: hashbrown::HashTable<ScopedMemberId>,
 }
 
-impl MemberTable {
+impl MemberTableBuilder {
     /// Returns the member with the given ID.
     ///
     /// ## Panics
@@ -454,65 +552,29 @@ impl MemberTable {
         self.members.iter()
     }
 
-    fn hash_member_expression_ref(member: &MemberExprRef) -> u64 {
-        hash_single(member)
-    }
-
     /// Returns the ID of the member with the given expression, if it exists.
     pub(crate) fn member_id<'a>(
         &self,
         member: impl Into<MemberExprRef<'a>>,
     ) -> Option<ScopedMemberId> {
         let member = member.into();
-        let hash = Self::hash_member_expression_ref(&member);
-        self.map
+        let hash = MemberTable::hash_member_expression_ref(&member);
+        self.lookup
             .find(hash, |id| self.members[*id].expression == member)
             .copied()
     }
 
-    pub(crate) fn place_id_by_instance_attribute_name(&self, name: &str) -> Option<ScopedMemberId> {
-        for (id, member) in self.members.iter_enumerated() {
-            if member.is_instance_attribute_named(name) {
-                return Some(id);
-            }
-        }
-
-        None
-    }
-}
-
-impl PartialEq for MemberTable {
-    fn eq(&self, other: &Self) -> bool {
-        // It's sufficient to compare the members as the map is only a reverse lookup.
-        self.members == other.members
-    }
-}
-
-impl Eq for MemberTable {}
-
-impl std::fmt::Debug for MemberTable {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("MemberTable").field(&self.members).finish()
-    }
-}
-
-#[derive(Debug, Default)]
-pub(super) struct MemberTableBuilder {
-    table: MemberTable,
-}
-
-impl MemberTableBuilder {
     /// Adds a member to the table or updates the flags of an existing member if it already exists.
     ///
     /// Members are identified by their expression, which is hashed to find the entry in the table.
     pub(super) fn add(&mut self, mut member: Member) -> (ScopedMemberId, bool) {
         let member_ref = member.expression.as_ref();
         let hash = MemberTable::hash_member_expression_ref(&member_ref);
-        let entry = self.table.map.entry(
+        let entry = self.lookup.entry(
             hash,
-            |id| self.table.members[*id].expression.as_ref() == member.expression.as_ref(),
+            |id| self.members[*id].expression.as_ref() == member.expression.as_ref(),
             |id| {
-                let ref_expr = self.table.members[*id].expression.as_ref();
+                let ref_expr = self.members[*id].expression.as_ref();
                 MemberTable::hash_member_expression_ref(&ref_expr)
             },
         );
@@ -530,7 +592,7 @@ impl MemberTableBuilder {
             Entry::Vacant(entry) => {
                 member.expression.shrink_to_fit();
 
-                let id = self.table.members.push(member);
+                let id = self.members.push(member);
                 entry.insert(id);
                 (id, true)
             }
@@ -538,27 +600,23 @@ impl MemberTableBuilder {
     }
 
     pub(super) fn build(self) -> MemberTable {
-        let mut table = self.table;
-        table.members.shrink_to_fit();
-        table.map.shrink_to_fit(|id| {
-            let ref_expr = table.members[*id].expression.as_ref();
-            MemberTable::hash_member_expression_ref(&ref_expr)
-        });
-        table
-    }
-}
+        let Self {
+            mut members,
+            mut lookup,
+        } = self;
 
-impl Deref for MemberTableBuilder {
-    type Target = MemberTable;
-
-    fn deref(&self) -> &Self::Target {
-        &self.table
-    }
-}
-
-impl DerefMut for MemberTableBuilder {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.table
+        match members.len() {
+            0 => MemberTable::Empty,
+            1 => MemberTable::Single(members.into_iter().next().unwrap()),
+            _ => {
+                members.shrink_to_fit();
+                lookup.shrink_to_fit(|id| {
+                    let ref_expr = members[*id].expression.as_ref();
+                    MemberTable::hash_member_expression_ref(&ref_expr)
+                });
+                MemberTable::Many { members, lookup }
+            }
+        }
     }
 }
 
