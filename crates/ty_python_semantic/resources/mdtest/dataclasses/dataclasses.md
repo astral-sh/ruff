@@ -621,6 +621,13 @@ class WithHashAssignment:
     # error: [invalid-dataclass-override] "Cannot overwrite attribute `__hash__` in dataclass `WithHashAssignment` with `unsafe_hash=True`"
     __hash__ = None
 
+@dataclass(unsafe_hash=True)
+class WithImplicitHashAssignment:
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, WithImplicitHashAssignment)
+
+    __hash__ = None
+
 @dataclass
 class WithoutUnsafeHash:
     def __hash__(self) -> int:

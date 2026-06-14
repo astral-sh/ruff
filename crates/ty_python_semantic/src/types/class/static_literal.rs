@@ -1882,36 +1882,47 @@ impl<'db> StaticClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
 
-            if name == "__hash__"
-                && let CodeGeneratorKind::DataclassLike(_) = field_policy
-                && self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH)
-            {
-                let binding =
-                    place_from_bindings(db, use_def.end_of_scope_symbol_bindings(symbol_id));
-                if let Some(definition) = binding.first_definition
-                    && let Some(builder) = context.report_lint(
-                        &INVALID_DATACLASS_OVERRIDE,
-                        definition.focus_range(db, context.module()),
-                    )
-                {
-                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                        "Cannot overwrite attribute `__hash__` in dataclass `{}` with `unsafe_hash=True`",
-                        self.name(db)
-                    ));
-                    diagnostic.info(name);
-                }
-                continue;
-            }
-
-            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
-            else {
-                continue;
-            };
-
             match name.as_str() {
+                "__hash__" => {
+                    if let CodeGeneratorKind::DataclassLike(_) = field_policy
+                        && self.has_dataclass_param(db, field_policy, DataclassFlags::UNSAFE_HASH)
+                    {
+                        let binding = place_from_bindings(
+                            db,
+                            use_def.end_of_scope_symbol_bindings(symbol_id),
+                        );
+                        let is_implicit_hash = binding
+                            .place
+                            .ignore_possibly_undefined()
+                            .is_some_and(|ty| ty.is_none(db))
+                            && table.symbol_id("__eq__").is_some_and(|symbol_id| {
+                                place_from_bindings(
+                                    db,
+                                    use_def.end_of_scope_symbol_bindings(symbol_id),
+                                )
+                                .place
+                                .is_definitely_bound()
+                            });
+                        if !is_implicit_hash
+                            && let Some(definition) = binding.first_definition
+                            && let Some(builder) = context.report_lint(
+                                &INVALID_DATACLASS_OVERRIDE,
+                                definition.focus_range(db, context.module()),
+                            )
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot overwrite attribute `__hash__` in dataclass `{}` with `unsafe_hash=True`",
+                                self.name(db)
+                            ));
+                            diagnostic.info(name);
+                        }
+                    }
+                }
                 "__setattr__" | "__delattr__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
                         && self.is_frozen_dataclass(db) == Some(true)
+                        && let Some(Type::FunctionLiteral(literal)) =
+                            attr.place.ignore_possibly_undefined()
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,
@@ -1929,6 +1940,8 @@ impl<'db> StaticClassLiteral<'db> {
                 "__lt__" | "__le__" | "__gt__" | "__ge__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
                         && self.has_dataclass_param(db, field_policy, DataclassFlags::ORDER)
+                        && let Some(Type::FunctionLiteral(literal)) =
+                            attr.place.ignore_possibly_undefined()
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,
