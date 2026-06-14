@@ -609,6 +609,7 @@ Defining `__hash__` when `unsafe_hash=True` raises an error:
 
 ```py
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 @dataclass(unsafe_hash=True)
 class WithExplicitHash:
@@ -628,10 +629,42 @@ class WithImplicitHashAssignment:
 
     __hash__ = None
 
-@dataclass
-class WithoutUnsafeHash:
-    def __hash__(self) -> int:
-        return 0
+@dataclass(unsafe_hash=True)
+class WithTypeCheckingOnlyHash:
+    if TYPE_CHECKING:
+        def __hash__(self) -> int:
+            return 0
+
+@dataclass(unsafe_hash=True)
+class WithTypeCheckingOnlyEq:
+    if TYPE_CHECKING:
+        def __eq__(self, other: object) -> bool:
+            return False
+
+    __hash__ = None  # TODO: error: [invalid-dataclass-override]
+
+def conditional_dataclass(condition: bool) -> None:
+    @dataclass(unsafe_hash=True)
+    class WithConditionalImplicitHash:
+        if condition:
+            def __eq__(self, other: object) -> bool:
+                return False
+
+            __hash__ = None
+
+    @dataclass(unsafe_hash=True)
+    class WithConditionalExplicitHash:
+        if condition:
+            # TODO: error: [invalid-dataclass-override]
+            def __hash__(self) -> int:
+                return 0
+
+@dataclass(unsafe_hash=True)
+class WithNotTypeCheckingHash:
+    if not TYPE_CHECKING:
+        # TODO: error: [invalid-dataclass-override]
+        def __hash__(self) -> int:
+            return 0
 ```
 
 ### `frozen`
