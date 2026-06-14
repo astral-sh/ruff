@@ -692,15 +692,6 @@ Module(
    |
 
 
-   |
-26 | # Sequence pattern can contain at most one star pattern
-27 | match subject:
-28 |     case [*head, middle, *tail]:
-   |                          ^^^^^ Syntax Error: Multiple starred names in sequence pattern
-29 |         pass
-   |
-
-
 ## Semantic Syntax Errors
 
    |
@@ -720,4 +711,13 @@ Module(
    |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
 12 |         pass
 13 |     case Foo(*_):
+   |
+
+
+   |
+26 | # Sequence pattern can contain at most one star pattern
+27 | match subject:
+28 |     case [*head, middle, *tail]:
+   |                          ^^^^^ Syntax Error: multiple starred names in sequence pattern
+29 |         pass
    |

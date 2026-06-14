@@ -138,8 +138,6 @@ pub enum ParseErrorType {
     InvalidStarredExpressionUsage,
     /// A star pattern was found outside a sequence pattern.
     InvalidStarPatternUsage,
-    /// Multiple star patterns were found in a sequence pattern.
-    MultipleStarredNamesInSequencePattern,
 
     /// A parameter was found after a vararg.
     ParamAfterVarKeywordParam,
@@ -303,9 +301,6 @@ impl std::fmt::Display for ParseErrorType {
             }
             ParseErrorType::InvalidStarPatternUsage => {
                 f.write_str("Star pattern cannot be used here")
-            }
-            ParseErrorType::MultipleStarredNamesInSequencePattern => {
-                f.write_str("Multiple starred names in sequence pattern")
             }
             ParseErrorType::ExpectedRealNumber => {
                 f.write_str("Expected a real number in complex literal pattern")

@@ -1301,6 +1301,9 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::MultipleCaseAssignment(name) => {
                 write!(f, "multiple assignments to name `{name}` in pattern")
             }
+            SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern => {
+                f.write_str("multiple starred names in sequence pattern")
+            }
             SemanticSyntaxErrorKind::IrrefutableCasePattern(kind) => match kind {
                 // These error messages are taken from CPython's syntax errors
                 IrrefutablePatternKind::Name(name) => {
@@ -1522,6 +1525,16 @@ pub enum SemanticSyntaxErrorKind {
     ///     case Class(x=1, x=2): ...
     /// ```
     MultipleCaseAssignment(ast::name::Name),
+
+    /// Represents multiple starred names in a sequence pattern.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// match x:
+    ///     case [*head, middle, *tail]: ...
+    /// ```
+    MultipleStarredNamesInSequencePattern,
 
     /// Represents an irrefutable `case` pattern before the last `case` in a `match` statement.
     ///
@@ -2109,6 +2122,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
         //     case Class(y=x, z=x): ...  # MatchClass keyword
         //     case [x] | {1: x} | Class(y=x, z=x): ...  # MatchOr
         //     case x as x: ...  # MatchAs
+
+        // test_err multiple_starred_names_in_sequence_pattern
+        // match subject:
+        //     case *first, *second, *third: ...
         match pattern {
             Pattern::MatchValue(_) | Pattern::MatchSingleton(_) => {}
             Pattern::MatchStar(ast::PatternMatchStar { name, .. }) => {
@@ -2117,7 +2134,18 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 }
             }
             Pattern::MatchSequence(ast::PatternMatchSequence { patterns, .. }) => {
+                let mut seen_star_pattern = false;
                 for pattern in patterns {
+                    if pattern.is_match_star() {
+                        if seen_star_pattern {
+                            SemanticSyntaxChecker::add_error(
+                                self.ctx,
+                                SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern,
+                                pattern.range(),
+                            );
+                        }
+                        seen_star_pattern = true;
+                    }
                     self.visit_pattern(pattern);
                 }
             }

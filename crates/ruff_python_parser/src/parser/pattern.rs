@@ -384,24 +384,11 @@ impl Parser<'_> {
             self.expect(TokenKind::Comma);
         }
 
-        let mut seen_star_pattern = first_element.is_match_star();
         let mut patterns = vec![first_element];
 
         self.parse_comma_separated_list(
             RecoveryContextKind::SequenceMatchPattern(parentheses),
-            |parser| {
-                let pattern = parser.parse_match_pattern(AllowStarPattern::Yes);
-                if pattern.is_match_star() {
-                    if seen_star_pattern {
-                        parser.add_error(
-                            ParseErrorType::MultipleStarredNamesInSequencePattern,
-                            &pattern,
-                        );
-                    }
-                    seen_star_pattern = true;
-                }
-                patterns.push(pattern);
-            },
+            |parser| patterns.push(parser.parse_match_pattern(AllowStarPattern::Yes)),
         );
 
         if let Some(parentheses) = parentheses {
