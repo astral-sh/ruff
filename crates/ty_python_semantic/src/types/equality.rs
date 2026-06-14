@@ -154,6 +154,116 @@ pub(crate) fn equality_truthiness<'db>(
     }
 }
 
+/// Return whether some value represented by `left` may compare equal to some value represented by
+/// `right`.
+///
+/// This is conservative: it only returns `false` when known comparison semantics prove that the
+/// equality comparison is always false. Unknown or custom comparison behavior therefore returns
+/// `true`.
+pub(super) fn may_compare_equal<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
+    let left = left.resolve_type_alias(db);
+    let right = right.resolve_type_alias(db);
+
+    if left.is_never() || right.is_never() {
+        return false;
+    }
+
+    // Decompose unions before checking for overlap so compatibility probes can short-circuit
+    // without first comparing every pair of union elements.
+    match (left, right) {
+        (Type::Union(union), other) => {
+            return union
+                .elements(db)
+                .iter()
+                .any(|element| may_compare_equal(db, *element, other));
+        }
+        (other, Type::Union(union)) => {
+            return union
+                .elements(db)
+                .iter()
+                .any(|element| may_compare_equal(db, other, *element));
+        }
+        _ => {}
+    }
+
+    if !left.is_disjoint_from(db, right) {
+        return true;
+    }
+
+    match (left, right) {
+        (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                may_compare_equal(db, constraints.as_type(db), other)
+            }
+            None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => true,
+        },
+        (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                may_compare_equal(db, other, constraints.as_type(db))
+            }
+            None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => true,
+        },
+
+        (Type::NewTypeInstance(newtype), other) => {
+            may_compare_equal(db, newtype.concrete_base_type(db), other)
+        }
+        (other, Type::NewTypeInstance(newtype)) => {
+            may_compare_equal(db, other, newtype.concrete_base_type(db))
+        }
+
+        (Type::Intersection(intersection), other) => {
+            let positive = intersection.positive(db);
+            positive.is_empty()
+                || positive
+                    .iter()
+                    .any(|element| may_compare_equal(db, *element, other))
+        }
+
+        (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+            known_literal_equality(db, left.kind(), right.kind(), ComparisonOperator::Equality)
+                .unwrap_or(true)
+        }
+        (Type::LiteralValue(literal), other) | (other, Type::LiteralValue(literal)) => {
+            compare_literal_to_other(
+                db,
+                Type::LiteralValue(literal),
+                literal.kind(),
+                other,
+                true,
+                ComparisonOperator::Equality,
+                true,
+            ) != ComparisonResult::AlwaysFalse
+        }
+
+        (Type::TypedDict(_), Type::TypedDict(_)) => true,
+        (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => matches!(
+            KnownComparisonSemantics::of_type(db, other, ComparisonOperator::Equality),
+            Some(KnownComparisonSemantics::Dict) | None
+        ),
+
+        (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => {
+            left.module(db) == right.module(db)
+        }
+        (left, right)
+            if has_known_identity_comparison_semantics(db, left, ComparisonOperator::Equality)
+                && has_known_identity_comparison_semantics(
+                    db,
+                    right,
+                    ComparisonOperator::Equality,
+                ) =>
+        {
+            left == right
+        }
+
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+            compare_nominal_instances(db, left, right, ComparisonOperator::Equality)
+                != ComparisonResult::AlwaysFalse
+        }
+
+        _ => true,
+    }
+}
+
 /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
 ///
 /// `is_positive` selects the branch whose constraint is accumulated when either operand expands
