@@ -41,6 +41,7 @@ pub enum KnownClass {
     Object,
     Bytes,
     Bytearray,
+    Memoryview,
     Type,
     Int,
     Float,
@@ -48,6 +49,7 @@ pub enum KnownClass {
     Str,
     List,
     Tuple,
+    Range,
     Set,
     FrozenSet,
     Dict,
@@ -219,6 +221,8 @@ impl KnownClass {
             | Self::Type
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::FrozenSet
             | Self::Property
             | Self::SpecialForm
@@ -283,6 +287,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -383,6 +389,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -484,6 +492,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -606,6 +616,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -698,6 +710,8 @@ impl KnownClass {
             | KnownClass::Object
             | KnownClass::Bytes
             | KnownClass::Bytearray
+            | KnownClass::Memoryview
+            | KnownClass::Range
             | KnownClass::Type
             | KnownClass::Int
             | KnownClass::Float
@@ -796,7 +810,9 @@ impl KnownClass {
             Self::Object => "object",
             Self::Bytes => "bytes",
             Self::Bytearray => "bytearray",
+            Self::Memoryview => "memoryview",
             Self::Tuple => "tuple",
+            Self::Range => "range",
             Self::Int => "int",
             Self::Float => "float",
             Self::Complex => "complex",
@@ -1158,6 +1174,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1274,6 +1292,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float
@@ -1378,6 +1398,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Tuple
             | Self::Int
             | Self::Float
@@ -1479,7 +1501,9 @@ impl KnownClass {
             "object" => &[Self::Object],
             "bytes" => &[Self::Bytes],
             "bytearray" => &[Self::Bytearray],
+            "memoryview" => &[Self::Memoryview],
             "tuple" => &[Self::Tuple],
+            "range" => &[Self::Range],
             "type" => &[Self::Type],
             "int" => &[Self::Int],
             "float" => &[Self::Float],
@@ -1586,6 +1610,8 @@ impl KnownClass {
             | Self::Object
             | Self::Bytes
             | Self::Bytearray
+            | Self::Memoryview
+            | Self::Range
             | Self::Type
             | Self::Int
             | Self::Float

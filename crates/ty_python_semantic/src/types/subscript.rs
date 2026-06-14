@@ -4,7 +4,6 @@ use std::fmt::{self, Display};
 
 use itertools::Itertools;
 use ruff_python_ast as ast;
-use ty_module_resolver::{KnownModule, file_to_module};
 
 use crate::Db;
 use crate::subscript::{PyIndex, PySlice};
@@ -20,7 +19,7 @@ use super::diagnostic::{
     report_not_subscriptable, report_slice_step_size_zero,
 };
 use super::infer::TypeContext;
-use super::instance::{NominalInstanceType, SliceLiteral};
+use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
@@ -523,18 +522,6 @@ fn typed_dict_subscript<'db>(
     )
 }
 
-fn builtin_sequence_rejects_zero_step<'db>(
-    db: &'db dyn Db,
-    instance: NominalInstanceType<'db>,
-) -> bool {
-    let class = instance.class_literal(db);
-    matches!(
-        class.name(db).as_str(),
-        "list" | "bytearray" | "memoryview" | "range" | "bytes" | "str"
-    ) && file_to_module(db, class.file(db))
-        .is_some_and(|module| module.is_known(db, KnownModule::Builtins))
-}
-
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -599,7 +586,18 @@ impl<'db> Type<'db> {
             (
                 Type::NominalInstance(maybe_sequence_nominal),
                 Type::NominalInstance(maybe_slice_nominal),
-            ) if builtin_sequence_rejects_zero_step(db, maybe_sequence_nominal)
+            ) if matches!(
+                maybe_sequence_nominal.known_class(db),
+                Some(
+                    KnownClass::List
+                        | KnownClass::Tuple
+                        | KnownClass::Str
+                        | KnownClass::Bytes
+                        | KnownClass::Bytearray
+                        | KnownClass::Range
+                        | KnownClass::Memoryview
+                )
+            )
                 && maybe_slice_nominal
                     .slice_literal(db)
                     .is_some_and(|slice| slice.step == Some(0)) =>
