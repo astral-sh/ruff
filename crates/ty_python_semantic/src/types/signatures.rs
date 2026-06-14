@@ -133,6 +133,16 @@ impl<'db> PartialSignatureApplication<'db> {
 }
 
 impl<'db> CallableSignature<'db> {
+    /// Returns `true` if binding this callable to a different receiver can change its signatures.
+    pub(crate) fn is_receiver_sensitive(&self, db: &'db dyn Db) -> bool {
+        let has_multiple_overloads = self.overloads.len() > 1;
+        self.overloads.iter().any(|signature| {
+            signature.needs_self_mapping(db, false)
+                || (has_multiple_overloads
+                    && signature.has_explicit_positional_receiver_annotation())
+        })
+    }
+
     pub(crate) fn single(signature: Signature<'db>) -> Self {
         Self {
             overloads: smallvec_inline![signature],

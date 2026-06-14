@@ -665,6 +665,18 @@ class OtherReceiverPath(ReceiverOverloads): ...
 # The receiver-specific overload only applies after the two paths meet again.
 class FinalReceiver(ReceiverOverride, OtherReceiverPath): ...  # error: [invalid-method-override]
 
+condition: bool
+
+class ConditionalSelfMethod:
+    if condition:
+        def copy(self) -> Self: ...
+
+    else:
+        def copy(self) -> Self: ...
+
+class ConditionalSelfOverride(ConditionalSelfMethod):
+    def copy(self) -> ConditionalSelfMethod: ...  # error: [invalid-method-override]
+
 class BrokenIntReturn(IntReturn):
     def method(self) -> str: ...  # error: [invalid-method-override]
 

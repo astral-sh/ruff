@@ -178,15 +178,10 @@ fn check_inherited_method_conflicts<'db>(
                 continue;
             }
 
-            let Some(overridden_type) = base_instance
-                .member_lookup_with_policy_and_receiver(
-                    db,
-                    member.clone(),
-                    MemberLookupPolicy::default(),
-                    Some(class_instance),
-                )
-                .place
-                .ignore_possibly_undefined()
+            let Some(overridden_type) =
+                member_with_receiver_if_needed(db, base_instance, class_instance, &member)
+                    .place
+                    .ignore_possibly_undefined()
             else {
                 continue;
             };
@@ -224,6 +219,50 @@ fn check_inherited_method_conflicts<'db>(
             );
             continue 'members;
         }
+    }
+}
+
+/// Looks up `name` on `instance`, binding receiver-sensitive signatures to `receiver`.
+///
+/// Most method signatures are independent of the concrete receiver. Reusing the ordinary member
+/// lookup for those methods avoids retaining a separate Salsa query result for every subclass.
+fn member_with_receiver_if_needed<'db>(
+    db: &'db dyn Db,
+    instance: Type<'db>,
+    receiver: Type<'db>,
+    name: &Name,
+) -> PlaceAndQualifiers<'db> {
+    let member = instance.member(db, name);
+    if !member
+        .place
+        .raw_type()
+        .is_some_and(|ty| contains_receiver_sensitive_bound_method(db, ty))
+    {
+        return member;
+    }
+
+    instance.member_lookup_with_policy_and_receiver(
+        db,
+        name.clone(),
+        MemberLookupPolicy::default(),
+        Some(receiver),
+    )
+}
+
+fn contains_receiver_sensitive_bound_method<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::BoundMethod(method) => method.function(db).signature(db).is_receiver_sensitive(db),
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .copied()
+            .any(|element| contains_receiver_sensitive_bound_method(db, element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .copied()
+            .any(|element| contains_receiver_sensitive_bound_method(db, element)),
+        _ => false,
     }
 }
 
@@ -300,16 +339,14 @@ fn inherited_conflict_already_reported<'db>(
     if override_type.try_upcast_to_callable(db).is_none() {
         return false;
     }
-    let Some(overridden_type) = Type::instance(db, overridden_ancestor)
-        .member_lookup_with_policy_and_receiver(
-            db,
-            name.clone(),
-            MemberLookupPolicy::default(),
-            Some(owner_instance),
-        )
-        .place
-        .ignore_possibly_undefined()
-    else {
+    let Some(overridden_type) = member_with_receiver_if_needed(
+        db,
+        Type::instance(db, overridden_ancestor),
+        owner_instance,
+        name,
+    )
+    .place
+    .ignore_possibly_undefined() else {
         return false;
     };
     let Some(overridden_callable) = overridden_type.try_upcast_to_callable(db) else {
@@ -600,13 +637,12 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member = Type::instance(db, superclass)
-                .member_lookup_with_policy_and_receiver(
-                    db,
-                    member.name.clone(),
-                    MemberLookupPolicy::default(),
-                    Some(instance_of_class),
-                );
+            let superclass_instance_member = member_with_receiver_if_needed(
+                db,
+                Type::instance(db, superclass),
+                instance_of_class,
+                &member.name,
+            );
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..
