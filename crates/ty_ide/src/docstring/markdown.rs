@@ -7,6 +7,6 @@ mod structured;
 /// normalization (typically via `docstring::documentation_trim`).
 pub(super) fn render(source: &str) -> String {
     let mut output = String::new();
-    structured::render_into(&mut output, source, Vec::new());
+    structured::render_into(&mut output, source);
     output
 }

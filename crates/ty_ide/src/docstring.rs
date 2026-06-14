@@ -1564,6 +1564,23 @@ mod tests {
         ");
     }
 
+    /// PEP 257 trimming removes indentation from a docstring's first physical
+    /// line. If a field starts there, continuation indentation is ambiguous, so
+    /// leave the normalized text unchanged rather than guessing. Starting the
+    /// field after the opening newline or a summary makes the intent unambiguous.
+    #[test]
+    fn rest_markdown_does_not_special_case_first_line_field_continuation() {
+        let _snap = bind_docstring_snapshot_filters();
+        let docstring = Docstring::new(":param value: First line.\n    Second line.".to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @"
+        ## Parameters
+        **value**: First line.
+
+        Second line.
+        ");
+    }
+
     #[test]
     fn test_rest_style_parameter_documentation() {
         let _snap = bind_docstring_snapshot_filters();
@@ -1607,14 +1624,18 @@ mod tests {
         ");
 
         assert_snapshot!(docstring.render_markdown(), @"
-        This is a function description.<HB>
-        <HB>
-        :param str param1: The first parameter description<HB>
-        :param int param2: The second parameter description<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;This is a continuation of param2 description.<HB>
-        :param param3: A parameter without type annotation<HB>
-        :returns: The return value description<HB>
-        :rtype: str
+        This is a function description.
+
+        ## Parameters
+        **param1** `str`: The first parameter description
+
+        **param2** `int`: The second parameter description<HB>
+        This is a continuation of param2 description.
+
+        **param3**: A parameter without type annotation
+
+        ## Returns
+        `str`: The return value description
         ");
     }
 
@@ -1683,11 +1704,13 @@ mod tests {
         <HB>
         Args:<HB>
         &nbsp;&nbsp;&nbsp;&nbsp;param1 (str): Google-style parameter<HB>
-        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Google-style duplicate parameter<HB>
-        <HB>
-        :param int param2: reST-style parameter<HB>
-        :param param3: Another reST-style parameter<HB>
-        <HB>
+        &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): Google-style duplicate parameter
+
+        ## Parameters
+        **param2** `int`: reST-style parameter
+
+        **param3**: Another reST-style parameter
+
         Parameters<HB>
         ----------<HB>
         param3 : str<HB>

@@ -7,11 +7,18 @@ use strum_macros::EnumIter;
 use super::general;
 use crate::docstring::document::preformatted::MarkdownFence;
 
-/// Renders a docstring from non-overlapping structured sections and general source fragments.
+mod rst;
+
+/// Renders a docstring as Markdown.
 ///
 /// `source` must have already undergone PEP-257 trimming and universal newline
 /// normalization (typically via `docstring::documentation_trim`).
-pub(super) fn render_into(output: &mut String, source: &str, sections: Vec<Section>) {
+pub(super) fn render_into(output: &mut String, source: &str) {
+    render_sections_into(output, source, rst::structured_sections(source));
+}
+
+/// Renders a docstring from non-overlapping structured sections and general source fragments.
+fn render_sections_into(output: &mut String, source: &str, sections: Vec<Section>) {
     if sections.is_empty() {
         general::render_into(output, source);
         return;
@@ -38,12 +45,15 @@ pub(super) fn render_into(output: &mut String, source: &str, sections: Vec<Secti
                     raw
                 };
 
-                if follows_section && !raw.is_empty() {
+                if follows_section && !raw.is_empty() && !output.is_empty() {
                     ensure_blank_line(output);
                 }
                 general::render_into(output, raw);
             }
             Segment::Structured(section) => {
+                if section.is_empty() {
+                    continue;
+                }
                 if !output.is_empty() {
                     ensure_blank_line(output);
                 }
@@ -111,26 +121,25 @@ fn ensure_blank_line(output: &mut String) {
 /// field list, then this structured renderer places it back into the
 /// surrounding source text.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct Section {
-    /// Byte range occupied by this section in the source passed to
-    /// `structured::render_into`.
+struct Section {
+    /// Byte range occupied by this section in the normalized docstring source.
     range: TextRange,
     /// The list of semantically-meaningful items to render to Markdown.
     items: Vec<SectionItem>,
 }
 
 impl Section {
-    /// Creates a section block from the items parsed out of one source section.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by follow-up structured docstring parsers")
-    )]
+    /// Creates a structured replacement from the items parsed out of one source section.
     fn new(range: TextRange, items: Vec<SectionItem>) -> Option<Self> {
-        if range.is_empty() || items.is_empty() || items.iter().any(SectionItem::is_empty) {
+        if range.is_empty() || items.iter().any(SectionItem::is_empty) {
             return None;
         }
 
         Some(Self { range, items })
+    }
+
+    fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 
     /// Renders the section as Markdown into the given buffer.
@@ -166,10 +175,6 @@ struct SectionItem {
 
 impl SectionItem {
     /// Creates a section item from parser-prepared name, type, and description parts.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "used by follow-up structured docstring parsers")
-    )]
     fn new(
         kind: SectionKind,
         display_name: Option<&str>,
@@ -461,7 +466,7 @@ mod tests {
     use insta::{Settings, assert_snapshot};
     use ruff_text_size::{TextRange, TextSize};
 
-    use super::{Section, SectionItem, SectionKind, render_into};
+    use super::{Section, SectionItem, SectionKind, render_sections_into};
 
     #[test]
     fn sections_render_in_canonical_order() {
@@ -868,7 +873,7 @@ mod tests {
 
     fn render_sections(raw: &str, sections: Vec<Section>) -> String {
         let mut output = String::new();
-        render_into(&mut output, raw, sections);
+        render_sections_into(&mut output, raw, sections);
         output
     }
 
