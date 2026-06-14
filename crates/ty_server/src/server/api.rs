@@ -110,9 +110,7 @@ pub(super) fn request(req: server::Request) -> Task {
         ),
         requests::WillRenameFilesHandler::METHOD => background_request_task::<
             requests::WillRenameFilesHandler,
-        >(
-            req, BackgroundSchedule::Worker
-        ),
+        >(req, BackgroundSchedule::Worker),
         requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
             requests::PrepareTypeHierarchyRequestHandler,
         >(

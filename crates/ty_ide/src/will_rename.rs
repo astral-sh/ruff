@@ -57,8 +57,7 @@ pub fn will_rename_file(
         component_range: TextRange::default(),
     };
 
-    let Some(refs) = references(db, old_file, &goto_target, ReferencesMode::RenameMultiFile)
-    else {
+    let Some(refs) = references(db, old_file, &goto_target, ReferencesMode::RenameMultiFile) else {
         return vec![];
     };
 
@@ -149,7 +148,7 @@ mod tests {
         let text = source.as_str().to_owned();
 
         let mut sorted_edits: Vec<_> = edits.iter().filter(|e| e.file == file).collect();
-        sorted_edits.sort_by(|a, b| b.range.start().cmp(&a.range.start()));
+        sorted_edits.sort_by_key(|b| std::cmp::Reverse(b.range.start()));
 
         let mut result = text;
         for edit in sorted_edits {
