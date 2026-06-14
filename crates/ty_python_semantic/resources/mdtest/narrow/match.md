@@ -1118,7 +1118,7 @@ the pattern does not bind an alias for the whole value. Nested patterns can remo
 union, and an `or` pattern combines the members matched by its alternatives.
 
 ```py
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Generic, Literal, TypeVar, final
 from typing_extensions import TypedDict
 from ty_extensions import Unknown
 
@@ -1158,6 +1158,16 @@ def test_match_class_or_pattern_narrows_subject(
         case TaggedPayload("int", _) | TaggedPayload("str", _):
             # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
             reveal_type(value)
+
+@final
+class FinalWithoutMissingAttribute: ...
+
+def test_missing_final_class_attribute_rejects_subject_alternative(
+    value: FinalWithoutMissingAttribute | TaggedPayload[Literal["int"], int],
+) -> None:
+    match value:
+        case FinalWithoutMissingAttribute(missing=_) | TaggedPayload("int", _):
+            reveal_type(value)  # revealed: TaggedPayload[Literal["int"], int]
 
 DynamicClass: Any = int
 

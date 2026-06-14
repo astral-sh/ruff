@@ -1654,8 +1654,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             if narrowed_subject_ty.is_never() {
                 return None;
             }
-            let argument_types =
-                analyzer.class_pattern_argument_types_for_arm(kind, &context, narrowed_subject_ty);
+            let argument_types = analyzer.class_pattern_argument_types_for_arm(
+                kind,
+                &context,
+                narrowed_subject_ty,
+            )?;
             kind.positional
                 .iter()
                 .chain(kind.keywords.iter().map(|keyword| &keyword.pattern))
