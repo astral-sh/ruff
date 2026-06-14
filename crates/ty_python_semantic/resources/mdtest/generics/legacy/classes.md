@@ -101,6 +101,13 @@ class OuterClass(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@OuterClass]
 reveal_type(generic_context(OuterClass))
+
+class ParamSpecOuterClass(Generic[P]):
+    # error: [shadowed-type-variable]
+    # error: [shadowed-type-variable]
+    class InnerClass(SingleParamSpec[P]): ...
+    # revealed: None
+    reveal_type(generic_context(InnerClass))
 ```
 
 If you don't specialize a generic base class, we use the default specialization, which maps each
