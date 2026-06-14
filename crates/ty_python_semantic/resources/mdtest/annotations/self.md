@@ -514,6 +514,151 @@ def _(c: MyClass):
     c.field = c
 ```
 
+Truthiness narrowing applies to a specific value, not to every value of the same concrete class.
+These refinements should not be preserved when binding `Self` in an attribute or method return.
+
+Regression test for <https://github.com/astral-sh/ty/issues/3755>.
+
+```py
+from typing import Self
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, Intersection, Not
+
+class Base:
+    values: list[Self]
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+    def replace(self, other: Self) -> None:
+        raise NotImplementedError
+
+    def preserve[T](self: Intersection[Self, T]) -> T:
+        raise NotImplementedError
+
+class Child(Base): ...
+class Other(Base): ...
+
+def truthy(value: Child | None) -> list[Child]:
+    if value:
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(value.preserve())  # revealed: Child & ~AlwaysFalsy
+        return value.values
+    raise ValueError
+
+type TruthyChild = Intersection[Child, Not[AlwaysFalsy]]
+
+def type_alias(value: TruthyChild) -> None:
+    reveal_type(value.copy())  # revealed: Child
+    reveal_type(Base.copy(value))  # revealed: Child
+
+def falsy(value: Child) -> None:
+    if not value:
+        reveal_type(value.copy())  # revealed: Child
+
+def union(value: Child | Other | None) -> None:
+    if value:
+        reveal_type(value.values)  # revealed: list[Child] | list[Other]
+        reveal_type(value.copy())  # revealed: Child | Other
+
+class Excluded: ...
+
+def positive_truthiness(
+    value: Intersection[Child, AlwaysTruthy, Not[Excluded]],
+) -> None:
+    reveal_type(value.copy())  # revealed: Child & ~Excluded
+
+def compound_negative(
+    value: Intersection[Child, Not[AlwaysFalsy | Excluded]],
+) -> None:
+    reveal_type(value.copy())  # revealed: Child & ~Excluded
+```
+
+Value-level refinements and synthesized structural refinements are removed from `Self` bindings,
+while nominal constraints, class-wide protocol constraints, and generic specializations are
+preserved.
+
+```py
+from collections import defaultdict
+from collections.abc import Iterable
+from enum import Enum
+from typing import Protocol, runtime_checkable
+from ty_extensions import Top
+
+def class_wide_protocol(
+    value: Intersection[
+        Iterable[str | type | None],
+        Top[defaultdict[str | type | None, object]],
+    ],
+) -> None:
+    copied: Iterable[str | type | None] = value.copy()
+
+def attribute_refinement(value: Child) -> None:
+    if hasattr(value, "name"):
+        reveal_type(value)  # revealed: Child & <Protocol with members 'name'>
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(Base.copy(value))  # revealed: Child
+
+@runtime_checkable
+class HasName(Protocol):
+    name: str
+
+def runtime_protocol_refinement(value: Child) -> None:
+    if isinstance(value, HasName):
+        reveal_type(value)  # revealed: Child & HasName
+        reveal_type(value.values)  # revealed: list[Child]
+        value.replace(Child())
+        narrowed: HasName = value.copy()  # error: [invalid-assignment]
+    else:
+        reveal_type(value.copy())  # revealed: Child
+
+class Copier(Protocol):
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def protocol_owner(value: Copier) -> None:
+    reveal_type(value.copy())  # revealed: Copier
+
+class Box[T]:
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def generic_specialization(value: Box[int] | None) -> None:
+    if value:
+        reveal_type(value.copy())  # revealed: Box[int]
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+reveal_type(Color.copy(Color.RED))  # revealed: Color
+
+def enum_complement(value: Color) -> None:
+    if value is not Color.RED:
+        reveal_type(value.copy())  # revealed: Color
+
+class TupleChild(tuple[int | str, ...]):
+    other: Self
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def exact_tuple_refinement(value: Intersection[TupleChild, tuple[int, int]]) -> None:
+    reveal_type(TupleChild.copy(value))  # revealed: TupleChild
+    reveal_type(value.other)  # revealed: TupleChild
+    exact: tuple[int, int] = value.copy()  # error: [invalid-assignment]
+
+def negative_exact_tuple_refinement(
+    value: Intersection[TupleChild, Not[tuple[int, int]]],
+) -> None:
+    reveal_type(value.copy())  # revealed: TupleChild
+```
+
 Self from class body annotations and method signatures represent the same logical type variable.
 When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
 and the method's `Self` should be considered the same type, even though they have different binding

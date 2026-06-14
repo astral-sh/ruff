@@ -1124,8 +1124,7 @@ impl<'db> Type<'db> {
 
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
-    /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
-    /// is in the MRO of the self type's class.
+    /// A `Self` typevar is only bound if the projected receiver is a subtype of its owner.
     ///
     /// Types that defer `Self` binding to call time (functions, bound methods, function-like
     /// callables) are skipped; see `supports_self_binding`.
@@ -1136,7 +1135,7 @@ impl<'db> Type<'db> {
 
         self.apply_type_mapping(
             db,
-            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
+            &TypeMapping::BindSelf(SelfBinding::new(self_type, None)),
             TypeContext::default(),
         )
     }
@@ -6034,7 +6033,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
+            TypeMapping::BindSelf(binding) if self == binding.ty => return self,
             _ => {}
         }
 
@@ -7206,80 +7205,184 @@ fn self_typevar_owner_class_literal<'db>(
         .map(|class| class.class_literal(db))
 }
 
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn class_mro_literals<'db>(
+/// Project a receiver type onto the facts that are stable across values represented by `Self`.
+///
+/// ```python
+/// from typing import Self
+///
+/// class Base:
+///     def copy(self) -> Self: ...
+///
+/// class Child(Base): ...
+///
+/// def copy_if_truthy(value: Child | None) -> Child:
+///     if value:
+///         return value.copy()
+///     raise ValueError
+/// ```
+///
+/// Here, `value` is narrowed to `Child & ~AlwaysFalsy`, but `copy` can return a different `Child`
+/// whose truthiness is unknown. Similarly, a synthesized protocol produced by `hasattr` only
+/// describes the current value and must not become part of the `Self` specialization.
+///
+/// Nominal constraints are preserved because they describe the receiver's concrete subtype. A
+/// protocol constraint is preserved only when it owns `Self`; protocol behavior guaranteed by the
+/// nominal receiver is already represented there. Type aliases are preserved unless projection
+/// changes their value.
+fn self_type_projection<'db>(
     db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
-) -> Box<[ClassLiteral<'db>]> {
-    class_literal
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .map(|class| class.class_literal(db))
-        .collect()
+    ty: Type<'db>,
+    owner_class: Option<ClassLiteral<'db>>,
+) -> Type<'db> {
+    struct SelfTypeProjection;
+    struct NegativeSelfTypeProjection;
+
+    #[derive(Default)]
+    struct ProjectionVisitors<'db> {
+        positive: TypeTransformer<'db, SelfTypeProjection>,
+        negative: CycleDetector<NegativeSelfTypeProjection, Type<'db>, Option<Type<'db>>>,
+    }
+
+    fn transform<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        owner_class: Option<ClassLiteral<'db>>,
+        visitors: &ProjectionVisitors<'db>,
+    ) -> Type<'db> {
+        match ty {
+            Type::TypeAlias(alias) => visitors.positive.visit_type(db, ty, || {
+                let value_type = alias.value_type(db);
+                let transformed = transform(db, value_type, owner_class, visitors);
+                if transformed == value_type {
+                    ty
+                } else {
+                    transformed
+                }
+            }),
+            Type::Union(union) => union
+                .map_leave_aliases(db, |element| transform(db, *element, owner_class, visitors)),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for positive in intersection.positive(db) {
+                    builder = builder.add_positive(transform(db, *positive, owner_class, visitors));
+                }
+                for negative in intersection.negative(db) {
+                    if let Some(negative) = transform_negative(db, *negative, visitors) {
+                        builder = builder.add_negative(negative);
+                    }
+                }
+                builder.build()
+            }
+            Type::EnumComplement(complement) => {
+                transform(db, complement.to_intersection(db), owner_class, visitors)
+            }
+            Type::LiteralValue(literal) => literal.fallback_instance(db),
+            Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_some() => {
+                Type::homogeneous_tuple(db, Type::object())
+            }
+            Type::ProtocolInstance(protocol)
+                if !protocol.to_nominal_instance().zip(owner_class).is_some_and(
+                    |(instance, owner)| instance.class(db).is_subtype_of_class_literal(db, owner),
+                ) =>
+            {
+                Type::object()
+            }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(),
+            _ => ty,
+        }
+    }
+
+    fn transform_negative<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitors: &ProjectionVisitors<'db>,
+    ) -> Option<Type<'db>> {
+        // A widened negative constraint cannot be retained: `~Literal[1]`, for example, does not
+        // imply `~int`. Unions are decomposed because `~(A | B)` implies both `~A` and `~B`.
+        match ty {
+            Type::TypeAlias(alias) => visitors.negative.visit(ty, || {
+                let value_type = alias.value_type(db);
+                transform_negative(db, value_type, visitors).map(|transformed| {
+                    if transformed == value_type {
+                        ty
+                    } else {
+                        transformed
+                    }
+                })
+            }),
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                for element in union.elements(db) {
+                    if let Some(element) = transform_negative(db, *element, visitors) {
+                        builder = builder.add(element);
+                    }
+                }
+                (!builder.is_empty()).then(|| builder.build())
+            }
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
+                .all(|element| transform_negative(db, *element, visitors) == Some(*element))
+                .then_some(ty),
+            Type::NominalInstance(instance) if instance.own_tuple_spec(db).is_some() => None,
+            Type::EnumComplement(_)
+            | Type::LiteralValue(_)
+            | Type::ProtocolInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => None,
+            _ => Some(ty),
+        }
+    }
+
+    transform(db, ty, owner_class, &ProjectionVisitors::default())
 }
 
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
-/// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
-/// is in the MRO of the self type's class.
+/// A `Self` typevar is only bound if the projected receiver is a subtype of its owner.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
-    class_literal: Option<ClassLiteral<'db>>,
     binding_context: Option<BindingContext<'db>>,
 }
 
 impl<'db> SelfBinding<'db> {
-    pub(crate) fn self_type(&self) -> Type<'db> {
-        self.ty
-    }
-
-    pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
-        self.binding_context
-    }
-}
-
-impl<'db> SelfBinding<'db> {
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
-    ) -> Self {
-        let class_literal = match self_type {
-            Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
-                self_typevar_owner_class_literal(db, typevar)
-            }
-            _ => self_type
-                .nominal_class(db)
-                .map(|class| class.class_literal(db)),
-        };
-
+    pub(crate) fn new(self_type: Type<'db>, binding_context: Option<BindingContext<'db>>) -> Self {
         Self {
             ty: self_type,
-            class_literal,
             binding_context,
         }
     }
 
-    /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
-    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
+    /// Returns the projected receiver type if it can bind `bound_typevar`.
+    fn binding_type(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
         if !bound_typevar.typevar(db).is_self(db) {
-            return false;
+            return None;
         }
+
+        let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+        let self_type = self_type_projection(db, self.ty, owner_class);
 
         // Fast path for the common method-signature case where the bound `Self`
         // carries the same binding context as this mapping.
         if self.binding_context == Some(bound_typevar.binding_context(db)) {
-            return true;
+            return Some(self_type);
         }
 
-        // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
-        self.class_literal.is_some_and(|class_literal| {
-            let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
-        })
+        match (self_type.nominal_class(db), owner_class) {
+            (Some(class), Some(owner_class)) => class.is_subtype_of_class_literal(db, owner_class),
+            (None, Some(owner_class)) => {
+                self_type.is_subtype_of(db, owner_class.to_non_generic_instance(db))
+            }
+            (Some(_), None) => true,
+            (None, None) => false,
+        }
+        .then_some(self_type)
     }
 }
 
@@ -7372,8 +7475,8 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
             TypeMapping::BindSelf(binding) => {
-                if binding.binding_context().is_some() {
-                    context.remove_self(db, binding.binding_context())
+                if binding.binding_context.is_some() {
+                    context.remove_self(db, binding.binding_context)
                 } else {
                     context
                 }

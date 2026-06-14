@@ -711,10 +711,11 @@ reveal_type(x)  # revealed: object
 
 ## Narrowing on `Self` in `match` statements
 
-When performing narrowing on `self` inside methods on enums, we take into account that `Self` might
-refer to a subtype of the enum class, like `Literal[Answer.YES]`. This is why we do not simplify
-`Self & ~Literal[Answer.YES]` to `Literal[Answer.NO, Answer.MAYBE]`. Otherwise, we wouldn't be able
-to return `self` in the `assert_yes` method below:
+When performing narrowing on `self` inside methods on enums, we retain the `Self` type variable
+rather than simplifying `Self & ~Literal[Answer.YES]` to `Literal[Answer.NO, Answer.MAYBE]`.
+Otherwise, we wouldn't be able to return `self` in the `assert_yes` method below. When binding the
+method, however, the enum member identity is not preserved because another value returned through
+`Self` can be a different member of the same enum class:
 
 ```py
 from enum import Enum
@@ -777,7 +778,7 @@ class Answer(Enum):
 Answer.YES.is_yes_through_class_member()
 
 try:
-    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
+    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Answer
 except ValueError:
     pass
 ```
