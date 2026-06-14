@@ -1562,7 +1562,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
     }
 }
 
-impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
+impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_subject_element_pattern(
         &mut self,
         subject_element: SubjectElementPatternPredicate<'db>,
