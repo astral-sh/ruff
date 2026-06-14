@@ -306,6 +306,13 @@ def test_impossible_sequence_capture(value: tuple[str]) -> None:
     match value:
         case [int() as item]:
             reveal_type(item)  # revealed: Never
+
+# A pattern only binds names if the complete pattern succeeds. The first element would bind `str`
+# on its own, but the second element makes this pattern impossible.
+def test_later_failure_rejects_earlier_capture(value: tuple[str, str]) -> None:
+    match value:
+        case [item, int()]:
+            reveal_type(item)  # revealed: Never
 ```
 
 ## Correlated sequence captures
