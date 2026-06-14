@@ -216,9 +216,14 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // Check for invalid `@dataclass` applications.
     let dataclass_params = class.dataclass_params(db);
-    if let Some(decorator_position) = class.find_dataclass_decorator_position(db) {
-        let decorator = &class_node.decorator_list[decorator_position];
-        check_dataclass_decorator_arguments(context, decorator, file_expression_type);
+    for decorator in &class_node.decorator_list {
+        if let ast::Expr::Call(call) = &decorator.expression
+            && file_expression_type(&call.func)
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
+        {
+            check_dataclass_decorator_arguments(context, decorator, file_expression_type);
+        }
     }
 
     if dataclass_params.is_some() {

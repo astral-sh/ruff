@@ -422,6 +422,10 @@ class InvalidOrder: ...
 def dynamic_eq(eq: bool):
     @dataclass(order=True, eq=eq)
     class PossiblyValidOrder: ...
+
+@dataclass
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidStackedOrder: ...
 ```
 
 Comparisons are only allowed for `WithOrder` instances:
