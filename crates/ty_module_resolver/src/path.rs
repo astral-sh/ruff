@@ -100,6 +100,10 @@ impl ModulePath {
                 system_path_to_file(resolver.db, search_path.join(relative_path))
                     == Err(FileError::IsADirectory)
             }
+            SearchPathInner::Redirect { root, .. } => {
+                system_path_to_file(resolver.db, root.join(relative_path))
+                    == Err(FileError::IsADirectory)
+            }
             SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 match query_stdlib_version(relative_path, resolver) {
                     TypeshedVersionsQueryResult::DoesNotExist => false,
@@ -135,6 +139,12 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 let absolute_path = search_path.join(relative_path);
+
+                system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
+                    || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
+            }
+            SearchPathInner::Redirect { root, .. } => {
+                let absolute_path = root.join(relative_path);
 
                 system_path_to_file(resolver.db, absolute_path.join("__init__.py")).is_ok()
                     || system_path_to_file(resolver.db, absolute_path.join("__init__.pyi")).is_ok()
@@ -202,6 +212,7 @@ impl ModulePath {
             | SearchPathInner::FirstParty(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => Some(search_path.join(relative_path)),
+            SearchPathInner::Redirect { root, .. } => Some(root.join(relative_path)),
             SearchPathInner::StandardLibraryReal(stdlib_root)
             | SearchPathInner::StandardLibraryCustom(stdlib_root) => {
                 Some(stdlib_root.join(relative_path))
@@ -223,6 +234,9 @@ impl ModulePath {
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => {
                 system_path_to_file(db, search_path.join(relative_path)).ok()
+            }
+            SearchPathInner::Redirect { root, .. } => {
+                system_path_to_file(db, root.join(relative_path)).ok()
             }
             SearchPathInner::StandardLibraryReal(search_path) => {
                 system_path_to_file(db, search_path.join(relative_path)).ok()
@@ -252,6 +266,10 @@ impl ModulePath {
     pub(crate) fn to_module_name(&self) -> Option<ModuleName> {
         fn strip_stubs(component: &str) -> &str {
             component.strip_suffix("-stubs").unwrap_or(component)
+        }
+
+        if let SearchPathInner::Redirect { prefix, .. } = &*self.search_path.0 {
+            return self.redirect_to_module_name(prefix);
         }
 
         let ModulePath {
@@ -297,6 +315,46 @@ impl ModulePath {
                 ModuleName::from_components(parent_components.chain([name]))
             }
         }
+    }
+
+    /// Convert a redirect [`ModulePath`] back into a module name.
+    ///
+    /// `relative_path` is relative to the redirect's `root` (it does not include
+    /// the `prefix`), so the full module name is `prefix` followed by the module
+    /// name that `relative_path` would resolve to on its own. An empty
+    /// `relative_path` means the file *is* the redirect target (a single-file
+    /// module or the package's own `__init__`), so the module name is just the
+    /// `prefix`.
+    ///
+    /// Note: unlike the general case, `-stubs` suffixes are never stripped here;
+    /// redirect targets are real source trees rather than stub packages.
+    #[must_use]
+    fn redirect_to_module_name(&self, prefix: &ModuleName) -> Option<ModuleName> {
+        let relative_path = &self.relative_path;
+        let mut name = prefix.clone();
+
+        if relative_path.as_str().is_empty() {
+            return Some(name);
+        }
+
+        let parent = relative_path.parent()?;
+        let parent_components = parent.components().map(|component| component.as_str());
+
+        let skip_final_part =
+            relative_path.ends_with("__init__.py") || relative_path.ends_with("__init__.pyi");
+        let suffix = if skip_final_part {
+            if parent.as_str().is_empty() {
+                // `__init__.py(i)` directly under `root`: the target *is* `prefix`.
+                return Some(name);
+            }
+            ModuleName::from_components(parent_components)?
+        } else {
+            let stem = relative_path.file_stem()?;
+            ModuleName::from_components(parent_components.chain([stem]))?
+        };
+
+        name.extend(&suffix);
+        Some(name)
     }
 
     #[must_use]
@@ -424,6 +482,24 @@ enum SearchPathInner {
     StandardLibraryReal(SystemPathBuf),
     SitePackages(SystemPathBuf),
     Editable(SystemPathBuf),
+    /// An "import redirect" declared via a structured comment in a `.pth` file,
+    /// of the form `# import redirect <module_name> -> <path>`.
+    ///
+    /// Unlike the other search paths, a redirect maps a *specific* module name
+    /// (`prefix`, which may be dotted, e.g. `coherent.test`) to the location of
+    /// that module on disk (`root`). The `root` is the module itself: a package
+    /// directory, or a single-file module. Submodules resolve relative to `root`.
+    ///
+    /// `relative_path` in a [`ModulePath`] built from a redirect is always
+    /// relative to `root` (i.e. it does *not* include the `prefix` components),
+    /// so the disk operations are identical to those for an editable install.
+    /// The `prefix` only comes into play when converting back to a module name
+    /// (see [`ModulePath::to_module_name`]) and when matching a requested module
+    /// name during forward resolution.
+    Redirect {
+        prefix: ModuleName,
+        root: SystemPathBuf,
+    },
 }
 
 /// Unification of the various kinds of search paths
@@ -539,6 +615,32 @@ impl SearchPath {
         ))))
     }
 
+    /// Create a new "import redirect" search path, mapping the module `prefix`
+    /// to `root` on disk (see [`SearchPathInner::Redirect`]).
+    ///
+    /// Unlike most other search paths, `root` is allowed to point at a single
+    /// file (for a single-file module redirect) as well as a directory (for a
+    /// package redirect); we only require that it exists.
+    pub(crate) fn redirect(
+        system: &dyn System,
+        prefix: ModuleName,
+        root: SystemPathBuf,
+    ) -> SearchPathResult<Self> {
+        if !system.path_exists(&root) {
+            return Err(SearchPathError::NotADirectory(root));
+        }
+        Ok(Self(Arc::new(SearchPathInner::Redirect { prefix, root })))
+    }
+
+    /// If this is an "import redirect" search path, return its `(prefix, root)`.
+    #[must_use]
+    pub(crate) fn as_redirect(&self) -> Option<(&ModuleName, &SystemPath)> {
+        match &*self.0 {
+            SearchPathInner::Redirect { prefix, root } => Some((prefix, root)),
+            _ => None,
+        }
+    }
+
     #[must_use]
     pub(crate) fn to_module_path(&self) -> ModulePath {
         ModulePath {
@@ -605,6 +707,7 @@ impl SearchPath {
             | SearchPathInner::StandardLibraryReal(search_path)
             | SearchPathInner::SitePackages(search_path)
             | SearchPathInner::Editable(search_path) => path.strip_prefix(search_path).ok(),
+            SearchPathInner::Redirect { root, .. } => path.strip_prefix(root).ok(),
             SearchPathInner::StandardLibraryVendored(_) => None,
         }
     }
@@ -624,7 +727,8 @@ impl SearchPath {
             | SearchPathInner::StandardLibraryCustom(_)
             | SearchPathInner::StandardLibraryReal(_)
             | SearchPathInner::SitePackages(_)
-            | SearchPathInner::Editable(_) => None,
+            | SearchPathInner::Editable(_)
+            | SearchPathInner::Redirect { .. } => None,
             SearchPathInner::StandardLibraryVendored(search_path) => path
                 .strip_prefix(search_path)
                 .ok()
@@ -644,6 +748,7 @@ impl SearchPath {
             | SearchPathInner::StandardLibraryReal(ref path)
             | SearchPathInner::SitePackages(ref path)
             | SearchPathInner::Editable(ref path) => SystemOrVendoredPathRef::System(path),
+            SearchPathInner::Redirect { ref root, .. } => SystemOrVendoredPathRef::System(root),
             SearchPathInner::StandardLibraryVendored(ref path) => {
                 SystemOrVendoredPathRef::Vendored(path)
             }
@@ -673,6 +778,7 @@ impl SearchPath {
             SearchPathInner::StandardLibraryReal(_) => "std-real",
             SearchPathInner::SitePackages(_) => "site-packages",
             SearchPathInner::Editable(_) => "editable",
+            SearchPathInner::Redirect { .. } => "redirect",
             SearchPathInner::StandardLibraryVendored(_) => "std-vendored",
         }
     }
@@ -692,6 +798,7 @@ impl SearchPath {
             SearchPathInner::StandardLibraryReal(_) => "runtime stdlib source code",
             SearchPathInner::SitePackages(_) => "site-packages",
             SearchPathInner::Editable(_) => "editable install",
+            SearchPathInner::Redirect { .. } => "editable install (import redirect)",
             SearchPathInner::StandardLibraryVendored(_) => "stdlib typeshed stubs vendored by ty",
         }
     }
@@ -755,6 +862,9 @@ impl fmt::Display for SearchPath {
             | SearchPathInner::StandardLibraryReal(system_path_buf)
             | SearchPathInner::StandardLibraryCustom(system_path_buf) => system_path_buf.fmt(f),
             SearchPathInner::StandardLibraryVendored(vendored_path_buf) => vendored_path_buf.fmt(f),
+            SearchPathInner::Redirect { prefix, root } => {
+                write!(f, "{root} (redirect for `{prefix}`)")
+            }
         }
     }
 }

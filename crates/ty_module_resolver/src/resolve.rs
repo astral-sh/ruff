@@ -907,6 +907,40 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                 }
             }
         }
+
+        // In addition to (or instead of) bare path lines, a `.pth` file may
+        // contain `# import redirect <module> -> <path>` comments that map a
+        // specific module name to its location on disk. Honor these so that
+        // editable installs which would otherwise depend on a runtime import
+        // hook can still be resolved statically.
+        let redirects = all_pth_files.iter().flat_map(PthFile::redirects);
+
+        for (prefix, target) in redirects {
+            let target = system.canonicalize_path(&target).unwrap_or(target);
+
+            match SearchPath::redirect(system, prefix.clone(), target.clone()) {
+                Ok(search_path) => {
+                    tracing::debug!(
+                        "Adding import redirect to module resolution path: `{prefix}` -> `{target}`"
+                    );
+
+                    // Register a file root for the redirect target so that
+                    // edits underneath it invalidate module resolution, unless
+                    // it's already covered by another root or points at a file
+                    // (file roots are directories). See the editable-install
+                    // handling above for more details.
+                    if system.is_directory(&target) && files.root(db, &target).is_none() {
+                        files.try_add_root(db, &target, FileRootKind::SearchPath);
+                    }
+
+                    dynamic_paths.push(search_path);
+                }
+
+                Err(error) => {
+                    tracing::debug!("Skipping import redirect: {error}");
+                }
+            }
+        }
     }
 
     dynamic_paths
@@ -988,6 +1022,55 @@ impl<'db> PthFile<'db> {
             Some(SystemPath::absolute(line, site_packages))
         })
     }
+
+    /// Yield "import redirect" declarations in this `.pth` file.
+    ///
+    /// These are structured comments of the form
+    /// `# import redirect <module_name> -> <path>` that map a specific module
+    /// name to the location of that module on disk, allowing static analysis
+    /// tools to honor editable installs that would otherwise rely on an import
+    /// hook executed at runtime. See <https://github.com/astral-sh/ty/issues/475>.
+    ///
+    /// The mechanism is build-backend agnostic: any installer can emit these
+    /// comments alongside (or instead of) the `import ...` line that registers
+    /// the runtime hook. `<path>` is resolved relative to `site-packages`, just
+    /// like the bare path lines handled by [`PthFile::items`].
+    fn redirects(&'db self) -> impl Iterator<Item = (ModuleName, SystemPathBuf)> + 'db {
+        let PthFile {
+            path: _,
+            contents,
+            site_packages,
+        } = self;
+
+        contents.lines().filter_map(move |line| {
+            let (prefix, target) = parse_import_redirect(line)?;
+            Some((prefix, SystemPath::absolute(target, site_packages)))
+        })
+    }
+}
+
+/// Parse a single `# import redirect <module_name> -> <path>` line.
+///
+/// Returns `None` for any line that isn't a well-formed redirect comment.
+/// Whitespace around the tokens is insignificant, and the leading `#` may be
+/// followed by any amount of whitespace (so both `#import redirect ...` and
+/// `#   import redirect ...` are accepted, mirroring how Python treats any
+/// line beginning with `#` in a `.pth` file as an ignorable comment).
+fn parse_import_redirect(line: &str) -> Option<(ModuleName, &str)> {
+    let rest = line.trim().strip_prefix('#')?.trim_start();
+    let rest = rest.strip_prefix("import redirect")?;
+    // Require at least one whitespace character after the marker so that we
+    // don't match e.g. `# import redirecting-something`.
+    if !rest.starts_with(|c: char| c.is_whitespace()) {
+        return None;
+    }
+    let (module, target) = rest.trim_start().split_once("->")?;
+    let prefix = ModuleName::new(module.trim())?;
+    let target = target.trim();
+    if target.is_empty() {
+        return None;
+    }
+    Some((prefix, target))
 }
 
 /// Iterator that yields a [`PthFile`] instance for every `.pth` file
@@ -1065,7 +1148,186 @@ struct ModuleNameIngredient<'db> {
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
     let search_paths = search_paths(db, mode);
-    resolve_name_impl(db, name, mode, search_paths)
+    let generic = resolve_name_impl(db, name, mode, search_paths);
+
+    // Import redirects are handled separately from the generic search-path walk
+    // and merged in at the end: like editable installs, they sit at the lowest
+    // module-resolution priority, so any module found via a "real" search path
+    // wins over a redirect of the same name.
+    let redirected = resolve_name_redirects(db, name, mode);
+    merge_resolved_names(db, generic, redirected)
+}
+
+/// Resolve `name` against any matching import-redirect search paths.
+///
+/// A redirect maps a module `prefix` (e.g. `coherent.test`) to its `root` on
+/// disk. `name` matches a redirect when it equals the prefix (resolving the
+/// redirect target itself) or is a submodule of it (resolving the remainder
+/// relative to `root`).
+fn resolve_name_redirects(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<ResolvedNames> {
+    let context = ResolverContext::new(db, db.python_version(), mode);
+
+    let mut candidates = ResolvedNames::new();
+    for search_path in search_paths(db, mode) {
+        let Some((prefix, _root)) = search_path.as_redirect() else {
+            continue;
+        };
+
+        if name == prefix {
+            // The requested module *is* the redirect target.
+            if let Some(candidate) = resolve_redirect_target(&context, search_path) {
+                candidates.push(candidate);
+            }
+        } else if let Some(remainder) = name.relative_to(prefix) {
+            // The requested module is a submodule of the redirect target;
+            // resolve the remainder relative to `root`, seeding the walk at the
+            // target (which behaves as the parent namespace/package).
+            if let Some(candidate) = resolve_redirect_submodule(&context, search_path, &remainder) {
+                candidates.push(candidate);
+            }
+        } else if prefix.starts_with(name) {
+            // The requested module is a (strict) ancestor of the redirect
+            // prefix, e.g. resolving `coherent` when `coherent.test` is
+            // redirected. Such an ancestor is an implicit namespace package:
+            // the redirect makes its descendant importable, so the ancestor is
+            // importable too. This matters in particular for the namespace
+            // packages that are common in editable-installed projects.
+            candidates.push(ModuleResolutionCandidate {
+                path: search_path.to_module_path(),
+                module: ResolvedModule::NamespacePackage,
+                py_typed: PyTyped::Untyped,
+                is_stub_package: false,
+            });
+        }
+    }
+
+    if candidates.is_empty() {
+        None
+    } else {
+        Some(candidates)
+    }
+}
+
+/// Resolve a module name that exactly matches a redirect's `prefix`, i.e. the
+/// redirect target itself. The target may be a regular package (a directory
+/// with an `__init__.py(i)`), a single-file module, or a namespace package (a
+/// directory without an `__init__`).
+fn resolve_redirect_target(
+    context: &ResolverContext,
+    search_path: &SearchPath,
+) -> Option<ModuleResolutionCandidate> {
+    let root = search_path.to_module_path();
+
+    // Regular (or legacy namespace) package: `root/__init__.py(i)`.
+    let mut init_path = root.clone();
+    init_path.push("__init__");
+    if let Some(init) = resolve_file_module(&init_path, context) {
+        let module = if is_legacy_namespace_package(&root, context, init) {
+            ResolvedModule::LegacyNamespacePackage(init)
+        } else {
+            ResolvedModule::RegularPackage(init)
+        };
+        return Some(ModuleResolutionCandidate {
+            path: root.clone(),
+            module,
+            py_typed: root.py_typed(context),
+            is_stub_package: false,
+        });
+    }
+
+    // Single-file module: `root` is the module file itself.
+    if let Some(file) = root.to_file(context) {
+        return Some(ModuleResolutionCandidate {
+            path: root,
+            module: ResolvedModule::Module(file),
+            py_typed: PyTyped::Untyped,
+            is_stub_package: false,
+        });
+    }
+
+    // Namespace package: `root` is a directory without an `__init__`.
+    if root.is_directory(context) {
+        return Some(ModuleResolutionCandidate {
+            path: root.clone(),
+            module: ResolvedModule::NamespacePackage,
+            py_typed: root.py_typed(context),
+            is_stub_package: false,
+        });
+    }
+
+    None
+}
+
+/// Resolve `remainder` (a submodule name relative to the redirect `prefix`)
+/// against a redirect search path, whose `root` is the prefix package.
+fn resolve_redirect_submodule(
+    context: &ResolverContext,
+    search_path: &SearchPath,
+    remainder: &ModuleName,
+) -> Option<ModuleResolutionCandidate> {
+    let mut candidate = ModuleResolutionCandidate {
+        path: search_path.to_module_path(),
+        // `root` is the prefix package, so we start the walk as if we'd already
+        // descended into it as a (namespace) package.
+        module: ResolvedModule::NamespacePackage,
+        py_typed: search_path.to_module_path().py_typed(context),
+        is_stub_package: false,
+    };
+
+    for component in remainder.components() {
+        resolve_name_in_search_path(context, &mut candidate, component).ok()?;
+    }
+
+    Some(candidate)
+}
+
+/// Merge the candidates found via the generic search-path walk with those found
+/// via import redirects.
+///
+/// Generic candidates come first (higher priority). Because regular packages
+/// and modules shadow namespace packages regardless of search-path order, drop
+/// namespace-package candidates whenever a non-namespace candidate exists in the
+/// merged set, mirroring the dedup performed within `resolve_name_impl`.
+fn merge_resolved_names(
+    db: &dyn Db,
+    generic: Option<ResolvedNames>,
+    redirected: Option<ResolvedNames>,
+) -> Option<ResolvedNames> {
+    let mut merged = match (generic, redirected) {
+        (Some(mut generic), Some(redirected)) => {
+            generic.extend(redirected);
+            generic
+        }
+        (Some(generic), None) => return Some(generic),
+        (None, redirected) => return redirected,
+    };
+
+    let found_non_namespace = merged
+        .iter()
+        .any(|candidate| !candidate.is_any_namespace_package());
+    if found_non_namespace {
+        merged.retain(|candidate| {
+            if candidate.is_any_namespace_package() {
+                tracing::trace!(
+                    "Discarding namespace package `{}` \
+                     because a non-namespace entry of the same name was found",
+                    candidate.to_str(db),
+                );
+                return false;
+            }
+            true
+        });
+    }
+
+    // Stub packages have priority over runtime packages regardless of
+    // search-path ordering.
+    merged.sort_by_key(|candidate| !candidate.is_stub_package);
+
+    Some(merged)
 }
 
 /// Like `resolve_name` but for cases where it failed to resolve the module
@@ -1199,6 +1461,14 @@ fn resolve_name_impl<'a>(
 
     let mut cur_candidates = search_paths
         .filter_map(|search_path| {
+            // Import-redirect search paths don't participate in the generic
+            // component-by-component walk (their `root` is the module itself,
+            // not a directory to search for the module by name). They are
+            // handled separately in `resolve_name_redirects`.
+            if search_path.as_redirect().is_some() {
+                return None;
+            }
+
             // When a builtin module is imported, standard module resolution is bypassed:
             // the module name always resolves to the stdlib module,
             // even if there's a module of the same name in the first-party root
@@ -2812,6 +3082,163 @@ not_a_directory
         db.memory_file_system().remove_directory(&src_path).unwrap();
         File::sync_path(&mut db, &src_path.join("foo.py"));
         File::sync_path(&mut db, &src_path);
+        assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
+    }
+
+    #[test]
+    fn import_redirect_dotted_package() {
+        // A redirect whose prefix is a dotted module name pointing at a package
+        // directory (whose on-disk name need not match the module name at all).
+        const SITE_PACKAGES: &[FileSpec] = &[(
+            "coherent.test-redirects.pth",
+            "# import redirect coherent.test -> /x/checkout",
+        )];
+        let checkout = [
+            ("/x/checkout/__init__.py", ""),
+            ("/x/checkout/sub.py", ""),
+            ("/x/checkout/deep/__init__.py", ""),
+            ("/x/checkout/deep/mod.py", ""),
+        ];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(checkout).unwrap();
+
+        // Forward resolution: the package itself and submodules at varying depth.
+        let cases = [
+            ("coherent.test", "/x/checkout/__init__.py"),
+            ("coherent.test.sub", "/x/checkout/sub.py"),
+            ("coherent.test.deep", "/x/checkout/deep/__init__.py"),
+            ("coherent.test.deep.mod", "/x/checkout/deep/mod.py"),
+        ];
+        for (name, expected) in cases {
+            let module_name = ModuleName::new_static(name).unwrap();
+            let module = resolve_module_confident(&db, &module_name)
+                .unwrap_or_else(|| panic!("`{name}` should resolve"));
+            assert_eq!(
+                module.file(&db).unwrap().path(&db),
+                &FilePath::system(expected),
+                "forward resolution of `{name}`"
+            );
+        }
+
+        // The ancestor namespace package `coherent` is resolvable too.
+        let coherent = ModuleName::new_static("coherent").unwrap();
+        assert!(resolve_module_confident(&db, &coherent).is_some());
+
+        // Reverse resolution: a file in the checkout maps back to the dotted
+        // module name implied by the redirect.
+        for (name, path) in cases {
+            let module = path_to_module(&db, &FilePath::system(path))
+                .unwrap_or_else(|| panic!("`{path}` should map to a module"));
+            assert_eq!(name, module.name(&db), "reverse resolution of `{path}`");
+        }
+    }
+
+    #[test]
+    fn import_redirect_single_file_module() {
+        // A redirect whose target is a single-file module rather than a package.
+        const SITE_PACKAGES: &[FileSpec] = &[(
+            "_mod.pth",
+            "# import redirect editable_mod -> /x/editable_mod.py",
+        )];
+        let files = [("/x/editable_mod.py", "")];
+
+        let TestCase { mut db, .. } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(files).unwrap();
+
+        let name = ModuleName::new_static("editable_mod").unwrap();
+        let module = resolve_module_confident(&db, &name).unwrap();
+        assert_eq!(
+            module.file(&db).unwrap().path(&db),
+            &FilePath::system("/x/editable_mod.py")
+        );
+
+        // A single-file module has no submodules.
+        let sub = ModuleName::new_static("editable_mod.nope").unwrap();
+        assert_eq!(resolve_module_confident(&db, &sub), None);
+
+        // Reverse resolution.
+        let module = path_to_module(&db, &FilePath::system("/x/editable_mod.py")).unwrap();
+        assert_eq!("editable_mod", module.name(&db));
+    }
+
+    #[test]
+    fn import_redirect_does_not_shadow_real_module() {
+        // A redirect sits at the lowest module-resolution priority (like an
+        // editable install): a first-party module of the same name wins.
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "# import redirect foo -> /x/foo")];
+        let redirect_files = [("/x/foo/__init__.py", "")];
+
+        let TestCase { mut db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("foo.py", "")])
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(redirect_files).unwrap();
+
+        let name = ModuleName::new_static("foo").unwrap();
+        let module = resolve_module_confident(&db, &name).unwrap();
+        assert_eq!(
+            module.file(&db).unwrap().path(&db),
+            &FilePath::from(src.join("foo.py"))
+        );
+    }
+
+    #[test]
+    fn import_redirect_parsing_is_tolerant_and_strict() {
+        assert_eq!(
+            parse_import_redirect("# import redirect coherent.test -> /x/y"),
+            Some((ModuleName::new_static("coherent.test").unwrap(), "/x/y"))
+        );
+        // Tolerant of surrounding/marker whitespace.
+        assert_eq!(
+            parse_import_redirect("  #import redirect  foo  ->  /a/b  "),
+            Some((ModuleName::new_static("foo").unwrap(), "/a/b"))
+        );
+        // Not a redirect comment.
+        assert_eq!(parse_import_redirect("/x/src"), None);
+        assert_eq!(parse_import_redirect("# a comment"), None);
+        assert_eq!(
+            parse_import_redirect("import redirect foo -> /a/b"),
+            None,
+            "a real `import` line is executed by Python, not a comment"
+        );
+        // Missing pieces.
+        assert_eq!(parse_import_redirect("# import redirect foo"), None);
+        assert_eq!(parse_import_redirect("# import redirect foo ->"), None);
+        assert_eq!(parse_import_redirect("# import redirect -> /a/b"), None);
+        // Invalid module name.
+        assert_eq!(
+            parse_import_redirect("# import redirect not-a-name -> /a/b"),
+            None
+        );
+    }
+
+    #[test]
+    fn deleting_redirect_pth_file_invalidates_cache() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "# import redirect foo -> /x/foo")];
+        let x_directory = [("/x/foo/__init__.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files(x_directory).unwrap();
+
+        let foo_module_name = ModuleName::new_static("foo").unwrap();
+        assert!(resolve_module_confident(&db, &foo_module_name).is_some());
+
+        db.memory_file_system()
+            .remove_file(site_packages.join("_foo.pth"))
+            .unwrap();
+        File::sync_path(&mut db, &site_packages.join("_foo.pth"));
+
         assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
     }
 
