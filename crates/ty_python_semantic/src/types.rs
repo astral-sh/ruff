@@ -7226,8 +7226,8 @@ fn self_typevar_owner_class_literal<'db>(
 /// describes the current value and must not become part of the `Self` specialization.
 ///
 /// Nominal constraints are preserved because they describe the receiver's concrete subtype. A
-/// protocol constraint is preserved only when it owns `Self`; protocol behavior guaranteed by the
-/// nominal receiver is already represented there. Type aliases are preserved unless projection
+/// class-based protocol constraint is preserved when it owns `Self` or when a class in the same
+/// intersection is known to implement that protocol. Type aliases are preserved unless projection
 /// changes their value.
 fn self_type_projection<'db>(
     db: &'db dyn Db,
@@ -7241,6 +7241,32 @@ fn self_type_projection<'db>(
     struct ProjectionVisitors<'db> {
         positive: TypeTransformer<'db, SelfTypeProjection>,
         negative: CycleDetector<NegativeSelfTypeProjection, Type<'db>, Option<Type<'db>>>,
+    }
+
+    fn protocol_is_guaranteed_by_top_class<'db>(
+        db: &'db dyn Db,
+        intersection: IntersectionType<'db>,
+        protocol: ProtocolInstanceType<'db>,
+    ) -> bool {
+        let Some(protocol_instance) = protocol.to_nominal_instance() else {
+            return false;
+        };
+        let unknown_protocol = Type::instance(
+            db,
+            protocol_instance
+                .class_literal(db)
+                .unknown_specialization(db),
+        )
+        .top_materialization(db);
+
+        intersection.positive(db).iter().any(|positive| {
+            positive
+                .class_specialization(db)
+                .is_some_and(|(_, specialization)| {
+                    specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+                })
+                && positive.is_subtype_of(db, unknown_protocol)
+        })
     }
 
     fn transform<'db>(
@@ -7264,7 +7290,19 @@ fn self_type_projection<'db>(
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 for positive in intersection.positive(db) {
-                    builder = builder.add_positive(transform(db, *positive, owner_class, visitors));
+                    // Narrowing `Iterable[T] | dict[...]` to `defaultdict` produces
+                    // `Iterable[T] & Top[defaultdict[Unknown, Unknown]]`. Keep `Iterable[T]`
+                    // because `defaultdict` implements `Iterable`; it is the only remaining source
+                    // of `T`. This does not preserve a runtime protocol check unless the class
+                    // itself implements that protocol.
+                    if let Type::ProtocolInstance(protocol) = positive
+                        && protocol_is_guaranteed_by_top_class(db, intersection, *protocol)
+                    {
+                        builder = builder.add_positive(*positive);
+                    } else {
+                        builder =
+                            builder.add_positive(transform(db, *positive, owner_class, visitors));
+                    }
                 }
                 for negative in intersection.negative(db) {
                     if let Some(negative) = transform_negative(db, *negative, visitors) {

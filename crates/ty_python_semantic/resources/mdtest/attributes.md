@@ -1863,10 +1863,10 @@ def _(a_and_b: Intersection[type[A], type[B]]):
     a_and_b.x = R()
 ```
 
-### `Self` binding uses the full intersection type
+### `Self` with multiple class constraints
 
-For `Intersection[A, B]`, member lookup searches `A` and `B` separately to find the attribute or
-method. Once found, however, `Self` must be bound using the full `A & B` receiver.
+When a value has type `A & B`, attributes and methods declared as `Self` on `A` also have type
+`A & B`. Both class constraints describe the value's class.
 
 ```py
 from typing_extensions import Self
@@ -1883,7 +1883,6 @@ class B: ...
 def _(a_and_b: Intersection[A, B]):
     reveal_type(a_and_b.value)  # revealed: A & B
     reveal_type(a_and_b.method())  # revealed: A & B
-    reveal_type(A.method(a_and_b))  # revealed: A & B
 ```
 
 ### Descriptor binding uses the full intersection type
