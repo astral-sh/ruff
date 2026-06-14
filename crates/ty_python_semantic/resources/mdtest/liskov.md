@@ -952,6 +952,21 @@ class B4(A4):
     def method(self, x: int) -> int: ...
 ```
 
+## Explicit receivers on inherited methods
+
+An inherited method with an explicit receiver only constrains subclasses accepted by that receiver:
+
+```pyi
+class Base:
+    def method(self: Included, value: object) -> None: ...
+
+class Included(Base):
+    def method(self, value: int) -> None: ...  # error: [invalid-method-override]
+
+class Excluded(Base):
+    def method(self, value: int) -> None: ...  # fine
+```
+
 ## Generic methods on generic classes work as expected
 
 ```toml
