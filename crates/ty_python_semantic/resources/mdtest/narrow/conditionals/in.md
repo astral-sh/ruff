@@ -296,8 +296,9 @@ def custom_contains_literal_domain(
 ## Final and non-final iterable classes
 
 An instance of a non-final class might be an instance of a subclass that defines `__contains__`. For
-a final class, we know that membership falls back to iteration, so we can use the iterable element
-type to narrow the subject:
+a final class without `__contains__`, we know that membership falls back to iteration, so we can use
+the iterable element type to narrow the subject. A final class with its own `__contains__` method
+remains conservative:
 
 ```py
 from collections.abc import Iterator
@@ -322,6 +323,21 @@ class FinalIterable:
 def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
+
+@final
+class FinalContainsEverything:
+    def __iter__(self) -> Iterator[Literal["missing"]]:
+        yield "missing"
+
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def final_custom_contains(
+    x: Payload | Literal["missing"],
+    values: FinalContainsEverything,
+):
+    if x in values:
+        reveal_type(x)  # revealed: Literal["missing"] | Payload
 ```
 
 ## Built-in containment with overridden iteration
