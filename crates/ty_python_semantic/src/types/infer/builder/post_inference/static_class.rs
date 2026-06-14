@@ -730,13 +730,10 @@ pub(crate) fn check_static_class_definitions<'db>(
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
     if class.has_pep_695_type_params(db)
-        && let Some(typevar) = class
-            .inherited_legacy_generic_context(db)
-            .and_then(|context| {
-                context
-                    .variables(db)
-                    .find(|typevar| !typevar.typevar(db).is_self(db))
-            })
+        && let Some(generic_context) = class.inherited_legacy_generic_context(db)
+        && let Some(typevar) = generic_context
+            .variables(db)
+            .find(|typevar| !typevar.typevar(db).is_self(db))
         && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
     {
         builder.into_diagnostic(format_args!(
