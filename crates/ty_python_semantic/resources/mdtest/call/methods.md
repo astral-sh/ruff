@@ -403,6 +403,38 @@ class D:
 D.f()
 ```
 
+When constructing a `classmethod` fails because the receiver is incompatible, we preserve the
+remaining parameters and return type. This prevents the receiver error from causing additional
+errors when the resulting descriptor is accessed or called:
+
+```py
+class FormatChecker:
+    def checks(self, format: str, raises: tuple[type[Exception], ...] = ()) -> str:
+        return format
+
+    # error: [invalid-argument-type] "Argument to `classmethod.__init__` is incorrect"
+    cls_checks = classmethod(checks)
+
+# revealed: (format: str, raises: tuple[type[Exception], ...] = ...) -> str
+reveal_type(FormatChecker.cls_checks)
+FormatChecker.cls_checks("email", (ValueError,))
+FormatChecker.cls_checks(1)  # error: [invalid-argument-type]
+```
+
+We only remove a positional receiver. If the callable starts with a keyword-only parameter, we fall
+back conservatively instead of incorrectly removing that parameter:
+
+```py
+class KeywordOnly:
+    def checks(*, format: str) -> str:
+        return format
+
+    # error: [invalid-argument-type] "Argument to `classmethod.__init__` is incorrect"
+    cls_checks = classmethod(checks)
+
+KeywordOnly.cls_checks(format="email")
+```
+
 When a class method is accessed on a derived class, it is bound to that derived class:
 
 ```py

@@ -2,9 +2,11 @@ use super::{Binding, Bindings, CallableBinding, CallableItem};
 use crate::db::Db;
 use crate::types::call::arguments::CallArguments;
 use crate::types::constraints::ConstraintSetBuilder;
-use crate::types::generics::Specialization;
-use crate::types::signatures::Parameter;
-use crate::types::{BoundTypeVarInstance, ClassLiteral, DynamicType, Type, TypeContext};
+use crate::types::generics::{Specialization, SpecializationBuilder};
+use crate::types::signatures::{Parameter, Parameters};
+use crate::types::{
+    BoundTypeVarInstance, ClassLiteral, DynamicType, KnownClass, Type, TypeContext, TypeVarVariance,
+};
 
 /// Bindings for a constructor call.
 ///
@@ -215,6 +217,89 @@ impl<'db> ConstructorBinding<'db> {
             .next()
     }
 
+    /// Recover only the callable tail and return type from a failed `classmethod` constructor.
+    ///
+    /// The binding's ordinary specialization may contain invalid mappings that were inferred only
+    /// to improve diagnostics, so it must not be used as the constructed descriptor's type.
+    fn recovered_classmethod_specialization(
+        &self,
+        db: &'db dyn Db,
+        class_specialization: Specialization<'db>,
+    ) -> Option<Specialization<'db>> {
+        if self.first_matching_overload().is_some()
+            || !self
+                .constructed_class_literal(db)
+                .and_then(ClassLiteral::as_static)
+                .is_some_and(|class| class.is_known(db, KnownClass::Classmethod))
+        {
+            return None;
+        }
+
+        let [overload] = self.callable().overloads() else {
+            return None;
+        };
+        let ([_, formal_parameter], [_, Some(actual)]) = (
+            overload.signature.parameters().as_slice(),
+            overload.parameter_types(),
+        ) else {
+            return None;
+        };
+        let Type::Callable(formal_callable) = formal_parameter.annotated_type() else {
+            return None;
+        };
+        let [formal] = formal_callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        let (prefix, paramspec) = formal.parameters().as_paramspec_with_prefix()?;
+        let [receiver] = prefix else {
+            return None;
+        };
+        let Type::SubclassOf(receiver_type) = receiver.annotated_type() else {
+            return None;
+        };
+        receiver_type.into_type_var()?;
+        let Type::TypeVar(return_typevar) = formal.return_ty else {
+            return None;
+        };
+
+        let actual_callables = actual.try_upcast_to_callable(db)?;
+        let [actual_callable] = actual_callables.as_slice() else {
+            return None;
+        };
+        let [actual] = actual_callable.signatures(db).overloads.as_slice() else {
+            return None;
+        };
+        if actual.generic_context.is_some()
+            || !actual
+                .parameters()
+                .iter()
+                .next()
+                .is_some_and(Parameter::is_positional)
+        {
+            return None;
+        }
+
+        let class_context = class_specialization.generic_context(db);
+        let constraints = ConstraintSetBuilder::new();
+        let mut builder =
+            SpecializationBuilder::new(db, &constraints, class_context.inferable_typevars(db));
+        let remaining_parameters = Parameters::new(db, actual.parameters().iter().skip(1).cloned());
+        builder.add_type_mapping(
+            paramspec,
+            Type::paramspec_value_callable(db, remaining_parameters),
+            TypeVarVariance::Covariant,
+        );
+        builder.add_type_mapping(return_typevar, actual.return_ty, TypeVarVariance::Covariant);
+
+        Some(builder.build_with(class_context, |typevar, bounds| {
+            bounds.is_none().then(|| {
+                class_specialization
+                    .get(db, typevar)
+                    .unwrap_or(Type::TypeVar(typevar))
+            })
+        }))
+    }
+
     /// Combine inferred specializations from this constructor and downstream constructors. The
     /// resulting specialization can be applied either to the constructed instance type or to an
     /// explicit `__new__` / `__call__` return annotation that is an instance of the constructed
@@ -233,6 +318,16 @@ impl<'db> ConstructorBinding<'db> {
 
         let mut combined: Option<Specialization<'db>> = None;
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
+            if let Some(specialization) =
+                binding.recovered_classmethod_specialization(db, class_specialization)
+            {
+                combined = Some(match combined {
+                    None => specialization,
+                    Some(previous) => previous.combine(db, specialization),
+                });
+                return;
+            }
+
             let Some(overload) = binding.first_matching_overload() else {
                 return;
             };
