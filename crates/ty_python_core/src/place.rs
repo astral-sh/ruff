@@ -3,7 +3,7 @@ use crate::member::{
     Member, MemberExpr, MemberExprBuilder, MemberExprRef, MemberTable, MemberTableBuilder,
     ScopedMemberId,
 };
-use crate::predicate::{PatternPredicate, PatternPredicateKind};
+use crate::predicate::PatternPredicate;
 use crate::scope::FileScopeId;
 use crate::symbol::{ScopedSymbolId, Symbol, SymbolTable, SymbolTableBuilder};
 use crate::{Db, PossiblyNarrowedPlaces};
@@ -13,6 +13,20 @@ use ruff_python_ast as ast;
 use smallvec::SmallVec;
 use std::hash::Hash;
 use std::iter::FusedIterator;
+
+/// Return the expressions whose existing bindings a match pattern can narrow.
+///
+/// In addition to the subject itself, matching an attribute or subscript can narrow its base.
+pub(crate) fn match_subject_place_expressions(subject: &ast::Expr) -> SmallVec<[&ast::Expr; 2]> {
+    let mut expressions: SmallVec<[&ast::Expr; 2]> = SmallVec::new();
+    expressions.push(subject);
+    match subject {
+        ast::Expr::Subscript(subscript) => expressions.push(&subscript.value),
+        ast::Expr::Attribute(attribute) => expressions.push(&attribute.value),
+        _ => {}
+    }
+    expressions
+}
 
 /// An expression that can be the target of a `Definition`.
 #[derive(Eq, PartialEq, Debug, get_size2::GetSize)]
@@ -601,7 +615,7 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         pattern: PatternPredicate<'db>,
         module: &ParsedModuleRef,
     ) -> PossiblyNarrowedPlaces {
-        self.pattern_kind(pattern.kind(self.db), pattern.subject(self.db), module)
+        self.pattern_kind(pattern.subject(self.db), module)
     }
 
     fn expression_node(&self, expr: &ast::Expr) -> PossiblyNarrowedPlaces {
@@ -762,47 +776,19 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
     /// Pattern predicates narrow the match subject.
     fn pattern_kind(
         &self,
-        kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
         module: &ParsedModuleRef,
     ) -> PossiblyNarrowedPlaces {
         let mut places = PossiblyNarrowedPlaces::default();
 
-        // The match subject can always be narrowed by a pattern
         let subject_node = subject.node_ref(self.db).node(module);
-        if let Some(subject_place_expr) = PlaceExpr::try_from_expr(subject_node) {
-            if let Some(place) = self.places.place_id((&subject_place_expr).into()) {
+        for expression in match_subject_place_expressions(subject_node) {
+            if let Some(place) = PlaceExpr::try_from_expr(expression)
+                .and_then(|place| self.places.place_id((&place).into()))
+            {
                 places.insert(place);
             }
         }
-
-        // For subscript subjects, the subscript base can also be narrowed (TypedDict/tuple narrowing)
-        if let ast::Expr::Subscript(subscript) = subject_node {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
-            }
-        }
-        if let ast::Expr::Attribute(attribute) = subject_node
-            && let Some(place_expr) = PlaceExpr::try_from_expr(&attribute.value)
-            && let Some(place) = self.places.place_id((&place_expr).into())
-        {
-            places.insert(place);
-        }
-
-        // Handle Or patterns by recursing into each alternative
-        if let PatternPredicateKind::Or(predicates) = kind {
-            for predicate in predicates {
-                places.extend(self.pattern_kind(predicate, subject, module));
-            }
-        }
-
-        // Handle As patterns by recursing into the inner pattern
-        if let PatternPredicateKind::As(Some(inner), _) = kind {
-            places.extend(self.pattern_kind(inner, subject, module));
-        }
-
         places
     }
 }
