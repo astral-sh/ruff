@@ -662,6 +662,15 @@ def runtime_protocol_narrowing(value: Child) -> None:
         value.replace(Child())
     else:
         reveal_type(value.copy())  # revealed: Child
+
+@runtime_checkable
+class HasItem[T](Protocol):
+    item: T
+
+def generic_runtime_protocol_narrowing(value: Child) -> None:
+    if isinstance(value, HasItem):
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
 ```
 
 Narrowing an `Iterable[...] | dict[...]` value to `defaultdict` retains the iterable element type.

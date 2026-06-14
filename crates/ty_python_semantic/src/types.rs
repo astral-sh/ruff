@@ -7260,11 +7260,12 @@ fn self_type_projection<'db>(
         .top_materialization(db);
 
         intersection.positive(db).iter().any(|positive| {
-            positive
-                .class_specialization(db)
-                .is_some_and(|(_, specialization)| {
-                    specialization.materialization_kind(db) == Some(MaterializationKind::Top)
-                })
+            matches!(positive, Type::NominalInstance(_))
+                && positive
+                    .class_specialization(db)
+                    .is_some_and(|(_, specialization)| {
+                        specialization.materialization_kind(db) == Some(MaterializationKind::Top)
+                    })
                 && positive.is_subtype_of(db, unknown_protocol)
         })
     }
