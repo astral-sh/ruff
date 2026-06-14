@@ -260,15 +260,14 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
         reveal_type(x)  # revealed: Never
 ```
 
-## Custom containment methods on non-tuple types
+## Custom containment methods
 
-Python uses `__contains__` when a class defines it. The method can return `True` for values that the
-class would never produce during iteration. We therefore retain every member of the subject's union
-unless we know that membership searches the values described by the iterable element type.
+A custom `__contains__` method can return `True` for values that the class would never produce
+during iteration. We therefore retain every member of the subject's union:
 
 ```py
 from collections.abc import Iterator
-from typing import Literal, TypedDict, final
+from typing import Literal, TypedDict
 
 class Payload(TypedDict):
     value: int
@@ -283,14 +282,27 @@ class ContainsEverything:
 def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"] | Payload
+```
+
+## Final and non-final iterable classes
+
+An instance of a non-final class might be an instance of a subclass that defines `__contains__`. For
+a final class, we know that membership falls back to iteration, so we can use the iterable element
+type to narrow the subject:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
 
 class IteratesMissing:
     def __iter__(self) -> Iterator[Literal["missing"]]:
         yield "missing"
 
-def open_iterable(x: Payload | Literal["missing"], values: IteratesMissing):
+def non_final_iterable(x: Payload | Literal["missing"], values: IteratesMissing):
     if x in values:
-        # A runtime subclass could introduce a custom `__contains__` implementation.
         reveal_type(x)  # revealed: Literal["missing"] | Payload
 
 @final
@@ -301,6 +313,19 @@ class FinalIterable:
 def final_iterable(x: Payload | Literal["missing"], values: FinalIterable):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"]
+```
+
+## Built-in containment with overridden iteration
+
+`list.__contains__` searches the values stored in the list. Overriding `__iter__` does not change
+which values membership can find:
+
+```py
+from collections.abc import Iterator
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
 
 @final
 class OverridesBuiltinIteration(list[object]):
@@ -312,15 +337,14 @@ def inherited_builtin_contains(
     values: OverridesBuiltinIteration,
 ):
     if x in values:
-        # `list.__contains__` searches the stored values, not those produced by the override.
         reveal_type(x)  # revealed: Literal["missing"] | Payload
 ```
 
 ## Custom containment methods on tuple subclasses
 
-Tuple subclasses are currently assumed to preserve tuple containment semantics, just as they are
-assumed to preserve tuple equality semantics. A custom `__contains__` method can violate that
-assumption:
+ty currently treats tuple subclasses like tuples when narrowing membership tests, even if the
+subclass overrides `__contains__`. The result below is therefore too narrow and documents a known
+limitation:
 
 ```py
 from typing import Literal, TypedDict
