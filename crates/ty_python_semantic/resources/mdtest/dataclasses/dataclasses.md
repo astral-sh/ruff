@@ -411,6 +411,15 @@ WithOrder(1) > WithOrder(2)
 WithOrder(1) >= WithOrder(2)
 ```
 
+`order=True` requires `eq=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+class InvalidOrder: ...
+```
+
 Comparisons are only allowed for `WithOrder` instances:
 
 ```py
@@ -1248,6 +1257,15 @@ class C:
     x: int
 
 reveal_type(C.__weakref__)  # revealed: Any | None
+```
+
+`weakref_slot=True` requires `slots=True`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+class InvalidWeakrefSlot: ...
 ```
 
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses

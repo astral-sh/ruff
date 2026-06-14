@@ -13,9 +13,9 @@ use crate::{
     diagnostic::format_enumeration,
     place::{DefinedPlace, Place, TypeOrigin, place_from_bindings, place_from_declarations},
     types::{
-        CallArguments, ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
-        StaticClassLiteral, Type, TypeVarVariance, binding_type,
+        CallArguments, ClassBase, ClassLiteral, ClassType, DataclassFlags, KnownClass,
+        KnownInstanceType, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature,
+        SpecialFormType, StaticClassLiteral, Type, TypeVarVariance, binding_type,
         call::Argument,
         class::{
             AbstractMethod, CodeGeneratorKind, FieldKind, MetaclassErrorKind,
@@ -173,7 +173,29 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check for invalid `@dataclass` applications.
-    if class.dataclass_params(db).is_some() {
+    let dataclass_params = class.dataclass_params(db);
+    if let Some(dataclass_params) = dataclass_params
+        && let Some(decorator_position) = class.find_dataclass_decorator_position(db)
+    {
+        let decorator = &class_node.decorator_list[decorator_position];
+        let flags = dataclass_params.flags(db);
+
+        if flags.contains(DataclassFlags::ORDER)
+            && !flags.contains(DataclassFlags::EQ)
+            && let Some(builder) = context.report_lint(&INVALID_DATACLASS, decorator)
+        {
+            builder.into_diagnostic("`order=True` requires `eq=True`");
+        }
+
+        if flags.contains(DataclassFlags::WEAKREF_SLOT)
+            && !flags.contains(DataclassFlags::SLOTS)
+            && let Some(builder) = context.report_lint(&INVALID_DATACLASS, decorator)
+        {
+            builder.into_diagnostic("`weakref_slot=True` requires `slots=True`");
+        }
+    }
+
+    if dataclass_params.is_some() {
         if class.has_named_tuple_class_in_mro(db) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(

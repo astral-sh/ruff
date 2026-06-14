@@ -494,30 +494,30 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for invalid applications of the `@dataclass` decorator.
+    /// Checks for invalid applications and arguments of the `@dataclass` decorator.
     ///
     /// ## Why is this bad?
-    /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
-    /// `Enum`, or `Protocol` is invalid:
+    /// Using incompatible arguments or applying `@dataclass` to certain classes causes a runtime
+    /// exception:
     ///
-    /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
-    ///   instantiating the class.
-    /// - `Enum` classes with `@dataclass` are [explicitly not supported].
-    /// - `Protocol` classes define interfaces and cannot be instantiated.
+    /// - `order=True` with `eq=False`
+    /// - `weakref_slot=True` with `slots=False`
+    /// - Classes inheriting from `NamedTuple` or `TypedDict`
+    /// - `Enum` or `Protocol` classes
     ///
     /// ## Examples
     /// ```python
     /// from dataclasses import dataclass
-    /// from typing import NamedTuple
     ///
-    /// @dataclass  # error: [invalid-dataclass]
-    /// class Foo(NamedTuple):
-    ///     x: int
+    /// @dataclass(order=True, eq=False)  # error: [invalid-dataclass]
+    /// class Ordered: ...
+    ///
+    /// @dataclass(weakref_slot=True)  # error: [invalid-dataclass]
+    /// class WeakrefSlot: ...
     /// ```
-    ///
-    /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    /// See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
     pub(crate) static INVALID_DATACLASS = {
-        summary: "detects invalid `@dataclass` applications",
+        summary: "detects invalid `@dataclass` applications and arguments",
         status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
     }
