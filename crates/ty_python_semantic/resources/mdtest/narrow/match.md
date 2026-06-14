@@ -485,6 +485,8 @@ def test_compatible_declared_alias(subject: object) -> None:
             reveal_type(item)  # revealed: int
 ```
 
+## Whole-pattern aliases
+
 When an alias surrounds the whole pattern, it preserves the subject's type variable instead of
 reconstructing a structural type from the pattern. If only some choices of a constrained type
 variable can match, the binding keeps the type variable together with the sequence shape established
@@ -534,12 +536,12 @@ def test_match_sequence_alias_narrows_constrained_typevar(
         case _:
             raise ValueError
 
-def test_match_sequence_alias_preserves_typevar_union_arm(
+def test_match_sequence_alias_preserves_typevar_union_member(
     value: BoundSequenceT | str,
 ) -> BoundSequenceT:
     match value:
         case [_] as whole:
-            # revealed: BoundSequenceT@test_match_sequence_alias_preserves_typevar_union_arm
+            # revealed: BoundSequenceT@test_match_sequence_alias_preserves_typevar_union_member
             reveal_type(whole)
             return whole
         case _:
@@ -616,9 +618,11 @@ def test_match_class_alias_rejects_disjoint_final_class(value: FinalA) -> None:
             reveal_type(item)  # revealed: Never
 ```
 
-A `TypedDict` is a `dict` at runtime, so it can also satisfy a runtime-checkable protocol. Class
-pattern filtering retains that structural overlap instead of treating every non-`dict` class as
-disjoint.
+## Class patterns for runtime dictionary values
+
+A `TypedDict` is not a nominal subtype of `dict`, but its values are dictionaries at runtime. A
+`TypedDict` can therefore match `dict`, the mapping abstract base classes, and runtime-checkable
+protocols implemented by dictionaries.
 
 ```py
 from collections.abc import Mapping, MutableMapping
@@ -652,6 +656,8 @@ def test_match_typed_dict_alias_preserves_mutable_mapping_runtime_type(
         case MutableMapping() as item:
             reveal_type(item)  # revealed: ProtocolPayload
 ```
+
+## Class pattern captures
 
 Class patterns pass the type of each extracted attribute to their nested patterns. The surrounding
 `as` pattern keeps the subject's original generic type or type variable.
@@ -699,10 +705,12 @@ def test_incompatible_declared_class_capture(value: PatternBox[int]) -> None:
             reveal_type(item)  # revealed: str
 ```
 
-Class patterns also inherit ty's existing limitation around intersections of related generic types.
-Matching a generic base as one of its subclasses does not yet carry the base's specialization into
-the subclass. This is tracked by [astral-sh/ty#1824](https://github.com/astral-sh/ty/issues/1824)
-and [astral-sh/ty#3676](https://github.com/astral-sh/ty/issues/3676).
+## Generic subclass captures
+
+When a value is typed as a generic base class and the pattern matches one of its subclasses, ty does
+not yet preserve the base class's type argument on the subclass. This is tracked by
+[astral-sh/ty#1824](https://github.com/astral-sh/ty/issues/1824) and
+[astral-sh/ty#3676](https://github.com/astral-sh/ty/issues/3676).
 
 ```py
 from typing import Generic, TypeVar
@@ -717,9 +725,11 @@ class GenericPatternChild(GenericPatternBase[GenericPatternT]):
 def test_match_generic_subclass_capture(value: GenericPatternBase[int]) -> None:
     match value:
         case GenericPatternChild(item=item):
-            # TODO: This should be `int` once related generic intersections can be simplified.
+            # TODO: This should be `int` once the base class's type argument is preserved.
             reveal_type(item)  # revealed: object
 ```
+
+## Positional class patterns
 
 `__match_args__` is read through the pattern class and must identify literal attribute names. This
 includes attributes provided by a metaclass. An explicit widened annotation does not tell us which
@@ -747,9 +757,11 @@ def test_widened_match_args_does_not_select_an_attribute(value: WidenedMatchArgs
             reveal_type(item)  # revealed: Unknown
 ```
 
-Each union arm is checked against the complete class pattern before the extracted values are
-combined. This keeps a tag, its payload, and the whole-pattern alias correlated. The same rule
-applies through an `or` pattern.
+## Class patterns and union members
+
+Each member of a union is checked against the complete class pattern before the extracted values are
+combined. This keeps a tag together with its payload and any alias around the whole pattern. The
+same rule applies through an `or` pattern.
 
 ```py
 from typing import Generic, Literal, TypeVar
@@ -762,14 +774,19 @@ class TaggedPayload(Generic[TagT, PayloadT]):
     tag: TagT
     payload: PayloadT
 
-def test_match_class_capture_filters_union_arms(
+def test_match_class_capture_filters_union_members(
     value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str],
 ) -> None:
     match value:
         case TaggedPayload("int", item) as whole:
             reveal_type(item)  # revealed: int
             reveal_type(whole)  # revealed: TaggedPayload[Literal["int"], int]
+```
 
+A name is bound only when the complete class pattern succeeds. If a later subpattern cannot match,
+an earlier capture has type `Never`:
+
+```py
 class ImpossibleClassPattern:
     __match_args__ = ("first", "second")
     first: str
@@ -782,7 +799,7 @@ def test_later_class_pattern_failure_rejects_earlier_capture(
         case ImpossibleClassPattern(item, int()):
             reveal_type(item)  # revealed: Never
 
-def test_match_class_or_pattern_filters_union_arms(
+def test_match_class_or_pattern_filters_union_members(
     value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool],
 ) -> None:
     match value:
@@ -790,7 +807,14 @@ def test_match_class_or_pattern_filters_union_arms(
             reveal_type(item)  # revealed: int | str
             # revealed: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str]
             reveal_type(whole)
+```
 
+## Ordered class pattern alternatives
+
+Alternatives are tried from left to right. Looking up an attribute on the first alternative can fail
+for a subclass, so the later alternative can still bind the subject itself:
+
+```py
 class OrderedBase:
     member: int = 0
 
@@ -800,11 +824,16 @@ def test_match_ordered_class_alternatives_preserve_later_bindings(
     value: OrderedChild,
 ) -> None:
     match value:
-        # Attribute extraction in the first alternative can fail for a subclass, so the second
-        # alternative still contributes its binding type.
         case OrderedBase(member=item) | (OrderedChild() as item):
             reveal_type(item)  # revealed: int | OrderedChild
+```
 
+## Built-in match-self captures
+
+For Python's built-in match-self classes, the positional subpattern receives the entire subject
+rather than one of its attributes:
+
+```py
 def test_match_builtin_match_self(
     value: list[int] | dict[str, int] | int,
 ) -> None:
@@ -815,7 +844,14 @@ def test_match_builtin_match_self(
             reveal_type(contents)  # revealed: dict[str, int]
         case int(contents):
             reveal_type(contents)  # revealed: int
+```
 
+## Overlapping class patterns
+
+Two unrelated non-final classes can have a common subclass through multiple inheritance. The
+successful pattern therefore preserves both class types:
+
+```py
 class OverlapCaptureA: ...
 
 class OverlapCaptureB:
@@ -832,7 +868,10 @@ def test_match_class_capture_preserves_possible_multiple_inheritance(
             reveal_type(whole)  # revealed: OverlapCaptureA & OverlapCaptureB
 ```
 
-Class patterns preserve gradual uncertainty alongside the member type declared by the pattern class.
+## Class pattern captures from `Any` and `Unknown`
+
+For an `Any` or `Unknown` subject, a capture keeps that uncertainty together with the attribute type
+declared by the pattern class.
 
 ```py
 from typing import Any
@@ -851,14 +890,15 @@ def test_match_gradual_class_captures(any_value: Any, unknown_value: Unknown) ->
             reveal_type(item)  # revealed: Unknown & int
 ```
 
-Mapping patterns use the mapping's key and value types. A successful keyed pattern can filter union
-arms, while `**rest` is always a new `dict` containing the unmatched items.
+## Mapping pattern captures
+
+Mapping patterns use the mapping's key and value types. A keyed pattern can remove members of a
+union that cannot contain the requested key, while `**rest` is always a new `dict` containing the
+unmatched items.
 
 ```py
 from collections.abc import Mapping
-from enum import IntEnum
 from typing import Literal, TypeVar
-from typing_extensions import Never
 
 MappingValueT = TypeVar("MappingValueT")
 
@@ -889,13 +929,21 @@ def test_incompatible_declared_mapping_captures(value: Mapping[str, int]) -> Non
             reveal_type(item)  # revealed: str
             reveal_type(rest)  # revealed: dict[str, str]
 
-def test_match_mapping_key_filters_union_arms(
+def test_match_mapping_key_filters_union_members(
     value: dict[Literal["a"], int] | dict[Literal["b"], str],
 ) -> None:
     match value:
         case {"a": item} as whole:
             reveal_type(item)  # revealed: int
             reveal_type(whole)  # revealed: dict[Literal["a"], int]
+```
+
+An `IntEnum` key can compare equal to the corresponding integer literal, so it can select the value
+from a mapping with integer literal keys:
+
+```py
+from enum import IntEnum
+from typing import Literal
 
 class MappingKey(IntEnum):
     ITEM = 1
@@ -922,6 +970,13 @@ def test_later_mapping_pattern_failure_rejects_bindings(
         case {"first": item, "second": int(), **rest}:
             reveal_type(item)  # revealed: Never
             reveal_type(rest)  # revealed: Never
+```
+
+A dictionary whose key type is `Never` cannot contain any keys, so a mapping pattern that requests a
+key can never match:
+
+```py
+from typing_extensions import Never
 
 def test_match_mapping_rejects_empty_key_domain(
     value: dict[Never, int],
@@ -931,8 +986,10 @@ def test_match_mapping_rejects_empty_key_domain(
             reveal_type(item)  # revealed: Never
 ```
 
-Mapping captures follow the same gradual-type rules. The rest pattern is a new dictionary whose key
-and value types come from the matched mapping.
+## Mapping captures from `Any` and `Unknown`
+
+The rest pattern is a new dictionary. For an `Any` or `Unknown` subject, its key and value types
+keep the same uncertainty as the subject.
 
 ```py
 from typing import Any
@@ -950,12 +1007,15 @@ def test_match_gradual_mapping_captures(any_value: Any, unknown_value: Unknown) 
             reveal_type(rest)  # revealed: dict[Unknown, Unknown]
 ```
 
-For a `TypedDict`, a literal key uses the declared field type. Closed dictionaries can rule out
-missing keys, and tagged unions remain correlated through `or` patterns.
+## `TypedDict` mapping patterns
+
+For a `TypedDict`, a literal key uses the declared field type. For a closed `TypedDict`, a pattern
+using an undeclared key is impossible. Tags keep each `TypedDict` together with its corresponding
+value type through an `or` pattern.
 
 ```py
 from typing import Literal
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 class IntPayload(TypedDict):
     tag: Literal["int"]
@@ -965,7 +1025,7 @@ class StrPayload(TypedDict):
     tag: Literal["str"]
     value: str
 
-def test_match_typed_dict_capture_filters_union_arms(
+def test_match_typed_dict_capture_filters_union_members(
     value: IntPayload | StrPayload,
 ) -> None:
     match value:
@@ -973,6 +1033,14 @@ def test_match_typed_dict_capture_filters_union_arms(
             reveal_type(item)  # revealed: int
             reveal_type(rest)  # revealed: dict[str, object]
             reveal_type(whole)  # revealed: IntPayload
+
+class OptionalPayload(TypedDict):
+    value: NotRequired[int]
+
+def test_match_optional_typed_dict_field(value: OptionalPayload) -> None:
+    match value:
+        case {"value": item}:
+            reveal_type(item)  # revealed: int
 
 class ClosedIntPayload(TypedDict, closed=True):
     tag: Literal["int"]
@@ -1012,7 +1080,7 @@ def test_match_typed_dict_extra_items(
             reveal_type(item)  # revealed: int
             reveal_type(whole)  # revealed: ExtraItemsPayload
 
-def test_match_typed_dict_or_pattern_filters_union_arms(
+def test_match_typed_dict_or_pattern_filters_union_members(
     value: ClosedIntPayload | ClosedStrPayload | ClosedBoolPayload,
 ) -> None:
     match value:
