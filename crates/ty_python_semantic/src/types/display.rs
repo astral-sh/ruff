@@ -1009,11 +1009,26 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 write!(f.with_type(self.ty), "{dynamic}")
             }
-            Type::Divergent(_) => f.with_type(self.ty).write_str("Divergent"),
-            Type::CycleMarked(marked) => marked
-                .inner(self.db)
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::Divergent(divergent) if divergent.is_placeholder(self.db) => {
+                f.with_type(self.ty).write_str("Divergent")
+            }
+            Type::Divergent(divergent) => {
+                let binder_id = divergent.id(self.db);
+                if self
+                    .settings
+                    .visited_recursive_type_binders
+                    .contains(&binder_id)
+                {
+                    return f
+                        .with_type(Type::divergent(self.db, binder_id))
+                        .write_str("Divergent");
+                }
+                let body = divergent
+                    .body(self.db)
+                    .expect("bodyful Divergent must have a body");
+                body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))
+                    .fmt_detailed(f)
+            }
             // Display `Type::Recursive` by substituting recursive-position `Divergent`
             // markers with the source type when it has an explicit origin, then printing the body.
             // So
@@ -1022,7 +1037,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             // (implicit recursion from inference cycles), fall back to the body as-is.
             Type::Recursive(r) => {
                 let binder_id = r.binder_id(self.db);
-                let marker = Type::divergent(binder_id);
+                let marker = Type::divergent(self.db, binder_id);
                 if self
                     .settings
                     .visited_recursive_type_binders

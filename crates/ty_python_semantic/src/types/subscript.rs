@@ -24,7 +24,7 @@ use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    CycleMarkable, CycleMarkedType, DynamicType, IntersectionBuilder, IntersectionType,
+    CycleMarkable, DivergentType, DynamicType, IntersectionBuilder, IntersectionType,
     KnownInstanceType, Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
@@ -199,7 +199,7 @@ impl<'db> Foldable<'db> for SubscriptError<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for SubscriptError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
             result_ty: self.result_ty.mark_cycle(db, marked),
             errors: self
@@ -271,7 +271,7 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::IndexOutOfBounds {
                 kind,
@@ -617,7 +617,7 @@ fn typed_dict_subscript<'db>(
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
-    if slice_ty.is_dynamic() {
+    if slice_ty.is_dynamic(db) {
         return Ok(Type::unknown());
     }
 
@@ -672,10 +672,14 @@ impl<'db> Type<'db> {
         let value_ty = self;
 
         let inferred = match (value_ty, slice_ty) {
-            (Type::CycleMarked(marked), _) => {
+            (Type::Divergent(divergent), _) if let Some(marked) =
+                divergent.as_cycle_marked(db) =>
+            {
                 Some(marked.map(db, |inner| inner.subscript(db, slice_ty, expr_context)))
             }
-            (_, Type::CycleMarked(marked)) => {
+            (_, Type::Divergent(divergent)) if let Some(marked) =
+                divergent.as_cycle_marked(db) =>
+            {
                 Some(marked.map(db, |inner| value_ty.subscript(db, inner, expr_context)))
             }
             // `Divergent` is the recursive α-leaf (reached after a `Type::Recursive` unfold, or a

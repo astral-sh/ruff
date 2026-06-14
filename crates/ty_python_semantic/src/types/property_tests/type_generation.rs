@@ -148,7 +148,7 @@ impl Ty {
         match self {
             Ty::Never => Type::Never,
             Ty::Unknown => Type::unknown(),
-            Ty::Divergent => divergent(1),
+            Ty::Divergent => divergent(db, 1),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
             Ty::IntLiteral(n) => Type::int_literal(n),
@@ -260,8 +260,8 @@ impl Ty {
     }
 }
 
-fn divergent<'db>(id_bits: u64) -> Type<'db> {
-    Type::divergent(salsa::plumbing::Id::from_bits(id_bits))
+fn divergent<'db>(db: &'db dyn Db, id_bits: u64) -> Type<'db> {
+    Type::divergent(db, salsa::plumbing::Id::from_bits(id_bits))
 }
 
 fn newtype_instance<'db>(db: &'db dyn Db, name: &str) -> Type<'db> {

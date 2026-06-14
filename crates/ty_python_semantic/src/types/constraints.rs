@@ -5416,7 +5416,7 @@ impl SequentMap {
                     let should_weaken_upper = !constrained_upper.is_type_var()
                         && !constrained_upper.is_never()
                         && !constrained_upper.is_object()
-                        && !constrained_upper.is_dynamic()
+                        && !constrained_upper.is_dynamic(db)
                         && match constrained_upper.variance_of(db, nested_typevar) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => !is_upper_bound,
@@ -5461,7 +5461,7 @@ impl SequentMap {
                     let should_weaken_lower = !constrained_lower.is_type_var()
                         && !constrained_lower.is_never()
                         && !constrained_lower.is_object()
-                        && !constrained_lower.is_dynamic()
+                        && !constrained_lower.is_dynamic(db)
                         && match constrained_lower.variance_of(db, nested_typevar) {
                             TypeVarVariance::Bivariant => false,
                             TypeVarVariance::Covariant => is_upper_bound,

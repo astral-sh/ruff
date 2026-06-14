@@ -87,8 +87,8 @@ fn todo_types() {
 #[test]
 fn divergent_type() {
     let db = setup_db();
-    let div = Type::divergent(Id::from_bits(1));
-    assert!(div.is_dynamic());
+    let div = Type::divergent(&db, Id::from_bits(1));
+    assert!(div.is_dynamic(&db));
     assert!(div.has_dynamic(&db));
     // `Divergent` is the α-binder variable of a μ-type: materialization leaves the bound
     // variable untouched (materializing `μα.body` materializes `body`, not `α` itself).
@@ -276,7 +276,7 @@ fn cycle_marked_type_is_transparent_but_preferred_in_unions() {
 fn cycle_marked_type_folds_marker_containing_inner_to_recursive() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let tuple_marker = Type::heterogeneous_tuple(&db, [marker]);
 
     assert_eq!(
@@ -327,7 +327,7 @@ fn intersection_builder_preserves_cycle_markers_through_simplification() {
 fn recursive_type_folds_same_binder_nesting() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let tuple_marker = Type::heterogeneous_tuple(&db, [marker]);
     let recursive = Type::implicit_recursive(&db, binder_id, tuple_marker);
 
@@ -342,7 +342,7 @@ fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let int = KnownClass::Int.to_instance(&db);
-    let marker_tuple = Type::heterogeneous_tuple(&db, [Type::divergent(binder_id), int]);
+    let marker_tuple = Type::heterogeneous_tuple(&db, [Type::divergent(&db, binder_id), int]);
     let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
     let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
 
@@ -361,7 +361,7 @@ fn cycle_recovery_overlays_union_marker_with_finite_counterpart() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let int = KnownClass::Int.to_instance(&db);
-    let marker_or_int = UnionType::from_elements(&db, [Type::divergent(binder_id), int]);
+    let marker_or_int = UnionType::from_elements(&db, [Type::divergent(&db, binder_id), int]);
     let marker_tuple = Type::heterogeneous_tuple(&db, [marker_or_int, int]);
     let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
     let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
@@ -379,7 +379,7 @@ fn cycle_recovery_overlays_cycle_marked_counterpart() {
     let int = KnownClass::Int.to_instance(&db);
     let marked_int = Type::cycle_marked(&db, binder_id, int);
     let marker_or_marked_int =
-        UnionType::from_elements(&db, [marked_int, Type::divergent(binder_id)]);
+        UnionType::from_elements(&db, [marked_int, Type::divergent(&db, binder_id)]);
     let marker_tuple = Type::heterogeneous_tuple(&db, [marker_or_marked_int, int]);
     let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
     let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
@@ -413,7 +413,7 @@ fn cycle_recovery_fuses_cycle_marked_subtype_with_supertype() {
 fn top_level_union_cycle_normalization_cycle_marks_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
     let int = KnownClass::Int.to_instance(&db);
 
@@ -421,7 +421,7 @@ fn top_level_union_cycle_normalization_cycle_marks_non_contractive_recursive_mar
 
     assert_eq!(
         union.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker)),
-        Some(Type::cycle_marked(&db, binder_id, int))
+        Some(int)
     );
 }
 
@@ -429,7 +429,7 @@ fn top_level_union_cycle_normalization_cycle_marks_non_contractive_recursive_mar
 fn top_level_union_cycle_normalization_keeps_structural_markers_recursive() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let int = KnownClass::Int.to_instance(&db);
     let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
     let list_marker = KnownClass::List.to_specialized_instance(&db, &[marker]);
@@ -450,11 +450,69 @@ fn top_level_union_cycle_normalization_keeps_structural_markers_recursive() {
 }
 
 #[test]
+fn top_level_union_cycle_normalization_drops_top_level_marker() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(&db, binder_id);
+    let int = KnownClass::Int.to_instance(&db);
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+
+    let union = UnionType::from_elements(&db, [marker, int, list_int]).expect_union();
+    let normalized = union
+        .recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(marker))
+        .unwrap();
+    let expected_body = UnionType::from_elements_cycle_recovery(&db, [int, list_int]);
+
+    assert_eq!(normalized, expected_body);
+}
+
+#[test]
+fn other_cycle_normalization_preserves_bodyful_marker_body() {
+    let db = setup_db();
+    let marker_id = Id::from_bits(1);
+    let other_id = Id::from_bits(2);
+    let other_marker = Type::divergent(&db, other_id);
+    let int = KnownClass::Int.to_instance(&db);
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let body = UnionType::from_elements_cycle_recovery(&db, [int, list_int]);
+    let marked = Type::cycle_marked(&db, marker_id, body);
+
+    assert_eq!(
+        marked.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(other_marker)),
+        Some(marked)
+    );
+}
+
+#[test]
+fn cycle_recovery_union_preserves_finite_shape_with_marker() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let marker = Type::divergent(&db, binder_id);
+    let int = KnownClass::Int.to_instance(&db);
+    let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
+    let list_marker = KnownClass::List.to_specialized_instance(&db, &[marker]);
+    let previous = UnionType::from_elements_cycle_recovery(&db, [int, list_marker]);
+    let current = UnionType::from_elements_cycle_recovery(&db, [int, list_int, marker]);
+
+    let recovered = UnionType::from_elements_cycle_recovery(&db, [previous, current]);
+
+    assert_eq!(
+        recovered.display(&db).to_string(),
+        UnionType::from_elements_cycle_recovery(&db, [int, list_int, list_marker])
+            .display(&db)
+            .to_string()
+    );
+}
+
+#[test]
 fn top_level_union_cycle_normalization_preserves_other_cycle_markers() {
     let db = setup_db();
-    let marker = Type::divergent(Id::from_bits(1));
-    let other_non_contractive =
-        Type::implicit_recursive(&db, Id::from_bits(3), Type::divergent(Id::from_bits(3)));
+    let marker = Type::divergent(&db, Id::from_bits(1));
+    let other_non_contractive = Type::implicit_recursive(
+        &db,
+        Id::from_bits(3),
+        Type::divergent(&db, Id::from_bits(3)),
+    );
     let int = KnownClass::Int.to_instance(&db);
 
     let union = UnionType::from_elements(&db, [int, other_non_contractive]).expect_union();
@@ -468,7 +526,7 @@ fn top_level_union_cycle_normalization_preserves_other_cycle_markers() {
 fn nested_union_cycle_normalization_preserves_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
     let int = KnownClass::Int.to_instance(&db);
     let list_recursive = KnownClass::List.to_specialized_instance(&db, &[non_contractive]);
@@ -486,7 +544,7 @@ fn nested_union_cycle_normalization_preserves_non_contractive_recursive_marker()
 fn recursive_cycle_normalization_treats_non_contractive_recursive_as_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
-    let marker = Type::divergent(binder_id);
+    let marker = Type::divergent(&db, binder_id);
     let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
 
     assert_eq!(
@@ -502,14 +560,14 @@ fn recursive_types_with_constructors_are_contractive() {
     let a = Id::from_bits(1);
     let b = Id::from_bits(2);
 
-    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(a)]);
+    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(&db, a)]);
     let mu_a_list_a = Type::implicit_recursive(&db, a, list_a);
     let Type::Recursive(recursive) = mu_a_list_a else {
         panic!("expected recursive type");
     };
     assert!(!recursive.is_non_contractive(&db));
 
-    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(a)]);
+    let list_a = KnownClass::List.to_specialized_instance(&db, &[Type::divergent(&db, a)]);
     let mu_b_list_a = Type::implicit_recursive(&db, b, list_a);
     let mu_a_mu_b_list_a = Type::implicit_recursive(&db, a, mu_b_list_a);
     let Type::Recursive(recursive) = mu_a_mu_b_list_a else {
@@ -695,7 +753,7 @@ fn recursive_alias_legacy_typevars() {
             &db,
             &[UnionType::from_elements(
                 &db,
-                [Type::TypeVar(typevar), Type::divergent(binder_id)],
+                [Type::TypeVar(typevar), Type::divergent(&db, binder_id)],
             )],
         ),
     );
@@ -742,7 +800,7 @@ fn recursive_materialization_maps_body() {
     let recursive = Type::implicit_recursive(
         &db,
         binder_id,
-        Type::heterogeneous_tuple(&db, [Type::unknown(), Type::divergent(binder_id)]),
+        Type::heterogeneous_tuple(&db, [Type::unknown(), Type::divergent(&db, binder_id)]),
     );
 
     let top = recursive.top_materialization(&db);
@@ -751,7 +809,7 @@ fn recursive_materialization_maps_body() {
     };
     assert_eq!(
         top_recursive.body(&db),
-        Type::heterogeneous_tuple(&db, [Type::object(), Type::divergent(binder_id)])
+        Type::heterogeneous_tuple(&db, [Type::object(), Type::divergent(&db, binder_id)])
     );
 }
 

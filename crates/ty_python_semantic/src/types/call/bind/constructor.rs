@@ -578,8 +578,8 @@ fn constructor_returns_instance<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             constructor_returns_instance(db, class_literal, unfolded)
         }),
-        Type::CycleMarked(marked) => {
-            constructor_returns_instance(db, class_literal, marked.inner(db))
+        Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+            constructor_returns_instance(db, class_literal, body)
         }
         // Spec says an explicit `Any` return type should be considered non-instance.
         Type::Dynamic(DynamicType::Any) => false,

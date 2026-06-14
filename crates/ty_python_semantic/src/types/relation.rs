@@ -282,7 +282,6 @@ impl<'db> Type<'db> {
             // might inherit `Any`, but subtyping is still reflexive
             | Type::ClassLiteral(_) => true,
             Type::Dynamic(_)
-            | Type::CycleMarked(_)
             | Type::Recursive(_)
             | Type::NominalInstance(_)
             | Type::ProtocolInstance(_)
@@ -450,12 +449,12 @@ impl<'db> Type<'db> {
             (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 self.is_trivially_constraint_set_assignable_to(db, unfolded)
             }),
-            (Type::CycleMarked(marked), _) => marked.map(db, |inner| {
-                inner.is_trivially_constraint_set_assignable_to(db, target)
-            }),
-            (_, Type::CycleMarked(marked)) => marked.map(db, |inner| {
-                self.is_trivially_constraint_set_assignable_to(db, inner)
-            }),
+            (Type::Divergent(divergent), _) if let Some(body) = divergent.body(db) => {
+                body.is_trivially_constraint_set_assignable_to(db, target)
+            }
+            (_, Type::Divergent(divergent)) if let Some(body) = divergent.body(db) => {
+                self.is_trivially_constraint_set_assignable_to(db, body)
+            }
             _ => false,
         }
     }
@@ -971,7 +970,8 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 let Type::Recursive(recursive) = ty else {
                     return false;
                 };
-                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id() {
+                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id(db)
+                {
                     wrapping.set(Some(recursive));
                     true
                 } else {
@@ -1169,16 +1169,15 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // Handle provisional cycle markers before the normal structural cases. If a matching
             // `Type::Recursive` is already active, `check_divergent_type_pair` restores it;
             // otherwise `Divergent` keeps its relation-specific gradual fallback.
+            (Type::Divergent(divergent), _) if let Some(body) = divergent.body(db) => {
+                self.with_recursion_guard(source, target, || self.check_type_pair(db, body, target))
+            }
+            (_, Type::Divergent(divergent)) if let Some(body) = divergent.body(db) => {
+                self.with_recursion_guard(source, target, || self.check_type_pair(db, source, body))
+            }
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, source, target)
             }
-            (Type::CycleMarked(marked), _) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, marked.inner(db), target)
-            }),
-            (_, Type::CycleMarked(marked)) => self.with_recursion_guard(source, target, || {
-                self.check_type_pair(db, source, marked.inner(db))
-            }),
-
             (Type::Recursive(_), _) => self.with_recursion_guard(source, target, || {
                 self.check_type_pair(db, source.unwrap_recursive(db), target)
             }),
@@ -1356,7 +1355,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     TypeRelation::Assignability => true,
                     TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
-                        Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
+                        Type::Union(union) => union.elements(db).iter().any(|ty| ty.is_dynamic(db)),
                         _ => false,
                     },
                 },
@@ -1373,7 +1372,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                             intersection
                                 .positive(db)
                                 .iter()
-                                .any(Type::is_non_divergent_dynamic)
+                                .any(|ty| ty.is_non_divergent_dynamic(db))
                         }
                         _ => false,
                     },
@@ -1403,7 +1402,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             }
             (Type::Intersection(intersection), _)
                 if self.is_eager_assignability()
-                    && intersection.positive(db).iter().any(Type::is_dynamic) =>
+                    && intersection.positive(db).iter().any(|ty| ty.is_dynamic(db)) =>
             {
                 // If the intersection contains `Any`/`Unknown`/`@Todo`, it is assignable to any type.
                 // `Any` could materialize to `Never`, `Never & T & ~S` simplifies to `Never` for any
@@ -2506,7 +2505,8 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 let Type::Recursive(recursive) = ty else {
                     return false;
                 };
-                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id() {
+                if !recursive.is_non_contractive(db) && recursive.binder_id(db) == divergent.id(db)
+                {
                     wrapping.set(Some(recursive));
                     true
                 } else {
@@ -2608,16 +2608,15 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::Never, _) | (_, Type::Never) => self.always(),
 
             (Type::Dynamic(_), _) | (_, Type::Dynamic(_)) => self.never(),
+            (Type::Divergent(divergent), _) if let Some(body) = divergent.body(db) => {
+                self.with_recursion_guard(left, right, || self.check_type_pair(db, body, right))
+            }
+            (_, Type::Divergent(divergent)) if let Some(body) = divergent.body(db) => {
+                self.with_recursion_guard(left, right, || self.check_type_pair(db, left, body))
+            }
             (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
                 self.check_divergent_type_pair(db, left, right)
             }
-            (Type::CycleMarked(marked), _) => self.with_recursion_guard(left, right, || {
-                self.check_type_pair(db, marked.inner(db), right)
-            }),
-            (_, Type::CycleMarked(marked)) => self.with_recursion_guard(left, right, || {
-                self.check_type_pair(db, left, marked.inner(db))
-            }),
-
             (Type::Recursive(_), _) => self.with_recursion_guard(left, right, || {
                 self.check_type_pair(db, left.unwrap_recursive(db), right)
             }),

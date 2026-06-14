@@ -60,7 +60,7 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, CycleMarkable, CycleMarkedType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    ClassLiteral, CycleMarkable, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DivergentType,
     DynamicType, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
     SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
@@ -484,7 +484,7 @@ pub(crate) struct Bindings<'db> {
     enclosing_binding_contexts: Option<Box<[BindingContext<'db>]>>,
 
     deferred_return_type_folds: SmallVec<[RecursiveType<'db>; 1]>,
-    deferred_return_type_marks: SmallVec<[CycleMarkedType<'db>; 1]>,
+    deferred_return_type_marks: SmallVec<[DivergentType<'db>; 1]>,
 }
 
 impl<'db> Bindings<'db> {
@@ -2249,7 +2249,7 @@ impl<'db> Bindings<'db> {
                                         definedness: Definedness::AlwaysDefined,
                                         ..
                                     }) => {
-                                        if ty.is_dynamic() {
+                                        if ty.is_dynamic(db) {
                                             // Here, we attempt to model the fact that an attribute lookup on
                                             // a dynamic type could fail
 
@@ -2801,7 +2801,7 @@ impl<'db> Foldable<'db> for Bindings<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for Bindings<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         let mut bindings = self.fields_mapped(&mut |ty| ty.mark_cycle(db, marked));
         bindings.deferred_return_type_marks.push(marked);
         bindings

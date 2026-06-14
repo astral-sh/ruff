@@ -1300,7 +1300,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent()) {
+        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent(self.db())) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
@@ -2196,7 +2196,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let narrowed = self.infer_type_expression(arguments_slice);
                     let expanded = narrowed.expand_eagerly(self.db());
 
-                    if expanded.is_divergent()
+                    if expanded.is_divergent(self.db())
                         || matches!(expanded, Type::Recursive(rec) if rec.is_non_contractive(self.db()))
                     {
                         expanded

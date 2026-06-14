@@ -1349,7 +1349,7 @@ impl<'db> StaticClassLiteral<'db> {
                     // problem is that we can't determine the type of the value parameter this way.
                     // Instead, we want to use the dynamic type itself in this case, so we skip the
                     // special descriptor handling.
-                    if !dunder_set.is_dynamic() {
+                    if !dunder_set.is_dynamic(db) {
                         // This type of this attribute is a data descriptor. Instead of overwriting the
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
@@ -2173,7 +2173,7 @@ impl<'db> StaticClassLiteral<'db> {
     #[salsa::tracked(
         cycle_fn=implicit_attribute_cycle_recover,
         cycle_initial=|db, id, _, _, _| Member {
-            inner: Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
+            inner: Place::bound(Type::implicit_recursive(db, id, Type::divergent(db, id))).into(),
         },
         heap_size=ruff_memory_usage::heap_size,
     )]
@@ -3113,7 +3113,7 @@ fn explicit_bases_cycle_initial<'db>(
     // Try to produce a list of `Divergent` types of the right length. However, if one or more of
     // the bases is a starred expression, we don't know how many entries that will eventually
     // expand to.
-    vec![Type::implicit_recursive(db, id, Type::divergent(id)); class_stmt.bases().len()]
+    vec![Type::implicit_recursive(db, id, Type::divergent(db, id)); class_stmt.bases().len()]
         .into_boxed_slice()
 }
 

@@ -37,13 +37,21 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use crate::types::enums::{EnumComplement, enum_metadata};
+use crate::types::generics::Specialization;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::tuple::Tuple;
 use crate::types::visitor::{self, TypeVisitor};
 use crate::types::{
-    BytesLiteralType, ClassLiteral, CycleMarkedType, EnumLiteralType, IntersectionType, KnownClass,
-    LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType,
-    SubclassOfType, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassLiteral, ClassType, DivergentType, EnumLiteralType, GenericAlias,
+    IntersectionType, KnownClass, LiteralValueType, LiteralValueTypeKind,
+    NegativeIntersectionElements, NominalInstanceType, StringLiteralType, SubclassOfType, Type,
+    TypeVarBoundOrConstraints, UnionType,
+    class::{
+        DynamicClassAnchor, DynamicClassLiteral, DynamicEnumAnchor, DynamicEnumLiteral,
+        DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, DynamicTypedDictAnchor,
+        DynamicTypedDictLiteral, EnumSpec, NamedTupleField, NamedTupleSpec,
+    },
+    typed_dict::{TypedDictOpenness, TypedDictSchema},
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -264,7 +272,7 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
-            Type::Divergent(divergent) => self.add_divergent_id(divergent.id()),
+            Type::Divergent(divergent) => self.add_divergent_id(divergent.id(db)),
             Type::Recursive(_) => self.has_recursive.set(true),
             Type::TypeAlias(_) => self.has_type_alias.set(true),
             _ => visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard),
@@ -275,11 +283,12 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
 /// Overlay a finite candidate onto a marker-tainted candidate during cycle recovery.
 ///
 /// For example, `tuple[Divergent(a), int]` overlaid with `tuple[str, int]` becomes
-/// `CycleMarked(a, tuple[str, int])`. This is intentionally limited to the
+/// `Divergent(a, tuple[str, int])`. This is intentionally limited to the
 /// cycle-recovery path: all markers must belong to one binder, and the finite side
 /// must already be available without expanding aliases or recursive types.
 struct CycleFusionOverlay {
     divergent_id: Cell<Option<salsa::Id>>,
+    has_bodyful_marker: Cell<bool>,
     has_multiple_divergent_ids: Cell<bool>,
 }
 
@@ -291,11 +300,24 @@ impl CycleFusionOverlay {
     ) -> Option<Type<'db>> {
         let overlay = Self {
             divergent_id: Cell::new(None),
+            has_bodyful_marker: Cell::new(false),
             has_multiple_divergent_ids: Cell::new(false),
         };
-        let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate)?;
+        let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate);
+        let overlaid = overlaid?;
         let marker_id = overlay.single_divergent_id()?;
         Some(Type::cycle_marked(db, marker_id, overlaid))
+    }
+
+    fn add_bodyful_marker_id(&self, id: salsa::Id) {
+        self.has_bodyful_marker.set(true);
+        self.add_divergent_id(id);
+    }
+
+    fn add_placeholder_id(&self, id: salsa::Id) {
+        if !self.has_bodyful_marker.get() {
+            self.add_divergent_id(id);
+        }
     }
 
     fn add_divergent_id(&self, id: salsa::Id) {
@@ -319,14 +341,23 @@ impl CycleFusionOverlay {
         marker: Type<'db>,
         finite: Type<'db>,
     ) -> Option<Type<'db>> {
-        // `CycleMarked<T>` is transparent, but its binder is the marker we are preserving.
-        if let Type::CycleMarked(marked) = marker {
-            self.add_divergent_id(marked.binder_id(db));
-            return self.overlay_type(db, marked.inner(db), finite);
+        if let Type::Divergent(marked) = marker
+            && let Some(body) = marked.body(db)
+        {
+            self.add_bodyful_marker_id(marked.binder_id(db));
+            if let Type::Divergent(finite_marked) = finite
+                && finite_marked.binder_id(db) == marked.binder_id(db)
+                && finite_marked.body(db).is_some()
+            {
+                return Some(body);
+            }
+            return self.overlay_type(db, body, finite);
         }
-        if let Type::CycleMarked(marked) = finite {
-            self.add_divergent_id(marked.binder_id(db));
-            return self.overlay_type(db, marker, marked.inner(db));
+        if let Type::Divergent(marked) = finite
+            && let Some(body) = marked.body(db)
+        {
+            self.add_bodyful_marker_id(marked.binder_id(db));
+            return self.overlay_type(db, marker, body);
         }
 
         if marker == finite {
@@ -335,7 +366,7 @@ impl CycleFusionOverlay {
 
         match marker {
             Type::Divergent(divergent) => {
-                self.add_divergent_id(divergent.id());
+                self.add_placeholder_id(divergent.id(db));
                 // A marker leaf can be replaced only by a finite shape that is
                 // already available without expanding aliases or recursive types.
                 CycleFusionSummary::collect(db, finite)
@@ -357,7 +388,7 @@ impl CycleFusionOverlay {
                 elements.push(finite);
                 Some(UnionType::from_elements(db, elements))
             }
-            Type::CycleMarked(_) | Type::Recursive(_) | Type::TypeAlias(_) => None,
+            Type::Recursive(_) | Type::TypeAlias(_) => None,
             _ => {
                 if let Some(overlaid_tuple) = self.overlay_tuple(db, marker, finite) {
                     return Some(overlaid_tuple);
@@ -645,20 +676,24 @@ enum RelationSimplification {
 }
 
 impl RelationSimplification {
-    fn allows_relation<'db>(self, left: Type<'db>, right: Type<'db>) -> bool {
+    fn allows_relation<'db>(self, db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
         match self {
             RelationSimplification::Full => true,
             RelationSimplification::NoProtocolRelations => {
                 !Self::relation_may_query_protocol_interface(left, right)
+                    && !left.contains_cycle_sensitive_type(db)
+                    && !right.contains_cycle_sensitive_type(db)
             }
             RelationSimplification::NoRelations => false,
         }
     }
 
-    fn allows_try_reduce<'db>(self, ty: Type<'db>) -> bool {
+    fn allows_try_reduce<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         match self {
             RelationSimplification::Full => true,
-            RelationSimplification::NoProtocolRelations => !matches!(ty, Type::ProtocolInstance(_)),
+            RelationSimplification::NoProtocolRelations => {
+                !matches!(ty, Type::ProtocolInstance(_)) && !ty.contains_cycle_sensitive_type(db)
+            }
             RelationSimplification::NoRelations => false,
         }
     }
@@ -771,7 +806,7 @@ impl<'db> UnionBuilder<'db> {
         self.cycle_recovery = val;
         if self.cycle_recovery {
             self.unpack_aliases = false;
-            self.relation_simplification = RelationSimplification::NoRelations;
+            self.relation_simplification = RelationSimplification::NoProtocolRelations;
         }
         self
     }
@@ -882,7 +917,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
-                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                    if !relation_simplification
+                                        .allows_relation(self.db, ty, *existing)
+                                    {
                                         continue;
                                     }
                                     // e.g. `existing` could be `Literal[""] & Any`,
@@ -932,7 +969,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
-                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                    if !relation_simplification
+                                        .allows_relation(self.db, ty, *existing)
+                                    {
                                         continue;
                                     }
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -984,7 +1023,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
-                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                    if !relation_simplification
+                                        .allows_relation(self.db, ty, *existing)
+                                    {
                                         continue;
                                     }
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -1069,7 +1110,9 @@ impl<'db> UnionBuilder<'db> {
                                     continue;
                                 }
                                 UnionElement::Type(existing) => {
-                                    if !relation_simplification.allows_relation(ty, *existing) {
+                                    if !relation_simplification
+                                        .allows_relation(self.db, ty, *existing)
+                                    {
                                         continue;
                                     }
                                     if ty.is_redundant_with(self.db, *existing) {
@@ -1134,14 +1177,25 @@ impl<'db> UnionBuilder<'db> {
 
     fn cycle_marked_represents_same_type(
         db: &'db dyn Db,
+        relation_simplification: RelationSimplification,
         preferred: Type<'db>,
         other: Type<'db>,
     ) -> bool {
-        // `CycleMarked<T>` and `T` are equivalent, but the marked representative
+        // `Divergent(id, Some(T))` and `T` are equivalent, but the marked representative
         // must survive so later cycle recovery can still see the binder.
-        preferred.contains_cycle_marked(db)
-            && !other.contains_cycle_marked(db)
-            && preferred.erase_cycle_marks(db) == other.erase_cycle_marks(db)
+        if !preferred.contains_cycle_marked(db) {
+            return false;
+        }
+        let other_contains_cycle_marked = other.contains_cycle_marked(db);
+        let preferred = preferred.erase_cycle_marks(db);
+        let other = other.erase_cycle_marks(db);
+        if preferred == other {
+            return true;
+        }
+        !other_contains_cycle_marked
+            && relation_simplification.allows_relation(db, preferred, other)
+            && (preferred.is_equivalent_to(db, other)
+                || preferred.is_assignable_to(db, other) && other.is_assignable_to(db, preferred))
     }
 
     fn cycle_fusion_candidate(
@@ -1155,6 +1209,1119 @@ impl<'db> UnionBuilder<'db> {
         }
 
         CycleFusionOverlay::build(db, marker_candidate, finite_candidate)
+    }
+
+    fn merge_matching_cycle_marked(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (Type::Divergent(left), Type::Divergent(right)) = (left, right) else {
+            return None;
+        };
+        if left.binder_id(db) != right.binder_id(db) {
+            return None;
+        }
+
+        match (left.body(db), right.body(db)) {
+            (Some(left_body), Some(right_body)) => Some(Type::cycle_marked(
+                db,
+                left.binder_id(db),
+                UnionType::from_elements_cycle_recovery(db, [left_body, right_body]),
+            )),
+            (Some(_), None) => Some(Type::Divergent(left)),
+            (None, Some(_)) => Some(Type::Divergent(right)),
+            (None, None) => Some(Type::Divergent(left)),
+        }
+    }
+
+    fn merge_cycle_recovery_type(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Type<'db> {
+        UnionType::from_elements_cycle_recovery(db, [left, right])
+    }
+
+    fn merge_cycle_recovery_type_slices(
+        db: &'db dyn Db,
+        left: &[Type<'db>],
+        right: &[Type<'db>],
+    ) -> Option<Box<[Type<'db>]>> {
+        (left.len() == right.len()).then(|| {
+            left.iter()
+                .zip(right)
+                .map(|(left, right)| Self::merge_cycle_recovery_type(db, *left, *right))
+                .collect()
+        })
+    }
+
+    fn merge_dynamic_class_members(
+        db: &'db dyn Db,
+        left: &[(ruff_python_ast::name::Name, Type<'db>)],
+        right: &[(ruff_python_ast::name::Name, Type<'db>)],
+    ) -> Box<[(ruff_python_ast::name::Name, Type<'db>)]> {
+        let mut merged = left.to_vec();
+        for (right_name, right_ty) in right {
+            if let Some((_, left_ty)) = merged
+                .iter_mut()
+                .find(|(left_name, _)| left_name == right_name)
+            {
+                *left_ty = Self::merge_cycle_recovery_type(db, *left_ty, *right_ty);
+            } else {
+                merged.push((right_name.clone(), *right_ty));
+            }
+        }
+        merged.into_boxed_slice()
+    }
+
+    fn merge_dynamic_class_anchor(
+        db: &'db dyn Db,
+        left: &DynamicClassAnchor<'db>,
+        right: &DynamicClassAnchor<'db>,
+    ) -> Option<DynamicClassAnchor<'db>> {
+        match (left, right) {
+            (DynamicClassAnchor::Definition(left), DynamicClassAnchor::Definition(right))
+                if left == right =>
+            {
+                Some(DynamicClassAnchor::Definition(*left))
+            }
+            (
+                DynamicClassAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    explicit_bases: left_bases,
+                },
+                DynamicClassAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    explicit_bases: right_bases,
+                },
+            ) if left_scope == right_scope && left_offset == right_offset => {
+                Some(DynamicClassAnchor::ScopeOffset {
+                    scope: *left_scope,
+                    offset: *left_offset,
+                    explicit_bases: Self::merge_cycle_recovery_type_slices(
+                        db,
+                        left_bases,
+                        right_bases,
+                    )?,
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn same_dynamic_class_anchor_origin(
+        left: &DynamicClassAnchor<'db>,
+        right: &DynamicClassAnchor<'db>,
+    ) -> bool {
+        match (left, right) {
+            (DynamicClassAnchor::Definition(left), DynamicClassAnchor::Definition(right)) => {
+                left == right
+            }
+            (
+                DynamicClassAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                DynamicClassAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
+    fn same_dynamic_named_tuple_anchor_origin(
+        left: &DynamicNamedTupleAnchor<'db>,
+        right: &DynamicNamedTupleAnchor<'db>,
+    ) -> bool {
+        match (left, right) {
+            (
+                DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: left, ..
+                },
+                DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: right, ..
+                },
+            ) => left == right,
+            (
+                DynamicNamedTupleAnchor::TypingDefinition(left),
+                DynamicNamedTupleAnchor::TypingDefinition(right),
+            ) => left == right,
+            (
+                DynamicNamedTupleAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                DynamicNamedTupleAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
+    fn same_dynamic_typed_dict_anchor_origin(
+        left: &DynamicTypedDictAnchor<'db>,
+        right: &DynamicTypedDictAnchor<'db>,
+    ) -> bool {
+        match (left, right) {
+            (
+                DynamicTypedDictAnchor::Definition(left),
+                DynamicTypedDictAnchor::Definition(right),
+            ) => left == right,
+            (
+                DynamicTypedDictAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                DynamicTypedDictAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
+    fn same_dynamic_enum_anchor_origin(
+        left: &DynamicEnumAnchor<'db>,
+        right: &DynamicEnumAnchor<'db>,
+    ) -> bool {
+        match (left, right) {
+            (
+                DynamicEnumAnchor::Definition {
+                    definition: left, ..
+                },
+                DynamicEnumAnchor::Definition {
+                    definition: right, ..
+                },
+            ) => left == right,
+            (
+                DynamicEnumAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    ..
+                },
+                DynamicEnumAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    ..
+                },
+            ) => left_scope == right_scope && left_offset == right_offset,
+            _ => false,
+        }
+    }
+
+    fn same_dynamic_class_literal_origin(
+        db: &'db dyn Db,
+        left: ClassLiteral<'db>,
+        right: ClassLiteral<'db>,
+    ) -> bool {
+        match (left, right) {
+            (ClassLiteral::Dynamic(left), ClassLiteral::Dynamic(right)) => {
+                left.name(db) == right.name(db)
+                    && Self::same_dynamic_class_anchor_origin(left.anchor(db), right.anchor(db))
+            }
+            (ClassLiteral::DynamicNamedTuple(left), ClassLiteral::DynamicNamedTuple(right)) => {
+                left.name(db) == right.name(db)
+                    && Self::same_dynamic_named_tuple_anchor_origin(
+                        left.anchor(db),
+                        right.anchor(db),
+                    )
+            }
+            (ClassLiteral::DynamicTypedDict(left), ClassLiteral::DynamicTypedDict(right)) => {
+                left.name(db) == right.name(db)
+                    && Self::same_dynamic_typed_dict_anchor_origin(
+                        left.anchor(db),
+                        right.anchor(db),
+                    )
+            }
+            (ClassLiteral::DynamicEnum(left), ClassLiteral::DynamicEnum(right)) => {
+                left.name(db) == right.name(db)
+                    && left.base_class(db) == right.base_class(db)
+                    && Self::same_dynamic_enum_anchor_origin(left.anchor(db), right.anchor(db))
+            }
+            _ => false,
+        }
+    }
+
+    fn widen_dynamic_origin_in_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> Type<'db> {
+        match ty {
+            Type::ClassLiteral(class) => {
+                if Self::same_dynamic_class_literal_origin(db, class, origin) {
+                    return KnownClass::Type.to_instance(db);
+                }
+                Type::ClassLiteral(Self::widen_dynamic_origin_in_class_literal(
+                    db, class, origin,
+                ))
+            }
+            Type::GenericAlias(alias) => {
+                let origin_class = alias.origin(db);
+                if origin_class.is_tuple(db) {
+                    return ty;
+                }
+                let specialization = Self::widen_dynamic_origin_in_specialization(
+                    db,
+                    alias.specialization(db),
+                    origin,
+                );
+                Type::GenericAlias(GenericAlias::new(db, origin_class, specialization))
+            }
+            Type::NominalInstance(instance) => {
+                let class = instance.class(db);
+                if class.known(db) == Some(KnownClass::Tuple) {
+                    return ty;
+                }
+                let widened = Self::widen_dynamic_origin_in_class_type(db, class, origin);
+                if widened == class {
+                    ty
+                } else {
+                    Type::instance(db, widened)
+                }
+            }
+            Type::Union(union) => UnionType::from_elements_cycle_recovery(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| Self::widen_dynamic_origin_in_type(db, *element, origin)),
+            ),
+            Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+                Type::cycle_marked(
+                    db,
+                    divergent.binder_id(db),
+                    Self::widen_dynamic_origin_in_type(db, body, origin),
+                )
+            }
+            _ => ty,
+        }
+    }
+
+    fn widen_dynamic_origin_in_class_type(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> ClassType<'db> {
+        match class {
+            ClassType::NonGeneric(class) => ClassType::NonGeneric(
+                Self::widen_dynamic_origin_in_class_literal(db, class, origin),
+            ),
+            ClassType::Generic(alias) => {
+                let origin_class = alias.origin(db);
+                if origin_class.is_tuple(db) {
+                    class
+                } else {
+                    ClassType::Generic(GenericAlias::new(
+                        db,
+                        origin_class,
+                        Self::widen_dynamic_origin_in_specialization(
+                            db,
+                            alias.specialization(db),
+                            origin,
+                        ),
+                    ))
+                }
+            }
+        }
+    }
+
+    fn widen_dynamic_origin_in_specialization(
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> Specialization<'db> {
+        let types: Box<_> = specialization
+            .types(db)
+            .iter()
+            .map(|ty| Self::widen_dynamic_origin_in_type(db, *ty, origin))
+            .collect();
+        if types.as_ref() == specialization.types(db) {
+            specialization
+        } else {
+            Specialization::new(
+                db,
+                specialization.generic_context(db),
+                types,
+                specialization.materialization_kind(db),
+                None,
+            )
+        }
+    }
+
+    fn widen_dynamic_origin_in_class_literal(
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> ClassLiteral<'db> {
+        match class {
+            ClassLiteral::Dynamic(dynamic) => ClassLiteral::Dynamic(
+                Self::widen_dynamic_origin_in_dynamic_class(db, dynamic, origin),
+            ),
+            ClassLiteral::DynamicNamedTuple(named_tuple) => ClassLiteral::DynamicNamedTuple(
+                Self::widen_dynamic_origin_in_dynamic_named_tuple(db, named_tuple, origin),
+            ),
+            ClassLiteral::DynamicTypedDict(typed_dict) => ClassLiteral::DynamicTypedDict(
+                Self::widen_dynamic_origin_in_dynamic_typed_dict(db, typed_dict, origin),
+            ),
+            ClassLiteral::DynamicEnum(enum_literal) => ClassLiteral::DynamicEnum(
+                Self::widen_dynamic_origin_in_dynamic_enum(db, enum_literal, origin),
+            ),
+            ClassLiteral::Static(_) => class,
+        }
+    }
+
+    fn widen_dynamic_origin_in_dynamic_class_anchor(
+        db: &'db dyn Db,
+        anchor: &DynamicClassAnchor<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicClassAnchor<'db> {
+        match anchor {
+            DynamicClassAnchor::Definition(definition) => {
+                DynamicClassAnchor::Definition(*definition)
+            }
+            DynamicClassAnchor::ScopeOffset {
+                scope,
+                offset,
+                explicit_bases,
+            } => DynamicClassAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                explicit_bases: explicit_bases
+                    .iter()
+                    .map(|base| Self::widen_dynamic_origin_in_type(db, *base, origin))
+                    .collect(),
+            },
+        }
+    }
+
+    fn widen_dynamic_origin_in_dynamic_class(
+        db: &'db dyn Db,
+        class: DynamicClassLiteral<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicClassLiteral<'db> {
+        DynamicClassLiteral::new(
+            db,
+            class.name(db).clone(),
+            Self::widen_dynamic_origin_in_dynamic_class_anchor(db, class.anchor(db), origin),
+            class
+                .members(db)
+                .iter()
+                .map(|(name, ty)| {
+                    (
+                        name.clone(),
+                        Self::widen_dynamic_origin_in_type(db, *ty, origin),
+                    )
+                })
+                .collect::<Box<_>>(),
+            class.has_dynamic_namespace(db),
+            class.dataclass_params(db),
+        )
+    }
+
+    fn widen_dynamic_origin_in_named_tuple_spec(
+        db: &'db dyn Db,
+        spec: NamedTupleSpec<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> NamedTupleSpec<'db> {
+        if !spec.has_known_fields(db) {
+            return spec;
+        }
+
+        let fields: Box<_> = spec
+            .fields(db)
+            .iter()
+            .map(|field| NamedTupleField {
+                name: field.name.clone(),
+                ty: Self::widen_dynamic_origin_in_type(db, field.ty, origin),
+                default: field
+                    .default
+                    .map(|default| Self::widen_dynamic_origin_in_type(db, default, origin)),
+                definition: field.definition,
+            })
+            .collect();
+        if fields.as_ref() == spec.fields(db) {
+            spec
+        } else {
+            NamedTupleSpec::known(db, fields)
+        }
+    }
+
+    fn widen_dynamic_origin_in_named_tuple_anchor(
+        db: &'db dyn Db,
+        anchor: &DynamicNamedTupleAnchor<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicNamedTupleAnchor<'db> {
+        match anchor {
+            DynamicNamedTupleAnchor::CollectionsDefinition { definition, spec } => {
+                DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: *definition,
+                    spec: Self::widen_dynamic_origin_in_named_tuple_spec(db, *spec, origin),
+                }
+            }
+            DynamicNamedTupleAnchor::TypingDefinition(definition) => {
+                DynamicNamedTupleAnchor::TypingDefinition(*definition)
+            }
+            DynamicNamedTupleAnchor::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => DynamicNamedTupleAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: Self::widen_dynamic_origin_in_named_tuple_spec(db, *spec, origin),
+            },
+        }
+    }
+
+    fn widen_dynamic_origin_in_dynamic_named_tuple(
+        db: &'db dyn Db,
+        named_tuple: DynamicNamedTupleLiteral<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicNamedTupleLiteral<'db> {
+        DynamicNamedTupleLiteral::new(
+            db,
+            named_tuple.name(db).clone(),
+            Self::widen_dynamic_origin_in_named_tuple_anchor(db, named_tuple.anchor(db), origin),
+        )
+    }
+
+    fn widen_dynamic_origin_in_typed_dict_schema(
+        db: &'db dyn Db,
+        schema: &TypedDictSchema<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> TypedDictSchema<'db> {
+        schema
+            .iter()
+            .map(|(name, field)| {
+                let mut field = field.clone();
+                field.declared_ty =
+                    Self::widen_dynamic_origin_in_type(db, field.declared_ty, origin);
+                (name.clone(), field)
+            })
+            .collect()
+    }
+
+    fn widen_dynamic_origin_in_typed_dict_openness(
+        db: &'db dyn Db,
+        openness: TypedDictOpenness<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> TypedDictOpenness<'db> {
+        match openness {
+            TypedDictOpenness::Extra(extra) => TypedDictOpenness::extra(
+                db,
+                Self::widen_dynamic_origin_in_type(db, extra.declared_ty, origin),
+                extra.is_read_only(),
+            ),
+            TypedDictOpenness::ImplicitlyOpen | TypedDictOpenness::Closed => openness,
+        }
+    }
+
+    fn widen_dynamic_origin_in_typed_dict_anchor(
+        db: &'db dyn Db,
+        anchor: &DynamicTypedDictAnchor<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicTypedDictAnchor<'db> {
+        match anchor {
+            DynamicTypedDictAnchor::Definition(definition) => {
+                DynamicTypedDictAnchor::Definition(*definition)
+            }
+            DynamicTypedDictAnchor::ScopeOffset {
+                scope,
+                offset,
+                schema,
+                openness,
+            } => DynamicTypedDictAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                schema: Self::widen_dynamic_origin_in_typed_dict_schema(db, schema, origin),
+                openness: Self::widen_dynamic_origin_in_typed_dict_openness(db, *openness, origin),
+            },
+        }
+    }
+
+    fn widen_dynamic_origin_in_dynamic_typed_dict(
+        db: &'db dyn Db,
+        typed_dict: DynamicTypedDictLiteral<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicTypedDictLiteral<'db> {
+        DynamicTypedDictLiteral::new(
+            db,
+            typed_dict.name(db).clone(),
+            Self::widen_dynamic_origin_in_typed_dict_anchor(db, typed_dict.anchor(db), origin),
+        )
+    }
+
+    fn widen_dynamic_origin_in_enum_spec(
+        db: &'db dyn Db,
+        spec: EnumSpec<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> EnumSpec<'db> {
+        if !spec.has_known_members(db) {
+            return spec;
+        }
+
+        let members: Box<_> = spec
+            .members(db)
+            .iter()
+            .map(|(name, ty)| {
+                (
+                    name.clone(),
+                    Self::widen_dynamic_origin_in_type(db, *ty, origin),
+                )
+            })
+            .collect();
+        if members.as_ref() == spec.members(db) {
+            spec
+        } else {
+            EnumSpec::new(db, members, true)
+        }
+    }
+
+    fn widen_dynamic_origin_in_enum_anchor(
+        db: &'db dyn Db,
+        anchor: &DynamicEnumAnchor<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicEnumAnchor<'db> {
+        match anchor {
+            DynamicEnumAnchor::Definition { definition, spec } => DynamicEnumAnchor::Definition {
+                definition: *definition,
+                spec: Self::widen_dynamic_origin_in_enum_spec(db, *spec, origin),
+            },
+            DynamicEnumAnchor::ScopeOffset {
+                scope,
+                offset,
+                spec,
+            } => DynamicEnumAnchor::ScopeOffset {
+                scope: *scope,
+                offset: *offset,
+                spec: Self::widen_dynamic_origin_in_enum_spec(db, *spec, origin),
+            },
+        }
+    }
+
+    fn widen_dynamic_origin_in_dynamic_enum(
+        db: &'db dyn Db,
+        enum_literal: DynamicEnumLiteral<'db>,
+        origin: ClassLiteral<'db>,
+    ) -> DynamicEnumLiteral<'db> {
+        DynamicEnumLiteral::new(
+            db,
+            enum_literal.name(db).clone(),
+            Self::widen_dynamic_origin_in_enum_anchor(db, enum_literal.anchor(db), origin),
+            enum_literal.base_class(db),
+            enum_literal
+                .mixin_type(db)
+                .map(|mixin| Self::widen_dynamic_origin_in_type(db, mixin, origin)),
+        )
+    }
+
+    fn merge_dynamic_class(
+        db: &'db dyn Db,
+        left: DynamicClassLiteral<'db>,
+        right: DynamicClassLiteral<'db>,
+    ) -> Option<DynamicClassLiteral<'db>> {
+        if left.name(db) != right.name(db)
+            || left.dataclass_params(db) != right.dataclass_params(db)
+        {
+            return None;
+        }
+
+        let origin = ClassLiteral::Dynamic(left);
+        let anchor = Self::merge_dynamic_class_anchor(db, left.anchor(db), right.anchor(db))?;
+        let anchor = Self::widen_dynamic_origin_in_dynamic_class_anchor(db, &anchor, origin);
+        let members: Box<_> =
+            Self::merge_dynamic_class_members(db, left.members(db), right.members(db))
+                .iter()
+                .map(|(name, ty)| {
+                    (
+                        name.clone(),
+                        Self::widen_dynamic_origin_in_type(db, *ty, origin),
+                    )
+                })
+                .collect();
+
+        Some(DynamicClassLiteral::new(
+            db,
+            left.name(db).clone(),
+            anchor,
+            members,
+            left.has_dynamic_namespace(db) || right.has_dynamic_namespace(db),
+            left.dataclass_params(db),
+        ))
+    }
+
+    fn merge_named_tuple_specs(
+        db: &'db dyn Db,
+        left: NamedTupleSpec<'db>,
+        right: NamedTupleSpec<'db>,
+    ) -> NamedTupleSpec<'db> {
+        if !left.has_known_fields(db) || !right.has_known_fields(db) {
+            return NamedTupleSpec::unknown(db);
+        }
+
+        let left_fields = left.fields(db);
+        let right_fields = right.fields(db);
+        if left_fields.len() != right_fields.len() {
+            return NamedTupleSpec::unknown(db);
+        }
+
+        let mut fields = Vec::with_capacity(left_fields.len());
+        for (left_field, right_field) in left_fields.iter().zip(right_fields) {
+            if left_field.name != right_field.name
+                || left_field.definition != right_field.definition
+            {
+                return NamedTupleSpec::unknown(db);
+            }
+
+            let default = match (left_field.default, right_field.default) {
+                (Some(left), Some(right)) => Some(Self::merge_cycle_recovery_type(db, left, right)),
+                (Some(default), None) | (None, Some(default)) => Some(default),
+                (None, None) => None,
+            };
+
+            fields.push(NamedTupleField {
+                name: left_field.name.clone(),
+                ty: Self::merge_cycle_recovery_type(db, left_field.ty, right_field.ty),
+                default,
+                definition: left_field.definition,
+            });
+        }
+
+        NamedTupleSpec::known(db, fields.into_boxed_slice())
+    }
+
+    fn merge_dynamic_named_tuple_anchor(
+        db: &'db dyn Db,
+        left: &DynamicNamedTupleAnchor<'db>,
+        right: &DynamicNamedTupleAnchor<'db>,
+    ) -> Option<DynamicNamedTupleAnchor<'db>> {
+        match (left, right) {
+            (
+                DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: left_definition,
+                    spec: left_spec,
+                },
+                DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: right_definition,
+                    spec: right_spec,
+                },
+            ) if left_definition == right_definition => {
+                Some(DynamicNamedTupleAnchor::CollectionsDefinition {
+                    definition: *left_definition,
+                    spec: Self::merge_named_tuple_specs(db, *left_spec, *right_spec),
+                })
+            }
+            (
+                DynamicNamedTupleAnchor::TypingDefinition(left),
+                DynamicNamedTupleAnchor::TypingDefinition(right),
+            ) if left == right => Some(DynamicNamedTupleAnchor::TypingDefinition(*left)),
+            (
+                DynamicNamedTupleAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    spec: left_spec,
+                },
+                DynamicNamedTupleAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    spec: right_spec,
+                },
+            ) if left_scope == right_scope && left_offset == right_offset => {
+                Some(DynamicNamedTupleAnchor::ScopeOffset {
+                    scope: *left_scope,
+                    offset: *left_offset,
+                    spec: Self::merge_named_tuple_specs(db, *left_spec, *right_spec),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn merge_dynamic_named_tuple(
+        db: &'db dyn Db,
+        left: DynamicNamedTupleLiteral<'db>,
+        right: DynamicNamedTupleLiteral<'db>,
+    ) -> Option<DynamicNamedTupleLiteral<'db>> {
+        if left.name(db) != right.name(db) {
+            return None;
+        }
+
+        Some(DynamicNamedTupleLiteral::new(
+            db,
+            left.name(db).clone(),
+            Self::merge_dynamic_named_tuple_anchor(db, left.anchor(db), right.anchor(db))?,
+        ))
+    }
+
+    fn merge_typed_dict_schemas(
+        db: &'db dyn Db,
+        left: &TypedDictSchema<'db>,
+        right: &TypedDictSchema<'db>,
+    ) -> TypedDictSchema<'db> {
+        let mut merged = left.clone();
+        for (name, right_field) in right.iter() {
+            if let Some(left_field) = merged.get_mut(name) {
+                left_field.declared_ty = Self::merge_cycle_recovery_type(
+                    db,
+                    left_field.declared_ty,
+                    right_field.declared_ty,
+                );
+            } else {
+                merged.insert(name.clone(), right_field.clone());
+            }
+        }
+        merged
+    }
+
+    fn merge_typed_dict_openness(
+        db: &'db dyn Db,
+        left: TypedDictOpenness<'db>,
+        right: TypedDictOpenness<'db>,
+    ) -> TypedDictOpenness<'db> {
+        match (left, right) {
+            _ if left == right => left,
+            (TypedDictOpenness::Extra(left), TypedDictOpenness::Extra(right))
+                if left.is_read_only() == right.is_read_only() =>
+            {
+                TypedDictOpenness::extra(
+                    db,
+                    Self::merge_cycle_recovery_type(db, left.declared_ty, right.declared_ty),
+                    left.is_read_only(),
+                )
+            }
+            _ => TypedDictOpenness::ImplicitlyOpen,
+        }
+    }
+
+    fn merge_dynamic_typed_dict_anchor(
+        db: &'db dyn Db,
+        left: &DynamicTypedDictAnchor<'db>,
+        right: &DynamicTypedDictAnchor<'db>,
+    ) -> Option<DynamicTypedDictAnchor<'db>> {
+        match (left, right) {
+            (
+                DynamicTypedDictAnchor::Definition(left),
+                DynamicTypedDictAnchor::Definition(right),
+            ) if left == right => Some(DynamicTypedDictAnchor::Definition(*left)),
+            (
+                DynamicTypedDictAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    schema: left_schema,
+                    openness: left_openness,
+                },
+                DynamicTypedDictAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    schema: right_schema,
+                    openness: right_openness,
+                },
+            ) if left_scope == right_scope && left_offset == right_offset => {
+                Some(DynamicTypedDictAnchor::ScopeOffset {
+                    scope: *left_scope,
+                    offset: *left_offset,
+                    schema: Self::merge_typed_dict_schemas(db, left_schema, right_schema),
+                    openness: Self::merge_typed_dict_openness(db, *left_openness, *right_openness),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn merge_dynamic_typed_dict(
+        db: &'db dyn Db,
+        left: DynamicTypedDictLiteral<'db>,
+        right: DynamicTypedDictLiteral<'db>,
+    ) -> Option<DynamicTypedDictLiteral<'db>> {
+        if left.name(db) != right.name(db) {
+            return None;
+        }
+
+        Some(DynamicTypedDictLiteral::new(
+            db,
+            left.name(db).clone(),
+            Self::merge_dynamic_typed_dict_anchor(db, left.anchor(db), right.anchor(db))?,
+        ))
+    }
+
+    fn merge_enum_specs(
+        db: &'db dyn Db,
+        left: EnumSpec<'db>,
+        right: EnumSpec<'db>,
+    ) -> EnumSpec<'db> {
+        if !left.has_known_members(db) || !right.has_known_members(db) {
+            return EnumSpec::new(db, Box::default(), false);
+        }
+
+        let mut members = left.members(db).to_vec();
+        for (right_name, right_ty) in right.members(db) {
+            if let Some((_, left_ty)) = members
+                .iter_mut()
+                .find(|(left_name, _)| left_name == right_name)
+            {
+                *left_ty = Self::merge_cycle_recovery_type(db, *left_ty, *right_ty);
+            } else {
+                members.push((right_name.clone(), *right_ty));
+            }
+        }
+
+        EnumSpec::new(db, members.into_boxed_slice(), true)
+    }
+
+    fn merge_dynamic_enum_anchor(
+        db: &'db dyn Db,
+        left: &DynamicEnumAnchor<'db>,
+        right: &DynamicEnumAnchor<'db>,
+    ) -> Option<DynamicEnumAnchor<'db>> {
+        match (left, right) {
+            (
+                DynamicEnumAnchor::Definition {
+                    definition: left_definition,
+                    spec: left_spec,
+                },
+                DynamicEnumAnchor::Definition {
+                    definition: right_definition,
+                    spec: right_spec,
+                },
+            ) if left_definition == right_definition => Some(DynamicEnumAnchor::Definition {
+                definition: *left_definition,
+                spec: Self::merge_enum_specs(db, *left_spec, *right_spec),
+            }),
+            (
+                DynamicEnumAnchor::ScopeOffset {
+                    scope: left_scope,
+                    offset: left_offset,
+                    spec: left_spec,
+                },
+                DynamicEnumAnchor::ScopeOffset {
+                    scope: right_scope,
+                    offset: right_offset,
+                    spec: right_spec,
+                },
+            ) if left_scope == right_scope && left_offset == right_offset => {
+                Some(DynamicEnumAnchor::ScopeOffset {
+                    scope: *left_scope,
+                    offset: *left_offset,
+                    spec: Self::merge_enum_specs(db, *left_spec, *right_spec),
+                })
+            }
+            _ => None,
+        }
+    }
+
+    fn merge_dynamic_enum(
+        db: &'db dyn Db,
+        left: DynamicEnumLiteral<'db>,
+        right: DynamicEnumLiteral<'db>,
+    ) -> Option<DynamicEnumLiteral<'db>> {
+        if left.name(db) != right.name(db) || left.base_class(db) != right.base_class(db) {
+            return None;
+        }
+
+        let mixin_type = match (left.mixin_type(db), right.mixin_type(db)) {
+            (Some(left), Some(right)) => Some(Self::merge_cycle_recovery_type(db, left, right)),
+            (Some(mixin), None) | (None, Some(mixin)) => Some(mixin),
+            (None, None) => None,
+        };
+
+        Some(DynamicEnumLiteral::new(
+            db,
+            left.name(db).clone(),
+            Self::merge_dynamic_enum_anchor(db, left.anchor(db), right.anchor(db))?,
+            left.base_class(db),
+            mixin_type,
+        ))
+    }
+
+    fn merge_same_dynamic_class_origin(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let (Type::ClassLiteral(left), Type::ClassLiteral(right)) = (left, right) else {
+            return None;
+        };
+
+        let merged = match (left, right) {
+            (ClassLiteral::Dynamic(left), ClassLiteral::Dynamic(right)) => {
+                ClassLiteral::Dynamic(Self::merge_dynamic_class(db, left, right)?)
+            }
+            (ClassLiteral::DynamicNamedTuple(left), ClassLiteral::DynamicNamedTuple(right)) => {
+                ClassLiteral::DynamicNamedTuple(Self::merge_dynamic_named_tuple(db, left, right)?)
+            }
+            (ClassLiteral::DynamicTypedDict(left), ClassLiteral::DynamicTypedDict(right)) => {
+                ClassLiteral::DynamicTypedDict(Self::merge_dynamic_typed_dict(db, left, right)?)
+            }
+            (ClassLiteral::DynamicEnum(left), ClassLiteral::DynamicEnum(right)) => {
+                ClassLiteral::DynamicEnum(Self::merge_dynamic_enum(db, left, right)?)
+            }
+            _ => return None,
+        };
+
+        Some(Type::ClassLiteral(merged))
+    }
+
+    fn contains_dynamic_class_literal(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::ClassLiteral(
+                ClassLiteral::Dynamic(_)
+                | ClassLiteral::DynamicNamedTuple(_)
+                | ClassLiteral::DynamicTypedDict(_)
+                | ClassLiteral::DynamicEnum(_),
+            ) => true,
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|element| Self::contains_dynamic_class_literal(db, *element)),
+            Type::GenericAlias(alias) => alias
+                .specialization(db)
+                .types(db)
+                .iter()
+                .any(|ty| Self::contains_dynamic_class_literal(db, *ty)),
+            Type::NominalInstance(instance) => match instance.class(db) {
+                ClassType::Generic(alias) => alias
+                    .specialization(db)
+                    .types(db)
+                    .iter()
+                    .any(|ty| Self::contains_dynamic_class_literal(db, *ty)),
+                ClassType::NonGeneric(class) => {
+                    Self::contains_dynamic_class_literal(db, Type::ClassLiteral(class))
+                }
+            },
+            Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+                Self::contains_dynamic_class_literal(db, body)
+            }
+            _ => false,
+        }
+    }
+
+    fn merge_specializations(
+        db: &'db dyn Db,
+        left: Specialization<'db>,
+        right: Specialization<'db>,
+    ) -> Option<Specialization<'db>> {
+        if left.generic_context(db) != right.generic_context(db)
+            || left.materialization_kind(db) != right.materialization_kind(db)
+        {
+            return None;
+        }
+
+        let left_types = left.types(db);
+        let right_types = right.types(db);
+        if left_types.len() != right_types.len() {
+            return None;
+        }
+
+        let mut changed = false;
+        let types: Box<_> = left_types
+            .iter()
+            .zip(right_types)
+            .map(|(left, right)| {
+                if left == right {
+                    Some(*left)
+                } else if Self::contains_dynamic_class_literal(db, *left)
+                    || Self::contains_dynamic_class_literal(db, *right)
+                {
+                    changed = true;
+                    Some(Self::merge_cycle_recovery_type(db, *left, *right))
+                } else {
+                    None
+                }
+            })
+            .collect::<Option<_>>()?;
+        if !changed {
+            return None;
+        }
+
+        Some(Specialization::new(
+            db,
+            left.generic_context(db),
+            types,
+            left.materialization_kind(db),
+            None,
+        ))
+    }
+
+    fn merge_generic_aliases(
+        db: &'db dyn Db,
+        left: GenericAlias<'db>,
+        right: GenericAlias<'db>,
+    ) -> Option<GenericAlias<'db>> {
+        if left.origin(db) != right.origin(db) {
+            return None;
+        }
+        if left.origin(db).is_tuple(db) {
+            return None;
+        }
+
+        Some(GenericAlias::new(
+            db,
+            left.origin(db),
+            Self::merge_specializations(db, left.specialization(db), right.specialization(db))?,
+        ))
+    }
+
+    fn merge_class_types(
+        db: &'db dyn Db,
+        left: ClassType<'db>,
+        right: ClassType<'db>,
+    ) -> Option<ClassType<'db>> {
+        match (left, right) {
+            (ClassType::NonGeneric(left), ClassType::NonGeneric(right)) => {
+                let merged = Self::merge_same_dynamic_class_origin(
+                    db,
+                    Type::ClassLiteral(left),
+                    Type::ClassLiteral(right),
+                )?;
+                match merged {
+                    Type::ClassLiteral(merged) => Some(ClassType::NonGeneric(merged)),
+                    _ => None,
+                }
+            }
+            (ClassType::Generic(left), ClassType::Generic(right)) => Some(ClassType::Generic(
+                Self::merge_generic_aliases(db, left, right)?,
+            )),
+            _ => None,
+        }
+    }
+
+    fn merge_nominal_instances(
+        db: &'db dyn Db,
+        left: NominalInstanceType<'db>,
+        right: NominalInstanceType<'db>,
+    ) -> Option<Type<'db>> {
+        let class = Self::merge_class_types(db, left.class(db), right.class(db))?;
+        Some(Type::instance(db, class))
+    }
+
+    fn merge_same_dynamic_origin_structural(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> Option<Type<'db>> {
+        match (left, right) {
+            (Type::ClassLiteral(_), Type::ClassLiteral(_)) => {
+                Self::merge_same_dynamic_class_origin(db, left, right)
+            }
+            (Type::GenericAlias(left), Type::GenericAlias(right)) => Some(Type::GenericAlias(
+                Self::merge_generic_aliases(db, left, right)?,
+            )),
+            (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+                Self::merge_nominal_instances(db, left, right)
+            }
+            _ => None,
+        }
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
@@ -1175,7 +2342,7 @@ impl<'db> UnionBuilder<'db> {
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
-        let should_try_reduce = relation_simplification.allows_try_reduce(ty);
+        let should_try_reduce = relation_simplification.allows_try_reduce(self.db, ty);
 
         for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = if !should_try_reduce {
@@ -1206,6 +2373,21 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            if let Some(merged) = Self::merge_matching_cycle_marked(self.db, ty, element_type) {
+                to_remove.push(i);
+                ty = merged;
+                continue;
+            }
+
+            if self.cycle_recovery
+                && let Some(merged) =
+                    Self::merge_same_dynamic_origin_structural(self.db, ty, element_type)
+            {
+                to_remove.push(i);
+                ty = merged;
+                continue;
+            }
+
             if let Some(fused) =
                 Self::cycle_fusion_candidate(self.db, self.cycle_recovery, ty, element_type)
             {
@@ -1222,12 +2404,22 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if Self::cycle_marked_represents_same_type(self.db, ty, element_type) {
+            if Self::cycle_marked_represents_same_type(
+                self.db,
+                relation_simplification,
+                ty,
+                element_type,
+            ) {
                 to_remove.push(i);
                 continue;
             }
 
-            if Self::cycle_marked_represents_same_type(self.db, element_type, ty) {
+            if Self::cycle_marked_represents_same_type(
+                self.db,
+                relation_simplification,
+                element_type,
+                ty,
+            ) {
                 return;
             }
 
@@ -1257,7 +2449,7 @@ impl<'db> UnionBuilder<'db> {
 
             if should_simplify_full
                 && !matches!(element_type, Type::TypeAlias(_))
-                && relation_simplification.allows_relation(ty, element_type)
+                && relation_simplification.allows_relation(self.db, ty, element_type)
             {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
@@ -1351,7 +2543,7 @@ impl<'db> UnionBuilder<'db> {
             let divergent_ids: Vec<_> = types
                 .iter()
                 .filter_map(|ty| match ty {
-                    Type::Divergent(divergent) => Some(divergent.id()),
+                    Type::Divergent(divergent) => Some(divergent.id(self.db)),
                     _ => None,
                 })
                 .collect();
@@ -1394,7 +2586,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
-    cycle_markers: FxOrderSet<CycleMarkedType<'db>>,
+    cycle_markers: FxOrderSet<DivergentType<'db>>,
     db: &'db dyn Db,
 }
 
@@ -1445,7 +2637,7 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_positive_impl(body, seen_recursive_binders)
             }
-            Type::CycleMarked(marked) => {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(self.db) => {
                 self.cycle_markers.insert(marked);
                 let inner = marked.inner(self.db);
                 self.add_positive_impl(inner, seen_recursive_binders)
@@ -1523,7 +2715,7 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_negative_impl(body, seen_recursive_binders)
             }
-            Type::CycleMarked(marked) => {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(self.db) => {
                 self.cycle_markers.insert(marked);
                 let inner = marked.inner(self.db);
                 self.add_negative_impl(inner, seen_recursive_binders)
@@ -1690,13 +2882,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
         // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
         // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
         // `Divergent` also gets a lot of special handling in cycle recovery.
-        if new_positive.is_divergent() {
+        if new_positive.is_divergent(db) {
             *self = Self::default();
             self.positive.insert(new_positive);
             return;
         }
         // `Divergent & T` -> `Divergent`
-        if self.positive.iter().any(Type::is_divergent) {
+        if self.positive.iter().any(|ty| ty.is_divergent(db)) {
             return;
         }
 
@@ -1891,13 +3083,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
 
         // `Divergent & ~T` -> `Divergent`.
-        if self.positive.iter().any(Type::is_divergent) {
+        if self.positive.iter().any(|ty| ty.is_divergent(db)) {
             debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
             return;
         }
 
         // `T & ~Divergent` -> `Divergent` (a divergent marker is gradual, so `~Divergent` is itself).
-        if new_negative.is_divergent() {
+        if new_negative.is_divergent(db) {
             *self = Self::default();
             self.positive.insert(new_negative);
             return;
@@ -2181,7 +3373,8 @@ mod tests {
     fn build_union_keeps_non_contractive_recursive_without_marker() {
         let db = setup_db();
         let binder_id = Id::from_bits(1);
-        let non_contractive = Type::implicit_recursive(&db, binder_id, Type::divergent(binder_id));
+        let non_contractive =
+            Type::implicit_recursive(&db, binder_id, Type::divergent(&db, binder_id));
         let int = KnownClass::Int.to_instance(&db);
 
         let union = UnionType::from_elements(&db, [int, non_contractive]).expect_union();
@@ -2193,7 +3386,7 @@ mod tests {
     fn build_union_drops_non_contractive_recursive_with_matching_marker() {
         let db = setup_db();
         let binder_id = Id::from_bits(1);
-        let marker = Type::divergent(binder_id);
+        let marker = Type::divergent(&db, binder_id);
         let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
 
         assert_eq!(
@@ -2210,7 +3403,7 @@ mod tests {
     fn build_cycle_recovery_union_keeps_non_contractive_recursive() {
         let db = setup_db();
         let binder_id = Id::from_bits(1);
-        let marker = Type::divergent(binder_id);
+        let marker = Type::divergent(&db, binder_id);
         let non_contractive = Type::implicit_recursive(&db, binder_id, marker);
 
         let union = UnionBuilder::new(&db)

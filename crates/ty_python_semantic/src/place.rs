@@ -966,7 +966,10 @@ impl<'db> PlaceAndQualifiers<'db> {
             (Place::Defined(prev), Place::Undefined) => {
                 if prev.ty.is_never() {
                     Place::Defined(prev)
-                } else if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
+                } else if cycle
+                    .head_ids()
+                    .any(|id| prev.ty == Type::divergent(db, id))
+                {
                     Place::Undefined
                 } else {
                     Place::Defined(DefinedPlace {
@@ -989,7 +992,7 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
 }
 
 #[salsa::tracked(
-    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(id))).into(),
+    cycle_initial=|db, id, _, _, _, _| Place::bound(Type::implicit_recursive(db, id, Type::divergent(db, id))).into(),
     cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
         place.cycle_normalized(db, *previous, cycle)
     },

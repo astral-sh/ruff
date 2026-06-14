@@ -107,7 +107,7 @@ impl<'db> RecursiveOrigin<'db> {
         };
         let visitor = ApplyTypeMappingVisitor::default();
         let body = build_body(binder_id, type_mapping, &visitor);
-        let marker = Type::divergent(binder_id);
+        let marker = Type::divergent(db, binder_id);
         // A marker that is a direct union element represents the current cycle
         // head, not recursive structure inside the body.
         let body = match body {
@@ -135,7 +135,7 @@ impl<'db> RecursiveOrigin<'db> {
             db,
             body,
             false,
-            |ty| matches!(ty, Type::Divergent(divergent) if divergent.id() == binder_id),
+            |ty| matches!(ty, Type::Divergent(divergent) if divergent.id(db) == binder_id),
         ) {
             Some(Type::recursive(db, binder_id, self, body))
         } else {
@@ -303,7 +303,7 @@ impl<'db> RecursiveType<'db> {
     /// Without it, repeated operations can keep materializing copies of the
     /// recursive body instead of preserving the fixed-point shape.
     fn fold(self, db: &'db dyn Db, unfold_operated: Type<'db>) -> Type<'db> {
-        let marker = Type::divergent(self.binder_id(db));
+        let marker = Type::divergent(db, self.binder_id(db));
         let normalization = RecursiveTypeNormalization::new(marker).preserve_top_level_recursive();
         unfold_operated
             .recursive_type_normalized_impl(db, normalization)
@@ -328,6 +328,6 @@ impl<'db> RecursiveType<'db> {
     /// `Divergent`. This only arises as a not-yet-converged cycle provisional; a converged,
     /// structureless cycle is resolved away rather than wrapped.
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
-        self.body(db) == Type::divergent(self.binder_id(db))
+        self.body(db) == Type::divergent(db, self.binder_id(db))
     }
 }

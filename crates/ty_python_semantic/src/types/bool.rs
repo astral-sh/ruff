@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, CycleMarkable, CycleMarkedType,
+        CallArguments, CallDunderError, ClassType, CycleDetector, CycleMarkable, DivergentType,
         KnownClass, KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
@@ -216,16 +216,19 @@ impl<'db> Type<'db> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 unfolded.try_bool_impl(db, allow_short_circuit, visitor)
             })?,
-            Type::CycleMarked(marked) => visitor.visit(*self, || {
-                marked.map(db, |inner| {
+            Type::Divergent(divergent) => {
+                if let Some(truthiness) = divergent.try_map(db, |inner| {
                     inner.try_bool_impl(db, allow_short_circuit, visitor)
-                })
-            })?,
+                }) {
+                    truthiness?
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
 
             // `Divergent` is the recursive α-leaf. A non-contractive `Recursive` has no structure
             // to inspect, so both are `Ambiguous`, like `Dynamic`.
             Type::Dynamic(_)
-            | Type::Divergent(_)
             | Type::Recursive(_)
             | Type::Never
             | Type::Callable(_)
@@ -392,7 +395,7 @@ impl<'db> Foldable<'db> for Truthiness {
 }
 
 impl<'db> CycleMarkable<'db> for Truthiness {
-    fn mark_cycle(self, _db: &'db dyn Db, _marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, _db: &'db dyn Db, _marked: DivergentType<'db>) -> Self {
         self
     }
 }
@@ -429,7 +432,7 @@ impl<'db> Foldable<'db> for BoolError<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for BoolError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::NotCallable { not_boolable_type } => Self::NotCallable {
                 not_boolable_type: not_boolable_type.mark_cycle(db, marked),

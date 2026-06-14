@@ -147,7 +147,7 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn cycle_initial(db: &'db dyn Db, id: salsa::Id) -> Self {
         Self::single(Signature::new(
             Parameters::bottom(),
-            Type::implicit_recursive(db, id, Type::divergent(id)),
+            Type::implicit_recursive(db, id, Type::divergent(db, id)),
         ))
     }
 
@@ -1022,7 +1022,7 @@ impl<'db> Signature<'db> {
     /// If a signature has no positional first parameter, we conservatively keep it.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
-        if self_type.is_dynamic() {
+        if self_type.is_dynamic(db) {
             return true;
         }
 
@@ -1044,7 +1044,7 @@ impl<'db> Signature<'db> {
 
         let mut expected_self_ty = first_parameter.annotated_type();
         let accepts_any_or_exact_self =
-            |ty: Type<'db>| ty.is_dynamic() || ty.is_object() || ty == self_type;
+            |ty: Type<'db>| ty.is_dynamic(db) || ty.is_object() || ty == self_type;
 
         // Avoid the more expensive normalization below for receiver annotations that already
         // accept all values, or already exactly match the bound receiver.

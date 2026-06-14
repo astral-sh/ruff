@@ -552,7 +552,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return (Some(ty), true);
         }
 
-        if ty.is_dynamic() {
+        if ty.is_dynamic(db) {
             return (Some(ty), true);
         }
 
@@ -696,7 +696,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             return self.parse_enum_members_from_dict(dict, base_class);
         }
 
-        if ty.is_dynamic() || ty.is_assignable_to(db, enum_names_type(db)) {
+        if ty.is_dynamic(db) || ty.is_assignable_to(db, enum_names_type(db)) {
             EnumMembersArgParseResult::Unknown
         } else {
             EnumMembersArgParseResult::Invalid
@@ -808,7 +808,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
             let key_ty = self.expression_type(key);
             let Some(string_lit) = key_ty.as_string_literal() else {
-                if key_ty.is_dynamic()
+                if key_ty.is_dynamic(db)
                     || key_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
                 {
                     has_opaque_keys = true;
@@ -868,7 +868,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
         let db = self.db();
         let name_ty = self.expression_type(name_expr);
-        name_ty.is_dynamic() || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+        name_ty.is_dynamic(db) || name_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
     }
 
     /// Classifies one element from a sequence-form `names` argument.
@@ -884,7 +884,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         if let Some((name, value)) = self.parse_explicit_enum_member(elt) {
             return SequenceEnumMember::PairKnown(name, value);
         }
-        if ty.is_dynamic() || ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
+        if ty.is_dynamic(db) || ty.is_assignable_to(db, KnownClass::Str.to_instance(db)) {
             return SequenceEnumMember::NameOpaque;
         }
         if self.is_potential_explicit_enum_member(elt) {

@@ -1637,7 +1637,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // type StrOrInt = str | IntOrStr  # It's redundant, but OK
         // ```
         let expanded = value_ty.expand_eagerly(self.db());
-        if expanded.is_divergent()
+        if expanded.is_divergent(self.db())
             || matches!(expanded, Type::Recursive(rec) if rec.is_non_contractive(self.db()))
         {
             if let Some(builder) = self
@@ -2737,15 +2737,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     emit_diagnostics,
                 )
             }),
-            Type::CycleMarked(marked) => marked.map(db, |inner| {
-                self.validate_attribute_assignment(
-                    target,
-                    inner,
-                    attribute,
-                    infer_value_ty,
-                    emit_diagnostics,
-                )
-            }),
+            Type::Divergent(divergent)
+                if let Some(result) = divergent.try_map(db, |inner| {
+                    self.validate_attribute_assignment(
+                        target,
+                        inner,
+                        attribute,
+                        infer_value_ty,
+                        emit_diagnostics,
+                    )
+                }) =>
+            {
+                result
+            }
 
             // Super instances do not allow attribute assignment
             Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Super) => {
@@ -3400,9 +3404,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 self.validate_attribute_deletion(target, unfolded, attribute, emit_diagnostics)
             }),
-            Type::CycleMarked(marked) => marked.map(db, |inner| {
-                self.validate_attribute_deletion(target, inner, attribute, emit_diagnostics)
-            }),
+            Type::Divergent(divergent)
+                if let Some(result) = divergent.try_map(db, |inner| {
+                    self.validate_attribute_deletion(target, inner, attribute, emit_diagnostics)
+                }) =>
+            {
+                result
+            }
 
             Type::NominalInstance(..)
             | Type::ProtocolInstance(_)
@@ -3592,10 +3600,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeForm(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_) => object_ty.instance_member(db, attribute),
-                Type::CycleMarked(marked) => {
-                    return marked.map(db, |inner| {
+                Type::Divergent(divergent)
+                    if let Some(member) = divergent.try_map(db, |inner| {
                         self.assignment_attribute_members(inner, attribute)
-                    });
+                    }) =>
+                {
+                    return member;
                 }
                 Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                     object_ty.class_object_member(db, attribute, MemberLookupPolicy::default())
@@ -5367,9 +5377,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::TypeAlias(alias) => {
                     propagate_callable_kind(db, alias.value_type(db), kind, provenance)
                 }
-                Type::CycleMarked(marked) => marked.map(db, |inner| {
-                    propagate_callable_kind(db, inner, kind, provenance)
-                }),
+                Type::Divergent(divergent)
+                    if let Some(propagated) = divergent.try_map(db, |inner| {
+                        propagate_callable_kind(db, inner, kind, provenance)
+                    }) =>
+                {
+                    propagated
+                }
                 // Intersections are currently not handled here because that would require
                 // the decorator to be explicitly annotated as returning an intersection.
                 Type::Intersection(_) | Type::EnumComplement(_) => None,
@@ -6206,10 +6220,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // unspecialized variable from an enclosing generic call.
         if target_callable.signatures(db).iter().all(|signature| {
             let parameters = signature.parameters().as_slice();
-            (signature.return_ty.is_dynamic()
+            (signature.return_ty.is_dynamic(self.db())
                 && parameters
                     .iter()
-                    .all(|parameter| parameter.annotated_type().is_dynamic()))
+                    .all(|parameter| parameter.annotated_type().is_dynamic(self.db())))
                 || (parameters.is_empty()
                     && matches!(
                         signature.return_ty,
@@ -7180,7 +7194,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .get(&elt_ty_identity)
                 .copied();
 
-            if elt_tcx.is_some_and(|elt_tcx| !elt_tcx.is_dynamic()) {
+            if elt_tcx.is_some_and(|elt_tcx| !elt_tcx.is_dynamic(self.db())) {
                 // Record type annotations that provide concrete shape information in order to
                 // disqualify this typevar from tuple size promotion.
                 tuple_size_promotion_constraints.record_declared_type(elt_ty_identity);
@@ -7241,7 +7255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let divergent_ty = match expression_ty {
                     Type::Divergent(divergent) => Some(Type::Divergent(divergent)),
                     Type::Recursive(rec) if !has_inferable_collection_use_constraint => {
-                        Some(Type::divergent(rec.binder_id(self.db())))
+                        Some(Type::divergent(self.db(), rec.binder_id(self.db())))
                     }
                     _ => None,
                 };
@@ -10287,9 +10301,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match (op, operand_type) {
-            (_, Type::CycleMarked(marked)) => marked.map(self.db(), |inner| {
-                self.infer_unary_expression_type(op, inner, unary)
-            }),
+            (_, Type::Divergent(divergent)) if let Some(inner) = divergent.body(self.db()) => {
+                let binder_id = divergent.binder_id(self.db());
+                let inferred = self.infer_unary_expression_type(op, inner, unary);
+                Type::cycle_marked(self.db(), binder_id, inferred)
+            }
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
             | (_, Type::Divergent(_)) => operand_type,
             (_, Type::Recursive(rec)) if rec.is_non_contractive(self.db()) => operand_type,

@@ -28,7 +28,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleMarkable, CycleMarkedType, ErrorContext,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleMarkable, DivergentType, ErrorContext,
     FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder,
     UnionType,
 };
@@ -389,7 +389,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 // (or any other dynamic type), then the `...` is the _gradual choice_ of all
                 // possible lengths. This means that `tuple[Any, ...]` can match any tuple of any
                 // length.
-                if !self.is_eager_assignability() || !source.variable().is_dynamic() {
+                if !self.is_eager_assignability() || !source.variable().is_dynamic(db) {
                     return self.never();
                 }
 
@@ -461,7 +461,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source.variable().is_dynamic() {
+                            if !self.is_eager_assignability() || !source.variable().is_dynamic(db) {
                                 return self.never();
                             }
                             self.check_type_pair(db, source.variable(), other_ty)
@@ -498,7 +498,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             // provide, unless the lhs has a dynamic variable-length portion
                             // that can materialize to provide it (for assignability only),
                             // as in `tuple[Any, ...]` matching `tuple[int, int]`.
-                            if !self.is_eager_assignability() || !source.variable().is_dynamic() {
+                            if !self.is_eager_assignability() || !source.variable().is_dynamic(db) {
                                 return self.never();
                             }
                             self.check_type_pair(db, source.variable(), target_ty)
@@ -603,7 +603,7 @@ fn to_class_type_cycle_initial<'db>(
         if generic_context.variables(db).len() == 1 {
             generic_context.specialize_tuple(
                 db,
-                Type::implicit_recursive(db, id, Type::divergent(id)),
+                Type::implicit_recursive(db, id, Type::divergent(db, id)),
                 self_,
             )
         } else {
@@ -1573,7 +1573,7 @@ impl<'db> Tuple<Type<'db>> {
 }
 
 impl<'db> CycleMarkable<'db> for Tuple<Type<'db>> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         self.map_elements(|ty| ty.mark_cycle(db, marked))
     }
 }

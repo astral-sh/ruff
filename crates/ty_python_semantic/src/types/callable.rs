@@ -6,7 +6,7 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, CycleMarkable, CycleMarkedType,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, CycleMarkable, DivergentType,
         FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         RecursiveTypeNormalization, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
@@ -87,6 +87,13 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
+            Type::Divergent(divergent)
+                if let Some(callable) = divergent.try_map(db, |inner| {
+                    inner.try_upcast_to_callable_with_policy_and_context(db, policy, context)
+                }) =>
+            {
+                callable
+            }
             // `Divergent` is the recursive α-leaf (after a `Type::Recursive` unfold), not a
             // standalone type — upcast to a dynamic callable, like `Dynamic`.
             Type::Divergent(_) => Some(CallableTypes::one(CallableType::function_like(
@@ -109,9 +116,6 @@ impl<'db> Type<'db> {
                 db,
                 Signature::dynamic(self),
             ))),
-            Type::CycleMarked(marked) => marked.map(db, |inner| {
-                inner.try_upcast_to_callable_with_policy_and_context(db, policy, context)
-            }),
 
             Type::FunctionLiteral(function_literal)
                 if context.is_recursive_reference(db, function_literal) =>
@@ -738,7 +742,7 @@ impl<'db> Foldable<'db> for CallableType<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for CallableType<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         let signatures = CallableSignature::from_overloads(
             self.signatures(db).overloads.iter().map(|signature| {
                 signature
@@ -757,7 +761,7 @@ impl<'db> Foldable<'db> for CallableTypes<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for CallableTypes<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         self.map(|callable| callable.mark_cycle(db, marked))
     }
 }

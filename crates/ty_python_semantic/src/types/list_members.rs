@@ -168,10 +168,10 @@ impl<'db> AllMembers<'db> {
                     // We don't need to use recursion here because
                     // `Type` guarantees that unions/intersections
                     // are kept in DNF (i.e., they are flattened).
-                    ty.is_dynamic()
+                    ty.is_dynamic(db)
                         || match ty {
                             Type::Intersection(intersection) => {
-                                intersection.positive(db).iter().any(Type::is_dynamic)
+                                intersection.positive(db).iter().any(|ty| ty.is_dynamic(db))
                             }
                             _ => false,
                         }
@@ -275,8 +275,8 @@ impl<'db> AllMembers<'db> {
             Type::Recursive(rec) => {
                 rec.map(db, |unfolded| self.extend_with_type(db, unfolded));
             }
-            Type::CycleMarked(marked) => {
-                marked.map(db, |inner| self.extend_with_type(db, inner));
+            Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+                self.extend_with_type(db, body);
             }
 
             Type::Dynamic(_)

@@ -21,7 +21,7 @@ use crate::{Db, DisplaySettings};
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -96,9 +96,15 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+            Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+                Self::try_from_type(db, body, subclass)
+            }
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
-            Type::Recursive(r) => Some(Self::Divergent(DivergentType::new(r.binder_id(db)))),
-            Type::CycleMarked(marked) => Self::try_from_type(db, marked.inner(db), subclass),
+            Type::Recursive(r) => Some(Self::Divergent(DivergentType::new(
+                db,
+                crate::types::recursive::BinderId::new(r.binder_id(db)),
+                None,
+            ))),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)

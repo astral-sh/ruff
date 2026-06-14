@@ -1838,7 +1838,9 @@ fn is_instance_truthiness<'db>(
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
-        Type::CycleMarked(marked) => is_instance_truthiness(db, marked.inner(db), class),
+        Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+            is_instance_truthiness(db, body, class)
+        }
 
         Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
             None => is_instance_truthiness(db, Type::object(), class),
@@ -2362,7 +2364,7 @@ impl KnownFunction {
                 };
                 let casted_type = casted_type.project_type_form(db);
                 let contains_unknown_or_todo = |ty: Type<'_>| {
-                    ty.is_dynamic() && !matches!(ty, Type::Dynamic(DynamicType::Any))
+                    ty.is_dynamic(db) && !matches!(ty, Type::Dynamic(DynamicType::Any))
                 };
                 if source_type.is_equivalent_to(db, casted_type)
                     && !any_over_type(db, *source_type, true, contains_unknown_or_todo)

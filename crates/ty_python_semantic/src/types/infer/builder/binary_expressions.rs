@@ -320,32 +320,40 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::CycleMarked(marked), rhs, _) => visitor.visit((left_ty, op, right_ty), || {
-                Some(marked.map(db, |inner| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        inner,
-                        rhs,
-                        op,
-                        visitor,
-                    )
-                    .unwrap_or_else(|| Type::divergent(marked.binder_id(db)))
-                }))
-            }),
-            (lhs, Type::CycleMarked(marked), _) => visitor.visit((left_ty, op, right_ty), || {
-                Some(marked.map(db, |inner| {
-                    self.infer_binary_expression_type_impl(
-                        node,
-                        emitted_division_by_zero_diagnostic,
-                        lhs,
-                        inner,
-                        op,
-                        visitor,
-                    )
-                    .unwrap_or_else(|| Type::divergent(marked.binder_id(db)))
-                }))
-            }),
+            (Type::Divergent(divergent), rhs, _)
+                if let Some(marked) = divergent.as_cycle_marked(db) =>
+            {
+                visitor.visit((left_ty, op, right_ty), || {
+                    Some(marked.map(db, |inner| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            inner,
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                        .unwrap_or_else(|| Type::divergent(db, marked.binder_id(db)))
+                    }))
+                })
+            }
+            (lhs, Type::Divergent(divergent), _)
+                if let Some(marked) = divergent.as_cycle_marked(db) =>
+            {
+                visitor.visit((left_ty, op, right_ty), || {
+                    Some(marked.map(db, |inner| {
+                        self.infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            inner,
+                            op,
+                            visitor,
+                        )
+                        .unwrap_or_else(|| Type::divergent(db, marked.binder_id(db)))
+                    }))
+                })
+            }
             (Type::Union(lhs_union), rhs, _) => lhs_union.try_map(db, |lhs_element| {
                 self.infer_binary_expression_type_impl(
                     node,
@@ -389,6 +397,48 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 )
             }),
 
+            (Type::Divergent(divergent), rhs, _) => {
+                let binder_id = divergent.binder_id(db);
+                visitor.visit((left_ty, op, right_ty), || {
+                    let inferred = self
+                        .infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            Type::unknown(),
+                            rhs,
+                            op,
+                            visitor,
+                        )
+                        .unwrap_or_else(|| Type::divergent(db, binder_id));
+                    Some(if inferred.is_dynamic(db) {
+                        Type::divergent(db, binder_id)
+                    } else {
+                        Type::cycle_marked(db, binder_id, inferred)
+                    })
+                })
+            }
+
+            (lhs, Type::Divergent(divergent), _) => {
+                let binder_id = divergent.binder_id(db);
+                visitor.visit((left_ty, op, right_ty), || {
+                    let inferred = self
+                        .infer_binary_expression_type_impl(
+                            node,
+                            emitted_division_by_zero_diagnostic,
+                            lhs,
+                            Type::unknown(),
+                            op,
+                            visitor,
+                        )
+                        .unwrap_or_else(|| Type::divergent(db, binder_id));
+                    Some(if inferred.is_dynamic(db) {
+                        Type::divergent(db, binder_id)
+                    } else {
+                        Type::cycle_marked(db, binder_id, inferred)
+                    })
+                })
+            }
+
             (Type::TypedDict(left_typed_dict), rhs, ast::Operator::BitOr)
                 if rhs.is_assignable_to(db, Type::TypedDict(left_typed_dict)) =>
             {
@@ -401,9 +451,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Some(Type::TypedDict(right_typed_dict))
             }
 
-            // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
-            // the result would then become Any or Unknown, respectively).
-            (div @ Type::Divergent(_), _, _) | (_, div @ Type::Divergent(_), _) => Some(div),
             (rec @ Type::Recursive(recursive), _, _) if recursive.is_non_contractive(db) => {
                 Some(rec)
             }

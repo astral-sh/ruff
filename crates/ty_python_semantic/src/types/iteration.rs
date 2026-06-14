@@ -1,7 +1,7 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, CycleMarkable, CycleMarkedType,
+        AwaitError, Bindings, CallArguments, CallDunderError, CycleMarkable, DivergentType,
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type,
         TypeContext, TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
@@ -152,8 +152,10 @@ impl<'db> Type<'db> {
                     Some(Cow::Owned(TupleSpec::homogeneous(Type::Never)))
                 }
                 Type::TypeAlias(alias) => non_async_special_case(db, alias.value_type(db)),
-                Type::CycleMarked(marked) => {
-                    marked.map(db, |inner| non_async_special_case(db, inner))
+                Type::Divergent(divergent) if let Some(spec) =
+                    divergent.try_map(db, |inner| non_async_special_case(db, inner)) =>
+                {
+                    spec
                 }
                 Type::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db)? {
                     TypeVarBoundOrConstraints::UpperBound(bound) => non_async_special_case(db, bound),
@@ -351,8 +353,11 @@ impl<'db> Type<'db> {
             return rec.map(db, |unfolded| unfolded.try_iterate_with_mode(db, mode));
         }
 
-        if let Type::CycleMarked(marked) = self {
-            return marked.map(db, |inner| inner.try_iterate_with_mode(db, mode));
+        if let Type::Divergent(divergent) = self
+            && let Some(iteration) =
+                divergent.try_map(db, |inner| inner.try_iterate_with_mode(db, mode))
+        {
+            return iteration;
         }
 
         if let Type::TypeAlias(alias) = self {
@@ -530,7 +535,7 @@ impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
 }
 
 impl<'db> CycleMarkable<'db> for Cow<'db, TupleSpec<'db>> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Cow::Owned(self.into_owned().mark_cycle(db, marked))
     }
 }
@@ -576,7 +581,7 @@ impl<'db> Foldable<'db> for IterationError<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for IterationError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::IterCallError {
                 kind,

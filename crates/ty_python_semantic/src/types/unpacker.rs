@@ -215,10 +215,15 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                         Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
                         ty => vec![ty],
                     }),
-                    Type::CycleMarked(marked) => marked.map(self.db(), |inner| match inner {
-                        Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
-                        ty => vec![ty],
-                    }),
+                    Type::Divergent(divergent)
+                        if let Some(unpack_types) =
+                            divergent.try_map(self.db(), |inner| match inner {
+                                Type::Union(union_ty) => union_ty.elements(self.db()).to_vec(),
+                                ty => vec![ty],
+                            }) =>
+                    {
+                        unpack_types
+                    }
                     _ => vec![value_ty],
                 };
 

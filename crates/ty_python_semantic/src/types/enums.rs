@@ -138,7 +138,7 @@ fn special_member_for_enum_complement<'db>(
 ) -> Option<PlaceAndQualifiers<'db>> {
     if matches!(name, "name" | "_name_" | "value" | "_value_")
         && !class_defines_property(db, complement.enum_class(db), name)
-        && complement.rest(db).iter().all(Type::is_dynamic)
+        && complement.rest(db).iter().all(|ty| ty.is_dynamic(db))
         && let Some(member_ty) = complement.member_type(db, name)
     {
         Some(Place::bound(member_ty).into())

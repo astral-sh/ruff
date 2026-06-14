@@ -289,7 +289,7 @@ impl<'db> ResolvedSuperOwner<'db> {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
-    Divergent(DivergentType),
+    Divergent(DivergentType<'db>),
     Resolved(ResolvedSuperOwner<'db>),
 }
 
@@ -601,9 +601,15 @@ impl<'db> BoundSuperType<'db> {
         let owner = match owner_type {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
+            Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
+                return delegate_to(body);
+            }
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
-            Type::Recursive(r) => SuperOwnerKind::Divergent(DivergentType::new(r.binder_id(db))),
-            Type::CycleMarked(marked) => return delegate_to(marked.inner(db)),
+            Type::Recursive(r) => SuperOwnerKind::Divergent(DivergentType::new(
+                db,
+                crate::types::recursive::BinderId::new(r.binder_id(db)),
+                None,
+            )),
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
                 pivot_class,

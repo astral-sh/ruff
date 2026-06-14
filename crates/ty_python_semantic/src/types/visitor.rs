@@ -3,7 +3,7 @@ use rustc_hash::FxHashSet;
 use crate::{
     Db,
     types::{
-        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, CycleMarkedType,
+        BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, DivergentType,
         EnumComplementType, GenericAlias, IntersectionType, KnownBoundMethodType,
         KnownInstanceType, NominalInstanceType, PropertyInstanceType, ProtocolInstanceType,
         SubclassOfType, Type, TypeAliasType, TypeFormType, TypeGuardType, TypeIsType,
@@ -135,7 +135,7 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_recursive_type(&self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) {}
 
-    fn visit_cycle_marked_type(&self, db: &'db dyn Db, marked: CycleMarkedType<'db>) {
+    fn visit_cycle_marked_type(&self, db: &'db dyn Db, marked: DivergentType<'db>) {
         walk_cycle_marked_type(db, marked, self);
     }
 }
@@ -165,7 +165,6 @@ pub(super) enum NonAtomicType<'db> {
     TypeAlias(TypeAliasType<'db>),
     NewTypeInstance(NewType<'db>),
     Recursive(RecursiveType<'db>),
-    CycleMarked(CycleMarkedType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -240,7 +239,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
             }
             Type::Recursive(recursive) => TypeKind::NonAtomic(NonAtomicType::Recursive(recursive)),
-            Type::CycleMarked(marked) => TypeKind::NonAtomic(NonAtomicType::CycleMarked(marked)),
         }
     }
 }
@@ -291,7 +289,6 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_newtype_instance_type(db, newtype);
         }
         NonAtomicType::Recursive(recursive) => visitor.visit_recursive_type(db, recursive),
-        NonAtomicType::CycleMarked(marked) => visitor.visit_cycle_marked_type(db, marked),
     }
 }
 
@@ -301,6 +298,16 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
     visitor: &impl TypeVisitor<'db>,
     recursion_guard: &TypeCollector<'db>,
 ) {
+    if let Type::Divergent(divergent) = ty
+        && divergent.body(db).is_some()
+    {
+        if recursion_guard.type_was_already_seen(ty) {
+            return;
+        }
+        visitor.visit_cycle_marked_type(db, divergent);
+        return;
+    }
+
     match TypeKind::from(ty) {
         TypeKind::Atomic => {}
         TypeKind::NonAtomic(non_atomic_type) => {

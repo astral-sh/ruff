@@ -66,7 +66,7 @@ impl<'db> UnionType<'db> {
 
     /// Create a union type `A | B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(db, id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, Some(*previous), cycle)
         },
@@ -355,12 +355,12 @@ impl<'db> UnionType<'db> {
             .unpack_aliases(false)
             .cycle_recovery(true);
         let mut empty = true;
-        let mut top_level_marker_id = None;
+        let mut removed_bodyful_marker_id = None;
         for ty in self.elements(db) {
             if normalization.is_nested() {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, normalization)?;
-                if ty.same_divergent_marker(normalization.marker()) {
+                if ty.same_divergent_marker(db, normalization.marker()) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
@@ -372,14 +372,16 @@ impl<'db> UnionType<'db> {
                 // Top-level cycle markers in a union do not mean true divergence, so we skip
                 // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
                 if ty.is_top_level_cycle_marker(db, normalization.marker()) {
-                    top_level_marker_id = normalization.marker_id();
                     continue;
                 }
-                if let Type::CycleMarked(marked) = ty
-                    && normalization.matches_cycle_marked_marker(db, marked)
+                if let Type::Divergent(marked) = ty
+                    && let Some(body) = marked.body(db)
+                    && normalization
+                        .marker_id(db)
+                        .is_some_and(|id| marked.binder_id(db) == id)
                 {
-                    top_level_marker_id = Some(marked.binder_id(db));
-                    builder = builder.add(marked.inner(db));
+                    removed_bodyful_marker_id = Some(marked.binder_id(db));
+                    builder = builder.add(body);
                     empty = false;
                     continue;
                 }
@@ -391,8 +393,9 @@ impl<'db> UnionType<'db> {
             builder = builder.add(normalization.marker());
         }
         let ty = builder.build();
-        if let Some(marker_id) = top_level_marker_id
-            && !ty.same_divergent_marker(normalization.marker())
+        if let Some(marker_id) = removed_bodyful_marker_id
+            && !ty.same_divergent_marker(db, normalization.marker())
+            && !normalization.contains_marker(db, ty)
         {
             Some(Type::cycle_marked(db, marker_id, ty))
         } else {
@@ -750,7 +753,7 @@ impl<'db> IntersectionType<'db> {
 
     /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
-        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(id)),
+        cycle_initial=|db, id, _, _| Type::implicit_recursive(db, id, Type::divergent(db, id)),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
             result.cycle_normalized(db, Some(*previous), cycle)
         },

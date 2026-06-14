@@ -546,11 +546,11 @@ enum ProtocolMemberKind<'db> {
 impl<'db> ProtocolMemberKind<'db> {
     fn is_cycle_marker(self, db: &'db dyn Db) -> bool {
         match self {
+            Self::Other(Type::Divergent(divergent)) if let Some(body) = divergent.body(db) => {
+                Self::Other(body).is_cycle_marker(db)
+            }
             Self::Other(Type::Divergent(_)) => true,
             Self::Other(Type::Recursive(recursive)) if recursive.is_non_contractive(db) => true,
-            Self::Other(Type::CycleMarked(marked)) => {
-                Self::Other(marked.inner(db)).is_cycle_marker(db)
-            }
             Self::Method(_) | Self::Property(_) | Self::Other(_) => false,
         }
     }

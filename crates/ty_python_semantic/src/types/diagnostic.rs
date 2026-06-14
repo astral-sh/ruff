@@ -5845,7 +5845,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                         .types(db)
                         .iter()
                         .zip(supercls_alias.specialization(db).types(db))
-                        .any(|(t1, t2)| !t1.is_dynamic() && !t2.is_dynamic() && t1 != t2)
+                        .any(|(t1, t2)| !t1.is_dynamic(db) && !t2.is_dynamic(db) && t1 != t2)
                 {
                     let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, header_range)
                     else {
@@ -5908,7 +5908,7 @@ pub(crate) fn report_inconsistent_generic_bases<'db>(
                 .specialization(db)
                 .types(db)
                 .iter()
-                .all(Type::is_dynamic)
+                .all(|ty| ty.is_dynamic(db))
             {
                 ancestor_specs.insert(origin, (supercls_alias, i));
             }

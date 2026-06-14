@@ -4,7 +4,7 @@ use super::{Signature, Type, TypeContext};
 use crate::Db;
 use crate::place::Provenance;
 use crate::types::call::bind::BindingError;
-use crate::types::{CycleMarkable, CycleMarkedType, MemberLookupPolicy, PropertyInstanceType};
+use crate::types::{CycleMarkable, DivergentType, MemberLookupPolicy, PropertyInstanceType};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -260,7 +260,7 @@ impl<'db> Foldable<'db> for CallDunderError<'db> {
 }
 
 impl<'db> CycleMarkable<'db> for CallDunderError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: CycleMarkedType<'db>) -> Self {
+    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::CallError(kind, bindings, provenance) => {
                 Self::CallError(kind, bindings.mark_cycle(db, marked), provenance)
