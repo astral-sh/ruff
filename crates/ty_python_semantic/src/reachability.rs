@@ -202,9 +202,9 @@ use crate::{
     types::{
         CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        enum_metadata, equality_truthiness, infer_narrowing_constraints,
-        infer_same_file_expression_type, mapping_pattern_type, sequence_pattern_type_builder,
-        singleton_pattern_type,
+        definite_match_pattern_type_for_subject, enum_metadata, equality_truthiness,
+        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
 use ruff_index::{Idx, IndexSlice};
@@ -274,7 +274,11 @@ fn type_narrowed_by_pattern<'db>(
 ) -> Type<'db> {
     IntersectionBuilder::new(db)
         .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .add_negative(definite_match_pattern_type_for_subject(
+            db,
+            predicate.kind(db),
+            subject_ty,
+        ))
         .build()
 }
 
@@ -492,7 +496,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 
     let truthiness =
-        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty);
+        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, None);
 
     if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
         // Fall back to ambiguous, the guard might change the result.
@@ -975,6 +979,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
+    precomputed_definite_match_ty: Option<Type<'db>>,
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
@@ -1009,9 +1014,20 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         .add_negative(UnionType::from_elements(db, excluded_types.iter()))
                         .build();
 
-                    excluded_types.push(definite_match_pattern_type(db, p));
+                    let definitely_matched =
+                        definite_match_pattern_type_for_subject(db, p, narrowed_subject_ty);
+                    excluded_types.push(definitely_matched);
 
-                    analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
+                    if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        analyze_single_pattern_predicate_kind(
+                            db,
+                            p,
+                            narrowed_subject_ty,
+                            Some(definitely_matched),
+                        )
+                    }
                 })
                 // this is just a "max", but with a slight optimization:
                 // `AlwaysTrue` is the "greatest" possible element, so we short-circuit if we get there
@@ -1031,31 +1047,25 @@ fn analyze_single_pattern_predicate_kind<'db>(
         PatternPredicateKind::Class(kind) => {
             let class_ty =
                 match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Some(Type::instance(db, class.top_materialization(db)))
-                    }
+                    Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
                     Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        Some(callable_pattern_type(db))
+                        callable_pattern_type(db)
                     }
-                    _ => None,
+                    _ => return Truthiness::Ambiguous,
                 };
+            let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
+                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty)
+            });
 
-            class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
-                if subject_ty.is_subtype_of(db, class_ty) {
-                    if kind.kind().is_irrefutable() {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        // A class pattern like `case Point(x=0, y=0)` is not irrefutable,
-                        // i.e. it does not match all instances of `Point`. This means that
-                        // we can't tell for sure if this pattern will match or not.
-                        Truthiness::Ambiguous
-                    }
-                } else if subject_ty.is_disjoint_from(db, class_ty) {
-                    Truthiness::AlwaysFalse
-                } else {
-                    Truthiness::Ambiguous
-                }
-            })
+            if subject_ty.is_equivalent_to(db, definitely_matched)
+                || subject_ty.is_subtype_of(db, definitely_matched)
+            {
+                Truthiness::AlwaysTrue
+            } else if subject_ty.is_disjoint_from(db, class_ty) {
+                Truthiness::AlwaysFalse
+            } else {
+                Truthiness::Ambiguous
+            }
         }
         PatternPredicateKind::Mapping(kind) => {
             let mapping_ty = mapping_pattern_type(db);
@@ -1087,7 +1097,14 @@ fn analyze_single_pattern_predicate_kind<'db>(
         }
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
+            .map(|p| {
+                analyze_single_pattern_predicate_kind(
+                    db,
+                    p,
+                    subject_ty,
+                    precomputed_definite_match_ty,
+                )
+            })
             .unwrap_or(Truthiness::AlwaysTrue),
         PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }

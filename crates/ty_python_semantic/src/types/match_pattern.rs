@@ -1,7 +1,9 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
-use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKind};
+use ty_python_core::predicate::{
+    ClassPatternPredicateKind, PatternPredicateKind, SequencePatternPredicateKind,
+};
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
@@ -55,6 +57,87 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
         .add_negative(KnownClass::Bytearray.to_instance(db))
 }
 
+/// Return whether every value in `subject_ty` is statically guaranteed to match this class pattern.
+///
+/// Attribute subpatterns are checked recursively against their statically known member types. A
+/// non-final subclass can override attribute access, so the pattern is not guaranteed to match it.
+/// A final subclass can provide members that are absent from the class named in the pattern.
+///
+/// ```python
+/// class Base: ...
+///
+/// @final
+/// class Child(Base):
+///     x: int
+///
+/// # Exhaustive for a `Child` subject because `Child.x` is definitely bound.
+/// case Base(x=_): ...
+/// ```
+fn class_pattern_is_exhaustive(
+    db: &dyn Db,
+    class: ClassLiteral<'_>,
+    subject_ty: Type<'_>,
+    kind: &ClassPatternPredicateKind<'_>,
+) -> bool {
+    let class_instance_ty = Type::instance(db, class.top_materialization(db));
+    let is_typed_dict_match =
+        matches!(subject_ty, Type::TypedDict(_)) && typed_dict_matches_class_pattern(db, class);
+    if !is_typed_dict_match && !subject_ty.is_subtype_of(db, class_instance_ty) {
+        return false;
+    }
+
+    let is_protocol = class.is_protocol(db);
+    if kind.is_argumentless() && !is_protocol {
+        return true;
+    }
+
+    let subject_is_non_final_subclass = if is_typed_dict_match {
+        false
+    } else {
+        let Some(subject_class) = subject_ty.nominal_class(db) else {
+            return false;
+        };
+        let subject_class_literal = subject_class.class_literal(db);
+        subject_class_literal != class && !subject_class_literal.is_final(db)
+    };
+
+    // TODO: A non-final subject class also admits subclasses that can override attribute access.
+    // Decide whether it should remain exhaustive under the static member model or be treated like
+    // a non-final subclass of the class named in the pattern.
+    if kind.is_argumentless() {
+        return !subject_is_non_final_subclass;
+    }
+
+    let positional_sources =
+        class_pattern_positional_sources(db, Some(class), kind.positional.len());
+    let extracts_attribute = !kind.keywords.is_empty()
+        || positional_sources
+            .iter()
+            .any(|source| !matches!(source, ClassPatternPositionalSource::MatchSelf));
+    if subject_is_non_final_subclass && (is_protocol || extracts_attribute) {
+        return false;
+    }
+
+    if !kind.keywords.iter().all(|keyword| {
+        member_pattern_is_exhaustive(db, subject_ty, keyword.attr.as_str(), &keyword.pattern)
+    }) {
+        return false;
+    }
+
+    kind.positional
+        .iter()
+        .zip(positional_sources)
+        .all(|(pattern, source)| match source {
+            ClassPatternPositionalSource::MatchSelf => {
+                pattern_is_exhaustive_for_subject(db, pattern, subject_ty)
+            }
+            ClassPatternPositionalSource::Attribute(name) => {
+                member_pattern_is_exhaustive(db, subject_ty, name.as_str(), pattern)
+            }
+            ClassPatternPositionalSource::Unknown => false,
+        })
+}
+
 enum ClassMatchArgs<'db> {
     Undefined,
     Defined(Type<'db>),
@@ -68,6 +151,11 @@ pub(crate) enum ClassPatternPositionalSource {
     Unknown,
 }
 
+/// Resolve `__match_args__` through the pattern class, including its metaclass.
+///
+/// Inferred assignments retain their literal binding type, while an explicit annotation remains
+/// authoritative. `PossiblyUndefined` is distinct from `Undefined` because only a truly absent
+/// `__match_args__` enables match-self behavior.
 fn class_match_args_type<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> ClassMatchArgs<'db> {
     match Type::ClassLiteral(class).member(db, "__match_args__").place {
         Place::Defined(
@@ -141,6 +229,220 @@ pub(crate) fn class_pattern_positional_sources(
         .collect()
 }
 
+/// Return whether `name` is definitely bound and `pattern` consumes its entire static member type.
+fn member_pattern_is_exhaustive(
+    db: &dyn Db,
+    instance_ty: Type<'_>,
+    name: &str,
+    pattern: &PatternPredicateKind<'_>,
+) -> bool {
+    let place = instance_ty.member(db, name).place;
+    place.is_definitely_bound()
+        && place
+            .raw_type()
+            .is_some_and(|member_ty| pattern_is_exhaustive_for_subject(db, pattern, member_ty))
+}
+
+/// Return whether `pattern` is statically guaranteed to match every value in `subject_ty`.
+fn pattern_is_exhaustive_for_subject(
+    db: &dyn Db,
+    pattern: &PatternPredicateKind<'_>,
+    subject_ty: Type<'_>,
+) -> bool {
+    subject_ty.is_subtype_of(
+        db,
+        definite_match_pattern_type_for_subject(db, pattern, subject_ty),
+    )
+}
+
+/// Return whether an exact tuple subject is fully consumed by a sequence pattern.
+///
+/// Each aligned element is checked with the subject-aware matcher so nested class patterns use the
+/// tuple element's actual static type.
+fn sequence_pattern_is_exhaustive_for_subject(
+    db: &dyn Db,
+    kind: &SequencePatternPredicateKind<'_>,
+    subject_ty: Type<'_>,
+) -> bool {
+    if !subject_ty.is_subtype_of(db, sequence_pattern_type_builder(db).build()) {
+        return false;
+    }
+
+    if kind.is_irrefutable() {
+        return true;
+    }
+
+    let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) else {
+        return false;
+    };
+    let Some(tuple) = tuple.as_fixed_length() else {
+        return false;
+    };
+    let elements = tuple.all_elements();
+
+    let Some((prefix, suffix)) = kind.split_around_star() else {
+        return elements.len() == kind.patterns.len()
+            && elements
+                .iter()
+                .zip(kind.patterns.iter())
+                .all(|(element, pattern)| {
+                    pattern_is_exhaustive_for_subject(db, pattern, *element)
+                });
+    };
+    if elements.len() < prefix.len() + suffix.len() {
+        return false;
+    }
+
+    elements
+        .iter()
+        .zip(prefix)
+        .chain(elements.iter().rev().zip(suffix.iter().rev()))
+        .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
+}
+
+/// Return the values that are statically guaranteed to match `kind`, using `subject_ty` when the
+/// answer depends on the subject.
+///
+/// This is an under-approximation used for negative narrowing and ordered alternatives: callers
+/// may subtract the result from `subject_ty` under ty's static member model. A subject-independent
+/// pattern can return a type wider than `subject_ty`; for example, `case Base()` returns `Base`
+/// even for a `Child` subject. Class patterns need the current subject type when the subject is a
+/// non-final subclass, while an exact or final class can make member extraction exhaustive.
+/// This treats access to a definitely bound descriptor as successful even though the descriptor
+/// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
+/// patterns.
+///
+/// ```python
+/// class Base:
+///     x: int
+///
+/// @final
+/// class Child(Base):
+///     pass
+///
+/// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
+/// case [Base(x=_)]: ...
+/// ```
+pub(crate) fn definite_match_pattern_type_for_subject<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
+    {
+        return subject_independent_ty;
+    }
+
+    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
+    if let Type::Union(union) = resolved_subject_ty {
+        return UnionType::from_elements(
+            db,
+            union
+                .elements(db)
+                .iter()
+                .map(|element| definite_match_pattern_type_for_subject(db, kind, *element)),
+        );
+    }
+
+    match kind {
+        PatternPredicateKind::Class(kind) => {
+            let class_ty = infer_same_file_expression_type(db, kind.class, TypeContext::default());
+            match class_ty {
+                Type::ClassLiteral(class) => {
+                    if class_pattern_is_exhaustive(db, class, resolved_subject_ty, kind) {
+                        return subject_ty;
+                    }
+                }
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless()
+                        && subject_ty.is_subtype_of(db, callable_pattern_type(db)) =>
+                {
+                    return callable_pattern_type(db);
+                }
+                _ => {}
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            return if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
+                subject_ty
+            } else {
+                // A nested subject-dependent pattern rejected the context-free approximation.
+                // Reusing that approximation for the surrounding sequence would reintroduce the
+                // values that the recursive analysis deliberately excluded.
+                Type::Never
+            };
+        }
+        PatternPredicateKind::Or(patterns) => {
+            return UnionType::from_elements(
+                db,
+                patterns.iter().map(|pattern| {
+                    definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+                }),
+            );
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            return definite_match_pattern_type_for_subject(db, pattern, subject_ty);
+        }
+        _ => return Type::Never,
+    }
+
+    let subject_independent_ty = definite_match_pattern_type(db, kind);
+    // The subject-aware checks above can reject an otherwise exhaustive-looking pattern. Do not
+    // let the less precise fallback reintroduce that conclusion.
+    if subject_ty.is_subtype_of(db, subject_independent_ty) {
+        return Type::Never;
+    }
+
+    IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_positive(subject_independent_ty)
+        .build()
+}
+
+/// Return the definite-match type when it does not depend on the current subject type.
+///
+/// `None` means that callers must use subject-aware analysis instead of falling back to the
+/// context-free approximation. In particular, protocol and attribute class patterns are not
+/// guaranteed to match a non-final subclass even when static subtyping says otherwise.
+fn subject_independent_definite_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Type<'db>> {
+    match kind {
+        PatternPredicateKind::Class(kind) => {
+            match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
+                Type::ClassLiteral(class)
+                    if kind.is_argumentless()
+                        && !class.is_protocol(db)
+                        && !typed_dict_matches_class_pattern(db, class) =>
+                {
+                    Some(Type::instance(db, class.top_materialization(db)))
+                }
+                Type::ClassLiteral(_) => None,
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
+                    if kind.is_argumentless() =>
+                {
+                    Some(callable_pattern_type(db))
+                }
+                _ => Some(Type::Never),
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            build_definite_sequence_pattern_type(db, kind, |pattern| {
+                subject_independent_definite_match_pattern_type(db, pattern)
+            })
+        }
+        PatternPredicateKind::Or(patterns) => patterns
+            .iter()
+            .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
+            .collect::<Option<Vec<_>>>()
+            .map(|types| UnionType::from_elements(db, types)),
+        PatternPredicateKind::As(Some(pattern), _) => {
+            subject_independent_definite_match_pattern_type(db, pattern)
+        }
+        _ => Some(definite_match_pattern_type(db, kind)),
+    }
+}
 fn sequence_pattern_getitem_method<'db>(
     db: &'db dyn Db,
     indexed_element_types: impl IntoIterator<Item = (i64, Type<'db>)>,
@@ -286,20 +588,7 @@ pub(crate) fn definite_match_pattern_type<'db>(
         }
         PatternPredicateKind::Class(kind) => {
             match infer_same_file_expression_type(db, kind.class, TypeContext::default()) {
-                Type::ClassLiteral(class)
-                    if kind.is_argumentless()
-                        || (kind.kind().is_irrefutable()
-                            && kind.keywords.is_empty()
-                            && class_pattern_positional_sources(
-                                db,
-                                Some(class),
-                                kind.positional.len(),
-                            )
-                            .iter()
-                            .all(|source| {
-                                matches!(source, ClassPatternPositionalSource::MatchSelf)
-                            })) =>
-                {
+                Type::ClassLiteral(class) if kind.is_argumentless() => {
                     Type::instance(db, class.top_materialization(db))
                 }
                 Type::SpecialForm(SpecialFormType::CollectionsAbcCallable)
@@ -333,36 +622,51 @@ pub(crate) fn definite_match_pattern_type<'db>(
 }
 
 /// Return the values that are guaranteed to match a sequence pattern.
-pub(crate) fn definite_sequence_pattern_type<'db>(
+fn definite_sequence_pattern_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
+    build_definite_sequence_pattern_type(db, kind, |pattern| {
+        Some(definite_match_pattern_type(db, pattern))
+    })
+    .unwrap_or(Type::Never)
+}
+
+fn build_definite_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
+) -> Option<Type<'db>> {
     if kind.is_irrefutable() {
-        return sequence_pattern_type_builder(db).build();
+        return Some(sequence_pattern_type_builder(db).build());
     }
 
     if let Some((prefix, suffix)) = kind.split_around_star() {
-        return Type::tuple(TupleType::mixed(
+        let prefix_types = prefix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        let suffix_types = suffix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        return Some(Type::tuple(TupleType::mixed(
             db,
-            prefix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
+            prefix_types,
             Type::object(),
-            suffix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
-        ));
+            suffix_types,
+        )));
     }
 
     let element_types: Vec<_> = kind
         .patterns
         .iter()
-        .map(|pattern| definite_match_pattern_type(db, pattern))
-        .collect();
+        .map(element_type)
+        .collect::<Option<_>>()?;
 
     if element_types.iter().any(Type::is_never) {
-        Type::Never
+        Some(Type::Never)
     } else {
-        exact_sequence_pattern_type(db, element_types.into_iter())
+        Some(exact_sequence_pattern_type(db, element_types.into_iter()))
     }
 }

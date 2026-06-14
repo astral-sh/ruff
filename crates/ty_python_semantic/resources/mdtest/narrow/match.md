@@ -1170,6 +1170,469 @@ def test_match_exact_mutable_sequence_negative(value: list[int]) -> None:
             reveal_type(value)
 ```
 
+## Built-in match-self patterns
+
+Python defines a fixed set of built-in classes whose single positional subpattern receives the
+entire subject. This example checks every such class, including nested sequence and `or` patterns:
+
+```py
+def builtin_match_self_patterns_are_exhaustive(
+    value: tuple[
+        bool,
+        bytearray,
+        bytes,
+        dict[object, object],
+        float,
+        frozenset[object],
+        int,
+        list[object],
+        set[object],
+        str,
+        tuple[object, ...],
+    ],
+) -> int:
+    match value:
+        case (
+            bool(_),
+            bytearray(_),
+            bytes(_),
+            dict(_),
+            (int(_) | float(_)),
+            frozenset(_),
+            int(_),
+            list(_),
+            set(_),
+            str(_),
+            tuple(_),
+        ):
+            return 1
+```
+
+## Runtime dictionary class patterns
+
+A `TypedDict` value is a dictionary at runtime, so argumentless `dict`, `Mapping`, and
+`MutableMapping` patterns always match it. The built-in `dict` match-self pattern does as well:
+
+```py
+from collections.abc import Mapping, MutableMapping
+from typing import TypedDict
+
+class Movie(TypedDict):
+    title: str
+
+def typed_dict_argumentless_dict_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict():
+            return 1
+
+def typed_dict_mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case Mapping():
+            return 1
+
+def typed_dict_mutable_mapping_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case MutableMapping():
+            return 1
+
+def typed_dict_match_self_pattern_is_exhaustive(value: Movie) -> int:
+    match value:
+        case dict(_):
+            return 1
+```
+
+## `NamedTuple` positional patterns
+
+A `NamedTuple` provides a generated `__match_args__` tuple containing all of its fields:
+
+```py
+from typing import NamedTuple
+
+class NamedPoint(NamedTuple):
+    x: int
+    label: str
+
+def named_tuple_positional_pattern_is_exhaustive(value: NamedPoint) -> int:
+    match value:
+        case NamedPoint(_, _):
+            return 1
+```
+
+## Built-in match-self subclasses
+
+Match-self behavior is inherited by subclasses. The positional subpattern still needs to match the
+entire value, so a literal subpattern is not exhaustive:
+
+```py
+class MyInt(int): ...
+
+def builtin_match_self_subclass_is_exhaustive(value: MyInt) -> int:
+    match value:
+        case MyInt(_):
+            return 1
+
+def builtin_match_self_is_exhaustive_for_subclass(value: MyInt) -> int:
+    match value:
+        case int(_):
+            return 1
+
+def nested_builtin_match_self_is_exhaustive_for_subclass(
+    value: tuple[MyInt],
+) -> int:
+    match value:
+        case [int(_)]:
+            return 1
+
+def builtin_match_self_literal_is_not_exhaustive(
+    value: MyInt,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case int(0):
+            return 1
+```
+
+## Resolving `__match_args__`
+
+For other positional class patterns, Python reads `__match_args__` from the pattern class. The
+attribute must be definitely present and must be a fixed tuple of literal attribute names. The
+selected attributes must also be definitely present on the subject:
+
+```py
+class MyIntWithDefinitelyBoundMatchArgs(int):
+    __match_args__ = ("real",)
+
+def builtin_subclass_with_definitely_bound_match_args_is_exhaustive(
+    value: MyIntWithDefinitelyBoundMatchArgs,
+) -> int:
+    match value:
+        case MyIntWithDefinitelyBoundMatchArgs(_):
+            return 1
+
+def nested_builtin_subclass_with_definitely_bound_match_args_is_exhaustive(
+    value: tuple[MyIntWithDefinitelyBoundMatchArgs],
+) -> int:
+    match value:
+        case [MyIntWithDefinitelyBoundMatchArgs(_)]:
+            return 1
+
+class MyIntWithMissingMatchArg(int):
+    __match_args__ = ("missing",)
+
+def builtin_subclass_with_missing_match_arg_is_not_exhaustive(
+    value: MyIntWithMissingMatchArg,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case MyIntWithMissingMatchArg(_):
+            return 1
+
+class MatchArgsMeta(type):
+    __match_args__ = ("missing",)
+
+class MyIntWithMetaclassMatchArgs(int, metaclass=MatchArgsMeta): ...
+
+def builtin_subclass_with_metaclass_match_args_is_not_exhaustive(
+    value: MyIntWithMetaclassMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case MyIntWithMetaclassMatchArgs(_):
+            return 1
+
+class KnownAttributes:
+    __match_args__ = ("x", "y")
+    x: int = 0
+    y: int = 0
+
+def direct_known_keyword_attributes_are_exhaustive(value: KnownAttributes) -> int:
+    match value:
+        case KnownAttributes(x=_, y=_):
+            return 1
+
+def direct_known_positional_attributes_are_exhaustive(value: KnownAttributes) -> int:
+    match value:
+        case KnownAttributes(_, _):
+            return 1
+
+class WidenedMatchArgs:
+    __match_args__: tuple[str, ...] = ("x",)
+    x: int = 0
+
+def widened_match_args_does_not_identify_an_attribute(
+    value: WidenedMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case WidenedMatchArgs(_):
+            return 1
+
+class AnnotatedMatchArgs(int):
+    __match_args__: tuple[str, ...]
+
+def annotated_match_args_is_not_exhaustive(
+    value: AnnotatedMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case AnnotatedMatchArgs(_):
+            return 1
+
+flag: bool = bool()
+
+class PossiblyBoundMatchArgs:
+    if flag:
+        __match_args__ = ("x",)
+    x: int = 0
+
+def possibly_bound_match_args_is_not_exhaustive(
+    value: PossiblyBoundMatchArgs,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PossiblyBoundMatchArgs(_):
+            return 1
+```
+
+## Properties and declared attributes
+
+Exhaustiveness follows ty's static member model. A property or attribute declaration counts as
+present even though descriptor access can raise `AttributeError` or an annotated attribute can be
+absent at runtime:
+
+```py
+from typing import Literal
+
+class FallibleProperty:
+    __match_args__ = ("x",)
+
+    @property
+    def x(self) -> Literal[1]:
+        raise AttributeError
+
+def direct_fallible_property_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(_):
+            return 1
+
+def nested_fallible_property_is_statically_exhaustive(value: FallibleProperty) -> int:
+    match value:
+        case FallibleProperty(x=1):
+            return 1
+
+class DeclaredLiteralAttribute:
+    x: Literal[1]
+
+def declared_literal_attribute_subpattern_is_exhaustive(
+    value: DeclaredLiteralAttribute,
+) -> int:
+    match value:
+        case DeclaredLiteralAttribute(x=1):
+            return 1
+```
+
+## Non-final subclasses
+
+A non-final subclass can have a runtime subclass that changes whether an inherited attribute is
+present, so the fallback remains reachable. The same rule applies inside a sequence pattern:
+
+```py
+class BaseWithX:
+    x: int = 0
+
+class NonFinalChild(BaseWithX): ...
+
+def non_final_subclass_preserves_fallback(value: NonFinalChild) -> None:
+    match value:
+        case BaseWithX(x=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: NonFinalChild
+
+def nested_non_final_subclass_is_not_exhaustive(
+    value: tuple[NonFinalChild],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [BaseWithX(x=_)]:
+            return 1
+```
+
+## Runtime-checkable protocol patterns
+
+Runtime-checkable protocols use `isinstance` at runtime. A non-final class or one with only an
+attribute declaration can have a subclass whose runtime behavior differs, so these patterns are not
+exhaustive:
+
+```py
+from typing import Protocol, final, runtime_checkable
+
+@runtime_checkable
+class RuntimeProtocolWithX(Protocol):
+    x: int
+
+class RuntimeProtocolImplementer:
+    x: int = 0
+
+def runtime_protocol_pattern_is_not_exhaustive_for_non_final_implementer(
+    value: RuntimeProtocolImplementer,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case RuntimeProtocolWithX(x=_):
+            return 1
+
+class DeclaredRuntimeProtocolImplementer:
+    x: int
+
+def argumentless_runtime_protocol_pattern_is_not_exhaustive(
+    value: DeclaredRuntimeProtocolImplementer,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case RuntimeProtocolWithX():
+            return 1
+
+@final
+class FinalDeclaredRuntimeProtocolImplementer:
+    x: int
+
+# TODO: This is currently considered exhaustive because ty treats the declared `x` member as
+# present on a final class. At runtime, however, `x` may never have been initialized, so the
+# protocol check can fail.
+def final_declared_runtime_protocol_implementer(
+    value: FinalDeclaredRuntimeProtocolImplementer,
+) -> int:
+    match value:
+        case RuntimeProtocolWithX():
+            return 1
+
+def nested_argumentless_runtime_protocol_pattern_is_not_exhaustive(
+    value: tuple[DeclaredRuntimeProtocolImplementer],
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            return 1
+
+def nested_argumentless_runtime_protocol_union_preserves_fallback(
+    value: tuple[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+
+def nested_argumentless_runtime_protocol_list_preserves_fallback(
+    value: list[DeclaredRuntimeProtocolImplementer | int],
+) -> None:
+    match value:
+        case [RuntimeProtocolWithX()]:
+            pass
+        case [DeclaredRuntimeProtocolImplementer()]:
+            reveal_type(value[0])  # revealed: DeclaredRuntimeProtocolImplementer
+```
+
+## Final subclasses
+
+A final subclass cannot be replaced by a runtime subclass, so an attribute defined on the subject
+can make a base-class pattern exhaustive. Match-self behavior still comes from the pattern class,
+not from another base of the subject class:
+
+```py
+from typing import final
+
+class BaseWithoutX: ...
+
+@final
+class FinalChildWithX(BaseWithoutX):
+    x: int = 0
+
+def final_subclass_member_is_exhaustive(value: FinalChildWithX) -> int:
+    match value:
+        case BaseWithoutX(x=_):
+            return 1
+
+def nested_final_subclass_member_is_exhaustive(
+    value: tuple[FinalChildWithX],
+) -> int:
+    match value:
+        case [BaseWithoutX(x=_)]:
+            return 1
+
+class PlainBase: ...
+
+@final
+class IntPlainChild(int, PlainBase): ...
+
+def match_self_comes_from_pattern_class(
+    value: IntPlainChild,
+    # error: [invalid-return-type]
+) -> int:
+    match value:
+        case PlainBase(_):
+            return 1
+```
+
+## Nested class patterns
+
+Every nested pattern must match all possible values of the attribute it receives:
+
+```py
+from typing import Literal
+
+class Inner:
+    x: int = 0
+
+class Outer:
+    inner: Inner = Inner()
+
+def nested_class_subpattern_is_exhaustive(value: tuple[Outer]) -> int:
+    match value:
+        case [Outer(inner=Inner(x=_))]:
+            return 1
+
+class LiteralAttribute:
+    x: Literal[1] = 1
+
+def literal_attribute_subpattern_is_exhaustive(value: LiteralAttribute) -> int:
+    match value:
+        case LiteralAttribute(x=1):
+            return 1
+```
+
+## Missing class-pattern attributes
+
+A class pattern can fail after its `isinstance` check if a requested attribute is missing. This
+preserves both direct fallthrough and fallthrough from a nested sequence pattern:
+
+```py
+class MissingAttributes:
+    __match_args__ = ("x", "missing")
+    x: int = 0
+
+class OtherClass: ...
+
+def keyword_class_pattern_preserves_direct_fallback(
+    value: MissingAttributes | OtherClass,
+) -> None:
+    match value:
+        case MissingAttributes(missing=_):
+            pass
+        case _:
+            reveal_type(value)  # revealed: MissingAttributes | OtherClass
+
+def keyword_class_pattern_in_sequence_preserves_fallback(
+    value: tuple[MissingAttributes],
+) -> None:
+    match value:
+        case [MissingAttributes(_, _)]:
+            pass
+        case _:
+            reveal_type(value)  # revealed: tuple[MissingAttributes]
+```
+
 ## Nested sequence patterns
 
 Nested patterns narrow the fixed positions they inspect. The narrowed element types remain available
