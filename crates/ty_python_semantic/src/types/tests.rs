@@ -410,6 +410,32 @@ fn cycle_recovery_fuses_cycle_marked_subtype_with_supertype() {
 }
 
 #[test]
+fn cycle_recovery_fuses_nested_cycle_marked_subtype_with_supertype() {
+    let db = setup_db();
+    let outer_binder = Id::from_bits(1);
+    let inner_binder = Id::from_bits(2);
+    let int = KnownClass::Int.to_instance(&db);
+    let none = Type::none(&db);
+
+    let marked_int = Type::cycle_marked(&db, inner_binder, int);
+    let marked_int_or_none = Type::cycle_marked(
+        &db,
+        inner_binder,
+        UnionType::from_elements(&db, [int, none]),
+    );
+    let outer_marked_int = Type::cycle_marked(&db, outer_binder, marked_int);
+    let outer_marked_int_or_none = Type::cycle_marked(&db, outer_binder, marked_int_or_none);
+
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(
+            &db,
+            [outer_marked_int_or_none, none, outer_marked_int],
+        ),
+        outer_marked_int_or_none
+    );
+}
+
+#[test]
 fn top_level_union_cycle_normalization_cycle_marks_non_contractive_recursive_marker() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);

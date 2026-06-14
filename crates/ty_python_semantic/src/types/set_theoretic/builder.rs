@@ -1104,11 +1104,16 @@ impl<'db> UnionBuilder<'db> {
     ) -> bool {
         // Cycle recovery must not start relation queries while normalizing a union. Only compare
         // top-level representatives and direct union elements.
-        fn top_level_cycle_marked_inner<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
-            match ty {
-                Type::CycleMarked(marked) => Some(marked.inner(db)),
-                _ => None,
+        fn top_level_cycle_marked_inner<'db>(
+            db: &'db dyn Db,
+            mut ty: Type<'db>,
+        ) -> Option<Type<'db>> {
+            let mut peeled = false;
+            while let Type::CycleMarked(marked) = ty {
+                peeled = true;
+                ty = marked.inner(db);
             }
+            peeled.then_some(ty)
         }
 
         fn union_elements<'db>(db: &'db dyn Db, ty: Type<'db>) -> SmallVec<[Type<'db>; 2]> {

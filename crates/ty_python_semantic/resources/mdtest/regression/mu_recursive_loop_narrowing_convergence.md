@@ -99,3 +99,37 @@ def sympy_recurrence_vector_like(values):
         q1, q2, b = q2, next_values, 1
     return [0]
 ```
+
+This is minimized from a pywin32 ecosystem failure. A value can be initialized from an implicit
+instance attribute, updated through a recursive loop, and then assigned back to the same attribute.
+The cycle-recovery union should treat nested cycle markers as transparent representatives so the
+loop-carried local converges.
+
+```py
+class History:
+    def __init__(self):
+        self.history_prefix = None
+        self.history_pointer = None
+
+    def history_do(self, reverse):
+        pointer = self.history_pointer
+        prefix = self.history_prefix
+        if pointer is None or prefix is None:
+            prefix = ""
+            if reverse:
+                pointer = 0
+            else:
+                pointer = -1
+        while True:
+            if reverse:
+                pointer = pointer - 1
+            else:
+                pointer = pointer + 1
+            if pointer < 0:
+                pointer = prefix = None
+                break
+            if prefix == "":
+                break
+        self.history_pointer = pointer
+        self.history_prefix = prefix
+```
