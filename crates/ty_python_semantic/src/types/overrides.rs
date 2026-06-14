@@ -29,7 +29,7 @@ use crate::{
             report_invalid_method_override, report_overridden_final_method,
             report_overridden_final_variable,
         },
-        enums::{EnumMetadata, enum_metadata},
+        enums::{EnumMetadata, enum_metadata, is_enum_class_by_inheritance},
         function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
         tuple::Tuple,
@@ -134,6 +134,7 @@ fn check_inherited_method_conflicts<'db>(
     }
 
     let class_instance = Type::instance(db, class_specialized);
+    let has_enum_semantics = is_enum_class_by_inheritance(db, class);
     let mut reported_members = FxHashSet::default();
 
     // Members from the first base win unless the class defines its own override. Compare that
@@ -147,7 +148,7 @@ fn check_inherited_method_conflicts<'db>(
             // example, enum data-type mixins inherit incompatible `__format__` methods from the
             // data type and `Enum`, but class creation resolves them using special enum semantics.
             if member_name == "_"
-                || is_dunder(member_name)
+                || (has_enum_semantics && is_dunder(member_name))
                 || is_mangled_private(member_name)
                 || reported_members.contains(&member)
             {

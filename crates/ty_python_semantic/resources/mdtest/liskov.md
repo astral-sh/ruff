@@ -594,6 +594,8 @@ The method selected by the MRO must satisfy every direct base class. A class the
 inherit incompatible methods from separate bases without defining a compatible override itself:
 
 ```pyi
+from collections.abc import Iterator
+
 class StrReturn:
     def method(self) -> str: ...
 
@@ -607,6 +609,14 @@ class IncompatibleReturns(StrReturn, IntReturn): ...  # error: [invalid-method-o
 
 # `bool` is a subtype of `int`, so this order is compatible.
 class CompatibleCovariantReturn(BoolReturn, IntReturn): ...
+
+class IntIterator:
+    def __iter__(self) -> Iterator[int]: ...
+
+class StrIterator:
+    def __iter__(self) -> Iterator[str]: ...
+
+class IncompatibleIterators(IntIterator, StrIterator): ...  # error: [invalid-method-override]
 ```
 
 The check follows inherited methods through intermediate bases, applies generic specializations, and
