@@ -729,6 +729,22 @@ pub(crate) fn check_static_class_definitions<'db>(
 
     // If the class is generic, verify that its generic context does not violate any of
     // the typevar scoping rules.
+    if class.has_pep_695_type_params(db)
+        && let Some(typevar) = class
+            .inherited_legacy_generic_context(db)
+            .and_then(|context| {
+                context
+                    .variables(db)
+                    .find(|typevar| !typevar.typevar(db).is_self(db))
+            })
+        && let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+    {
+        builder.into_diagnostic(format_args!(
+            "Legacy type variable `{}` cannot be used in a PEP 695 class base",
+            typevar.name(db),
+        ));
+    }
+
     if let (Some(legacy), Some(inherited)) = (
         class.legacy_generic_context(db),
         class.inherited_legacy_generic_context(db),
