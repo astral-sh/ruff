@@ -36,21 +36,9 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe if there's comments in the
-/// base classes, as comments may be removed.
-///
-/// For example, the fix would be marked as unsafe in the following case:
-/// ```python
-/// class Foo:
-///     pass
-///
-///
-/// class Bar(
-///     Foo,  # comment
-///     Foo,
-/// ):
-///     pass
-/// ```
+/// This rule's fix is marked as unsafe because removing duplicate base
+/// classes can change runtime behavior even when the duplicate appears
+/// redundant.
 ///
 /// ## References
 /// - [Python documentation: Class definitions](https://docs.python.org/3/reference/compound_stmts.html#class-definitions)
@@ -102,14 +90,7 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                         checker.tokens(),
                     )
                     .map(|edit| {
-                        Fix::applicable_edit(
-                            edit,
-                            if checker.comment_ranges().intersects(arguments.range()) {
-                                Applicability::Unsafe
-                            } else {
-                                Applicability::Safe
-                            },
-                        )
+                        Fix::applicable_edit(edit, Applicability::Unsafe)
                     })
                 });
             }

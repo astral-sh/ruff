@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
+assertion_line: 260
 ---
 PLE0241 [*] Duplicate base `A` for class `F1`
   --> duplicate_bases.py:13:13
@@ -18,6 +19,7 @@ help: Remove duplicate base
 14 |     ...
 15 |
 16 |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F2`
   --> duplicate_bases.py:17:13
@@ -35,6 +37,7 @@ help: Remove duplicate base
 18 |     ...
 19 |
 20 |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F3`
   --> duplicate_bases.py:23:5
@@ -54,6 +57,7 @@ help: Remove duplicate base
 22 |     A
 23 | ):
 24 |     ...
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `F4`
   --> duplicate_bases.py:30:5
@@ -73,6 +77,7 @@ help: Remove duplicate base
 30 | ):
 31 |     ...
 32 |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G1`
   --> duplicate_bases.py:36:13
@@ -91,6 +96,7 @@ help: Remove duplicate base
 37 |     ...
 38 |
 39 |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G2`
   --> duplicate_bases.py:40:13
@@ -108,6 +114,7 @@ help: Remove duplicate base
 41 |     ...
 42 |
 43 |
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G3`
   --> duplicate_bases.py:46:5
@@ -127,6 +134,7 @@ help: Remove duplicate base
 46 |     B
 47 | ):
 48 |     ...
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `A` for class `G4`
   --> duplicate_bases.py:54:5
@@ -146,6 +154,7 @@ help: Remove duplicate base
 54 |     B,
 55 | ):
 56 |     ...
+note: This is an unsafe fix and may change runtime behavior
 
 PLE0241 [*] Duplicate base `Foo` for class `Bar`
   --> duplicate_bases.py:76:5
