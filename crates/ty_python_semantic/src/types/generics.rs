@@ -613,7 +613,8 @@ impl<'db> GenericContext<'db> {
                 {
                     Some(legacy_ctx.merge(db, ctx))
                 } else {
-                    // TODO: Raise a diagnostic — mixing PEP 695 and legacy typevars is not allowed
+                    // Invalid mixes retained in the inferred signature are reported during
+                    // post-inference validation.
                     Some(ctx)
                 }
             }

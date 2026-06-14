@@ -35,6 +35,25 @@ def return_value[T](x: T) -> T:
     return x
 ```
 
+## Compatibility with legacy type variables
+
+A function with its own PEP 695 type parameter list cannot also introduce a legacy type variable.
+Functions without a PEP 695 list can still use the traditional implicit generic-function syntax.
+
+```py
+from typing import TypeVar
+
+K = TypeVar("K")
+
+class C[V]:
+    def legacy(self, value: V, other: K) -> V | K:
+        raise NotImplementedError
+
+    # error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
+    def mixed[M](self, value: M, other: K) -> M | K:
+        raise NotImplementedError
+```
+
 Each typevar must also appear _somewhere_ in the parameter list:
 
 ```py
