@@ -985,6 +985,10 @@ class Contravariant(Generic[T_contra]): ...
 
 def _(
     invariant: Intersection[Invariant[P], Invariant[Q]],
+) -> None:
+    reveal_type(invariant)  # revealed: Never
+
+def _(
     covariant: Intersection[Covariant[P], Covariant[Q]],
     contravariant: Intersection[Contravariant[P], Contravariant[Q]],
     covariant_unrelated: Intersection[Covariant[P], Covariant[R]],
@@ -998,7 +1002,6 @@ def _(
     covariant_any: Intersection[Covariant[P], Covariant[Any]],
     contravariant_any: Intersection[Contravariant[P], Contravariant[Any]],
 ) -> None:
-    reveal_type(invariant)  # revealed: Invariant[P] & Invariant[Q]
     reveal_type(covariant)  # revealed: Covariant[P]
     reveal_type(contravariant)  # revealed: Contravariant[Q]
     reveal_type(covariant_unrelated)  # revealed: Covariant[P] & Covariant[R]
