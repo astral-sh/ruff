@@ -311,9 +311,9 @@ pub(crate) struct PatternSuccessTypes<'db> {
 impl<'db> PatternSuccessTypes<'db> {
     /// Return the inferred binding type.
     ///
-    /// A missing entry is `Never` when the whole pattern cannot match and `Unknown` when the
-    /// analysis does not support that binding. During cycle recovery, it is the divergent type for
-    /// that cycle.
+    /// A missing entry is `Never` when the whole pattern cannot match. Otherwise, it is `Unknown`
+    /// as defensive recovery for a malformed pattern or a binding that was not recorded. During
+    /// cycle recovery, it is the divergent type for that cycle.
     pub(crate) fn binding_type(&self, place: ScopedPlaceId) -> Type<'db> {
         // An OR pattern's alternatives define one runtime binding, so their types are merged by
         // place.
@@ -357,6 +357,12 @@ impl<'db> PatternSuccessTypes<'db> {
 struct PatternSuccessResult<'db> {
     matched_subject_ty: Type<'db>,
     bindings: BTreeMap<ScopedPlaceId, Type<'db>>,
+}
+
+struct ClassPatternContext<'db> {
+    class: Option<ClassLiteral<'db>>,
+    class_ty: Type<'db>,
+    positional_sources: Vec<ClassPatternPositionalSource>,
 }
 
 /// Computes the subject and binding types produced by successful match patterns.
@@ -961,12 +967,6 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
     is_positive: bool,
-}
-
-struct ClassPatternContext<'db> {
-    class: Option<ClassLiteral<'db>>,
-    class_ty: Type<'db>,
-    positional_sources: Vec<ClassPatternPositionalSource>,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
