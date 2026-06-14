@@ -1465,7 +1465,7 @@ attribute declaration can have a subclass whose runtime behavior differs, so the
 exhaustive:
 
 ```py
-from typing import Protocol, runtime_checkable
+from typing import Protocol, final, runtime_checkable
 
 @runtime_checkable
 class RuntimeProtocolWithX(Protocol):
@@ -1488,6 +1488,20 @@ class DeclaredRuntimeProtocolImplementer:
 def argumentless_runtime_protocol_pattern_is_not_exhaustive(
     value: DeclaredRuntimeProtocolImplementer,
     # error: [invalid-return-type]
+) -> int:
+    match value:
+        case RuntimeProtocolWithX():
+            return 1
+
+@final
+class FinalDeclaredRuntimeProtocolImplementer:
+    x: int
+
+# TODO: This is currently considered exhaustive because ty treats the declared `x` member as
+# present on a final class. At runtime, however, `x` may never have been initialized, so the
+# protocol check can fail.
+def final_declared_runtime_protocol_implementer(
+    value: FinalDeclaredRuntimeProtocolImplementer,
 ) -> int:
     match value:
         case RuntimeProtocolWithX():
