@@ -594,7 +594,8 @@ The method selected by the MRO must satisfy every direct base class. A class the
 inherit incompatible methods from separate bases without defining a compatible override itself:
 
 ```pyi
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
+from enum import Enum
 
 class StrReturn:
     def method(self) -> str: ...
@@ -617,6 +618,62 @@ class StrIterator:
     def __iter__(self) -> Iterator[str]: ...
 
 class IncompatibleIterators(IntIterator, StrIterator): ...  # error: [invalid-method-override]
+class EnumIteratorConflict(IntIterator, StrIterator, Enum): ...  # error: [invalid-method-override]
+class StringEnum(str, Enum): ...
+
+class StrEnumMethod:
+    def __str__(self, value: int = 0) -> str: ...
+
+class IntEnumMethod:
+    def __str__(self, value: str = "") -> str: ...
+
+class EnumMethodConflict(StrEnumMethod, IntEnumMethod, Enum): ...  # error: [invalid-method-override]
+
+class IntStrDescriptor:
+    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
+
+class IntStrMixin:
+    __str__ = IntStrDescriptor()
+
+class StringEnumMethodConflict(IntStrMixin, str, Enum): ...  # error: [invalid-method-override]
+
+class StrUnderscore:
+    def _(self) -> str: ...
+
+class IntUnderscore:
+    def _(self) -> int: ...
+
+class IncompatibleUnderscore(StrUnderscore, IntUnderscore): ...  # error: [invalid-method-override]
+```
+
+`Flag` creation rewrites its bitwise operators on Python 3.11 and newer, but ordinary `Enum`
+creation does not:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```pyi
+from collections.abc import Callable
+from enum import Enum, Flag, ReprEnum
+
+class StrOr:
+    def __or__(self, other: object) -> str: ...
+
+class IntOr:
+    def __or__(self, other: object) -> int: ...
+
+class RewrittenFlagOr(StrOr, IntOr, Flag): ...
+class EnumOrConflict(StrOr, IntOr, Enum): ...  # error: [invalid-method-override]
+
+class ReprEnumStrDescriptor:
+    def __get__(self, instance: object, owner: type[object]) -> Callable[[], int]: ...
+
+class ReprEnumStrMixin:
+    __str__ = ReprEnumStrDescriptor()
+
+class RewrittenReprEnumStr(ReprEnumStrMixin, str, ReprEnum): ...
 ```
 
 The check follows inherited methods through intermediate bases, applies generic specializations, and
@@ -626,7 +683,7 @@ wins, but a later dynamic base does not erase a known conflict.
 
 ```pyi
 from collections.abc import Callable
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, NamedTuple, TypeVar, overload
 from typing_extensions import Self
 
 T = TypeVar("T")
@@ -701,7 +758,47 @@ class DescriptorMethod:
     method = CallableDescriptor()
 
 class DescriptorConflict(DescriptorMethod, StrReturn): ...  # error: [invalid-method-override]
+
+class ReceiverSensitiveDescriptor:
+    @overload
+    def __get__(self, instance: DescriptorReceiver, owner: type[DescriptorReceiver]) -> Callable[[], int]: ...
+    @overload
+    def __get__(self, instance: object, owner: type[object]) -> int: ...
+
+class DescriptorContract:
+    method = ReceiverSensitiveDescriptor()
+
+class DescriptorReceiver(StrReturn, DescriptorContract): ...  # error: [invalid-method-override]
+
+DynamicStrReturn = type("DynamicStrReturn", (), {"method": lambda self: ""})
+DynamicIntReturn = type("DynamicIntReturn", (), {"method": lambda self: 1})
+
+class DynamicClassConflict(DynamicStrReturn, DynamicIntReturn): ...  # error: [invalid-method-override]
+
+CallableNamedTuple = NamedTuple("CallableNamedTuple", [("method", Callable[[], int])])
+
+class DynamicNamedTupleConflict(CallableNamedTuple, StrReturn): ...  # error: [invalid-method-override]
 ```
+
+### Class members assigned in class methods
+
+These members also participate in inherited method checks:
+
+```py
+class ImplicitIntMethod:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.implicit_method = lambda self: 1
+
+class ImplicitStrMethod:
+    @classmethod
+    def initialize(cls) -> None:
+        cls.implicit_method = lambda self: ""
+
+class ImplicitMethodConflict(ImplicitIntMethod, ImplicitStrMethod): ...  # error: [invalid-method-override]
+```
+
+### Synthesized inherited methods
 
 Synthesized methods participate in the contract from each base, regardless of which method wins in
 the MRO:
@@ -717,6 +814,8 @@ class SourceMake:
 
 class SynthesizedMethodWins(GeneratedMake, SourceMake): ...  # error: [invalid-method-override]
 class SourceMethodWins(SourceMake, GeneratedMake): ...  # error: [invalid-method-override]
+class GeneratedMakeChild(GeneratedMake): ...
+class InheritedSynthesizedMethodWins(GeneratedMakeChild, SourceMake): ...  # error: [invalid-method-override]
 ```
 
 ### Synthesized methods from both bases
@@ -740,6 +839,22 @@ class StrData:
     value: str
 
 class SynthesizedDataclassConflict(IntData, StrData): ...  # error: [invalid-method-override]
+
+@dataclass
+class OtherIntData:
+    value: int
+
+class CompatibleSynthesizedDataclasses(IntData, OtherIntData): ...
+
+class ReplaceContract:
+    def __replace__(self, *, value: str = "") -> "ReplaceContract":
+        raise NotImplementedError
+
+@dataclass
+class GeneratedReplace(ReplaceContract):
+    value: int
+
+class SynthesizedCascade(GeneratedReplace, ReplaceContract): ...  # error: [invalid-method-override]
 ```
 
 ### Dataclasses
@@ -955,6 +1070,9 @@ class RawGenericParent(GenericGrandparent):  # error: [missing-type-argument]
 
 class RawGenericChild(RawGenericParent):
     def method(self, renamed: int) -> None: ...
+
+class RawGenericDiamond(RawGenericParent, GenericGrandparent):  # error: [missing-type-argument]
+    ...
 ```
 
 `other_stub.pyi`:

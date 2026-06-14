@@ -435,6 +435,53 @@ enum InstanceFallbackShadowsNonDataDescriptor {
     No,
 }
 
+/// Controls how descriptors and `Self` are bound when a member is looked up through another type.
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum MemberLookupContext<'db> {
+    Default,
+    /// Intersection members bind `Self` to the full intersection, while descriptors retain the
+    /// owner of the element currently being searched.
+    Intersection(Type<'db>),
+    /// Explicit override lookups bind both the descriptor instance and owner to this receiver.
+    Explicit(Type<'db>),
+}
+
+#[derive(Clone, Debug, Copy)]
+struct DescriptorBinding<'db> {
+    receiver: Type<'db>,
+    owner: Type<'db>,
+}
+
+impl<'db> MemberLookupContext<'db> {
+    fn from_receiver(receiver: Option<Type<'db>>) -> Self {
+        receiver.map_or(Self::Default, Self::Explicit)
+    }
+
+    fn for_intersection(self, intersection: Type<'db>) -> Self {
+        match self {
+            Self::Default => Self::Intersection(intersection),
+            _ => self,
+        }
+    }
+
+    fn descriptor_binding(self, db: &'db dyn Db, fallback: Type<'db>) -> DescriptorBinding<'db> {
+        match self {
+            Self::Default => DescriptorBinding {
+                receiver: fallback,
+                owner: fallback.to_meta_type(db),
+            },
+            Self::Intersection(receiver) => DescriptorBinding {
+                receiver,
+                owner: fallback.to_meta_type(db),
+            },
+            Self::Explicit(receiver) => DescriptorBinding {
+                receiver,
+                owner: receiver.to_meta_type(db),
+            },
+        }
+    }
+}
+
 bitflags! {
     #[derive(Clone, Debug, Copy, PartialEq, Eq, Hash)]
     pub(crate) struct MemberLookupPolicy: u8 {
@@ -3300,12 +3347,13 @@ impl<'db> Type<'db> {
     fn invoke_descriptor_protocol(
         self,
         db: &'db dyn Db,
-        receiver: Type<'db>,
+        binding: DescriptorBinding<'db>,
         name: &str,
         fallback: PlaceAndQualifiers<'db>,
         policy: InstanceFallbackShadowsNonDataDescriptor,
         member_policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
+        let DescriptorBinding { receiver, owner } = binding;
         let (
             PlaceAndQualifiers {
                 place: meta_attr,
@@ -3316,7 +3364,7 @@ impl<'db> Type<'db> {
             db,
             self.class_member_with_policy(db, name.into(), member_policy),
             Some(receiver),
-            self.to_meta_type(db),
+            owner,
         );
 
         let PlaceAndQualifiers {
@@ -3457,6 +3505,21 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
         receiver: Option<Type<'db>>,
     ) -> PlaceAndQualifiers<'db> {
+        self.member_lookup_with_policy_in_context(
+            db,
+            name,
+            policy,
+            MemberLookupContext::from_receiver(receiver),
+        )
+    }
+
+    fn member_lookup_with_policy_in_context(
+        self,
+        db: &'db dyn Db,
+        name: Name,
+        policy: MemberLookupPolicy,
+        context: MemberLookupContext<'db>,
+    ) -> PlaceAndQualifiers<'db> {
         #[salsa::tracked(
             cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
             cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, member: PlaceAndQualifiers<'db>, _, _, _, _| {
@@ -3469,36 +3532,31 @@ impl<'db> Type<'db> {
             this: Type<'db>,
             name: Name,
             policy: MemberLookupPolicy,
-            receiver: Option<Type<'db>>,
+            context: MemberLookupContext<'db>,
         ) -> PlaceAndQualifiers<'db> {
             tracing::trace!("member_lookup_with_policy: {}.{}", this.display(db), name);
             if let Some(fallback) = this.materialized_divergent_fallback() {
-                return fallback.member_lookup_with_policy_and_receiver(db, name, policy, receiver);
+                return fallback.member_lookup_with_policy_in_context(db, name, policy, context);
             }
 
             let name_str = name.as_str();
 
             match this {
                 Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
-                    elem.member_lookup_with_policy_and_receiver(
-                        db,
-                        name_str.into(),
-                        policy,
-                        receiver,
-                    )
+                    elem.member_lookup_with_policy_in_context(db, name_str.into(), policy, context)
                 }),
 
                 Type::Intersection(intersection) => {
                     if let Some(complement) = intersection.enum_complement(db) {
                         enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                     } else {
-                        let receiver = Some(receiver.unwrap_or(this));
+                        let context = context.for_intersection(this);
                         intersection.map_with_boundness_and_qualifiers(db, |elem| {
-                            elem.member_lookup_with_policy_and_receiver(
+                            elem.member_lookup_with_policy_in_context(
                                 db,
                                 name_str.into(),
                                 policy,
-                                receiver,
+                                context,
                             )
                         })
                     }
@@ -3636,12 +3694,7 @@ impl<'db> Type<'db> {
                     _ => {
                         KnownClass::MethodType
                             .to_instance(db)
-                            .member_lookup_with_policy_and_receiver(
-                                db,
-                                name.clone(),
-                                policy,
-                                receiver,
-                            )
+                            .member_lookup_with_policy_in_context(db, name.clone(), policy, context)
                             .or_fall_back_to(db, || {
                                 // If an attribute is not available on the bound method object,
                                 // it will be looked up on the underlying function object. This
@@ -3655,13 +3708,13 @@ impl<'db> Type<'db> {
                 Type::KnownBoundMethod(method) => method
                     .class()
                     .to_instance(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                    .member_lookup_with_policy_in_context(db, name, policy, context),
                 Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType
                     .to_instance(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                    .member_lookup_with_policy_in_context(db, name, policy, context),
                 Type::DataclassDecorator(_) => KnownClass::FunctionType
                     .to_instance(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                    .member_lookup_with_policy_in_context(db, name, policy, context),
 
                 Type::Callable(_) | Type::DataclassTransformer(_) if name_str == "__call__" => {
                     Place::bound(this).into()
@@ -3670,11 +3723,12 @@ impl<'db> Type<'db> {
                 Type::Callable(callable) if callable.is_function_like(db) => {
                     KnownClass::FunctionType
                         .to_instance(db)
-                        .member_lookup_with_policy_and_receiver(db, name, policy, receiver)
+                        .member_lookup_with_policy_in_context(db, name, policy, context)
                 }
 
-                Type::Callable(_) | Type::DataclassTransformer(_) => Type::object()
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                Type::Callable(_) | Type::DataclassTransformer(_) => {
+                    Type::object().member_lookup_with_policy_in_context(db, name, policy, context)
+                }
 
                 Type::NominalInstance(instance)
                     if matches!(name.as_str(), "major" | "minor")
@@ -3746,11 +3800,11 @@ impl<'db> Type<'db> {
 
                 Type::TypeAlias(alias) => alias
                     .value_type(db)
-                    .member_lookup_with_policy_and_receiver(db, name, policy, receiver),
+                    .member_lookup_with_policy_in_context(db, name, policy, context),
 
                 _ if policy.no_instance_fallback() => this.invoke_descriptor_protocol(
                     db,
-                    receiver.unwrap_or(this),
+                    context.descriptor_binding(db, this),
                     name_str,
                     Place::Undefined.into(),
                     InstanceFallbackShadowsNonDataDescriptor::No,
@@ -3837,7 +3891,7 @@ impl<'db> Type<'db> {
                     let nominal_lookup = partial
                         .partial(db)
                         .into_functools_partial_instance(db)
-                        .member_lookup_with_policy_and_receiver(db, name.clone(), policy, receiver);
+                        .member_lookup_with_policy_in_context(db, name.clone(), policy, context);
                     if name_str == "func" {
                         match nominal_lookup.place {
                             Place::Defined(DefinedPlace {
@@ -3876,7 +3930,8 @@ impl<'db> Type<'db> {
                 | Type::TypeGuard(..)
                 | Type::TypeForm(..)
                 | Type::TypedDict(_) => {
-                    let receiver = receiver.unwrap_or(this);
+                    let binding = context.descriptor_binding(db, this);
+                    let receiver = binding.receiver;
 
                     // Enum members can be accessed through enum instances and other enum members,
                     // e.g. `answer.YES` or `Answer.YES.NO`.
@@ -3897,7 +3952,7 @@ impl<'db> Type<'db> {
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        receiver,
+                        binding,
                         name_str,
                         fallback,
                         InstanceFallbackShadowsNonDataDescriptor::No,
@@ -3949,7 +4004,10 @@ impl<'db> Type<'db> {
 
                     let result = this.invoke_descriptor_protocol(
                         db,
-                        this,
+                        DescriptorBinding {
+                            receiver: this,
+                            owner: context.descriptor_binding(db, this).owner,
+                        },
                         name_str,
                         class_attr_fallback,
                         InstanceFallbackShadowsNonDataDescriptor::Yes,
@@ -4008,7 +4066,7 @@ impl<'db> Type<'db> {
             }
         }
 
-        member_lookup_with_policy_inner(db, self, name, policy, receiver)
+        member_lookup_with_policy_inner(db, self, name, policy, context)
     }
 
     /// Return the type of `len()` on a type if it is known more precisely than `int`,

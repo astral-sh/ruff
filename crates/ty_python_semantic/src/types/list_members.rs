@@ -17,8 +17,9 @@ use crate::{
         place_from_declarations,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StaticClassLiteral,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind,
+        ClassBase, ClassLiteral, ClassType, KnownClass, KnownInstanceType, StaticClassLiteral,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints,
+        class::{CodeGeneratorKind, implicit_attribute_names},
     },
 };
 use ty_python_core::{
@@ -147,6 +148,91 @@ const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
     "__dataclass_fields__",
     "__dataclass_params__",
 ];
+
+/// Returns an over-approximation of the class-member names available through `class` without
+/// resolving their types.
+///
+/// Callers must perform an ordinary member lookup before using a candidate. Avoiding those lookups
+/// here is important for callers that only need names, because resolving every inherited member
+/// can populate a large number of retained Salsa query results.
+pub(crate) fn all_class_member_names<'db>(
+    db: &'db dyn Db,
+    class: ClassType<'db>,
+) -> FxHashSet<Name> {
+    fn extend_names_from_mro<'db>(
+        db: &'db dyn Db,
+        class: ClassType<'db>,
+        names: &mut FxHashSet<Name>,
+    ) {
+        for class in class.iter_mro(db).filter_map(ClassBase::into_class) {
+            match class.class_literal(db) {
+                ClassLiteral::Static(class_literal) => {
+                    let class_body_scope = class_literal.body_scope(db);
+                    names.extend(
+                        place_table(db, class_body_scope)
+                            .symbols()
+                            .filter(|symbol| symbol.is_local())
+                            .map(|symbol| symbol.name().clone()),
+                    );
+
+                    names.extend(
+                        implicit_attribute_names(db, class_body_scope)
+                            .iter()
+                            .cloned(),
+                    );
+                }
+                ClassLiteral::Dynamic(class_literal) => {
+                    names.extend(
+                        class_literal
+                            .members(db)
+                            .iter()
+                            .map(|(name, _)| name.clone()),
+                    );
+                }
+                ClassLiteral::DynamicNamedTuple(class_literal) => {
+                    names.extend(
+                        class_literal
+                            .fields(db)
+                            .iter()
+                            .map(|field| field.name.clone()),
+                    );
+                }
+                ClassLiteral::DynamicTypedDict(_) | ClassLiteral::DynamicEnum(_) => {}
+            }
+
+            match CodeGeneratorKind::from_class(db, class.class_literal(db)) {
+                Some(CodeGeneratorKind::NamedTuple) => {
+                    if let Some(fallback) = KnownClass::NamedTupleFallback
+                        .to_class_literal(db)
+                        .to_class_type(db)
+                    {
+                        extend_names_from_mro(db, fallback, names);
+                    }
+                }
+                Some(CodeGeneratorKind::DataclassLike(_)) => {
+                    names.extend(
+                        SYNTHETIC_DATACLASS_ATTRIBUTES
+                            .iter()
+                            .map(|name| Name::new_static(name)),
+                    );
+                }
+                Some(CodeGeneratorKind::TypedDict) => {
+                    if let Some(fallback) = KnownClass::TypedDictFallback
+                        .to_class_literal(db)
+                        .to_class_type(db)
+                    {
+                        extend_names_from_mro(db, fallback, names);
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+
+    let mut names = FxHashSet::default();
+    extend_names_from_mro(db, class, &mut names);
+    names
+}
 
 struct AllMembers<'db> {
     members: FxHashSet<Member<'db>>,

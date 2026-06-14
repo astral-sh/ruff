@@ -17,12 +17,12 @@ use crate::{
     },
     reachability::{DeclarationsIteratorExtension, binding_reachability},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallArguments, CallableType, ClassBase,
-        ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias,
-        GenericContext, KnownClass, KnownInstanceType, MaterializationKind, MemberLookupPolicy,
-        MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters, PropertyInstanceType,
-        Signature, SpecialFormType, StaticMroError, SubclassOfType, Truthiness, Type, TypeContext,
-        TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
+        ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallArguments, CallableType,
+        ClassBase, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+        GenericAlias, GenericContext, KnownClass, KnownInstanceType, MaterializationKind,
+        MemberLookupPolicy, MetaclassCandidate, MetaclassTransformInfo, Parameter, Parameters,
+        PropertyInstanceType, Signature, SpecialFormType, StaticMroError, SubclassOfType,
+        Truthiness, Type, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder, UnionType,
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
@@ -1606,10 +1606,15 @@ impl<'db> StaticClassLiteral<'db> {
             (CodeGeneratorKind::DataclassLike(_), "__replace__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
             {
+                let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                    db,
+                    instance_ty,
+                    BindingContext::Synthetic,
+                ));
                 let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(instance_ty);
+                    .with_annotated_type(self_ty);
 
-                signature_from_fields(vec![self_parameter], instance_ty)
+                signature_from_fields(vec![self_parameter], self_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
                 if self.is_frozen_dataclass(db) == Some(true) {
@@ -3138,7 +3143,10 @@ fn explicit_bases_cycle_fn<'db>(
 }
 
 #[salsa::tracked(returns(deref), heap_size=ruff_memory_usage::heap_size)]
-fn implicit_attribute_names<'db>(db: &'db dyn Db, class_body_scope: ScopeId<'db>) -> Box<[Name]> {
+pub(crate) fn implicit_attribute_names<'db>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+) -> Box<[Name]> {
     let index = semantic_index(db, class_body_scope.file(db));
     let mut names = Vec::new();
 

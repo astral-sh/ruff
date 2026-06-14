@@ -17,9 +17,10 @@ use crate::{
     },
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
-        ErrorContext, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
-        KnownFunction, MemberLookupPolicy, PropertyInstanceType, ProtocolInstanceType, Signature,
-        StaticClassLiteral, Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        DescriptorBinding, ErrorContext, FindLegacyTypeVarsVisitor,
+        InstanceFallbackShadowsNonDataDescriptor, KnownFunction, MemberLookupPolicy,
+        PropertyInstanceType, ProtocolInstanceType, Signature, StaticClassLiteral, Type,
+        TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -705,7 +706,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }) = ty
                         .invoke_descriptor_protocol(
                             db,
-                            ty,
+                            DescriptorBinding {
+                                receiver: ty,
+                                owner: ty.to_meta_type(db),
+                            },
                             member.name,
                             Place::Undefined.into(),
                             InstanceFallbackShadowsNonDataDescriptor::No,

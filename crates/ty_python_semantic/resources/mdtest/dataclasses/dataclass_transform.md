@@ -2134,7 +2134,7 @@ will be called when using `replace` (this is how `attrs` behaves):
 basic = Basic("1", "2")
 
 # __replace__ uses the converter input type (str):
-reveal_type(Basic.__replace__)  # revealed: (self: Basic, *, a: str = ..., b: str = ...) -> Basic
+reveal_type(Basic.__replace__)  # revealed: (self: Self, *, a: str = ..., b: str = ...) -> Self
 ```
 
 Converter fields inherited from a base class should also be validated correctly:
