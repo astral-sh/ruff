@@ -1032,7 +1032,7 @@ impl<'db> Signature<'db> {
         &self,
         db: &'db dyn Db,
         self_type: Type<'db>,
-        unresolved_is_compatible: bool,
+        unresolved_subclass_is_compatible: bool,
         predicate: impl for<'c> FnOnce(ConstraintSet<'db, 'c>) -> bool,
     ) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
@@ -1085,10 +1085,13 @@ impl<'db> Signature<'db> {
                 return true;
             }
         }
-        if unresolved_is_compatible
-            && (expected_self_ty.has_dynamic(db)
-                || expected_self_ty.has_typevar_or_typevar_instance(db))
+        if unresolved_subclass_is_compatible
+            && let Type::SubclassOf(subclass_of) = expected_self_ty
+            && (subclass_of.is_dynamic() || subclass_of.is_type_var())
+            && self_type.is_assignable_to(db, KnownClass::Type.to_instance(db))
         {
+            // An unresolved `type[...]` receiver can accept a class object, but unresolved
+            // components nested in an unrelated type do not make that outer type compatible.
             return true;
         }
 
