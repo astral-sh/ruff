@@ -173,8 +173,7 @@ pub(crate) fn check_static_class_definitions<'db>(
     }
 
     // Check for invalid `@dataclass` applications.
-    let dataclass_params = class.dataclass_params(db);
-    if dataclass_params.is_some() {
+    if class.dataclass_params(db).is_some() {
         if class.has_named_tuple_class_in_mro(db) {
             if let Some(builder) = context.report_lint(&INVALID_DATACLASS, class.header_range(db)) {
                 let mut diagnostic = builder.into_diagnostic(format_args!(

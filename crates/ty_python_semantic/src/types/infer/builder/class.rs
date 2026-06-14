@@ -195,13 +195,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 continue;
             }
 
-            if let Type::DataclassDecorator(params) = decorator_ty {
+            if let Type::DataclassDecorator(dataclass_decorator) = decorator_ty {
                 report_invalid_dataclass_arguments(
                     &self.context,
                     decorator.into(),
-                    params.invalid_arguments(db),
+                    dataclass_decorator.invalid_arguments,
                 );
-                dataclass_params = Some(params);
+                dataclass_params = Some(dataclass_decorator.params);
                 continue;
             }
 

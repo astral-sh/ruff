@@ -781,12 +781,8 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     }
 
-                    *transformer_params = DataclassParams::new(
-                        db,
-                        flags,
-                        transformer_params.invalid_arguments(db),
-                        transformer_params.field_specifiers(db),
-                    );
+                    *transformer_params =
+                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
                 }
             }
         }

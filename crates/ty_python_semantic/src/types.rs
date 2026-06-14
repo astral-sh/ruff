@@ -780,13 +780,19 @@ bitflags! {
 bitflags! {
     /// Invalid combinations of arguments passed to the stdlib `dataclass` decorator factory.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct InvalidDataclassArguments: u8 {
+    pub(crate) struct InvalidDataclassArguments: u8 {
         const ORDER_REQUIRES_EQ = 1 << 0;
         const WEAKREF_SLOT_REQUIRES_SLOTS = 1 << 1;
     }
 }
 
 impl get_size2::GetSize for InvalidDataclassArguments {}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct DataclassDecorator<'db> {
+    params: DataclassParams<'db>,
+    invalid_arguments: InvalidDataclassArguments,
+}
 
 pub(crate) const DATACLASS_FLAGS: &[(&str, DataclassFlags)] = &[
     ("init", DataclassFlags::INIT),
@@ -840,7 +846,6 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct DataclassParams<'db> {
     flags: DataclassFlags,
-    invalid_arguments: InvalidDataclassArguments,
 
     #[returns(deref)]
     field_specifiers: Box<[Type<'db>]>,
@@ -854,32 +859,18 @@ impl<'db> DataclassParams<'db> {
     }
 
     fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
-        Self::from_stdlib_flags(db, flags, InvalidDataclassArguments::empty())
-    }
-
-    fn from_stdlib_flags(
-        db: &'db dyn Db,
-        flags: DataclassFlags,
-        invalid_arguments: InvalidDataclassArguments,
-    ) -> Self {
         let dataclasses_field = known_module_symbol(db, KnownModule::Dataclasses, "field")
             .place
             .ignore_possibly_undefined()
             .unwrap_or_else(Type::unknown);
 
-        Self::new(
-            db,
-            flags,
-            invalid_arguments,
-            vec![dataclasses_field].into_boxed_slice(),
-        )
+        Self::new(db, flags, vec![dataclasses_field].into_boxed_slice())
     }
 
     fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {
         Self::new(
             db,
             DataclassFlags::from(params.flags(db)),
-            InvalidDataclassArguments::empty(),
             params.field_specifiers(db),
         )
     }
@@ -899,12 +890,7 @@ impl<'db> DataclassParams<'db> {
             })
             .collect::<Option<Box<_>>>()?;
 
-        Some(Self::new(
-            db,
-            self.flags(db),
-            self.invalid_arguments(db),
-            field_specifiers,
-        ))
+        Some(Self::new(db, self.flags(db), field_specifiers))
     }
 }
 
@@ -950,7 +936,7 @@ pub enum Type<'db> {
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
     /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassParams<'db>),
+    DataclassDecorator(DataclassDecorator<'db>),
     /// A special callable that is returned by a `dataclass_transform(…)` call.
     DataclassTransformer(DataclassTransformerParams<'db>),
     /// The type of an arbitrary callable object with a certain specified signature.

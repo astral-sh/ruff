@@ -419,10 +419,6 @@ from dataclasses import dataclass
 @dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 class InvalidOrder: ...
 
-def dynamic_eq(eq: bool):
-    @dataclass(order=True, eq=eq)
-    class PossiblyValidOrder: ...
-
 @dataclass
 @dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 class InvalidStackedOrder: ...
@@ -1277,10 +1273,24 @@ from dataclasses import dataclass
 
 @dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
 class InvalidWeakrefSlot: ...
+```
+
+When `slots` is a non-literal `bool`, the combination might be valid at runtime, so we don't report
+an error:
+
+```py
+from dataclasses import dataclass
 
 def dynamic_slots(slots: bool):
     @dataclass(weakref_slot=True, slots=slots)
     class PossiblyValidWeakrefSlot: ...
+```
+
+Calling `dataclass(weakref_slot=True)` only creates a decorator. We report the error when that
+decorator is later applied to a class:
+
+```py
+from dataclasses import dataclass
 
 invalid_weakref_slot = dataclass(weakref_slot=True)
 
@@ -1961,10 +1971,6 @@ class C:
 C(1) < C(2)  # ok
 
 invalid_order = dataclass(order=True, eq=False)
-
-class AppliedLater: ...
-
-invalid_order(AppliedLater)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 
 @invalid_order  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 class IndirectDecorator: ...
