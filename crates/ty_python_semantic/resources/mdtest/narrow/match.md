@@ -1111,12 +1111,11 @@ def test_match_typed_dict_or_pattern_filters_union_members(
             reveal_type(whole)  # revealed: ClosedIntPayload | ClosedStrPayload
 ```
 
-## Direct subject narrowing
+## Narrowing the match subject
 
-The same structural analysis can narrow the original match subject, even when the pattern does not
-bind an alias for the whole value. Nested class and mapping patterns can rule out union arms, and
-the result is preserved through an `or` pattern. This analysis does not yet narrow expressions used
-to construct tuple or dictionary display subjects.
+The successful type of a class or mapping pattern also narrows the original match subject, even when
+the pattern does not bind an alias for the whole value. Nested patterns can remove members of a
+union, and an `or` pattern combines the members matched by its alternatives.
 
 ```py
 from typing import Any, Generic, Literal, TypeVar
@@ -1166,6 +1165,14 @@ def test_match_mapping_narrows_subject(value: IntPayload | StrPayload) -> None:
         case {"tag": "int"}:
             reveal_type(value)  # revealed: IntPayload
 
+class PayloadContainer:
+    payload: IntPayload | StrPayload
+
+def test_match_narrows_attribute_subject(container: PayloadContainer) -> None:
+    match container.payload:
+        case {"tag": "int"}:
+            reveal_type(container.payload)  # revealed: IntPayload
+
 def test_nested_mapping_narrows_sequence_subject(
     value: tuple[IntPayload] | tuple[StrPayload],
 ) -> None:
@@ -1178,8 +1185,8 @@ def test_match_mapping_does_not_narrow_tuple_display_element(
 ) -> None:
     match (value,):
         case ({"tag": "int"},):
-            # TODO: This should reveal `IntPayload`. Structural mapping analysis is not yet
-            # applied to expressions used to construct tuple display subjects.
+            # TODO: This should reveal `IntPayload`. Recursive mapping narrowing is not yet
+            # propagated back to expressions used to construct tuple display subjects.
             reveal_type(value)  # revealed: IntPayload | StrPayload
 
 def test_match_mapping_does_not_narrow_dictionary_display_element(
