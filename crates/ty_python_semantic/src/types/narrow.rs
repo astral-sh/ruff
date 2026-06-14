@@ -348,6 +348,11 @@ struct SuccessfulSequencePattern<'db> {
     element_types: Vec<Type<'db>>,
 }
 
+struct PatternSuccessAnalyzer<'db> {
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+}
+
 #[salsa::tracked(
     returns(ref),
     cycle_initial=|_, id, _| SuccessfulPatternAnalysis::cycle_initial(Type::divergent(id)),
@@ -360,13 +365,11 @@ pub(crate) fn successful_pattern_analysis<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
 ) -> SuccessfulPatternAnalysis<'db> {
-    let module = parsed_module(db, pattern.file(db)).load(db);
     let subject = pattern.subject(db);
     let incoming_subject_ty = infer_same_file_expression_type(db, subject, TypeContext::default());
     let incoming_subject_ty = type_narrowed_by_previous_patterns(db, pattern, incoming_subject_ty);
-    let mut builder =
-        NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true);
-    let result = builder.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
+    let mut analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
+    let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     SuccessfulPatternAnalysis {
         bindings: FrozenMap::from(result.bindings),
         cycle_recovery: None,
@@ -863,6 +866,77 @@ fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
     ty == Type::Never || ty.is_single_valued(db)
 }
 
+/// Return a type that contains every value that can match `pattern`.
+///
+/// For example, given:
+///
+/// ```python
+/// def f(x: list[object]):
+///     match x:
+///         case [int(real=0)]:
+///             reveal_type(x)
+/// ```
+///
+/// Every `x` that matches `[int(real=0)]` must be a one-element sequence
+/// containing an `int`. We can represent this information in the returned
+/// type; however, that type omits the `real=0` constraint, and so includes
+/// values like `[1]`, which do not match the pattern. In other words, the
+/// returned type may include values that do not match, but it must include
+/// every value that does.
+fn necessary_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    pattern: &PatternPredicateKind<'db>,
+) -> Type<'db> {
+    match pattern {
+        PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(db, *singleton),
+        PatternPredicateKind::Class(cls, _) => {
+            match infer_same_file_expression_type(db, *cls, TypeContext::default()) {
+                Type::ClassLiteral(class) => Type::instance(db, class.top_materialization(db)),
+                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                    callable_pattern_type(db)
+                }
+                _ => Type::object(),
+            }
+        }
+        PatternPredicateKind::Mapping(_) => mapping_pattern_type(db),
+        PatternPredicateKind::Sequence(kind) => necessary_sequence_pattern_type(db, kind),
+        PatternPredicateKind::Or(predicates) => UnionType::from_elements(
+            db,
+            predicates
+                .iter()
+                .map(|predicate| necessary_match_pattern_type(db, predicate)),
+        ),
+        PatternPredicateKind::As(pattern, _) => pattern
+            .as_deref()
+            .map(|pattern| necessary_match_pattern_type(db, pattern))
+            .unwrap_or_else(Type::object),
+        PatternPredicateKind::Value(_) | PatternPredicateKind::Star(_) => Type::object(),
+    }
+}
+
+/// Preserve the sequence element constraints that can be addressed at fixed indices.
+fn necessary_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+) -> Type<'db> {
+    if let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() {
+        let prefix_element_types = prefix_patterns
+            .iter()
+            .map(|pattern| necessary_match_pattern_type(db, pattern));
+        let suffix_element_types = suffix_patterns
+            .iter()
+            .map(|pattern| necessary_match_pattern_type(db, pattern));
+
+        starred_sequence_pattern_type(db, prefix_element_types, suffix_element_types)
+    } else {
+        let element_types = kind
+            .patterns
+            .iter()
+            .map(|pattern| necessary_match_pattern_type(db, pattern));
+        exact_sequence_pattern_type(db, element_types)
+    }
+}
+
 struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
@@ -1067,6 +1141,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         self.evaluate_pattern_predicate_kind(kind, subject, is_positive)
             .into_constraints()
     }
+}
+
+impl<'db> PatternSuccessAnalyzer<'db> {
+    fn new(db: &'db dyn Db, scope: ScopeId<'db>) -> Self {
+        Self { db, scope }
+    }
 
     /// Compute the subject and binding types produced by a successful pattern.
     ///
@@ -1222,7 +1302,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Value(value) => {
                 let value_ty =
                     infer_same_file_expression_type(self.db, *value, TypeContext::default());
-                self.evaluate_expr_compare_op(subject_ty, value_ty, None, ast::CmpOp::Eq, true)
+                evaluate_type_equality(self.db, subject_ty, value_ty, true)
                     .map(|constraint| self.intersect_types(subject_ty, constraint))
                     .unwrap_or(subject_ty)
             }
@@ -1241,13 +1321,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .matched_subject_ty
             }
             PatternPredicateKind::Class(class_expr, _) => {
-                let class_ty = self.necessary_match_pattern_type(pattern);
+                let class_ty = necessary_match_pattern_type(self.db, pattern);
                 let class =
                     infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
                         .as_class_literal();
                 self.match_class_pattern_subject_type(class, class_ty, subject_ty, false)
             }
-            _ => self.intersect_types(subject_ty, self.necessary_match_pattern_type(pattern)),
+            _ => self.intersect_types(subject_ty, necessary_match_pattern_type(self.db, pattern)),
         }
     }
 
@@ -1348,7 +1428,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let target_len = Self::sequence_pattern_target_len(kind);
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
         let subject_arms = self.sequence_pattern_subject_arms(subject_ty);
-        let sequence_ty = self.necessary_sequence_pattern_type(kind);
+        let sequence_ty = necessary_sequence_pattern_type(self.db, kind);
         let grouped_arms = subject_arms
             .into_iter()
             .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
@@ -1486,6 +1566,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .build()
     }
 
+    fn places(&self) -> &'db PlaceTable {
+        place_table(self.db, self.scope)
+    }
+}
+
+impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     fn evaluate_subject_element_pattern(
         &mut self,
         subject_element: SubjectElementPatternPredicate<'db>,
@@ -2568,78 +2654,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         )]))
     }
 
-    /// Return a type that contains every value that can match `pattern`.
-    ///
-    /// For example, given:
-    ///
-    /// ```python
-    /// def f(x: list[object]):
-    ///     match x:
-    ///         case [int(real=0)]:
-    ///             reveal_type(x)
-    /// ```
-    ///
-    /// Every `x` that matches `[int(real=0)]` must be a one-element sequence
-    /// containing an `int`. We can represent this information in the returned
-    /// type; however, that type omits the `real=0` constraint, and so includes
-    /// values like as `[1]`, which do not match the pattern. In other words,
-    /// the returned type may include values that do not match, but it must include
-    /// every value that does.
-    fn necessary_match_pattern_type(&self, pattern: &PatternPredicateKind<'db>) -> Type<'db> {
-        match pattern {
-            PatternPredicateKind::Singleton(singleton) => {
-                singleton_pattern_type(self.db, *singleton)
-            }
-            PatternPredicateKind::Class(cls, _) => {
-                match infer_same_file_expression_type(self.db, *cls, TypeContext::default()) {
-                    Type::ClassLiteral(class) => {
-                        Type::instance(self.db, class.top_materialization(self.db))
-                    }
-                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                        callable_pattern_type(self.db)
-                    }
-                    _ => Type::object(),
-                }
-            }
-            PatternPredicateKind::Mapping(_) => mapping_pattern_type(self.db),
-            PatternPredicateKind::Sequence(kind) => self.necessary_sequence_pattern_type(kind),
-            PatternPredicateKind::Or(predicates) => UnionType::from_elements(
-                self.db,
-                predicates
-                    .iter()
-                    .map(|predicate| self.necessary_match_pattern_type(predicate)),
-            ),
-            PatternPredicateKind::As(pattern, _) => pattern
-                .as_deref()
-                .map(|pattern| self.necessary_match_pattern_type(pattern))
-                .unwrap_or_else(Type::object),
-            PatternPredicateKind::Value(_) | PatternPredicateKind::Star(_) => Type::object(),
-        }
-    }
-
-    /// Preserve the element constraints that can be addressed at fixed indices.
-    fn necessary_sequence_pattern_type(
-        &self,
-        kind: &SequencePatternPredicateKind<'db>,
-    ) -> Type<'db> {
-        if let Some((prefix_patterns, suffix_patterns)) = kind.split_around_star() {
-            let prefix_element_types = prefix_patterns
-                .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern));
-            let suffix_element_types = suffix_patterns
-                .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern));
-
-            starred_sequence_pattern_type(self.db, prefix_element_types, suffix_element_types)
-        } else {
-            let element_types = kind
-                .patterns
-                .iter()
-                .map(|pattern| self.necessary_match_pattern_type(pattern));
-            exact_sequence_pattern_type(self.db, element_types)
-        }
-    }
-
     fn evaluate_match_pattern_sequence(
         &mut self,
         subject: Expression<'db>,
@@ -2668,7 +2682,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
 
         let constraint = if is_positive {
-            NarrowingConstraint::intersection(self.necessary_sequence_pattern_type(kind))
+            NarrowingConstraint::intersection(necessary_sequence_pattern_type(self.db, kind))
         } else {
             let sequence_type = definite_sequence_pattern_type(self.db, kind);
             if sequence_type.is_never() {
@@ -2776,7 +2790,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             self.expect_place(&subject),
-            NarrowingConstraint::intersection(self.necessary_match_pattern_type(pattern)),
+            NarrowingConstraint::intersection(necessary_match_pattern_type(self.db, pattern)),
         )])))
     }
 
