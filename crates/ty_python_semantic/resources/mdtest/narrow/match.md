@@ -581,8 +581,6 @@ def _(value: FinalPatternInt):
             reveal_type(value)  # revealed: FinalPatternInt
 ```
 
-More examples follow.
-
 ```py
 from typing import Literal
 
@@ -617,7 +615,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, StrEnum
-from typing import Literal, assert_never, reveal_type
+from typing import Literal, assert_never
 
 class Color(StrEnum):
     RED = "r"
