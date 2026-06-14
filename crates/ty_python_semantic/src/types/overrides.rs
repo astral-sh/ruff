@@ -15,8 +15,8 @@ use crate::{
     lint::LintId,
     place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
-        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, Parameter, Parameters,
-        Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, MemberLookupPolicy,
+        Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
         call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         constraints::ConstraintSetBuilder,
@@ -189,7 +189,12 @@ fn check_inherited_method_conflicts<'db>(
                 continue;
             };
             let Some(overridden_type) = base_instance
-                .member(db, &member)
+                .member_lookup_with_policy_and_receiver(
+                    db,
+                    member.clone(),
+                    MemberLookupPolicy::default(),
+                    Some(class_instance),
+                )
                 .place
                 .ignore_possibly_undefined()
             else {
@@ -554,8 +559,13 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
             }
 
-            let superclass_instance_member =
-                Type::instance(db, superclass).member(db, &member.name);
+            let superclass_instance_member = Type::instance(db, superclass)
+                .member_lookup_with_policy_and_receiver(
+                    db,
+                    member.name.clone(),
+                    MemberLookupPolicy::default(),
+                    Some(instance_of_class),
+                );
             let Place::Defined(DefinedPlace {
                 ty: superclass_type,
                 ..

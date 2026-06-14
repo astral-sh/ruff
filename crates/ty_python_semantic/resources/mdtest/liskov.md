@@ -616,6 +616,7 @@ wins, but a later dynamic base does not erase a known conflict.
 
 ```pyi
 from typing import Any, Generic, TypeVar
+from typing_extensions import Self
 
 T = TypeVar("T")
 
@@ -626,6 +627,18 @@ class GenericReturn(Generic[T]):
     def method(self) -> T: ...
 
 class GenericConflict(StrReturn, GenericReturn[int]): ...  # error: [invalid-method-override]
+
+class IntMethod(int):
+    def method(self, other: int) -> Self: ...
+
+class SelfMethod:
+    def method(self, other: Self) -> Self: ...
+
+# `Self` in `SelfMethod.method` specializes to the subclass, which is an `int`.
+class InheritedSelf(IntMethod, SelfMethod): ...
+
+class ExplicitSelf(IntMethod, SelfMethod):
+    def method(self, other: int) -> Self: ...
 
 class BrokenIntReturn(IntReturn):
     def method(self) -> str: ...  # error: [invalid-method-override]
