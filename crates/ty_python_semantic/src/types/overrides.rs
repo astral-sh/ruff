@@ -9,12 +9,12 @@ use ruff_python_ast::{PythonVersion, name::Name};
 use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
-use ty_module_resolver::KnownModule;
+use ty_module_resolver::{KnownModule, resolve_module_confident};
 
 use crate::{
     Db, Program,
     lint::LintId,
-    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin, known_module_symbol},
+    place::{DefinedPlace, Place, PlaceAndQualifiers, TypeOrigin},
     types::{
         CallableType, ClassBase, ClassLiteral, ClassType, KnownClass, MemberLookupPolicy,
         Parameter, Parameters, Signature, StaticClassLiteral, Type, TypeContext, TypeQualifiers,
@@ -137,7 +137,11 @@ fn check_inherited_method_conflicts<'db>(
     }
 
     let class_instance = Type::instance(db, class_specialized);
-    let has_enum_semantics = is_enum_class_by_inheritance(db, class);
+    let has_enum_semantics = is_enum_class_by_inheritance(db, class)
+        || class.explicit_bases(db).iter().any(|base| {
+            base.to_class_type(db)
+                .is_some_and(|base| is_stdlib_enum_class(db, base.class_literal(db)))
+        });
     let member_candidates = member_candidates_in_direct_bases(db, &direct_bases);
 
     'members: for (member, base_indices) in member_candidates {
@@ -358,14 +362,37 @@ fn is_enum_rewritten_method<'db>(
 }
 
 fn class_has_repr_enum_base<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
-    let Some(repr_enum) = known_module_symbol(db, KnownModule::Enum, "ReprEnum")
-        .place
-        .ignore_possibly_undefined()
-    else {
-        return false;
-    };
+    class.explicit_bases(db).iter().any(|base| {
+        base.to_class_type(db)
+            .is_some_and(|base| is_stdlib_enum_class_named(db, base.class_literal(db), "ReprEnum"))
+    })
+}
 
-    class.explicit_bases(db).contains(&repr_enum)
+/// Returns `true` for a class defined by the standard-library `enum` module.
+///
+/// While checking `enum.pyi` itself, resolving `KnownClass::Enum` can be cyclic. Identifying these
+/// classes by their defining file lets the special Enum construction rules apply there as well.
+fn is_stdlib_enum_class<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    matches!(
+        class.name(db).as_str(),
+        "Enum" | "ReprEnum" | "IntEnum" | "StrEnum" | "Flag" | "IntFlag"
+    ) && resolve_module_confident(db, &KnownModule::Enum.name())
+        .and_then(|module| module.file(db))
+        .is_some_and(|file| {
+            let class_file = class.file(db);
+            file == class_file
+                || file
+                    .path(db)
+                    .as_system_path()
+                    .zip(class_file.path(db).as_system_path())
+                    .is_some_and(|(left, right)| {
+                        db.system().is_same_file(left, right).unwrap_or(false)
+                    })
+        })
+}
+
+fn is_stdlib_enum_class_named<'db>(db: &'db dyn Db, class: ClassLiteral<'db>, name: &str) -> bool {
+    class.name(db) == name && is_stdlib_enum_class(db, class)
 }
 
 /// Returns the data type selected by `EnumType` for `class`.
@@ -403,6 +430,7 @@ fn enum_data_type_in_base_mro<'db>(
 
         if Type::ClassLiteral(class.class_literal(db))
             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+            || is_stdlib_enum_class(db, class.class_literal(db))
         {
             if let Some((enum_class, _)) = class.static_class_literal(db)
                 && let Some(data_type) = enum_data_type(db, enum_class)

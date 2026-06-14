@@ -780,6 +780,44 @@ CallableNamedTuple = NamedTuple("CallableNamedTuple", [("method", Callable[[], i
 class DynamicNamedTupleConflict(CallableNamedTuple, StrReturn): ...  # error: [invalid-method-override]
 ```
 
+### Standard-library Enum construction
+
+The same Enum rewrites apply while checking the standard-library Enum classes themselves. This
+requires a fallback because resolving `enum.Enum` from within `enum.pyi` can be cyclic:
+
+```toml
+[environment]
+python-version = "3.13"
+typeshed = "/src/typeshed"
+```
+
+`/src/typeshed/stdlib/builtins.pyi`:
+
+```pyi
+class object: ...
+class type(object): ...
+class str(object): ...
+class tuple: ...
+```
+
+`/src/typeshed/stdlib/enum.pyi`:
+
+```pyi
+class Enum:
+    def __format__(self, format_spec: str) -> str: ...
+
+class ReprEnum(Enum): ...
+class Flag(Enum): ...
+
+class DataType:
+    def __new__(cls) -> DataType: ...
+    def __format__(self, format_spec: str, /) -> str: ...
+
+class IntEnum(DataType, ReprEnum): ...
+class StrEnum(DataType, ReprEnum): ...
+class IntFlag(DataType, ReprEnum, Flag): ...
+```
+
 ### Class members assigned in class methods
 
 These members also participate in inherited method checks:
