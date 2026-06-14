@@ -1939,6 +1939,129 @@ dataclass(B)("a")
 reveal_type(dataclass(B)(3).x)  # revealed: int
 ```
 
+The returned class has the same nominal typing identity as the input class. This remains true for
+final and generic classes:
+
+```py
+from typing import final, Generic, TypeVar
+from ty_extensions import TypeOf, is_disjoint_from, is_equivalent_to, static_assert
+
+T = TypeVar("T")
+
+@final
+class Point:
+    x: int
+
+functional_point = dataclass(Point)
+
+def accepts_point(value: Point) -> None: ...
+
+accepts_point(functional_point(1))
+
+static_assert(is_equivalent_to(Point, TypeOf[functional_point(1)]))
+static_assert(not is_disjoint_from(Point, TypeOf[functional_point(1)]))
+static_assert(Point is functional_point)
+static_assert(is_equivalent_to(TypeOf[Point], TypeOf[functional_point]))
+static_assert(not is_disjoint_from(TypeOf[Point], TypeOf[functional_point]))
+
+class Box(Generic[T]):
+    value: T
+
+functional_box = dataclass(Box)
+
+def accepts_int_box(value: Box[int]) -> None: ...
+
+accepts_int_box(functional_box[int](1))
+accepts_int_box(functional_box[str]("one"))  # error: [invalid-argument-type]
+static_assert(Box is functional_box)
+static_assert(is_equivalent_to(TypeOf[Box[int]], TypeOf[functional_box[int]]))
+static_assert(not is_disjoint_from(TypeOf[Box[int]], TypeOf[functional_box[int]]))
+```
+
+With `slots=True`, `dataclass` returns a new runtime class, so the returned class keeps a distinct
+nominal identity:
+
+```py
+@final
+class SlottedPoint:
+    x: int
+
+functional_slotted_point = dataclass(slots=True)(SlottedPoint)
+
+def accepts_slotted_point(value: SlottedPoint) -> None: ...
+
+accepts_slotted_point(functional_slotted_point(1))  # error: [invalid-argument-type]
+static_assert(is_disjoint_from(SlottedPoint, TypeOf[functional_slotted_point(1)]))
+static_assert(SlottedPoint is not functional_slotted_point)
+static_assert(is_disjoint_from(TypeOf[SlottedPoint], TypeOf[functional_slotted_point]))
+
+another_slotted_point = dataclass(slots=True)(SlottedPoint)
+static_assert(functional_slotted_point is not another_slotted_point)
+static_assert(is_disjoint_from(TypeOf[functional_slotted_point], TypeOf[another_slotted_point]))
+
+redecorated_slotted_point = dataclass(functional_slotted_point)
+static_assert(redecorated_slotted_point is functional_slotted_point)
+static_assert(SlottedPoint is not redecorated_slotted_point)
+
+slotted_box = dataclass(slots=True)(Box)
+static_assert(Box is not slotted_box)
+static_assert(is_disjoint_from(TypeOf[Box[int]], TypeOf[slotted_box[int]]))
+```
+
+If `slots` is not statically known, the returned class may or may not be the input class. Ty does
+not allow the returned instances where the input class is required, but preserves the possibility
+that the two classes are identical:
+
+```py
+def dynamic_bool() -> bool:
+    return bool()
+
+@final
+class MaybeSlottedPoint:
+    x: int
+
+maybe_slotted_point = dataclass(slots=dynamic_bool())(MaybeSlottedPoint)
+
+def accepts_maybe_slotted_point(value: MaybeSlottedPoint) -> None: ...
+
+# error: [invalid-argument-type]
+accepts_maybe_slotted_point(maybe_slotted_point(1))
+reveal_type(MaybeSlottedPoint is maybe_slotted_point)  # revealed: bool
+static_assert(not is_disjoint_from(MaybeSlottedPoint, TypeOf[maybe_slotted_point(1)]))
+static_assert(not is_disjoint_from(TypeOf[MaybeSlottedPoint], TypeOf[maybe_slotted_point]))
+
+redecorated_maybe_slotted_point = dataclass(maybe_slotted_point)
+static_assert(redecorated_maybe_slotted_point is maybe_slotted_point)
+reveal_type(MaybeSlottedPoint is redecorated_maybe_slotted_point)  # revealed: bool
+static_assert(not is_disjoint_from(TypeOf[MaybeSlottedPoint], TypeOf[redecorated_maybe_slotted_point]))
+
+class MaybeBox(Generic[T]):
+    value: T
+
+maybe_box = dataclass(slots=dynamic_bool())(MaybeBox)
+reveal_type(MaybeBox is maybe_box)  # revealed: bool
+static_assert(not is_disjoint_from(TypeOf[MaybeBox[int]], TypeOf[maybe_box[int]]))
+
+class UnionPoint:
+    x: int
+
+class OtherUnionPoint:
+    x: int
+
+# Every branch of a union-valued input receives a fresh identity.
+union_slotted_point = dataclass(slots=True)(UnionPoint if dynamic_bool() else OtherUnionPoint)
+static_assert(UnionPoint is not union_slotted_point)
+static_assert(OtherUnionPoint is not union_slotted_point)
+static_assert(is_disjoint_from(TypeOf[UnionPoint], TypeOf[union_slotted_point]))
+static_assert(is_disjoint_from(TypeOf[OtherUnionPoint], TypeOf[union_slotted_point]))
+
+# A union-valued decorator preserves the identity behavior of each branch.
+maybe_slotted_decorator = dataclass(slots=True) if dynamic_bool() else dataclass()
+maybe_decorated_union_point = maybe_slotted_decorator(UnionPoint)
+reveal_type(UnionPoint is maybe_decorated_union_point)  # revealed: bool
+static_assert(not is_disjoint_from(TypeOf[UnionPoint], TypeOf[maybe_decorated_union_point]))
+```
+
 ## Internals
 
 The `dataclass` decorator returns the class itself. This means that the type of `Person` is `type`,

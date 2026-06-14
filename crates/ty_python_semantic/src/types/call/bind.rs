@@ -1590,30 +1590,14 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::DataclassDecorator(params) => match overload.parameter_types() {
-                        [Some(Type::ClassLiteral(class_literal))] => {
-                            if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                overload
-                                    .errors
-                                    .push(BindingError::InvalidDataclassApplication(target));
-                            } else {
-                                overload.set_return_type(Type::from(
-                                    class_literal.with_dataclass_params(db, Some(params)),
-                                ));
-                            }
+                    Type::DataclassDecorator(params) => {
+                        if let [Some(input)] = overload.parameter_types()
+                            && let Some(return_ty) =
+                                apply_dataclass_params(db, *input, params, &mut overload.errors)
+                        {
+                            overload.set_return_type(return_ty);
                         }
-                        [Some(Type::GenericAlias(generic_alias))] => {
-                            let new_origin = generic_alias
-                                .origin(db)
-                                .with_dataclass_params(db, Some(params));
-                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                db,
-                                new_origin,
-                                generic_alias.specialization(db),
-                            )));
-                        }
-                        _ => {}
-                    },
+                    }
 
                     Type::BoundMethod(bound_method)
                         if bound_method.self_instance(db).is_property_instance() =>
@@ -2205,7 +2189,7 @@ impl<'db> Bindings<'db> {
                                 versioned_parameters @ ..,
                             ] = overload.parameter_types()
                             {
-                                let mut flags = DataclassFlags::empty();
+                                let mut flags = DataclassFlags::SLOTS_CREATE_NEW_CLASS;
 
                                 if to_bool(init, true) {
                                     flags |= DataclassFlags::INIT;
@@ -2226,6 +2210,18 @@ impl<'db> Bindings<'db> {
                                     flags |= DataclassFlags::FROZEN;
                                 }
 
+                                let set_slots_flags =
+                                    |flags: &mut DataclassFlags, slots: &Option<Type<'db>>| {
+                                        if let Some(slots) = slots {
+                                            let truthiness = slots.bool(db);
+                                            if truthiness.is_always_true() {
+                                                *flags |= DataclassFlags::SLOTS;
+                                            } else if truthiness.may_be_true() {
+                                                *flags |= DataclassFlags::SLOTS_MAY_BE_TRUE;
+                                            }
+                                        }
+                                    };
+
                                 match versioned_parameters {
                                     // Python < 3.10.
                                     [] => {}
@@ -2237,9 +2233,7 @@ impl<'db> Bindings<'db> {
                                         if to_bool(kw_only, false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
-                                            flags |= DataclassFlags::SLOTS;
-                                        }
+                                        set_slots_flags(&mut flags, slots);
                                     }
                                     // Python >= 3.11.
                                     [match_args, kw_only, slots, weakref_slot] => {
@@ -2249,9 +2243,7 @@ impl<'db> Bindings<'db> {
                                         if to_bool(kw_only, false) {
                                             flags |= DataclassFlags::KW_ONLY;
                                         }
-                                        if to_bool(slots, false) {
-                                            flags |= DataclassFlags::SLOTS;
-                                        }
+                                        set_slots_flags(&mut flags, slots);
                                         if to_bool(weakref_slot, false) {
                                             flags |= DataclassFlags::WEAKREF_SLOT;
                                         }
@@ -2406,6 +2398,7 @@ impl<'db> Bindings<'db> {
                                     db,
                                     flags,
                                     dataclass_params.field_specifiers(db),
+                                    dataclass_params.nominal_identity(db),
                                 );
 
                                 // The dataclass_transform spec doesn't clarify how to tell whether
@@ -6970,6 +6963,40 @@ pub(crate) enum InvalidDataclassTarget {
     TypedDict,
     Enum,
     Protocol,
+}
+
+fn apply_dataclass_params<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    params: DataclassParams<'db>,
+    errors: &mut Vec<BindingError<'db>>,
+) -> Option<Type<'db>> {
+    match ty {
+        Type::ClassLiteral(class_literal) => {
+            if let Some(target) = invalid_dataclass_target(db, &class_literal) {
+                errors.push(BindingError::InvalidDataclassApplication(target));
+                None
+            } else {
+                Some(Type::from(
+                    class_literal.with_dataclass_params(db, Some(params)),
+                ))
+            }
+        }
+        Type::GenericAlias(generic_alias) => {
+            let new_origin = generic_alias
+                .origin(db)
+                .with_dataclass_params(db, Some(params));
+            Some(Type::GenericAlias(GenericAlias::new(
+                db,
+                new_origin,
+                generic_alias.specialization(db),
+            )))
+        }
+        Type::Union(union) => union.try_map(db, |element| {
+            apply_dataclass_params(db, *element, params, errors)
+        }),
+        _ => None,
+    }
 }
 
 /// Returns the invalid dataclass target for a class literal, if any.

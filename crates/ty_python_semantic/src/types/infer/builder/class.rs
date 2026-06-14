@@ -1,7 +1,7 @@
 use crate::place::Place;
 use crate::types::{
     CallArguments, DataclassParams, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
+    NominalClassIdentity, SpecialFormType, StaticClassLiteral, SubclassOfType, Type, TypeContext,
     call::CallError,
     callable::CallableFunctionProvenance,
     function::KnownFunction,
@@ -13,7 +13,7 @@ use crate::types::{
     special_form::TypeQualifier,
 };
 use ruff_python_ast::name::Name;
-use ruff_python_ast::{self as ast, helpers::any_over_expr};
+use ruff_python_ast::{self as ast, HasNodeIndex, helpers::any_over_expr};
 use ty_module_resolver::{KnownModule, file_to_module};
 use ty_python_core::{definition::Definition, scope::NodeWithScopeRef};
 
@@ -121,7 +121,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let mut metadata_applies_to_original_class = true;
         let mut deprecated = None;
         let mut type_check_only = false;
-        let mut dataclass_params = None;
+        let mut dataclass_params: Option<DataclassParams<'db>> = None;
         let mut dataclass_transformer_params = None;
         let mut total_ordering = false;
         let has_explicit_bases = class_node
@@ -182,7 +182,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(db, KnownFunction::Dataclass))
             {
-                dataclass_params = Some(DataclassParams::default_params(db));
+                let nominal_identity = dataclass_params.map_or_else(
+                    || NominalClassIdentity::original(db),
+                    |params| params.nominal_identity(db),
+                );
+                dataclass_params = Some(
+                    DataclassParams::default_params(db).with_nominal_identity(db, nominal_identity),
+                );
                 continue;
             }
 
@@ -195,7 +201,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             if let Type::DataclassDecorator(params) = decorator_ty {
-                dataclass_params = Some(params);
+                let nominal_identity = dataclass_params.map_or_else(
+                    || NominalClassIdentity::original(db),
+                    |params| params.nominal_identity(db),
+                );
+                dataclass_params = Some(
+                    params
+                        .with_nominal_identity(db, nominal_identity)
+                        .after_dataclass_application(
+                            db,
+                            self.dataclass_application_id(decorator.expression.node_index().load()),
+                        ),
+                );
                 continue;
             }
 
@@ -254,10 +271,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     .rev()
                     .find_map(|overload| overload.dataclass_transformer_params(db));
                 if let Some(transformer_params) = transformer_params {
-                    dataclass_params = Some(DataclassParams::from_transformer_params(
-                        db,
-                        transformer_params,
-                    ));
+                    let nominal_identity = dataclass_params.map_or_else(
+                        || NominalClassIdentity::original(db),
+                        |params| params.nominal_identity(db),
+                    );
+                    dataclass_params = Some(
+                        DataclassParams::from_transformer_params(db, transformer_params)
+                            .with_nominal_identity(db, nominal_identity),
+                    );
                     continue;
                 }
             }
@@ -324,13 +345,20 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => apply_class_decorator(db, decorator_ty, inferred_ty),
             };
-            let decorated_ty = match decorator_result {
+            let mut decorated_ty = match decorator_result {
                 Ok(return_ty) => return_ty,
                 Err(CallError(_, bindings)) => {
                     bindings.report_diagnostics(&self.context, decorator_node.into());
                     bindings.return_type(db)
                 }
             };
+            if let Some(params) = self.dataclass_params_for_callable(decorator_ty) {
+                decorated_ty = self.apply_dataclass_application(
+                    decorated_ty,
+                    decorator_node.expression.node_index().load(),
+                    params,
+                );
+            }
             let decorated_ty = match decorated_ty {
                 Type::DataclassDecorator(_) | Type::DataclassTransformer(_) => Type::unknown(),
                 decorated_ty => decorated_ty,

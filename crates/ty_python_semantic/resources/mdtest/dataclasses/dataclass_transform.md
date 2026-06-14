@@ -856,6 +856,7 @@ Other parameters from normal dataclasses can also be set on models created using
 
 ```py
 from typing_extensions import dataclass_transform, TypeVar, Callable
+from ty_extensions import static_assert
 
 T = TypeVar("T", bound=type)
 
@@ -874,6 +875,12 @@ class WithSlots:
     name: str
 
 reveal_type(WithSlots.__slots__)  # revealed: tuple[Literal["name"]]
+
+class FunctionalModel:
+    name: str
+
+functional_model = fancy_model(slots=True)(FunctionalModel)
+static_assert(FunctionalModel is functional_model)
 ```
 
 ### Using metaclass-based transformers

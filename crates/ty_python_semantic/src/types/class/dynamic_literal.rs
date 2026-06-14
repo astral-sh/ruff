@@ -9,7 +9,8 @@ use crate::{
         ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
         SubclassOfType, Type,
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
+            ClassMemberResult, CodeGeneratorKind, DataclassApplicationId, DisjointBase,
+            InstanceMemberResult, MroLookup, NominalClassIdentity,
         },
         definition_expression_type, extract_fixed_length_iterable_element_types,
         member::Member,
@@ -522,6 +523,8 @@ impl<'db> DynamicClassLiteral<'db> {
         db: &'db dyn Db,
         dataclass_params: Option<DataclassParams<'db>>,
     ) -> Self {
+        let dataclass_params = dataclass_params
+            .map(|params| params.with_nominal_identity(db, self.nominal_identity(db)));
         Self::new(
             db,
             self.name(db).clone(),
@@ -529,6 +532,36 @@ impl<'db> DynamicClassLiteral<'db> {
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
+        )
+    }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        let Some(params) = self.dataclass_params(db) else {
+            return self;
+        };
+        let params = params.after_dataclass_application(db, application);
+        if Some(params) == self.dataclass_params(db) {
+            return self;
+        }
+
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.anchor(db).clone(),
+            self.members(db),
+            self.has_dynamic_namespace(db),
+            Some(params),
+        )
+    }
+
+    pub(crate) fn nominal_identity(self, db: &'db dyn Db) -> NominalClassIdentity<'db> {
+        self.dataclass_params(db).map_or_else(
+            || NominalClassIdentity::original(db),
+            |params| params.nominal_identity(db),
         )
     }
 }

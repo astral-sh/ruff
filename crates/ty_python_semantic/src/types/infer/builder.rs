@@ -98,13 +98,14 @@ use crate::types::typed_dict::{TypedDictAssignmentKind, TypedDictKeyAssignment};
 use crate::types::typevar::{BoundTypeVarIdentity, TypeVarConstraints, TypeVarIdentity};
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes, ClassType,
-    DynamicType, InferenceFlags, InternedConstraintSet, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LiteralValueTypeKind,
-    MemberLookupPolicy, ParamSpecAttrKind, Parameter, Parameters, SentinelInstance, Signature,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarKind, TypeVarVariance, TypedDictType,
-    UnionAccumulator, UnionBuilder, UnionType, any_over_type, binding_type,
-    infer_complete_scope_types, infer_scope_types, is_discarded_dict_key_assignment, todo_type,
+    DataclassApplicationId, DataclassParams, DynamicType, GenericAlias, InferenceFlags,
+    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, KnownUnion, LiteralValueTypeKind, MemberLookupPolicy, ParamSpecAttrKind,
+    Parameter, Parameters, SentinelInstance, Signature, SpecialFormType, SubclassOfType, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarKind, TypeVarVariance, TypedDictType, UnionAccumulator, UnionBuilder, UnionType,
+    any_over_type, binding_type, infer_complete_scope_types, infer_scope_types,
+    is_discarded_dict_key_assignment, todo_type,
 };
 use crate::{AnalysisSettings, Db, FxIndexSet, Program};
 use ty_python_core::ast_ids::ScopedUseId;
@@ -8257,6 +8258,77 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }
 
+    pub(super) fn dataclass_application_id(
+        &self,
+        node_index: ast::NodeIndex,
+    ) -> DataclassApplicationId<'db> {
+        let db = self.db();
+        let scope = self.scope();
+        let scope_anchor = scope
+            .node(db)
+            .node_index()
+            .unwrap_or(ast::NodeIndex::from(0));
+        let scope_anchor = scope_anchor
+            .as_u32()
+            .expect("scope anchor should not be NodeIndex::NONE");
+        let node_index = node_index
+            .as_u32()
+            .expect("dataclass application should not be NodeIndex::NONE");
+        DataclassApplicationId::new(scope, node_index - scope_anchor)
+    }
+
+    pub(super) fn apply_dataclass_application(
+        &self,
+        ty: Type<'db>,
+        node_index: ast::NodeIndex,
+        params: DataclassParams<'db>,
+    ) -> Type<'db> {
+        fn apply<'db>(
+            db: &'db dyn Db,
+            ty: Type<'db>,
+            application: DataclassApplicationId<'db>,
+            params: DataclassParams<'db>,
+        ) -> Type<'db> {
+            match ty {
+                Type::ClassLiteral(class) => {
+                    let class = class.with_dataclass_params(db, Some(params));
+                    Type::ClassLiteral(class.after_dataclass_application(db, application))
+                }
+                Type::GenericAlias(alias) => {
+                    let origin = alias.origin(db).with_dataclass_params(db, Some(params));
+                    let alias = GenericAlias::new(db, origin, alias.specialization(db));
+                    Type::GenericAlias(alias.after_dataclass_application(db, application))
+                }
+                Type::Union(union) => {
+                    union.map(db, |element| apply(db, *element, application, params))
+                }
+                _ => ty,
+            }
+        }
+
+        apply(
+            self.db(),
+            ty,
+            self.dataclass_application_id(node_index),
+            params,
+        )
+    }
+
+    pub(super) fn dataclass_params_for_callable(
+        &self,
+        callable: Type<'db>,
+    ) -> Option<DataclassParams<'db>> {
+        match callable {
+            Type::DataclassDecorator(params) => Some(params),
+            Type::FunctionLiteral(function)
+                if function.is_known(self.db(), KnownFunction::Dataclass) =>
+            {
+                Some(DataclassParams::default_params(self.db()))
+            }
+            _ => None,
+        }
+    }
+
     fn infer_call_expression_impl(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -8749,6 +8821,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                     _ => {}
+                }
+
+                if let Some(params) = self.dataclass_params_for_callable(binding_type) {
+                    let return_ty = self.apply_dataclass_application(
+                        overload.return_type(),
+                        call_expression.node_index().load(),
+                        params,
+                    );
+                    overload.set_return_type(return_ty);
                 }
             }
         }

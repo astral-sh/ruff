@@ -26,9 +26,10 @@ use crate::{
         call::{CallError, CallErrorKind},
         callable::{CallableFunctionProvenance, CallableTypeKind},
         class::{
-            ClassMemberResult, CodeGeneratorKind, DisjointBase, DynamicTypedDictLiteral, Field,
-            FieldKind, InstanceMemberResult, MetaclassError, MetaclassErrorKind, MethodDecorator,
-            MroLookup, NamedTupleField, SlotsKind, synthesize_namedtuple_class_member,
+            ClassMemberResult, CodeGeneratorKind, DataclassApplicationId, DisjointBase,
+            DynamicTypedDictLiteral, Field, FieldKind, InstanceMemberResult, MetaclassError,
+            MetaclassErrorKind, MethodDecorator, MroLookup, NamedTupleField, NominalClassIdentity,
+            SlotsKind, synthesize_namedtuple_class_member,
             typed_dict::{TypedDictFields, synthesize_typed_dict_method, typed_dict_class_member},
         },
         context::InferContext,
@@ -155,6 +156,8 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         dataclass_params: Option<DataclassParams<'db>>,
     ) -> Self {
+        let dataclass_params = dataclass_params
+            .map(|params| params.with_nominal_identity(db, self.nominal_identity(db)));
         Self::new(
             db,
             self.name(db).clone(),
@@ -169,6 +172,43 @@ impl<'db> StaticClassLiteral<'db> {
             self.has_type_params(db),
             self.has_explicit_bases(db),
             self.has_explicit_metaclass(db),
+        )
+    }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        let Some(params) = self.dataclass_params(db) else {
+            return self;
+        };
+        let params = params.after_dataclass_application(db, application);
+        if Some(params) == self.dataclass_params(db) {
+            return self;
+        }
+
+        Self::new(
+            db,
+            self.name(db).clone(),
+            self.body_scope(db),
+            self.known(db),
+            self.deprecated(db),
+            self.type_check_only(db),
+            Some(params),
+            self.dataclass_transformer_params(db),
+            self.total_ordering(db),
+            self.has_decorators(db),
+            self.has_type_params(db),
+            self.has_explicit_bases(db),
+            self.has_explicit_metaclass(db),
+        )
+    }
+
+    pub(crate) fn nominal_identity(self, db: &'db dyn Db) -> NominalClassIdentity<'db> {
+        self.dataclass_params(db).map_or_else(
+            || NominalClassIdentity::original(db),
+            |params| params.nominal_identity(db),
         )
     }
 
@@ -773,8 +813,12 @@ impl<'db> StaticClassLiteral<'db> {
                         }
                     }
 
-                    *transformer_params =
-                        DataclassParams::new(db, flags, transformer_params.field_specifiers(db));
+                    *transformer_params = DataclassParams::new(
+                        db,
+                        flags,
+                        transformer_params.field_specifiers(db),
+                        transformer_params.nominal_identity(db),
+                    );
                 }
             }
         }

@@ -1108,6 +1108,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, source, target_alias.value_type(db))
             }),
 
+            (Type::ClassLiteral(source), Type::ClassLiteral(target)) => ConstraintSet::from_bool(
+                self.constraints,
+                source.has_same_nominal_identity_as(db, target),
+            ),
+
             // Annotation unions retain type aliases so recursive aliases can be represented.
             // Normalize direct alias elements together before checking the union so reductions
             // that depend on multiple elements, such as all members of an enum, are visible.
@@ -2672,6 +2677,11 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 !left_sentinel.is_same_sentinel(db, right_sentinel),
             ),
 
+            (Type::ClassLiteral(left), Type::ClassLiteral(right)) => ConstraintSet::from_bool(
+                self.constraints,
+                left.is_definitely_distinct_from(db, right),
+            ),
+
             // any single-valued type is disjoint from another single-valued type
             // iff the two types are nonequal
             (
@@ -2838,7 +2848,10 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
             (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
                 ConstraintSet::from_bool(
                     self.constraints,
-                    left_alias.origin(db) != right_alias.origin(db),
+                    ClassLiteral::Static(left_alias.origin(db)).is_definitely_distinct_from(
+                        db,
+                        ClassLiteral::Static(right_alias.origin(db)),
+                    ),
                 )
                 .or(db, self.constraints, || {
                     self.check_specialization_pair(

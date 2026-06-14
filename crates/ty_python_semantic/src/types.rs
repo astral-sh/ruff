@@ -98,7 +98,10 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::{Db, FxOrderSet, Program};
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StaticClassLiteral};
+pub(crate) use class::{
+    ClassLiteral, ClassType, DataclassApplicationId, GenericAlias, NominalClassIdentity,
+    StaticClassLiteral,
+};
 pub use class::{KnownClass, MethodDecorator};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
@@ -774,6 +777,12 @@ bitflags! {
         const KW_ONLY = 1 << 7;
         const SLOTS = 1 << 8   ;
         const WEAKREF_SLOT = 1 << 9;
+        /// The `slots` argument is not statically known and may cause `dataclass` to return a new
+        /// runtime class.
+        const SLOTS_MAY_BE_TRUE = 1 << 10;
+        /// The decorator follows stdlib `dataclass` semantics, where `slots=True` returns a new
+        /// runtime class. Dataclass-transform decorators do not make this guarantee.
+        const SLOTS_CREATE_NEW_CLASS = 1 << 11;
     }
 }
 
@@ -832,13 +841,20 @@ pub struct DataclassParams<'db> {
 
     #[returns(deref)]
     field_specifiers: Box<[Type<'db>]>,
+
+    /// Runtime class identity is stored with the dataclass metadata so ordinary metadata updates
+    /// can preserve it without adding another field to the interned class-literal structures.
+    nominal_identity: NominalClassIdentity<'db>,
 }
 
 impl get_size2::GetSize for DataclassParams<'_> {}
 
 impl<'db> DataclassParams<'db> {
     fn default_params(db: &'db dyn Db) -> Self {
-        Self::from_flags(db, DataclassFlags::default())
+        Self::from_flags(
+            db,
+            DataclassFlags::default() | DataclassFlags::SLOTS_CREATE_NEW_CLASS,
+        )
     }
 
     fn from_flags(db: &'db dyn Db, flags: DataclassFlags) -> Self {
@@ -847,7 +863,12 @@ impl<'db> DataclassParams<'db> {
             .ignore_possibly_undefined()
             .unwrap_or_else(Type::unknown);
 
-        Self::new(db, flags, vec![dataclasses_field].into_boxed_slice())
+        Self::new(
+            db,
+            flags,
+            vec![dataclasses_field].into_boxed_slice(),
+            NominalClassIdentity::original(db),
+        )
     }
 
     fn from_transformer_params(db: &'db dyn Db, params: DataclassTransformerParams<'db>) -> Self {
@@ -855,7 +876,36 @@ impl<'db> DataclassParams<'db> {
             db,
             DataclassFlags::from(params.flags(db)),
             params.field_specifiers(db),
+            NominalClassIdentity::original(db),
         )
+    }
+
+    pub(crate) fn with_nominal_identity(
+        self,
+        db: &'db dyn Db,
+        nominal_identity: NominalClassIdentity<'db>,
+    ) -> Self {
+        if self.nominal_identity(db) == nominal_identity {
+            self
+        } else {
+            Self::new(
+                db,
+                self.flags(db),
+                self.field_specifiers(db),
+                nominal_identity,
+            )
+        }
+    }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        let nominal_identity =
+            self.nominal_identity(db)
+                .after_dataclass_application(db, self.flags(db), application);
+        self.with_nominal_identity(db, nominal_identity)
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -873,7 +923,12 @@ impl<'db> DataclassParams<'db> {
             })
             .collect::<Option<Box<_>>>()?;
 
-        Some(Self::new(db, self.flags(db), field_specifiers))
+        Some(Self::new(
+            db,
+            self.flags(db),
+            field_specifiers,
+            self.nominal_identity(db),
+        ))
     }
 }
 

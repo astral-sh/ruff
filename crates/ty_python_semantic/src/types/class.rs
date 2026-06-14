@@ -38,7 +38,7 @@ use crate::types::signatures::{
 };
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassParams,
+    ApplyTypeMappingVisitor, CallableType, CallableTypes, DataclassFlags, DataclassParams,
     FindLegacyTypeVarsVisitor, IntersectionType, TypeContext, TypeMapping, UnionBuilder,
     VarianceInferable,
 };
@@ -56,6 +56,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast};
 use ruff_text_size::TextRange;
 use ty_python_core::definition::Definition;
+use ty_python_core::scope::ScopeId;
 use ty_python_core::{place_table, use_def_map};
 
 mod dynamic_literal;
@@ -64,6 +65,114 @@ mod known;
 mod named_tuple;
 mod static_literal;
 mod typed_dict;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub struct DataclassApplicationId<'db> {
+    scope: ScopeId<'db>,
+    offset: u32,
+}
+
+impl<'db> DataclassApplicationId<'db> {
+    pub(crate) fn new(scope: ScopeId<'db>, offset: u32) -> Self {
+        Self { scope, offset }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
+pub enum NominalClassIdentityKind<'db> {
+    Original,
+    FreshDataclass(DataclassApplicationId<'db>),
+    MaybeFreshDataclass {
+        input: NominalClassIdentity<'db>,
+        application: DataclassApplicationId<'db>,
+    },
+}
+
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct NominalClassIdentity<'db> {
+    kind: NominalClassIdentityKind<'db>,
+}
+
+impl get_size2::GetSize for NominalClassIdentity<'_> {}
+
+impl<'db> NominalClassIdentity<'db> {
+    pub(crate) fn original(db: &'db dyn Db) -> Self {
+        Self::new(db, NominalClassIdentityKind::Original)
+    }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        flags: DataclassFlags,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        if !flags.contains(DataclassFlags::SLOTS_CREATE_NEW_CLASS) {
+            return self;
+        }
+
+        if flags.contains(DataclassFlags::SLOTS) {
+            Self::new(db, NominalClassIdentityKind::FreshDataclass(application))
+        } else if flags.contains(DataclassFlags::SLOTS_MAY_BE_TRUE) {
+            Self::new(
+                db,
+                NominalClassIdentityKind::MaybeFreshDataclass {
+                    input: self,
+                    application,
+                },
+            )
+        } else {
+            self
+        }
+    }
+
+    fn nominal_identity_with(self, db: &'db dyn Db, other: Self) -> NominalIdentity {
+        if self == other {
+            NominalIdentity::Same
+        } else if self.may_have_same_identity_as(db, other) {
+            NominalIdentity::PossiblySame
+        } else {
+            NominalIdentity::Distinct
+        }
+    }
+
+    fn may_have_same_identity_as(self, db: &'db dyn Db, other: Self) -> bool {
+        match self.kind(db) {
+            NominalClassIdentityKind::Original => other.may_be_original(db),
+            NominalClassIdentityKind::FreshDataclass(application) => {
+                other.may_be_dataclass_application(db, application)
+            }
+            NominalClassIdentityKind::MaybeFreshDataclass { input, application } => {
+                input.may_have_same_identity_as(db, other)
+                    || other.may_be_dataclass_application(db, application)
+            }
+        }
+    }
+
+    fn may_be_original(self, db: &'db dyn Db) -> bool {
+        match self.kind(db) {
+            NominalClassIdentityKind::Original => true,
+            NominalClassIdentityKind::FreshDataclass(_) => false,
+            NominalClassIdentityKind::MaybeFreshDataclass { input, .. } => {
+                input.may_be_original(db)
+            }
+        }
+    }
+
+    fn may_be_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> bool {
+        match self.kind(db) {
+            NominalClassIdentityKind::Original => false,
+            NominalClassIdentityKind::FreshDataclass(other) => application == other,
+            NominalClassIdentityKind::MaybeFreshDataclass {
+                input,
+                application: other,
+            } => application == other || input.may_be_dataclass_application(db, application),
+        }
+    }
+}
 
 /// A category of classes with code generation capabilities (with synthesized methods).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -269,6 +378,19 @@ impl<'db> GenericAlias<'db> {
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.origin(db).is_typed_dict(db)
     }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        let origin = self.origin(db).after_dataclass_application(db, application);
+        if origin == self.origin(db) {
+            self
+        } else {
+            Self::new(db, origin, self.specialization(db))
+        }
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -336,7 +458,66 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NominalIdentity {
+    Same,
+    Distinct,
+    PossiblySame,
+}
+
 impl<'db> ClassLiteral<'db> {
+    /// Return whether two class literals have the same nominal typing identity.
+    ///
+    /// Class metadata can change when a class decorator is called imperatively. The updated class
+    /// literal is a distinct interned value, but both literals still originate from the same class
+    /// definition and therefore have the same nominal identity for type relations. A dataclass
+    /// application with `slots=True` is an exception because it creates a new runtime class.
+    pub(crate) fn has_same_nominal_identity_as(self, db: &'db dyn Db, other: Self) -> bool {
+        self.nominal_identity_with(db, other) == NominalIdentity::Same
+    }
+
+    pub(crate) fn may_have_same_nominal_identity_as(self, db: &'db dyn Db, other: Self) -> bool {
+        self.nominal_identity_with(db, other) != NominalIdentity::Distinct
+    }
+
+    pub(crate) fn is_definitely_distinct_from(self, db: &'db dyn Db, other: Self) -> bool {
+        self.nominal_identity_with(db, other) == NominalIdentity::Distinct
+    }
+
+    fn nominal_identity_with(self, db: &'db dyn Db, other: Self) -> NominalIdentity {
+        if self == other {
+            return NominalIdentity::Same;
+        }
+
+        match (self, other) {
+            (Self::Static(left), Self::Static(right))
+                if left.body_scope(db) == right.body_scope(db) =>
+            {
+                left.nominal_identity(db)
+                    .nominal_identity_with(db, right.nominal_identity(db))
+            }
+            (Self::Dynamic(left), Self::Dynamic(right)) if left.anchor(db) == right.anchor(db) => {
+                left.nominal_identity(db)
+                    .nominal_identity_with(db, right.nominal_identity(db))
+            }
+            _ => NominalIdentity::Distinct,
+        }
+    }
+
+    pub(crate) fn after_dataclass_application(
+        self,
+        db: &'db dyn Db,
+        application: DataclassApplicationId<'db>,
+    ) -> Self {
+        match self {
+            Self::Static(class) => Self::Static(class.after_dataclass_application(db, application)),
+            Self::Dynamic(class) => {
+                Self::Dynamic(class.after_dataclass_application(db, application))
+            }
+            Self::DynamicNamedTuple(_) | Self::DynamicTypedDict(_) | Self::DynamicEnum(_) => self,
+        }
+    }
+
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
         KnownClass::Object
@@ -897,6 +1078,30 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    fn has_same_nominal_origin_as(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::NonGeneric(left), Self::NonGeneric(right)) => {
+                left.has_same_nominal_identity_as(db, right)
+            }
+            (Self::Generic(_), Self::Generic(_)) => self
+                .class_literal(db)
+                .has_same_nominal_identity_as(db, other.class_literal(db)),
+            _ => false,
+        }
+    }
+
+    fn may_have_same_nominal_origin_as(self, db: &'db dyn Db, other: Self) -> bool {
+        match (self, other) {
+            (Self::NonGeneric(left), Self::NonGeneric(right)) => {
+                left.may_have_same_nominal_identity_as(db, right)
+            }
+            (Self::Generic(_), Self::Generic(_)) => self
+                .class_literal(db)
+                .may_have_same_nominal_identity_as(db, other.class_literal(db)),
+            _ => false,
+        }
+    }
+
     /// Returns the underlying class literal and specialization, if any.
     ///
     /// For a non-generic class, this returns the class literal directly.
@@ -1008,7 +1213,10 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .any(|base| base.class_literal(db) == class_literal)
+            .any(|base| {
+                base.class_literal(db)
+                    .has_same_nominal_identity_as(db, class_literal)
+            })
     }
 
     pub(super) fn apply_type_mapping_impl<'a>(
@@ -1282,11 +1490,11 @@ impl<'db> ClassType<'db> {
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
             .any(|class| match (self, class) {
-                (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
-                    this_class == other_class
+                (ClassType::NonGeneric(_), ClassType::NonGeneric(_)) => {
+                    self.may_have_same_nominal_origin_as(db, class)
                 }
                 (ClassType::Generic(this_alias), ClassType::Generic(other_alias)) => {
-                    this_alias.origin(db) == other_alias.origin(db)
+                    self.may_have_same_nominal_origin_as(db, class)
                         && !specializations_are_disjoint(
                             this_alias.specialization(db),
                             other_alias.specialization(db),
@@ -1314,7 +1522,8 @@ impl<'db> ClassType<'db> {
             .filter_map(ClassType::into_generic_alias)
             .any(|self_alias| {
                 other_generic_bases.iter().any(|other_alias| {
-                    self_alias.origin(db) == other_alias.origin(db)
+                    ClassType::Generic(self_alias)
+                        .has_same_nominal_origin_as(db, ClassType::Generic(*other_alias))
                         && specializations_are_disjoint(
                             self_alias.specialization(db),
                             other_alias.specialization(db),
@@ -1384,6 +1593,24 @@ impl<'db> ClassType<'db> {
     ) -> bool {
         if self == other {
             return true;
+        }
+
+        match (self, other) {
+            (ClassType::NonGeneric(_), ClassType::NonGeneric(_))
+                if self.may_have_same_nominal_origin_as(db, other) =>
+            {
+                return true;
+            }
+            (ClassType::Generic(left), ClassType::Generic(right))
+                if self.may_have_same_nominal_origin_as(db, other)
+                    && !specializations_are_disjoint(
+                        left.specialization(db),
+                        right.specialization(db),
+                    ) =>
+            {
+                return true;
+            }
+            _ => {}
         }
 
         if self.is_final(db) {
@@ -2154,11 +2381,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         // Fast path: if source and target are the same class (possibly with different
         // specializations), we can compare them directly without walking the MRO.
         match (source, target) {
-            (ClassType::NonGeneric(source), ClassType::NonGeneric(target)) if source == target => {
+            (ClassType::NonGeneric(_), ClassType::NonGeneric(_))
+                if source.has_same_nominal_origin_as(db, target) =>
+            {
                 return self.always();
             }
             (ClassType::Generic(source_alias), ClassType::Generic(target_alias))
-                if source_alias.origin(db) == target_alias.origin(db) =>
+                if source.has_same_nominal_origin_as(db, target) =>
             {
                 return self.check_specialization_pair(
                     db,
@@ -2187,18 +2416,19 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
                 ClassBase::Class(source) => match (source, target) {
                     // Two non-generic classes match if they have the same class literal.
-                    (
-                        ClassType::NonGeneric(source_literal),
-                        ClassType::NonGeneric(target_literal),
-                    ) => {
-                        ConstraintSet::from_bool(self.constraints, source_literal == target_literal)
+                    (source @ ClassType::NonGeneric(_), target @ ClassType::NonGeneric(_)) => {
+                        ConstraintSet::from_bool(
+                            self.constraints,
+                            source.has_same_nominal_origin_as(db, target),
+                        )
                     }
 
                     // Two generic classes match if they have the same origin and compatible specializations.
                     (ClassType::Generic(source), ClassType::Generic(target)) => {
                         ConstraintSet::from_bool(
                             self.constraints,
-                            source.origin(db) == target.origin(db),
+                            ClassType::Generic(source)
+                                .has_same_nominal_origin_as(db, ClassType::Generic(target)),
                         )
                         .and(db, self.constraints, || {
                             self.check_specialization_pair(
