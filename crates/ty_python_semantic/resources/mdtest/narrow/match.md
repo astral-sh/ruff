@@ -1156,7 +1156,7 @@ nested pattern consumes that attribute's full static type. Positional patterns f
 
 ```py
 from collections.abc import Mapping, MutableMapping
-from typing import Literal, Protocol, TypedDict, final, runtime_checkable
+from typing import Literal, NamedTuple, Protocol, TypedDict, final, runtime_checkable
 
 def builtin_match_self_patterns_are_exhaustive(
     value: tuple[
@@ -1210,6 +1210,15 @@ def typed_dict_mutable_mapping_pattern_is_exhaustive(value: Movie) -> int:
 def typed_dict_match_self_pattern_is_exhaustive(value: Movie) -> int:
     match value:
         case dict(_):
+            return 1
+
+class NamedPoint(NamedTuple):
+    x: int
+    label: str
+
+def named_tuple_positional_pattern_is_exhaustive(value: NamedPoint) -> int:
+    match value:
+        case NamedPoint(_, _):
             return 1
 
 class MyInt(int): ...
