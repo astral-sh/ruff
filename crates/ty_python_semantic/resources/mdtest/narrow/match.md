@@ -423,6 +423,26 @@ def test_match_sequence_as_pattern_excludes_previous_cases(
             reveal_type(item)  # revealed: Literal[2]
 ```
 
+An earlier OR alternative must only be removed when every value of its type is certain to match.
+A protocol class pattern can still fail if a declared member is absent at runtime, so the later
+sequence alternative remains possible:
+
+```py
+from typing import Protocol, runtime_checkable
+
+@runtime_checkable
+class HasX(Protocol):
+    x: int
+
+class Values(list[str]):
+    x: int
+
+def test_or_binding_keeps_values_that_can_fail_a_class_pattern(value: Values) -> None:
+    match value:
+        case (HasX() as item) | [item]:
+            reveal_type(item)  # revealed: Values | str
+```
+
 ## Declared pattern captures
 
 A capture still has to satisfy an earlier declaration for the same name. This uses the same
