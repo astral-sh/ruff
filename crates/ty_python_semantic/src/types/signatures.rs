@@ -1016,6 +1016,25 @@ impl<'db> Signature<'db> {
     /// This is used to prune impossible overloads when a method is bound to a concrete receiver.
     /// If a signature has no positional first parameter, we conservatively keep it.
     pub(crate) fn can_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        self.self_binding_satisfies(db, self_type, false, |constraints| {
+            constraints.is_always_satisfied(db)
+        })
+    }
+
+    /// Returns `true` if this signature's first parameter might accept the bound `self` type.
+    pub(crate) fn can_possibly_bind_self_to(&self, db: &'db dyn Db, self_type: Type<'db>) -> bool {
+        self.self_binding_satisfies(db, self_type, true, |constraints| {
+            !constraints.is_never_satisfied(db)
+        })
+    }
+
+    fn self_binding_satisfies(
+        &self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        unresolved_is_compatible: bool,
+        predicate: impl for<'c> FnOnce(ConstraintSet<'db, 'c>) -> bool,
+    ) -> bool {
         // A dynamic receiver might be compatible with any explicit receiver annotation.
         if self_type.is_dynamic() {
             return true;
@@ -1066,16 +1085,20 @@ impl<'db> Signature<'db> {
                 return true;
             }
         }
+        if unresolved_is_compatible
+            && (expected_self_ty.has_dynamic(db)
+                || expected_self_ty.has_typevar_or_typevar_instance(db))
+        {
+            return true;
+        }
 
         let constraints = ConstraintSetBuilder::new();
-        self_type
-            .when_assignable_to(
-                db,
-                expected_self_ty,
-                &constraints,
-                self.inferable_typevars(db),
-            )
-            .is_always_satisfied(db)
+        predicate(self_type.when_assignable_to(
+            db,
+            expected_self_ty,
+            &constraints,
+            self.inferable_typevars(db),
+        ))
     }
 
     pub(crate) fn has_explicit_positional_receiver_annotation(&self) -> bool {

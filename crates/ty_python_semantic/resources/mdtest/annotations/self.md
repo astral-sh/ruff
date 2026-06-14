@@ -1052,7 +1052,7 @@ python-version = "3.12"
 ```py
 from __future__ import annotations
 
-from typing import final
+from typing import Callable, final
 
 @final
 class Disjoint: ...
@@ -1078,6 +1078,14 @@ ExplicitGeneric[int]().special()
 
 # TODO: this should be an `invalid-argument-type` error
 ExplicitGeneric[str]().special()
+
+class InvariantExplicitGeneric[T]:
+    value: T
+
+    def special(self: InvariantExplicitGeneric[int]) -> None: ...
+
+valid_callback: Callable[[], None] = InvariantExplicitGeneric[int]().special
+invalid_callback: Callable[[], None] = InvariantExplicitGeneric[str]().special  # error: [invalid-assignment]
 ```
 
 ## Binding a method fixes `Self`

@@ -109,6 +109,10 @@ impl<'db> BoundMethodType<'db> {
             );
         };
 
+        if !signature.can_possibly_bind_self_to(db, self.self_instance(db)) {
+            return CallableSignature::from_overloads([]);
+        }
+
         CallableSignature::single(signature.bind_self(db, Some(typing_self_type)))
     }
 
