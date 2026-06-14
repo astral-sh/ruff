@@ -263,7 +263,7 @@ def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
 ## Custom containment methods
 
 A custom `__contains__` method can return `True` for values that the class would never produce
-during iteration. We therefore retain every member of the subject's union:
+during iteration. We therefore retain broader members of the subject's union:
 
 ```py
 from collections.abc import Iterator
@@ -282,6 +282,15 @@ class ContainsEverything:
 def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"] | Payload
+
+def custom_contains_literal_domain(
+    x: Literal["present", "missing"],
+    values: ContainsEverything,
+):
+    if x in values:
+        # TODO: `x` can still be `Literal["present"]` because `values.__contains__` always
+        # returns `True`. The pre-existing finite-domain narrowing still uses the iterator type.
+        reveal_type(x)  # revealed: Literal["missing"]
 ```
 
 ## Final and non-final iterable classes
@@ -338,6 +347,35 @@ def inherited_builtin_contains(
 ):
     if x in values:
         reveal_type(x)  # revealed: Literal["missing"] | Payload
+```
+
+## Byte containment
+
+Unlike ordinary element-wise containment, `bytes` and `bytearray` accept objects with an `__index__`
+method as well as byte subsequences. Their iterator element type therefore cannot be used to remove
+broader union members:
+
+```py
+from typing import Literal, final
+
+@final
+class ByteIndex:
+    def __index__(self) -> int:
+        return 97
+
+def bytes_literal_contains_index(value: ByteIndex | Literal[97]) -> None:
+    if value in b"abc":
+        reveal_type(value)  # revealed: Literal[97] | ByteIndex
+
+@final
+class FinalBytearray(bytearray): ...
+
+def bytearray_contains_index(
+    value: ByteIndex | Literal[97],
+    values: FinalBytearray,
+) -> None:
+    if value in values:
+        reveal_type(value)  # revealed: Literal[97] | ByteIndex
 ```
 
 ## Custom containment methods on tuple subclasses

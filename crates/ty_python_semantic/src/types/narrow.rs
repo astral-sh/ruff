@@ -64,7 +64,6 @@ fn has_exact_builtin_membership_semantics(expr: &ast::Expr) -> bool {
     matches!(
         expr,
         ast::Expr::StringLiteral(_)
-            | ast::Expr::BytesLiteral(_)
             | ast::Expr::FString(_)
             | ast::Expr::Tuple(_)
             | ast::Expr::List(_)
@@ -93,9 +92,7 @@ fn can_filter_membership_union_arms<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
             .all(|element| can_filter_membership_union_arms(db, *element)),
         Type::LiteralValue(literal) => matches!(
             literal.kind(),
-            LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::LiteralString
-                | LiteralValueTypeKind::Bytes(_)
+            LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString
         ),
         Type::TypedDict(_) => true,
         Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
@@ -124,8 +121,6 @@ fn can_filter_membership_union_arms<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
                         class.known(db),
                         Some(
                             KnownClass::Str
-                                | KnownClass::Bytes
-                                | KnownClass::Bytearray
                                 | KnownClass::List
                                 | KnownClass::Set
                                 | KnownClass::FrozenSet
