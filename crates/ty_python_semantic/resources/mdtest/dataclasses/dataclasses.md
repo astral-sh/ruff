@@ -1924,19 +1924,42 @@ C(1) < C(2)  # ok
 
 ### Using `dataclass` as a function
 
+Calling `dataclass` with a class returns a class with a generated constructor:
+
 ```py
 from dataclasses import dataclass
 
-class B:
+class Point:
     x: int
 
-# error: [missing-argument]
-dataclass(B)()
+dataclass(Point)()  # error: [missing-argument]
+dataclass(Point)("one")  # error: [invalid-argument-type]
 
-# error: [invalid-argument-type]
-dataclass(B)("a")
+reveal_type(dataclass(Point)(1).x)  # revealed: int
+```
 
-reveal_type(dataclass(B)(3).x)  # revealed: int
+Options can be passed in the same call:
+
+```py
+class Ordered:
+    x: int
+
+ordered = dataclass(Ordered, order=True)
+
+ordered(1) < ordered(2)
+ordered("one")  # error: [invalid-argument-type]
+```
+
+Passing `None` explicitly returns a decorator that uses the supplied options:
+
+```py
+class Item:
+    x: int
+
+ordered_item = dataclass(None, order=True)(Item)
+
+reveal_type(ordered_item)  # revealed: <class 'Item'>
+ordered_item(1) < ordered_item(2)
 ```
 
 ## Internals

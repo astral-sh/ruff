@@ -4280,24 +4280,30 @@ impl<'db> Type<'db> {
                         decorator_factory_parameters.push(bool_parameter("weakref_slot", false));
                     }
 
+                    let parameters_with_cls = |cls_ty| {
+                        let mut parameters =
+                            Vec::with_capacity(decorator_factory_parameters.len() + 1);
+                        parameters.push(
+                            Parameter::positional_only(Some(Name::new_static("cls")))
+                                .with_annotated_type(cls_ty),
+                        );
+                        parameters.extend(decorator_factory_parameters.iter().cloned());
+                        parameters
+                    };
+
                     CallableBinding::from_overloads(
                         self,
                         [
-                            // def dataclass(cls: None, /) -> Callable[[type[_T]], type[_T]]: ...
+                            // def dataclass(cls: None, /, *, ...) -> Callable[[type[_T]], type[_T]]: ...
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static("cls")))
-                                        .with_annotated_type(Type::none(db))],
-                                ),
+                                Parameters::new(db, parameters_with_cls(Type::none(db))),
                                 Type::unknown(),
                             ),
-                            // def dataclass(cls: type[_T], /) -> type[_T]: ...
+                            // def dataclass(cls: type[_T], /, *, ...) -> type[_T]: ...
                             Signature::new(
                                 Parameters::new(
                                     db,
-                                    [Parameter::positional_only(Some(Name::new_static("cls")))
-                                        .with_annotated_type(KnownClass::Type.to_instance(db))],
+                                    parameters_with_cls(KnownClass::Type.to_instance(db)),
                                 ),
                                 Type::unknown(),
                             ),
