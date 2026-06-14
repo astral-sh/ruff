@@ -86,7 +86,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
-use crate::types::narrow::successful_pattern_analysis;
+use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
@@ -2368,8 +2368,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
-        let ty = successful_pattern_analysis(self.db(), predicate)
-            .binding_type(definition.place(self.db()));
+        let ty =
+            pattern_success_types(self.db(), predicate).binding_type(definition.place(self.db()));
         self.add_binding(pattern.into(), definition)
             .insert(self, ty);
     }
