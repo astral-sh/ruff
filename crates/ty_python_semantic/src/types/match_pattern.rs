@@ -417,11 +417,11 @@ fn subject_independent_definite_match_pattern_type<'db>(
                 _ => Some(Type::Never),
             }
         }
-        PatternPredicateKind::Sequence(kind) => kind
-            .patterns
-            .iter()
-            .all(|pattern| subject_independent_definite_match_pattern_type(db, pattern).is_some())
-            .then(|| definite_sequence_pattern_type(db, kind)),
+        PatternPredicateKind::Sequence(kind) => {
+            build_definite_sequence_pattern_type(db, kind, |pattern| {
+                subject_independent_definite_match_pattern_type(db, pattern)
+            })
+        }
         PatternPredicateKind::Or(patterns) => patterns
             .iter()
             .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
@@ -616,32 +616,47 @@ fn definite_sequence_pattern_type<'db>(
     db: &'db dyn Db,
     kind: &SequencePatternPredicateKind<'db>,
 ) -> Type<'db> {
+    build_definite_sequence_pattern_type(db, kind, |pattern| {
+        Some(definite_match_pattern_type(db, pattern))
+    })
+    .unwrap_or(Type::Never)
+}
+
+fn build_definite_sequence_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &SequencePatternPredicateKind<'db>,
+    mut element_type: impl FnMut(&PatternPredicateKind<'db>) -> Option<Type<'db>>,
+) -> Option<Type<'db>> {
     if kind.is_irrefutable() {
-        return sequence_pattern_type_builder(db).build();
+        return Some(sequence_pattern_type_builder(db).build());
     }
 
     if let Some((prefix, suffix)) = kind.split_around_star() {
-        return Type::tuple(TupleType::mixed(
+        let prefix_types = prefix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        let suffix_types = suffix
+            .iter()
+            .map(&mut element_type)
+            .collect::<Option<Vec<_>>>()?;
+        return Some(Type::tuple(TupleType::mixed(
             db,
-            prefix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
+            prefix_types,
             Type::object(),
-            suffix
-                .iter()
-                .map(|pattern| definite_match_pattern_type(db, pattern)),
-        ));
+            suffix_types,
+        )));
     }
 
     let element_types: Vec<_> = kind
         .patterns
         .iter()
-        .map(|pattern| definite_match_pattern_type(db, pattern))
-        .collect();
+        .map(element_type)
+        .collect::<Option<_>>()?;
 
     if element_types.iter().any(Type::is_never) {
-        Type::Never
+        Some(Type::Never)
     } else {
-        exact_sequence_pattern_type(db, element_types.into_iter())
+        Some(exact_sequence_pattern_type(db, element_types.into_iter()))
     }
 }
