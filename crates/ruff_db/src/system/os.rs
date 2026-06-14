@@ -6,7 +6,7 @@ use super::walk_directory::{
 };
 use crate::max_parallelism;
 use crate::system::{
-    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use filetime::FileTime;
@@ -25,8 +25,6 @@ pub struct OsSystem {
 struct OsSystemInner {
     cwd: SystemPathBuf,
 
-    case_sensitivity: CaseSensitivity,
-
     /// Overrides the user's configuration directory for testing.
     /// This is an `Option<Option<..>>` to allow setting an override of `None`.
     #[cfg(feature = "testing")]
@@ -38,10 +36,8 @@ impl OsSystem {
         let cwd = cwd.as_ref();
         assert!(cwd.as_utf8_path().is_absolute());
 
-        let case_sensitivity = detect_case_sensitivity(cwd);
-
         tracing::debug!(
-            "Architecture: {}, OS: {}, case-sensitive: {case_sensitivity}",
+            "Architecture: {}, OS: {}",
             std::env::consts::ARCH,
             std::env::consts::OS,
         );
@@ -50,7 +46,6 @@ impl OsSystem {
             // Spreading `..Default` because it isn't possible to feature gate the initializer of a single field.
             inner: Arc::new(OsSystemInner {
                 cwd: cwd.to_path_buf(),
-                case_sensitivity,
                 ..Default::default()
             }),
         }
@@ -114,10 +109,6 @@ impl System for OsSystem {
 
     fn path_exists(&self, path: &SystemPath) -> bool {
         path.as_std_path().exists()
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.inner.case_sensitivity
     }
 
     fn which(&self, name: &str) -> WhichResult {
@@ -475,45 +466,6 @@ pub(super) mod testing {
                 self.system.inner.user_config_directory_override.try_lock()
             {
                 *directory_override = self.previous.take();
-            }
-        }
-    }
-}
-
-#[cfg(not(unix))]
-fn detect_case_sensitivity(_path: &SystemPath) -> CaseSensitivity {
-    // 99% of windows systems aren't case sensitive Don't bother checking.
-    CaseSensitivity::Unknown
-}
-
-#[cfg(unix)]
-fn detect_case_sensitivity(path: &SystemPath) -> CaseSensitivity {
-    use std::os::unix::fs::MetadataExt;
-
-    let Ok(original_case_metadata) = path.as_std_path().metadata() else {
-        return CaseSensitivity::Unknown;
-    };
-
-    let upper_case = SystemPathBuf::from(path.as_str().to_uppercase());
-    if &*upper_case == path {
-        return CaseSensitivity::Unknown;
-    }
-
-    match upper_case.as_std_path().metadata() {
-        Ok(uppercase_meta) => {
-            // The file system is case insensitive if the upper case and mixed case paths have the same inode.
-            if uppercase_meta.ino() == original_case_metadata.ino() {
-                CaseSensitivity::CaseInsensitive
-            } else {
-                CaseSensitivity::CaseSensitive
-            }
-        }
-        // In the error case, the file system is case sensitive if the file in all upper case doesn't exist.
-        Err(error) => {
-            if error.kind() == std::io::ErrorKind::NotFound {
-                CaseSensitivity::CaseSensitive
-            } else {
-                CaseSensitivity::Unknown
             }
         }
     }

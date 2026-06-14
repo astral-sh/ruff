@@ -1047,15 +1047,15 @@ mod tests {
     }
 
     #[test]
-    fn nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
+    fn deeply_nested_file_does_not_invalidate_top_level_listing() -> anyhow::Result<()> {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("package/__init__.py", "")])
+            .with_src_files(&[("package/__init__.py", ""), ("package/sub/__init__.py", "")])
             .build();
 
         list_modules(&db);
         db.clear_salsa_events();
 
-        db.write_file(src.join("package/nested.py"), "")?;
+        db.write_file(src.join("package/sub/nested.py"), "")?;
         list_modules(&db);
 
         let events = db.take_salsa_events();

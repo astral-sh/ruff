@@ -39,6 +39,15 @@ impl DirectoryListing {
         }
     }
 
+    /// Returns whether `name` resolves to a directory, following symbolic links.
+    pub fn entry_is_directory(&self, db: &dyn Db, directory: &SystemPath, name: &str) -> bool {
+        match self.file_type(name) {
+            Some(FileType::Directory) => true,
+            Some(FileType::File) | None => false,
+            Some(FileType::Symlink) => db.system().is_directory(&directory.join(name)),
+        }
+    }
+
     /// Iterates over the entries in the directory in name order.
     pub fn iter(&self) -> impl Iterator<Item = (&str, FileType)> {
         self.0

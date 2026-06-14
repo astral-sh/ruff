@@ -4,8 +4,8 @@ use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
-    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WhichResult, WritableSystem,
+    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -402,10 +402,6 @@ impl System for MdtestSystem {
         path: &ruff_db::system::SystemVirtualPath,
     ) -> Result<Notebook, NotebookError> {
         self.as_system().read_virtual_path_to_notebook(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.as_system().case_sensitivity()
     }
 
     fn which(&self, name: &str) -> WhichResult {

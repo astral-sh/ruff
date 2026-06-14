@@ -1183,10 +1183,6 @@ fn resolve_name_impl<'a>(
 
     let mut next_candidates = Vec::new();
 
-    // FIXME?: because we have to search every candidate on each step of this loop,
-    // in theory we can search them all in parallel. However we need to join the parallelism
-    // at the end of each iteration, and after the first iteration in 99% of cases we will have
-    // reduced down to a single candidate, so maybe meh?
     for component in components {
         for mut candidate in cur_candidates.drain(..) {
             if !candidate_may_exist(&context, &candidate, component)
@@ -1353,12 +1349,7 @@ fn resolve_name_in_search_path(
     // simply skip this check which also helps performance. If typeshed
     // ever uses namespace packages, ensure that this check also takes the
     // `VERSIONS` file into consideration.
-    if !package_path.search_path().is_standard_library()
-        && package_path.is_directory(context)
-        && package_path
-            .to_system_path()
-            .is_none_or(|path| file_name_matches_case(context.db, &path))
-    {
+    if !package_path.search_path().is_standard_library() && package_path.is_directory(context) {
         candidate.py_typed = package_path
             .py_typed(context)
             .inherit_parent(candidate.py_typed);
@@ -1412,26 +1403,7 @@ pub(super) fn resolve_file_module(
             .and_then(|path| path.to_file(resolver_state))
     })?;
 
-    // Vendored and virtual file systems are case sensitive.
-    if let Some(path) = file.path(resolver_state.db).as_system_path()
-        && !file_name_matches_case(resolver_state.db, path)
-    {
-        return None;
-    }
-
     Some(file)
-}
-
-fn file_name_matches_case(db: &dyn Db, path: &SystemPath) -> bool {
-    if db.system().case_sensitivity().is_case_sensitive() {
-        return true;
-    }
-
-    let Some((parent, name)) = path.parent().zip(path.file_name()) else {
-        return true;
-    };
-
-    directory_listing(db, parent).is_ok_and(|listing| listing.file_type(name).is_some())
 }
 
 /// Determines whether a package is a legacy namespace package.
