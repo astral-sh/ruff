@@ -555,6 +555,7 @@ def falsy(value: Child) -> None:
 
 def union(value: Child | Other | None) -> None:
     if value:
+        reveal_type(value.values)  # revealed: list[Child] | list[Other]
         reveal_type(value.copy())  # revealed: Child | Other
 
 class Excluded: ...
@@ -563,6 +564,81 @@ def positive_truthiness(
     value: Intersection[Child, AlwaysTruthy, Not[Excluded]],
 ) -> None:
     reveal_type(value.copy())  # revealed: Child & ~Excluded
+
+def compound_negative(
+    value: Intersection[Child, Not[AlwaysFalsy | Excluded]],
+) -> None:
+    reveal_type(value.copy())  # revealed: Child & ~Excluded
+```
+
+Structural and value-level refinements are removed from `Self` bindings, while nominal constraints
+and generic specializations are preserved.
+
+```py
+from enum import Enum
+from typing import Protocol, Self, runtime_checkable
+from ty_extensions import Intersection
+
+class StableBase:
+    value: Self
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+class StableChild(StableBase): ...
+
+@runtime_checkable
+class WithName(Protocol):
+    name: str
+
+def explicit_intersection(value: Intersection[StableChild, WithName]) -> None:
+    reveal_type(value.value)  # revealed: StableChild
+    reveal_type(value.copy())  # revealed: StableChild
+    reveal_type(StableBase.copy(value))  # revealed: StableChild
+
+type NamedChild = Intersection[StableChild, WithName]
+
+def explicit_intersection_alias(value: NamedChild) -> None:
+    reveal_type(value.value)  # revealed: StableChild
+    reveal_type(value.copy())  # revealed: StableChild
+    reveal_type(StableBase.copy(value))  # revealed: StableChild
+
+def attribute_refinement(value: StableChild) -> None:
+    if hasattr(value, "name"):
+        reveal_type(value)  # revealed: StableChild & <Protocol with members 'name'>
+        reveal_type(value.value)  # revealed: StableChild
+        reveal_type(value.copy())  # revealed: StableChild
+        reveal_type(StableBase.copy(value))  # revealed: StableChild
+
+def protocol_refinement(value: StableChild) -> None:
+    if isinstance(value, WithName):
+        reveal_type(value)  # revealed: StableChild & WithName
+        reveal_type(value.value)  # revealed: StableChild
+        reveal_type(value.copy())  # revealed: StableChild
+        reveal_type(StableBase.copy(value))  # revealed: StableChild
+
+class Box[T]:
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+def generic_specialization(value: Box[int] | None) -> None:
+    if value:
+        reveal_type(value.copy())  # revealed: Box[int]
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+    def copy(self) -> Self:
+        raise NotImplementedError
+
+reveal_type(Color.RED.copy())  # revealed: Color
+reveal_type(Color.copy(Color.RED))  # revealed: Color
+
+def enum_complement(value: Color) -> None:
+    if value is not Color.RED:
+        reveal_type(value.copy())  # revealed: Color
 ```
 
 Self from class body annotations and method signatures represent the same logical type variable.

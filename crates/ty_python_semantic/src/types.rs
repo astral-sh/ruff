@@ -1136,7 +1136,7 @@ impl<'db> Type<'db> {
 
         self.apply_type_mapping(
             db,
-            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
+            &TypeMapping::BindSelf(SelfBinding::new(self_type, None)),
             TypeContext::default(),
         )
     }
@@ -7206,10 +7206,7 @@ fn self_typevar_owner_class_literal<'db>(
         .map(|class| class.class_literal(db))
 }
 
-/// Remove value-level truthiness refinements from a receiver before using it to bind `Self`.
-///
-/// A different instance returned through `Self` is not necessarily truthy or falsy just because
-/// the receiver was narrowed by a condition.
+/// Project a receiver type onto the facts that are stable across values represented by `Self`.
 ///
 /// ```python
 /// from typing import Self
@@ -7225,70 +7222,160 @@ fn self_typevar_owner_class_literal<'db>(
 ///     raise ValueError
 /// ```
 ///
-/// Here, `value` is narrowed to `Child & ~AlwaysFalsy`, but `copy` returns a different `Child`
-/// whose truthiness is unknown.
+/// Here, `value` is narrowed to `Child & ~AlwaysFalsy`, but `copy` can return a different `Child`
+/// whose truthiness is unknown. Similarly, a synthesized protocol produced by `hasattr` only
+/// describes the current value and must not become part of the `Self` specialization.
 ///
-/// Type aliases are preserved unless removing a refinement requires expanding their value type.
-fn self_binding_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    struct SelfBindingTypeTransformation;
+/// Nominal constraints are preserved because they describe the receiver's concrete subtype. A
+/// protocol constraint is only preserved when that protocol owns `Self`; unrelated structural
+/// constraints can describe instance state. Type aliases are preserved unless projection changes
+/// their value.
+fn self_type_projection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    owner_class: Option<ClassLiteral<'db>>,
+) -> Type<'db> {
+    struct SelfTypeProjection;
+    struct NegativeSelfTypeProjection;
+
+    #[derive(Default)]
+    struct ProjectionVisitors<'db> {
+        positive: TypeTransformer<'db, SelfTypeProjection>,
+        negative: CycleDetector<NegativeSelfTypeProjection, Type<'db>, Option<Type<'db>>>,
+    }
 
     fn transform<'db>(
         db: &'db dyn Db,
         ty: Type<'db>,
-        visitor: &TypeTransformer<'db, SelfBindingTypeTransformation>,
+        owner_class: Option<ClassLiteral<'db>>,
+        visitors: &ProjectionVisitors<'db>,
     ) -> Type<'db> {
-        visitor.visit_type(db, ty, || {
-            let intersection = match ty {
-                Type::TypeAlias(alias) => {
-                    let value_type = alias.value_type(db);
-                    let transformed = transform(db, value_type, visitor);
-                    return if transformed == value_type {
+        match ty {
+            Type::TypeAlias(alias) => visitors.positive.visit_type(db, ty, || {
+                let value_type = alias.value_type(db);
+                let transformed = transform(db, value_type, owner_class, visitors);
+                if transformed == value_type {
+                    ty
+                } else {
+                    transformed
+                }
+            }),
+            Type::Union(union) => union
+                .map_leave_aliases(db, |element| transform(db, *element, owner_class, visitors)),
+            Type::Intersection(intersection) => {
+                let mut builder = IntersectionBuilder::new(db);
+                for positive in intersection.positive(db) {
+                    builder = builder.add_positive(transform(db, *positive, owner_class, visitors));
+                }
+                for negative in intersection.negative(db) {
+                    if let Some(negative) = transform_negative(db, *negative, visitors) {
+                        builder = builder.add_negative(negative);
+                    }
+                }
+                builder.build()
+            }
+            Type::EnumComplement(complement) => {
+                transform(db, complement.to_intersection(db), owner_class, visitors)
+            }
+            Type::LiteralValue(literal) => literal.fallback_instance(db),
+            Type::ProtocolInstance(protocol) => {
+                let is_owner = owner_class.is_some_and(|owner_class| {
+                    protocol.to_nominal_instance().is_some_and(|instance| {
+                        instance
+                            .class(db)
+                            .is_subtype_of_class_literal(db, owner_class)
+                    })
+                });
+                if is_owner { ty } else { Type::object() }
+            }
+            Type::AlwaysTruthy | Type::AlwaysFalsy => Type::object(),
+            _ => ty,
+        }
+    }
+
+    fn transform_negative<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitors: &ProjectionVisitors<'db>,
+    ) -> Option<Type<'db>> {
+        // A widened negative constraint cannot be retained: `~Literal[1]`, for example, does not
+        // imply `~int`. Unions are decomposed because `~(A | B)` implies both `~A` and `~B`.
+        match ty {
+            Type::TypeAlias(alias) => visitors.negative.visit(ty, || {
+                let value_type = alias.value_type(db);
+                transform_negative(db, value_type, visitors).map(|transformed| {
+                    if transformed == value_type {
                         ty
                     } else {
                         transformed
-                    };
+                    }
+                })
+            }),
+            Type::Union(union) => {
+                let mut builder = UnionBuilder::new(db);
+                let mut retained = false;
+                for element in union.elements(db) {
+                    if let Some(element) = transform_negative(db, *element, visitors) {
+                        builder = builder.add(element);
+                        retained = true;
+                    }
                 }
-                Type::Union(union) => {
-                    return union.map_leave_aliases(db, |element| transform(db, *element, visitor));
-                }
-                Type::Intersection(intersection) => intersection,
-                _ => return ty,
-            };
-
-            let is_truthiness_refinement = |ty: &Type<'db>| {
-                matches!(
-                    ty.resolve_type_alias(db),
-                    Type::AlwaysTruthy | Type::AlwaysFalsy
-                )
-            };
-            if !intersection
+                retained.then(|| builder.build())
+            }
+            Type::Intersection(intersection) => intersection
                 .positive(db)
                 .iter()
                 .chain(intersection.negative(db))
-                .any(is_truthiness_refinement)
-            {
-                return ty;
-            }
+                .all(|element| transform_negative(db, *element, visitors) == Some(*element))
+                .then_some(ty),
+            Type::EnumComplement(_)
+            | Type::LiteralValue(_)
+            | Type::ProtocolInstance(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy => None,
+            _ => Some(ty),
+        }
+    }
 
-            intersection
-                .negative(db)
+    transform(db, ty, owner_class, &ProjectionVisitors::default())
+}
+
+/// Returns whether `self_type` can be proven to inherit from `owner_class`.
+///
+/// Unlike [`Type::nominal_class`], this can prove inheritance through a union or a positive
+/// intersection element without choosing a single nominal class for the entire type.
+fn self_type_inherits_owner<'db>(
+    db: &'db dyn Db,
+    self_type: Type<'db>,
+    owner_class: ClassLiteral<'db>,
+) -> bool {
+    struct SelfTypeOwnerCheck;
+
+    fn check<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        owner_class: ClassLiteral<'db>,
+        visitor: &CycleDetector<SelfTypeOwnerCheck, Type<'db>, bool>,
+    ) -> bool {
+        if let Some(class) = ty.nominal_class(db) {
+            return class.is_subtype_of_class_literal(db, owner_class);
+        }
+
+        visitor.visit(ty, || match ty {
+            Type::TypeAlias(alias) => check(db, alias.value_type(db), owner_class, visitor),
+            Type::Union(union) => union
+                .elements(db)
                 .iter()
-                .filter(|ty| !is_truthiness_refinement(ty))
-                .fold(
-                    IntersectionBuilder::new(db).positive_elements(
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .filter(|ty| !is_truthiness_refinement(ty))
-                            .copied(),
-                    ),
-                    |builder, negative| builder.add_negative(*negative),
-                )
-                .build()
+                .all(|element| check(db, *element, owner_class, visitor)),
+            Type::Intersection(intersection) => intersection
+                .positive(db)
+                .iter()
+                .any(|element| check(db, *element, owner_class, visitor)),
+            _ => false,
         })
     }
 
-    transform(db, ty, &TypeTransformer::default())
+    check(db, self_type, owner_class, &CycleDetector::new(false))
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
@@ -7310,7 +7397,6 @@ fn class_mro_literals<'db>(
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
-    class_literal: Option<ClassLiteral<'db>>,
     binding_context: Option<BindingContext<'db>>,
 }
 
@@ -7325,47 +7411,44 @@ impl<'db> SelfBinding<'db> {
 }
 
 impl<'db> SelfBinding<'db> {
-    pub(crate) fn new(
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
-    ) -> Self {
-        let self_type = self_binding_type(db, self_type);
-        let class_literal = match self_type {
-            Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
-                self_typevar_owner_class_literal(db, typevar)
-            }
-            _ => self_type
-                .nominal_class(db)
-                .map(|class| class.class_literal(db)),
-        };
-
+    pub(crate) fn new(self_type: Type<'db>, binding_context: Option<BindingContext<'db>>) -> Self {
         Self {
             ty: self_type,
-            class_literal,
             binding_context,
         }
     }
 
-    /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
-    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
+    /// Returns the projected receiver type if it can bind `bound_typevar`.
+    fn binding_type(
+        &self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+    ) -> Option<Type<'db>> {
         if !bound_typevar.typevar(db).is_self(db) {
-            return false;
+            return None;
         }
+
+        let owner_class = self_typevar_owner_class_literal(db, bound_typevar);
+        let self_type = self_type_projection(db, self.ty, owner_class);
 
         // Fast path for the common method-signature case where the bound `Self`
         // carries the same binding context as this mapping.
         if self.binding_context == Some(bound_typevar.binding_context(db)) {
-            return true;
+            return Some(self_type);
         }
 
-        // Check that the Self typevar's owner class is in the MRO of the self type's class.
-        // If we can't determine either class, conservatively don't bind.
-        self.class_literal.is_some_and(|class_literal| {
-            let class_mro = class_mro_literals(db, class_literal);
-            self_typevar_owner_class_literal(db, bound_typevar)
-                .is_none_or(|owner_class| class_mro.contains(&owner_class))
-        })
+        let class_literal = self_type
+            .nominal_class(db)
+            .map(|class| class.class_literal(db));
+        let inherits_owner = match (class_literal, owner_class) {
+            (Some(class_literal), owner_class) => owner_class.is_none_or(|owner_class| {
+                class_mro_literals(db, class_literal).contains(&owner_class)
+            }),
+            (None, Some(owner_class)) => self_type_inherits_owner(db, self_type, owner_class),
+            (None, None) => false,
+        };
+
+        inherits_owner.then_some(self_type)
     }
 }
 

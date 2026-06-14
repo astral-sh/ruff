@@ -32,7 +32,8 @@ use crate::types::{
     ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType, KnownClass, KnownInstanceType,
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
-    infer_definition_types, inferred_declaration, self_binding_type,
+    infer_definition_types, inferred_declaration, self_type_projection,
+    self_typevar_owner_class_literal,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2664,8 +2665,13 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
                 if bound_typevar.is_inferable(self.db, self.inferable) =>
             {
+                let argument = ty;
                 let ty = if bound_typevar.typevar(self.db).is_self(self.db) {
-                    self_binding_type(self.db, ty)
+                    self_type_projection(
+                        self.db,
+                        ty,
+                        self_typevar_owner_class_literal(self.db, bound_typevar),
+                    )
                 } else {
                     ty
                 };
@@ -2691,7 +2697,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         {
                             return Err(SpecializationError::MismatchedBound {
                                 bound_typevar,
-                                argument: ty,
+                                argument,
                             });
                         }
                         self.add_type_mapping(bound_typevar, ty, polarity);
@@ -2763,7 +2769,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
                         }
                         return Err(SpecializationError::MismatchedConstraint {
                             bound_typevar,
-                            argument: ty,
+                            argument,
                         });
                     }
                     _ => self.add_type_mapping(bound_typevar, ty, polarity),

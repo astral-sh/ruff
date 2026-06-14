@@ -1077,13 +1077,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                     }
                 })
                 .unwrap_or(Type::TypeVar(self)),
-            TypeMapping::BindSelf(binding) => {
-                if binding.should_bind(db, self) {
-                    binding.self_type()
-                } else {
-                    Type::TypeVar(self)
-                }
-            }
+            TypeMapping::BindSelf(binding) => binding
+                .binding_type(db, self)
+                .unwrap_or(Type::TypeVar(self)),
             TypeMapping::ReplaceSelf { new_upper_bound } => {
                 if self.typevar(db).is_self(db) {
                     Type::TypeVar(BoundTypeVarInstance::synthetic_self(
