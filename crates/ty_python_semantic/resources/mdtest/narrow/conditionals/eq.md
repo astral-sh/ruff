@@ -269,10 +269,10 @@ def _(answer: IndependentEquality):
         reveal_type(answer)  # revealed: IndependentEquality
 ```
 
-## Equality between concrete runtime classes
+## Known built-in equality behavior
 
-Types such as `bool`, `LiteralString`, and `TypedDict` correspond to specific runtime classes.
-Equality with another instance of the same runtime class can therefore eliminate `None`:
+For `bool`, `LiteralString`, and `TypedDict`, ty knows which built-in equality implementation is
+used. Comparing two values with the same known behavior can therefore eliminate `None`:
 
 ```py
 from typing import TypedDict
