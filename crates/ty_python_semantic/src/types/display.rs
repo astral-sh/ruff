@@ -33,9 +33,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     CallableType, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
     LiteralValueType, LiteralValueTypeKind, MaterializationKind, PropertyInstanceType, Protocol,
-    ProtocolInstanceType, RecursiveTypeNormalization, SpecialFormType, StringLiteralType,
-    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
+    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
 use ty_python_core::definition::Definition;
 use ty_python_core::scope::{FileScopeId, ScopeKind};
@@ -1031,13 +1030,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 {
                     return f.with_type(marker).write_str("Divergent");
                 }
-                let body = r
-                    .body_with_origin_marker(self.db)
-                    .recursive_type_normalized_impl(
-                        self.db,
-                        RecursiveTypeNormalization::new(marker),
-                    )
-                    .unwrap_or(marker);
+                let body = r.body_with_origin_marker(self.db);
                 body.display_with(self.db, self.settings.with_recursive_type_binder(binder_id))
                     .fmt_detailed(f)
             }
