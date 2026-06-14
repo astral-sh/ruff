@@ -403,6 +403,22 @@ class D:
 D.f()
 ```
 
+When constructing a `classmethod` fails, we preserve the error but recover the descriptor's generic
+specialization. This prevents the unresolved type variables from causing additional errors when the
+attribute is accessed or called:
+
+```py
+class FormatChecker:
+    def checks(self, format, raises=()):
+        return lambda function: function
+
+    # error: [invalid-argument-type] "Argument to `classmethod.__init__` is incorrect"
+    cls_checks = classmethod(checks)
+
+reveal_type(FormatChecker.cls_checks)  # revealed: (...) -> Unknown
+FormatChecker.cls_checks("email", (ValueError,))
+```
+
 When a class method is accessed on a derived class, it is bound to that derived class:
 
 ```py

@@ -208,11 +208,19 @@ impl<'db> ConstructorBinding<'db> {
             .apply_optional_specialization(db, self.instance_return_specialization(db))
     }
 
-    fn first_matching_overload(&self) -> Option<&Binding<'db>> {
-        self.callable()
+    fn first_matching_or_only_overload(&self) -> Option<&Binding<'db>> {
+        let callable = self.callable();
+        callable
             .matching_overloads()
             .map(|(_, overload)| overload)
             .next()
+            // An invalid call to a non-overloaded constructor still has an unambiguous
+            // specialization. Use it to recover the constructed instance type instead of
+            // leaking the generic class's type variables into downstream expressions.
+            .or_else(|| match callable.overloads() {
+                [overload] => Some(overload),
+                _ => None,
+            })
     }
 
     /// Combine inferred specializations from this constructor and downstream constructors. The
@@ -233,7 +241,7 @@ impl<'db> ConstructorBinding<'db> {
 
         let mut combined: Option<Specialization<'db>> = None;
         let mut combine_binding_specialization = |binding: &ConstructorBinding<'db>| {
-            let Some(overload) = binding.first_matching_overload() else {
+            let Some(overload) = binding.first_matching_or_only_overload() else {
                 return;
             };
             let return_specialization = static_class_literal

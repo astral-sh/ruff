@@ -1236,6 +1236,21 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+An invalid call to a non-overloaded constructor still has an unambiguous generic specialization. We
+preserve it while reporting the argument error:
+
+```py
+from typing import Generic, TypeVar
+
+U = TypeVar("U")
+
+class FallibleBox(Generic[U]):
+    def __init__(self, value: U, count: int) -> None: ...
+
+# error: [invalid-argument-type]
+reveal_type(FallibleBox("value", "bad"))  # revealed: FallibleBox[str]
+```
+
 ## Generic constructor inference from overloaded `__init__` self types
 
 ```py
