@@ -496,7 +496,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     }
 
     let truthiness =
-        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty);
+        analyze_single_pattern_predicate_kind(db, predicate.kind(db), narrowed_subject_ty, None);
 
     if truthiness == Truthiness::AlwaysTrue && predicate.guard(db).is_some() {
         // Fall back to ambiguous, the guard might change the result.
@@ -979,6 +979,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
     db: &'db dyn Db,
     predicate_kind: &PatternPredicateKind<'db>,
     subject_ty: Type<'db>,
+    precomputed_definite_match_ty: Option<Type<'db>>,
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
@@ -1020,7 +1021,12 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     if narrowed_subject_ty.is_subtype_of(db, definitely_matched) {
                         Truthiness::AlwaysTrue
                     } else {
-                        analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
+                        analyze_single_pattern_predicate_kind(
+                            db,
+                            p,
+                            narrowed_subject_ty,
+                            Some(definitely_matched),
+                        )
                     }
                 })
                 // this is just a "max", but with a slight optimization:
@@ -1047,8 +1053,9 @@ fn analyze_single_pattern_predicate_kind<'db>(
                     }
                     _ => return Truthiness::Ambiguous,
                 };
-            let definitely_matched =
-                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty);
+            let definitely_matched = precomputed_definite_match_ty.unwrap_or_else(|| {
+                definite_match_pattern_type_for_subject(db, predicate_kind, subject_ty)
+            });
 
             if subject_ty.is_equivalent_to(db, definitely_matched)
                 || subject_ty.is_subtype_of(db, definitely_matched)
@@ -1090,7 +1097,14 @@ fn analyze_single_pattern_predicate_kind<'db>(
         }
         PatternPredicateKind::As(pattern, _) => pattern
             .as_deref()
-            .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
+            .map(|p| {
+                analyze_single_pattern_predicate_kind(
+                    db,
+                    p,
+                    subject_ty,
+                    precomputed_definite_match_ty,
+                )
+            })
             .unwrap_or(Truthiness::AlwaysTrue),
         PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }
