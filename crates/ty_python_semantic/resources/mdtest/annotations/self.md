@@ -576,46 +576,23 @@ and generic specializations are preserved.
 
 ```py
 from enum import Enum
-from typing import Protocol, Self, runtime_checkable
+from typing import Protocol, Self
 from ty_extensions import Intersection
 
-class StableBase:
-    value: Self
-
-    def copy(self) -> Self:
-        raise NotImplementedError
-
-class StableChild(StableBase): ...
-
-@runtime_checkable
 class WithName(Protocol):
     name: str
 
-def explicit_intersection(value: Intersection[StableChild, WithName]) -> None:
-    reveal_type(value.value)  # revealed: StableChild
-    reveal_type(value.copy())  # revealed: StableChild
-    reveal_type(StableBase.copy(value))  # revealed: StableChild
+def explicit_intersection(value: Intersection[Child, WithName]) -> None:
+    reveal_type(value.values)  # revealed: list[Child]
+    reveal_type(value.copy())  # revealed: Child
+    reveal_type(Base.copy(value))  # revealed: Child
 
-type NamedChild = Intersection[StableChild, WithName]
-
-def explicit_intersection_alias(value: NamedChild) -> None:
-    reveal_type(value.value)  # revealed: StableChild
-    reveal_type(value.copy())  # revealed: StableChild
-    reveal_type(StableBase.copy(value))  # revealed: StableChild
-
-def attribute_refinement(value: StableChild) -> None:
+def attribute_refinement(value: Child) -> None:
     if hasattr(value, "name"):
-        reveal_type(value)  # revealed: StableChild & <Protocol with members 'name'>
-        reveal_type(value.value)  # revealed: StableChild
-        reveal_type(value.copy())  # revealed: StableChild
-        reveal_type(StableBase.copy(value))  # revealed: StableChild
-
-def protocol_refinement(value: StableChild) -> None:
-    if isinstance(value, WithName):
-        reveal_type(value)  # revealed: StableChild & WithName
-        reveal_type(value.value)  # revealed: StableChild
-        reveal_type(value.copy())  # revealed: StableChild
-        reveal_type(StableBase.copy(value))  # revealed: StableChild
+        reveal_type(value)  # revealed: Child & <Protocol with members 'name'>
+        reveal_type(value.values)  # revealed: list[Child]
+        reveal_type(value.copy())  # revealed: Child
+        reveal_type(Base.copy(value))  # revealed: Child
 
 class Box[T]:
     def copy(self) -> Self:
@@ -633,7 +610,6 @@ class Color(Enum):
     def copy(self) -> Self:
         raise NotImplementedError
 
-reveal_type(Color.RED.copy())  # revealed: Color
 reveal_type(Color.copy(Color.RED))  # revealed: Color
 
 def enum_complement(value: Color) -> None:

@@ -1124,8 +1124,7 @@ impl<'db> Type<'db> {
 
     /// Bind `Self` type variables in this type to a concrete self type.
     ///
-    /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
-    /// is in the MRO of the self type's class.
+    /// A `Self` typevar is only bound if the projected receiver is a subtype of its owner.
     ///
     /// Types that defer `Self` binding to call time (functions, bound methods, function-like
     /// callables) are skipped; see `supports_self_binding`.
@@ -7313,14 +7312,12 @@ fn self_type_projection<'db>(
             }),
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
-                let mut retained = false;
                 for element in union.elements(db) {
                     if let Some(element) = transform_negative(db, *element, visitors) {
                         builder = builder.add(element);
-                        retained = true;
                     }
                 }
-                retained.then(|| builder.build())
+                (!builder.is_empty()).then(|| builder.build())
             }
             Type::Intersection(intersection) => intersection
                 .positive(db)
@@ -7340,60 +7337,9 @@ fn self_type_projection<'db>(
     transform(db, ty, owner_class, &ProjectionVisitors::default())
 }
 
-/// Returns whether `self_type` can be proven to inherit from `owner_class`.
-///
-/// Unlike [`Type::nominal_class`], this can prove inheritance through a union or a positive
-/// intersection element without choosing a single nominal class for the entire type.
-fn self_type_inherits_owner<'db>(
-    db: &'db dyn Db,
-    self_type: Type<'db>,
-    owner_class: ClassLiteral<'db>,
-) -> bool {
-    struct SelfTypeOwnerCheck;
-
-    fn check<'db>(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        owner_class: ClassLiteral<'db>,
-        visitor: &CycleDetector<SelfTypeOwnerCheck, Type<'db>, bool>,
-    ) -> bool {
-        if let Some(class) = ty.nominal_class(db) {
-            return class.is_subtype_of_class_literal(db, owner_class);
-        }
-
-        visitor.visit(ty, || match ty {
-            Type::TypeAlias(alias) => check(db, alias.value_type(db), owner_class, visitor),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|element| check(db, *element, owner_class, visitor)),
-            Type::Intersection(intersection) => intersection
-                .positive(db)
-                .iter()
-                .any(|element| check(db, *element, owner_class, visitor)),
-            _ => false,
-        })
-    }
-
-    check(db, self_type, owner_class, &CycleDetector::new(false))
-}
-
-#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-fn class_mro_literals<'db>(
-    db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
-) -> Box<[ClassLiteral<'db>]> {
-    class_literal
-        .iter_mro(db)
-        .filter_map(ClassBase::into_class)
-        .map(|class| class.class_literal(db))
-        .collect()
-}
-
 /// Information needed to bind `Self` typevars to a concrete type.
 ///
-/// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
-/// is in the MRO of the self type's class.
+/// A `Self` typevar is only bound if the projected receiver is a subtype of its owner.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub struct SelfBinding<'db> {
     ty: Type<'db>,
@@ -7437,18 +7383,15 @@ impl<'db> SelfBinding<'db> {
             return Some(self_type);
         }
 
-        let class_literal = self_type
-            .nominal_class(db)
-            .map(|class| class.class_literal(db));
-        let inherits_owner = match (class_literal, owner_class) {
-            (Some(class_literal), owner_class) => owner_class.is_none_or(|owner_class| {
-                class_mro_literals(db, class_literal).contains(&owner_class)
-            }),
-            (None, Some(owner_class)) => self_type_inherits_owner(db, self_type, owner_class),
+        match (self_type.nominal_class(db), owner_class) {
+            (Some(class), Some(owner_class)) => class.is_subtype_of_class_literal(db, owner_class),
+            (None, Some(owner_class)) => {
+                self_type.is_subtype_of(db, owner_class.to_non_generic_instance(db))
+            }
+            (Some(_), None) => true,
             (None, None) => false,
-        };
-
-        inherits_owner.then_some(self_type)
+        }
+        .then_some(self_type)
     }
 }
 
