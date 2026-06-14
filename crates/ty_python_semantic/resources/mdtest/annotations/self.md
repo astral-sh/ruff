@@ -529,6 +529,9 @@ class Base:
     def copy(self) -> Self:
         raise NotImplementedError
 
+    def replace(self, other: Self) -> None:
+        raise NotImplementedError
+
     def preserve[T](self: Intersection[Self, T]) -> T:
         raise NotImplementedError
 
@@ -571,21 +574,24 @@ def compound_negative(
     reveal_type(value.copy())  # revealed: Child & ~Excluded
 ```
 
-Structural and value-level refinements are removed from `Self` bindings, while nominal constraints
-and generic specializations are preserved.
+Value-level refinements and synthesized structural refinements are removed from `Self` bindings,
+while nominal constraints, declared protocols, and generic specializations are preserved.
 
 ```py
+from collections.abc import Callable, Iterable
 from enum import Enum
-from typing import Protocol, Self
+from typing import Self
 from ty_extensions import Intersection
 
-class WithName(Protocol):
-    name: str
-
-def explicit_intersection(value: Intersection[Child, WithName]) -> None:
-    reveal_type(value.values)  # revealed: list[Child]
-    reveal_type(value.copy())  # revealed: Child
-    reveal_type(Base.copy(value))  # revealed: Child
+def declared_protocol(
+    value: Intersection[Child, Iterable[str | type | None]],
+    other: Intersection[Child, Iterable[str | type | None]],
+) -> None:
+    reveal_type(value.values)  # revealed: list[Child & Iterable[str | type | None]]
+    reveal_type(value.copy())  # revealed: Child & Iterable[str | type | None]
+    reveal_type(Base.copy(value))  # revealed: Child & Iterable[str | type | None]
+    value.replace(other)
+    callback: Callable[[Child], None] = value.replace  # error: [invalid-assignment]
 
 def attribute_refinement(value: Child) -> None:
     if hasattr(value, "name"):

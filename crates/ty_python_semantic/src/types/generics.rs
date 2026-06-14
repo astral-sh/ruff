@@ -33,7 +33,6 @@ use crate::types::{
     MaterializationKind, Type, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
     TypeVarKind, TypeVarVariance, UnionAccumulator, UnionType, binding_type,
     infer_definition_types, inferred_declaration, self_type_projection,
-    self_typevar_owner_class_literal,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
 use ty_python_core::definition::{Definition, DefinitionKind};
@@ -2667,11 +2666,7 @@ impl<'db, 'c> SpecializationBuilder<'db, 'c> {
             {
                 let argument = ty;
                 let ty = if bound_typevar.typevar(self.db).is_self(self.db) {
-                    self_type_projection(
-                        self.db,
-                        ty,
-                        self_typevar_owner_class_literal(self.db, bound_typevar),
-                    )
+                    self_type_projection(self.db, ty)
                 } else {
                     ty
                 };
