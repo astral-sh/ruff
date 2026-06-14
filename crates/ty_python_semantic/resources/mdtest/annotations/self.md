@@ -521,7 +521,7 @@ Regression test for <https://github.com/astral-sh/ty/issues/3755>.
 
 ```py
 from typing import Self
-from ty_extensions import AlwaysTruthy, Intersection, Not
+from ty_extensions import AlwaysFalsy, AlwaysTruthy, Intersection, Not
 
 class Base:
     values: list[Self]
@@ -542,6 +542,12 @@ def truthy(value: Child | None) -> list[Child]:
         reveal_type(value.preserve())  # revealed: Child & ~AlwaysFalsy
         return value.values
     raise ValueError
+
+type TruthyChild = Intersection[Child, Not[AlwaysFalsy]]
+
+def type_alias(value: TruthyChild) -> None:
+    reveal_type(value.copy())  # revealed: Child
+    reveal_type(Base.copy(value))  # revealed: Child
 
 def falsy(value: Child) -> None:
     if not value:

@@ -7227,39 +7227,68 @@ fn self_typevar_owner_class_literal<'db>(
 ///
 /// Here, `value` is narrowed to `Child & ~AlwaysFalsy`, but `copy` returns a different `Child`
 /// whose truthiness is unknown.
+///
+/// Type aliases are preserved unless removing a refinement requires expanding their value type.
 fn self_binding_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    let intersection = match ty {
-        Type::Union(union) => return union.map(db, |element| self_binding_type(db, *element)),
-        Type::Intersection(intersection) => intersection,
-        _ => return ty,
-    };
+    struct SelfBindingTypeTransformation;
 
-    let is_truthiness_refinement =
-        |ty: &Type<'db>| matches!(ty, Type::AlwaysTruthy | Type::AlwaysFalsy);
-    if !intersection
-        .positive(db)
-        .iter()
-        .chain(intersection.negative(db))
-        .any(is_truthiness_refinement)
-    {
-        return ty;
+    fn transform<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        visitor: &TypeTransformer<'db, SelfBindingTypeTransformation>,
+    ) -> Type<'db> {
+        visitor.visit_type(db, ty, || {
+            let intersection = match ty {
+                Type::TypeAlias(alias) => {
+                    let value_type = alias.value_type(db);
+                    let transformed = transform(db, value_type, visitor);
+                    return if transformed == value_type {
+                        ty
+                    } else {
+                        transformed
+                    };
+                }
+                Type::Union(union) => {
+                    return union.map_leave_aliases(db, |element| transform(db, *element, visitor));
+                }
+                Type::Intersection(intersection) => intersection,
+                _ => return ty,
+            };
+
+            let is_truthiness_refinement = |ty: &Type<'db>| {
+                matches!(
+                    ty.resolve_type_alias(db),
+                    Type::AlwaysTruthy | Type::AlwaysFalsy
+                )
+            };
+            if !intersection
+                .positive(db)
+                .iter()
+                .chain(intersection.negative(db))
+                .any(is_truthiness_refinement)
+            {
+                return ty;
+            }
+
+            intersection
+                .negative(db)
+                .iter()
+                .filter(|ty| !is_truthiness_refinement(ty))
+                .fold(
+                    IntersectionBuilder::new(db).positive_elements(
+                        intersection
+                            .positive(db)
+                            .iter()
+                            .filter(|ty| !is_truthiness_refinement(ty))
+                            .copied(),
+                    ),
+                    |builder, negative| builder.add_negative(*negative),
+                )
+                .build()
+        })
     }
 
-    intersection
-        .negative(db)
-        .iter()
-        .filter(|ty| !is_truthiness_refinement(ty))
-        .fold(
-            IntersectionBuilder::new(db).positive_elements(
-                intersection
-                    .positive(db)
-                    .iter()
-                    .filter(|ty| !is_truthiness_refinement(ty))
-                    .copied(),
-            ),
-            |builder, negative| builder.add_negative(*negative),
-        )
-        .build()
+    transform(db, ty, &TypeTransformer::default())
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
