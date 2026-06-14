@@ -60,8 +60,8 @@ pub(crate) fn sequence_pattern_type_builder(db: &dyn Db) -> IntersectionBuilder<
 /// Return whether every value in `subject_ty` is statically guaranteed to match this class pattern.
 ///
 /// Attribute subpatterns are checked recursively against their statically known member types. A
-/// proper non-final subtype remains refutable because it can override attribute access, while a
-/// final subtype can supply members absent from the class named in the pattern.
+/// non-final subclass can override attribute access, so the pattern is not guaranteed to match it.
+/// A final subclass can provide members that are absent from the class named in the pattern.
 ///
 /// ```python
 /// class Base: ...
@@ -91,7 +91,7 @@ fn class_pattern_is_exhaustive(
         return true;
     }
 
-    let is_proper_non_final_subtype = if is_typed_dict_match {
+    let subject_is_non_final_subclass = if is_typed_dict_match {
         false
     } else {
         let Some(subject_class) = subject_ty.nominal_class(db) else {
@@ -103,9 +103,9 @@ fn class_pattern_is_exhaustive(
 
     // TODO: A non-final subject class also admits subclasses that can override attribute access.
     // Decide whether it should remain exhaustive under the static member model or be treated like
-    // a proper non-final subtype.
+    // a non-final subclass of the class named in the pattern.
     if kind.is_argumentless() {
-        return !is_proper_non_final_subtype;
+        return !subject_is_non_final_subclass;
     }
 
     let positional_sources =
@@ -114,7 +114,7 @@ fn class_pattern_is_exhaustive(
         || positional_sources
             .iter()
             .any(|source| !matches!(source, ClassPatternPositionalSource::MatchSelf));
-    if is_proper_non_final_subtype && (is_protocol || extracts_attribute) {
+    if subject_is_non_final_subclass && (is_protocol || extracts_attribute) {
         return false;
     }
 
@@ -305,15 +305,22 @@ fn sequence_pattern_is_exhaustive_for_subject(
 ///
 /// This is an under-approximation used for negative narrowing and ordered alternatives: callers
 /// may subtract the result from `subject_ty` under ty's static member model. A subject-independent
-/// pattern can return a type wider than `subject_ty`; for example, `case object()` returns `object`
-/// even for an `int` subject. Class patterns need the current subject type when a proper non-final
-/// subtype is conservative, while an exact or final subtype can make member extraction exhaustive.
+/// pattern can return a type wider than `subject_ty`; for example, `case Base()` returns `Base`
+/// even for a `Child` subject. Class patterns need the current subject type when the subject is a
+/// non-final subclass, while an exact or final class can make member extraction exhaustive.
 /// This treats access to a definitely bound descriptor as successful even though the descriptor
 /// could raise at runtime. The same rule is propagated through nested sequence, `or`, and `as`
 /// patterns.
 ///
 /// ```python
-/// # For a `tuple[Child]` subject, this evaluates the class pattern against `Child`, not `Base`.
+/// class Base:
+///     x: int
+///
+/// @final
+/// class Child(Base):
+///     pass
+///
+/// # For a `tuple[Child]` subject, this checks `x` on `Child`, not only on `Base`.
 /// case [Base(x=_)]: ...
 /// ```
 pub(crate) fn definite_match_pattern_type_for_subject<'db>(
@@ -395,8 +402,8 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
 /// Return the definite-match type when it does not depend on the current subject type.
 ///
 /// `None` means that callers must use subject-aware analysis instead of falling back to the
-/// context-free approximation. In particular, protocol and attribute class patterns can be
-/// refutable for a proper non-final subtype even when static subtyping says otherwise.
+/// context-free approximation. In particular, protocol and attribute class patterns are not
+/// guaranteed to match a non-final subclass even when static subtyping says otherwise.
 fn subject_independent_definite_match_pattern_type<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
