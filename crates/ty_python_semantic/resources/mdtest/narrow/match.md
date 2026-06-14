@@ -784,9 +784,12 @@ def test_match_class_capture_filters_union_members(
 ```
 
 A name is bound only when the complete class pattern succeeds. If a later subpattern cannot match,
-an earlier capture has type `Never`:
+an earlier capture has type `Never`. A missing attribute rejects a final-class alternative, while a
+non-final class remains possible because a subclass can provide the attribute:
 
 ```py
+from typing import final
+
 class ImpossibleClassPattern:
     __match_args__ = ("first", "second")
     first: str
@@ -798,6 +801,25 @@ def test_later_class_pattern_failure_rejects_earlier_capture(
     match value:
         case ImpossibleClassPattern(item, int()):
             reveal_type(item)  # revealed: Never
+
+@final
+class MissingClassPatternAttribute: ...
+
+def test_missing_final_class_attribute_rejects_or_alternative(
+    value: MissingClassPatternAttribute | int,
+) -> None:
+    match value:
+        case MissingClassPatternAttribute(missing=item) | (int() as item):
+            reveal_type(item)  # revealed: int
+
+class NonFinalMissingClassPatternAttribute: ...
+
+def test_missing_non_final_class_attribute_preserves_or_alternative(
+    value: NonFinalMissingClassPatternAttribute | int,
+) -> None:
+    match value:
+        case NonFinalMissingClassPatternAttribute(missing=item) | (int() as item):
+            reveal_type(item)  # revealed: Unknown | int
 
 def test_match_class_or_pattern_filters_union_members(
     value: TaggedPayload[Literal["int"], int] | TaggedPayload[Literal["str"], str] | TaggedPayload[Literal["bool"], bool],

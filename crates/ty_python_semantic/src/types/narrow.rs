@@ -1416,22 +1416,24 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         kind: &ClassPatternPredicateKind<'db>,
         context: &ClassPatternContext<'db>,
         subject_ty: Type<'db>,
-    ) -> Vec<Type<'db>> {
+    ) -> Option<Vec<Type<'db>>> {
+        let subject_is_final = subject_ty
+            .nominal_class(self.db)
+            .is_some_and(|class| class.is_final(self.db));
         let member_type = |name: &Name| {
-            subject_ty
-                .member(self.db, name.as_str())
-                .place
+            let place = subject_ty.member(self.db, name.as_str()).place;
+            place
                 .ignore_possibly_undefined()
-                .unwrap_or_else(Type::unknown)
+                .or_else(|| (!subject_is_final).then_some(Type::unknown()))
         };
 
         context
             .positional_sources
             .iter()
             .map(|source| match source {
-                ClassPatternPositionalSource::MatchSelf => subject_ty,
+                ClassPatternPositionalSource::MatchSelf => Some(subject_ty),
                 ClassPatternPositionalSource::Attribute(name) => member_type(name),
-                ClassPatternPositionalSource::Unknown => Type::unknown(),
+                ClassPatternPositionalSource::Unknown => Some(Type::unknown()),
             })
             .chain(
                 kind.keywords
@@ -1477,8 +1479,11 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 return None;
             }
 
-            let argument_types =
-                analyzer.class_pattern_argument_types_for_arm(kind, &context, narrowed_subject_ty);
+            let argument_types = analyzer.class_pattern_argument_types_for_arm(
+                kind,
+                &context,
+                narrowed_subject_ty,
+            )?;
             let mut bindings = BTreeMap::new();
             for (pattern, argument_ty) in kind
                 .positional
