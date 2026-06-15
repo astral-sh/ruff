@@ -23,7 +23,8 @@ use crate::{
         type_form::walk_typeform_type,
         typed_dict::walk_typed_dict_type,
         typevar::{TypeVarInstance, walk_bound_type_var_type, walk_type_var_type},
-        walk_cycle_marked_type, walk_property_instance_type, walk_typeguard_type, walk_typeis_type,
+        walk_bodyful_divergent_type, walk_property_instance_type, walk_typeguard_type,
+        walk_typeis_type,
     },
 };
 use std::cell::{Cell, RefCell};
@@ -135,8 +136,8 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_recursive_type(&self, _db: &'db dyn Db, _recursive: RecursiveType<'db>) {}
 
-    fn visit_cycle_marked_type(&self, db: &'db dyn Db, marked: DivergentType<'db>) {
-        walk_cycle_marked_type(db, marked, self);
+    fn visit_bodyful_divergent_type(&self, db: &'db dyn Db, marked: DivergentType<'db>) {
+        walk_bodyful_divergent_type(db, marked, self);
     }
 }
 
@@ -304,7 +305,7 @@ pub(crate) fn walk_type_with_recursion_guard<'db>(
         if recursion_guard.type_was_already_seen(ty) {
             return;
         }
-        visitor.visit_cycle_marked_type(db, divergent);
+        visitor.visit_bodyful_divergent_type(db, divergent);
         return;
     }
 

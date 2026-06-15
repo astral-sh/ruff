@@ -6,7 +6,7 @@ use crate::{
     Db, FxOrderSet,
     place::Place,
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, CycleMarkable, DivergentType,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DivergentMarkable, DivergentType,
         FindLegacyTypeVarsVisitor, FunctionType, InternedType, KnownBoundMethodType, KnownClass,
         KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, Parameter, Parameters,
         RecursiveTypeNormalization, Signature, SubclassOfInner, Type, TypeContext, TypeMapping,
@@ -739,13 +739,13 @@ impl<'db> Foldable<'db> for CallableType<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for CallableType<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for CallableType<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         let signatures = CallableSignature::from_overloads(
             self.signatures(db).overloads.iter().map(|signature| {
                 signature
                     .clone()
-                    .with_return_type(signature.return_ty.mark_cycle(db, marked))
+                    .with_return_type(signature.return_ty.mark_divergent(db, marked))
             }),
         );
         CallableType::new(db, signatures, self.kind(db), self.provenance(db))
@@ -758,9 +758,9 @@ impl<'db> Foldable<'db> for CallableTypes<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for CallableTypes<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
-        self.map(|callable| callable.mark_cycle(db, marked))
+impl<'db> DivergentMarkable<'db> for CallableTypes<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+        self.map(|callable| callable.mark_divergent(db, marked))
     }
 }
 

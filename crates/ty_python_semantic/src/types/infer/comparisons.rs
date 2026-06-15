@@ -10,9 +10,9 @@ use crate::types::cyclic::CycleDetector;
 use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::tuple::TupleSpec;
 use crate::types::{
-    CycleMarkable, DivergentType, DynamicType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy, Type,
-    TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
+    DivergentMarkable, DivergentType, DynamicType, IntersectionBuilder, IntersectionType,
+    KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder,
 };
 use ty_python_core::Truthiness;
 
@@ -122,12 +122,12 @@ impl<'db> Foldable<'db> for UnsupportedComparisonError<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for UnsupportedComparisonError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for UnsupportedComparisonError<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
             op: self.op,
-            left_ty: self.left_ty.mark_cycle(db, marked),
-            right_ty: self.right_ty.mark_cycle(db, marked),
+            left_ty: self.left_ty.mark_divergent(db, marked),
+            right_ty: self.right_ty.mark_divergent(db, marked),
         }
     }
 }

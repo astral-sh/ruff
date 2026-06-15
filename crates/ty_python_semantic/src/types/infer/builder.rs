@@ -10304,7 +10304,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (_, Type::Divergent(divergent)) if let Some(inner) = divergent.body(self.db()) => {
                 let binder_id = divergent.binder_id(self.db());
                 let inferred = self.infer_unary_expression_type(op, inner, unary);
-                Type::cycle_marked(self.db(), binder_id, inferred)
+                Type::divergent_with_body(self.db(), binder_id, inferred)
             }
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
             | (_, Type::Divergent(_)) => operand_type,

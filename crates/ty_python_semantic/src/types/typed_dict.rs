@@ -1,4 +1,4 @@
-use crate::types::{CycleMarkable, DivergentType, RecursiveTypeNormalization};
+use crate::types::{DivergentMarkable, DivergentType, RecursiveTypeNormalization};
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, btree_map::Entry};
 use std::ops::{Deref, DerefMut};
@@ -189,10 +189,10 @@ impl<'db> Foldable<'db> for TypedDictExtraItems<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for TypedDictExtraItems<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for TypedDictExtraItems<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
-            declared_ty: self.declared_ty.mark_cycle(db, marked),
+            declared_ty: self.declared_ty.mark_divergent(db, marked),
             is_read_only: self.is_read_only,
         }
     }
@@ -210,11 +210,11 @@ impl<'db> Foldable<'db> for TypedDictOpenness<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for TypedDictOpenness<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for TypedDictOpenness<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::Extra(extra_items) => {
-                let extra_items = extra_items.mark_cycle(db, marked);
+                let extra_items = extra_items.mark_divergent(db, marked);
                 Self::extra(db, extra_items.declared_ty, extra_items.is_read_only)
             }
             Self::ImplicitlyOpen | Self::Closed => self,
@@ -1648,10 +1648,10 @@ impl<'db> Foldable<'db> for UnpackedTypedDictKey<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for UnpackedTypedDictKey<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for UnpackedTypedDictKey<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
-            value_ty: self.value_ty.mark_cycle(db, marked),
+            value_ty: self.value_ty.mark_divergent(db, marked),
             is_required: self.is_required,
             definition: self.definition,
         }
@@ -1682,11 +1682,11 @@ impl<'db> Foldable<'db> for UnpackedTypedDict<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for UnpackedTypedDict<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for UnpackedTypedDict<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
-            keys: self.keys.mark_cycle(db, marked),
-            openness: self.openness.mark_cycle(db, marked),
+            keys: self.keys.mark_divergent(db, marked),
+            openness: self.openness.mark_divergent(db, marked),
         }
     }
 }

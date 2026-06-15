@@ -316,7 +316,7 @@ impl ClassInfoConstraintFunction {
                     },
                 }
             }
-            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => {
                 self.generate_constraint(db, marked.inner(db), is_positive)
             }
             Type::Dynamic(_) | Type::Divergent(_) => Some(classinfo),
@@ -789,10 +789,10 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| could_compare_equal(db, left_ty, unfolded))
         }
-        (Type::Divergent(divergent), _) if let Some(marked) = divergent.as_cycle_marked(db) => {
+        (Type::Divergent(divergent), _) if let Some(marked) = divergent.as_bodyful(db) => {
             marked.map(db, |inner| could_compare_equal(db, inner, right_ty))
         }
-        (_, Type::Divergent(divergent)) if let Some(marked) = divergent.as_cycle_marked(db) => {
+        (_, Type::Divergent(divergent)) if let Some(marked) = divergent.as_bodyful(db) => {
             marked.map(db, |inner| could_compare_equal(db, left_ty, inner))
         }
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
@@ -1133,7 +1133,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 Self::narrow_type_by_len(db, unfolded, is_positive)
             }),
-            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => {
                 marked.map(db, |inner| Self::narrow_type_by_len(db, inner, is_positive))
             }
             Type::Intersection(intersection) => {
@@ -1189,11 +1189,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
                 Self::narrow_type_by_exact_len(db, unfolded, length, is_equality)
             }),
-            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => {
-                marked.map(db, |inner| {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => marked
+                .map(db, |inner| {
                     Self::narrow_type_by_exact_len(db, inner, length, is_equality)
-                })
-            }
+                }),
             Type::Intersection(intersection) => intersection.map_positive(db, |element| {
                 Self::narrow_type_by_exact_len(db, *element, length, is_equality)
             }),
@@ -2806,7 +2805,7 @@ fn narrow_attribute_union<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             narrow_attribute_union(db, unfolded, should_keep)
         }),
-        Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => {
+        Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => {
             marked.map(db, |inner| narrow_attribute_union(db, inner, should_keep))
         }
         _ => ty,
@@ -2830,7 +2829,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Recursive(rec) if !rec.is_non_contractive(db) => {
             rec.map(db, |unfolded| is_or_contains_typeddict(db, unfolded))
         }
-        Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => {
+        Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => {
             marked.map(db, |inner| is_or_contains_typeddict(db, inner))
         }
         Type::Dynamic(_)
@@ -3017,7 +3016,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
             all_matching_typeddict_fields_have_literal_types(db, unfolded, field_name)
         }),
-        Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(db) => marked
+        Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => marked
             .map(db, |inner| {
                 all_matching_typeddict_fields_have_literal_types(db, inner, field_name)
             }),

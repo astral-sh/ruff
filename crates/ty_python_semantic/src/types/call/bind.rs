@@ -60,12 +60,12 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, CycleMarkable, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DivergentType,
-    DynamicType, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
-    list_members,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DivergentMarkable,
+    DivergentType, DynamicType, GenericAlias, InternedConstraintSet, IntersectionType,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members,
     recursive::{Foldable, RecursiveType},
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
@@ -1134,7 +1134,7 @@ impl<'db> Bindings<'db> {
             return_ty = Self::drop_top_level_recursive_return_marker(db, return_ty, *rec);
         }
         for marked in &self.deferred_return_type_marks {
-            return_ty = return_ty.mark_cycle(db, *marked);
+            return_ty = return_ty.mark_divergent(db, *marked);
         }
         return_ty
     }
@@ -2800,9 +2800,9 @@ impl<'db> Foldable<'db> for Bindings<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for Bindings<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
-        let mut bindings = self.fields_mapped(&mut |ty| ty.mark_cycle(db, marked));
+impl<'db> DivergentMarkable<'db> for Bindings<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+        let mut bindings = self.fields_mapped(&mut |ty| ty.mark_divergent(db, marked));
         bindings.deferred_return_type_marks.push(marked);
         bindings
     }

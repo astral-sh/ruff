@@ -1166,7 +1166,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 self.always()
             }
 
-            // Handle provisional cycle markers before the normal structural cases. If a matching
+            // Handle bodyful `Divergent` markers before the normal structural cases. If a matching
             // `Type::Recursive` is already active, `check_divergent_type_pair` restores it;
             // otherwise `Divergent` keeps its relation-specific gradual fallback.
             (Type::Divergent(divergent), _) if let Some(body) = divergent.body(db) => {

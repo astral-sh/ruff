@@ -320,9 +320,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         match (left_ty, right_ty, op) {
-            (Type::Divergent(divergent), rhs, _)
-                if let Some(marked) = divergent.as_cycle_marked(db) =>
-            {
+            (Type::Divergent(divergent), rhs, _) if let Some(marked) = divergent.as_bodyful(db) => {
                 visitor.visit((left_ty, op, right_ty), || {
                     Some(marked.map(db, |inner| {
                         self.infer_binary_expression_type_impl(
@@ -337,9 +335,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }))
                 })
             }
-            (lhs, Type::Divergent(divergent), _)
-                if let Some(marked) = divergent.as_cycle_marked(db) =>
-            {
+            (lhs, Type::Divergent(divergent), _) if let Some(marked) = divergent.as_bodyful(db) => {
                 visitor.visit((left_ty, op, right_ty), || {
                     Some(marked.map(db, |inner| {
                         self.infer_binary_expression_type_impl(
@@ -413,7 +409,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Some(if inferred.is_dynamic(db) {
                         Type::divergent(db, binder_id)
                     } else {
-                        Type::cycle_marked(db, binder_id, inferred)
+                        Type::divergent_with_body(db, binder_id, inferred)
                     })
                 })
             }
@@ -434,7 +430,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Some(if inferred.is_dynamic(db) {
                         Type::divergent(db, binder_id)
                     } else {
-                        Type::cycle_marked(db, binder_id, inferred)
+                        Type::divergent_with_body(db, binder_id, inferred)
                     })
                 })
             }

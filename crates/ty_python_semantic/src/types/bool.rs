@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::{
     Db,
     types::{
-        CallArguments, CallDunderError, ClassType, CycleDetector, CycleMarkable, DivergentType,
+        CallArguments, CallDunderError, ClassType, CycleDetector, DivergentMarkable, DivergentType,
         KnownClass, KnownInstanceType, LiteralValueTypeKind, SubclassOfInner, Type, TypeContext,
         TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
@@ -394,8 +394,8 @@ impl<'db> Foldable<'db> for Truthiness {
     }
 }
 
-impl<'db> CycleMarkable<'db> for Truthiness {
-    fn mark_cycle(self, _db: &'db dyn Db, _marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for Truthiness {
+    fn mark_divergent(self, _db: &'db dyn Db, _marked: DivergentType<'db>) -> Self {
         self
     }
 }
@@ -431,32 +431,34 @@ impl<'db> Foldable<'db> for BoolError<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for BoolError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for BoolError<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::NotCallable { not_boolable_type } => Self::NotCallable {
-                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+                not_boolable_type: not_boolable_type.mark_divergent(db, marked),
             },
             Self::IncorrectArguments {
                 not_boolable_type,
                 truthiness,
             } => Self::IncorrectArguments {
-                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+                not_boolable_type: not_boolable_type.mark_divergent(db, marked),
                 truthiness,
             },
             Self::IncorrectReturnType {
                 not_boolable_type,
                 return_type,
             } => Self::IncorrectReturnType {
-                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
-                return_type: return_type.mark_cycle(db, marked),
+                not_boolable_type: not_boolable_type.mark_divergent(db, marked),
+                return_type: return_type.mark_divergent(db, marked),
             },
-            Self::Union { union, truthiness } => match Type::Union(union).mark_cycle(db, marked) {
-                Type::Union(union) => Self::Union { union, truthiness },
-                not_boolable_type => Self::Other { not_boolable_type },
-            },
+            Self::Union { union, truthiness } => {
+                match Type::Union(union).mark_divergent(db, marked) {
+                    Type::Union(union) => Self::Union { union, truthiness },
+                    not_boolable_type => Self::Other { not_boolable_type },
+                }
+            }
             Self::Other { not_boolable_type } => Self::Other {
-                not_boolable_type: not_boolable_type.mark_cycle(db, marked),
+                not_boolable_type: not_boolable_type.mark_divergent(db, marked),
             },
         }
     }

@@ -1,7 +1,7 @@
 use crate::{
     Db,
     types::{
-        AwaitError, Bindings, CallArguments, CallDunderError, CycleMarkable, DivergentType,
+        AwaitError, Bindings, CallArguments, CallDunderError, DivergentMarkable, DivergentType,
         KnownClass, LintDiagnosticGuard, LintDiagnosticGuardBuilder, LiteralValueTypeKind, Type,
         TypeContext, TypeVarBoundOrConstraints, UnionType,
         call::CallErrorKind,
@@ -534,9 +534,9 @@ impl<'db> Foldable<'db> for Cow<'db, TupleSpec<'db>> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for Cow<'db, TupleSpec<'db>> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
-        Cow::Owned(self.into_owned().mark_cycle(db, marked))
+impl<'db> DivergentMarkable<'db> for Cow<'db, TupleSpec<'db>> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+        Cow::Owned(self.into_owned().mark_divergent(db, marked))
     }
 }
 
@@ -580,8 +580,8 @@ impl<'db> Foldable<'db> for IterationError<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for IterationError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for IterationError<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::IterCallError {
                 kind,
@@ -589,7 +589,7 @@ impl<'db> CycleMarkable<'db> for IterationError<'db> {
                 mode,
             } => Self::IterCallError {
                 kind,
-                bindings: bindings.mark_cycle(db, marked),
+                bindings: bindings.mark_divergent(db, marked),
                 mode,
             },
             Self::IterReturnsInvalidIterator {
@@ -597,8 +597,8 @@ impl<'db> CycleMarkable<'db> for IterationError<'db> {
                 dunder_error,
                 mode,
             } => Self::IterReturnsInvalidIterator {
-                iterator: iterator.mark_cycle(db, marked),
-                dunder_error: dunder_error.mark_cycle(db, marked),
+                iterator: iterator.mark_divergent(db, marked),
+                dunder_error: dunder_error.mark_divergent(db, marked),
                 mode,
             },
             Self::PossiblyUnboundIterAndGetitemError {
@@ -606,14 +606,14 @@ impl<'db> CycleMarkable<'db> for IterationError<'db> {
                 unbound_on_iter,
                 dunder_getitem_error,
             } => Self::PossiblyUnboundIterAndGetitemError {
-                dunder_next_return: dunder_next_return.mark_cycle(db, marked),
-                unbound_on_iter: unbound_on_iter.mark_cycle(db, marked),
-                dunder_getitem_error: dunder_getitem_error.mark_cycle(db, marked),
+                dunder_next_return: dunder_next_return.mark_divergent(db, marked),
+                unbound_on_iter: unbound_on_iter.mark_divergent(db, marked),
+                dunder_getitem_error: dunder_getitem_error.mark_divergent(db, marked),
             },
             Self::UnboundIterAndGetitemError {
                 dunder_getitem_error,
             } => Self::UnboundIterAndGetitemError {
-                dunder_getitem_error: dunder_getitem_error.mark_cycle(db, marked),
+                dunder_getitem_error: dunder_getitem_error.mark_divergent(db, marked),
             },
             Self::UnboundAiterError => Self::UnboundAiterError,
         }

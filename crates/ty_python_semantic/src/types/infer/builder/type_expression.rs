@@ -1641,7 +1641,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Infer slice as a value expression to avoid false-positive
                 // `invalid-type-form` diagnostics, when we have e.g.
                 // `MyCallable[[int, str], None]` but `MyCallable` is dynamic.
-                // A `Recursive` cycle marker must pass through unchanged (like `Divergent`):
+                // A `Recursive` binder marker must pass through unchanged (like `Divergent`):
                 // losing it to `Unknown` here breaks fixed-point convergence for a self-referential
                 // generic alias (`Rec = dict[K, "Rec[K]"]`), causing the definition cycle to diverge.
                 if !self.in_string_annotation() {

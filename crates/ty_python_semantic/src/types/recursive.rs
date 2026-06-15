@@ -116,7 +116,7 @@ impl<'db> RecursiveOrigin<'db> {
                 let kept: Vec<Type<'db>> = elements
                     .iter()
                     .copied()
-                    .filter(|ty| !ty.is_top_level_cycle_marker(db, marker))
+                    .filter(|ty| !ty.is_top_level_divergent_marker(db, marker))
                     .collect();
 
                 if kept.len() == elements.len() {

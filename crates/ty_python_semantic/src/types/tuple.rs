@@ -28,7 +28,7 @@ use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::relation::{DisjointnessChecker, TypeRelationChecker};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, CycleMarkable, DivergentType, ErrorContext,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, DivergentMarkable, DivergentType, ErrorContext,
     FindLegacyTypeVarsVisitor, IntersectionType, Type, TypeContext, TypeMapping, UnionBuilder,
     UnionType,
 };
@@ -1572,9 +1572,9 @@ impl<'db> Tuple<Type<'db>> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for Tuple<Type<'db>> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
-        self.map_elements(|ty| ty.mark_cycle(db, marked))
+impl<'db> DivergentMarkable<'db> for Tuple<Type<'db>> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+        self.map_elements(|ty| ty.mark_divergent(db, marked))
     }
 }
 

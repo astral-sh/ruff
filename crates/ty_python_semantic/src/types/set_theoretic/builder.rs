@@ -294,7 +294,7 @@ impl CycleFusionOverlay {
         let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate);
         let overlaid = overlaid?;
         let marker_id = overlay.single_divergent_id()?;
-        Some(Type::cycle_marked(db, marker_id, overlaid))
+        Some(Type::divergent_with_body(db, marker_id, overlaid))
     }
 
     fn add_divergent_id(&self, id: salsa::Id) {
@@ -372,7 +372,7 @@ impl CycleFusionOverlay {
                 }
 
                 // If both sides are finite, keep both possibilities. The enclosing
-                // `CycleMarked` carries the cycle information rather than either branch.
+                // bodyful `Divergent` carries the recursion marker rather than either branch.
                 let marker_summary = CycleFusionSummary::collect(db, marker);
                 let finite_summary = CycleFusionSummary::collect(db, finite);
                 if marker_summary.is_finite_cycle_fusion_target()
@@ -1135,7 +1135,7 @@ impl<'db> UnionBuilder<'db> {
         }
     }
 
-    fn cycle_marked_represents_same_type(
+    fn bodyful_divergent_represents_same_type(
         db: &'db dyn Db,
         relation_simplification: RelationSimplification,
         preferred: Type<'db>,
@@ -1143,16 +1143,16 @@ impl<'db> UnionBuilder<'db> {
     ) -> bool {
         // `Divergent(id, Some(T))` and `T` are equivalent, but the marked representative
         // must survive so later cycle recovery can still see the binder.
-        if !preferred.contains_cycle_marked(db) {
+        if !preferred.contains_bodyful_divergent(db) {
             return false;
         }
-        let other_contains_cycle_marked = other.contains_cycle_marked(db);
-        let preferred = preferred.erase_cycle_marks(db);
-        let other = other.erase_cycle_marks(db);
+        let other_contains_bodyful_divergent = other.contains_bodyful_divergent(db);
+        let preferred = preferred.erase_divergent_markers(db);
+        let other = other.erase_divergent_markers(db);
         if preferred == other {
             return true;
         }
-        !other_contains_cycle_marked
+        !other_contains_bodyful_divergent
             && relation_simplification.allows_relation(db, preferred, other)
             && (preferred.is_equivalent_to(db, other)
                 || preferred.is_assignable_to(db, other) && other.is_assignable_to(db, preferred))
@@ -1171,7 +1171,7 @@ impl<'db> UnionBuilder<'db> {
         CycleFusionOverlay::build(db, marker_candidate, finite_candidate)
     }
 
-    fn merge_matching_cycle_marked(
+    fn merge_matching_bodyful_divergent(
         db: &'db dyn Db,
         left: Type<'db>,
         right: Type<'db>,
@@ -1184,7 +1184,7 @@ impl<'db> UnionBuilder<'db> {
         }
 
         match (left.body(db), right.body(db)) {
-            (Some(left_body), Some(right_body)) => Some(Type::cycle_marked(
+            (Some(left_body), Some(right_body)) => Some(Type::divergent_with_body(
                 db,
                 left.binder_id(db),
                 UnionType::from_elements_cycle_recovery(db, [left_body, right_body]),
@@ -1458,7 +1458,7 @@ impl<'db> UnionBuilder<'db> {
                     .map(|element| Self::widen_dynamic_origin_in_type(db, *element, origin)),
             ),
             Type::Divergent(divergent) if let Some(body) = divergent.body(db) => {
-                Type::cycle_marked(
+                Type::divergent_with_body(
                     db,
                     divergent.binder_id(db),
                     Self::widen_dynamic_origin_in_type(db, body, origin),
@@ -2333,7 +2333,8 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if let Some(merged) = Self::merge_matching_cycle_marked(self.db, ty, element_type) {
+            if let Some(merged) = Self::merge_matching_bodyful_divergent(self.db, ty, element_type)
+            {
                 to_remove.push(i);
                 ty = merged;
                 continue;
@@ -2364,7 +2365,7 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if Self::cycle_marked_represents_same_type(
+            if Self::bodyful_divergent_represents_same_type(
                 self.db,
                 relation_simplification,
                 ty,
@@ -2374,7 +2375,7 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if Self::cycle_marked_represents_same_type(
+            if Self::bodyful_divergent_represents_same_type(
                 self.db,
                 relation_simplification,
                 element_type,
@@ -2497,7 +2498,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
 
-        // `μα.α` still acts as a gradual cycle marker unless the bare `α`
+        // `μα.α` still acts as a gradual recursion marker unless the bare `α`
         // marker is also present. Only remove the redundant wrapper.
         if !cycle_recovery {
             let divergent_ids: Vec<_> = types
@@ -2546,7 +2547,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
-    cycle_markers: FxOrderSet<DivergentType<'db>>,
+    divergent_markers: FxOrderSet<DivergentType<'db>>,
     db: &'db dyn Db,
 }
 
@@ -2555,7 +2556,7 @@ impl<'db> IntersectionBuilder<'db> {
         Self {
             db,
             intersections: vec![InnerIntersectionBuilder::default()],
-            cycle_markers: FxOrderSet::default(),
+            divergent_markers: FxOrderSet::default(),
         }
     }
 
@@ -2563,7 +2564,7 @@ impl<'db> IntersectionBuilder<'db> {
         Self {
             db,
             intersections: vec![],
-            cycle_markers: FxOrderSet::default(),
+            divergent_markers: FxOrderSet::default(),
         }
     }
 
@@ -2597,8 +2598,8 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_positive_impl(body, seen_recursive_binders)
             }
-            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(self.db) => {
-                self.cycle_markers.insert(marked);
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(self.db) => {
+                self.divergent_markers.insert(marked);
                 let inner = marked.inner(self.db);
                 self.add_positive_impl(inner, seen_recursive_binders)
             }
@@ -2620,7 +2621,7 @@ impl<'db> IntersectionBuilder<'db> {
                     })
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
-                        builder.cycle_markers.extend(sub.cycle_markers);
+                        builder.divergent_markers.extend(sub.divergent_markers);
                         builder
                     })
             }
@@ -2675,8 +2676,8 @@ impl<'db> IntersectionBuilder<'db> {
                 let body = rec.body_with_origin_marker(self.db);
                 self.add_negative_impl(body, seen_recursive_binders)
             }
-            Type::Divergent(divergent) if let Some(marked) = divergent.as_cycle_marked(self.db) => {
-                self.cycle_markers.insert(marked);
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(self.db) => {
+                self.divergent_markers.insert(marked);
                 let inner = marked.inner(self.db);
                 self.add_negative_impl(inner, seen_recursive_binders)
             }
@@ -2716,7 +2717,7 @@ impl<'db> IntersectionBuilder<'db> {
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
                         builder.intersections.extend(sub.intersections);
-                        builder.cycle_markers.extend(sub.cycle_markers);
+                        builder.divergent_markers.extend(sub.divergent_markers);
                         builder
                     },
                 )
@@ -2746,14 +2747,14 @@ impl<'db> IntersectionBuilder<'db> {
     }
 
     pub(crate) fn build(self) -> Type<'db> {
-        let cycle_markers = self.cycle_markers;
+        let divergent_markers = self.divergent_markers;
         UnionType::from_elements(
             self.db,
             self.intersections.into_iter().map(|inner| {
-                cycle_markers
+                divergent_markers
                     .iter()
                     .fold(inner.build(self.db), |ty, marked| {
-                        Type::cycle_marked(self.db, marked.binder_id(self.db), ty)
+                        Type::divergent_with_body(self.db, marked.binder_id(self.db), ty)
                     })
             }),
         )

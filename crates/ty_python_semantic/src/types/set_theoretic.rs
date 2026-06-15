@@ -368,9 +368,9 @@ impl<'db> UnionType<'db> {
                 let ty = ty
                     .recursive_type_normalized_impl(db, normalization)
                     .unwrap_or(normalization.marker());
-                // Top-level cycle markers in a union do not mean true divergence, so we skip
+                // Top-level recursion markers in a union do not mean true divergence, so we skip
                 // them if not nested. e.g. T | Divergent == T | (T | (T | ...)) == T.
-                if ty.is_top_level_cycle_marker(db, normalization.marker()) {
+                if ty.is_top_level_divergent_marker(db, normalization.marker()) {
                     continue;
                 }
                 if let Type::Divergent(marked) = ty

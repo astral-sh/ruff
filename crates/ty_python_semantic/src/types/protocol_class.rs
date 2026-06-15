@@ -544,10 +544,10 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn is_cycle_marker(self, db: &'db dyn Db) -> bool {
+    fn is_recursive_marker(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Other(Type::Divergent(divergent)) if let Some(body) = divergent.body(db) => {
-                Self::Other(body).is_cycle_marker(db)
+                Self::Other(body).is_recursive_marker(db)
             }
             Self::Other(Type::Divergent(_)) => true,
             Self::Other(Type::Recursive(recursive)) if recursive.is_non_contractive(db) => true,
@@ -590,7 +590,7 @@ impl<'db> ProtocolMemberKind<'db> {
             (Self::Other(curr), Self::Other(prev)) => {
                 Self::Other(curr.cycle_normalized(db, Some(*prev), cycle))
             }
-            (_, previous) if previous.is_cycle_marker(db) => *self,
+            (_, previous) if previous.is_recursive_marker(db) => *self,
             _ => {
                 debug_assert!(false);
                 *self

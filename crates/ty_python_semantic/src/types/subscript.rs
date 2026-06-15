@@ -24,7 +24,7 @@ use super::recursive::{Foldable, RecursiveType};
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    CycleMarkable, DivergentType, DynamicType, IntersectionBuilder, IntersectionType,
+    DivergentMarkable, DivergentType, DynamicType, IntersectionBuilder, IntersectionType,
     KnownInstanceType, Type, TypeAliasType, TypedDictType, UnionBuilder, UnionType, todo_type,
 };
 
@@ -198,14 +198,14 @@ impl<'db> Foldable<'db> for SubscriptError<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for SubscriptError<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for SubscriptError<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         Self {
-            result_ty: self.result_ty.mark_cycle(db, marked),
+            result_ty: self.result_ty.mark_divergent(db, marked),
             errors: self
                 .errors
                 .into_iter()
-                .map(|error| error.mark_cycle(db, marked))
+                .map(|error| error.mark_divergent(db, marked))
                 .collect(),
         }
     }
@@ -270,8 +270,8 @@ impl<'db> Foldable<'db> for SubscriptErrorKind<'db> {
     }
 }
 
-impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
-    fn mark_cycle(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
+impl<'db> DivergentMarkable<'db> for SubscriptErrorKind<'db> {
+    fn mark_divergent(self, db: &'db dyn Db, marked: DivergentType<'db>) -> Self {
         match self {
             Self::IndexOutOfBounds {
                 kind,
@@ -280,13 +280,13 @@ impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
                 index,
             } => Self::IndexOutOfBounds {
                 kind,
-                tuple_ty: tuple_ty.mark_cycle(db, marked),
+                tuple_ty: tuple_ty.mark_divergent(db, marked),
                 length,
                 index,
             },
             Self::DunderPossiblyUnbound { method, value_ty } => Self::DunderPossiblyUnbound {
                 method,
-                value_ty: value_ty.mark_cycle(db, marked),
+                value_ty: value_ty.mark_divergent(db, marked),
             },
             Self::DunderCallError {
                 method,
@@ -296,10 +296,10 @@ impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
                 bindings,
             } => Self::DunderCallError {
                 method,
-                value_ty: value_ty.mark_cycle(db, marked),
-                slice_ty: slice_ty.mark_cycle(db, marked),
+                value_ty: value_ty.mark_divergent(db, marked),
+                slice_ty: slice_ty.mark_divergent(db, marked),
                 kind,
-                bindings: bindings.mark_cycle(db, marked),
+                bindings: bindings.mark_divergent(db, marked),
             },
             Self::InvalidTypedDictKey {
                 typed_dict,
@@ -307,11 +307,11 @@ impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
                 full_object_ty,
             } => Self::InvalidTypedDictKey {
                 typed_dict,
-                slice_ty: slice_ty.mark_cycle(db, marked),
-                full_object_ty: full_object_ty.mark_cycle(db, marked),
+                slice_ty: slice_ty.mark_divergent(db, marked),
+                full_object_ty: full_object_ty.mark_divergent(db, marked),
             },
             Self::NotSubscriptable { value_ty, method } => Self::NotSubscriptable {
-                value_ty: value_ty.mark_cycle(db, marked),
+                value_ty: value_ty.mark_divergent(db, marked),
                 method,
             },
             Self::InvalidLegacyGenericArgument {
@@ -319,7 +319,7 @@ impl<'db> CycleMarkable<'db> for SubscriptErrorKind<'db> {
                 argument_ty,
             } => Self::InvalidLegacyGenericArgument {
                 origin,
-                argument_ty: argument_ty.mark_cycle(db, marked),
+                argument_ty: argument_ty.mark_divergent(db, marked),
             },
             Self::NonGenericTypeAlias { .. }
             | Self::DuplicateTypevar { .. }
@@ -673,12 +673,12 @@ impl<'db> Type<'db> {
 
         let inferred = match (value_ty, slice_ty) {
             (Type::Divergent(divergent), _) if let Some(marked) =
-                divergent.as_cycle_marked(db) =>
+                divergent.as_bodyful(db) =>
             {
                 Some(marked.map(db, |inner| inner.subscript(db, slice_ty, expr_context)))
             }
             (_, Type::Divergent(divergent)) if let Some(marked) =
-                divergent.as_cycle_marked(db) =>
+                divergent.as_bodyful(db) =>
             {
                 Some(marked.map(db, |inner| value_ty.subscript(db, inner, expr_context)))
             }

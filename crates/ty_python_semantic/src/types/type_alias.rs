@@ -140,7 +140,7 @@ impl<'db> PEP695TypeAliasType<'db> {
     /// The RHS type of a PEP-695 style type alias with specialization applied.
     ///
     /// For self-referential aliases, the body is folded so that each recursive
-    /// position becomes `Type::Divergent(binder_id)`, then any cycle marker
+    /// position becomes `Type::Divergent(binder_id)`, then any top-level marker
     /// that sits as a direct member of the body's top-level union is stripped
     /// (so `int | Divergent` collapses to `int` for `IntOr`-style aliases).
     /// If the body still contains the binder's `Divergent` anywhere — nested

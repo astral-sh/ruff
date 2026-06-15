@@ -250,11 +250,11 @@ fn divergent_type() {
 }
 
 #[test]
-fn cycle_marked_type_is_transparent_but_preferred_in_unions() {
+fn bodyful_divergent_is_transparent_but_preferred_in_unions() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let int = KnownClass::Int.to_instance(&db);
-    let marked_int = Type::cycle_marked(&db, binder_id, int);
+    let marked_int = Type::divergent_with_body(&db, binder_id, int);
 
     assert!(marked_int.is_equivalent_to(&db, int));
     assert!(int.is_equivalent_to(&db, marked_int));
@@ -273,42 +273,42 @@ fn cycle_marked_type_is_transparent_but_preferred_in_unions() {
 }
 
 #[test]
-fn cycle_marked_type_folds_marker_containing_inner_to_recursive() {
+fn bodyful_divergent_folds_marker_containing_inner_to_recursive() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let marker = Type::divergent(&db, binder_id);
     let tuple_marker = Type::heterogeneous_tuple(&db, [marker]);
 
     assert_eq!(
-        Type::cycle_marked(&db, binder_id, tuple_marker),
+        Type::divergent_with_body(&db, binder_id, tuple_marker),
         Type::implicit_recursive(&db, binder_id, tuple_marker)
     );
 }
 
 #[test]
-fn cycle_marked_type_has_stable_nested_order() {
+fn bodyful_divergent_has_stable_nested_order() {
     let db = setup_db();
     let a = Id::from_bits(1);
     let b = Id::from_bits(2);
     let int = KnownClass::Int.to_instance(&db);
 
     assert_eq!(
-        Type::cycle_marked(&db, a, Type::cycle_marked(&db, b, int)),
-        Type::cycle_marked(&db, b, Type::cycle_marked(&db, a, int))
+        Type::divergent_with_body(&db, a, Type::divergent_with_body(&db, b, int)),
+        Type::divergent_with_body(&db, b, Type::divergent_with_body(&db, a, int))
     );
 }
 
 #[test]
-fn cycle_marked_type_skips_single_valued_inner() {
+fn bodyful_divergent_skips_single_valued_inner() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let literal = Type::int_literal(1);
 
-    assert_eq!(Type::cycle_marked(&db, binder_id, literal), literal);
+    assert_eq!(Type::divergent_with_body(&db, binder_id, literal), literal);
 }
 
 #[test]
-fn intersection_builder_preserves_cycle_markers_through_simplification() {
+fn intersection_builder_preserves_divergent_markers_through_simplification() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let int = KnownClass::Int.to_instance(&db);
@@ -316,10 +316,10 @@ fn intersection_builder_preserves_cycle_markers_through_simplification() {
 
     assert_eq!(
         IntersectionBuilder::new(&db)
-            .add_positive(Type::cycle_marked(&db, binder_id, optional_int))
+            .add_positive(Type::divergent_with_body(&db, binder_id, optional_int))
             .add_negative(Type::none(&db))
             .build(),
-        Type::cycle_marked(&db, binder_id, int)
+        Type::divergent_with_body(&db, binder_id, int)
     );
 }
 
@@ -344,7 +344,7 @@ fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
     let int = KnownClass::Int.to_instance(&db);
     let marker_tuple = Type::heterogeneous_tuple(&db, [Type::divergent(&db, binder_id), int]);
     let finite_tuple = Type::heterogeneous_tuple(&db, [int, int]);
-    let marked_finite_tuple = Type::cycle_marked(&db, binder_id, finite_tuple);
+    let marked_finite_tuple = Type::divergent_with_body(&db, binder_id, finite_tuple);
 
     assert_eq!(
         UnionType::from_elements_cycle_recovery(&db, [marker_tuple, finite_tuple]),
@@ -357,13 +357,13 @@ fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
 }
 
 #[test]
-fn cycle_recovery_fuses_cycle_marked_subtype_with_supertype() {
+fn cycle_recovery_fuses_bodyful_divergent_subtype_with_supertype() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);
     let int = KnownClass::Int.to_instance(&db);
     let bool = KnownClass::Bool.to_instance(&db);
-    let marked_int = Type::cycle_marked(&db, binder_id, int);
-    let marked_bool = Type::cycle_marked(&db, binder_id, bool);
+    let marked_int = Type::divergent_with_body(&db, binder_id, int);
+    let marked_bool = Type::divergent_with_body(&db, binder_id, bool);
 
     assert_eq!(
         UnionType::from_elements_cycle_recovery(&db, [marked_bool, marked_int]),
@@ -411,7 +411,7 @@ fn top_level_union_cycle_normalization_keeps_structural_markers_recursive() {
             .display(&db)
             .to_string()
     );
-    assert!(!normalized.contains_cycle_marked(&db));
+    assert!(!normalized.contains_bodyful_divergent(&db));
     assert!(RecursiveTypeNormalization::new(marker).contains_marker(&db, normalized));
 }
 
@@ -441,7 +441,7 @@ fn other_cycle_normalization_preserves_bodyful_marker_body() {
     let int = KnownClass::Int.to_instance(&db);
     let list_int = KnownClass::List.to_specialized_instance(&db, &[int]);
     let body = UnionType::from_elements_cycle_recovery(&db, [int, list_int]);
-    let marked = Type::cycle_marked(&db, marker_id, body);
+    let marked = Type::divergent_with_body(&db, marker_id, body);
 
     assert_eq!(
         marked.recursive_type_normalized_impl(&db, RecursiveTypeNormalization::new(other_marker)),
@@ -471,7 +471,7 @@ fn cycle_recovery_union_preserves_finite_shape_with_marker() {
 }
 
 #[test]
-fn top_level_union_cycle_normalization_preserves_other_cycle_markers() {
+fn top_level_union_normalization_preserves_other_divergent_markers() {
     let db = setup_db();
     let marker = Type::divergent(&db, Id::from_bits(1));
     let other_non_contractive = Type::implicit_recursive(
