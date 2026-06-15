@@ -328,6 +328,13 @@ impl<'db> RecursiveType<'db> {
     /// `Divergent`. This only arises as a not-yet-converged cycle provisional; a converged,
     /// structureless cycle is resolved away rather than wrapped.
     pub(crate) fn is_non_contractive(self, db: &'db dyn Db) -> bool {
-        self.body(db) == Type::divergent(db, self.binder_id(db))
+        let mut body = self.body(db);
+        while let Type::Divergent(divergent) = body {
+            let Some(inner) = divergent.body(db) else {
+                break;
+            };
+            body = inner;
+        }
+        body == Type::divergent(db, self.binder_id(db))
     }
 }

@@ -31,3 +31,21 @@ def sympy_nested_numeric_loop(a, b):
 
     return a
 ```
+
+This is minimized from another SymPy stack overflow. A call result can be used as a
+truthiness guard inside an inner loop, while the called value itself is rotated through
+outer loop-carried variables. The recovered recursive state may be wrapped in a transparent
+cycle marker, but should still be treated as non-contractive when there is no real structure.
+
+```py
+def sympy_modular_gcd_loop(fp, gp, deg):
+    while gp:
+        rem = fp
+        while True:
+            degrem = rem()
+            if degrem < deg:
+                break
+            rem = rem - gp
+        fp = gp
+        gp = rem
+```
