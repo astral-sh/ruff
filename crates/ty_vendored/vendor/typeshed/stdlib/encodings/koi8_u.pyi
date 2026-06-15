@@ -1,5 +1,3 @@
-"""Python Character Mapping Codec koi8_u generated from 'python-mappings/KOI8-U.TXT' with gencodec.py."""
-
 import codecs
 from _codecs import _EncodingMap
 from _typeshed import ReadableBuffer
