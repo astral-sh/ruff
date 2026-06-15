@@ -64,8 +64,27 @@ impl Triple {
 /// decision about which [`Provenance`] tier it carries. Frontends MUST NOT
 /// emit raw predicate strings — they go through this enum so the Python and
 /// Ruby graphs cannot drift.
+///
+/// # Origin tiers (count = 34)
+///
+/// 1. **Core 7** (`RdfType` … `TraversesRelation`) — Odoo Python harvest,
+///    the original Foundry-shape ontology. Object/Property/Function with
+///    declared / body-authoritative / body-inferred truth tiers.
+/// 2. **`OpenProject` AR-shape 27** (`DeclaresAssociation` … `UsesRefinement`)
+///    — Rails `ActiveRecord` class-body DSL surface, measured on the
+///    `OpenProject` corpus (941 models / 1696 declarations / 78 distinct
+///    names → 67 emit categories + 11 scope markers; the 27 here cover
+///    every emit category that is not already in the core 7). Default
+///    tier: [`Provenance::OpenProjectExtracted`] — one notch below
+///    [`Provenance::Authoritative`] (Odoo `@api.depends`) to encode the
+///    Ruby metaprogramming surface delta. Two per-edge overrides:
+///    [`Self::DefinesMethod`] defaults to [`Provenance::Inferred`]
+///    (dynamic-method finds are heuristic by definition);
+///    [`Self::ConcernIncludedBlock`] / [`Self::ConcernClassMethods`] are
+///    structural-by-construction and carry [`Provenance::Structural`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Predicate {
+    // ───── Core (Odoo Python harvest) ─────
     /// `(subject, rdf:type, EntityKind)` — structural classification.
     RdfType,
     /// `(model, has_function, model.fn)` — a model owns a function.
@@ -80,6 +99,118 @@ pub enum Predicate {
     Raises,
     /// `(model.fn, traverses_relation, model.rel)` — body walks the relation.
     TraversesRelation,
+
+    // ───── OpenProject AR-shape (Rails class-body DSL) ─────
+    //
+    // Subject is the *class* (not a function) for declarative-level facts;
+    // the function-level analogue stays on the core 7 (see TraversesRelation
+    // for the body-walk counterpart of DeclaresAssociation).
+    /// `(model, declares_association, model.<rel>)` — a class-level
+    /// `belongs_to` / `has_many` / `has_one` / `has_and_belongs_to_many` /
+    /// `accepts_nested_attributes_for` declaration. **Distinct from**
+    /// [`Self::TraversesRelation`] (subject = fn, body-walked, Inferred):
+    /// this is class-level + OpenProject-extracted-grade because the
+    /// declaration is machine-readable in the AST.
+    DeclaresAssociation,
+    /// `(model, validates_constraint, attr|"block")` — `validates` /
+    /// `validate` / `validates_associated` / `validates_each`. The verb
+    /// form (vs. the planned `has_constraint`) disambiguates from
+    /// declarative `has_*` predicates.
+    ValidatesConstraint,
+    /// `(model, normalizes_attribute, attr)` — `normalizes :attr, with:`
+    /// declaration. Distinct from `ValidatesConstraint` because the
+    /// transformation runs on assignment, not on validation.
+    NormalizesAttribute,
+    /// `(model, has_callback, "<phase>:<target>")` — `before_save :foo`,
+    /// `after_create :bar`, etc. The 12 phases are encoded in the object
+    /// slot, not as separate predicates, so the vocab stays bounded.
+    HasCallback,
+    /// `(model, includes_module, mod)` — `include ModX`. Distinct verb
+    /// per Rails composition rule (include / extend / prepend each have
+    /// different MRO effects).
+    IncludesModule,
+    /// `(model, extends_module, mod)` — `extend ModX`.
+    ExtendsModule,
+    /// `(model, prepends_module, mod)` — `prepend ModX` (rare; 4 sites).
+    PrependsModule,
+    /// `(concern_mod, concern_class_methods, "block")` — `class_methods do
+    /// … end` block inside a concern. Marker-only: structural-by-
+    /// construction; the contained `def`s become regular `has_function`
+    /// triples in the second pass.
+    ConcernClassMethods,
+    /// `(concern_mod, concern_included_block, "block")` — `included do
+    /// … end` block inside a concern. Same shape as `ConcernClassMethods`.
+    ConcernIncludedBlock,
+    /// `(model, has_attribute, attr)` — `attribute :x, :type` /
+    /// `attr_accessor :x` / `attr_reader :x` / `attr_readonly :x` /
+    /// `store_attribute …` / `store_accessor …` / `serialize :x` /
+    /// `enum :x` / `define_attribute_method :x`. The unified declaration
+    /// surface for non-DB-column attributes.
+    HasAttribute,
+    /// `(model, aliases_attribute, "<new>=<orig>")` — `alias_attribute`.
+    AliasesAttribute,
+    /// `(model, aliases_method, "<new>=<orig>")` — `alias_method` /
+    /// `alias`. Method-level alias (vs. attribute-level above).
+    AliasesMethod,
+    /// `(model.column, column_override, "<key>=<value>")` — DSL that
+    /// overrides a column's behavior (e.g. `serialize :data, JSON`,
+    /// `undef_method :foo`). Marker for non-default column treatment.
+    ColumnOverride,
+    /// `(model, delegates_to, "<method>=>via:<assoc>")` — `delegate :foo,
+    /// :bar, to: :baz`. Object encodes one method per triple (multiple
+    /// methods in one `delegate` call expand to multiple triples).
+    DelegatesTo,
+    /// `(model, has_scope, "<name>=<lambda_body_ref>")` — `scope :active,
+    /// -> { where(active: true) }`. Lambda body kept as a body-source ref
+    /// (per `scope` precedent).
+    HasScope,
+    /// `(model, has_default_scope, "<lambda_body_ref>")` — `default_scope
+    /// -> { … }`. One per class at most.
+    HasDefaultScope,
+    /// `(model, acts_as, "<variant>[:<options>]")` — the `acts_as_*`
+    /// family (`acts_as_list`, `acts_as_attachable`, …). The variant
+    /// name + options live in the object slot; the predicate is one.
+    ActsAs,
+    /// `(model, registers_journal_formatter, "<key>=<formatter>")` —
+    /// `OpenProject`'s `register_journal_formatter` (27 sites). Promoted
+    /// out of `has_dsl_call` per iron-rule bulk (74 % of the OP custom
+    /// registration mass).
+    RegistersJournalFormatter,
+    /// `(model, registers_journal_formatted_fields, "<key>")` —
+    /// `OpenProject`'s `register_journal_formatted_fields` (13 sites).
+    /// Same promotion rationale as `RegistersJournalFormatter`.
+    RegistersJournalFormattedFields,
+    /// `(model, has_dsl_call, "<name>(<args>)")` — long-tail catch-all
+    /// for `OpenProject` custom registrations (`register_query`,
+    /// `activity_provider_for`, `deprecated_alias`,
+    /// `associated_to_ask_before_destruction`, `has_details_table` —
+    /// 5 singletons total, ≤ 6 sites each). Keeps the closed vocab from
+    /// growing for every one-off DSL while preserving queryability via
+    /// the name slot.
+    HasDslCall,
+    /// `(model, mounts_uploader, "<attr>=<uploader_class>")` —
+    /// `CarrierWave`'s `mount_uploader :attr, Class`.
+    MountsUploader,
+    /// `(model, has_paper_trail, "<options>")` — `paper_trail` gem's
+    /// `has_paper_trail` declaration.
+    HasPaperTrail,
+    /// `(model, has_closure_tree, "<options>")` — `closure_tree` gem's
+    /// `has_closure_tree` declaration.
+    HasClosureTree,
+    /// `(model, counter_cultures, "<column>=<via>")` — `counter_culture`
+    /// gem's denormalised-counter declaration.
+    CounterCultures,
+    /// `(model, auto_strips, "<attrs>")` — `auto_strip_attributes` gem's
+    /// declaration.
+    AutoStrips,
+    /// `(model, defines_method, "<name>=<body_source_ref>")` —
+    /// `define_method` dynamic method synthesis. **Default truth tier
+    /// is `Inferred`** (dynamic = heuristic): the 24 sites in the
+    /// `OpenProject` corpus are inherently un-statically-resolvable.
+    DefinesMethod,
+    /// `(model, uses_refinement, "<refinement_module>")` — `using
+    /// Refinement` declaration.
+    UsesRefinement,
 }
 
 impl Predicate {
@@ -87,6 +218,7 @@ impl Predicate {
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
+            // Core 7
             Self::RdfType => "rdf:type",
             Self::HasFunction => "has_function",
             Self::EmittedBy => "emitted_by",
@@ -94,6 +226,34 @@ impl Predicate {
             Self::ReadsField => "reads_field",
             Self::Raises => "raises",
             Self::TraversesRelation => "traverses_relation",
+            // OpenProject AR-shape 27
+            Self::DeclaresAssociation => "declares_association",
+            Self::ValidatesConstraint => "validates_constraint",
+            Self::NormalizesAttribute => "normalizes_attribute",
+            Self::HasCallback => "has_callback",
+            Self::IncludesModule => "includes_module",
+            Self::ExtendsModule => "extends_module",
+            Self::PrependsModule => "prepends_module",
+            Self::ConcernClassMethods => "concern_class_methods",
+            Self::ConcernIncludedBlock => "concern_included_block",
+            Self::HasAttribute => "has_attribute",
+            Self::AliasesAttribute => "aliases_attribute",
+            Self::AliasesMethod => "aliases_method",
+            Self::ColumnOverride => "column_override",
+            Self::DelegatesTo => "delegates_to",
+            Self::HasScope => "has_scope",
+            Self::HasDefaultScope => "has_default_scope",
+            Self::ActsAs => "acts_as",
+            Self::RegistersJournalFormatter => "registers_journal_formatter",
+            Self::RegistersJournalFormattedFields => "registers_journal_formatted_fields",
+            Self::HasDslCall => "has_dsl_call",
+            Self::MountsUploader => "mounts_uploader",
+            Self::HasPaperTrail => "has_paper_trail",
+            Self::HasClosureTree => "has_closure_tree",
+            Self::CounterCultures => "counter_cultures",
+            Self::AutoStrips => "auto_strips",
+            Self::DefinesMethod => "defines_method",
+            Self::UsesRefinement => "uses_refinement",
         }
     }
 
@@ -103,6 +263,7 @@ impl Predicate {
     #[must_use]
     pub fn from_str(s: &str) -> Option<Self> {
         Some(match s {
+            // Core 7
             "rdf:type" => Self::RdfType,
             "has_function" => Self::HasFunction,
             "emitted_by" => Self::EmittedBy,
@@ -110,35 +271,147 @@ impl Predicate {
             "reads_field" => Self::ReadsField,
             "raises" => Self::Raises,
             "traverses_relation" => Self::TraversesRelation,
+            // OpenProject AR-shape 27
+            "declares_association" => Self::DeclaresAssociation,
+            "validates_constraint" => Self::ValidatesConstraint,
+            "normalizes_attribute" => Self::NormalizesAttribute,
+            "has_callback" => Self::HasCallback,
+            "includes_module" => Self::IncludesModule,
+            "extends_module" => Self::ExtendsModule,
+            "prepends_module" => Self::PrependsModule,
+            "concern_class_methods" => Self::ConcernClassMethods,
+            "concern_included_block" => Self::ConcernIncludedBlock,
+            "has_attribute" => Self::HasAttribute,
+            "aliases_attribute" => Self::AliasesAttribute,
+            "aliases_method" => Self::AliasesMethod,
+            "column_override" => Self::ColumnOverride,
+            "delegates_to" => Self::DelegatesTo,
+            "has_scope" => Self::HasScope,
+            "has_default_scope" => Self::HasDefaultScope,
+            "acts_as" => Self::ActsAs,
+            "registers_journal_formatter" => Self::RegistersJournalFormatter,
+            "registers_journal_formatted_fields" => Self::RegistersJournalFormattedFields,
+            "has_dsl_call" => Self::HasDslCall,
+            "mounts_uploader" => Self::MountsUploader,
+            "has_paper_trail" => Self::HasPaperTrail,
+            "has_closure_tree" => Self::HasClosureTree,
+            "counter_cultures" => Self::CounterCultures,
+            "auto_strips" => Self::AutoStrips,
+            "defines_method" => Self::DefinesMethod,
+            "uses_refinement" => Self::UsesRefinement,
             _ => return None,
         })
     }
 
-    /// The default provenance tier for this predicate, per the Odoo
-    /// extraction calibration:
+    /// Every predicate in canonical declaration order. Used by the
+    /// closed-vocab round-trip test and by any consumer that needs to
+    /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// - structural (`rdf:type`, `has_function`) → [`Provenance::Structural`]
+    /// **Length invariant:** `ALL.len() == 34` (7 core + 27 AR-shape).
+    /// A new variant added to [`Predicate`] **must** be appended here in
+    /// the same order, or the closed-vocab round-trip test fails.
+    pub const ALL: &'static [Predicate] = &[
+        // Core 7
+        Self::RdfType,
+        Self::HasFunction,
+        Self::EmittedBy,
+        Self::DependsOn,
+        Self::ReadsField,
+        Self::Raises,
+        Self::TraversesRelation,
+        // OpenProject AR-shape 27
+        Self::DeclaresAssociation,
+        Self::ValidatesConstraint,
+        Self::NormalizesAttribute,
+        Self::HasCallback,
+        Self::IncludesModule,
+        Self::ExtendsModule,
+        Self::PrependsModule,
+        Self::ConcernClassMethods,
+        Self::ConcernIncludedBlock,
+        Self::HasAttribute,
+        Self::AliasesAttribute,
+        Self::AliasesMethod,
+        Self::ColumnOverride,
+        Self::DelegatesTo,
+        Self::HasScope,
+        Self::HasDefaultScope,
+        Self::ActsAs,
+        Self::RegistersJournalFormatter,
+        Self::RegistersJournalFormattedFields,
+        Self::HasDslCall,
+        Self::MountsUploader,
+        Self::HasPaperTrail,
+        Self::HasClosureTree,
+        Self::CounterCultures,
+        Self::AutoStrips,
+        Self::DefinesMethod,
+        Self::UsesRefinement,
+    ];
+
+    /// The default provenance tier for this predicate, per the Odoo
+    /// extraction calibration + `OpenProject` hand-tune:
+    ///
+    /// - structural (`rdf:type`, `has_function`, concern markers) →
+    ///   [`Provenance::Structural`]
     /// - declared / body-authoritative (`emitted_by`, `depends_on`,
     ///   `raises`) → [`Provenance::Authoritative`]
-    /// - body-inferred (`reads_field`, `traverses_relation`) →
-    ///   [`Provenance::Inferred`]
+    /// - body-inferred (`reads_field`, `traverses_relation`,
+    ///   `defines_method`) → [`Provenance::Inferred`]
+    /// - `OpenProject` Rails class-body DSL (the 22 remaining new
+    ///   predicates) → [`Provenance::OpenProjectExtracted`]
     ///
     /// Frontends may override per-edge (e.g. a Rails frontend that proves a
-    /// read statically can promote `reads_field` to Authoritative), but the
-    /// default keeps cross-language graphs comparable.
+    /// read statically can promote `reads_field` to Authoritative; one
+    /// `define_method` whose name is a static literal can be promoted to
+    /// `OpenProjectExtracted`), but the default keeps cross-language
+    /// graphs comparable.
     #[must_use]
     pub const fn default_provenance(self) -> Provenance {
         match self {
-            Self::RdfType | Self::HasFunction => Provenance::Structural,
+            // Structural-by-construction
+            Self::RdfType
+            | Self::HasFunction
+            | Self::ConcernClassMethods
+            | Self::ConcernIncludedBlock => Provenance::Structural,
+            // Body-authoritative (Odoo + Rails declared)
             Self::EmittedBy | Self::DependsOn | Self::Raises => Provenance::Authoritative,
-            Self::ReadsField | Self::TraversesRelation => Provenance::Inferred,
+            // Body-inferred (heuristic by definition)
+            Self::ReadsField | Self::TraversesRelation | Self::DefinesMethod => {
+                Provenance::Inferred
+            }
+            // OpenProject AR-shape (everything else from the 27)
+            Self::DeclaresAssociation
+            | Self::ValidatesConstraint
+            | Self::NormalizesAttribute
+            | Self::HasCallback
+            | Self::IncludesModule
+            | Self::ExtendsModule
+            | Self::PrependsModule
+            | Self::HasAttribute
+            | Self::AliasesAttribute
+            | Self::AliasesMethod
+            | Self::ColumnOverride
+            | Self::DelegatesTo
+            | Self::HasScope
+            | Self::HasDefaultScope
+            | Self::ActsAs
+            | Self::RegistersJournalFormatter
+            | Self::RegistersJournalFormattedFields
+            | Self::HasDslCall
+            | Self::MountsUploader
+            | Self::HasPaperTrail
+            | Self::HasClosureTree
+            | Self::CounterCultures
+            | Self::AutoStrips
+            | Self::UsesRefinement => Provenance::OpenProjectExtracted,
         }
     }
 }
 
 /// The `rdf:type` object vocabulary — the Foundry-shape entity classes.
 ///
-/// Object Type = an entity/model (Odoo model, Rails ActiveRecord class).
+/// Object Type = an entity/model (Odoo model, Rails `ActiveRecord` class).
 /// Property = a field/attribute. Function = a method.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum EntityKind {
@@ -168,10 +441,19 @@ impl EntityKind {
 
 /// Provenance tier → NARS `(frequency, confidence)`.
 ///
-/// The three tiers are the calibration from the Odoo harvest:
+/// The first three tiers are the calibration from the Odoo harvest:
 /// structural facts are certain; decorator/declared/body-authoritative
 /// facts are strong; purely body-inferred facts are weaker so the
 /// `TruthGate` can filter them out under a strict expectation threshold.
+///
+/// [`Self::OpenProjectExtracted`] is one notch below `Authoritative`,
+/// hand-tuned per `I-NOISE-FLOOR-JIRAK`: Ruby `ActiveRecord` declarative
+/// facts (`belongs_to :project`) are as truth-functionally certain as
+/// Odoo `@api.depends`, so the **frequency** matches at `0.95`. The
+/// **confidence** drops `0.90 → 0.88` (two NARS revision-counts) to
+/// encode the Ruby metaprogramming surface delta — `class_methods do`,
+/// `included do`, `define_method`, `class << self`, dynamic constants —
+/// a small fraction of declarations are unresolvable at static-AST time.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Provenance {
     /// Structural facts that are true by construction — `(1.0, 1.0)`.
@@ -185,6 +467,10 @@ pub enum Provenance {
     /// e.g. a field name that appears as an attribute read, a relation
     /// walked in a `for r in self.<rel>` loop.
     Inferred,
+    /// `OpenProject` Rails class-body DSL — `(0.95, 0.88)`. Same frequency
+    /// as `Authoritative` (the declaration IS the fact), confidence one
+    /// notch lower to encode the Ruby metaprogramming residual.
+    OpenProjectExtracted,
 }
 
 impl Provenance {
@@ -195,6 +481,7 @@ impl Provenance {
             Self::Structural => (1.0, 1.0),
             Self::Authoritative => (0.95, 0.90),
             Self::Inferred => (0.85, 0.75),
+            Self::OpenProjectExtracted => (0.95, 0.88),
         }
     }
 }
@@ -204,42 +491,108 @@ mod tests {
     use super::*;
 
     #[test]
-    fn predicate_string_round_trips() {
-        for p in [
-            Predicate::RdfType,
-            Predicate::HasFunction,
-            Predicate::EmittedBy,
-            Predicate::DependsOn,
-            Predicate::ReadsField,
-            Predicate::Raises,
-            Predicate::TraversesRelation,
-        ] {
-            assert_eq!(Predicate::from_str(p.as_str()), Some(p));
+    fn predicate_string_round_trips_for_every_canonical() {
+        // The closed-vocab guarantee: every variant in ALL must round-trip
+        // through as_str → from_str. Adding a Predicate variant without
+        // updating ALL or the match arms breaks this test loudly.
+        for p in Predicate::ALL {
+            assert_eq!(
+                Predicate::from_str(p.as_str()),
+                Some(*p),
+                "predicate `{}` failed to round-trip",
+                p.as_str()
+            );
         }
         assert_eq!(Predicate::from_str("not_a_predicate"), None);
     }
 
     #[test]
-    fn provenance_truth_tiers_match_odoo_calibration() {
+    fn predicate_count_locked_at_34() {
+        // The exact count is part of the schema contract: 7 core (Odoo
+        // Python) + 27 OpenProject AR-shape = 34. Council review of any
+        // new variant means this number changes — the test must change
+        // with the source.
+        assert_eq!(Predicate::ALL.len(), 34);
+    }
+
+    #[test]
+    fn provenance_truth_tiers_match_calibration() {
         assert_eq!(Provenance::Structural.truth(), (1.0, 1.0));
         assert_eq!(Provenance::Authoritative.truth(), (0.95, 0.90));
         assert_eq!(Provenance::Inferred.truth(), (0.85, 0.75));
+        assert_eq!(Provenance::OpenProjectExtracted.truth(), (0.95, 0.88));
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // exact comparison is the assertion's whole point
+    fn open_project_extracted_is_one_notch_below_authoritative() {
+        // Hand-tune assertion (per I-NOISE-FLOOR-JIRAK): same frequency
+        // as Authoritative, confidence two NARS revision-counts lower.
+        let (auth_f, auth_c) = Provenance::Authoritative.truth();
+        let (op_f, op_c) = Provenance::OpenProjectExtracted.truth();
+        assert_eq!(auth_f, op_f, "frequency must match Authoritative");
+        assert!(
+            op_c < auth_c,
+            "confidence must be strictly below Authoritative"
+        );
+        assert!(
+            (auth_c - op_c - 0.02).abs() < 1e-6,
+            "exactly two revision-counts below"
+        );
     }
 
     #[test]
     fn default_provenance_matches_predicate_class() {
+        // Structural-by-construction
         assert_eq!(
             Predicate::RdfType.default_provenance(),
             Provenance::Structural
         );
         assert_eq!(
+            Predicate::ConcernClassMethods.default_provenance(),
+            Provenance::Structural
+        );
+        assert_eq!(
+            Predicate::ConcernIncludedBlock.default_provenance(),
+            Provenance::Structural
+        );
+        // Authoritative (Odoo)
+        assert_eq!(
             Predicate::DependsOn.default_provenance(),
             Provenance::Authoritative
         );
+        // Inferred — including DefinesMethod (per-edge override possible
+        // but the default tier is heuristic)
         assert_eq!(
             Predicate::ReadsField.default_provenance(),
             Provenance::Inferred
         );
+        assert_eq!(
+            Predicate::DefinesMethod.default_provenance(),
+            Provenance::Inferred
+        );
+        // OpenProjectExtracted (the bulk of the new 27)
+        assert_eq!(
+            Predicate::DeclaresAssociation.default_provenance(),
+            Provenance::OpenProjectExtracted
+        );
+        assert_eq!(
+            Predicate::ActsAs.default_provenance(),
+            Provenance::OpenProjectExtracted
+        );
+        assert_eq!(
+            Predicate::RegistersJournalFormatter.default_provenance(),
+            Provenance::OpenProjectExtracted
+        );
+    }
+
+    #[test]
+    fn every_predicate_has_a_default_provenance() {
+        // Exhaustiveness lock: const match in default_provenance must
+        // cover every variant in ALL.
+        for p in Predicate::ALL {
+            let _ = p.default_provenance();
+        }
     }
 
     #[test]
@@ -253,6 +606,18 @@ mod tests {
         assert_eq!(t.p, "emitted_by");
         assert_eq!((t.f, t.c), (0.95, 0.90));
         assert_eq!(t.key(), ("odoo:m.f", "emitted_by", "odoo:m._fn"));
+    }
+
+    #[test]
+    fn triple_new_carries_op_extracted_truth() {
+        let t = Triple::new(
+            "openproject:WorkPackage",
+            Predicate::DeclaresAssociation,
+            "openproject:WorkPackage.project",
+            Provenance::OpenProjectExtracted,
+        );
+        assert_eq!(t.p, "declares_association");
+        assert_eq!((t.f, t.c), (0.95, 0.88));
     }
 
     #[test]
