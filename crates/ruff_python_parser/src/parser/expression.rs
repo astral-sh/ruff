@@ -945,7 +945,7 @@ impl<'src> Parser<'src> {
             range: self.node_range(start),
             node_index: AtomicNodeIndex::NONE,
             args: args.into_boxed_slice(),
-            keywords: keywords.into_boxed_slice(),
+            keywords: keywords.into(),
         };
 
         self.validate_arguments(&arguments, has_trailing_comma);
