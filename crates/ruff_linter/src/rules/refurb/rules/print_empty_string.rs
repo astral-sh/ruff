@@ -269,8 +269,7 @@ impl EmptyStringFix {
                     false
                 })
                 .cloned()
-                .collect::<Vec<_>>()
-                .into_boxed_slice();
+                .collect();
         }
 
         let contents = generator.expr(&call.into());
