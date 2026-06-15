@@ -15,7 +15,7 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_match_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_match_pattern_type_for_subject,
     definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
     mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type,
@@ -1485,13 +1485,15 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         for pattern in patterns {
             let definitely_matched_ty = if Self::contains_class_pattern(previous_pattern) {
-                // A class pattern can fail after its runtime type check, for example when a
-                // protocol member is only declared but is absent at runtime. Without the subject
-                // type, `definite_match_pattern_type` cannot distinguish those cases, so leave the
-                // later alternative intact.
+                // Attribute extraction can still fail after the runtime class check. The next PR
+                // refines this with subject-aware class-pattern exhaustiveness.
                 Type::Never
             } else {
-                definite_match_pattern_type(self.db, previous_pattern)
+                definite_match_pattern_type_for_subject(
+                    self.db,
+                    previous_pattern,
+                    remaining_subject_ty,
+                )
             };
             remaining_subject_ty = IntersectionBuilder::new(self.db)
                 .add_positive(remaining_subject_ty)
@@ -1772,9 +1774,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         original_subject_ty: Type<'db>,
         matched_types: Type<'db>,
     ) -> Type<'db> {
-        let filtering_types = original_subject_ty
-            .flatten_typevars(self.db)
-            .resolve_type_alias(self.db);
+        let filtering_types = self.pattern_filtering_type(original_subject_ty);
         if matched_types.is_equivalent_to(self.db, filtering_types)
             && original_subject_ty.has_typevar(self.db)
         {
@@ -1788,8 +1788,9 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     /// Pair each original subject type with the union members used to test the pattern.
     ///
-    /// Type variables are expanded for matching, but each arm keeps the original type so a
-    /// successful pattern result can preserve that type variable.
+    /// An upper-bounded type variable uses its bound for matching, but each arm keeps the original
+    /// type so a successful result can preserve that type variable. Constrained type variables are
+    /// left opaque; selecting and correlating one of their constraints is handled separately.
     fn match_pattern_subject_arms(
         &self,
         subject_ty: Type<'db>,
@@ -1797,9 +1798,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let subject_ty = subject_ty.resolve_type_alias(self.db);
         let mut arms = SmallVec::new();
         let mut add_arm = |original_subject_ty: Type<'db>| {
-            let filtering_subject_ty = original_subject_ty
-                .flatten_typevars(self.db)
-                .resolve_type_alias(self.db);
+            let filtering_subject_ty = self.pattern_filtering_type(original_subject_ty);
             match filtering_subject_ty {
                 Type::Union(union) => arms.extend(
                     union
@@ -1821,6 +1820,17 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
 
         arms
+    }
+
+    fn pattern_filtering_type(&self, ty: Type<'db>) -> Type<'db> {
+        let ty = ty.resolve_type_alias(self.db);
+        if let Type::TypeVar(typevar) = ty
+            && let Some(bound) = typevar.typevar(self.db).upper_bound(self.db)
+        {
+            bound.resolve_type_alias(self.db)
+        } else {
+            ty
+        }
     }
 
     fn sequence_pattern_target_len(kind: &SequencePatternPredicateKind<'db>) -> TupleLength {

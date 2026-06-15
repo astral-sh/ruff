@@ -321,10 +321,10 @@ def test_later_failure_rejects_earlier_capture(value: tuple[str, str]) -> None:
 
 When a union contains several tuple types, matching one element can determine the types of the other
 captures. A wildcard keeps every tuple type that can match. The same rules apply through type
-aliases and constrained type variables.
+aliases.
 
 ```py
-from typing import Literal, TypeAlias, TypeVar
+from typing import Literal, TypeAlias
 
 def test_match_star_capture_filters_union_members(
     value: tuple[Literal[1], int, int] | tuple[Literal[2], str, str],
@@ -354,18 +354,8 @@ def test_match_capture_filters_union_members(
             return 0
 
 MatchPair: TypeAlias = tuple[Literal[1], int] | tuple[Literal[2], str]
-MatchPairT = TypeVar(
-    "MatchPairT",
-    tuple[Literal[1], int],
-    tuple[Literal[2], str],
-)
 
 def test_match_capture_filters_aliased_union_members(value: MatchPair) -> None:
-    match value:
-        case [1, item]:
-            reveal_type(item)  # revealed: int
-
-def test_match_capture_filters_constrained_typevar_members(value: MatchPairT) -> None:
     match value:
         case [1, item]:
             reveal_type(item)  # revealed: int
@@ -414,6 +404,24 @@ def test_match_sequence_as_pattern_excludes_previous_cases(
             pass
         case [int() as item, _]:
             reveal_type(item)  # revealed: Literal[2]
+
+def test_match_alias_excludes_cross_type_equal_values(
+    value: Literal[True, 1, 2],
+) -> None:
+    match value:
+        case 1:
+            pass
+        case _ as item:
+            # Both `True` and `1` compare equal to the first pattern.
+            reveal_type(item)  # revealed: Literal[2]
+
+def test_ordered_or_alias_excludes_cross_type_equal_values(
+    value: tuple[Literal[True], str] | tuple[Literal[2], bytes],
+) -> None:
+    match value:
+        case [1, *item] | [item, _]:
+            # The first alternative consumes the `Literal[True]` tuple.
+            reveal_type(item)  # revealed: list[str] | Literal[2]
 ```
 
 ## Ordered `or`-pattern bindings
@@ -476,32 +484,13 @@ def test_compatible_declared_alias(subject: object) -> None:
 
 ## Binding the whole pattern
 
-Binding an entire pattern with `as` keeps the subject's original type variable. If only some
-constraints can match, the binding also keeps the sequence shape established by the pattern. For a
-tuple, successful child patterns can also refine the types at fixed indices.
+Binding an entire pattern with `as` keeps the subject's original type variable. For a tuple,
+successful child patterns can also refine the types at fixed indices.
 
 ```py
-from typing import final, Literal, TypeVar
-
-@final
-class BoundA: ...
-
-@final
-class BoundB: ...
-
-BoundChoiceT = TypeVar("BoundChoiceT", BoundA, BoundB)
+from typing import Literal, TypeVar
 
 BoundSequenceT = TypeVar("BoundSequenceT", bound=tuple[object])
-ConstrainedSequenceT = TypeVar(
-    "ConstrainedSequenceT",
-    tuple[int],
-    tuple[str],
-)
-PartiallyMatchedSequenceT = TypeVar(
-    "PartiallyMatchedSequenceT",
-    tuple[int],
-    tuple[int, int],
-)
 
 def test_match_sequence_alias_preserves_bound_typevar(
     value: BoundSequenceT,
@@ -510,26 +499,6 @@ def test_match_sequence_alias_preserves_bound_typevar(
         case [_] as whole:
             reveal_type(whole)  # revealed: BoundSequenceT@test_match_sequence_alias_preserves_bound_typevar
             return whole
-
-def test_match_sequence_alias_preserves_constrained_typevar(
-    value: ConstrainedSequenceT,
-) -> ConstrainedSequenceT:
-    match value:
-        case [_] as whole:
-            # revealed: ConstrainedSequenceT@test_match_sequence_alias_preserves_constrained_typevar
-            reveal_type(whole)
-            return whole
-
-def test_match_sequence_alias_narrows_constrained_typevar(
-    value: PartiallyMatchedSequenceT,
-) -> PartiallyMatchedSequenceT:
-    match value:
-        case [_] as whole:
-            # revealed: PartiallyMatchedSequenceT@test_match_sequence_alias_narrows_constrained_typevar & tuple[int]
-            reveal_type(whole)
-            return whole
-        case _:
-            raise ValueError
 
 def test_match_sequence_alias_preserves_typevar_union_member(
     value: BoundSequenceT | str,
@@ -589,33 +558,6 @@ def test_nested_mutable_sequence_alias_does_not_keep_length(
         case _:
             raise ValueError
 
-def test_match_or_alias_preserves_constrained_typevar(
-    value: BoundChoiceT | str,
-) -> BoundChoiceT:
-    match value:
-        case (BoundA() | BoundB()) as whole:
-            reveal_type(whole)  # revealed: BoundChoiceT@test_match_or_alias_preserves_constrained_typevar
-            return whole
-        case _:
-            raise ValueError
-
-def test_match_or_alternative_alias_preserves_constrained_typevar(
-    value: BoundChoiceT,
-) -> BoundChoiceT:
-    match value:
-        case (BoundA() as whole) | (BoundB() as whole):
-            # revealed: BoundChoiceT@test_match_or_alternative_alias_preserves_constrained_typevar
-            reveal_type(whole)
-            return whole
-
-def test_match_ordered_or_preserves_nested_constrained_typevar(
-    value: tuple[BoundChoiceT] | BoundChoiceT,
-) -> BoundChoiceT:
-    match value:
-        case [item] | item:
-            # revealed: BoundChoiceT@test_match_ordered_or_preserves_nested_constrained_typevar
-            reveal_type(item)
-            return item
 ```
 
 ## Indirect class patterns

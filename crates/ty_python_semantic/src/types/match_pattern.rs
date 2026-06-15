@@ -1,7 +1,9 @@
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ty_python_core::Truthiness;
-use ty_python_core::predicate::{PatternPredicateKind, SequencePatternPredicateKind};
+use ty_python_core::predicate::{
+    ClassPatternKind, PatternPredicateKind, SequencePatternPredicateKind,
+};
 
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
@@ -162,6 +164,154 @@ pub(crate) fn starred_sequence_pattern_type<'db>(
     sequence_pattern_type_builder(db)
         .add_positive(protocol)
         .build()
+}
+
+fn pattern_is_exhaustive_for_subject(
+    db: &dyn Db,
+    pattern: &PatternPredicateKind<'_>,
+    subject_ty: Type<'_>,
+) -> bool {
+    subject_ty.is_subtype_of(
+        db,
+        definite_match_pattern_type_for_subject(db, pattern, subject_ty),
+    )
+}
+
+fn sequence_pattern_is_exhaustive_for_subject(
+    db: &dyn Db,
+    kind: &SequencePatternPredicateKind<'_>,
+    subject_ty: Type<'_>,
+) -> bool {
+    if !subject_ty.is_subtype_of(db, sequence_pattern_type_builder(db).build()) {
+        return false;
+    }
+
+    if kind.is_irrefutable() {
+        return true;
+    }
+
+    let Some(tuple) = subject_ty.exact_tuple_instance_spec(db) else {
+        return false;
+    };
+    let Some(tuple) = tuple.as_fixed_length() else {
+        return false;
+    };
+    let elements = tuple.all_elements();
+
+    let Some((prefix, suffix)) = kind.split_around_star() else {
+        return elements.len() == kind.patterns.len()
+            && elements
+                .iter()
+                .zip(kind.patterns.iter())
+                .all(|(element, pattern)| {
+                    pattern_is_exhaustive_for_subject(db, pattern, *element)
+                });
+    };
+    if elements.len() < prefix.len() + suffix.len() {
+        return false;
+    }
+
+    elements
+        .iter()
+        .zip(prefix)
+        .chain(elements.iter().rev().zip(suffix.iter().rev()))
+        .all(|(element, pattern)| pattern_is_exhaustive_for_subject(db, pattern, *element))
+}
+
+fn subject_independent_definite_match_pattern_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+) -> Option<Type<'db>> {
+    match kind {
+        PatternPredicateKind::Singleton(_)
+        | PatternPredicateKind::Class(_, ClassPatternKind::Irrefutable)
+        | PatternPredicateKind::Mapping(ClassPatternKind::Irrefutable) => {
+            Some(definite_match_pattern_type(db, kind))
+        }
+        PatternPredicateKind::Sequence(sequence) if sequence.is_irrefutable() => {
+            Some(definite_match_pattern_type(db, kind))
+        }
+        PatternPredicateKind::Or(patterns) => {
+            let patterns = patterns
+                .iter()
+                .map(|pattern| subject_independent_definite_match_pattern_type(db, pattern))
+                .collect::<Option<Vec<_>>>()?;
+            Some(UnionType::from_elements(db, patterns))
+        }
+        PatternPredicateKind::As(Some(pattern), _) => {
+            subject_independent_definite_match_pattern_type(db, pattern)
+        }
+        PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => Some(Type::object()),
+        PatternPredicateKind::Value(_)
+        | PatternPredicateKind::Class(_, ClassPatternKind::Refutable)
+        | PatternPredicateKind::Mapping(ClassPatternKind::Refutable)
+        | PatternPredicateKind::Sequence(_) => None,
+    }
+}
+
+/// Return the values in `subject_ty` that are statically guaranteed to match `kind`.
+///
+/// Unlike [`definite_match_pattern_type`], this can recognize guarantees that depend on the
+/// current subject. For example, both `Literal[True]` and `Literal[1]` are guaranteed to match the
+/// value pattern `1` because match value patterns use equality.
+pub(crate) fn definite_match_pattern_type_for_subject<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    if let Some(subject_independent_ty) = subject_independent_definite_match_pattern_type(db, kind)
+    {
+        return subject_independent_ty;
+    }
+
+    let resolved_subject_ty = subject_ty.resolve_type_alias(db);
+    if let Type::Union(union) = resolved_subject_ty {
+        return UnionType::from_elements(
+            db,
+            union
+                .elements(db)
+                .iter()
+                .map(|element| definite_match_pattern_type_for_subject(db, kind, *element)),
+        );
+    }
+
+    match kind {
+        PatternPredicateKind::Value(value) => {
+            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+            if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
+                subject_ty
+            } else {
+                IntersectionBuilder::new(db)
+                    .add_positive(subject_ty)
+                    .add_positive(definite_match_pattern_type(db, kind))
+                    .build()
+            }
+        }
+        PatternPredicateKind::Sequence(kind) => {
+            if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
+                subject_ty
+            } else {
+                IntersectionBuilder::new(db)
+                    .add_positive(subject_ty)
+                    .add_positive(definite_sequence_pattern_type(db, kind))
+                    .build()
+            }
+        }
+        PatternPredicateKind::Or(patterns) => UnionType::from_elements(
+            db,
+            patterns
+                .iter()
+                .map(|pattern| definite_match_pattern_type_for_subject(db, pattern, subject_ty)),
+        ),
+        PatternPredicateKind::As(Some(pattern), _) => {
+            definite_match_pattern_type_for_subject(db, pattern, subject_ty)
+        }
+        PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
+        _ => IntersectionBuilder::new(db)
+            .add_positive(subject_ty)
+            .add_positive(definite_match_pattern_type(db, kind))
+            .build(),
+    }
 }
 
 /// Return the values that are guaranteed to match `kind`.
