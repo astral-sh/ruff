@@ -435,10 +435,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for enclosing in enclosing_generic_contexts(db, self.index, current_scope) {
                     if let Some(other_typevar) = enclosing.binds_named_typevar(db, &param_name.id) {
                         let kind = match type_param {
-                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695,
+                            ast::TypeParam::TypeVar(_) => TypeVarKind::Pep695TypeVar,
                             ast::TypeParam::ParamSpec(_) => TypeVarKind::Pep695ParamSpec,
                             // TODO: should be `TypeVarKind::Pep695TypeVarTuple`
-                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695,
+                            ast::TypeParam::TypeVarTuple(_) => TypeVarKind::Pep695TypeVar,
                         };
                         report_shadowed_type_variable(
                             &self.context,

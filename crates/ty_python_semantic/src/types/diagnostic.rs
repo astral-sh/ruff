@@ -5935,8 +5935,8 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         return;
     };
     let typevar_kind = match type_var_kind {
-        TypeVarKind::Legacy
-        | TypeVarKind::Pep695
+        TypeVarKind::LegacyTypeVar
+        | TypeVarKind::Pep695TypeVar
         | TypeVarKind::TypingSelf
         | TypeVarKind::Pep613Alias => "type variable",
         TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",

@@ -69,7 +69,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if bound_or_constraint.is_some() || default.is_some() {
             self.deferred.insert(definition);
         }
-        let identity = TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695);
+        let identity =
+            TypeVarIdentity::new(db, &name.id, Some(definition), TypeVarKind::Pep695TypeVar);
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
             identity,
@@ -1253,7 +1254,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             target_name.clone(),
             Some(definition),
-            TypeVarKind::Legacy,
+            TypeVarKind::LegacyTypeVar,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db,
