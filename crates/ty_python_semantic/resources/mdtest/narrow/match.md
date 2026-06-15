@@ -666,8 +666,9 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
 
 ## Enum equality semantics
 
-Enum value patterns use the enum class's actual `__eq__` implementation. Members of `StrEnum`
-therefore compare equal to string literals with the same value:
+Enum value patterns use the enum class's actual `__eq__` implementation. Members of an ordinary
+`Enum` compare by identity and cannot equal `None`. Members of `StrEnum` compare equal to string
+literals with the same value:
 
 ```toml
 [environment]
@@ -704,6 +705,15 @@ def test_enum_as_literal(y: Literal[Color.BLUE]) -> None:
             reveal_type(y)  # revealed: Literal[Color.BLUE]
         case _:
             assert_never(y)
+
+class Direction(Enum):
+    NORTH = "north"
+    SOUTH = "south"
+
+def enum_member_excludes_none(direction: Direction | None) -> None:
+    match direction:
+        case Direction.NORTH:
+            reveal_type(direction)  # revealed: Literal[Direction.NORTH]
 
 class AlwaysEqual(Enum):
     RED = "r"
