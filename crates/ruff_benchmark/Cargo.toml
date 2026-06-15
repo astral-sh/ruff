@@ -22,6 +22,7 @@ ruff_linter = { workspace = true, optional = true }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
+ty_module_resolver = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
 
 anyhow = { workspace = true }
@@ -44,7 +45,7 @@ ruff_python_ast = { workspace = true }
 rustc-hash = { workspace = true }
 
 [features]
-default = ["ty_instrumented", "ty_walltime", "ruff_instrumented"]
+default = ["module_resolution", "ruff_instrumented", "ty_instrumented", "ty_walltime"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
@@ -57,6 +58,8 @@ ruff_instrumented = [
 ]
 # Enables the ty instrumented benchmarks
 ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
+# Enables the module-resolution benchmark
+module_resolution = ["divan", "ty_module_resolver", "ty_project"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
 ty_walltime = ["ruff_db/os", "ty_project", "divan"]
@@ -87,6 +90,11 @@ harness = false
 required-features = ["ty_instrumented"]
 
 [[bench]]
+name = "module_resolution"
+harness = false
+required-features = ["module_resolution"]
+
+[[bench]]
 name = "ty_walltime"
 harness = false
 required-features = ["ty_walltime"]
@@ -103,6 +111,7 @@ ignored = [
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
+    "ty_module_resolver",
     "mimalloc",
     "tikv-jemallocator"
 ]
