@@ -504,6 +504,10 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         constraints: &'c ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        if self.is_trivially_constraint_set_assignable_to(db, target) {
+            return ConstraintSet::from_bool(constraints, true);
+        }
+
         self.has_relation_to_with_typevar_evaluation(
             db,
             target,

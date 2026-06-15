@@ -49,3 +49,20 @@ def sympy_modular_gcd_loop(fp, gp, deg):
         fp = gp
         gp = rem
 ```
+
+This is minimized from a SymPy constraint-solver assertion. An empty list literal can
+accumulate elements from a loop-carried recursive value, then become the next value for
+that same loop variable. Constraint-set assignability must treat the recovered recursive
+placeholder as assignable to a union that explicitly contains it.
+
+```py
+def sympy_permutation_group_loop(self, H, p):
+    gns = self.generators
+    while True:
+        pows = []
+        for g in gns:
+            elm = g**p
+            if not H.contains(elm):
+                pows.append(elm)
+        gns = pows
+```
