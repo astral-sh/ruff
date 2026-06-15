@@ -1929,39 +1929,31 @@ enum HashableExprKind<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-enum HashableNumber {
-    Real(HashableReal),
-    Complex {
-        real: HashableReal,
-        imag: HashableReal,
-    },
+struct HashableNumber {
+    real: HashableReal,
+    imag: HashableReal,
 }
 
 impl HashableNumber {
-    fn complex(real: HashableReal, imag: HashableReal) -> Self {
-        if imag.is_zero() {
-            Self::Real(real)
-        } else {
-            Self::Complex { real, imag }
+    fn real(real: HashableReal) -> Self {
+        Self {
+            real,
+            imag: HashableReal::zero(),
         }
     }
 
+    fn complex(real: HashableReal, imag: HashableReal) -> Self {
+        Self { real, imag }
+    }
+
     fn negate(mut self) -> Self {
-        match &mut self {
-            Self::Real(real) => real.negate(),
-            Self::Complex { real, imag } => {
-                real.negate();
-                imag.negate();
-            }
-        }
+        self.real.negate();
+        self.imag.negate();
         self
     }
 
     fn into_real(self) -> Option<HashableReal> {
-        match self {
-            Self::Real(real) => Some(real),
-            Self::Complex { .. } => None,
-        }
+        self.imag.is_zero().then_some(self.real)
     }
 }
 
@@ -1972,6 +1964,10 @@ enum HashableReal {
 }
 
 impl HashableReal {
+    fn zero() -> Self {
+        Self::Integer(HashableInteger::zero())
+    }
+
     fn from_int(value: &ast::Int) -> Self {
         Self::Integer(HashableInteger::from_int(value))
     }
@@ -2148,13 +2144,13 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
 
         fn as_number(expr: &Expr) -> Option<HashableNumber> {
             match expr {
-                Expr::BooleanLiteral(boolean) => Some(HashableNumber::Real(HashableReal::Integer(
+                Expr::BooleanLiteral(boolean) => Some(HashableNumber::real(HashableReal::Integer(
                     HashableInteger::from_u64(u64::from(boolean.value)),
                 ))),
                 Expr::NumberLiteral(number) => match &number.value {
-                    Number::Int(int) => Some(HashableNumber::Real(HashableReal::from_int(int))),
+                    Number::Int(int) => Some(HashableNumber::real(HashableReal::from_int(int))),
                     Number::Float(float) => {
-                        Some(HashableNumber::Real(HashableReal::from_float(*float)))
+                        Some(HashableNumber::real(HashableReal::from_float(*float)))
                     }
                     Number::Complex { real, imag } => Some(HashableNumber::complex(
                         HashableReal::from_float(*real),
@@ -2167,8 +2163,11 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
                     ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
                 Expr::BinOp(ast::ExprBinOp {
-                    left, op, right, ..
-                }) if matches!(op, ast::Operator::Add | ast::Operator::Sub) => {
+                    left,
+                    op: op @ (ast::Operator::Add | ast::Operator::Sub),
+                    right,
+                    ..
+                }) => {
                     let real = as_number(left)?.into_real()?;
                     let Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value:

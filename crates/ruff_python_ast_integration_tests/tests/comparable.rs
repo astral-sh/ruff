@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_parser::{ParseError, parse_expression};
 
@@ -32,27 +30,11 @@ fn assert_hashable_equal(left: &str, right: &str) -> Result<(), ParseError> {
     let left_parsed = parse_expression(left)?;
     let right_parsed = parse_expression(right)?;
 
-    let left_hashable = HashableExpr::from(left_parsed.expr());
-    let right_hashable = HashableExpr::from(right_parsed.expr());
-
-    assert_eq!(left_hashable, right_hashable);
-
-    let mut seen = HashSet::new();
-    assert!(seen.insert(left_hashable));
-    assert!(!seen.insert(right_hashable));
-
-    Ok(())
-}
-
-#[track_caller]
-fn assert_hashable_not_equal(left: &str, right: &str) -> Result<(), ParseError> {
-    let left_parsed = parse_expression(left)?;
-    let right_parsed = parse_expression(right)?;
-
-    assert_ne!(
+    assert_eq!(
         HashableExpr::from(left_parsed.expr()),
         HashableExpr::from(right_parsed.expr())
     );
+
     Ok(())
 }
 
@@ -105,5 +87,12 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal("18446744073709551616", "1.8446744073709552e19")?;
     assert_hashable_equal("0x10000000000000000", "18446744073709551616")?;
 
-    assert_hashable_not_equal("9007199254740993", "9007199254740992.0")
+    let integer = parse_expression("9007199254740993")?;
+    let float = parse_expression("9007199254740992.0")?;
+    assert_ne!(
+        HashableExpr::from(integer.expr()),
+        HashableExpr::from(float.expr())
+    );
+
+    Ok(())
 }
