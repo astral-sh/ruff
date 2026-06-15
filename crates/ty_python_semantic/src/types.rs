@@ -4603,6 +4603,8 @@ impl<'db> Type<'db> {
                 //         stacklevel: int = 1
                 //     ) -> Self: ...
                 // ```
+                let warning_class_type = KnownClass::Warning.to_subclass_of(db);
+
                 Some(
                     Binding::single(
                         self,
@@ -4615,12 +4617,10 @@ impl<'db> Type<'db> {
                                     Parameter::keyword_only(Name::new_static("category"))
                                         .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            // TODO: should be `type[Warning]`
-                                            Type::any(),
-                                            KnownClass::NoneType.to_instance(db),
+                                            warning_class_type,
+                                            Type::none(db),
                                         ))
-                                        // TODO: should be `type[Warning]`
-                                        .with_default_type(Type::any()),
+                                        .with_default_type(warning_class_type),
                                     Parameter::keyword_only(Name::new_static("stacklevel"))
                                         .with_annotated_type(KnownClass::Int.to_instance(db))
                                         .with_default_type(Type::int_literal(1)),

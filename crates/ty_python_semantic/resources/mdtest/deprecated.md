@@ -222,6 +222,19 @@ def valid_deco(): ...
 valid_deco()  # error: [deprecated] "some message"
 ```
 
+## Category
+
+The category must be a `Warning` subclass or `None`.
+
+```py
+from typing_extensions import deprecated
+
+@deprecated("some message", category=42)  # error: [invalid-argument-type] "type[Warning] | None"
+def invalid_category(): ...
+@deprecated("some message", category=None)
+def no_category(): ...
+```
+
 ## Different Versions
 
 There are 2 different sources of `@deprecated`: `warnings` and `typing_extensions`. The version in
