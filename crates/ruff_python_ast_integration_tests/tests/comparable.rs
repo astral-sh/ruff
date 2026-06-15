@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_parser::{ParseError, parse_expression};
 
@@ -30,10 +32,14 @@ fn assert_hashable_equal(left: &str, right: &str) -> Result<(), ParseError> {
     let left_parsed = parse_expression(left)?;
     let right_parsed = parse_expression(right)?;
 
-    assert_eq!(
-        HashableExpr::from(left_parsed.expr()),
-        HashableExpr::from(right_parsed.expr())
-    );
+    let left_hashable = HashableExpr::from(left_parsed.expr());
+    let right_hashable = HashableExpr::from(right_parsed.expr());
+
+    assert_eq!(left_hashable, right_hashable);
+
+    let mut seen = HashSet::new();
+    assert!(seen.insert(left_hashable));
+    assert!(!seen.insert(right_hashable));
 
     Ok(())
 }
@@ -93,6 +99,18 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal(power_of_two_256, &format!("0x1{}", "0".repeat(64)))?;
     assert_hashable_equal(power_of_two_256, &format!("0o2{}", "0".repeat(85)))?;
     assert_hashable_equal(power_of_two_256, &format!("0b1{}", "0".repeat(256)))?;
+
+    assert_hashable_equal(
+        &format!("0x1{}", "0".repeat(1024)),
+        &format!("0b1{}", "0".repeat(4096)),
+    )?;
+    assert_hashable_equal(
+        &format!("0o2{}", "0".repeat(1365)),
+        &format!("0b1{}", "0".repeat(4096)),
+    )?;
+
+    let large_decimal = "9".repeat(310);
+    assert_hashable_equal(&large_decimal, &format!("+{large_decimal}"))?;
 
     let integer = parse_expression("9007199254740993")?;
     let float = parse_expression("9007199254740992.0")?;

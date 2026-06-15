@@ -1920,7 +1920,7 @@ pub struct HashableExpr<'a>(HashableExprKind<'a>);
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum HashableExprKind<'a> {
     Comparable(ComparableExpr<'a>),
-    Number(HashableNumber),
+    Number(HashableNumber<'a>),
     NamedExpr {
         target: ComparableExpr<'a>,
         value: Box<HashableExpr<'a>>,
@@ -1929,20 +1929,20 @@ enum HashableExprKind<'a> {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct HashableNumber {
-    real: HashableReal,
-    imag: HashableReal,
+struct HashableNumber<'a> {
+    real: HashableReal<'a>,
+    imag: HashableReal<'a>,
 }
 
-impl HashableNumber {
-    fn real(real: HashableReal) -> Self {
+impl<'a> HashableNumber<'a> {
+    fn real(real: HashableReal<'a>) -> Self {
         Self {
             real,
             imag: HashableReal::zero(),
         }
     }
 
-    fn complex(real: HashableReal, imag: HashableReal) -> Self {
+    fn complex(real: HashableReal<'a>, imag: HashableReal<'a>) -> Self {
         Self { real, imag }
     }
 
@@ -1952,23 +1952,23 @@ impl HashableNumber {
         self
     }
 
-    fn into_real(self) -> Option<HashableReal> {
+    fn into_real(self) -> Option<HashableReal<'a>> {
         self.imag.is_zero().then_some(self.real)
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-enum HashableReal {
-    Integer(HashableInteger),
+enum HashableReal<'a> {
+    Integer(HashableInteger<'a>),
     Float(u64),
 }
 
-impl HashableReal {
+impl<'a> HashableReal<'a> {
     fn zero() -> Self {
         Self::Integer(HashableInteger::zero())
     }
 
-    fn from_int(value: &ast::Int) -> Self {
+    fn from_int(value: &'a ast::Int) -> Self {
         Self::Integer(HashableInteger::from_int(value))
     }
 
@@ -1991,84 +1991,112 @@ impl HashableReal {
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
-struct HashableInteger {
+struct HashableInteger<'a> {
     negative: bool,
-    /// The magnitude in little-endian base-2^64 limbs. Zero has no limbs.
-    magnitude: Box<[u64]>,
+    magnitude: HashableIntegerMagnitude<'a>,
 }
 
-impl HashableInteger {
+/// Large decimal and power-of-two literals occupy separate equivalence domains to avoid
+/// unbounded base conversion. This can miss a duplicate across those domains, but cannot report a
+/// false positive.
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableIntegerMagnitude<'a> {
+    /// Values small enough to compare with every finite integral float.
+    Bounded(Box<[u64]>),
+    /// Larger decimal values retain their normalized parser representation.
+    Decimal(&'a str),
+    /// Larger binary, octal, and hexadecimal values stream a shared limb representation.
+    PowerOfTwo(PowerOfTwoLiteral<'a>),
+}
+
+#[derive(Debug, Copy, Clone)]
+struct PowerOfTwoLiteral<'a> {
+    digits: &'a str,
+    radix: u32,
+    bit_len: usize,
+}
+
+const MAX_BOUNDED_DECIMAL_DIGITS: usize = 309;
+const MAX_BOUNDED_INTEGER_BITS: usize = 1024;
+
+impl<'a> HashableInteger<'a> {
     fn zero() -> Self {
         Self {
             negative: false,
-            magnitude: Box::new([]),
+            magnitude: HashableIntegerMagnitude::Bounded(Box::new([])),
         }
     }
 
     fn from_u64(value: u64) -> Self {
-        if value == 0 {
-            Self::zero()
+        let magnitude: Box<[u64]> = if value == 0 {
+            Box::new([])
         } else {
-            Self {
-                negative: false,
-                magnitude: Box::new([value]),
-            }
+            Box::new([value])
+        };
+        Self {
+            negative: false,
+            magnitude: HashableIntegerMagnitude::Bounded(magnitude),
         }
     }
 
-    fn from_int(value: &ast::Int) -> Self {
-        let Some(value) = value.as_u64() else {
-            return Self::from_literal(&value.to_string());
-        };
-        Self::from_u64(value)
-    }
+    fn from_int(value: &'a ast::Int) -> Self {
+        if let Some(value) = value.as_u64() {
+            return Self::from_u64(value);
+        }
 
-    fn from_literal(literal: &str) -> Self {
-        let (digits, radix) = if let Some(digits) = literal
+        let literal = value
+            .as_big_str()
+            .expect("integers that exceed `u64` are stored as strings");
+        let magnitude = if let Some(digits) = literal
             .strip_prefix("0x")
             .or_else(|| literal.strip_prefix("0X"))
         {
-            (digits, 16u32)
+            Self::from_power_of_two_literal(digits, 16)
         } else if let Some(digits) = literal
             .strip_prefix("0o")
             .or_else(|| literal.strip_prefix("0O"))
         {
-            (digits, 8)
+            Self::from_power_of_two_literal(digits, 8)
         } else if let Some(digits) = literal
             .strip_prefix("0b")
             .or_else(|| literal.strip_prefix("0B"))
         {
-            (digits, 2)
+            Self::from_power_of_two_literal(digits, 2)
         } else {
-            (literal, 10)
+            let digits = literal.trim_start_matches('0');
+            if digits.is_empty() {
+                return Self::zero();
+            }
+            if digits.len() <= MAX_BOUNDED_DECIMAL_DIGITS {
+                let magnitude = decimal_magnitude(digits);
+                if magnitude.len() <= MAX_BOUNDED_INTEGER_BITS / 64 {
+                    HashableIntegerMagnitude::Bounded(magnitude)
+                } else {
+                    HashableIntegerMagnitude::Decimal(digits)
+                }
+            } else {
+                HashableIntegerMagnitude::Decimal(digits)
+            }
         };
-
-        let limb_radix = u64::from(radix);
-        let mut magnitude = Vec::new();
-        // Accumulate as many digits as possible before rescanning the existing limbs.
-        let mut chunk = 0u64;
-        let mut chunk_radix = 1u64;
-        for byte in digits.bytes().filter(|byte| *byte != b'_') {
-            let Some(digit) = char::from(byte).to_digit(radix) else {
-                continue;
-            };
-            let digit = u64::from(digit);
-
-            let Some(next_chunk_radix) = chunk_radix.checked_mul(limb_radix) else {
-                multiply_add(&mut magnitude, chunk_radix, chunk);
-                chunk = digit;
-                chunk_radix = limb_radix;
-                continue;
-            };
-
-            chunk = chunk * limb_radix + digit;
-            chunk_radix = next_chunk_radix;
-        }
-        multiply_add(&mut magnitude, chunk_radix, chunk);
 
         Self {
             negative: false,
-            magnitude: magnitude.into_boxed_slice(),
+            magnitude,
+        }
+    }
+
+    fn from_power_of_two_literal(digits: &'a str, radix: u32) -> HashableIntegerMagnitude<'a> {
+        let bit_len = power_of_two_bit_len(digits, radix);
+        if bit_len == 0 {
+            HashableIntegerMagnitude::Bounded(Box::new([]))
+        } else if bit_len <= MAX_BOUNDED_INTEGER_BITS {
+            HashableIntegerMagnitude::Bounded(power_of_two_magnitude(digits, radix, bit_len))
+        } else {
+            HashableIntegerMagnitude::PowerOfTwo(PowerOfTwoLiteral {
+                digits,
+                radix,
+                bit_len,
+            })
         }
     }
 
@@ -2104,12 +2132,12 @@ impl HashableInteger {
 
         Some(Self {
             negative: value.is_sign_negative(),
-            magnitude: magnitude.into_boxed_slice(),
+            magnitude: HashableIntegerMagnitude::Bounded(magnitude.into_boxed_slice()),
         })
     }
 
     fn is_zero(&self) -> bool {
-        self.magnitude.is_empty()
+        matches!(&self.magnitude, HashableIntegerMagnitude::Bounded(magnitude) if magnitude.is_empty())
     }
 
     fn negate(&mut self) {
@@ -2117,6 +2145,136 @@ impl HashableInteger {
             self.negative = !self.negative;
         }
     }
+}
+
+impl Hash for PowerOfTwoLiteral<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.bit_len.hash(state);
+        for limb in self.limbs() {
+            limb.hash(state);
+        }
+    }
+}
+
+impl PartialEq for PowerOfTwoLiteral<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.bit_len == other.bit_len && self.limbs().eq(other.limbs())
+    }
+}
+
+impl Eq for PowerOfTwoLiteral<'_> {}
+
+impl PowerOfTwoLiteral<'_> {
+    fn limbs(&self) -> PowerOfTwoLimbs<'_> {
+        PowerOfTwoLimbs {
+            digits: self.digits.bytes().rev(),
+            radix: self.radix,
+            bits_per_digit: self.radix.trailing_zeros(),
+            buffer: 0,
+            buffered_bits: 0,
+            remaining: self.bit_len.div_ceil(64),
+        }
+    }
+}
+
+struct PowerOfTwoLimbs<'a> {
+    digits: std::iter::Rev<std::str::Bytes<'a>>,
+    radix: u32,
+    bits_per_digit: u32,
+    buffer: u128,
+    buffered_bits: u32,
+    remaining: usize,
+}
+
+impl Iterator for PowerOfTwoLimbs<'_> {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+
+        while self.buffered_bits < 64 {
+            let Some(byte) = self.digits.find(|byte| *byte != b'_') else {
+                break;
+            };
+            let Some(digit) = char::from(byte).to_digit(self.radix) else {
+                continue;
+            };
+            self.buffer |= u128::from(digit) << self.buffered_bits;
+            self.buffered_bits += self.bits_per_digit;
+        }
+
+        let limb = lower_u64(self.buffer);
+        if self.buffered_bits >= 64 {
+            self.buffer >>= 64;
+            self.buffered_bits -= 64;
+        } else {
+            self.buffer = 0;
+            self.buffered_bits = 0;
+        }
+        self.remaining -= 1;
+        Some(limb)
+    }
+}
+
+fn power_of_two_bit_len(digits: &str, radix: u32) -> usize {
+    let bits_per_digit = radix.trailing_zeros() as usize;
+    let mut significant_digits = 0usize;
+    let mut first_digit = 0u32;
+    for byte in digits.bytes().filter(|byte| *byte != b'_') {
+        let Some(digit) = char::from(byte).to_digit(radix) else {
+            continue;
+        };
+        if significant_digits == 0 && digit == 0 {
+            continue;
+        }
+        if significant_digits == 0 {
+            first_digit = digit;
+        }
+        significant_digits += 1;
+    }
+
+    if significant_digits == 0 {
+        0
+    } else {
+        (significant_digits - 1) * bits_per_digit
+            + (u32::BITS - first_digit.leading_zeros()) as usize
+    }
+}
+
+fn power_of_two_magnitude(digits: &str, radix: u32, bit_len: usize) -> Box<[u64]> {
+    PowerOfTwoLiteral {
+        digits,
+        radix,
+        bit_len,
+    }
+    .limbs()
+    .collect()
+}
+
+fn decimal_magnitude(literal: &str) -> Box<[u64]> {
+    let mut magnitude = Vec::new();
+    let mut chunk = 0u64;
+    let mut chunk_radix = 1u64;
+    for byte in literal.bytes() {
+        let Some(digit) = char::from(byte).to_digit(10) else {
+            continue;
+        };
+        let digit = u64::from(digit);
+
+        let Some(next_chunk_radix) = chunk_radix.checked_mul(10) else {
+            multiply_add(&mut magnitude, chunk_radix, chunk);
+            chunk = digit;
+            chunk_radix = 10;
+            continue;
+        };
+
+        chunk = chunk * 10 + digit;
+        chunk_radix = next_chunk_radix;
+    }
+    multiply_add(&mut magnitude, chunk_radix, chunk);
+    magnitude.into_boxed_slice()
 }
 
 fn multiply_add(magnitude: &mut Vec<u64>, multiplier: u64, addend: u64) {
@@ -2179,7 +2337,7 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
             Some(HashableExpr(kind))
         }
 
-        fn as_number(expr: &Expr) -> Option<HashableNumber> {
+        fn as_number(expr: &Expr) -> Option<HashableNumber<'_>> {
             match expr {
                 Expr::BooleanLiteral(boolean) => Some(HashableNumber::real(HashableReal::Integer(
                     HashableInteger::from_u64(u64::from(boolean.value)),
