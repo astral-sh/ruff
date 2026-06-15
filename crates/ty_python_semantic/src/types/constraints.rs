@@ -2006,22 +2006,40 @@ impl ConstraintId {
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> bool {
-        let self_constraint = builder.constraint_data(self);
-        let other_constraint = builder.constraint_data(other);
-        if !self_constraint
-            .typevar
-            .is_same_typevar_as(db, other_constraint.typevar)
-        {
-            return false;
-        }
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
-            && self_constraint
+        #[salsa::tracked(
+            returns(copy),
+            cycle_initial=|_, _, _, _| false,
+            heap_size=ruff_memory_usage::heap_size,
+        )]
+        fn constraint_implies<'db>(
+            db: &'db dyn Db,
+            self_constraint: Constraint<'db>,
+            other_constraint: Constraint<'db>,
+        ) -> bool {
+            if !self_constraint
+                .typevar
+                .is_same_typevar_as(db, other_constraint.typevar)
+            {
+                return false;
+            }
+            other_constraint
                 .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+                .materialized_lower()
+                .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
+                && self_constraint
+                    .bounds
+                    .materialized_upper()
+                    .is_constraint_set_assignable_to(
+                        db,
+                        other_constraint.bounds.materialized_upper(),
+                    )
+        }
+
+        constraint_implies(
+            db,
+            builder.constraint_data(self),
+            builder.constraint_data(other),
+        )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
