@@ -271,8 +271,8 @@ def _(answer: IndependentEquality):
 
 ## Known built-in equality behavior
 
-For `bool`, `LiteralString`, and `TypedDict`, ty knows which built-in equality implementation is
-used. Comparing two values with the same known behavior can therefore eliminate `None`:
+`bool`, `LiteralString`, and `TypedDict` have known built-in equality behavior. Comparing two values
+with the same known behavior can therefore eliminate `None`:
 
 ```py
 from typing import TypedDict
