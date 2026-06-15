@@ -1240,7 +1240,8 @@ fn resolve_name_impl<'a>(
         }
 
         let is_stdlib = search_path.is_standard_library();
-        // Only an exact post-stdlib stub package match prevents an early exit before stdlib.
+        // A terminal candidate can stop the search unless a matching post-stdlib stub package
+        // could still override it. A terminal stdlib candidate always stops the search.
         let can_stop = is_stdlib || pending_stub_paths.is_empty();
         let mut candidate = ModuleResolutionCandidate::root(search_path);
         let terminal = if candidate_may_exist(&context, &candidate, root_component) {
@@ -1260,6 +1261,8 @@ fn resolve_name_impl<'a>(
             break;
         }
 
+        // Reaching this point for stdlib means that it did not provide a terminal candidate.
+        // The deferred post-stdlib stub packages are therefore eligible, so resolve them now.
         if is_stdlib && let Some(stub_name) = stub_name.as_deref() {
             cur_candidates.extend(pending_stub_paths.drain(..).filter_map(|search_path| {
                 resolve_stub_package_in_search_path(&context, search_path, stub_name)
