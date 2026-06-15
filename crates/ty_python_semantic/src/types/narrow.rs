@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::collections::{BTreeMap, btree_map::Entry as BTreeEntry, hash_map::Entry};
 
 use crate::Db;
@@ -12,9 +13,9 @@ use crate::types::typed_dict::{
     TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType,
-    KnownClass, KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature,
-    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
+    BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral, ClassType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, callable_pattern_type, definite_match_pattern_type,
     definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
     mapping_pattern_type, singleton_pattern_type, starred_sequence_pattern_type,
@@ -36,6 +37,7 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use super::UnionType;
 use super::enums::enum_metadata;
 use super::equality::{evaluate_type_equality, evaluate_type_inequality, may_compare_equal};
+use super::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -380,7 +382,18 @@ struct PatternBindingTypes<'db> {
 #[derive(Clone, Copy)]
 struct PatternBindingType<'db> {
     ty: Type<'db>,
-    aliases_subject: bool,
+    source: PatternValueSource,
+}
+
+/// Whether a binding contribution aliases the current pattern node's subject or an extracted value.
+///
+/// Subject contributions can recover an original type variable after all filtering arms match.
+/// Extracted contributions remain separate because that restoration applies only to aliases of
+/// the subject represented by the current pattern node.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PatternValueSource {
+    Subject,
+    Extracted,
 }
 
 impl<'db> PatternBindingTypes<'db> {
@@ -388,7 +401,7 @@ impl<'db> PatternBindingTypes<'db> {
         Self {
             contributions: smallvec![PatternBindingType {
                 ty: subject_ty,
-                aliases_subject: true,
+                source: PatternValueSource::Subject,
             }],
         }
     }
@@ -399,7 +412,7 @@ impl<'db> PatternBindingTypes<'db> {
 
     fn demote_subject(&mut self) {
         for contribution in &mut self.contributions {
-            contribution.aliases_subject = false;
+            contribution.source = PatternValueSource::Extracted;
         }
     }
 
@@ -412,7 +425,7 @@ impl<'db> PatternBindingTypes<'db> {
             db,
             self.contributions
                 .iter()
-                .filter(|binding| binding.aliases_subject)
+                .filter(|binding| binding.source == PatternValueSource::Subject)
                 .map(|binding| binding.ty),
         )
     }
@@ -420,7 +433,7 @@ impl<'db> PatternBindingTypes<'db> {
     fn restore_subject(&mut self, restored_subject_ty: Type<'db>) {
         let mut restored = false;
         self.contributions.retain_mut(|contribution| {
-            if !contribution.aliases_subject {
+            if contribution.source != PatternValueSource::Subject {
                 return true;
             }
             if restored {
@@ -1679,6 +1692,55 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         subject_ty: Type<'db>,
         analyze_arm: impl Fn(&Self, Type<'db>) -> Option<PatternSuccessResult<'db>>,
     ) -> PatternSuccessResult<'db> {
+        // Analyze the original subject to preserve type-variable identity in the result. The
+        // consistent substitutions then filter out combinations that no legal specialization can
+        // produce, without replacing the original type variable in successful bindings.
+        let mut result = self.analyze_pattern_subject_arms_impl(subject_ty, &analyze_arm);
+        let Some(expanded_subject_types) = self.expand_constrained_typevars(subject_ty) else {
+            return result;
+        };
+
+        let mut filtering_result = PatternSuccessResult {
+            matched_subject_ty: Type::Never,
+            bindings: BTreeMap::new(),
+        };
+        for expanded_subject_ty in expanded_subject_types {
+            let expanded_result =
+                self.analyze_pattern_subject_arms_impl(expanded_subject_ty, &analyze_arm);
+            filtering_result.matched_subject_ty = UnionType::from_two_elements(
+                self.db,
+                filtering_result.matched_subject_ty,
+                expanded_result.matched_subject_ty,
+            );
+            Self::merge_bindings(&mut filtering_result.bindings, expanded_result.bindings);
+        }
+
+        result.matched_subject_ty = self.typevar_preserving_intersection(
+            result.matched_subject_ty,
+            filtering_result.matched_subject_ty,
+        );
+        result.bindings.retain(|place, binding| {
+            let filtering_ty = filtering_result
+                .bindings
+                .get(place)
+                .map_or(Type::Never, |binding| binding.ty(self.db));
+            for contribution in &mut binding.contributions {
+                contribution.ty =
+                    self.typevar_preserving_intersection(contribution.ty, filtering_ty);
+            }
+            binding
+                .contributions
+                .retain(|contribution| !contribution.ty.is_never());
+            !binding.contributions.is_empty()
+        });
+        result
+    }
+
+    fn analyze_pattern_subject_arms_impl(
+        &self,
+        subject_ty: Type<'db>,
+        analyze_arm: &impl Fn(&Self, Type<'db>) -> Option<PatternSuccessResult<'db>>,
+    ) -> PatternSuccessResult<'db> {
         let subject_arms = self.match_pattern_subject_arms(subject_ty);
         let grouped_arms = subject_arms
             .into_iter()
@@ -1715,6 +1777,23 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         PatternSuccessResult {
             matched_subject_ty: matched_subject_types.build(),
             bindings,
+        }
+    }
+
+    fn typevar_preserving_intersection(
+        &self,
+        original_ty: Type<'db>,
+        filtering_ty: Type<'db>,
+    ) -> Type<'db> {
+        let flattened_original_ty = original_ty
+            .flatten_typevars(self.db)
+            .resolve_type_alias(self.db);
+        if original_ty.has_typevar(self.db)
+            && filtering_ty.is_equivalent_to(self.db, flattened_original_ty)
+        {
+            original_ty
+        } else {
+            self.intersect_types(original_ty, filtering_ty)
         }
     }
 
@@ -1772,6 +1851,72 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
 
         arms
+    }
+
+    /// Expand constrained type variables consistently across the complete subject type.
+    ///
+    /// A constrained type variable chooses one constraint for every occurrence. For example,
+    /// `tuple[T, T]` for `T = TypeVar("T", A, B)` expands to `tuple[A, A] | tuple[B, B]`, not the
+    /// Cartesian product of independently expanding each tuple element. A bounded type variable is
+    /// deliberately not substituted here because it can specialize to its union bound itself.
+    fn expand_constrained_typevars(
+        &self,
+        subject_ty: Type<'db>,
+    ) -> Option<SmallVec<[Type<'db>; 2]>> {
+        #[derive(Default)]
+        struct ConstrainedTypeVars<'db> {
+            typevars: RefCell<SmallVec<[BoundTypeVarInstance<'db>; 2]>>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for ConstrainedTypeVars<'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                if bound_typevar.typevar(db).constraints(db).is_some()
+                    && !self
+                        .typevars
+                        .borrow()
+                        .iter()
+                        .any(|existing| existing.is_same_typevar_as(db, bound_typevar))
+                {
+                    self.typevars.borrow_mut().push(bound_typevar);
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        let collector = ConstrainedTypeVars::default();
+        collector.visit_type(self.db, subject_ty);
+
+        let typevars = collector.typevars.into_inner();
+        if typevars.is_empty() {
+            return None;
+        }
+
+        let mut expanded: SmallVec<[Type<'db>; 2]> = smallvec![subject_ty];
+        for typevar in typevars {
+            let Some(constraints) = typevar.typevar(self.db).constraints(self.db) else {
+                continue;
+            };
+            let mut next = SmallVec::new();
+            for subject_ty in expanded {
+                next.extend(constraints.iter().map(|constraint| {
+                    subject_ty.substitute_one_typevar(self.db, typevar, *constraint)
+                }));
+            }
+            expanded = next;
+        }
+        Some(expanded)
     }
 
     fn sequence_pattern_target_len(kind: &SequencePatternPredicateKind<'db>) -> TupleLength {

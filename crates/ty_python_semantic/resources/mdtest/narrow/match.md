@@ -491,6 +491,8 @@ class BoundB: ...
 
 BoundChoiceT = TypeVar("BoundChoiceT", BoundA, BoundB)
 
+BoundedChoiceT = TypeVar("BoundedChoiceT", bound=BoundA | BoundB)
+
 BoundSequenceT = TypeVar("BoundSequenceT", bound=tuple[object])
 ConstrainedSequenceT = TypeVar(
     "ConstrainedSequenceT",
@@ -604,6 +606,34 @@ def test_match_ordered_or_preserves_nested_constrained_typevar(
             # revealed: BoundChoiceT@test_match_ordered_or_preserves_nested_constrained_typevar
             reveal_type(item)
             return item
+
+def test_repeated_constrained_typevar_uses_one_constraint(
+    value: tuple[BoundChoiceT, BoundChoiceT],
+) -> BoundB:
+    match value:
+        case [BoundA() as item, BoundB()]:
+            # This branch is impossible: both occurrences use the same constraint.
+            return item
+        case _:
+            raise ValueError
+
+def test_repeated_constrained_typevar_can_match_consistently(
+    value: tuple[BoundChoiceT, BoundChoiceT],
+) -> BoundA:
+    match value:
+        case [BoundA() as item, BoundA()]:
+            return item
+        case _:
+            raise ValueError
+
+def test_repeated_bounded_typevar_can_match_different_union_members(
+    value: tuple[BoundedChoiceT, BoundedChoiceT],
+) -> BoundA:
+    match value:
+        case [BoundA() as item, BoundB()]:
+            return item
+        case _:
+            raise ValueError
 ```
 
 ## Indirect class patterns
@@ -626,8 +656,8 @@ def test_match_indirect_class_pattern(
 
 ## Recursive class pattern aliases
 
-The same rule applies outside sequence patterns. Preserving a recursive alias lets later code keep
-using the recursive relationship after a class pattern matches.
+Class-pattern bindings also preserve recursive aliases, so later code can keep using the recursive
+relationship after the pattern matches.
 
 ```toml
 [environment]

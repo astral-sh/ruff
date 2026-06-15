@@ -578,6 +578,11 @@ def value_alias(target: Literal[1, 2]):
     match target:
         case 1 as item:
             reveal_type(item)  # revealed: Literal[1]
+
+def value_alias_with_cross_type_equality(target: Literal[True, 1, 2]):
+    match target:
+        case 1 as item:
+            reveal_type(item)  # revealed: Literal[1, True]
 ```
 
 ### Bindings that always match
