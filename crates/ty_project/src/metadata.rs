@@ -7,6 +7,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_static::EnvVars;
 
 use crate::Db;
@@ -351,6 +352,12 @@ impl ProjectMetadata {
 
     pub fn uv_workspace_member(&self) -> Option<&SystemPath> {
         self.uv_workspace.as_ref().and_then(uv::UvWorkspace::member)
+    }
+
+    pub fn uv_dependency_metadata(&self) -> Option<&DependencyMetadata> {
+        self.uv_workspace
+            .as_ref()
+            .and_then(uv::UvWorkspace::dependency_metadata)
     }
 
     pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
