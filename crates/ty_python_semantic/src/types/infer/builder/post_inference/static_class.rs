@@ -861,6 +861,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                                 "class",
                                 &class_node.name.id,
                                 class.header_range(db),
+                                self_typevar.kind(db),
                                 other_typevar,
                             );
                         }
@@ -880,6 +881,7 @@ pub(crate) fn check_static_class_definitions<'db>(
                             "class",
                             &class_node.name.id,
                             class.header_range(db),
+                            base_typevar.kind(db),
                             other_typevar,
                         );
                     }

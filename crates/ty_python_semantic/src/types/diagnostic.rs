@@ -30,7 +30,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
     binding_type, protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
@@ -5927,17 +5927,25 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
+    type_var_kind: TypeVarKind,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
+    let typevar_kind = match type_var_kind {
+        TypeVarKind::Legacy
+        | TypeVarKind::Pep695
+        | TypeVarKind::TypingSelf
+        | TypeVarKind::Pep613Alias => "type variable",
+        TypeVarKind::ParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
@@ -5950,9 +5958,15 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "Type variable `{typevar_name}` is bound in this enclosing scope",
-    )));
+    if other_typevar.is_paramspec(db) {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "ParamSpec `{typevar_name}` is bound in this enclosing scope"
+        )));
+    } else {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "Type variable `{typevar_name}` is bound in this enclosing scope"
+        )));
+    }
 }
 
 // I tried refactoring this function to placate Clippy,
