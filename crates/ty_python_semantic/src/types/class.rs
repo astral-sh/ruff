@@ -2458,7 +2458,7 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
         let mut union = UnionBuilder::new(db);
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
-        let mut provenance = Provenance::Unknown;
+        let mut provenance = Provenance::UNKNOWN;
 
         for superclass in self.mro_iter {
             match superclass {

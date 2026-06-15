@@ -2198,7 +2198,7 @@ impl<'db> StaticClassLiteral<'db> {
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;
-        let mut provenance = Provenance::Unknown;
+        let mut provenance = Provenance::UNKNOWN;
 
         let file = class_body_scope.file(db);
         let module = parsed_module(db, file).load(db);
@@ -2482,7 +2482,7 @@ impl<'db> StaticClassLiteral<'db> {
                 };
 
                 if let Some(inferred_ty) = inferred_ty {
-                    provenance = provenance.or(Provenance::SingleDefinition(binding));
+                    provenance = provenance.or(Provenance::single(binding));
                     union_of_inferred_types = union_of_inferred_types.add(inferred_ty);
                 }
             }

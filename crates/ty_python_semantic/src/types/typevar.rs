@@ -1573,7 +1573,7 @@ impl<'db> TypeVarConstraints<'db> {
                         Definedness::AlwaysDefined
                     },
                     public_type_policy: PublicTypePolicy::Raw,
-                    provenance: Provenance::Unknown,
+                    provenance: Provenance::UNKNOWN,
                 })
             },
             qualifiers,

@@ -904,6 +904,9 @@ pub(crate) struct DefinitionInference<'db> {
     extra: Option<Box<DefinitionInferenceExtra<'db>>>,
 }
 
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(DefinitionInference<'_>, [u64; 7]);
+
 /// The binding and declaration types inferred for a definition region.
 ///
 /// Almost all regions contain a single binding, optionally paired with a declaration for the same
@@ -917,6 +920,9 @@ enum DefinitionTypes<'db> {
     BindingAndDeclaration(TypeAndQualifiers<'db>),
     Other(Box<OtherDefinitionTypes<'db>>),
 }
+
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(DefinitionTypes<'_>, [u64; 4]);
 
 type DefinitionBinding<'db> = (Definition<'db>, Type<'db>);
 type DefinitionDeclaration<'db> = (Definition<'db>, TypeAndQualifiers<'db>);

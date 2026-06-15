@@ -216,7 +216,7 @@ impl<'db> CallDunderError<'db> {
     pub(super) fn provenance(&self) -> Provenance<'db> {
         match self {
             Self::CallError(_, _, provenance) => *provenance,
-            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => Provenance::Unknown,
+            Self::PossiblyUnbound { .. } | Self::MethodNotAvailable => Provenance::UNKNOWN,
         }
     }
 

@@ -2,6 +2,7 @@ use itertools::Either;
 use ruff_db::files::File;
 use ruff_index::IndexSlice;
 use ruff_python_ast::PythonVersion;
+use salsa::plumbing::{AsId, FromId, Id};
 use ty_module_resolver::{
     KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
 };
@@ -97,40 +98,88 @@ impl PublicTypePolicy {
 }
 
 /// The source definition provenance for a place.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum Provenance<'db> {
+///
+/// A Salsa ID's low word is nonzero, so a zero low word encodes the two states without a source
+/// definition. All other values preserve the complete Salsa ID, including its generation.
+#[derive(Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Provenance<'db> {
+    bits: [u32; 2],
+    marker: std::marker::PhantomData<Definition<'db>>,
+}
+
+static_assertions::assert_eq_size!(Provenance<'_>, [u32; 2]);
+static_assertions::assert_eq_align!(Provenance<'_>, u32);
+
+impl<'db> Provenance<'db> {
     /// No source definition is known.
-    #[default]
-    Unknown,
-    /// Exactly one source definition is known.
-    SingleDefinition(Definition<'db>),
+    pub(crate) const UNKNOWN: Self = Self::sentinel(0);
+
     /// Multiple distinct source definitions contribute to the place. Instead of storing all of
     /// them, or selecting one arbitrarily, we currently discard provenance information in this
     /// case.
-    MultipleDefinitions,
-}
+    const MULTIPLE_DEFINITIONS: Self = Self::sentinel(1);
 
-impl<'db> Provenance<'db> {
+    const fn sentinel(generation: u32) -> Self {
+        Self {
+            bits: [0, generation],
+            marker: std::marker::PhantomData,
+        }
+    }
+
+    /// Exactly one source definition is known.
+    pub(crate) fn single(definition: Definition<'db>) -> Self {
+        let bits = definition.as_id().as_bits();
+        Self {
+            bits: [bits as u32, (bits >> u32::BITS) as u32],
+            marker: std::marker::PhantomData,
+        }
+    }
+
     pub(crate) fn from_definition(definition: Option<Definition<'db>>) -> Self {
-        definition.map_or(Self::Unknown, Self::SingleDefinition)
+        definition.map_or(Self::UNKNOWN, Self::single)
     }
 
     /// Merge the provenance from two places.
     pub(crate) fn or(self, other: Self) -> Self {
-        match (self, other) {
-            (Self::Unknown, provenance) | (provenance, Self::Unknown) => provenance,
-            (Self::MultipleDefinitions, _) | (_, Self::MultipleDefinitions) => {
-                Self::MultipleDefinitions
-            }
-            (Self::SingleDefinition(left), Self::SingleDefinition(right)) if left == right => self,
-            (Self::SingleDefinition(_), Self::SingleDefinition(_)) => Self::MultipleDefinitions,
+        if self == Self::UNKNOWN {
+            other
+        } else if other == Self::UNKNOWN || self == other {
+            self
+        } else {
+            Self::MULTIPLE_DEFINITIONS
         }
     }
 
     pub(crate) fn definition(self) -> Option<Definition<'db>> {
-        match self {
-            Self::SingleDefinition(definition) => Some(definition),
-            Self::Unknown | Self::MultipleDefinitions => None,
+        if self == Self::UNKNOWN || self == Self::MULTIPLE_DEFINITIONS {
+            None
+        } else {
+            Some(self.single_definition())
+        }
+    }
+
+    fn single_definition(self) -> Definition<'db> {
+        let bits = u64::from(self.bits[0]) | (u64::from(self.bits[1]) << u32::BITS);
+        Definition::from_id(Id::from_bits(bits))
+    }
+}
+
+impl Default for Provenance<'_> {
+    fn default() -> Self {
+        Self::UNKNOWN
+    }
+}
+
+impl std::fmt::Debug for Provenance<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if *self == Self::UNKNOWN {
+            f.write_str("Unknown")
+        } else if *self == Self::MULTIPLE_DEFINITIONS {
+            f.write_str("MultipleDefinitions")
+        } else {
+            f.debug_tuple("SingleDefinition")
+                .field(&self.single_definition())
+                .finish()
         }
     }
 }
@@ -145,6 +194,9 @@ pub(crate) struct DefinedPlace<'db> {
     pub(crate) provenance: Provenance<'db>,
 }
 
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(DefinedPlace<'_>, [u32; 7]);
+
 impl<'db> DefinedPlace<'db> {
     pub(crate) fn new(ty: Type<'db>) -> Self {
         Self {
@@ -152,7 +204,7 @@ impl<'db> DefinedPlace<'db> {
             origin: TypeOrigin::Inferred,
             definedness: Definedness::AlwaysDefined,
             public_type_policy: PublicTypePolicy::Raw,
-            provenance: Provenance::Unknown,
+            provenance: Provenance::UNKNOWN,
         }
     }
 
@@ -172,7 +224,7 @@ impl<'db> DefinedPlace<'db> {
     }
 
     pub(crate) fn with_definition(mut self, definition: Definition<'db>) -> Self {
-        self.provenance = Provenance::SingleDefinition(definition);
+        self.provenance = Provenance::single(definition);
         self
     }
 
@@ -221,6 +273,9 @@ pub(crate) enum Place<'db> {
     #[default]
     Undefined,
 }
+
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(Place<'_>, [u32; 7]);
 
 impl<'db> Place<'db> {
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Inferred`] and definedness [`Definedness::AlwaysDefined`].
@@ -358,7 +413,7 @@ impl<'db> Place<'db> {
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
-                        provenance: Provenance::Unknown,
+                        provenance: Provenance::UNKNOWN,
                         ..defined
                     })
                 } else {
@@ -781,6 +836,9 @@ pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
 }
+
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(PlaceAndQualifiers<'_>, [u32; 8]);
 
 impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn unbound() -> Self {
@@ -1506,7 +1564,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
-    let mut provenance = Provenance::Unknown;
+    let mut provenance = Provenance::UNKNOWN;
     // special handling for synthetic loop header definitions and nested bindings definitions
     let mut only_non_shadowing_bindings = true;
 
@@ -1631,7 +1689,7 @@ fn place_from_bindings_impl<'db>(
             }
 
             first_definition.get_or_insert(binding);
-            provenance = provenance.or(Provenance::SingleDefinition(binding));
+            provenance = provenance.or(Provenance::single(binding));
             let binding_ty = binding_type(db, binding);
             Some((
                 narrowing_constraint.narrow(db, binding_ty, binding.place(db)),
@@ -1878,7 +1936,7 @@ fn place_from_declarations_impl<'db>(
     };
 
     let mut first_declaration = None;
-    let mut provenance = Provenance::Unknown;
+    let mut provenance = Provenance::UNKNOWN;
     let mut all_declarations_definitely_reachable = true;
 
     let mut types = declarations.filter_map(|declaration_with_constraint| {
@@ -1909,7 +1967,7 @@ fn place_from_declarations_impl<'db>(
         } else {
             let declared_type = inferred_declaration(db, declaration).declared()?;
             first_declaration.get_or_insert(declaration);
-            provenance = provenance.or(Provenance::SingleDefinition(declaration));
+            provenance = provenance.or(Provenance::single(declaration));
             all_declarations_definitely_reachable =
                 all_declarations_definitely_reachable && static_reachability.is_always_true();
 
@@ -2279,6 +2337,31 @@ mod tests {
     use crate::db::tests::setup_db;
 
     #[test]
+    fn provenance_round_trip_and_merge() {
+        let first_id = Id::from_bits(1 | (7 << 32));
+        let first: Definition<'static> = Definition::from_id(first_id);
+        let second: Definition<'static> = Definition::from_id(Id::from_bits(2));
+
+        let single = Provenance::single(first);
+        assert_eq!(
+            single.definition().map(|definition| definition.as_id()),
+            Some(first_id)
+        );
+        assert_eq!(single.or(Provenance::UNKNOWN), single);
+        assert_eq!(Provenance::UNKNOWN.or(single), single);
+        assert_eq!(single.or(Provenance::single(first)), single);
+        assert_eq!(
+            single.or(Provenance::single(second)),
+            Provenance::MULTIPLE_DEFINITIONS
+        );
+        assert_eq!(
+            Provenance::MULTIPLE_DEFINITIONS.or(single),
+            Provenance::MULTIPLE_DEFINITIONS
+        );
+        assert!(Provenance::MULTIPLE_DEFINITIONS.definition().is_none());
+    }
+
+    #[test]
     fn test_symbol_or_fall_back_to() {
         use Definedness::{AlwaysDefined, PossiblyUndefined};
         use TypeOrigin::Inferred;
@@ -2295,7 +2378,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2305,7 +2388,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2316,7 +2399,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2326,7 +2409,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .with_qualifiers(TypeQualifiers::empty())
         };
@@ -2351,7 +2434,7 @@ mod tests {
                 origin: Inferred,
                 definedness: PossiblyUndefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .into()
         );
@@ -2362,7 +2445,7 @@ mod tests {
                 origin: Inferred,
                 definedness: AlwaysDefined,
                 public_type_policy: PublicTypePolicy::Raw,
-                provenance: Provenance::Unknown,
+                provenance: Provenance::UNKNOWN,
             })
             .into()
         );

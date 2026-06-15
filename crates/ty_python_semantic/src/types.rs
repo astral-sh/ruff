@@ -3158,7 +3158,7 @@ impl<'db> Type<'db> {
                             origin,
                             definedness: boundness,
                             public_type_policy,
-                            provenance: Provenance::Unknown,
+                            provenance: Provenance::UNKNOWN,
                         })
                     })
                     .with_provenance(attribute_provenance)
@@ -3197,7 +3197,7 @@ impl<'db> Type<'db> {
                                 origin,
                                 definedness,
                                 public_type_policy,
-                                provenance: Provenance::Unknown,
+                                provenance: Provenance::UNKNOWN,
                             })
                         })
                         .with_provenance(attribute_provenance)
@@ -6963,7 +6963,7 @@ impl<'db> IntersectionType<'db> {
         let positive = self.positive(db);
         let mut successful_bindings = Vec::with_capacity(positive.len());
         let mut last_error = None;
-        let mut error_provenance = Provenance::Unknown;
+        let mut error_provenance = Provenance::UNKNOWN;
 
         for element in positive {
             match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
@@ -7010,7 +7010,7 @@ impl<'db> UnionType<'db> {
         let mut unbound_on: Vec<Type<'db>> = Vec::new();
         let mut any_defined = false;
         let mut possibly_undefined = false;
-        let mut provenance = Provenance::Unknown;
+        let mut provenance = Provenance::UNKNOWN;
 
         for element in elements {
             match element
@@ -7624,13 +7624,16 @@ pub(crate) struct TypeAndQualifiers<'db> {
     provenance: Provenance<'db>,
 }
 
+#[cfg(all(target_pointer_width = "64", not(debug_assertions)))]
+static_assertions::assert_eq_size!(TypeAndQualifiers<'_>, [u32; 7]);
+
 impl<'db> TypeAndQualifiers<'db> {
     pub(crate) fn new(inner: Type<'db>, origin: TypeOrigin, qualifiers: TypeQualifiers) -> Self {
         Self {
             inner,
             origin,
             qualifiers,
-            provenance: Provenance::Unknown,
+            provenance: Provenance::UNKNOWN,
         }
     }
 
@@ -7639,7 +7642,7 @@ impl<'db> TypeAndQualifiers<'db> {
             inner,
             origin: TypeOrigin::Declared,
             qualifiers: TypeQualifiers::empty(),
-            provenance: Provenance::Unknown,
+            provenance: Provenance::UNKNOWN,
         }
     }
 
@@ -8196,7 +8199,7 @@ impl<'db> ModuleLiteralType<'db> {
                 return PlaceAndQualifiers {
                     place: Place::Defined(DefinedPlace {
                         ty: outcome.return_type(db),
-                        provenance: Provenance::Unknown,
+                        provenance: Provenance::UNKNOWN,
                         ..place
                     }),
                     qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
