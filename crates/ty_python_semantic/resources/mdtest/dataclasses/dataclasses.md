@@ -340,6 +340,7 @@ class C:
     x: int
 
 reveal_type(C.__init__)  # revealed: (self: C, x: int) -> None
+reveal_type(C.__slots__)  # revealed: tuple[Literal["x"]]
 C(1)
 ```
 
@@ -1301,17 +1302,17 @@ def dynamic_slots(slots: bool):
     class PossiblyValidWeakrefSlot: ...
 ```
 
-Calling `dataclass(weakref_slot=True)` only creates a decorator. We report the error when that
-decorator is later applied to a class:
+An invalid combination is reported when the decorator factory is called, even if the decorator is
+applied later:
 
 ```py
 from dataclasses import dataclass
 
-invalid_weakref_slot = dataclass(weakref_slot=True)
+invalid_weakref_slot = dataclass(weakref_slot=True)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
 
 class AppliedWeakrefSlotLater: ...
 
-invalid_weakref_slot(AppliedWeakrefSlotLater)  # error: [invalid-dataclass] "`weakref_slot=True` requires `slots=True`"
+invalid_weakref_slot(AppliedWeakrefSlotLater)
 ```
 
 The `__weakref__` attribute is correctly not modeled as existing on instances of slotted dataclasses
@@ -1985,9 +1986,9 @@ class C:
 
 C(1) < C(2)  # ok
 
-invalid_order = dataclass(order=True, eq=False)
+invalid_order = dataclass(order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 
-@invalid_order  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
+@invalid_order
 class IndirectDecorator: ...
 ```
 
@@ -2005,10 +2006,6 @@ dataclass(Point)()  # error: [missing-argument]
 dataclass(Point)("one")  # error: [invalid-argument-type]
 
 reveal_type(dataclass(Point)(1).x)  # revealed: int
-
-class InvalidDirectApplication: ...
-
-dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 ```
 
 Options can be passed in the same call:
@@ -2021,6 +2018,10 @@ ordered = dataclass(Ordered, order=True)
 
 ordered(1) < ordered(2)
 ordered("one")  # error: [invalid-argument-type]
+
+class InvalidDirectApplication: ...
+
+dataclass(InvalidDirectApplication, order=True, eq=False)  # error: [invalid-dataclass] "`order=True` requires `eq=True`"
 ```
 
 Passing `None` explicitly returns a decorator that uses the supplied options:

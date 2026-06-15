@@ -39,7 +39,6 @@ use crate::types::diagnostic::{
     MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
     POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
     add_invariant_generic_hints, note_numbers_module_not_supported,
-    report_invalid_dataclass_arguments,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -61,12 +60,11 @@ use crate::types::typevar::{BoundTypeVarIdentity, TypeVarNonceGenerator};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     BindingContext, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes,
-    ClassLiteral, DATACLASS_FLAGS, DataclassDecorator, DataclassFlags, DataclassParams,
-    DynamicType, GenericAlias, InternedConstraintSet, IntersectionType, InvalidDataclassArguments,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind, NominalInstanceType,
-    PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeMapping,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -1588,40 +1586,30 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    Type::DataclassDecorator(decorator) => {
-                        if !decorator.invalid_arguments.is_empty() {
-                            overload
-                                .errors
-                                .push(BindingError::InvalidDataclassArguments(
-                                    decorator.invalid_arguments,
+                    Type::DataclassDecorator(params) => match overload.parameter_types() {
+                        [Some(Type::ClassLiteral(class_literal))] => {
+                            if let Some(target) = invalid_dataclass_target(db, class_literal) {
+                                overload
+                                    .errors
+                                    .push(BindingError::InvalidDataclassApplication(target));
+                            } else {
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
                                 ));
-                        }
-                        match overload.parameter_types() {
-                            [Some(Type::ClassLiteral(class_literal))] => {
-                                if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                    overload
-                                        .errors
-                                        .push(BindingError::InvalidDataclassApplication(target));
-                                } else {
-                                    overload.set_return_type(Type::from(
-                                        class_literal
-                                            .with_dataclass_params(db, Some(decorator.params)),
-                                    ));
-                                }
                             }
-                            [Some(Type::GenericAlias(generic_alias))] => {
-                                let new_origin = generic_alias
-                                    .origin(db)
-                                    .with_dataclass_params(db, Some(decorator.params));
-                                overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                    db,
-                                    new_origin,
-                                    generic_alias.specialization(db),
-                                )));
-                            }
-                            _ => {}
                         }
-                    }
+                        [Some(Type::GenericAlias(generic_alias))] => {
+                            let new_origin = generic_alias
+                                .origin(db)
+                                .with_dataclass_params(db, Some(params));
+                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                                db,
+                                new_origin,
+                                generic_alias.specialization(db),
+                            )));
+                        }
+                        _ => {}
+                    },
 
                     Type::BoundMethod(bound_method)
                         if bound_method.self_instance(db).is_property_instance() =>
@@ -2224,7 +2212,9 @@ impl<'db> Bindings<'db> {
                             ] = dataclass_parameter_types
                             {
                                 let mut flags = DataclassFlags::empty();
-                                let mut invalid_arguments = InvalidDataclassArguments::empty();
+                                let invalid_order = to_bool(order, false) == Some(true)
+                                    && to_bool(eq, true) == Some(false);
+                                let mut invalid_weakref_slot = false;
 
                                 // TODO: Emit a diagnostic if a dataclass flag is not statically
                                 // known.
@@ -2246,13 +2236,6 @@ impl<'db> Bindings<'db> {
                                 if to_bool(frozen, false).unwrap_or(false) {
                                     flags |= DataclassFlags::FROZEN;
                                 }
-                                if to_bool(order, false) == Some(true)
-                                    && to_bool(eq, true) == Some(false)
-                                {
-                                    invalid_arguments |=
-                                        InvalidDataclassArguments::ORDER_REQUIRES_EQ;
-                                }
-
                                 match versioned_parameters {
                                     // Python < 3.10.
                                     [] => {}
@@ -2285,34 +2268,33 @@ impl<'db> Bindings<'db> {
                                         if to_bool(weakref_slot, false) == Some(true)
                                             && to_bool(slots, false) == Some(false)
                                         {
-                                            invalid_arguments |=
-                                                InvalidDataclassArguments::WEAKREF_SLOT_REQUIRES_SLOTS;
+                                            invalid_weakref_slot = true;
                                         }
                                     }
                                     _ => {}
                                 }
 
                                 let params = DataclassParams::from_flags(db, flags);
-                                let decorator = DataclassDecorator {
-                                    params,
-                                    invalid_arguments,
-                                };
 
                                 if cls_argument.is_none_or(|cls_ty| cls_ty.is_none(db)) {
-                                    overload.set_return_type(Type::DataclassDecorator(decorator));
+                                    overload.set_return_type(Type::DataclassDecorator(params));
+                                }
+
+                                if invalid_order {
+                                    overload.errors.push(BindingError::InvalidDataclassArgument(
+                                        InvalidDataclassArgument::OrderRequiresEq,
+                                    ));
+                                }
+                                if invalid_weakref_slot {
+                                    overload.errors.push(BindingError::InvalidDataclassArgument(
+                                        InvalidDataclassArgument::WeakrefSlotRequiresSlots,
+                                    ));
                                 }
 
                                 // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`).
                                 if let Some(Type::ClassLiteral(class_literal)) =
                                     cls_argument.as_ref()
                                 {
-                                    if !invalid_arguments.is_empty() {
-                                        overload.errors.push(
-                                            BindingError::InvalidDataclassArguments(
-                                                invalid_arguments,
-                                            ),
-                                        );
-                                    }
                                     if let Some(target) =
                                         invalid_dataclass_target(db, class_literal)
                                     {
@@ -2519,12 +2501,8 @@ impl<'db> Bindings<'db> {
 
                                 // Zero or more than one positional argument, or the argument is
                                 // not a class: assume it's a decorator factory.
-                                overload.set_return_type(Type::DataclassDecorator(
-                                    DataclassDecorator {
-                                        params: dataclass_params,
-                                        invalid_arguments: InvalidDataclassArguments::empty(),
-                                    },
-                                ));
+                                overload
+                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
                             }
                         }
                     },
@@ -6844,6 +6822,18 @@ pub(crate) enum InvalidArgumentTypeProvenance {
     OpenTypedDictExtraItems,
 }
 
+/// A statically known combination of arguments that makes a stdlib `dataclass` decorator invalid.
+///
+/// Each variant represents a combination that causes the returned decorator to raise when applied
+/// to a class.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InvalidDataclassArgument {
+    /// `order=True` combined with `eq=False`.
+    OrderRequiresEq,
+    /// `weakref_slot=True` combined with `slots=False`.
+    WeakrefSlotRequiresSlots,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BindingError<'db> {
     /// The type of an argument is not assignable to the annotated type of its corresponding
@@ -6913,8 +6903,8 @@ pub(crate) enum BindingError<'db> {
     CalledTopCallable(Type<'db>),
     /// The `@dataclass` decorator was applied to an invalid target.
     InvalidDataclassApplication(InvalidDataclassTarget),
-    /// The stdlib `dataclass` decorator was applied with incompatible arguments.
-    InvalidDataclassArguments(InvalidDataclassArguments),
+    /// The stdlib `dataclass` decorator factory was called with incompatible arguments.
+    InvalidDataclassArgument(InvalidDataclassArgument),
 }
 
 impl BindingError<'_> {
@@ -6998,7 +6988,7 @@ impl BindingError<'_> {
             BindingError::CalledTopCallable(..)
             | BindingError::InternalCallError(..)
             | BindingError::InvalidDataclassApplication(..)
-            | BindingError::InvalidDataclassArguments(..)
+            | BindingError::InvalidDataclassArgument(..)
             | BindingError::MissingArguments { .. }
             | BindingError::UnmatchedOverload
             | BindingError::PropertyHasNoSetter(..)
@@ -7059,7 +7049,7 @@ impl<'db> BindingError<'db> {
         match self {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
-            | Self::InvalidDataclassArguments(_)
+            | Self::InvalidDataclassArgument(_)
             | Self::PropertyHasNoSetter(_)
             | Self::PropertyHasNoDeleter(_)
             | Self::CalledTopCallable(_)
@@ -7582,9 +7572,18 @@ impl<'db> BindingError<'db> {
                 }
             }
 
-            Self::InvalidDataclassArguments(invalid_arguments) => {
+            Self::InvalidDataclassArgument(argument) => {
                 let node = Self::get_node(node, None);
-                report_invalid_dataclass_arguments(context, node, *invalid_arguments);
+                if let Some(builder) = context.report_lint(&INVALID_DATACLASS, node) {
+                    builder.into_diagnostic(match argument {
+                        InvalidDataclassArgument::OrderRequiresEq => {
+                            "`order=True` requires `eq=True`"
+                        }
+                        InvalidDataclassArgument::WeakrefSlotRequiresSlots => {
+                            "`weakref_slot=True` requires `slots=True`"
+                        }
+                    });
+                }
             }
         }
     }

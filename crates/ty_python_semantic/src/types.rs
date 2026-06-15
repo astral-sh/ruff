@@ -777,23 +777,6 @@ bitflags! {
     }
 }
 
-bitflags! {
-    /// Invalid combinations of arguments passed to the stdlib `dataclass` decorator factory.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub(crate) struct InvalidDataclassArguments: u8 {
-        const ORDER_REQUIRES_EQ = 1 << 0;
-        const WEAKREF_SLOT_REQUIRES_SLOTS = 1 << 1;
-    }
-}
-
-impl get_size2::GetSize for InvalidDataclassArguments {}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub struct DataclassDecorator<'db> {
-    params: DataclassParams<'db>,
-    invalid_arguments: InvalidDataclassArguments,
-}
-
 pub(crate) const DATACLASS_FLAGS: &[(&str, DataclassFlags)] = &[
     ("init", DataclassFlags::INIT),
     ("repr", DataclassFlags::REPR),
@@ -936,7 +919,7 @@ pub enum Type<'db> {
     /// A special callable that is returned by a `dataclass(…)` call. It is usually
     /// used as a decorator. Note that this is only used as a return type for actual
     /// `dataclass` calls, not for the argumentless `@dataclass` decorator.
-    DataclassDecorator(DataclassDecorator<'db>),
+    DataclassDecorator(DataclassParams<'db>),
     /// A special callable that is returned by a `dataclass_transform(…)` call.
     DataclassTransformer(DataclassTransformerParams<'db>),
     /// The type of an arbitrary callable object with a certain specified signature.

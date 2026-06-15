@@ -26,9 +26,9 @@ use crate::types::tuple::TupleSpec;
 use crate::types::typed_dict::TypedDictSchema;
 use crate::types::typevar::TypeVarInstance;
 use crate::types::{
-    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, InvalidDataclassArguments,
-    LintDiagnosticGuard, Protocol, ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type,
-    TypeContext, TypeVarVariance, binding_type, protocol_class::ProtocolClass,
+    BoundTypeVarInstance, ClassType, DynamicType, ErrorContextTree, LintDiagnosticGuard, Protocol,
+    ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
+    binding_type, protocol_class::ProtocolClass,
 };
 use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
@@ -530,29 +530,6 @@ declare_lint! {
         summary: "detects invalid `@dataclass` applications",
         status: LintStatus::stable("0.0.12"),
         default_level: Level::Error,
-    }
-}
-
-pub(crate) fn report_invalid_dataclass_arguments(
-    context: &InferContext<'_, '_>,
-    node: ast::AnyNodeRef<'_>,
-    invalid_arguments: InvalidDataclassArguments,
-) {
-    for (error, message) in [
-        (
-            InvalidDataclassArguments::ORDER_REQUIRES_EQ,
-            "`order=True` requires `eq=True`",
-        ),
-        (
-            InvalidDataclassArguments::WEAKREF_SLOT_REQUIRES_SLOTS,
-            "`weakref_slot=True` requires `slots=True`",
-        ),
-    ] {
-        if invalid_arguments.contains(error)
-            && let Some(builder) = context.report_lint(&INVALID_DATACLASS, node)
-        {
-            builder.into_diagnostic(message);
-        }
     }
 }
 
