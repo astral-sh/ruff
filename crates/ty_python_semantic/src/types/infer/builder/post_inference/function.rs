@@ -56,15 +56,12 @@ fn check_pep695_function_legacy_typevars<'db>(
 ) {
     let db = context.db();
     let node = last_definition.node(db, context.file(), context.module());
-    if node.type_params.is_none() {
+    let Some(type_params) = node.type_params.as_deref() else {
         return;
-    }
+    };
 
-    let legacy_default = node
-        .type_params
-        .as_deref()
-        .into_iter()
-        .flatten()
+    let legacy_default = type_params
+        .iter()
         .filter_map(ast::TypeParam::default)
         .find_map(|default| {
             find_over_type(db, file_expression_type(default), false, |ty| {
