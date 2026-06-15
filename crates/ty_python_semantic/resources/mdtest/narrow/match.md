@@ -1230,7 +1230,6 @@ def keyword_class_pattern_in_sequence_preserves_fallback(
             reveal_type(value)  # revealed: tuple[MissingAttributes]
 ```
 
-
 ## Sequence exhaustiveness
 
 Sequence patterns also contribute to negative narrowing and exhaustiveness. Exact tuple shapes can
