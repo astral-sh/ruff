@@ -833,8 +833,15 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
         ];
 
         /// Returns the root node kind with the given discriminant.
+        #[inline]
         pub fn from_u8(value: u8) -> Option<Self> {
-            Self::ALL.get(usize::from(value)).copied()
+            match value {
+    """)
+    for index, (name, _) in enumerate(root_nodes):
+        out.append(f"""{index} => Some(Self::{name}),""")
+    out.append("""
+                _ => None,
+            }
         }
     }
     """)
