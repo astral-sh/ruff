@@ -1745,11 +1745,7 @@ impl<'db> Type<'db> {
             // result directly. We still ensure monotonicity after the first couple iterations, which
             // still ensures convergence in cases that are prone to oscillation.
             if cycle.iteration() <= crate::TAINTED_CYCLES {
-                if matches!(self, Type::Divergent(divergent) if !divergent.is_placeholder(db))
-                    && self.is_subtype_of(db, previous)
-                {
-                    self
-                } else if let Some(overlaid) = overlay_cycle_marker(db, self, previous) {
+                if let Some(overlaid) = overlay_cycle_marker(db, self, previous) {
                     overlaid
                 } else {
                     let self_degraded_by_overload =
