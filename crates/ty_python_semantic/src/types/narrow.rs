@@ -15,16 +15,17 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, pattern_binding_fallthrough_type, pattern_fallthrough_type,
-    sequence_pattern_type_builder, singleton_pattern_type, starred_sequence_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_match_pattern_type_for_subject,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_binding_fallthrough_type, pattern_fallthrough_type, sequence_pattern_type_builder,
+    singleton_pattern_type, starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
 use ty_python_core::frozen::FrozenMap;
 use ty_python_core::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use ty_python_core::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, SequencePatternPredicateKind, SubjectElementPatternPredicate,
+    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    SequencePatternPredicateKind, SubjectElementPatternPredicate,
 };
 use ty_python_core::scope::ScopeId;
 use ty_python_core::{ExpressionNodeKey, NarrowingEvaluator, place_table, semantic_index};
@@ -1060,9 +1061,9 @@ fn necessary_match_pattern_type<'db>(
 ) -> Type<'db> {
     match pattern {
         PatternPredicateKind::Singleton(singleton) => singleton_pattern_type(db, *singleton),
-        PatternPredicateKind::Class(cls, _) => positive_class_pattern_type(
+        PatternPredicateKind::Class(kind) => positive_class_pattern_type(
             db,
-            infer_same_file_expression_type(db, *cls, TypeContext::default()),
+            infer_same_file_expression_type(db, kind.class, TypeContext::default()),
         )
         .unwrap_or_else(Type::object),
         PatternPredicateKind::Mapping(_) => mapping_pattern_type(db),
@@ -1270,15 +1271,23 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Singleton(singleton) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_singleton(subject, *singleton, is_positive),
             ),
-            PatternPredicateKind::Class(cls, kind) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive),
-            ),
-            PatternPredicateKind::Mapping(kind) => PatternNarrowingResult::Possible(
-                self.evaluate_match_pattern_mapping(subject, *kind, is_positive),
-            ),
-            PatternPredicateKind::Sequence(kind) => {
-                self.evaluate_match_pattern_sequence(subject, kind, is_positive)
+            PatternPredicateKind::Class(kind) => {
+                PatternNarrowingResult::Possible(self.evaluate_match_pattern_class(
+                    subject,
+                    kind.class,
+                    pattern_predicate_kind,
+                    is_positive,
+                ))
             }
+            PatternPredicateKind::Mapping(_) => PatternNarrowingResult::Possible(
+                self.evaluate_match_pattern_mapping(subject, pattern_predicate_kind, is_positive),
+            ),
+            PatternPredicateKind::Sequence(kind) => self.evaluate_match_pattern_sequence(
+                subject,
+                kind,
+                pattern_predicate_kind,
+                is_positive,
+            ),
             PatternPredicateKind::Value(expr) => PatternNarrowingResult::Possible(
                 self.evaluate_match_pattern_value(subject, *expr, is_positive),
             ),
@@ -1412,10 +1421,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     bindings: BTreeMap::new(),
                 }
             }
-            PatternPredicateKind::Class(class_expr, _) => {
+            PatternPredicateKind::Class(kind) => {
                 let class_ty = necessary_match_pattern_type(self.db, pattern);
                 let class =
-                    infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
+                    infer_same_file_expression_type(self.db, kind.class, TypeContext::default())
                         .as_class_literal();
                 let matched_subject_ty =
                     self.match_class_pattern_subject_type(class, class_ty, subject_ty, false);
@@ -1459,18 +1468,6 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         evaluate_type_equality(self.db, subject_ty, value_ty, true)
             .map(|constraint| self.intersect_types(subject_ty, constraint))
             .unwrap_or(subject_ty)
-    }
-
-    fn contains_class_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
-        match pattern {
-            PatternPredicateKind::Class(..) => true,
-            PatternPredicateKind::Sequence(kind) => {
-                kind.patterns.iter().any(Self::contains_class_pattern)
-            }
-            PatternPredicateKind::Or(patterns) => patterns.iter().any(Self::contains_class_pattern),
-            PatternPredicateKind::As(Some(pattern), _) => Self::contains_class_pattern(pattern),
-            _ => false,
-        }
     }
 
     fn contains_unsupported_binding_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
@@ -1536,13 +1533,8 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let mut previous_pattern = first_pattern;
 
         for pattern in patterns {
-            remaining_subject_ty = if Self::contains_class_pattern(previous_pattern) {
-                // Attribute extraction can still fail after the runtime class check. The next PR
-                // refines this with subject-aware class-pattern exhaustiveness.
-                remaining_subject_ty
-            } else {
-                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty)
-            };
+            remaining_subject_ty =
+                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty);
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
             binding_subject_types.add_in_place(alternative.binding_subject_ty);
@@ -2954,35 +2946,29 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
-        kind: ClassPatternKind,
+        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if !kind.is_irrefutable() && !is_positive {
-            // A class pattern like `case Point(x=0, y=0)` is not irrefutable. In the positive case,
-            // we can still narrow the type of the match subject to `Point`. But in the negative case,
-            // we cannot exclude `Point` as a possibility.
-            return None;
+        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject_place);
+
+        if !is_positive {
+            let subject_ty =
+                infer_same_file_expression_type(self.db, subject, TypeContext::default());
+            let definitely_matched =
+                definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
+            if definitely_matched.is_never() {
+                return None;
+            }
+
+            return Some(NarrowingConstraints::from_iter([(
+                place,
+                NarrowingConstraint::intersection(definitely_matched.negate(self.db)),
+            )]));
         }
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject);
-
         let class_type = infer_same_file_expression_type(self.db, cls, TypeContext::default());
-
-        let narrowed_type = if is_positive {
-            positive_class_pattern_type(self.db, class_type)?
-        } else {
-            match class_type {
-                Type::ClassLiteral(class) => {
-                    Type::instance(self.db, class.top_materialization(self.db)).negate(self.db)
-                }
-                Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
-                    callable_pattern_type(self.db).negate(self.db)
-                }
-                dynamic @ Type::Dynamic(_) => dynamic,
-                _ => return None,
-            }
-        };
+        let narrowed_type = positive_class_pattern_type(self.db, class_type)?;
 
         Some(NarrowingConstraints::from_iter([(
             place,
@@ -2993,15 +2979,26 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
     fn evaluate_match_pattern_mapping(
         &mut self,
         subject: Expression<'db>,
-        kind: ClassPatternKind,
+        pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        if !kind.is_irrefutable() && !is_positive {
-            return None;
-        }
+        let subject_place = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
+        let place = self.expect_place(&subject_place);
 
-        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db).node(self.module))?;
-        let place = self.expect_place(&subject);
+        if !is_positive {
+            let subject_ty =
+                infer_same_file_expression_type(self.db, subject, TypeContext::default());
+            let definitely_matched =
+                definite_match_pattern_type_for_subject(self.db, pattern, subject_ty);
+            if definitely_matched.is_never() {
+                return None;
+            }
+
+            return Some(NarrowingConstraints::from_iter([(
+                place,
+                NarrowingConstraint::intersection(definitely_matched.negate(self.db)),
+            )]));
+        }
 
         let mapping_type = ClassInfoConstraintFunction::IsInstance
             .generate_constraint(
@@ -3021,6 +3018,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         &mut self,
         subject: Expression<'db>,
         kind: &SequencePatternPredicateKind<'db>,
+        _pattern: &PatternPredicateKind<'db>,
         is_positive: bool,
     ) -> PatternNarrowingResult<'db> {
         let subject_node = subject.node_ref(self.db).node(self.module);
@@ -3041,7 +3039,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
         }
 
         let subject_ty = infer_same_file_expression_type(self.db, subject, TypeContext::default());
-        let Some(subject) = PlaceExpr::try_from_expr(subject_node) else {
+        let Some(subject_place) = PlaceExpr::try_from_expr(subject_node) else {
             return PatternNarrowingResult::Possible(None);
         };
 
@@ -3058,7 +3056,7 @@ impl<'db> NarrowingConstraintsBuilder<'db, '_> {
             return PatternNarrowingResult::Possible(None);
         }
 
-        let place = self.expect_place(&subject);
+        let place = self.expect_place(&subject_place);
 
         PatternNarrowingResult::Possible(Some(NarrowingConstraints::from_iter([(
             place,

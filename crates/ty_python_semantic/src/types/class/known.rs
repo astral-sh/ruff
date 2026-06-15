@@ -163,6 +163,25 @@ impl KnownClass {
         matches!(self, Self::SpecialForm)
     }
 
+    /// Return whether class patterns with a single positional subpattern match against the
+    /// subject itself when `__match_args__` is undefined.
+    pub(crate) const fn has_match_self_flag(self) -> bool {
+        matches!(
+            self,
+            Self::Bool
+                | Self::Bytearray
+                | Self::Bytes
+                | Self::Dict
+                | Self::Float
+                | Self::FrozenSet
+                | Self::Int
+                | Self::List
+                | Self::Set
+                | Self::Str
+                | Self::Tuple
+        )
+    }
+
     /// Determine whether instances of this class are always truthy, always falsy,
     /// or have an ambiguous truthiness.
     ///
