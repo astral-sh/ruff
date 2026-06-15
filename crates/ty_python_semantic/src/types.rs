@@ -1200,9 +1200,7 @@ impl<'db> Type<'db> {
         binder_id: salsa::Id,
         body: Type<'db>,
     ) -> Self {
-        if matches!(body, Type::FunctionLiteral(_))
-            || body.is_signature_cycle_body_for_cycle_recovery(db)
-            || !body.is_recursion_value_like(db)
+        if body.is_signature_cycle_body_for_cycle_recovery(db) || !body.is_recursion_value_like(db)
         {
             return body;
         }
@@ -1231,20 +1229,6 @@ impl<'db> Type<'db> {
     /// structurally recursive inners into [`Type::Recursive`], erases duplicate markers for the
     /// same binder, and canonicalizes nested marker order for stable fixed-point convergence.
     pub(crate) fn cycle_marked(db: &'db dyn Db, binder_id: salsa::Id, inner: Type<'db>) -> Self {
-        if matches!(inner, Type::FunctionLiteral(_))
-            || inner.is_signature_cycle_body_for_cycle_recovery(db)
-        {
-            return inner;
-        }
-
-        if !inner.is_recursion_value_like(db) {
-            return inner;
-        }
-
-        if inner.is_single_valued(db) {
-            return inner;
-        }
-
         let marker = Type::divergent(db, binder_id);
         let inner = inner.apply_type_mapping(
             db,
@@ -1263,11 +1247,6 @@ impl<'db> Type<'db> {
                     db,
                     [Type::divergent(db, binder_id), Type::Divergent(divergent)],
                 )
-            }
-            Type::Divergent(marked)
-                if !marked.is_placeholder(db) && marked.binder(db).into_id() == binder_id =>
-            {
-                inner
             }
             Type::Divergent(marked)
                 if let Some(body) = marked.body(db)
