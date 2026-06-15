@@ -7,6 +7,9 @@ from typing import Protocol, TypeAlias, type_check_only
 __all__ = ["BufferWrapper"]
 
 class Arena:
+    """
+A shared memory area backed by a temporary file (POSIX).
+"""
     size: int
     buffer: mmap
     if sys.platform == "win32":
