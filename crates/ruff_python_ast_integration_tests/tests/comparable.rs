@@ -88,6 +88,12 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal("0x10000000000000000", "18446744073709551616")?;
     assert_hashable_equal("(2,)", "(2.0,)")?;
 
+    let power_of_two_256 =
+        "115792089237316195423570985008687907853269984665640564039457584007913129639936";
+    assert_hashable_equal(power_of_two_256, &format!("0x1{}", "0".repeat(64)))?;
+    assert_hashable_equal(power_of_two_256, &format!("0o2{}", "0".repeat(85)))?;
+    assert_hashable_equal(power_of_two_256, &format!("0b1{}", "0".repeat(256)))?;
+
     let integer = parse_expression("9007199254740993")?;
     let float = parse_expression("9007199254740992.0")?;
     assert_ne!(

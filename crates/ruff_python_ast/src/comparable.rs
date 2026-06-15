@@ -2043,22 +2043,28 @@ impl HashableInteger {
             (literal, 10)
         };
 
+        let limb_radix = u64::from(radix);
         let mut magnitude = Vec::new();
+        // Accumulate as many digits as possible before rescanning the existing limbs.
+        let mut chunk = 0u64;
+        let mut chunk_radix = 1u64;
         for byte in digits.bytes().filter(|byte| *byte != b'_') {
             let Some(digit) = char::from(byte).to_digit(radix) else {
                 continue;
             };
+            let digit = u64::from(digit);
 
-            let mut carry = u128::from(digit);
-            for limb in &mut magnitude {
-                let value = u128::from(*limb) * u128::from(radix) + carry;
-                *limb = lower_u64(value);
-                carry = value >> 64;
-            }
-            if carry != 0 {
-                magnitude.push(lower_u64(carry));
-            }
+            let Some(next_chunk_radix) = chunk_radix.checked_mul(limb_radix) else {
+                multiply_add(&mut magnitude, chunk_radix, chunk);
+                chunk = digit;
+                chunk_radix = limb_radix;
+                continue;
+            };
+
+            chunk = chunk * limb_radix + digit;
+            chunk_radix = next_chunk_radix;
         }
+        multiply_add(&mut magnitude, chunk_radix, chunk);
 
         Self {
             negative: false,
@@ -2110,6 +2116,18 @@ impl HashableInteger {
         if !self.is_zero() {
             self.negative = !self.negative;
         }
+    }
+}
+
+fn multiply_add(magnitude: &mut Vec<u64>, multiplier: u64, addend: u64) {
+    let mut carry = u128::from(addend);
+    for limb in &mut *magnitude {
+        let value = u128::from(*limb) * u128::from(multiplier) + carry;
+        *limb = lower_u64(value);
+        carry = value >> 64;
+    }
+    if carry != 0 {
+        magnitude.push(lower_u64(carry));
     }
 }
 
