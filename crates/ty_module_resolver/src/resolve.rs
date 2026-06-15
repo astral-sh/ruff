@@ -37,8 +37,9 @@ use std::iter::FusedIterator;
 
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
-use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::files::{File, FilePath, FileRootKind, directory_listing, system_path_to_file};
+use ruff_db::source::source_text;
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
     self as ast, PySourceType, PythonVersion,
@@ -386,36 +387,26 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
             ))
         })?;
 
-    // Read the revision on the corresponding file root to
-    // register an explicit dependency on this directory. When
-    // the revision gets bumped, the cache that Salsa creates
-    // for this routine will be invalidated.
-    //
-    // (This is conditional because ruff uses this code too and doesn't set roots)
-    if let Some(root) = db.files().root(db, base_path) {
-        let _ = root.revision(db);
-    }
-
     // Only allow searching up to the first-party path's root
     let mut search_paths = Vec::new();
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
-        if !system.is_directory(&candidate_path) {
+        let Ok(listing) = directory_listing(db, &candidate_path) else {
             continue;
-        }
+        };
         // Any dir that isn't a proper package is plausibly some test/script dir that could be
         // added as a search-path at runtime. Notably this reflects pytest's default mode where
         // it adds every dir with a .py to the search-paths (making all test files root modules),
         // unless they see an `__init__.py`, in which case they assume you don't want that.
-        let isnt_regular_package = !system.is_file(&candidate_path.join("__init__.py"))
-            && !system.is_file(&candidate_path.join("__init__.pyi"));
+        let isnt_regular_package = !listing.entry_is_file(db, &candidate_path, "__init__.py")
+            && !listing.entry_is_file(db, &candidate_path, "__init__.pyi");
         // Any dir with a pyproject.toml or ty.toml is a valid relative desperate search-path and
         // we want all of those to also be valid absolute desperate search-paths. It doesn't
         // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
         // not let something cursed and spooky happen, ok? d
         if isnt_regular_package
-            || system.is_file(&candidate_path.join("pyproject.toml"))
-            || system.is_file(&candidate_path.join("ty.toml"))
+            || listing.entry_is_file(db, &candidate_path, "pyproject.toml")
+            || listing.entry_is_file(db, &candidate_path, "ty.toml")
         {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             search_paths.push(search_path);
@@ -460,22 +451,15 @@ fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
             ))
         })?;
 
-    // Read the revision on the corresponding file root to
-    // register an explicit dependency on this directory. When
-    // the revision gets bumped, the cache that Salsa creates
-    // for this routine will be invalidated.
-    //
-    // (This is conditional because ruff uses this code too and doesn't set roots)
-    if let Some(root) = db.files().root(db, base_path) {
-        let _ = root.revision(db);
-    }
-
     // Only allow searching up to the first-party path's root
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
+        let Ok(listing) = directory_listing(db, &candidate_path) else {
+            continue;
+        };
         // Any dir with a pyproject.toml or ty.toml might be a project root
-        if system.is_file(&candidate_path.join("pyproject.toml"))
-            || system.is_file(&candidate_path.join("ty.toml"))
+        if listing.entry_is_file(db, &candidate_path, "pyproject.toml")
+            || listing.entry_is_file(db, &candidate_path, "ty.toml")
         {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             return Some(search_path);
@@ -838,15 +822,6 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             continue;
         }
 
-        let site_packages_root = files.expect_root(db, site_packages_dir);
-
-        // This query needs to be re-executed each time a `.pth` file
-        // is added, modified or removed from the `site-packages` directory.
-        // However, we don't use Salsa queries to read the source text of `.pth` files;
-        // we use the APIs on the `System` trait directly. As such, add a dependency on the
-        // site-package directory's revision.
-        site_packages_root.revision(db);
-
         dynamic_paths.push(site_packages_search_path.clone());
 
         // As well as modules installed directly into `site-packages`,
@@ -855,8 +830,8 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         // containing a (relative or absolute) path.
         // Each of these paths may point to an editable install of a package,
         // so should be considered an additional search path.
-        let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
-            Ok(iterator) => iterator,
+        let listing = match directory_listing(db, site_packages_dir) {
+            Ok(listing) => listing,
             Err(error) => {
                 tracing::warn!(
                     "Failed to search for editable installation in {site_packages_dir}: {error}"
@@ -866,43 +841,70 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         };
 
         // The Python documentation specifies that `.pth` files in `site-packages`
-        // are processed in alphabetical order, so collecting and then sorting is necessary.
+        // are processed in alphabetical order. `DirectoryListing` is already sorted.
         // https://docs.python.org/3/library/site.html#module-site
-        let mut all_pth_files: Vec<PthFile> = pth_file_iterator.collect();
-        all_pth_files.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+        let pth_files = listing.iter().filter(|(name, file_type)| {
+            !file_type.is_directory() && SystemPath::new(name).extension() == Some("pth")
+        });
 
-        let installations = all_pth_files.iter().flat_map(PthFile::items);
+        for (name, _) in pth_files {
+            let path = site_packages_dir.join(name);
+            // Track each `.pth` file independently so content changes invalidate this query.
+            let Ok(file) = system_path_to_file(db, &path).inspect_err(|error| {
+                tracing::warn!("Failed to open .pth file `{path}`: {error}");
+            }) else {
+                continue;
+            };
+            let contents = source_text(db, file);
+            if let Some(error) = contents.read_error() {
+                tracing::warn!("Failed to read .pth file `{path}`: {error}");
+                continue;
+            }
 
-        for installation in installations {
-            let installation = system
-                .canonicalize_path(&installation)
-                .unwrap_or(installation);
+            let installations = contents.lines().filter_map(|line| {
+                let line = line.trim_end();
+                if line.is_empty()
+                    || line.starts_with('#')
+                    || line.starts_with("import ")
+                    || line.starts_with("import\t")
+                {
+                    return None;
+                }
 
-            if existing_paths.insert(Cow::Owned(installation.clone())) {
-                match SearchPath::editable(system, installation.clone()) {
-                    Ok(search_path) => {
-                        tracing::debug!(
-                            "Adding editable installation to module resolution path {path}",
-                            path = installation
-                        );
+                Some(SystemPath::absolute(line, site_packages_dir))
+            });
 
-                        // Register a file root for editable installs that are outside any other root
-                        // (Most importantly, don't register a root for editable installations from the project
-                        // directory as that would change the durability of files within those folders).
-                        // Not having an exact file root for editable installs just means that
-                        // some queries (like `list_modules_in`) will run slightly more frequently
-                        // than they would otherwise.
-                        if let Some(dynamic_path) = search_path.as_system_path() {
-                            if files.root(db, dynamic_path).is_none() {
-                                files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
+            for installation in installations {
+                let installation = system
+                    .canonicalize_path(&installation)
+                    .unwrap_or(installation);
+
+                if existing_paths.insert(Cow::Owned(installation.clone())) {
+                    match SearchPath::editable(system, installation.clone()) {
+                        Ok(search_path) => {
+                            tracing::debug!(
+                                "Adding editable installation to module resolution path {path}",
+                                path = installation
+                            );
+
+                            // Register a file root for editable installs that are outside any other root
+                            // (Most importantly, don't register a root for editable installations from the project
+                            // directory as that would change the durability of files within those folders).
+                            // Not having an exact file root for editable installs just means that
+                            // some queries (like `list_modules_in`) will run slightly more frequently
+                            // than they would otherwise.
+                            if let Some(dynamic_path) = search_path.as_system_path() {
+                                if files.root(db, dynamic_path).is_none() {
+                                    files.try_add_root(db, dynamic_path, FileRootKind::SearchPath);
+                                }
                             }
+
+                            dynamic_paths.push(search_path);
                         }
 
-                        dynamic_paths.push(search_path);
-                    }
-
-                    Err(error) => {
-                        tracing::debug!("Skipping editable installation: {error}");
+                        Err(error) => {
+                            tracing::debug!("Skipping editable installation: {error}");
+                        }
                     }
                 }
             }
@@ -951,105 +953,6 @@ impl<'db> Iterator for SearchPathIterator<'db> {
 }
 
 impl FusedIterator for SearchPathIterator<'_> {}
-
-/// Represents a single `.pth` file in a `site-packages` directory.
-/// One or more lines in a `.pth` file may be a (relative or absolute)
-/// path that represents an editable installation of a package.
-struct PthFile<'db> {
-    path: SystemPathBuf,
-    contents: String,
-    site_packages: &'db SystemPath,
-}
-
-impl<'db> PthFile<'db> {
-    /// Yield paths in this `.pth` file that appear to represent editable installations,
-    /// and should therefore be added as module-resolution search paths.
-    fn items(&'db self) -> impl Iterator<Item = SystemPathBuf> + 'db {
-        let PthFile {
-            path: _,
-            contents,
-            site_packages,
-        } = self;
-
-        // Empty lines or lines starting with '#' are ignored by the Python interpreter.
-        // Lines that start with "import " or "import\t" do not represent editable installs at all;
-        // instead, these are lines that are executed by Python at startup.
-        // https://docs.python.org/3/library/site.html#module-site
-        contents.lines().filter_map(move |line| {
-            let line = line.trim_end();
-            if line.is_empty()
-                || line.starts_with('#')
-                || line.starts_with("import ")
-                || line.starts_with("import\t")
-            {
-                return None;
-            }
-
-            Some(SystemPath::absolute(line, site_packages))
-        })
-    }
-}
-
-/// Iterator that yields a [`PthFile`] instance for every `.pth` file
-/// found in a given `site-packages` directory.
-struct PthFileIterator<'db> {
-    db: &'db dyn Db,
-    directory_iterator: Box<dyn Iterator<Item = std::io::Result<DirectoryEntry>> + 'db>,
-    site_packages: &'db SystemPath,
-}
-
-impl<'db> PthFileIterator<'db> {
-    fn new(db: &'db dyn Db, site_packages: &'db SystemPath) -> std::io::Result<Self> {
-        Ok(Self {
-            db,
-            directory_iterator: db.system().read_directory(site_packages)?,
-            site_packages,
-        })
-    }
-}
-
-impl<'db> Iterator for PthFileIterator<'db> {
-    type Item = PthFile<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let PthFileIterator {
-            db,
-            directory_iterator,
-            site_packages,
-        } = self;
-
-        let system = db.system();
-
-        loop {
-            let entry_result = directory_iterator.next()?;
-            let Ok(entry) = entry_result else {
-                continue;
-            };
-            let file_type = entry.file_type();
-            if file_type.is_directory() {
-                continue;
-            }
-            let path = entry.into_path();
-            if path.extension() != Some("pth") {
-                continue;
-            }
-
-            let contents = match system.read_to_string(&path) {
-                Ok(contents) => contents,
-                Err(error) => {
-                    tracing::warn!("Failed to read .pth file `{path}`: {error}");
-                    continue;
-                }
-            };
-
-            return Some(PthFile {
-                path,
-                contents,
-                site_packages,
-            });
-        }
-    }
-}
 
 /// A thin wrapper around `ModuleName` to make it a Salsa ingredient.
 ///
@@ -2754,6 +2657,66 @@ not_a_directory
             ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
             &events,
         );
+    }
+
+    #[test]
+    fn nested_site_packages_change_does_not_invalidate_dynamic_resolution_paths() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_foo.pth", "/x/src"), ("package/__init__.py", "")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+
+        dynamic_resolution_paths(
+            &db,
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+        );
+        db.clear_salsa_events();
+
+        db.write_file(site_packages.join("package/nested.py"), "")
+            .unwrap();
+        dynamic_resolution_paths(
+            &db,
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+        );
+
+        let events = db.take_salsa_events();
+        assert_function_query_was_not_run(
+            &db,
+            dynamic_resolution_paths,
+            ModuleResolveModeIngredient::new(&db, ModuleResolveMode::StubsAllowed),
+            &events,
+        );
+    }
+
+    #[test]
+    fn modifying_pth_file_invalidates_dynamic_resolution_paths() {
+        const SITE_PACKAGES: &[FileSpec] = &[("_editable.pth", "/x/src")];
+
+        let TestCase {
+            mut db,
+            site_packages,
+            ..
+        } = TestCaseBuilder::new()
+            .with_site_packages_files(SITE_PACKAGES)
+            .build();
+        db.write_files([("/x/src/foo.py", ""), ("/y/src/bar.py", "")])
+            .unwrap();
+
+        assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_some());
+
+        let pth_path = site_packages.join("_editable.pth");
+        db.memory_file_system()
+            .write_file(&pth_path, "/y/src")
+            .unwrap();
+        File::sync_path_only(&mut db, &pth_path);
+
+        assert!(resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).is_none());
+        assert!(resolve_module_confident(&db, &ModuleName::new_static("bar").unwrap()).is_some());
     }
 
     #[test]
