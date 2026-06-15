@@ -615,12 +615,12 @@ impl DiagnosticData {
 #[cfg(test)]
 mod tests {
     use lsp_types::ClientCapabilities;
+    use ruff_db::Db as _;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic as TyDiagnostic, DiagnosticId, Severity, Span, SubDiagnostic,
         SubDiagnosticSeverity,
     };
-    use ruff_db::files::system_path_to_file;
-    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+    use ruff_db::system::{SystemPathBuf, SystemVirtualPath, TestSystem};
     use ruff_python_ast::name::Name;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::{ProjectDatabase, ProjectMetadata};
@@ -632,14 +632,16 @@ mod tests {
     use super::to_lsp_diagnostic;
 
     #[test]
-    fn all_annotations_are_related_information() -> anyhow::Result<()> {
-        let path = SystemPath::new("/test.py");
+    fn all_annotations_are_related_information() {
+        let path = SystemVirtualPath::new("untitled:test.py");
         let system = TestSystem::default();
-        system.memory_file_system().write_file(path, "abcdef")?;
+        system
+            .memory_file_system()
+            .write_virtual_file(path, "abcdef");
 
         let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
         let db = ProjectDatabase::use_defaults(metadata, system);
-        let file = system_path_to_file(&db, path).expect("test file to exist");
+        let file = db.files().virtual_file(&db, path).file();
         let span = |offset| {
             Span::from(file).with_range(TextRange::at(TextSize::new(offset), TextSize::new(1)))
         };
@@ -702,7 +704,5 @@ mod tests {
                 "Additional primary subannotation",
             ]
         );
-
-        Ok(())
     }
 }
