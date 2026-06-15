@@ -1174,12 +1174,13 @@ fn resolve_name_impl<'a>(
     }
 
     discard_shadowed_namespace_candidates(db, &mut cur_candidates);
-    // Stub packages have priority over runtime packages regardless of
-    // search path ordering.
-    cur_candidates.sort_by_key(|candidate| !candidate.is_stub_package);
     if cur_candidates.is_empty() {
         return None;
     }
+
+    // Stub packages have priority over runtime packages regardless of
+    // search path ordering.
+    cur_candidates.sort_by_key(|candidate| !candidate.is_stub_package);
 
     let mut next_candidates = Vec::new();
 
@@ -1204,13 +1205,13 @@ fn resolve_name_impl<'a>(
         }
 
         discard_shadowed_namespace_candidates(db, &mut next_candidates);
+        if next_candidates.is_empty() {
+            return None;
+        }
 
         // Stub packages have priority over runtime packages regardless of
         // search path ordering.
         next_candidates.sort_by_key(|c| !c.is_stub_package);
-        if next_candidates.is_empty() {
-            return None;
-        }
 
         // Advance to the next level of candidates while reusing allocations
         // (we used `drain` so cur_candidates is empty)
