@@ -84,19 +84,8 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal("-1", "-1.0")?;
     assert_hashable_equal("2", "2 + 0j")?;
     assert_hashable_equal("1j", "0 + 1j")?;
-    assert_hashable_equal("18446744073709551616", "1.8446744073709552e19")?;
-    assert_hashable_equal("0x10000000000000000", "18446744073709551616")?;
+    assert_hashable_equal("9007199254740992", "9007199254740992.0")?;
     assert_hashable_equal("(2,)", "(2.0,)")?;
-
-    let power_of_two_256 =
-        "115792089237316195423570985008687907853269984665640564039457584007913129639936";
-    assert_hashable_equal(power_of_two_256, &format!("0x1{}", "0".repeat(64)))?;
-    assert_hashable_equal(power_of_two_256, &format!("0o2{}", "0".repeat(85)))?;
-    assert_hashable_equal(power_of_two_256, &format!("0b1{}", "0".repeat(256)))?;
-    assert_hashable_equal(
-        &format!("0x8{}", "0".repeat(255)),
-        &format!("0b1{}", "0".repeat(1023)),
-    )?;
 
     let integer = parse_expression("9007199254740993")?;
     let float = parse_expression("9007199254740992.0")?;
@@ -105,16 +94,23 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
         HashableExpr::from(float.expr())
     );
 
+    let maximum_integer = parse_expression("18446744073709551615")?;
+    let out_of_range_float = parse_expression("18446744073709551616.0")?;
+    assert_ne!(
+        HashableExpr::from(maximum_integer.expr()),
+        HashableExpr::from(out_of_range_float.expr())
+    );
+
     Ok(())
 }
 
 #[test]
 fn large_integers_fall_back_to_structural_comparison() -> Result<(), ParseError> {
-    let binary = parse_expression(&format!("0b1{}", "0".repeat(1024)))?;
-    let hexadecimal = parse_expression(&format!("0x1{}", "0".repeat(256)))?;
+    let decimal = parse_expression("18446744073709551616")?;
+    let hexadecimal = parse_expression("0x10000000000000000")?;
 
     assert_ne!(
-        HashableExpr::from(binary.expr()),
+        HashableExpr::from(decimal.expr()),
         HashableExpr::from(hexadecimal.expr())
     );
 

@@ -97,14 +97,6 @@ impl Int {
         }
     }
 
-    /// Return the stored literal for an integer that cannot be represented as a `u64`.
-    pub(crate) fn as_big_str(&self) -> Option<&str> {
-        match &self.0 {
-            Number::Small(_) => None,
-            Number::Big(big) => Some(big),
-        }
-    }
-
     /// Return the [`Int`] as an usize, if it can be represented as that data type.
     pub fn as_usize(&self) -> Option<usize> {
         match &self.0 {

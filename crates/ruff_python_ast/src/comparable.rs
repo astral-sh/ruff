@@ -1993,118 +1993,59 @@ impl HashableReal {
 #[derive(Debug, PartialEq, Eq, Hash)]
 struct HashableInteger {
     negative: bool,
-    /// The magnitude in little-endian base-2^64 limbs. Zero has no limbs.
-    magnitude: Box<[u64]>,
+    magnitude: u64,
 }
+
+const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
 
 impl HashableInteger {
     fn zero() -> Self {
         Self {
             negative: false,
-            magnitude: Box::new([]),
+            magnitude: 0,
         }
     }
 
     fn from_u64(value: u64) -> Self {
-        if value == 0 {
-            Self::zero()
-        } else {
-            Self {
-                negative: false,
-                magnitude: Box::new([value]),
-            }
+        Self {
+            negative: false,
+            magnitude: value,
         }
     }
 
     fn from_int(value: &ast::Int) -> Option<Self> {
-        if let Some(value) = value.as_u64() {
-            return Some(Self::from_u64(value));
-        }
-
-        let literal = value.as_big_str()?;
-        let (digits, radix) = integer_literal_parts(literal);
-        if digits
-            .bytes()
-            .filter(|byte| *byte != b'_')
-            .nth(max_normalized_digits(radix))
-            .is_some()
-        {
-            None
-        } else {
-            Some(Self::from_literal(literal))
-        }
+        value.as_u64().map(Self::from_u64)
     }
 
-    fn from_literal(literal: &str) -> Self {
-        let (digits, radix) = integer_literal_parts(literal);
-
-        let limb_radix = u64::from(radix);
-        let mut magnitude = Vec::new();
-        // Accumulate as many digits as possible before rescanning the existing limbs.
-        let mut chunk = 0u64;
-        let mut chunk_radix = 1u64;
-        for byte in digits.bytes().filter(|byte| *byte != b'_') {
-            let Some(digit) = char::from(byte).to_digit(radix) else {
-                continue;
-            };
-            let digit = u64::from(digit);
-
-            let Some(next_chunk_radix) = chunk_radix.checked_mul(limb_radix) else {
-                multiply_add(&mut magnitude, chunk_radix, chunk);
-                chunk = digit;
-                chunk_radix = limb_radix;
-                continue;
-            };
-
-            chunk = chunk * limb_radix + digit;
-            chunk_radix = next_chunk_radix;
-        }
-        multiply_add(&mut magnitude, chunk_radix, chunk);
-
-        Self {
-            negative: false,
-            magnitude: magnitude.into_boxed_slice(),
-        }
-    }
-
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_precision_loss,
+        clippy::cast_sign_loss,
+        clippy::float_cmp,
+        reason = "the round-trip check guarantees that the float is exactly representable as a u64"
+    )]
     fn from_float(value: f64) -> Option<Self> {
-        if !value.is_finite() || value.fract() != 0.0 {
+        if !value.is_finite() {
             return None;
         }
-        if value == 0.0 {
-            return Some(Self::zero());
+
+        let magnitude = value.abs();
+        if magnitude >= U64_EXCLUSIVE_UPPER_BOUND {
+            return None;
+        }
+        let integer = magnitude as u64;
+        if integer as f64 != magnitude {
+            return None;
         }
 
-        let bits = value.to_bits();
-        let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023 - 52;
-        let significand = (bits & ((1 << 52) - 1)) | (1 << 52);
-        let magnitude = if exponent >= 0 {
-            let exponent = exponent.cast_unsigned();
-            let word_shift = usize::try_from(exponent / 64).ok()?;
-            let bit_shift = exponent % 64;
-            let mut magnitude = vec![0; word_shift];
-            magnitude.push(significand << bit_shift);
-            if bit_shift != 0 {
-                let high = significand >> (64 - bit_shift);
-                if high != 0 {
-                    magnitude.push(high);
-                }
-            }
-            magnitude
-        } else {
-            let shift = exponent.unsigned_abs();
-            debug_assert!(shift < 64);
-            vec![significand >> shift]
-        };
-
         Some(Self {
-            negative: value.is_sign_negative(),
-            magnitude: magnitude.into_boxed_slice(),
+            negative: value.is_sign_negative() && integer != 0,
+            magnitude: integer,
         })
     }
 
     fn is_zero(&self) -> bool {
-        self.magnitude.is_empty()
+        self.magnitude == 0
     }
 
     fn negate(&mut self) {
@@ -2112,61 +2053,6 @@ impl HashableInteger {
             self.negative = !self.negative;
         }
     }
-}
-
-fn integer_literal_parts(literal: &str) -> (&str, u32) {
-    if let Some(digits) = literal
-        .strip_prefix("0x")
-        .or_else(|| literal.strip_prefix("0X"))
-    {
-        (digits, 16)
-    } else if let Some(digits) = literal
-        .strip_prefix("0o")
-        .or_else(|| literal.strip_prefix("0O"))
-    {
-        (digits, 8)
-    } else if let Some(digits) = literal
-        .strip_prefix("0b")
-        .or_else(|| literal.strip_prefix("0B"))
-    {
-        (digits, 2)
-    } else {
-        (literal, 10)
-    }
-}
-
-/// Return the maximum number of digits to normalize for the given radix.
-///
-/// These limits cover every integer that can equal a finite `f64` while bounding the cost of the
-/// quadratic base conversion.
-fn max_normalized_digits(radix: u32) -> usize {
-    match radix {
-        2 => 1024,
-        8 => 342,
-        10 => 309,
-        16 => 256,
-        _ => 0,
-    }
-}
-
-fn multiply_add(magnitude: &mut Vec<u64>, multiplier: u64, addend: u64) {
-    let mut carry = u128::from(addend);
-    for limb in &mut *magnitude {
-        let value = u128::from(*limb) * u128::from(multiplier) + carry;
-        *limb = lower_u64(value);
-        carry = value >> 64;
-    }
-    if carry != 0 {
-        magnitude.push(lower_u64(carry));
-    }
-}
-
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "the caller only needs the lower 64 bits"
-)]
-fn lower_u64(value: u128) -> u64 {
-    value as u64
 }
 
 impl<'a> From<&'a Expr> for HashableExpr<'a> {
