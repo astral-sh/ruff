@@ -1914,93 +1914,287 @@ impl<'a> From<&'a ast::ModExpression> for ComparableModExpression<'a> {
 /// in Python, along with `False`, `0`, and `0.0`.
 ///
 /// See: <https://docs.python.org/3/library/stdtypes.html#mapping-types-dict>
-#[derive(Debug)]
-pub struct HashableExpr<'a>(ComparableExpr<'a>);
+#[derive(Debug, PartialEq, Eq, Hash)]
+pub struct HashableExpr<'a>(HashableExprKind<'a>);
 
-impl Hash for HashableExpr<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.0.hash(state);
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableExprKind<'a> {
+    Comparable(ComparableExpr<'a>),
+    Number(HashableNumber),
+    NamedExpr {
+        target: ComparableExpr<'a>,
+        value: Box<HashableExpr<'a>>,
+    },
+    Tuple(Vec<HashableExpr<'a>>),
+}
+
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableNumber {
+    Real(HashableReal),
+    Complex {
+        real: HashableReal,
+        imag: HashableReal,
+    },
+}
+
+impl HashableNumber {
+    fn complex(real: HashableReal, imag: HashableReal) -> Self {
+        if imag.is_zero() {
+            Self::Real(real)
+        } else {
+            Self::Complex { real, imag }
+        }
+    }
+
+    fn negate(mut self) -> Self {
+        match &mut self {
+            Self::Real(real) => real.negate(),
+            Self::Complex { real, imag } => {
+                real.negate();
+                imag.negate();
+            }
+        }
+        self
+    }
+
+    fn into_real(self) -> Option<HashableReal> {
+        match self {
+            Self::Real(real) => Some(real),
+            Self::Complex { .. } => None,
+        }
     }
 }
 
-impl PartialEq<Self> for HashableExpr<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.0 == other.0
+#[derive(Debug, PartialEq, Eq, Hash)]
+enum HashableReal {
+    Integer(HashableInteger),
+    Float(u64),
+}
+
+impl HashableReal {
+    fn from_int(value: &ast::Int) -> Self {
+        Self::Integer(HashableInteger::from_int(value))
+    }
+
+    fn from_float(value: f64) -> Self {
+        HashableInteger::from_float(value)
+            .map(Self::Integer)
+            .unwrap_or_else(|| Self::Float(value.to_bits()))
+    }
+
+    fn is_zero(&self) -> bool {
+        matches!(self, Self::Integer(integer) if integer.is_zero())
+    }
+
+    fn negate(&mut self) {
+        match self {
+            Self::Integer(integer) => integer.negate(),
+            Self::Float(bits) => *bits ^= 1 << 63,
+        }
     }
 }
 
-impl Eq for HashableExpr<'_> {}
+#[derive(Debug, PartialEq, Eq, Hash)]
+struct HashableInteger {
+    negative: bool,
+    /// The magnitude in little-endian base-2^64 limbs. Zero has no limbs.
+    magnitude: Box<[u64]>,
+}
+
+impl HashableInteger {
+    fn zero() -> Self {
+        Self {
+            negative: false,
+            magnitude: Box::new([]),
+        }
+    }
+
+    fn from_u64(value: u64) -> Self {
+        if value == 0 {
+            Self::zero()
+        } else {
+            Self {
+                negative: false,
+                magnitude: Box::new([value]),
+            }
+        }
+    }
+
+    fn from_int(value: &ast::Int) -> Self {
+        let Some(value) = value.as_u64() else {
+            return Self::from_literal(&value.to_string());
+        };
+        Self::from_u64(value)
+    }
+
+    fn from_literal(literal: &str) -> Self {
+        let (digits, radix) = if let Some(digits) = literal
+            .strip_prefix("0x")
+            .or_else(|| literal.strip_prefix("0X"))
+        {
+            (digits, 16u32)
+        } else if let Some(digits) = literal
+            .strip_prefix("0o")
+            .or_else(|| literal.strip_prefix("0O"))
+        {
+            (digits, 8)
+        } else if let Some(digits) = literal
+            .strip_prefix("0b")
+            .or_else(|| literal.strip_prefix("0B"))
+        {
+            (digits, 2)
+        } else {
+            (literal, 10)
+        };
+
+        let mut magnitude = Vec::new();
+        for byte in digits.bytes().filter(|byte| *byte != b'_') {
+            let Some(digit) = char::from(byte).to_digit(radix) else {
+                continue;
+            };
+
+            let mut carry = u128::from(digit);
+            for limb in &mut magnitude {
+                let value = u128::from(*limb) * u128::from(radix) + carry;
+                *limb = lower_u64(value);
+                carry = value >> 64;
+            }
+            if carry != 0 {
+                magnitude.push(lower_u64(carry));
+            }
+        }
+
+        Self {
+            negative: false,
+            magnitude: magnitude.into_boxed_slice(),
+        }
+    }
+
+    fn from_float(value: f64) -> Option<Self> {
+        if !value.is_finite() || value.fract() != 0.0 {
+            return None;
+        }
+        if value == 0.0 {
+            return Some(Self::zero());
+        }
+
+        let bits = value.to_bits();
+        let exponent = ((bits >> 52) & 0x7ff) as i32 - 1023 - 52;
+        let significand = (bits & ((1 << 52) - 1)) | (1 << 52);
+        let magnitude = if exponent >= 0 {
+            let exponent = exponent.cast_unsigned();
+            let word_shift = usize::try_from(exponent / 64).ok()?;
+            let bit_shift = exponent % 64;
+            let mut magnitude = vec![0; word_shift];
+            magnitude.push(significand << bit_shift);
+            if bit_shift != 0 {
+                let high = significand >> (64 - bit_shift);
+                if high != 0 {
+                    magnitude.push(high);
+                }
+            }
+            magnitude
+        } else {
+            let shift = exponent.unsigned_abs();
+            debug_assert!(shift < 64);
+            vec![significand >> shift]
+        };
+
+        Some(Self {
+            negative: value.is_sign_negative(),
+            magnitude: magnitude.into_boxed_slice(),
+        })
+    }
+
+    fn is_zero(&self) -> bool {
+        self.magnitude.is_empty()
+    }
+
+    fn negate(&mut self) {
+        if !self.is_zero() {
+            self.negative = !self.negative;
+        }
+    }
+}
+
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the caller only needs the lower 64 bits"
+)]
+fn lower_u64(value: u128) -> u64 {
+    value as u64
+}
 
 impl<'a> From<&'a Expr> for HashableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> ComparableExpr<'_> {
-            if let Some(value) = as_bool(expr) {
-                return ComparableExpr::BoolLiteral(ExprBoolLiteral { value });
+        fn as_hashable(expr: &Expr) -> HashableExpr<'_> {
+            if let Some(number) = as_number(expr) {
+                return HashableExpr(HashableExprKind::Number(number));
             }
 
-            match expr {
-                Expr::Named(named) => ComparableExpr::NamedExpr(ExprNamed {
-                    target: Box::new(ComparableExpr::from(&named.target)),
+            HashableExpr(match expr {
+                Expr::Named(named) => HashableExprKind::NamedExpr {
+                    target: ComparableExpr::from(&named.target),
                     value: Box::new(as_hashable(&named.value)),
-                }),
-                Expr::Tuple(tuple) => ComparableExpr::Tuple(ExprTuple {
-                    elts: tuple.iter().map(as_hashable).collect(),
-                }),
-                _ => ComparableExpr::from(expr),
-            }
+                },
+                Expr::Tuple(tuple) => {
+                    HashableExprKind::Tuple(tuple.iter().map(as_hashable).collect())
+                }
+                _ => HashableExprKind::Comparable(ComparableExpr::from(expr)),
+            })
         }
 
-        /// Returns the `bool` value of the given expression, if it has an equivalent hash to
-        /// `True` or `False`.
-        fn as_bool(expr: &Expr) -> Option<bool> {
+        fn as_number(expr: &Expr) -> Option<HashableNumber> {
             match expr {
+                Expr::BooleanLiteral(boolean) => Some(HashableNumber::Real(HashableReal::Integer(
+                    HashableInteger::from_u64(u64::from(boolean.value)),
+                ))),
                 Expr::NumberLiteral(number) => match &number.value {
-                    Number::Int(int) => match int.as_u8() {
-                        Some(0) => Some(false),
-                        Some(1) => Some(true),
-                        _ => None,
-                    },
-                    Number::Float(float) => match float {
-                        0.0 => Some(false),
-                        1.0 => Some(true),
-                        _ => None,
-                    },
-                    Number::Complex { real, imag } => match (real, imag) {
-                        (0.0, 0.0) => Some(false),
-                        (1.0, 0.0) => Some(true),
-                        _ => None,
-                    },
+                    Number::Int(int) => Some(HashableNumber::Real(HashableReal::from_int(int))),
+                    Number::Float(float) => {
+                        Some(HashableNumber::Real(HashableReal::from_float(*float)))
+                    }
+                    Number::Complex { real, imag } => Some(HashableNumber::complex(
+                        HashableReal::from_float(*real),
+                        HashableReal::from_float(*imag),
+                    )),
                 },
                 Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => match op {
-                    ast::UnaryOp::UAdd => as_bool(operand),
-                    ast::UnaryOp::USub => as_bool(operand).filter(|value| !value),
+                    ast::UnaryOp::UAdd => as_number(operand),
+                    ast::UnaryOp::USub => as_number(operand).map(HashableNumber::negate),
                     ast::UnaryOp::Invert | ast::UnaryOp::Not => None,
                 },
                 Expr::BinOp(ast::ExprBinOp {
-                    left,
-                    op: ast::Operator::Add | ast::Operator::Sub,
-                    right,
-                    ..
-                }) if is_complex_zero(right) => as_bool(left),
+                    left, op, right, ..
+                }) if matches!(op, ast::Operator::Add | ast::Operator::Sub) => {
+                    let real = as_number(left)?.into_real()?;
+                    let Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value:
+                            Number::Complex {
+                                real: complex_real,
+                                imag,
+                            },
+                        ..
+                    }) = right.as_ref()
+                    else {
+                        return None;
+                    };
+                    let complex_real = HashableReal::from_float(*complex_real);
+                    if !complex_real.is_zero() {
+                        return None;
+                    }
+                    let mut imag = HashableReal::from_float(*imag);
+                    if op.is_sub() {
+                        imag.negate();
+                    }
+                    Some(HashableNumber::complex(real, imag))
+                }
                 _ => None,
             }
         }
 
-        fn is_complex_zero(expr: &Expr) -> bool {
-            matches!(
-                expr,
-                Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: Number::Complex {
-                        real: 0.0,
-                        imag: 0.0,
-                    },
-                    ..
-                })
-            )
-        }
-
-        Self(as_hashable(expr))
+        as_hashable(expr)
     }
 }

@@ -1,4 +1,6 @@
-use ruff_python_ast::comparable::ComparableExpr;
+use std::collections::HashSet;
+
+use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
 use ruff_python_parser::{ParseError, parse_expression};
 
 #[track_caller]
@@ -22,6 +24,35 @@ fn assert_noncomparable(left: &str, right: &str) -> Result<(), ParseError> {
     let right_compr = ComparableExpr::from(right_parsed.expr());
 
     assert_ne!(left_compr, right_compr);
+    Ok(())
+}
+
+#[track_caller]
+fn assert_hashable_equal(left: &str, right: &str) -> Result<(), ParseError> {
+    let left_parsed = parse_expression(left)?;
+    let right_parsed = parse_expression(right)?;
+
+    let left_hashable = HashableExpr::from(left_parsed.expr());
+    let right_hashable = HashableExpr::from(right_parsed.expr());
+
+    assert_eq!(left_hashable, right_hashable);
+
+    let mut seen = HashSet::new();
+    assert!(seen.insert(left_hashable));
+    assert!(!seen.insert(right_hashable));
+
+    Ok(())
+}
+
+#[track_caller]
+fn assert_hashable_not_equal(left: &str, right: &str) -> Result<(), ParseError> {
+    let left_parsed = parse_expression(left)?;
+    let right_parsed = parse_expression(right)?;
+
+    assert_ne!(
+        HashableExpr::from(left_parsed.expr()),
+        HashableExpr::from(right_parsed.expr())
+    );
     Ok(())
 }
 
@@ -63,4 +94,16 @@ fn t_strings_literal_order_matters_compare_unequal() -> Result<(), ParseError> {
     let literal_then_interp_contents = r#"t"bar{foo}""#;
 
     assert_noncomparable(interp_then_literal_contents, literal_then_interp_contents)
+}
+
+#[test]
+fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
+    assert_hashable_equal("2", "2.0")?;
+    assert_hashable_equal("-1", "-1.0")?;
+    assert_hashable_equal("2", "2 + 0j")?;
+    assert_hashable_equal("1j", "0 + 1j")?;
+    assert_hashable_equal("18446744073709551616", "1.8446744073709552e19")?;
+    assert_hashable_equal("0x10000000000000000", "18446744073709551616")?;
+
+    assert_hashable_not_equal("9007199254740993", "9007199254740992.0")
 }
