@@ -66,7 +66,9 @@ fn check_pep695_function_legacy_typevars<'db>(
             if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
                 && matches!(
                     typevar.kind(db),
-                    TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+                    TypeVarKind::LegacyTypeVar
+                        | TypeVarKind::Pep613Alias
+                        | TypeVarKind::LegacyParamSpec
                 )
             {
                 Some(typevar)
@@ -206,7 +208,7 @@ fn check_legacy_typevar_defaults<'db>(
         // by `check_default_for_outer_scope_typevars` in the type parameter scope.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
         ) {
             continue;
         }
@@ -331,7 +333,7 @@ fn check_legacy_typevar_ordering<'db>(
         // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
         ) {
             continue;
         }

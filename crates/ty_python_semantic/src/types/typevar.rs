@@ -638,7 +638,7 @@ impl<'db> TypeVarInstance<'db> {
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
         if !matches!(
             self.identity(db).kind(db),
-            TypeVarKind::Pep695 | TypeVarKind::Pep695ParamSpec
+            TypeVarKind::Pep695TypeVar | TypeVarKind::Pep695ParamSpec
         ) {
             return None;
         }
@@ -945,7 +945,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             name,
             None, // definition
-            TypeVarKind::Pep695,
+            TypeVarKind::Pep695TypeVar,
         );
         let typevar = TypeVarInstance::new(
             db,
@@ -1234,13 +1234,13 @@ impl<'db> BoundTypeVarInstance<'db> {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
-    Legacy,
+    LegacyTypeVar,
     /// `def foo[T](x: T) -> T: ...`
-    Pep695,
+    Pep695TypeVar,
     /// `typing.Self`
     TypingSelf,
     /// `P = ParamSpec("P")`
-    ParamSpec,
+    LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
     /// `Alias: typing.TypeAlias = T`
@@ -1249,7 +1249,7 @@ pub enum TypeVarKind {
 
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
-        matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+        matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }
 }
 
