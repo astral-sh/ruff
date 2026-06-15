@@ -17,14 +17,41 @@ reveal_type(x[0])  # revealed: int
 
 reveal_type(x[0:1])  # revealed: list[int]
 
-# error: [invalid-argument-type]
+# snapshot: invalid-argument-type
 reveal_type(x["a"])  # revealed: Unknown
+
+# error: [invalid-argument-type] "Cannot subscript an object of type `list[int]` with an index of type `Literal["b"]` (expected one of `SupportsIndex` or `slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None]`)"
+x["b"]
 
 def invalid_slice_bound(xs: list[int], start: float) -> list[int]:
     return xs[start:]  # error: [invalid-argument-type]
 
 def gradual_slice_bound(xs: list[int], start: Any) -> list[int]:
     return xs[start:]
+```
+
+```snapshot
+error[invalid-argument-type]: Invalid subscript read
+  --> src/mdtest_snippet.py:11:13
+   |
+11 | reveal_type(x["a"])  # revealed: Unknown
+   |             -^^^^^
+   |             | |
+   |             | Has type `Literal["a"]`
+   |             Has type `list[int]`
+   |
+info: This subscript expression implicitly calls `list[int].__getitem__`
+info: First overload defined here
+    --> stdlib/builtins.pyi:3029:5
+     |
+3029 | /     @overload
+3030 | |     def __getitem__(self, i: SupportsIndex, /) -> _T:
+3031 | |         """Return self[index]."""
+     | |_________________________________^ First overload defined here
+     |
+info: Possible overloads for bound method `__getitem__`:
+info:   (self, i: SupportsIndex, /) -> _T@list
+info:   (self, s: slice[SupportsIndex | None, SupportsIndex | None, SupportsIndex | None], /) -> list[_T@list]
 ```
 
 ## Assignments within list assignment

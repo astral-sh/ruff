@@ -128,10 +128,33 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
     }
 }
 
-/// Format a list of elements as a human-readable enumeration.
+/// Format a list of elements as a human-readable enumeration,
+/// separating the last two elements with "and".
 ///
 /// Encloses every element in backticks (`1`, `2` and `3`).
 pub(crate) fn format_enumeration<I, IT, D>(elements: I) -> String
+where
+    I: IntoIterator<IntoIter = IT>,
+    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
+    D: std::fmt::Display,
+{
+    format_enumeration_with_conjunction(elements, "and")
+}
+
+/// Format a list of elements as a human-readable enumeration,
+/// separating the last two elements with "or".
+///
+/// Encloses every element in backticks (`1`, `2` or `3`).
+pub(crate) fn format_enumeration_with_or<I, IT, D>(elements: I) -> String
+where
+    I: IntoIterator<IntoIter = IT>,
+    IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
+    D: std::fmt::Display,
+{
+    format_enumeration_with_conjunction(elements, "or")
+}
+
+fn format_enumeration_with_conjunction<I, IT, D>(elements: I, conjunction: &str) -> String
 where
     I: IntoIterator<IntoIter = IT>,
     IT: ExactSizeIterator<Item = D> + DoubleEndedIterator,
@@ -147,7 +170,11 @@ where
     for element in elements {
         write!(&mut buffer, "`{element}`, ").ok();
     }
-    write!(&mut buffer, "`{penultimate_element}` and `{final_element}`").ok();
+    write!(
+        &mut buffer,
+        "`{penultimate_element}` {conjunction} `{final_element}`"
+    )
+    .ok();
 
     buffer
 }

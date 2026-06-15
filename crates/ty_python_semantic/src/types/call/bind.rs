@@ -66,7 +66,7 @@ use crate::types::{
     TypeAliasType, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
 };
-use crate::{DisplaySettings, FxOrderSet, Program};
+use crate::{DisplaySettings, FxIndexSet, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, AnyNodeRef, ArgOrKeyword, PythonVersion};
 use ty_python_core::semantic_index;
@@ -1068,6 +1068,63 @@ impl<'db> Bindings<'db> {
                 .map(CallableItem::callable)
         } else {
             None
+        }
+    }
+
+    /// Given a [`Bindings`] that represents a failed call due to invalid argument
+    /// types, this method attempts to answer the question, "Well, what type *should*
+    /// the user have passed instead?"
+    ///
+    /// Answering this question can get complicated in lots of situations, but this
+    /// method doesn't need to exhaustively answer it in all situations. The use case
+    /// of this method is just for diagnostic hints, so we bail and return `None` in
+    /// lots of situations:
+    ///
+    /// - If the called object is a union or intersection of callables
+    /// - If any binding errors are not `InvalidArgumentType` errors
+    /// - If any binding errors are related to a different argument index than the one
+    ///   passed into this method.
+    ///
+    /// Future developers: if you're confident in your implementation and you have the
+    /// need, feel free to expand this method to handle more situations!
+    ///
+    /// Despite the deliberate simplifications, this method returns
+    /// `Option<Vec<Type>>` rather than `Option<Type>` because there are
+    /// situations where multiple overloads might match, and could have different
+    /// expected types for the same argument index.
+    pub(crate) fn expected_types_for_argument(
+        &self,
+        argument_index: usize,
+    ) -> Option<Vec<Type<'db>>> {
+        let callable = self.single_element()?;
+        let mut expected = FxIndexSet::default();
+
+        for overload in &callable.overloads {
+            for error in &overload.errors {
+                let BindingError::InvalidArgumentType {
+                    parameter: _,
+                    argument_index: Some(error_index),
+                    expected_ty,
+                    provided_ty,
+                    provenance: InvalidArgumentTypeProvenance::Argument,
+                } = error
+                else {
+                    return None;
+                };
+                if expected_ty == provided_ty {
+                    return None;
+                }
+                if *error_index != argument_index {
+                    return None;
+                }
+                expected.insert(*expected_ty);
+            }
+        }
+
+        if expected.is_empty() {
+            None
+        } else {
+            Some(expected.into_iter().collect())
         }
     }
 
@@ -3880,22 +3937,8 @@ impl<'db> CallableBinding<'db> {
                 );
             }
             _overloads => {
-                // TODO: This should probably be adapted to handle more
-                // types of callables[1]. At present, it just handles
-                // standard function and method calls.
-                //
-                // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
-                let function_type_and_kind = match self.signature_type {
-                    Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
-                    Type::BoundMethod(bound_method) => Some((
-                        FunctionKind::BoundMethod,
-                        bound_method.function(context.db()),
-                    )),
-                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                        function,
-                    )) => Some((FunctionKind::MethodWrapper, function)),
-                    _ => None,
-                };
+                let function_type_and_kind =
+                    FunctionKind::classify(context.db(), self.signature_type);
 
                 // If only one overload passed arity check, report its errors directly.
                 if let Some(matching_overload_index) = self.matching_overload_before_type_checking {
@@ -3983,63 +4026,7 @@ impl<'db> CallableBinding<'db> {
                 }
 
                 if let Some((kind, function)) = function_type_and_kind {
-                    let (overloads, implementation) =
-                        function.overloads_and_implementation(context.db());
-                    let diagnostic_overload_indexes =
-                        self.diagnostic_overload_indexes(context.db(), kind, function);
-                    let possible_overloads = diagnostic_overload_indexes
-                        .iter()
-                        .filter_map(|&index| overloads.get(index).copied())
-                        .collect_vec();
-
-                    if let Some(overload) = possible_overloads.first() {
-                        let mut sub = SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "First overload defined here",
-                        );
-                        let file = function.file(context.db());
-                        let module = parsed_module(context.db(), file).load(context.db());
-                        let node =
-                            overload.node(context.db(), function.file(context.db()), &module);
-                        let span = if node.body.len() == 1 {
-                            Span::from(file).with_range(node.range())
-                        } else {
-                            overload.spans(context.db()).decorators_and_header
-                        };
-                        sub.annotate(
-                            Annotation::primary(span).message("First overload defined here"),
-                        );
-                        diag.sub(sub);
-                    }
-
-                    diag.info(format_args!(
-                        "Possible overloads for {kind} `{}`:",
-                        function.name(context.db())
-                    ));
-
-                    for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
-                        diag.info(format_args!(
-                            "  {}",
-                            overload.signature(context.db()).display(context.db())
-                        ));
-                    }
-                    if possible_overloads.len() > MAXIMUM_OVERLOADS {
-                        diag.info(format_args!(
-                            "... omitted {remaining} overloads",
-                            remaining = possible_overloads.len() - MAXIMUM_OVERLOADS
-                        ));
-                    }
-
-                    if let Some(implementation) = implementation {
-                        let mut sub = SubDiagnostic::new(
-                            SubDiagnosticSeverity::Info,
-                            "Overload implementation defined here",
-                        );
-                        sub.annotate(Annotation::primary(
-                            implementation.spans(context.db()).signature,
-                        ));
-                        diag.sub(sub);
-                    }
+                    annotate_with_overloads(context, self, &mut diag, function, kind);
                 }
 
                 if let Some(compound_diag) = compound_diag {
@@ -4065,6 +4052,61 @@ impl<'db> IntoIterator for CallableBinding<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.overloads.into_iter()
+    }
+}
+
+pub(crate) fn annotate_with_overloads<'db>(
+    context: &InferContext<'db, '_>,
+    binding: &CallableBinding<'db>,
+    diagnostic: &mut Diagnostic,
+    function: FunctionType<'db>,
+    kind: FunctionKind,
+) {
+    let db = context.db();
+    let (overloads, implementation) = function.overloads_and_implementation(db);
+    let diagnostic_overload_indexes = binding.diagnostic_overload_indexes(db, kind, function);
+    let possible_overloads = diagnostic_overload_indexes
+        .iter()
+        .filter_map(|&index| overloads.get(index).copied())
+        .collect_vec();
+
+    if let Some(overload) = possible_overloads.first() {
+        let mut sub =
+            SubDiagnostic::new(SubDiagnosticSeverity::Info, "First overload defined here");
+        let file = function.file(db);
+        let module = parsed_module(db, file).load(db);
+        let node = overload.node(db, function.file(db), &module);
+        let span = if node.body.len() == 1 {
+            Span::from(file).with_range(node.range())
+        } else {
+            overload.spans(db).decorators_and_header
+        };
+        sub.annotate(Annotation::primary(span).message("First overload defined here"));
+        diagnostic.sub(sub);
+    }
+
+    diagnostic.info(format_args!(
+        "Possible overloads for {kind} `{}`:",
+        function.name(db)
+    ));
+
+    for overload in possible_overloads.iter().take(MAXIMUM_OVERLOADS) {
+        diagnostic.info(format_args!("  {}", overload.signature(db).display(db)));
+    }
+    if possible_overloads.len() > MAXIMUM_OVERLOADS {
+        diagnostic.info(format_args!(
+            "... omitted {remaining} overloads",
+            remaining = possible_overloads.len() - MAXIMUM_OVERLOADS
+        ));
+    }
+
+    if let Some(implementation) = implementation {
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "Overload implementation defined here",
+        );
+        sub.annotate(Annotation::primary(implementation.spans(db).signature));
+        diagnostic.sub(sub);
     }
 }
 
@@ -7761,10 +7803,33 @@ impl<'db> MatchingOverloadLiteral<'db> {
 }
 
 #[derive(Clone, Copy, Debug)]
-enum FunctionKind {
+pub(crate) enum FunctionKind {
     Function,
     BoundMethod,
     MethodWrapper,
+}
+
+impl FunctionKind {
+    pub(crate) fn classify<'db>(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+    ) -> Option<(FunctionKind, FunctionType<'db>)> {
+        // TODO: This should probably be adapted to handle more
+        // types of callables[1]. At present, it just handles
+        // standard function and method calls.
+        //
+        // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
+        match ty {
+            Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
+            Type::BoundMethod(bound_method) => {
+                Some((FunctionKind::BoundMethod, bound_method.function(db)))
+            }
+            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
+                Some((FunctionKind::MethodWrapper, function))
+            }
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for FunctionKind {

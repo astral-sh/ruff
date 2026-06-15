@@ -3,10 +3,15 @@
 use std::fmt::{self, Display};
 
 use itertools::Itertools;
+use ruff_db::diagnostic::{Annotation, Span, SubDiagnostic, SubDiagnosticSeverity};
+use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 
 use crate::Db;
+use crate::diagnostic::format_enumeration_with_or;
+use crate::place::Provenance;
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::call::bind::{FunctionKind, annotate_with_overloads};
 use crate::types::special_form::TypeQualifier;
 
 use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
@@ -14,9 +19,8 @@ use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
 use super::diagnostic::{
-    CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, report_index_out_of_bounds, report_invalid_key_on_typed_dict,
-    report_not_subscriptable, report_slice_step_size_zero,
+    INVALID_ARGUMENT_TYPE, INVALID_GENERIC_CLASS, NOT_SUBSCRIPTABLE, report_index_out_of_bounds,
+    report_invalid_key_on_typed_dict, report_not_subscriptable, report_slice_step_size_zero,
 };
 use super::infer::TypeContext;
 use super::instance::SliceLiteral;
@@ -89,10 +93,20 @@ impl Display for LegacyGenericOrigin {
     }
 }
 
+impl From<LegacyGenericOrigin> for Type<'_> {
+    fn from(origin: LegacyGenericOrigin) -> Self {
+        match origin {
+            LegacyGenericOrigin::Generic => Type::SpecialForm(SpecialFormType::Generic),
+            LegacyGenericOrigin::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct SubscriptError<'db> {
     result_ty: Type<'db>,
     errors: Vec<SubscriptErrorKind<'db>>,
+    subscripted_type: Type<'db>,
 }
 
 #[derive(Debug)]
@@ -120,6 +134,7 @@ pub(crate) enum SubscriptErrorKind<'db> {
         slice_ty: Type<'db>,
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
+        provenance: Provenance<'db>,
     },
     /// A `TypedDict` was subscripted with an invalid key.
     InvalidTypedDictKey {
@@ -147,15 +162,28 @@ pub(crate) enum SubscriptErrorKind<'db> {
 }
 
 impl<'db> SubscriptError<'db> {
-    pub(crate) fn new(result_ty: Type<'db>, error: SubscriptErrorKind<'db>) -> Self {
+    pub(crate) fn new(
+        result_ty: Type<'db>,
+        error: SubscriptErrorKind<'db>,
+        subscripted_type: Type<'db>,
+    ) -> Self {
         Self {
             result_ty,
             errors: vec![error],
+            subscripted_type,
         }
     }
 
-    fn with_errors(result_ty: Type<'db>, errors: Vec<SubscriptErrorKind<'db>>) -> Self {
-        Self { result_ty, errors }
+    fn with_errors(
+        result_ty: Type<'db>,
+        errors: Vec<SubscriptErrorKind<'db>>,
+        subscripted_type: Type<'db>,
+    ) -> Self {
+        Self {
+            result_ty,
+            errors,
+            subscripted_type,
+        }
     }
 
     pub(crate) fn result_type(&self) -> Type<'db> {
@@ -179,7 +207,13 @@ impl<'db> SubscriptError<'db> {
         let value_node = subscript.value.as_ref();
         let slice_node = subscript.slice.as_ref();
         for error in &self.errors {
-            error.report_diagnostic(context, subscript, value_node, slice_node);
+            error.report_diagnostic(
+                context,
+                subscript,
+                value_node,
+                slice_node,
+                self.subscripted_type,
+            );
         }
     }
 }
@@ -206,7 +240,32 @@ impl<'db> SubscriptErrorKind<'db> {
         subscript: &ast::ExprSubscript,
         value_node: &ast::Expr,
         slice_node: &ast::Expr,
+        subscripted_type: Type<'db>,
     ) {
+        #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+        enum TermOfArt {
+            Index,
+            Key,
+        }
+
+        impl TermOfArt {
+            fn with_article(self) -> &'static str {
+                match self {
+                    TermOfArt::Index => "an index",
+                    TermOfArt::Key => "a key",
+                }
+            }
+        }
+
+        impl std::fmt::Display for TermOfArt {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.write_str(match self {
+                    TermOfArt::Index => "index",
+                    TermOfArt::Key => "key",
+                })
+            }
+        }
+
         let db = context.db();
         match self {
             Self::IndexOutOfBounds {
@@ -215,14 +274,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 length,
                 index,
             } => {
-                report_index_out_of_bounds(
-                    context,
-                    kind.as_str(),
-                    value_node.into(),
-                    *tuple_ty,
-                    length,
-                    *index,
-                );
+                report_index_out_of_bounds(context, *kind, value_node, *tuple_ty, length, *index);
             }
             Self::SliceStepSizeZero => {
                 report_slice_step_size_zero(context, value_node.into());
@@ -245,12 +297,24 @@ impl<'db> SubscriptErrorKind<'db> {
                 }
             }
             Self::DunderPossiblyUnbound { method, value_ty } => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(db),
+                if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                    diagnostic.set_concise_message(format_args!(
+                        "Cannot subscript an object of type `{}` \
+                        with a possibly missing `{method}` method",
+                        value_ty.display(db)
+                    ));
+                    diagnostic.annotate(
+                        context
+                            .secondary(value_node)
+                            .message(format_args!("Has type `{}`", subscripted_type.display(db))),
+                    );
+                    diagnostic.annotate(
+                        Annotation::primary(context.span(slice_node))
+                            .message(format_args!("Method `{method}` may be missing")),
+                    );
+                    diagnostic.info(format_args!(
+                        "`{method}` is implicitly called due to this subscript expression"
                     ));
                 }
             }
@@ -260,14 +324,57 @@ impl<'db> SubscriptErrorKind<'db> {
                 slice_ty,
                 kind,
                 bindings,
+                provenance,
             } => match kind {
                 CallErrorKind::NotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` is not callable on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            value_ty.display(db),
+                    if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                        let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                        let value_type = value_ty.display(db);
+                        let method_type = bindings.callable_type().display(db);
+                        diagnostic.set_concise_message(format_args!(
+                            "Cannot subscript an object of type `{value_type}` with an invalid `{method}` method",
                         ));
+                        diagnostic.annotate(
+                            context.secondary(value_node).message(format_args!(
+                                "Has type `{}`",
+                                subscripted_type.display(db)
+                            )),
+                        );
+                        if let Some(definition) = provenance.definition() {
+                            diagnostic.annotate(
+                                Annotation::primary(context.span(slice_node)).message(
+                                    format_args!(
+                                        "Subscript expression implicitly calls `{method}`, \
+                                        which is not callable"
+                                    ),
+                                ),
+                            );
+                            let mut sub = SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                format_args!("`{method}` defined here"),
+                            );
+                            let file = definition.file(db);
+                            let module = parsed_module(db, file).load(db);
+                            sub.annotate(
+                                Annotation::primary(Span::from(
+                                    definition.focus_range(db, &module),
+                                ))
+                                .message(format_args!("Has type `{method_type}`")),
+                            );
+                            diagnostic.sub(sub);
+                        } else {
+                            for message in [
+                                format_args!("Method `{method}` has type `{method_type}`"),
+                                format_args!("An object of type `{method_type}` cannot be called"),
+                            ] {
+                                diagnostic.annotate(
+                                    Annotation::primary(context.span(slice_node)).message(message),
+                                );
+                            }
+                            diagnostic.info(format_args!(
+                                "Subscript expression implicitly calls `{method}`"
+                            ));
+                        }
                     }
                 }
                 CallErrorKind::BindingError => {
@@ -281,23 +388,136 @@ impl<'db> SubscriptErrorKind<'db> {
                             *slice_ty,
                             typed_dict.items(db),
                         );
-                    } else if let Some(builder) =
-                        context.report_lint(&INVALID_ARGUMENT_TYPE, value_node)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` cannot be called with key of type `{}` on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            slice_ty.display(db),
-                            value_ty.display(db),
-                        ));
+                    } else {
+                        let expected_types_for_slice = bindings.expected_types_for_argument(0);
+
+                        if let Some(expected_types) = expected_types_for_slice.as_deref()
+                            && let Some(builder) =
+                                context.report_lint(&INVALID_ARGUMENT_TYPE, subscript)
+                        {
+                            let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                            let term_of_art = if value_ty.is_redundant_with(
+                                db,
+                                KnownClass::Sequence.to_specialized_instance(db, &[Type::object()]),
+                            ) {
+                                TermOfArt::Index
+                            } else {
+                                TermOfArt::Key
+                            };
+                            let value_type = value_ty.display(db);
+                            let slice_type = slice_ty.display(db);
+                            diagnostic.annotate(context.secondary(value_node).message(
+                                format_args!("Has type `{}`", subscripted_type.display(db)),
+                            ));
+                            let mut primary_annotation =
+                                Annotation::primary(context.span(slice_node));
+                            match expected_types {
+                                [] => {
+                                    primary_annotation = primary_annotation.message(format_args!(
+                                        "Invalid {term_of_art} of type `{}`",
+                                        slice_ty.display(db)
+                                    ));
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Cannot subscript an object of type `{value_type}` \
+                                        with {} of type `{slice_type}`",
+                                        term_of_art.with_article()
+                                    ));
+                                }
+                                [single_expected] => {
+                                    primary_annotation = primary_annotation.message(format_args!(
+                                        "Expected `{}`, got object of type `{}`",
+                                        single_expected.display(db),
+                                        slice_ty.display(db),
+                                    ));
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Cannot subscript an object of type `{value_type}` \
+                                        with {} of type `{slice_type}` (expected `{}`)",
+                                        term_of_art.with_article(),
+                                        single_expected.display(db)
+                                    ));
+                                }
+                                multiple_expected => {
+                                    let enumeration = format_enumeration_with_or(
+                                        multiple_expected.iter().map(|ty| ty.display(db)),
+                                    );
+                                    primary_annotation = primary_annotation.message(format_args!(
+                                        "Has type `{}`",
+                                        slice_ty.display(db)
+                                    ));
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Cannot subscript an object of type `{value_type}` \
+                                        with {} of type `{slice_type}` (expected one of {enumeration})",
+                                        term_of_art.with_article()
+                                    ));
+                                }
+                            }
+                            diagnostic.annotate(primary_annotation);
+
+                            if let Some(definition) = provenance.definition() {
+                                let mut sub = SubDiagnostic::new(
+                                    SubDiagnosticSeverity::Info,
+                                    format_args!(
+                                        "This subscript expression implicitly calls `{}.{method}`",
+                                        value_ty.display(db)
+                                    ),
+                                );
+                                let file = definition.file(db);
+                                let module = parsed_module(db, file).load(db);
+
+                                if bindings
+                                    .single_element()
+                                    .is_none_or(|single| single.overloads().len() == 1)
+                                {
+                                    let annotation = Annotation::primary(Span::from(
+                                        definition.focus_range(db, &module),
+                                    ));
+
+                                    sub.annotate(annotation.message("Method defined here"));
+                                    diagnostic.sub(sub);
+                                } else if let Some(binding) = bindings.single_element() {
+                                    diagnostic.sub(sub);
+                                    let kind = FunctionKind::classify(db, bindings.callable_type());
+                                    if let Some((kind, function)) = kind {
+                                        annotate_with_overloads(
+                                            context,
+                                            binding,
+                                            &mut diagnostic,
+                                            function,
+                                            kind,
+                                        );
+                                    }
+                                }
+                            }
+                        } else {
+                            bindings.report_diagnostics(context, ast::AnyNodeRef::from(subscript));
+                        }
                     }
                 }
                 CallErrorKind::PossiblyNotCallable => {
-                    if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                        builder.into_diagnostic(format_args!(
-                            "Method `{method}` of type `{}` may not be callable on object of type `{}`",
-                            bindings.callable_type().display(db),
-                            value_ty.display(db),
+                    if let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                        let mut diagnostic = builder.into_diagnostic("Invalid subscript read");
+                        let value_type = value_ty.display(db);
+                        diagnostic.set_concise_message(format_args!(
+                            "Cannot subscript an object of type `{value_type}` \
+                            which may not have a valid `{method}` method",
+                        ));
+                        diagnostic.annotate(
+                            context.secondary(value_node).message(format_args!(
+                                "Has type `{}`",
+                                subscripted_type.display(db)
+                            )),
+                        );
+                        let method_type = bindings.callable_type().display(db);
+                        for message in [
+                            format_args!("Method `{method}` has type `{method_type}`"),
+                            format_args!("An object of type `{method_type}` may not be callable"),
+                        ] {
+                            diagnostic.annotate(
+                                Annotation::primary(context.span(slice_node)).message(message),
+                            );
+                        }
+                        diagnostic.info(format_args!(
+                            "`{method}` is implicitly called due to this subscript expression"
                         ));
                     }
                 }
@@ -325,7 +545,7 @@ impl<'db> SubscriptErrorKind<'db> {
                 origin,
                 argument_ty,
             } => {
-                if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, value_node) {
+                if let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, subscript) {
                     builder.into_diagnostic(format_args!(
                         "`{}` is not a valid argument to `{origin}`",
                         argument_ty.display(db),
@@ -364,6 +584,7 @@ impl<'db> SubscriptErrorKind<'db> {
 fn map_union_subscript<'db, F>(
     db: &'db dyn Db,
     union: UnionType<'db>,
+    subscripted_type: Type<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
 where
@@ -395,13 +616,18 @@ where
     if errors.is_empty() {
         Ok(result_ty)
     } else {
-        Err(SubscriptError::with_errors(result_ty, errors))
+        Err(SubscriptError::with_errors(
+            result_ty,
+            errors,
+            subscripted_type,
+        ))
     }
 }
 
 fn map_intersection_subscript<'db, F>(
     db: &'db dyn Db,
     intersection: IntersectionType<'db>,
+    subscripted_type: Type<'db>,
     mut map_fn: F,
 ) -> Result<Type<'db>, SubscriptError<'db>>
 where
@@ -462,6 +688,7 @@ where
     Err(SubscriptError::with_errors(
         builder.build(),
         collected_errors,
+        subscripted_type,
     ))
 }
 
@@ -472,9 +699,10 @@ fn typed_dict_subscript<'db>(
     db: &'db dyn Db,
     typed_dict: TypedDictType<'db>,
     slice_ty: Type<'db>,
+    subscripted_type: Type<'db>,
 ) -> Result<Type<'db>, SubscriptError<'db>> {
     if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-        return typed_dict_subscript(db, typed_dict, fallback);
+        return typed_dict_subscript(db, typed_dict, fallback, subscripted_type);
     }
 
     if slice_ty.is_dynamic() {
@@ -504,6 +732,7 @@ fn typed_dict_subscript<'db>(
                 slice_ty,
                 full_object_ty: None,
             },
+            subscripted_type,
         ));
     };
 
@@ -516,6 +745,7 @@ fn typed_dict_subscript<'db>(
                     slice_ty,
                     full_object_ty: None,
                 },
+                subscripted_type,
             ))
         },
         |field| Ok(field.declared_ty),
@@ -529,12 +759,24 @@ impl<'db> Type<'db> {
         slice_ty: Type<'db>,
         expr_context: ast::ExprContext,
     ) -> Result<Type<'db>, SubscriptError<'db>> {
+        self.subscript_impl(db, slice_ty, expr_context, self)
+    }
+
+    /// Implementation of [`Type::subscript`], which keeps track of the *original* type that was subscripted
+    /// even as we recurse into unions and intersections. This is used to report diagnostics with the correct type.
+    fn subscript_impl(
+        self,
+        db: &'db dyn Db,
+        slice_ty: Type<'db>,
+        expr_context: ast::ExprContext,
+        subscripted_type: Type<'db>,
+    ) -> Result<Type<'db>, SubscriptError<'db>> {
         if let Some(fallback) = self.materialized_divergent_fallback() {
-            return fallback.subscript(db, slice_ty, expr_context);
+            return fallback.subscript_impl(db, slice_ty, expr_context, subscripted_type);
         }
 
         if let Some(fallback) = slice_ty.materialized_divergent_fallback() {
-            return self.subscript(db, fallback, expr_context);
+            return self.subscript_impl(db, fallback, expr_context, subscripted_type);
         }
 
         let value_ty = self;
@@ -543,44 +785,44 @@ impl<'db> Type<'db> {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::Never, _) => Some(Ok(value_ty)),
 
             (Type::TypeAlias(alias), _) => {
-                Some(alias.value_type(db).subscript(db, slice_ty, expr_context))
+                Some(alias.value_type(db).subscript_impl(db, slice_ty, expr_context, subscripted_type))
             }
 
             (_, Type::TypeAlias(alias)) => {
-                Some(value_ty.subscript(db, alias.value_type(db), expr_context))
+                Some(value_ty.subscript_impl(db, alias.value_type(db), expr_context, subscripted_type))
             }
 
-            (Type::Union(union), _) => Some(map_union_subscript(db, union, |element| {
-                element.subscript(db, slice_ty, expr_context)
+            (Type::Union(union), _) => Some(map_union_subscript(db, union, subscripted_type,|element| {
+                element.subscript_impl(db, slice_ty, expr_context, subscripted_type)
             })),
 
-            (_, Type::Union(union)) => Some(map_union_subscript(db, union, |element| {
-                value_ty.subscript(db, element, expr_context)
+            (_, Type::Union(union)) => Some(map_union_subscript(db, union, subscripted_type,|element| {
+                value_ty.subscript_impl(db, element, expr_context, subscripted_type)
             })),
 
             (Type::EnumComplement(complement), _) => {
-                Some(complement.remaining_literal_union(db).subscript(db, slice_ty, expr_context))
+                Some(complement.remaining_literal_union(db).subscript_impl(db, slice_ty, expr_context, subscripted_type))
             }
 
             (_, Type::EnumComplement(complement)) => {
-                Some(value_ty.subscript(db, complement.remaining_literal_union(db), expr_context))
+                Some(value_ty.subscript_impl(db, complement.remaining_literal_union(db), expr_context, subscripted_type))
             }
 
             (Type::Intersection(intersection), _) => {
-                Some(map_intersection_subscript(db, intersection, |element| {
-                    element.subscript(db, slice_ty, expr_context)
+                Some(map_intersection_subscript(db, intersection, subscripted_type,|element| {
+                    element.subscript_impl(db, slice_ty, expr_context, subscripted_type)
                 }))
             }
 
             (_, Type::Intersection(intersection)) => {
-                Some(map_intersection_subscript(db, intersection, |element| {
-                    value_ty.subscript(db, element, expr_context)
+                Some(map_intersection_subscript(db, intersection, subscripted_type,|element| {
+                    value_ty.subscript_impl(db, element, expr_context, subscripted_type)
                 }))
             }
 
             // Ex) Given `person["name"]`, return `str`
             (Type::TypedDict(typed_dict), _) if expr_context != ast::ExprContext::Store => {
-                Some(typed_dict_subscript(db, typed_dict, slice_ty))
+                Some(typed_dict_subscript(db, typed_dict, slice_ty, subscripted_type))
             }
 
             (
@@ -605,6 +847,7 @@ impl<'db> Type<'db> {
                 Some(Err(SubscriptError::new(
                     value_ty,
                     SubscriptErrorKind::SliceStepSizeZero,
+                    subscripted_type
                 )))
             }
 
@@ -624,6 +867,7 @@ impl<'db> Type<'db> {
                                 length: tuple.len().display_minimum().into(),
                                 index: i64_int,
                             },
+                            subscripted_type
                         )),
                     })
             }
@@ -644,6 +888,7 @@ impl<'db> Type<'db> {
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::SliceStepSizeZero,
+                            subscripted_type
                         )),
                     },
                     TupleSpec::Variable(_) => {
@@ -667,6 +912,7 @@ impl<'db> Type<'db> {
                                 length: literal_value.chars().count().to_string().into(),
                                 index: i64_int,
                             },
+                            subscripted_type
                         )),
                     }
                 })
@@ -689,6 +935,7 @@ impl<'db> Type<'db> {
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::SliceStepSizeZero,
+                            subscripted_type
                         )),
                     }
                 })
@@ -720,6 +967,7 @@ impl<'db> Type<'db> {
                                 length: literal_value.len().to_string().into(),
                                 index: i64_int,
                             },
+                            subscripted_type
                         )),
                     }
                 })
@@ -742,6 +990,7 @@ impl<'db> Type<'db> {
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::SliceStepSizeZero,
+                            subscripted_type
                         )),
                     }
                 })
@@ -750,14 +999,14 @@ impl<'db> Type<'db> {
             // Ex) Given `"value"[True]`, return `"a"`
             (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
                 let bool = rhs_literal.as_bool().unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(db, Type::int_literal(i64::from(bool)), expr_context, subscripted_type))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
                 if literal.is_bool() && nominal.tuple_spec(db).is_some() =>
             {
                 let bool = literal.as_bool().unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
+                Some(value_ty.subscript_impl(db, Type::int_literal(i64::from(bool)), expr_context, subscripted_type))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {
@@ -775,6 +1024,7 @@ impl<'db> Type<'db> {
                     SubscriptErrorKind::NonGenericTypeAlias {
                         alias: TypeAliasType::PEP695(alias),
                     },
+                    subscripted_type
                 )))
             }
 
@@ -856,9 +1106,10 @@ impl<'db> Type<'db> {
                         method: DunderMethod::GetItem,
                         value_ty,
                     },
+                    subscripted_type,
                 ));
             }
-            Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
+            Err(CallDunderError::CallError(call_error_kind, bindings, provenance)) => {
                 return Err(SubscriptError::new(
                     bindings.return_type(db),
                     SubscriptErrorKind::DunderCallError {
@@ -867,7 +1118,9 @@ impl<'db> Type<'db> {
                         slice_ty,
                         kind: call_error_kind,
                         bindings,
+                        provenance,
                     },
+                    subscripted_type,
                 ));
             }
             Err(CallDunderError::MethodNotAvailable) => {
@@ -902,9 +1155,10 @@ impl<'db> Type<'db> {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
                         },
+                        subscripted_type,
                     ));
                 }
-                Err(CallDunderError::CallError(call_error_kind, bindings, _)) => {
+                Err(CallDunderError::CallError(call_error_kind, bindings, provenance)) => {
                     return Err(SubscriptError::new(
                         bindings.return_type(db),
                         SubscriptErrorKind::DunderCallError {
@@ -913,7 +1167,9 @@ impl<'db> Type<'db> {
                             slice_ty,
                             kind: call_error_kind,
                             bindings,
+                            provenance,
                         },
+                        subscripted_type,
                     ));
                 }
                 Err(CallDunderError::MethodNotAvailable) => {
@@ -949,6 +1205,7 @@ impl<'db> Type<'db> {
                         value_ty,
                         method: DunderMethod::ClassGetItem,
                     },
+                    subscripted_type,
                 ));
             }
         } else if expr_context != ast::ExprContext::Store {
@@ -958,6 +1215,7 @@ impl<'db> Type<'db> {
                     value_ty,
                     method: DunderMethod::GetItem,
                 },
+                subscripted_type,
             ));
         }
 
