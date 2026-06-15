@@ -2,6 +2,7 @@ import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
 import {
   type DiagnosticDetail,
+  type DiagnosticDetailLocation,
   DiagnosticDetailItem,
   secondaryAnnotationsWithMessages,
   Theme,
@@ -65,8 +66,8 @@ function Items({
   onGoTo(line: number, column: number): void;
 }) {
   const handleDetailGoTo = useCallback(
-    (location: DiagnosticLocation["start_location"]) => {
-      onGoTo(location.row, location.column);
+    (location: DiagnosticDetailLocation) => {
+      onGoTo(location.startLineNumber, location.startColumn);
     },
     [onGoTo],
   );
@@ -116,8 +117,11 @@ function Items({
                   <li key={`annotation-${index}`}>
                     <DiagnosticDetailItem
                       item={toDisplayDiagnosticDetail(annotation)}
-                      goToLocation={diagnosticGoToLocation(annotation.location)}
-                      onGoTo={handleDetailGoTo}
+                      onGoTo={
+                        annotation.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
                     />
                   </li>
                 ))}
@@ -125,10 +129,11 @@ function Items({
                   <li key={`sub-diagnostic-${index}`}>
                     <DiagnosticDetailItem
                       item={toDisplayDiagnosticDetail(subDiagnostic)}
-                      goToLocation={diagnosticGoToLocation(
-                        subDiagnostic.location,
-                      )}
-                      onGoTo={handleDetailGoTo}
+                      onGoTo={
+                        subDiagnostic.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
                     />
                   </li>
                 ))}
@@ -141,9 +146,11 @@ function Items({
   );
 }
 
-function toDisplayDiagnosticDetail(
-  item: DiagnosticDetail<DiagnosticLocation>,
-): DiagnosticDetail {
+function toDisplayDiagnosticDetail(item: {
+  message: string;
+  severity?: string;
+  location: DiagnosticLocation | null;
+}): DiagnosticDetail {
   const location = item.location;
 
   return {
@@ -153,22 +160,11 @@ function toDisplayDiagnosticDetail(
       location == null
         ? null
         : {
-            line: location.start_location.row,
-            column: location.start_location.column,
-            displayPath:
-              location.path === PLAYGROUND_FILE_PATH
-                ? undefined
-                : location.path,
+            path: location.path,
+            startLineNumber: location.start_location.row,
+            startColumn: location.start_location.column,
+            endLineNumber: location.end_location.row,
+            endColumn: location.end_location.column,
           },
   };
-}
-
-function diagnosticGoToLocation(
-  location: DiagnosticLocation | null,
-): DiagnosticLocation["start_location"] | null {
-  if (location == null || location.path !== PLAYGROUND_FILE_PATH) {
-    return null;
-  }
-
-  return location.start_location;
 }

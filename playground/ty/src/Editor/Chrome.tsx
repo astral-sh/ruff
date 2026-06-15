@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import {
+  type DiagnosticDetailLocation,
   ErrorMessage,
   HorizontalResizeHandle,
   Theme,
@@ -25,10 +26,7 @@ import SecondaryPanel, {
   SecondaryPanelResult,
   SecondaryTool,
 } from "./SecondaryPanel";
-import Diagnostics, {
-  type Diagnostic,
-  type DiagnosticLocation,
-} from "./Diagnostics";
+import Diagnostics, { type Diagnostic } from "./Diagnostics";
 import VendoredFileBanner from "./VendoredFileBanner";
 import type { FileId, PlaygroundSession, ReadonlyFiles } from "../Playground";
 import type { EditorHandle } from "./Editor";
@@ -128,7 +126,7 @@ export default function Chrome({
     editorRef.current = handle;
   }, []);
 
-  const handleGoTo = useCallback((location: DiagnosticLocation) => {
+  const handleGoTo = useCallback((location: DiagnosticDetailLocation) => {
     editorRef.current?.goToLocation(location);
   }, []);
 

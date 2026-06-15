@@ -17,7 +17,11 @@ import {
   Uri,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { secondaryAnnotationsWithMessages, Theme } from "shared";
+import {
+  type DiagnosticDetailLocation,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
 import {
   Hint,
   Position as TyPosition,
@@ -62,7 +66,7 @@ type Props = {
 export type EditorHandle = {
   editor: IStandaloneCodeEditor;
   monaco: Monaco;
-  goToLocation(location: DiagnosticLocation): void;
+  goToLocation(location: DiagnosticDetailLocation): void;
 };
 
 export default function Editor({
@@ -926,12 +930,8 @@ class PlaygroundServer
     return { edits };
   }
 
-  goToLocation(location: DiagnosticLocation): void {
-    this.openCodeEditor(
-      this.editor,
-      this.uriForPath(location.path),
-      tyRangeToMonacoRange(location.range),
-    );
+  goToLocation(location: DiagnosticDetailLocation): void {
+    this.openCodeEditor(this.editor, this.uriForPath(location.path), location);
   }
 
   private mapNavigationTarget(link: LocationLink): languages.LocationLink {

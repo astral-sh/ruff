@@ -10,6 +10,7 @@ import type {
 import classNames from "classnames";
 import {
   type DiagnosticDetail,
+  type DiagnosticDetailLocation,
   DiagnosticDetailItem,
   secondaryAnnotationsWithMessages,
   Theme,
@@ -21,7 +22,7 @@ interface Props {
   currentFilePath: string | null;
   theme: Theme;
 
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }
 
 export default function Diagnostics({
@@ -73,7 +74,7 @@ function Items({
 }: {
   diagnostics: Array<Diagnostic>;
   currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }) {
   if (diagnostics.length === 0) {
     return (
@@ -97,7 +98,13 @@ function Items({
         const location =
           currentFilePath == null || position == null
             ? null
-            : { path: currentFilePath, range: position };
+            : {
+                path: currentFilePath,
+                startLineNumber: startLine,
+                startColumn: startColumn,
+                endLineNumber: position.end.line,
+                endColumn: position.end.column,
+              };
         const secondaryAnnotations = secondaryAnnotationsWithMessages(
           diagnostic.annotations,
         );
@@ -139,11 +146,10 @@ function Items({
                   return (
                     <li key={`annotation-${index}`}>
                       <DiagnosticDetailItem
-                        item={toDisplayDiagnosticDetail(
-                          { message: annotation.message, location },
-                          currentFilePath,
-                        )}
-                        goToLocation={location}
+                        item={toDisplayDiagnosticDetail({
+                          message: annotation.message,
+                          location,
+                        })}
                         onGoTo={onGoTo}
                       />
                     </li>
@@ -153,7 +159,6 @@ function Items({
                   <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
                       subDiagnostic={subDiagnostic}
-                      currentFilePath={currentFilePath}
                       onGoTo={onGoTo}
                     />
                   </li>
@@ -185,12 +190,10 @@ export type DiagnosticLocation = {
 
 function SubDiagnosticItem({
   subDiagnostic,
-  currentFilePath,
   onGoTo,
 }: {
   subDiagnostic: SubDiagnostic;
-  currentFilePath: string | null;
-  onGoTo(location: DiagnosticLocation): void;
+  onGoTo(location: DiagnosticDetailLocation): void;
 }) {
   let primaryAnnotation: DiagnosticAnnotation | undefined;
   const additionalAnnotations: DiagnosticAnnotation[] = [];
@@ -214,18 +217,14 @@ function SubDiagnosticItem({
         />
       ) : (
         <DiagnosticDetailItem
-          item={toDisplayDiagnosticDetail(
-            {
-              message: formatSubDiagnosticAnnotation(
-                subDiagnostic,
-                primaryAnnotation,
-              ),
-              location: primaryLocation,
-              severity,
-            },
-            currentFilePath,
-          )}
-          goToLocation={primaryLocation}
+          item={toDisplayDiagnosticDetail({
+            message: formatSubDiagnosticAnnotation(
+              subDiagnostic,
+              primaryAnnotation,
+            ),
+            location: primaryLocation,
+            severity,
+          })}
           onGoTo={onGoTo}
         />
       )}
@@ -237,18 +236,14 @@ function SubDiagnosticItem({
             return (
               <li key={index}>
                 <DiagnosticDetailItem
-                  item={toDisplayDiagnosticDetail(
-                    {
-                      message: formatSubDiagnosticAnnotation(
-                        subDiagnostic,
-                        annotation,
-                        false,
-                      ),
-                      location,
-                    },
-                    currentFilePath,
-                  )}
-                  goToLocation={location}
+                  item={toDisplayDiagnosticDetail({
+                    message: formatSubDiagnosticAnnotation(
+                      subDiagnostic,
+                      annotation,
+                      false,
+                    ),
+                    location,
+                  })}
                   onGoTo={onGoTo}
                 />
               </li>
@@ -260,10 +255,11 @@ function SubDiagnosticItem({
   );
 }
 
-function toDisplayDiagnosticDetail(
-  item: DiagnosticDetail<DiagnosticLocation>,
-  currentFilePath: string | null,
-): DiagnosticDetail {
+function toDisplayDiagnosticDetail(item: {
+  message: string;
+  severity?: string;
+  location: DiagnosticLocation | null;
+}): DiagnosticDetail {
   const location = item.location;
 
   return {
@@ -273,10 +269,11 @@ function toDisplayDiagnosticDetail(
       location == null
         ? null
         : {
-            line: location.range.start.line,
-            column: location.range.start.column,
-            displayPath:
-              location.path === currentFilePath ? undefined : location.path,
+            path: location.path,
+            startLineNumber: location.range.start.line,
+            startColumn: location.range.start.column,
+            endLineNumber: location.range.end.line,
+            endColumn: location.range.end.column,
           },
   };
 }

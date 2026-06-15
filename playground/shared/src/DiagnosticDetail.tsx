@@ -1,33 +1,30 @@
+import type { IRange } from "monaco-editor";
 import { useCallback } from "react";
 
-export interface DiagnosticDetail<Location = DiagnosticDetailLocation> {
+export interface DiagnosticDetail {
   message: string;
   severity?: string;
-  location: Location | null;
+  location: DiagnosticDetailLocation | null;
 }
 
-export interface DiagnosticDetailLocation {
-  line: number;
-  column: number;
-  displayPath?: string;
+export interface DiagnosticDetailLocation extends IRange {
+  path: string;
 }
 
-export function DiagnosticDetailItem<GoToLocation>({
+export function DiagnosticDetailItem({
   item,
-  goToLocation,
   onGoTo,
 }: {
   item: DiagnosticDetail;
-  goToLocation?: GoToLocation | null;
-  onGoTo?: (location: GoToLocation) => void;
+  onGoTo?: (location: DiagnosticDetailLocation) => void;
 }) {
   const severity = item.severity == null ? null : `${item.severity}: `;
   const location = item.location;
   const handleGoTo = useCallback(() => {
-    if (goToLocation != null) {
-      onGoTo?.(goToLocation);
+    if (location != null) {
+      onGoTo?.(location);
     }
-  }, [goToLocation, onGoTo]);
+  }, [location, onGoTo]);
 
   if (location == null) {
     return (
@@ -38,10 +35,7 @@ export function DiagnosticDetailItem<GoToLocation>({
     );
   }
 
-  const locationLabel =
-    location.displayPath == null
-      ? `[Ln ${location.line}, Col ${location.column}]`
-      : `[${location.displayPath}: Ln ${location.line}, Col ${location.column}]`;
+  const locationLabel = `[Ln ${location.startLineNumber}, Col ${location.startColumn}]`;
 
   // Keep the message outside the button so that only the bracketed source
   // location is presented as a navigation link. If the whole message is
@@ -50,7 +44,7 @@ export function DiagnosticDetailItem<GoToLocation>({
     <>
       {severity}
       {item.message}{" "}
-      {goToLocation == null || onGoTo == null ? (
+      {onGoTo == null ? (
         <span className="text-gray-500">{locationLabel}</span>
       ) : (
         <button
