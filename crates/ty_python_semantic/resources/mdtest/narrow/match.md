@@ -586,6 +586,24 @@ def test_match_or_alias_preserves_constrained_typevar(
             return whole
         case _:
             raise ValueError
+
+def test_match_or_alternative_alias_preserves_constrained_typevar(
+    value: BoundChoiceT,
+) -> BoundChoiceT:
+    match value:
+        case (BoundA() as whole) | (BoundB() as whole):
+            # revealed: BoundChoiceT@test_match_or_alternative_alias_preserves_constrained_typevar
+            reveal_type(whole)
+            return whole
+
+def test_match_ordered_or_preserves_nested_constrained_typevar(
+    value: tuple[BoundChoiceT] | BoundChoiceT,
+) -> BoundChoiceT:
+    match value:
+        case [item] | item:
+            # revealed: BoundChoiceT@test_match_ordered_or_preserves_nested_constrained_typevar
+            reveal_type(item)
+            return item
 ```
 
 ## Indirect class patterns
@@ -1519,6 +1537,12 @@ class Answer(Enum):
             case _:
                 reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
                 raise ValueError("Answer is not YES")
+
+    def alias_through_alternatives(self) -> Self:
+        match self:
+            case (Answer.NO as item) | (Answer.YES as item) | (Answer.MAYBE as item):
+                reveal_type(item)  # revealed: Self@alias_through_alternatives
+                return item
 
 Answer.YES.is_yes_through_class_member()
 
