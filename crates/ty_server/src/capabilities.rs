@@ -78,6 +78,13 @@ impl FromStr for SupportedCommand {
     }
 }
 
+/// Returns the preferred markup kind, derived from preference list.
+fn preferred_markup_kind(formats: &[MarkupKind]) -> Option<&MarkupKind> {
+    formats
+        .iter()
+        .find(|markup_kind| matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText))
+}
+
 impl ResolvedClientCapabilities {
     /// Returns `true` if the client supports workspace diagnostic refresh.
     pub(crate) const fn supports_workspace_diagnostic_refresh(self) -> bool {
@@ -264,35 +271,20 @@ impl ResolvedClientCapabilities {
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .hover
-                        .as_ref()?
-                        .content_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
-            })
-            .unwrap_or_default()
+            .and_then(|document| document.hover.as_ref())
+            .and_then(|hover| preferred_markup_kind(hover.content_format.as_deref()?))
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
         }
 
         if text_document
-            .and_then(|text_document| {
-                Some(
-                    text_document
-                        .completion
-                        .as_ref()?
-                        .completion_item
-                        .as_ref()?
-                        .documentation_format
-                        .as_ref()?
-                        .contains(&MarkupKind::Markdown),
-                )
+            .and_then(|document| document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| {
+                preferred_markup_kind(completion_item.documentation_format.as_deref()?)
             })
-            .unwrap_or_default()
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }
