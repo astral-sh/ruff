@@ -539,6 +539,16 @@ def _(target: None | Foo):
 
 ## `as` patterns
 
+An `as` pattern binds the value matched by the pattern on its left. The bound name gets the type of
+the subject after that pattern succeeds.
+
+### Value-pattern aliases
+
+Value patterns use `==`, and `as` binds the original subject rather than the value written in the
+pattern. An `int` or `str` subclass can define `__eq__` so that it compares equal to `1`, so `x`
+remains `int | str` in the first branch. If that branch fails, we can rule out the exact integer
+literal `1`, but not the rest of either class.
+
 ```py
 def _(target: int | str):
     y = 1
@@ -546,14 +556,47 @@ def _(target: int | str):
     match target:
         case 1 as x:
             y = 2
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: int | str
         case "foo" as x:
             y = 3
-            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(x)  # revealed: (int & ~Literal[1]) | str
         case _:
             y = 4
 
     reveal_type(y)  # revealed: Literal[2, 3, 4]
+```
+
+### Narrowing a value alias
+
+When every possible value has known equality behavior, the value pattern can narrow the bound name.
+Here, matching `1` narrows `item` to `Literal[1]`.
+
+```py
+from typing import Literal
+
+def value_alias(target: Literal[1, 2]):
+    match target:
+        case 1 as item:
+            reveal_type(item)  # revealed: Literal[1]
+```
+
+### Bindings that always match
+
+A wildcard alias and a capture pattern both match every subject, so they bind the subject's full
+type.
+
+```py
+from typing import Literal
+
+def wildcard_alias(target: Literal[1, 2]):
+    match target:
+        case _ as item:
+            reveal_type(item)  # revealed: Literal[1, 2]
+
+def capture_pattern(target: Literal[1, 2]):
+    match target:
+        case item:
+            reveal_type(item)  # revealed: Literal[1, 2]
 ```
 
 ## Guard with object that implements `__bool__` incorrectly
@@ -634,7 +677,7 @@ If the match pattern is not an instance of `type`, we raise a diagnostic:
 from typing import Any
 from ty_extensions import Intersection
 
-def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
+def _(val: object, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
     Invalid1 = "foo"
 
     match val:
@@ -645,8 +688,8 @@ def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any
 
     match val:
         # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
-        case Invalid2():
-            pass
+        case Invalid2() as item:
+            reveal_type(item)  # revealed: object
         case Valid1():  # fine
             pass
         case Valid2():  # fine

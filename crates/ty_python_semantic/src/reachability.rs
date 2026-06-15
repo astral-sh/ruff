@@ -238,7 +238,7 @@ use ty_python_core::{
     },
     heap_size = ruff_memory_usage::heap_size
 )]
-fn type_narrowed_by_previous_patterns<'db>(
+pub(crate) fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
@@ -1089,7 +1089,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
             .unwrap_or(Truthiness::AlwaysTrue),
-        PatternPredicateKind::MatchStar => Truthiness::Ambiguous,
+        PatternPredicateKind::Star(_) => Truthiness::AlwaysTrue,
     }
 }
 

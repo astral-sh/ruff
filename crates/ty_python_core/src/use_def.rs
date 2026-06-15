@@ -1465,6 +1465,31 @@ impl<'db> UseDefMapBuilder<'db> {
         );
     }
 
+    /// Records a narrowing constraint on the current live bindings selected by definition ID.
+    pub(super) fn record_narrowing_constraint_for_bindings(
+        &mut self,
+        predicate: ScopedPredicateId,
+        place: ScopedPlaceId,
+        bindings: &[ScopedDefinitionId],
+    ) {
+        if predicate == ScopedPredicateId::ALWAYS_TRUE
+            || predicate == ScopedPredicateId::ALWAYS_FALSE
+        {
+            return;
+        }
+
+        let constraint = self.narrowing_constraints.add_atom(predicate);
+        let state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        state.record_narrowing_constraint_for_bindings(
+            &mut self.narrowing_constraints,
+            constraint,
+            bindings,
+        );
+    }
+
     /// Records a negated narrowing constraint for only the specified places.
     ///
     /// The positive and negative constraints use the same predicate ID. This lets `P or not P`
@@ -1923,10 +1948,8 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Get a snapshot of the current bindings for a place. We use this at the end of loop bodies
-    /// to populate the loop header definitions (bindings in the loop body that are visible via
-    /// loop-back to prior uses in the loop body and also to the loop condition).
-    pub(super) fn loop_back_bindings(
+    /// Get the current live bindings for a place.
+    pub(super) fn current_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> impl Iterator<Item = LiveBinding> + '_ {
