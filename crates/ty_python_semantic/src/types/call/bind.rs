@@ -2195,6 +2195,16 @@ impl<'db> Bindings<'db> {
                         }
 
                         Some(KnownFunction::Dataclass) => {
+                            let parameter_types = overload.parameter_types();
+                            let (cls_argument, dataclass_parameter_types) = overload
+                                .signature
+                                .parameters()
+                                .positional_only_by_name("cls")
+                                .map(|(index, _)| {
+                                    (parameter_types[index], &parameter_types[index + 1..])
+                                })
+                                .unwrap_or((None, parameter_types));
+
                             if let [
                                 init,
                                 repr,
@@ -2203,7 +2213,7 @@ impl<'db> Bindings<'db> {
                                 unsafe_hash,
                                 frozen,
                                 versioned_parameters @ ..,
-                            ] = overload.parameter_types()
+                            ] = dataclass_parameter_types
                             {
                                 let mut flags = DataclassFlags::empty();
 
@@ -2261,22 +2271,25 @@ impl<'db> Bindings<'db> {
 
                                 let params = DataclassParams::from_flags(db, flags);
 
-                                overload.set_return_type(Type::DataclassDecorator(params));
-                            }
+                                if cls_argument.is_none_or(|cls_ty| cls_ty.is_none(db)) {
+                                    overload.set_return_type(Type::DataclassDecorator(params));
+                                }
 
-                            // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
-                            if let [Some(Type::ClassLiteral(class_literal)), ..] =
-                                overload.parameter_types()
-                            {
-                                if let Some(target) = invalid_dataclass_target(db, class_literal) {
-                                    overload
-                                        .errors
-                                        .push(BindingError::InvalidDataclassApplication(target));
-                                } else {
-                                    let params = DataclassParams::default_params(db);
-                                    overload.set_return_type(Type::from(
-                                        class_literal.with_dataclass_params(db, Some(params)),
-                                    ));
+                                // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`).
+                                if let Some(Type::ClassLiteral(class_literal)) =
+                                    cls_argument.as_ref()
+                                {
+                                    if let Some(target) =
+                                        invalid_dataclass_target(db, class_literal)
+                                    {
+                                        overload.errors.push(
+                                            BindingError::InvalidDataclassApplication(target),
+                                        );
+                                    } else {
+                                        overload.set_return_type(Type::from(
+                                            class_literal.with_dataclass_params(db, Some(params)),
+                                        ));
+                                    }
                                 }
                             }
                         }
