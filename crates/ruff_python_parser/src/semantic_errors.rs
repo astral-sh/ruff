@@ -586,6 +586,7 @@ impl SemanticSyntaxChecker {
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
+                // lambda __debug__: 0  # lambda parameter name
                 Self::check_identifier(name, ctx);
                 if let Some(type_params) = type_params {
                     for type_param in type_params.iter() {
@@ -1012,6 +1013,9 @@ impl SemanticSyntaxChecker {
                 parameters: Some(parameters),
                 ..
             }) => {
+                for parameter in parameters {
+                    Self::check_identifier(parameter.name(), ctx);
+                }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
             _ => {}
