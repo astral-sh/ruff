@@ -7,7 +7,7 @@
 use ruff_python_ast::{
     self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
     StmtFunctionDef, StmtImportFrom,
-    comparable::ComparableExpr,
+    comparable::HashableExpr,
     helpers,
     visitor::{Visitor, walk_expr, walk_stmt},
 };
@@ -2167,12 +2167,13 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                 let mut seen = FxHashSet::default();
                 for key in keys
                     .iter()
-                    // complex numbers (`1 + 2j`) are allowed as keys but are not literals
-                    // because they are represented as a `BinOp::Add` between a real number and
-                    // an imaginary number
-                    .filter(|key| key.is_literal_expr() || key.is_bin_op_expr())
+                    // Signed and complex numbers are allowed as keys but are represented as unary
+                    // or binary expressions rather than literals.
+                    .filter(|key| {
+                        key.is_literal_expr() || key.is_unary_op_expr() || key.is_bin_op_expr()
+                    })
                 {
-                    if !seen.insert(ComparableExpr::from(key)) {
+                    if !seen.insert(HashableExpr::from(key)) {
                         let key_range = key.range();
                         let duplicate_key = self.ctx.source()[key_range].to_string();
                         // test_ok duplicate_match_key_attr
@@ -2188,6 +2189,10 @@ impl<'a, Ctx: SemanticSyntaxContext> MatchPatternVisitor<'a, Ctx> {
                         //     case {1.0 + 2j: 1, 1.0 + 2j: 2}: ...
                         //     case {True: 1, True: 2}: ...
                         //     case {None: 1, None: 2}: ...
+                        //     case {0: 1, False: 2}: ...
+                        //     case {1.0: 1, True: 2}: ...
+                        //     case {-0: 1, False: 2}: ...
+                        //     case {1 + 0j: 1, True: 2}: ...
                         //     case {
                         //     """x
                         //     y
