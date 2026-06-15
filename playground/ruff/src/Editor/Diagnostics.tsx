@@ -1,7 +1,13 @@
-import type { Diagnostic, SubDiagnostic } from "ruff_wasm";
+import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
-import { Theme } from "shared";
-import { useMemo } from "react";
+import {
+  type DiagnosticDetail,
+  type DiagnosticDetailLocation,
+  DiagnosticDetailItem,
+  secondaryAnnotationsWithMessages,
+  Theme,
+} from "shared";
+import { useCallback, useMemo } from "react";
 import { PLAYGROUND_FILE_PATH } from "./SourceEditor";
 
 interface Props {
@@ -59,6 +65,13 @@ function Items({
   diagnostics: Array<Diagnostic>;
   onGoTo(line: number, column: number): void;
 }) {
+  const handleDetailGoTo = useCallback(
+    (location: DiagnosticDetailLocation) => {
+      onGoTo(location.startLineNumber, location.startColumn);
+    },
+    [onGoTo],
+  );
+
   if (diagnostics.length === 0) {
     return (
       <div className={"flex flex-auto flex-col justify-center  items-center"}>
@@ -74,6 +87,9 @@ function Items({
       {diagnostics.map((diagnostic) => {
         const row = diagnostic.start_location.row;
         const column = diagnostic.start_location.column;
+        const secondaryAnnotations = secondaryAnnotationsWithMessages(
+          diagnostic.annotations,
+        );
         const mostlyUniqueId = `${row}:${column}-${diagnostic.code}`;
 
         const disambiguator = uniqueIds.get(mostlyUniqueId) ?? 0;
@@ -91,13 +107,33 @@ function Items({
                 Col {column}]
               </span>
             </button>
-            {diagnostic.subDiagnostics.length > 0 ? (
+            {/* Some subdiagnostics use whitespace to align types in columns, so
+                we use a monospace font. See
+                https://github.com/astral-sh/ruff/pull/25860#pullrequestreview-4475222305 */}
+            {secondaryAnnotations.length > 0 ||
+            diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
+                {secondaryAnnotations.map((annotation, index) => (
+                  <li key={`annotation-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(annotation)}
+                      onGoTo={
+                        annotation.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
+                    />
+                  </li>
+                ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
-                  <li key={index}>
-                    <SubDiagnosticItem
-                      subDiagnostic={subDiagnostic}
-                      onGoTo={onGoTo}
+                  <li key={`sub-diagnostic-${index}`}>
+                    <DiagnosticDetailItem
+                      item={toDisplayDiagnosticDetail(subDiagnostic)}
+                      onGoTo={
+                        subDiagnostic.location?.path === PLAYGROUND_FILE_PATH
+                          ? handleDetailGoTo
+                          : undefined
+                      }
                     />
                   </li>
                 ))}
@@ -110,46 +146,25 @@ function Items({
   );
 }
 
-function SubDiagnosticItem({
-  subDiagnostic,
-  onGoTo,
-}: {
-  subDiagnostic: SubDiagnostic;
-  onGoTo(line: number, column: number): void;
-}) {
-  const location = subDiagnostic.location;
+function toDisplayDiagnosticDetail(item: {
+  message: string;
+  severity?: string;
+  location: DiagnosticLocation | null;
+}): DiagnosticDetail {
+  const location = item.location;
 
-  if (location == null) {
-    return <span>{formatSubDiagnostic(subDiagnostic)}</span>;
-  }
-
-  const start = location.start_location;
-  const locationLabel =
-    location.path === PLAYGROUND_FILE_PATH
-      ? `[Ln ${start.row}, Col ${start.column}]`
-      : `[${location.path}: Ln ${start.row}, Col ${start.column}]`;
-
-  return (
-    <>
-      {subDiagnostic.severity}:{" "}
-      {location.path === PLAYGROUND_FILE_PATH ? (
-        <button
-          onClick={() => onGoTo(start.row, start.column)}
-          className="text-start cursor-pointer text-current underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
-        >
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </button>
-      ) : (
-        <span>
-          {subDiagnostic.message}
-          <span className="text-gray-500"> {locationLabel}</span>
-        </span>
-      )}
-    </>
-  );
-}
-
-function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {
-  return `${subDiagnostic.severity}: ${subDiagnostic.message}`;
+  return {
+    message: item.message,
+    severity: item.severity,
+    location:
+      location == null
+        ? null
+        : {
+            path: location.path,
+            startLineNumber: location.start_location.row,
+            startColumn: location.start_location.column,
+            endLineNumber: location.end_location.row,
+            endColumn: location.end_location.column,
+          },
+  };
 }

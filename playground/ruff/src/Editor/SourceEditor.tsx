@@ -12,8 +12,8 @@ import {
   Range,
 } from "monaco-editor";
 import { useCallback, useEffect, useRef } from "react";
-import { Diagnostic } from "ruff_wasm";
-import { Theme } from "shared";
+import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
+import { secondaryAnnotationsWithMessages, Theme } from "shared";
 import CodeActionProvider = languages.CodeActionProvider;
 import IStandaloneCodeEditor = editor.IStandaloneCodeEditor;
 
@@ -223,24 +223,46 @@ function diagnosticRelatedInformation(
   diagnostic: Diagnostic,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
-  return diagnostic.subDiagnostics.flatMap((subDiagnostic) => {
-    const location = subDiagnostic.location;
+  const secondaryAnnotations = secondaryAnnotationsWithMessages(
+    diagnostic.annotations,
+  ).flatMap((annotation) =>
+    diagnosticLocationRelatedInformation(
+      annotation.message,
+      annotation.location,
+      resource,
+    ),
+  );
 
-    if (location?.path !== PLAYGROUND_FILE_PATH) {
-      return [];
-    }
+  const subDiagnostics = diagnostic.subDiagnostics.flatMap((subDiagnostic) =>
+    diagnosticLocationRelatedInformation(
+      formatSubDiagnostic(subDiagnostic),
+      subDiagnostic.location,
+      resource,
+    ),
+  );
 
-    return [
-      {
-        resource,
-        message: formatSubDiagnostic(subDiagnostic),
-        startLineNumber: location.start_location.row,
-        startColumn: location.start_location.column,
-        endLineNumber: location.end_location.row,
-        endColumn: location.end_location.column,
-      },
-    ];
-  });
+  return secondaryAnnotations.concat(subDiagnostics);
+}
+
+function diagnosticLocationRelatedInformation(
+  message: string,
+  location: DiagnosticLocation | null,
+  resource: editor.ITextModel["uri"],
+): editor.IRelatedInformation[] {
+  if (location?.path !== PLAYGROUND_FILE_PATH) {
+    return [];
+  }
+
+  return [
+    {
+      resource,
+      message,
+      startLineNumber: location.start_location.row,
+      startColumn: location.start_location.column,
+      endLineNumber: location.end_location.row,
+      endColumn: location.end_location.column,
+    },
+  ];
 }
 
 function formatSubDiagnostic(
