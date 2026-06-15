@@ -79,11 +79,9 @@ impl FromStr for SupportedCommand {
 }
 
 /// Returns the preferred markup kind, derived from preference list.
-fn preferred_markup_kind<'a>(
-    formats: impl IntoIterator<Item = &'a MarkupKind>,
-) -> Option<&'a MarkupKind> {
+fn preferred_markup_kind(formats: &[MarkupKind]) -> Option<&MarkupKind> {
     formats
-        .into_iter()
+        .iter()
         .find(|markup_kind| matches!(markup_kind, MarkupKind::Markdown | MarkupKind::PlainText))
 }
 
@@ -274,9 +272,8 @@ impl ResolvedClientCapabilities {
 
         if text_document
             .and_then(|document| document.hover.as_ref())
-            .and_then(|hover| hover.content_format.as_ref())
-            .and_then(preferred_markup_kind)
-            .is_some_and(|first_supported| matches!(first_supported, MarkupKind::Markdown))
+            .and_then(|hover| preferred_markup_kind(hover.content_format.as_deref()?))
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
         }
@@ -284,9 +281,10 @@ impl ResolvedClientCapabilities {
         if text_document
             .and_then(|document| document.completion.as_ref())
             .and_then(|completion| completion.completion_item.as_ref())
-            .and_then(|completion_item| completion_item.documentation_format.as_ref())
-            .and_then(preferred_markup_kind)
-            .is_some_and(|first_supported| matches!(first_supported, MarkupKind::Markdown))
+            .and_then(|completion_item| {
+                preferred_markup_kind(completion_item.documentation_format.as_deref()?)
+            })
+            == Some(&MarkupKind::Markdown)
         {
             flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }

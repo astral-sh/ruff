@@ -5,45 +5,63 @@ use ruff_db::system::SystemPath;
 use crate::TestServerBuilder;
 
 #[test]
-fn hover_content_format_preference() -> Result<()> {
-    let cases = [
-        (
-            vec![MarkupKind::Markdown, MarkupKind::PlainText],
-            MarkupKind::Markdown,
-        ),
-        (
-            vec![MarkupKind::PlainText, MarkupKind::Markdown],
-            MarkupKind::PlainText,
-        ),
-        (vec![MarkupKind::Markdown], MarkupKind::Markdown),
-        (vec![MarkupKind::PlainText], MarkupKind::PlainText),
-    ];
+fn prefers_markdown_when_listed_first() -> Result<()> {
+    assert_eq!(
+        hover_content_format(vec![MarkupKind::Markdown, MarkupKind::PlainText])?,
+        MarkupKind::Markdown,
+    );
+    Ok(())
+}
 
-    for (formats, expected_format) in cases {
-        let workspace_root = SystemPath::new("src");
-        let foo = SystemPath::new("src/foo.py");
-        let foo_content = "\
+#[test]
+fn prefers_plain_text_when_listed_first() -> Result<()> {
+    assert_eq!(
+        hover_content_format(vec![MarkupKind::PlainText, MarkupKind::Markdown])?,
+        MarkupKind::PlainText,
+    );
+    Ok(())
+}
+
+#[test]
+fn supports_only_markdown() -> Result<()> {
+    assert_eq!(
+        hover_content_format(vec![MarkupKind::Markdown])?,
+        MarkupKind::Markdown
+    );
+    Ok(())
+}
+
+#[test]
+fn supports_only_plain_text() -> Result<()> {
+    assert_eq!(
+        hover_content_format(vec![MarkupKind::PlainText])?,
+        MarkupKind::PlainText
+    );
+    Ok(())
+}
+
+fn hover_content_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
     x: int = 1
     ";
 
-        let mut server = TestServerBuilder::new()?
-            .with_workspace(workspace_root, None)?
-            .with_file(foo, foo_content)?
-            .with_hover_content_format(formats)
-            .build()
-            .wait_until_workspaces_are_initialized();
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .with_hover_content_format(formats)
+        .build()
+        .wait_until_workspaces_are_initialized();
 
-        server.open_text_document(foo, foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
-        let hover = server
-            .hover_request(foo, Position::new(0, 0))
-            .expect("Expected a hover response");
-        let Contents::MarkupContent(markup) = hover.contents else {
-            panic!("Expected markup content");
-        };
+    let hover = server
+        .hover_request(foo, Position::new(0, 0))
+        .expect("Expected a hover response");
+    let Contents::MarkupContent(markup) = hover.contents else {
+        panic!("Expected markup content");
+    };
 
-        assert_eq!(markup.kind, expected_format);
-    }
-
-    Ok(())
+    Ok(markup.kind)
 }
