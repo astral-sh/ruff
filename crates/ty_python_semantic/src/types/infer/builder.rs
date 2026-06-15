@@ -86,6 +86,7 @@ use crate::types::infer::{
     nearest_enclosing_function, original_class_type,
 };
 use crate::types::narrow::NarrowingEvaluatorExtension;
+use crate::types::narrow::pattern_success_types;
 use crate::types::newtype::NewType;
 use crate::types::set_theoretic::RecursivelyDefined;
 use crate::types::signatures::{CallableSignature, ReturnCallableTypeVarScope};
@@ -120,6 +121,7 @@ use ty_python_core::expression::{Expression, ExpressionKind};
 use ty_python_core::narrowing_constraints::ConstraintKey;
 use ty_python_core::node_key::NodeKey;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
+use ty_python_core::predicate::PatternPredicate;
 use ty_python_core::scope::{FileScopeId, NodeWithScopeKind, NodeWithScopeRef, ScopeId, ScopeKind};
 use ty_python_core::symbol::{ScopedSymbolId, Symbol};
 use ty_python_core::{
@@ -1138,7 +1140,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 self.infer_match_pattern_definition(
                     match_pattern.pattern(self.module()),
-                    match_pattern.index(),
+                    match_pattern.predicate(),
                     definition,
                 );
             }
@@ -2375,15 +2377,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_match_pattern_definition(
         &mut self,
         pattern: &'ast ast::Pattern,
-        _index: u32,
+        predicate: PatternPredicate<'db>,
         definition: Definition<'db>,
     ) {
-        // TODO(dhruvmanila): The correct way to infer types here is to perform structural matching
-        // against the subject expression type (which we can query via `infer_expression_types`)
-        // and extract the type at the `index` position if the pattern matches. This will be
-        // similar to the logic in `self.infer_assignment_definition`.
+        let ty =
+            pattern_success_types(self.db(), predicate).binding_type(definition.place(self.db()));
         self.add_binding(pattern.into(), definition)
-            .insert(self, todo_type!("`match` pattern definition types"));
+            .insert(self, ty);
     }
 
     fn validate_class_pattern(&mut self, pattern: &ast::PatternMatchClass, cls_ty: Type<'db>) {
@@ -2424,22 +2424,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // we need to choose an Expr that can “stand in” for the pattern, which we can wrap in a
         // standalone expression.
         //
-        // That said, when inferring the type of a standalone expression, we don't have access to
-        // its parent or sibling nodes.  That means, for instance, that in a class pattern, where
-        // we are currently using the class name as the standalone expression, we do not have
-        // access to the class pattern's arguments in the standalone expression inference scope.
-        // At the moment, we aren't trying to do anything with those arguments when creating a
-        // narrowing constraint for the pattern.  But in the future, if we do, we will have to
-        // either wrap those arguments in their own standalone expressions, or update Expression to
-        // be able to wrap other AST node types besides just ast::Expr.
+        // The structural pattern is stored separately on `PatternPredicate`, so analyses that need
+        // the complete pattern can inspect its arguments without making them standalone
+        // expressions.
         //
         // This function is only called for the top-level pattern of a match arm, and is
         // responsible for inferring the standalone expression for each supported pattern type. It
         // then hands off to `infer_nested_match_pattern` for any subexpressions and subpatterns,
         // where we do NOT have any additional standalone expressions to infer through.
         //
-        // TODO(dhruvmanila): Add a Salsa query for inferring pattern types and matching against
-        // the subject expression: https://github.com/astral-sh/ruff/pull/13147#discussion_r1739424510
         match pattern {
             ast::Pattern::MatchValue(match_value) => {
                 self.infer_standalone_expression(&match_value.value, TypeContext::default());
@@ -2487,13 +2480,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     node_index: _,
                     keys,
                     patterns,
-                    rest: _,
+                    rest,
                 } = match_mapping;
                 for key in keys {
                     self.infer_expression(key, TypeContext::default());
                 }
                 for pattern in patterns {
                     self.infer_nested_match_pattern(pattern);
+                }
+                if let Some(rest) = rest {
+                    self.infer_definition(rest);
                 }
             }
             ast::Pattern::MatchClass(match_class) => {
@@ -2516,13 +2512,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(pattern) = &match_as.pattern {
                     self.infer_nested_match_pattern(pattern);
                 }
+                if let Some(name) = &match_as.name {
+                    self.infer_definition(name);
+                }
             }
             ast::Pattern::MatchOr(match_or) => {
                 for pattern in &match_or.patterns {
                     self.infer_nested_match_pattern(pattern);
                 }
             }
-            ast::Pattern::MatchStar(_) | ast::Pattern::MatchSingleton(_) => {}
+            ast::Pattern::MatchStar(match_star) => {
+                if let Some(name) = &match_star.name {
+                    self.infer_definition(name);
+                }
+            }
+            ast::Pattern::MatchSingleton(_) => {}
         }
     }
 
