@@ -97,16 +97,14 @@ fn check_pep695_function_legacy_typevars<'db>(
         return;
     };
 
-    let Some(typevar) = legacy_context
+    for typevar in legacy_context
         .variables(db)
         .map(|typevar| typevar.typevar(db))
-        .find(|typevar| !typevar.is_self(db))
-    else {
-        return;
-    };
-
-    let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
-    report_pep695_function_legacy_typevar(context, typevar, range);
+        .filter(|typevar| !typevar.is_self(db))
+    {
+        let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
+        report_pep695_function_legacy_typevar(context, typevar, range);
+    }
 }
 
 fn report_pep695_function_legacy_typevar<'db>(

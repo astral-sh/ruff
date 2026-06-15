@@ -44,6 +44,7 @@ Functions without a PEP 695 list can still use the traditional implicit generic-
 from typing import TypeVar
 
 K = TypeVar("K")
+L = TypeVar("L")
 
 def identity(value: K) -> K:
     return value
@@ -53,7 +54,8 @@ class C[V]:
         raise NotImplementedError
 
     # error: [unbound-type-variable] "Legacy type variable `K` cannot be used in a function with PEP 695 type parameters"
-    def mixed[M](self, value: M, other: K) -> M | K:
+    # error: [unbound-type-variable] "Legacy type variable `L` cannot be used in a function with PEP 695 type parameters"
+    def mixed[M](self, value: M, other: K, another: L) -> M | K | L:
         raise NotImplementedError
 ```
 
