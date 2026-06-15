@@ -35,7 +35,7 @@ pub(crate) use self::infer::{
 pub(crate) use self::iteration::extract_fixed_length_iterable_element_types;
 pub use self::known_instance::KnownInstanceType;
 pub(crate) use self::match_pattern::{
-    callable_pattern_type, definite_match_pattern_type, definite_sequence_pattern_type,
+    callable_pattern_type, definite_match_pattern_type, definite_match_pattern_type_for_subject,
     exact_sequence_pattern_type, mapping_pattern_type, sequence_pattern_type_builder,
     singleton_pattern_type, starred_sequence_pattern_type,
 };

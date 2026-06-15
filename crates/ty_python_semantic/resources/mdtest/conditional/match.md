@@ -211,7 +211,8 @@ def _(target: FooSub | str):
 
 ### Dynamic class
 
-A dynamically typed class pattern is not known to match every subject, so later cases remain
+A dynamically typed class expression may match any value, but we cannot prove which values it does
+not match. The failed branch therefore keeps the original subject type, and later cases remain
 reachable.
 
 ```py
@@ -225,10 +226,24 @@ def _(target: int | str):
             reveal_type(target)  # revealed: (int & Any) | (str & Any)
             y = 1
         case _:
-            reveal_type(target)  # revealed: (int & Any) | (str & Any)
+            reveal_type(target)  # revealed: int | str
             y = 2
 
     reveal_type(y)  # revealed: Literal[1, 2]
+
+def dynamic_attribute_value_pattern_preserves_fallthrough(target: int) -> None:
+    match target:
+        case DynamicClass(real=0):
+            pass
+        case _:
+            target.missing  # error: [unresolved-attribute]
+
+def dynamic_attribute_capture_preserves_fallthrough(target: int) -> None:
+    match target:
+        case DynamicClass(real=_):
+            pass
+        case _:
+            target.missing  # error: [unresolved-attribute]
 ```
 
 ### Subclass-of type
@@ -291,6 +306,20 @@ def _(subj: int | abc.Callable[..., str]) -> None:
             y = 3
 
     reveal_type(y)  # revealed: Literal[2, 3]
+
+def callable_then_int(subj: abc.Callable[..., str] | int) -> int:
+    match subj:
+        case abc.Callable():
+            return 1
+        case int():
+            return 2
+
+def int_then_callable(subj: abc.Callable[..., str] | int) -> int:
+    match subj:
+        case int():
+            return 1
+        case abc.Callable():
+            return 2
 ```
 
 ### With arguments
@@ -336,6 +365,15 @@ def _(target: Point | Other):
             reveal_type(target)  # revealed: Point
         case Other():
             reveal_type(target)  # revealed: Other
+
+def ordered_or_class_pattern_preserves_fallthrough(target: Point):
+    y = 1
+
+    match target:
+        case Point(missing=_) | Other():
+            y = 2
+
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```
 
 ## Singleton match
