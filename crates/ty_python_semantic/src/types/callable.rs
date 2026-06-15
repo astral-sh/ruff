@@ -603,8 +603,6 @@ impl<'db> CallableType<'db> {
         db: &'db dyn Db,
         normalization: RecursiveTypeNormalization<'db>,
     ) -> Option<Self> {
-        let normalization = normalization.enter_callable_normalization()?;
-
         Some(CallableType::new(
             db,
             self.signatures(db)

@@ -1061,36 +1061,6 @@ pub(super) struct RecursiveTypeNormalization<'db> {
     marker: Type<'db>,
     nested: bool,
     preserve_top_level_recursive: bool,
-    active_callable_normalizations: ActiveCallableNormalizations,
-}
-
-#[derive(Debug, Clone, Copy, Default)]
-struct ActiveCallableNormalizations {
-    top_level: bool,
-    nested: bool,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum CallableNormalizationPosition {
-    TopLevel,
-    Nested,
-}
-
-impl ActiveCallableNormalizations {
-    fn enter(self, position: CallableNormalizationPosition) -> Option<Self> {
-        match position {
-            CallableNormalizationPosition::TopLevel if self.top_level => None,
-            CallableNormalizationPosition::TopLevel => Some(Self {
-                top_level: true,
-                ..self
-            }),
-            CallableNormalizationPosition::Nested if self.nested => None,
-            CallableNormalizationPosition::Nested => Some(Self {
-                nested: true,
-                ..self
-            }),
-        }
-    }
 }
 
 impl<'db> RecursiveTypeNormalization<'db> {
@@ -1099,7 +1069,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
             marker,
             nested: false,
             preserve_top_level_recursive: false,
-            active_callable_normalizations: ActiveCallableNormalizations::default(),
         }
     }
 
@@ -1127,19 +1096,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
 
     fn should_preserve_top_level_recursive(self) -> bool {
         !self.nested && self.preserve_top_level_recursive
-    }
-
-    pub(super) fn enter_callable_normalization(self) -> Option<Self> {
-        // Callable normalization only distinguishes the current marker's top-level and nested paths.
-        let position = if self.nested {
-            CallableNormalizationPosition::Nested
-        } else {
-            CallableNormalizationPosition::TopLevel
-        };
-        Some(Self {
-            active_callable_normalizations: self.active_callable_normalizations.enter(position)?,
-            ..self
-        })
     }
 
     fn matches_marker(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
