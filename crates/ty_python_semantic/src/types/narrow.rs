@@ -37,6 +37,7 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 use std::collections::hash_map::Entry;
+use ty_python_core::frozen::FrozenMap;
 
 fn is_union_of_single_valued<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
@@ -211,7 +212,7 @@ pub(crate) fn infer_narrowing_constraints<'db>(
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<FrozenNarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
 }
@@ -237,7 +238,7 @@ fn all_narrowing_constraints_for_expression<'db>(
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<FrozenNarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
@@ -247,7 +248,7 @@ fn all_narrowing_constraints_for_subject_element_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
     target: ExpressionNodeKey,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<FrozenNarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(
         db,
@@ -615,6 +616,7 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
 }
 
 type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+type FrozenNarrowingConstraints<'db> = FrozenMap<ScopedPlaceId, NarrowingConstraint<'db>>;
 
 /// The narrowing constraints contributed by a match pattern.
 ///
@@ -654,8 +656,8 @@ impl<'db> PatternNarrowingResult<'db> {
 
 #[derive(Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct ExpressionNarrowingConstraints<'db> {
-    positive: Option<NarrowingConstraints<'db>>,
-    negative: Option<NarrowingConstraints<'db>>,
+    positive: Option<FrozenNarrowingConstraints<'db>>,
+    negative: Option<FrozenNarrowingConstraints<'db>>,
 }
 
 impl<'db> ExpressionNarrowingConstraints<'db> {
@@ -843,8 +845,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
-        let mut constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
+    fn finish(mut self) -> Option<FrozenNarrowingConstraints<'db>> {
+        let constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
@@ -858,11 +860,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
-        if let Some(ref mut constraints) = constraints {
-            constraints.shrink_to_fit();
-        }
-
-        constraints
+        constraints.map(FrozenNarrowingConstraints::from)
     }
 
     fn evaluate_expression_predicate(

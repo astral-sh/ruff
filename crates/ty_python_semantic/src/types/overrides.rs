@@ -255,7 +255,7 @@ fn check_class_declaration<'db>(
             let is_auto = enum_info.auto_members.contains(&member.name);
             let skip_type_check = (context.in_stub() && is_ellipsis)
                 || is_auto
-                || enum_info.custom_enum_metaclass_new;
+                || enum_info.custom_enum_metaclass_hooks;
 
             if !skip_type_check {
                 if let Some(new_function) = enum_info.new_function {
@@ -281,6 +281,8 @@ fn check_class_declaration<'db>(
                         EnumConstructorHook::Init,
                     );
                 } else if enum_info.new_function.is_none()
+                    && !enum_info.opaque_init
+                    && !enum_info.opaque_new
                     && let Some(expected_type) = enum_info.value_annotation
                 {
                     if !member_value_type.is_assignable_to(db, expected_type) {

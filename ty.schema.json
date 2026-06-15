@@ -1522,7 +1522,7 @@
         },
         "zero-stepsize-in-slice": {
           "title": "detects a slice step size of zero",
-          "description": "## What it does\nChecks for step size 0 in slices.\n\n## Why is this bad?\nA slice with a step size of zero will raise a `ValueError` at runtime.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
+          "description": "## What it does\nChecks for a step size of zero in slices when the operation is known to fail.\n\n## Why is this bad?\nPython's built-in sequence types raise a `ValueError` when sliced with a step size of zero.\n\n## Known problems\nThis check is not exhaustive. It reports zero-step slices for certain built-in sequence\ntypes where the operation is known to fail. A custom `__getitem__` implementation can\naccept or reject such a slice, so ty cannot detect every runtime failure.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
           "default": "error",
           "oneOf": [
             {
