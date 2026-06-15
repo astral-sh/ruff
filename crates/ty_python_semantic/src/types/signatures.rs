@@ -177,6 +177,17 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn cycle_recovery_merge(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        (self.overloads.len() == other.overloads.len()).then(|| {
+            self.overloads
+                .iter()
+                .zip(&other.overloads)
+                .map(|(left, right)| left.cycle_recovery_merge(db, right))
+                .collect::<Option<SmallVec<[_; 1]>>>()
+                .map(|overloads| Self { overloads })
+        })?
+    }
+
     /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
     pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
         match self.overloads.as_slice() {
@@ -719,6 +730,24 @@ impl<'db> Signature<'db> {
     /// Returns the signature which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown() -> Self {
         Self::new(Parameters::unknown(), Type::unknown())
+    }
+
+    fn cycle_recovery_merge(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        if self.generic_context != other.generic_context || self.definition != other.definition {
+            return None;
+        }
+
+        Some(Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            parameters: self
+                .parameters
+                .cycle_recovery_merge(db, &other.parameters)?,
+            return_ty: UnionType::from_elements_cycle_recovery_without_callable_merge(
+                db,
+                [self.return_ty, other.return_ty],
+            ),
+        })
     }
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
@@ -3357,6 +3386,21 @@ impl<'db> Parameters<'db> {
         self.data.kind
     }
 
+    fn cycle_recovery_merge(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        if self.kind() != other.kind() || self.as_slice().len() != other.as_slice().len() {
+            return None;
+        }
+
+        let parameters = self
+            .as_slice()
+            .iter()
+            .zip(other.as_slice())
+            .map(|(left, right)| left.cycle_recovery_merge(db, right))
+            .collect::<Option<Box<[_]>>>()?;
+
+        Some(Self::from_parts(parameters, self.kind()))
+    }
+
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
     pub(crate) fn is_gradual(&self) -> bool {
@@ -4019,6 +4063,26 @@ impl<'db> Parameter<'db> {
         }
     }
 
+    fn cycle_recovery_merge(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        if self.definition != other.definition
+            || self.inferred_annotation != other.inferred_annotation
+            || self.annotation_kind != other.annotation_kind
+        {
+            return None;
+        }
+
+        Some(Self {
+            annotated_type: UnionType::from_elements_cycle_recovery_without_callable_merge(
+                db,
+                [self.annotated_type, other.annotated_type],
+            ),
+            definition: self.definition,
+            inferred_annotation: self.inferred_annotation,
+            annotation_kind: self.annotation_kind,
+            kind: self.kind.cycle_recovery_merge(db, &other.kind)?,
+        })
+    }
+
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -4310,6 +4374,78 @@ pub enum ParameterKind<'db> {
 }
 
 impl<'db> ParameterKind<'db> {
+    fn cycle_recovery_merge_default(
+        db: &'db dyn Db,
+        left: Option<Type<'db>>,
+        right: Option<Type<'db>>,
+    ) -> Option<Option<Type<'db>>> {
+        match (left, right) {
+            (Some(left), Some(right)) => Some(Some(
+                UnionType::from_elements_cycle_recovery_without_callable_merge(db, [left, right]),
+            )),
+            (None, None) => Some(None),
+            (Some(_), None) | (None, Some(_)) => None,
+        }
+    }
+
+    fn cycle_recovery_merge(&self, db: &'db dyn Db, other: &Self) -> Option<Self> {
+        match (self, other) {
+            (
+                Self::PositionalOnly { name, default_type },
+                Self::PositionalOnly {
+                    name: other_name,
+                    default_type: other_default,
+                },
+            ) if name == other_name => Some(Self::PositionalOnly {
+                name: name.clone(),
+                default_type: Self::cycle_recovery_merge_default(
+                    db,
+                    *default_type,
+                    *other_default,
+                )?,
+            }),
+            (
+                Self::PositionalOrKeyword { name, default_type },
+                Self::PositionalOrKeyword {
+                    name: other_name,
+                    default_type: other_default,
+                },
+            ) if name == other_name => Some(Self::PositionalOrKeyword {
+                name: name.clone(),
+                default_type: Self::cycle_recovery_merge_default(
+                    db,
+                    *default_type,
+                    *other_default,
+                )?,
+            }),
+            (
+                Self::KeywordOnly { name, default_type },
+                Self::KeywordOnly {
+                    name: other_name,
+                    default_type: other_default,
+                },
+            ) if name == other_name => Some(Self::KeywordOnly {
+                name: name.clone(),
+                default_type: Self::cycle_recovery_merge_default(
+                    db,
+                    *default_type,
+                    *other_default,
+                )?,
+            }),
+            (Self::Variadic { name }, Self::Variadic { name: other_name })
+                if name == other_name =>
+            {
+                Some(Self::Variadic { name: name.clone() })
+            }
+            (Self::KeywordVariadic { name }, Self::KeywordVariadic { name: other_name })
+                if name == other_name =>
+            {
+                Some(Self::KeywordVariadic { name: name.clone() })
+            }
+            _ => None,
+        }
+    }
+
     #[expect(clippy::ref_option)]
     fn cycle_normalized_default(
         db: &'db dyn Db,

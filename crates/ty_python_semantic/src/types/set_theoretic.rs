@@ -113,10 +113,35 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        Self::from_elements_cycle_recovery_impl(db, elements, true)
+    }
+
+    pub(crate) fn from_elements_cycle_recovery_without_callable_merge<I, T>(
+        db: &'db dyn Db,
+        elements: I,
+    ) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        Self::from_elements_cycle_recovery_impl(db, elements, false)
+    }
+
+    fn from_elements_cycle_recovery_impl<I, T>(
+        db: &'db dyn Db,
+        elements: I,
+        merge_structural_callables: bool,
+    ) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
+                UnionBuilder::new(db)
+                    .cycle_recovery(true)
+                    .merge_structural_callables(merge_structural_callables),
                 |builder, element| builder.add(element.into()),
             )
             .build()

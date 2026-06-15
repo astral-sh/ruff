@@ -42,8 +42,8 @@ use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
 use crate::types::tuple::Tuple;
 use crate::types::visitor;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, ClassType, DivergentType, EnumLiteralType, GenericAlias,
-    IntersectionType, KnownClass, LiteralValueType, LiteralValueTypeKind,
+    BytesLiteralType, CallableType, ClassLiteral, ClassType, DivergentType, EnumLiteralType,
+    GenericAlias, IntersectionType, KnownClass, LiteralValueType, LiteralValueTypeKind,
     NegativeIntersectionElements, NominalInstanceType, StringLiteralType, SubclassOfType, Type,
     TypeVarBoundOrConstraints, UnionType,
     class::{
@@ -554,6 +554,11 @@ const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 enum RelationSimplification {
     /// Union construction may ask relation queries to remove redundant members.
     Full,
+    /// Union construction must not ask relation queries.
+    ///
+    /// Cycle recovery runs while Salsa is iterating an already-known cycle. Opening a relation
+    /// query from that path can introduce a new cycle head, which Salsa rejects.
+    None,
     /// Skip relation checks whose direct operands include a protocol instance.
     ///
     /// Alias-preserving annotation unions can be built while recovering a protocol
@@ -566,6 +571,7 @@ impl RelationSimplification {
     fn allows_relation<'db>(self, db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> bool {
         match self {
             RelationSimplification::Full => true,
+            RelationSimplification::None => false,
             RelationSimplification::NoProtocolRelations => {
                 !Self::relation_may_query_protocol_interface(left, right)
                     && !left.contains_cycle_sensitive_type(db)
@@ -577,6 +583,7 @@ impl RelationSimplification {
     fn allows_try_reduce<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         match self {
             RelationSimplification::Full => true,
+            RelationSimplification::None => false,
             RelationSimplification::NoProtocolRelations => {
                 !matches!(ty, Type::ProtocolInstance(_)) && !ty.contains_cycle_sensitive_type(db)
             }
@@ -596,6 +603,7 @@ pub(crate) struct UnionBuilder<'db> {
     db: &'db dyn Db,
     unpack_aliases: bool,
     relation_simplification: RelationSimplification,
+    merge_structural_callables: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     cycle_recovery: bool,
 }
@@ -663,6 +671,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             relation_simplification: RelationSimplification::Full,
+            merge_structural_callables: true,
             cycle_recovery: false,
         }
     }
@@ -685,11 +694,16 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
+    pub(crate) fn merge_structural_callables(mut self, val: bool) -> Self {
+        self.merge_structural_callables = val;
+        self
+    }
+
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
             self.unpack_aliases = false;
-            self.relation_simplification = RelationSimplification::NoProtocolRelations;
+            self.relation_simplification = RelationSimplification::None;
         }
         self
     }
@@ -1120,6 +1134,24 @@ impl<'db> UnionBuilder<'db> {
 
     fn merge_cycle_recovery_type(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Type<'db> {
         UnionType::from_elements_cycle_recovery(db, [left, right])
+    }
+
+    fn cycle_recovery_query_free_redundant(
+        db: &'db dyn Db,
+        left: Type<'db>,
+        right: Type<'db>,
+    ) -> bool {
+        let left_known_class = left
+            .as_nominal_instance()
+            .and_then(|instance| instance.known_class(db));
+        let right_known_class = right
+            .as_nominal_instance()
+            .and_then(|instance| instance.known_class(db));
+
+        matches!(
+            (left_known_class, right_known_class),
+            (Some(KnownClass::Bool), Some(KnownClass::Int))
+        )
     }
 
     fn merge_cycle_recovery_type_slices(
@@ -2192,6 +2224,7 @@ impl<'db> UnionBuilder<'db> {
         db: &'db dyn Db,
         left: Type<'db>,
         right: Type<'db>,
+        merge_callables: bool,
     ) -> Option<Type<'db>> {
         match (left, right) {
             (Type::ClassLiteral(_), Type::ClassLiteral(_)) => {
@@ -2203,8 +2236,29 @@ impl<'db> UnionBuilder<'db> {
             (Type::NominalInstance(left), Type::NominalInstance(right)) => {
                 Self::merge_nominal_instances(db, left, right)
             }
+            (Type::Callable(left), Type::Callable(right)) if merge_callables => {
+                Self::merge_callable_types(db, left, right)
+            }
             _ => None,
         }
+    }
+
+    fn merge_callable_types(
+        db: &'db dyn Db,
+        left: CallableType<'db>,
+        right: CallableType<'db>,
+    ) -> Option<Type<'db>> {
+        if left.kind(db) != right.kind(db) || left.provenance(db) != right.provenance(db) {
+            return None;
+        }
+
+        Some(Type::Callable(CallableType::new(
+            db,
+            left.signatures(db)
+                .cycle_recovery_merge(db, right.signatures(db))?,
+            left.kind(db),
+            left.provenance(db),
+        )))
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
@@ -2264,8 +2318,12 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if self.cycle_recovery
-                && let Some(merged) =
-                    Self::merge_same_dynamic_origin_structural(self.db, ty, element_type)
+                && let Some(merged) = Self::merge_same_dynamic_origin_structural(
+                    self.db,
+                    ty,
+                    element_type,
+                    self.merge_structural_callables,
+                )
             {
                 to_remove.push(i);
                 ty = merged;
@@ -2321,6 +2379,16 @@ impl<'db> UnionBuilder<'db> {
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
                 return;
+            }
+
+            if self.cycle_recovery {
+                if Self::cycle_recovery_query_free_redundant(self.db, ty, element_type) {
+                    return;
+                }
+                if Self::cycle_recovery_query_free_redundant(self.db, element_type, ty) {
+                    to_remove.push(i);
+                    continue;
+                }
             }
 
             // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
@@ -2391,6 +2459,7 @@ impl<'db> UnionBuilder<'db> {
         let db = self.db;
         let unpack_aliases = self.unpack_aliases;
         let cycle_recovery = self.cycle_recovery;
+        let merge_structural_callables = self.merge_structural_callables;
         let relation_simplification = self.relation_simplification;
 
         let type_count = self.elements.iter().map(UnionElement::type_count).sum();
@@ -2447,6 +2516,7 @@ impl<'db> UnionBuilder<'db> {
             let builder = UnionBuilder::new(db)
                 .unpack_aliases(unpack_aliases)
                 .with_relation_simplification(relation_simplification)
+                .merge_structural_callables(merge_structural_callables)
                 .cycle_recovery(cycle_recovery);
             return types
                 .into_iter()

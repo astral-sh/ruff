@@ -189,7 +189,7 @@ class RecursiveCallOperation:
 
     def use_call_result(self):
         result = self.fn()
-        reveal_type(result)  # revealed: list[int] | list[Divergent]
+        reveal_type(result)  # revealed: list[Divergent] | list[int]
 ```
 
 ## Meta-type lookups through recursive aliases

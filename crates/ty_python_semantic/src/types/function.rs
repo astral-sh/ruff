@@ -1097,18 +1097,22 @@ impl<'db> FunctionType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        // Returned-callable rescoping and type-alias specialization should not rebuild signatures from the
-        // function literal; doing so can re-enter recursive `TypeOf` evaluation.
+        // These mappings must not rebuild signatures from the function literal; doing so can
+        // re-enter recursive `TypeOf` evaluation while recovering an alias/signature cycle.
         let literal = self.literal(db);
         let (updated_signature, updated_implementation_signature) = if matches!(
             type_mapping,
-            TypeMapping::ApplySpecialization(
-                ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
-            ) | TypeMapping::ApplySpecializationWithMaterialization {
-                specialization: ApplySpecialization::ReturnCallables(_)
-                    | ApplySpecialization::TypeAlias(_),
-                ..
-            }
+            TypeMapping::ReplaceRecursiveOrigin { .. }
+                | TypeMapping::EraseDivergentMarkers
+                | TypeMapping::EraseDivergentMarker { .. }
+                | TypeMapping::ApplySpecialization(
+                    ApplySpecialization::ReturnCallables(_) | ApplySpecialization::TypeAlias(_)
+                )
+                | TypeMapping::ApplySpecializationWithMaterialization {
+                    specialization: ApplySpecialization::ReturnCallables(_)
+                        | ApplySpecialization::TypeAlias(_),
+                    ..
+                }
         ) {
             (
                 self.updated_signature(db).map(|signature| {
@@ -1135,7 +1139,10 @@ impl<'db> FunctionType<'db> {
             )
         };
 
-        if updated_signature.is_none() && updated_implementation_signature.is_none() {
+        if updated_signature.as_ref() == self.updated_signature(db)
+            && updated_implementation_signature.as_ref()
+                == self.updated_implementation_signature(db)
+        {
             self
         } else {
             Self::new(
