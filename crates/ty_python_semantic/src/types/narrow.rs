@@ -322,7 +322,68 @@ impl<'db> PatternSuccessTypes<'db> {
 /// second element prevents the complete sequence pattern from matching.
 struct PatternSuccessResult<'db> {
     matched_subject_ty: Type<'db>,
-    bindings: BTreeMap<ScopedPlaceId, Type<'db>>,
+    bindings: BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
+}
+
+#[derive(Clone)]
+struct PatternBindingTypes<'db> {
+    contributions: SmallVec<[PatternBindingType<'db>; 2]>,
+}
+
+#[derive(Clone, Copy)]
+struct PatternBindingType<'db> {
+    ty: Type<'db>,
+    aliases_subject: bool,
+}
+
+impl<'db> PatternBindingTypes<'db> {
+    fn subject(subject_ty: Type<'db>) -> Self {
+        Self {
+            contributions: smallvec![PatternBindingType {
+                ty: subject_ty,
+                aliases_subject: true,
+            }],
+        }
+    }
+
+    fn ty(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(db, self.contributions.iter().map(|binding| binding.ty))
+    }
+
+    fn demote_subject(&mut self) {
+        for contribution in &mut self.contributions {
+            contribution.aliases_subject = false;
+        }
+    }
+
+    fn merge(&mut self, other: Self) {
+        self.contributions.extend(other.contributions);
+    }
+
+    fn subject_ty(&self, db: &'db dyn Db) -> Type<'db> {
+        UnionType::from_elements(
+            db,
+            self.contributions
+                .iter()
+                .filter(|binding| binding.aliases_subject)
+                .map(|binding| binding.ty),
+        )
+    }
+
+    fn restore_subject(&mut self, restored_subject_ty: Type<'db>) {
+        let mut restored = false;
+        self.contributions.retain_mut(|contribution| {
+            if !contribution.aliases_subject {
+                return true;
+            }
+            if restored {
+                return false;
+            }
+            contribution.ty = restored_subject_ty;
+            restored = true;
+            true
+        });
+    }
 }
 
 /// Computes the subject and binding types produced by successful match patterns.
@@ -365,7 +426,11 @@ pub(crate) fn pattern_success_types<'db>(
     let analyzer = PatternSuccessAnalyzer::new(db, pattern.scope(db));
     let result = analyzer.analyze_successful_pattern(pattern.kind(db), incoming_subject_ty);
     PatternSuccessTypes {
-        bindings: FrozenMap::from(result.bindings),
+        bindings: result
+            .bindings
+            .into_iter()
+            .map(|(place, binding)| (place, binding.ty(db)))
+            .collect(),
         missing_binding_ty: if result.matched_subject_ty.is_never() {
             Type::Never
         } else {
@@ -1218,27 +1283,36 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
     fn merge_binding(
         &self,
-        bindings: &mut BTreeMap<ScopedPlaceId, Type<'db>>,
+        bindings: &mut BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
         place: ScopedPlaceId,
-        ty: Type<'db>,
+        binding: PatternBindingTypes<'db>,
     ) {
         match bindings.entry(place) {
             BTreeEntry::Occupied(mut entry) => {
-                *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
+                entry.get_mut().merge(binding);
             }
             BTreeEntry::Vacant(entry) => {
-                entry.insert(ty);
+                entry.insert(binding);
             }
         }
     }
 
     fn merge_bindings(
         &self,
-        into: &mut BTreeMap<ScopedPlaceId, Type<'db>>,
-        from: BTreeMap<ScopedPlaceId, Type<'db>>,
+        into: &mut BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
+        from: BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
     ) {
-        for (place, ty) in from {
-            self.merge_binding(into, place, ty);
+        for (place, binding) in from {
+            self.merge_binding(into, place, binding);
+        }
+    }
+
+    fn demote_subject_bindings(
+        &self,
+        bindings: &mut BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
+    ) {
+        for binding in bindings.values_mut() {
+            binding.demote_subject();
         }
     }
 
@@ -1284,7 +1358,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     self.merge_binding(
                         &mut result.bindings,
                         place.into(),
-                        result.matched_subject_ty,
+                        PatternBindingTypes::subject(result.matched_subject_ty),
                     );
                 }
                 result
@@ -1295,7 +1369,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     .as_ref()
                     .and_then(|name| self.places().symbol_id(name.as_str()))
                 {
-                    bindings.insert(place.into(), subject_ty);
+                    bindings.insert(place.into(), PatternBindingTypes::subject(subject_ty));
                 }
                 PatternSuccessResult {
                     matched_subject_ty: subject_ty,
@@ -1525,11 +1599,12 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             let mut bindings = BTreeMap::new();
             let mut matched_element_types = Vec::with_capacity(kind.patterns.len());
             for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
-                let child = analyzer.analyze_successful_pattern(pattern, element_ty);
+                let mut child = analyzer.analyze_successful_pattern(pattern, element_ty);
                 if child.matched_subject_ty.is_never() {
                     return None;
                 }
                 matched_element_types.push(child.matched_subject_ty);
+                analyzer.demote_subject_bindings(&mut child.bindings);
                 analyzer.merge_bindings(&mut bindings, child.bindings);
             }
             let matched_subject_ty = analyzer.successful_sequence_subject_type(
@@ -1624,13 +1699,24 @@ impl<'db> PatternSuccessAnalyzer<'db> {
 
         for (original_subject_ty, arms) in &grouped_arms {
             let mut matched_types = UnionBuilder::new(self.db);
+            let mut arm_bindings = BTreeMap::new();
 
             for (_, filtering_subject_ty) in arms {
                 if let Some(arm) = analyze_arm(self, filtering_subject_ty) {
                     matched_types.add_in_place(arm.matched_subject_ty);
-                    self.merge_bindings(&mut bindings, arm.bindings);
+                    self.merge_bindings(&mut arm_bindings, arm.bindings);
                 }
             }
+
+            for binding in arm_bindings.values_mut() {
+                let subject_ty = binding.subject_ty(self.db);
+                if !subject_ty.is_never() {
+                    binding.restore_subject(
+                        self.matched_subject_type_for_original(original_subject_ty, subject_ty),
+                    );
+                }
+            }
+            self.merge_bindings(&mut bindings, arm_bindings);
 
             matched_subject_types.add_in_place(
                 self.matched_subject_type_for_original(original_subject_ty, matched_types.build()),
