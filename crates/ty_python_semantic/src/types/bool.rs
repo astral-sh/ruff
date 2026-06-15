@@ -213,16 +213,20 @@ impl<'db> Type<'db> {
         };
 
         let truthiness = match self {
-            Type::Recursive(rec) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
-                unfolded.try_bool_impl(db, allow_short_circuit, visitor)
+            Type::Recursive(rec) if !rec.is_non_contractive(db) => visitor.visit(*self, || {
+                rec.map(db, |unfolded| {
+                    unfolded.try_bool_impl(db, allow_short_circuit, visitor)
+                })
             })?,
             Type::Divergent(divergent) => {
-                if let Some(truthiness) = divergent.try_map(db, |inner| {
-                    inner.try_bool_impl(db, allow_short_circuit, visitor)
-                }) {
-                    truthiness?
-                } else {
+                if divergent.is_placeholder(db) {
                     Truthiness::Ambiguous
+                } else {
+                    visitor.visit(*self, || {
+                        divergent.map(db, |inner| {
+                            inner.try_bool_impl(db, allow_short_circuit, visitor)
+                        })
+                    })?
                 }
             }
 

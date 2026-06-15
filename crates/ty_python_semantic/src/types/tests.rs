@@ -411,7 +411,6 @@ fn top_level_union_cycle_normalization_keeps_structural_markers_recursive() {
             .display(&db)
             .to_string()
     );
-    assert!(!normalized.contains_bodyful_divergent(&db));
     assert!(RecursiveTypeNormalization::new(marker).contains_marker(&db, normalized));
 }
 

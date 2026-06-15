@@ -23,6 +23,31 @@ def f(items):
         state["end"] = None
 ```
 
+This is minimized from a more-itertools ecosystem stack overflow. Evaluating the truthiness of a
+recursive loop-carried value must use the same cycle detector as other recursive type operations.
+
+```py
+def nth_combination_core(r: int):
+    n = 3
+    c = 1
+    while r:
+        c, r = c * r // n, r - 1
+        if c:
+            n = n - 1
+```
+
+This is also minimized from more-itertools. A bodyful recursive marker that reaches a comparison
+must be transparent to the comparison operation while still marking the comparison result.
+
+```py
+def comparison_loop_carried_marker(r: int):
+    c = 1
+    while r:
+        c, r = c * r, r - 1
+        if 1 >= c:
+            c = c + 1
+```
+
 This is minimized from a steam.py ecosystem stack overflow. A loop-carried augmented assignment can
 feed back into the same variable's equality guard in the rest of the loop body. The loop fixpoint
 uses a cycle-recovery approximation for the augmented assignment, and applying the equality

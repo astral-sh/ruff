@@ -89,7 +89,7 @@ use crate::types::recursive::{Foldable, RecursiveType};
 use crate::types::signatures::walk_signature;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::special_form::TypeQualifier;
-use crate::types::tuple::TupleSpec;
+use crate::types::tuple::{Tuple, TupleSpec};
 pub use crate::types::type_alias::TypeAliasType;
 pub use crate::types::type_form::TypeFormType;
 pub(crate) use crate::types::typed_dict::TypedDictType;
@@ -1138,8 +1138,9 @@ impl<'db> RecursiveTypeNormalization<'db> {
                 }
                 if let Type::Divergent(divergent) = ty
                     && let Some(body) = divergent.body(db)
+                    && !self.recursion_guard.type_was_already_seen(ty)
                 {
-                    self.visit_type(db, body);
+                    visitor::TypeVisitor::visit_type(self, db, body);
                     return;
                 }
                 if self.normalization.matches_marker(db, ty) {
@@ -1165,6 +1166,352 @@ impl<'db> RecursiveTypeNormalization<'db> {
         };
         visitor::TypeVisitor::visit_type(&visitor, db, ty);
         visitor.found.get()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum MarkerPosition {
+    TopLevel,
+    Nested,
+}
+
+/// Query-free structural matching for cycle-recovery marker approximations.
+///
+/// `Divergent(id, None)` is treated as a hole. Top-level unions may drop that
+/// hole (`T | α => T`), but nested unions may not (`list[T | α]` stays recursive).
+struct DivergentApproximation {
+    expected_id: Option<salsa::Id>,
+    marker_id: Cell<Option<salsa::Id>>,
+    invalid_marker: Cell<bool>,
+    allow_dynamic_fallback: bool,
+}
+
+impl DivergentApproximation {
+    fn any_single_marker() -> Self {
+        Self::new(None, true)
+    }
+
+    fn any_single_marker_without_dynamic_fallback() -> Self {
+        Self::new(None, false)
+    }
+
+    fn specific_marker(id: salsa::Id) -> Self {
+        Self::new(Some(id), true)
+    }
+
+    fn new(expected_id: Option<salsa::Id>, allow_dynamic_fallback: bool) -> Self {
+        Self {
+            expected_id,
+            marker_id: Cell::new(None),
+            invalid_marker: Cell::new(false),
+            allow_dynamic_fallback,
+        }
+    }
+
+    fn record_marker(&self, id: salsa::Id) -> bool {
+        if self.expected_id.is_some_and(|expected| expected != id) {
+            return false;
+        }
+
+        match self.marker_id.get() {
+            Some(existing) if existing != id => {
+                self.invalid_marker.set(true);
+                false
+            }
+            Some(_) => true,
+            None => {
+                self.marker_id.set(Some(id));
+                true
+            }
+        }
+    }
+
+    fn single_marker_id(&self) -> Option<salsa::Id> {
+        (!self.invalid_marker.get()).then_some(self.marker_id.get())?
+    }
+
+    fn overlay_type<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+        position: MarkerPosition,
+    ) -> Option<Type<'db>> {
+        let overlaid = self.overlay_type_impl(db, approximation, precise, position)?;
+        Some(Type::divergent_with_body(
+            db,
+            self.single_marker_id()?,
+            overlaid,
+        ))
+    }
+
+    fn overlay_type_impl<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+        position: MarkerPosition,
+    ) -> Option<Type<'db>> {
+        if let Type::Divergent(divergent) = approximation
+            && let Some(body) = divergent.body(db)
+        {
+            self.record_marker(divergent.id(db)).then_some(())?;
+            return self.overlay_type_impl(db, body, precise, position);
+        }
+
+        if let Some(overlaid) = self.overlay_equal_or_literal_fallback(db, approximation, precise) {
+            return Some(overlaid);
+        }
+        if self.allow_dynamic_fallback
+            && self.single_marker_id().is_some()
+            && precise.is_non_divergent_dynamic_fallback(db)
+        {
+            return Some(approximation);
+        }
+        if self.single_marker_id().is_some() && Self::is_placeholder_marker(db, precise) {
+            return Some(approximation);
+        }
+
+        match approximation {
+            Type::Divergent(divergent) => {
+                self.record_marker(divergent.id(db)).then_some(())?;
+                precise
+                    .is_finite_divergent_overlay_target(db)
+                    .then_some(precise)
+            }
+            Type::Union(union) if position == MarkerPosition::TopLevel => {
+                self.overlay_top_level_union(db, union, precise)
+            }
+            _ => self.overlay_tuple(db, approximation, precise),
+        }
+    }
+
+    fn overlay_top_level_union<'db>(
+        &self,
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        precise: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let mut non_marker_elements = Vec::new();
+        for &element in union.elements(db) {
+            if self.record_top_level_marker(db, element) {
+                continue;
+            }
+            non_marker_elements.push(element);
+        }
+
+        match non_marker_elements.as_slice() {
+            [] => precise
+                .is_finite_divergent_overlay_target(db)
+                .then_some(precise),
+            [element] => self.overlay_type_impl(db, *element, precise, MarkerPosition::Nested),
+            _ => {
+                let Type::Union(precise_union) = precise else {
+                    return None;
+                };
+                let precise_elements = precise_union.elements(db);
+                (non_marker_elements.len() == precise_elements.len()
+                    && non_marker_elements
+                        .iter()
+                        .all(|element| precise_elements.contains(element)))
+                .then_some(precise)
+            }
+        }
+    }
+
+    fn overlay_tuple<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let approximation_tuple = approximation.exact_tuple_instance_spec(db)?;
+        let precise_tuple = precise.exact_tuple_instance_spec(db)?;
+
+        let (Tuple::Fixed(approximation), Tuple::Fixed(precise)) =
+            (approximation_tuple.as_ref(), precise_tuple.as_ref())
+        else {
+            return None;
+        };
+
+        if approximation.len() != precise.len() {
+            return None;
+        }
+
+        let elements = approximation
+            .iter_all_elements()
+            .zip(precise.iter_all_elements())
+            .map(|(approximation, precise)| {
+                self.overlay_type_impl(db, approximation, precise, MarkerPosition::Nested)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Type::heterogeneous_tuple(db, elements))
+    }
+
+    fn matches_type<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+        position: MarkerPosition,
+    ) -> bool {
+        if self.matches_equal_or_literal_fallback(db, approximation, precise) {
+            return true;
+        }
+        if self.is_recorded_marker(db, precise) {
+            return true;
+        }
+
+        if let Type::Divergent(divergent) = approximation {
+            if !self.record_marker(divergent.id(db)) {
+                return false;
+            }
+            return divergent
+                .body(db)
+                .is_none_or(|body| self.matches_type(db, body, precise, position));
+        }
+
+        if let Type::Divergent(divergent) = precise
+            && let Some(body) = divergent.body(db)
+            && self
+                .expected_id
+                .is_some_and(|expected| expected == divergent.id(db))
+        {
+            return self.matches_type(db, approximation, body, position);
+        }
+
+        if let Type::Union(union) = approximation
+            && position == MarkerPosition::TopLevel
+        {
+            return self.matches_top_level_union(db, union, precise);
+        }
+
+        self.matches_tuple(db, approximation, precise)
+    }
+
+    fn matches_top_level_union<'db>(
+        &self,
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        precise: Type<'db>,
+    ) -> bool {
+        let mut non_marker_elements = Vec::new();
+        let mut saw_marker = false;
+        for &element in union.elements(db) {
+            if self.record_top_level_marker(db, element) {
+                saw_marker = true;
+                continue;
+            }
+            non_marker_elements.push(element);
+        }
+
+        match non_marker_elements.as_slice() {
+            [] => saw_marker,
+            [element] => self.matches_type(db, *element, precise, MarkerPosition::Nested),
+            _ => {
+                let Type::Union(precise_union) = precise else {
+                    return false;
+                };
+                let precise_elements = precise_union.elements(db);
+                non_marker_elements.len() == precise_elements.len()
+                    && non_marker_elements
+                        .iter()
+                        .all(|element| precise_elements.contains(element))
+            }
+        }
+    }
+
+    fn matches_tuple<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+    ) -> bool {
+        let Some(approximation_tuple) = approximation.exact_tuple_instance_spec(db) else {
+            return false;
+        };
+        let Some(precise_tuple) = precise.exact_tuple_instance_spec(db) else {
+            return false;
+        };
+
+        let (Tuple::Fixed(approximation), Tuple::Fixed(precise)) =
+            (approximation_tuple.as_ref(), precise_tuple.as_ref())
+        else {
+            return false;
+        };
+
+        approximation.len() == precise.len()
+            && approximation
+                .iter_all_elements()
+                .zip(precise.iter_all_elements())
+                .all(|(approximation, precise)| {
+                    self.matches_type(db, approximation, precise, MarkerPosition::Nested)
+                })
+    }
+
+    fn record_top_level_marker<'db>(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::Divergent(divergent) if divergent.is_placeholder(db) => {
+                self.record_marker(divergent.id(db))
+            }
+            Type::Recursive(recursive) if recursive.is_non_contractive(db) => {
+                self.record_marker(recursive.binder_id(db))
+            }
+            _ => false,
+        }
+    }
+
+    fn is_recorded_marker<'db>(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let Some(marker_id) = self.single_marker_id() else {
+            return false;
+        };
+        matches!(
+            ty,
+            Type::Divergent(divergent)
+                if divergent.is_placeholder(db) && divergent.id(db) == marker_id
+        ) || matches!(
+            ty,
+            Type::Recursive(recursive)
+                if recursive.is_non_contractive(db) && recursive.binder_id(db) == marker_id
+        )
+    }
+
+    fn is_placeholder_marker<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        matches!(
+            ty,
+            Type::Divergent(divergent) if divergent.is_placeholder(db)
+        ) || matches!(
+            ty,
+            Type::Recursive(recursive) if recursive.is_non_contractive(db)
+        )
+    }
+
+    fn overlay_equal_or_literal_fallback<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+    ) -> Option<Type<'db>> {
+        if approximation == precise {
+            return Some(precise);
+        }
+        if precise.literal_fallback_instance(db) == Some(approximation) {
+            return Some(approximation);
+        }
+        if approximation.literal_fallback_instance(db) == Some(precise) {
+            return Some(precise);
+        }
+        None
+    }
+
+    fn matches_equal_or_literal_fallback<'db>(
+        &self,
+        db: &'db dyn Db,
+        approximation: Type<'db>,
+        precise: Type<'db>,
+    ) -> bool {
+        self.overlay_equal_or_literal_fallback(db, approximation, precise)
+            .is_some()
     }
 }
 
@@ -1290,8 +1637,85 @@ impl<'db> Type<'db> {
         visitor.found.get()
     }
 
+    fn is_finite_divergent_overlay_target(self, db: &'db dyn Db) -> bool {
+        // Lazy attributes can trigger queries, so this check is intentionally
+        // conservative: aliases and recursive types are not expanded in cycle recovery.
+        !visitor::any_over_type(db, self, false, |ty| {
+            matches!(
+                ty,
+                Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_)
+            )
+        })
+    }
+
+    pub(crate) fn divergent_overlay_candidate(
+        db: &'db dyn Db,
+        marker_candidate: Type<'db>,
+        finite_candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        DivergentApproximation::any_single_marker().overlay_type(
+            db,
+            marker_candidate,
+            finite_candidate,
+            MarkerPosition::TopLevel,
+        )
+    }
+
+    pub(crate) fn divergent_overlay_candidate_without_dynamic_fallback(
+        db: &'db dyn Db,
+        marker_candidate: Type<'db>,
+        finite_candidate: Type<'db>,
+    ) -> Option<Type<'db>> {
+        DivergentApproximation::any_single_marker_without_dynamic_fallback().overlay_type(
+            db,
+            marker_candidate,
+            finite_candidate,
+            MarkerPosition::TopLevel,
+        )
+    }
+
+    fn is_divergent_approximation_of(
+        self,
+        db: &'db dyn Db,
+        precise: Type<'db>,
+        marker_id: salsa::Id,
+    ) -> bool {
+        DivergentApproximation::specific_marker(marker_id).matches_type(
+            db,
+            self,
+            precise,
+            MarkerPosition::TopLevel,
+        )
+    }
+
     pub(crate) fn is_divergent(self, db: &'db dyn Db) -> bool {
         matches!(self, Type::Divergent(divergent) if divergent.is_placeholder(db))
+    }
+
+    pub(crate) fn is_non_divergent_dynamic_fallback(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Dynamic(_) => true,
+            Type::Intersection(intersection) => {
+                let contains_dynamic = intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| matches!(ty, Type::Dynamic(_)));
+                contains_dynamic
+                    && intersection.positive(db).iter().all(|ty| {
+                        !matches!(
+                            ty,
+                            Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_)
+                        )
+                    })
+                    && intersection.negative(db).iter().all(|ty| {
+                        !matches!(
+                            ty,
+                            Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_)
+                        )
+                    })
+            }
+            _ => false,
+        }
     }
 
     pub(crate) fn is_cycle_recovery_placeholder(self, db: &'db dyn Db) -> bool {
@@ -1415,8 +1839,10 @@ impl<'db> Type<'db> {
                         self.ids.borrow_mut().insert(divergent.id(db));
                         return;
                     }
-                    if let Some(body) = divergent.body(db) {
-                        self.visit_type(db, body);
+                    if let Some(body) = divergent.body(db)
+                        && !self.recursion_guard.type_was_already_seen(ty)
+                    {
+                        visitor::TypeVisitor::visit_type(self, db, body);
                         return;
                     }
                 }
@@ -1426,7 +1852,7 @@ impl<'db> Type<'db> {
 
             fn visit_recursive_type(&self, db: &'db dyn Db, recursive: RecursiveType<'db>) {
                 self.ids.borrow_mut().insert(recursive.binder_id(db));
-                self.visit_type(db, recursive.body(db));
+                visitor::TypeVisitor::visit_type(self, db, recursive.body(db));
             }
         }
 
@@ -1633,6 +2059,13 @@ impl<'db> Type<'db> {
         let recovered = if let Some(previous) = previous {
             let previous = cycle_head_body(previous, &head_ids);
 
+            if let Type::Divergent(divergent) = self
+                && let Some(body) = divergent.body(db)
+                && head_ids.iter().any(|id| *id == divergent.id(db))
+                && previous.is_divergent_approximation_of(db, body, divergent.id(db))
+            {
+                self
+            }
             // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
             // without converging on a fixed-point result. Most of the time, we union together the
             // types from each cycle iteration to ensure that our result is monotonic, even if we
@@ -1646,7 +2079,7 @@ impl<'db> Type<'db> {
             // So we avoid unioning in the first couple iterations, and just use the later iteration's
             // result directly. We still ensure monotonicity after the first couple iterations, which
             // still ensures convergence in cases that are prone to oscillation.
-            if cycle.iteration() <= crate::TAINTED_CYCLES {
+            else if cycle.iteration() <= crate::TAINTED_CYCLES {
                 let self_degraded_by_overload =
                     any_over_type(db, self, false, |ty| {
                         matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))

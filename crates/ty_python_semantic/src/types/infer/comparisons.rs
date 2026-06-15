@@ -208,6 +208,61 @@ pub(super) fn infer_binary_type_comparison<'db>(
             visitor,
         )),
 
+        (Type::Divergent(divergent), right) if let Some(marked) = divergent.as_bodyful(db) => {
+            Some(visitor.visit((left, op, right), || {
+                marked.map(db, |inner| {
+                    infer_binary_type_comparison(context, inner, op, right, range, visitor)
+                })
+            }))
+        }
+        (left, Type::Divergent(divergent)) if let Some(marked) = divergent.as_bodyful(db) => {
+            Some(visitor.visit((left, op, right), || {
+                marked.map(db, |inner| {
+                    infer_binary_type_comparison(context, left, op, inner, range, visitor)
+                })
+            }))
+        }
+        (Type::Divergent(divergent), right) => {
+            let binder_id = divergent.binder_id(db);
+            Some(visitor.visit((left, op, right), || {
+                let inferred = infer_binary_type_comparison(
+                    context,
+                    Type::unknown(),
+                    op,
+                    right,
+                    range,
+                    visitor,
+                )
+                .unwrap_or_else(|_| Type::divergent(db, binder_id));
+
+                Ok(if inferred.is_dynamic(db) {
+                    Type::divergent(db, binder_id)
+                } else {
+                    Type::divergent_with_body(db, binder_id, inferred)
+                })
+            }))
+        }
+        (left, Type::Divergent(divergent)) => {
+            let binder_id = divergent.binder_id(db);
+            Some(visitor.visit((left, op, right), || {
+                let inferred = infer_binary_type_comparison(
+                    context,
+                    left,
+                    op,
+                    Type::unknown(),
+                    range,
+                    visitor,
+                )
+                .unwrap_or_else(|_| Type::divergent(db, binder_id));
+
+                Ok(if inferred.is_dynamic(db) {
+                    Type::divergent(db, binder_id)
+                } else {
+                    Type::divergent_with_body(db, binder_id, inferred)
+                })
+            }))
+        }
+
         (Type::Union(union), other) => {
             let mut builder = UnionBuilder::new(db);
             for element in union.elements(db) {

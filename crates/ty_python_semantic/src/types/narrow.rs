@@ -1,6 +1,7 @@
 use crate::Db;
 use crate::reachability::narrow_type_by_constraint;
 use crate::subscript::PyIndex;
+use crate::types::cyclic::CycleDetector;
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::special_form::TypeQualifier;
@@ -756,6 +757,30 @@ fn merge_constraints_or<'db>(
 /// Return `true` if it is possible for any two inhabitants of the given types to
 /// compare equal to each other; otherwise return `false`.
 fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<'db>) -> bool {
+    let visitor = CouldCompareEqualVisitor::new(true);
+    could_compare_equal_impl(db, left_ty, right_ty, &visitor)
+}
+
+type CouldCompareEqualVisitor<'db> = CycleDetector<CouldCompareEqual, (Type<'db>, Type<'db>), bool>;
+struct CouldCompareEqual;
+
+fn could_compare_equal_impl<'db>(
+    db: &'db dyn Db,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+    visitor: &CouldCompareEqualVisitor<'db>,
+) -> bool {
+    visitor.visit((left_ty, right_ty), || {
+        could_compare_equal_inner(db, left_ty, right_ty, visitor)
+    })
+}
+
+fn could_compare_equal_inner<'db>(
+    db: &'db dyn Db,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+    visitor: &CouldCompareEqualVisitor<'db>,
+) -> bool {
     if !left_ty.is_disjoint_from(db, right_ty) {
         // If types overlap, they have inhabitants in common; it's definitely possible
         // for an object to compare equal to itself.
@@ -765,13 +790,13 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
     if let Some(left_alternatives) = finite_single_valued_union_alternatives(db, left_ty) {
         return left_alternatives
             .into_iter()
-            .any(|ty| could_compare_equal(db, ty, right_ty));
+            .any(|ty| could_compare_equal_impl(db, ty, right_ty, visitor));
     }
 
     if let Some(right_alternatives) = finite_single_valued_union_alternatives(db, right_ty) {
         return right_alternatives
             .into_iter()
-            .any(|ty| could_compare_equal(db, left_ty, ty));
+            .any(|ty| could_compare_equal_impl(db, left_ty, ty, visitor));
     }
 
     match (left_ty, right_ty) {
@@ -780,23 +805,25 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         (Type::Union(union), _) => union
             .elements(db)
             .iter()
-            .any(|ty| could_compare_equal(db, *ty, right_ty)),
+            .any(|ty| could_compare_equal_impl(db, *ty, right_ty, visitor)),
         (_, Type::Union(union)) => union
             .elements(db)
             .iter()
-            .any(|ty| could_compare_equal(db, left_ty, *ty)),
-        (Type::Recursive(rec), _) if !rec.is_non_contractive(db) => {
-            rec.map(db, |unfolded| could_compare_equal(db, unfolded, right_ty))
-        }
-        (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => {
-            rec.map(db, |unfolded| could_compare_equal(db, left_ty, unfolded))
-        }
-        (Type::Divergent(divergent), _) if let Some(marked) = divergent.as_bodyful(db) => {
-            marked.map(db, |inner| could_compare_equal(db, inner, right_ty))
-        }
-        (_, Type::Divergent(divergent)) if let Some(marked) = divergent.as_bodyful(db) => {
-            marked.map(db, |inner| could_compare_equal(db, left_ty, inner))
-        }
+            .any(|ty| could_compare_equal_impl(db, left_ty, *ty, visitor)),
+        (Type::Recursive(rec), _) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            could_compare_equal_impl(db, unfolded, right_ty, visitor)
+        }),
+        (_, Type::Recursive(rec)) if !rec.is_non_contractive(db) => rec.map(db, |unfolded| {
+            could_compare_equal_impl(db, left_ty, unfolded, visitor)
+        }),
+        (Type::Divergent(divergent), _) if let Some(marked) = divergent.as_bodyful(db) => marked
+            .map(db, |inner| {
+                could_compare_equal_impl(db, inner, right_ty, visitor)
+            }),
+        (_, Type::Divergent(divergent)) if let Some(marked) = divergent.as_bodyful(db) => marked
+            .map(db, |inner| {
+                could_compare_equal_impl(db, left_ty, inner, visitor)
+            }),
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
             match (left.kind(), right.kind()) {
                 // Boolean literals and int literals are disjoint, and single valued, and yet
@@ -816,6 +843,117 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         // equal.
         _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
     }
+}
+
+type CanNarrowToRhsVisitor<'db> = CycleDetector<CanNarrowToRhs, (Type<'db>, Type<'db>), bool>;
+struct CanNarrowToRhs;
+
+fn can_narrow_to_rhs<'db>(db: &'db dyn Db, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> bool {
+    let visitor = CanNarrowToRhsVisitor::new(false);
+    can_narrow_to_rhs_impl(db, lhs_ty, rhs_ty, &visitor)
+}
+
+fn can_narrow_to_rhs_impl<'db>(
+    db: &'db dyn Db,
+    lhs_ty: Type<'db>,
+    rhs_ty: Type<'db>,
+    visitor: &CanNarrowToRhsVisitor<'db>,
+) -> bool {
+    visitor.visit((lhs_ty, rhs_ty), || {
+        if let Type::Union(union) = lhs_ty {
+            return union
+                .elements(db)
+                .iter()
+                .all(|ty| can_narrow_to_rhs_impl(db, *ty, rhs_ty, visitor));
+        }
+
+        if let Type::Recursive(rec) = lhs_ty
+            && !rec.is_non_contractive(db)
+        {
+            return rec.map(db, |unfolded| {
+                can_narrow_to_rhs_impl(db, unfolded, rhs_ty, visitor)
+            });
+        }
+
+        if let Type::Divergent(divergent) = lhs_ty
+            && let Some(can_narrow) = divergent.try_map(db, |inner| {
+                can_narrow_to_rhs_impl(db, inner, rhs_ty, visitor)
+            })
+        {
+            return can_narrow;
+        }
+
+        if let Some(alternatives) = finite_single_valued_union_alternatives(db, lhs_ty) {
+            return alternatives
+                .into_iter()
+                .all(|ty| can_narrow_to_rhs_impl(db, ty, rhs_ty, visitor));
+        }
+
+        // Either `rhs_ty` is a string literal, in which case we can narrow to it (no other
+        // string literal could compare equal to it), or it is not a string literal, in which
+        // case (given that it is single-valued), LiteralString cannot compare equal to it.
+        if lhs_ty.is_subtype_of(db, Type::literal_string()) {
+            return true;
+        }
+
+        !could_compare_equal(db, lhs_ty, rhs_ty)
+    })
+}
+
+type FilterToCannotBeEqualVisitor<'db> =
+    CycleDetector<FilterToCannotBeEqual, (Type<'db>, Type<'db>), Type<'db>>;
+struct FilterToCannotBeEqual;
+
+fn filter_to_cannot_be_equal<'db>(db: &'db dyn Db, ty: Type<'db>, rhs_ty: Type<'db>) -> Type<'db> {
+    let visitor = FilterToCannotBeEqualVisitor::new(Type::Never);
+    filter_to_cannot_be_equal_impl(db, ty, rhs_ty, &visitor)
+}
+
+fn filter_to_cannot_be_equal_impl<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    rhs_ty: Type<'db>,
+    visitor: &FilterToCannotBeEqualVisitor<'db>,
+) -> Type<'db> {
+    visitor.visit((ty, rhs_ty), || {
+        if let Type::Union(union) = ty {
+            return union.map(db, |ty| {
+                filter_to_cannot_be_equal_impl(db, *ty, rhs_ty, visitor)
+            });
+        }
+
+        if let Type::Recursive(rec) = ty
+            && !rec.is_non_contractive(db)
+        {
+            return rec.map(db, |unfolded| {
+                filter_to_cannot_be_equal_impl(db, unfolded, rhs_ty, visitor)
+            });
+        }
+
+        if let Type::Divergent(divergent) = ty
+            && let Some(filtered) = divergent.try_map(db, |inner| {
+                filter_to_cannot_be_equal_impl(db, inner, rhs_ty, visitor)
+            })
+        {
+            return filtered;
+        }
+
+        if let Some(alternatives) = finite_single_valued_union_alternatives(db, ty) {
+            return UnionType::from_elements(
+                db,
+                alternatives
+                    .into_iter()
+                    .map(|ty| filter_to_cannot_be_equal_impl(db, ty, rhs_ty, visitor)),
+            );
+        }
+
+        if !could_compare_equal(db, ty, rhs_ty) {
+            // Cannot compare equal to rhs, so keep this type.
+            ty
+        } else {
+            Type::Never
+        }
+    })
 }
 
 fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
@@ -1295,90 +1433,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
             // instead of intersecting with a type.)
 
-            // Return `true` if `lhs_ty` consists only of `LiteralString` and types that cannot
-            // compare equal to `rhs_ty`.
-            fn can_narrow_to_rhs<'db>(
-                db: &'db dyn Db,
-                lhs_ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> bool {
-                if let Type::Union(union) = lhs_ty {
-                    return union
-                        .elements(db)
-                        .iter()
-                        .all(|ty| can_narrow_to_rhs(db, *ty, rhs_ty));
-                }
-
-                if let Type::Recursive(rec) = lhs_ty
-                    && !rec.is_non_contractive(db)
-                {
-                    return rec.map(db, |unfolded| can_narrow_to_rhs(db, unfolded, rhs_ty));
-                }
-
-                if let Type::Divergent(divergent) = lhs_ty
-                    && let Some(can_narrow) =
-                        divergent.try_map(db, |inner| can_narrow_to_rhs(db, inner, rhs_ty))
-                {
-                    return can_narrow;
-                }
-
-                if let Some(alternatives) = finite_single_valued_union_alternatives(db, lhs_ty) {
-                    return alternatives
-                        .into_iter()
-                        .all(|ty| can_narrow_to_rhs(db, ty, rhs_ty));
-                }
-
-                // Either `rhs_ty` is a string literal, in which case we can narrow to it (no other
-                // string literal could compare equal to it), or it is not a string literal, in which
-                // case (given that it is single-valued), LiteralString cannot compare equal to it.
-                if lhs_ty.is_subtype_of(db, Type::literal_string()) {
-                    return true;
-                }
-
-                !could_compare_equal(db, lhs_ty, rhs_ty)
-            }
-
-            // Filter `ty` to just the types that cannot be equal to `rhs_ty`.
-            fn filter_to_cannot_be_equal<'db>(
-                db: &'db dyn Db,
-                ty: Type<'db>,
-                rhs_ty: Type<'db>,
-            ) -> Type<'db> {
-                if let Type::Union(union) = ty {
-                    return union.map(db, |ty| filter_to_cannot_be_equal(db, *ty, rhs_ty));
-                }
-
-                if let Type::Recursive(rec) = ty
-                    && !rec.is_non_contractive(db)
-                {
-                    return rec.map(db, |unfolded| {
-                        filter_to_cannot_be_equal(db, unfolded, rhs_ty)
-                    });
-                }
-
-                if let Type::Divergent(divergent) = ty
-                    && let Some(filtered) =
-                        divergent.try_map(db, |inner| filter_to_cannot_be_equal(db, inner, rhs_ty))
-                {
-                    return filtered;
-                }
-
-                if let Some(alternatives) = finite_single_valued_union_alternatives(db, ty) {
-                    return UnionType::from_elements(
-                        db,
-                        alternatives
-                            .into_iter()
-                            .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
-                    );
-                }
-
-                if !could_compare_equal(db, ty, rhs_ty) {
-                    // Cannot compare equal to rhs, so keep this type
-                    ty
-                } else {
-                    Type::Never
-                }
-            }
             Some(if can_narrow_to_rhs(self.db, lhs_ty, rhs_ty) {
                 rhs_ty
             } else {

@@ -39,8 +39,6 @@
 use crate::types::enums::{EnumComplement, enum_metadata};
 use crate::types::generics::Specialization;
 use crate::types::set_theoretic::expand_intersection_typevars_and_newtypes;
-use crate::types::tuple::Tuple;
-use crate::types::visitor;
 use crate::types::{
     BytesLiteralType, CallableType, ClassLiteral, ClassType, DivergentType, EnumLiteralType,
     GenericAlias, IntersectionType, KnownClass, LiteralValueType, LiteralValueTypeKind,
@@ -56,7 +54,6 @@ use crate::types::{
 use crate::{Db, FxOrderMap, FxOrderSet};
 use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
-use std::cell::Cell;
 
 /// Extract `(core, guard)` from truthiness-guarded intersections.
 ///
@@ -227,114 +224,6 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
     }
 
     false
-}
-
-fn is_finite_divergent_overlay_target<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    // Lazy attributes can trigger queries, so this check is intentionally
-    // conservative: aliases and recursive types are not expanded in cycle recovery.
-    !visitor::any_over_type(db, ty, false, |ty| {
-        matches!(
-            ty,
-            Type::Divergent(_) | Type::Recursive(_) | Type::TypeAlias(_)
-        )
-    })
-}
-
-/// Overlay a finite candidate onto a marker-tainted candidate during cycle recovery.
-///
-/// For example, `tuple[Divergent(a), int]` overlaid with `tuple[str, int]` becomes
-/// `Divergent(a, tuple[str, int])`. This is intentionally limited to the
-/// cycle-recovery path: all markers must belong to one binder, and the finite side
-/// must already be available without expanding aliases or recursive types.
-struct DivergentOverlay {
-    divergent_id: Cell<Option<salsa::Id>>,
-    has_multiple_divergent_ids: Cell<bool>,
-}
-
-impl DivergentOverlay {
-    fn build<'db>(
-        db: &'db dyn Db,
-        marker_candidate: Type<'db>,
-        finite_candidate: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let overlay = Self {
-            divergent_id: Cell::new(None),
-            has_multiple_divergent_ids: Cell::new(false),
-        };
-        let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate);
-        let overlaid = overlaid?;
-        let marker_id = overlay.single_divergent_id()?;
-        Some(Type::divergent_with_body(db, marker_id, overlaid))
-    }
-
-    fn add_divergent_id(&self, id: salsa::Id) {
-        match self.divergent_id.get() {
-            Some(existing) if existing != id => self.has_multiple_divergent_ids.set(true),
-            Some(_) => {}
-            None => self.divergent_id.set(Some(id)),
-        }
-    }
-
-    fn single_divergent_id(&self) -> Option<salsa::Id> {
-        if self.has_multiple_divergent_ids.get() {
-            return None;
-        }
-        self.divergent_id.get()
-    }
-
-    fn overlay_type<'db>(
-        &self,
-        db: &'db dyn Db,
-        marker: Type<'db>,
-        finite: Type<'db>,
-    ) -> Option<Type<'db>> {
-        if let Type::Divergent(marked) = marker
-            && let Some(body) = marked.body(db)
-        {
-            self.add_divergent_id(marked.binder_id(db));
-            return self.overlay_type(db, body, finite);
-        }
-        if marker == finite {
-            return Some(marker);
-        }
-
-        match marker {
-            Type::Divergent(divergent) => {
-                self.add_divergent_id(divergent.id(db));
-                // A marker leaf can be replaced only by a finite shape that is
-                // already available without expanding aliases or recursive types.
-                is_finite_divergent_overlay_target(db, finite).then_some(finite)
-            }
-            _ => self.overlay_tuple(db, marker, finite),
-        }
-    }
-
-    fn overlay_tuple<'db>(
-        &self,
-        db: &'db dyn Db,
-        marker: Type<'db>,
-        finite: Type<'db>,
-    ) -> Option<Type<'db>> {
-        let marker_tuple = marker.tuple_instance_spec(db)?;
-        let finite_tuple = finite.tuple_instance_spec(db)?;
-
-        let (Tuple::Fixed(marker), Tuple::Fixed(finite)) =
-            (marker_tuple.as_ref(), finite_tuple.as_ref())
-        else {
-            return None;
-        };
-
-        if marker.len() != finite.len() {
-            return None;
-        }
-
-        let elements = marker
-            .iter_all_elements()
-            .zip(finite.iter_all_elements())
-            .map(|(marker, finite)| self.overlay_type(db, marker, finite))
-            .collect::<Option<Vec<_>>>()?;
-        Some(Type::heterogeneous_tuple(db, elements))
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1074,7 +963,6 @@ impl<'db> UnionBuilder<'db> {
 
     fn bodyful_divergent_represents_same_type(
         db: &'db dyn Db,
-        relation_simplification: RelationSimplification,
         preferred: Type<'db>,
         other: Type<'db>,
     ) -> bool {
@@ -1083,16 +971,26 @@ impl<'db> UnionBuilder<'db> {
         if !preferred.contains_bodyful_divergent(db) {
             return false;
         }
+        let marked_preferred = preferred;
+        let unmarked_other = other;
         let other_contains_bodyful_divergent = other.contains_bodyful_divergent(db);
         let preferred = preferred.erase_divergent_markers(db);
         let other = other.erase_divergent_markers(db);
         if preferred == other {
             return true;
         }
-        !other_contains_bodyful_divergent
-            && relation_simplification.allows_relation(db, preferred, other)
-            && (preferred.is_equivalent_to(db, other)
-                || preferred.is_assignable_to(db, other) && other.is_assignable_to(db, preferred))
+        if other_contains_bodyful_divergent {
+            return false;
+        }
+        Type::divergent_overlay_candidate_without_dynamic_fallback(
+            db,
+            marked_preferred,
+            unmarked_other,
+        )
+        .is_some()
+            || (unmarked_other.is_non_divergent_dynamic_fallback(db)
+                && !preferred.is_non_divergent_dynamic_fallback(db))
+                && !preferred.is_cycle_recovery_placeholder(db)
     }
 
     fn divergent_overlay_candidate(
@@ -1105,7 +1003,7 @@ impl<'db> UnionBuilder<'db> {
             return None;
         }
 
-        DivergentOverlay::build(db, marker_candidate, finite_candidate)
+        Type::divergent_overlay_candidate(db, marker_candidate, finite_candidate)
     }
 
     fn merge_matching_bodyful_divergent(
@@ -2346,22 +2244,12 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if Self::bodyful_divergent_represents_same_type(
-                self.db,
-                relation_simplification,
-                ty,
-                element_type,
-            ) {
+            if Self::bodyful_divergent_represents_same_type(self.db, ty, element_type) {
                 to_remove.push(i);
                 continue;
             }
 
-            if Self::bodyful_divergent_represents_same_type(
-                self.db,
-                relation_simplification,
-                element_type,
-                ty,
-            ) {
+            if Self::bodyful_divergent_represents_same_type(self.db, element_type, ty) {
                 return;
             }
 
