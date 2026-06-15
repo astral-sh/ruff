@@ -1204,8 +1204,11 @@ fn known_literal_equality<'db>(
             if left_semantics != right_semantics {
                 return Some(false);
             }
+            if same_enum_member(db, left, right) {
+                return Some(true);
+            }
             if left_semantics == KnownComparisonSemantics::Object {
-                return Some(same_enum_member(db, left, right));
+                return Some(false);
             }
             known_literal_equality(
                 db,
