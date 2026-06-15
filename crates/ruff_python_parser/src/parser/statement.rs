@@ -722,6 +722,15 @@ impl<'src> Parser<'src> {
             self.add_error(ParseErrorType::EmptyImportNames, self.current_token_range());
         }
 
+        if seen_star_import && parenthesized.is_yes() {
+            // test_err from_import_parenthesized_star
+            // from x import (*)
+            self.add_error(
+                ParseErrorType::OtherError("Star import cannot be parenthesized".to_string()),
+                self.node_range(names_start),
+            );
+        }
+
         if seen_star_import && names.len() > 1 {
             // test_err from_import_star_with_other_names
             // from x import *, a
