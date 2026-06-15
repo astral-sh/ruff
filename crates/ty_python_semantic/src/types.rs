@@ -4618,7 +4618,7 @@ impl<'db> Type<'db> {
                                         .with_annotated_type(UnionType::from_two_elements(
                                             db,
                                             warning_class_type,
-                                            KnownClass::NoneType.to_instance(db),
+                                            Type::none(db),
                                         ))
                                         .with_default_type(warning_class_type),
                                     Parameter::keyword_only(Name::new_static("stacklevel"))
