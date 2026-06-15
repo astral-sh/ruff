@@ -1116,15 +1116,6 @@ impl<'db> RecursiveTypeNormalization<'db> {
         Some(divergent.id(db))
     }
 
-    fn matches_top_level_bodyful_divergent(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
-        matches!(
-            ty,
-            Type::Divergent(divergent)
-                if !divergent.is_placeholder(db)
-                    && self.marker_id(db).is_some_and(|id| divergent.id(db) == id)
-        )
-    }
-
     fn matches_recursive_marker(self, db: &'db dyn Db, recursive: RecursiveType<'db>) -> bool {
         self.matches_marker(db, Type::divergent(db, recursive.binder_id(db)))
     }
@@ -1196,19 +1187,12 @@ impl<'db> Type<'db> {
     }
 
     fn divergent_with_body_raw(db: &'db dyn Db, binder_id: salsa::Id, body: Type<'db>) -> Self {
-        if body.is_signature_cycle_body_for_cycle_recovery(db) || !body.is_recursion_value_like(db)
-        {
+        if !body.is_recursion_value_like(db) {
             return body;
         }
 
         if body.is_single_valued(db) {
             return body.erase_divergent_markers(db);
-        }
-
-        if let Type::Divergent(divergent) = body
-            && divergent.binder_id(db) == binder_id
-        {
-            return Type::Divergent(divergent);
         }
 
         Self::Divergent(DivergentType::new(
@@ -1632,27 +1616,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    fn is_signature_cycle_body_for_cycle_recovery(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Callable(_)
-            | Type::PropertyInstance(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_) => true,
-            Type::KnownBoundMethod(
-                KnownBoundMethodType::FunctionTypeDunderGet(_)
-                | KnownBoundMethodType::FunctionTypeDunderCall(_)
-                | KnownBoundMethodType::PropertyDunderGet(_)
-                | KnownBoundMethodType::PropertyDunderSet(_)
-                | KnownBoundMethodType::PropertyDunderDelete(_),
-            ) => true,
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .all(|element| element.is_signature_cycle_body_for_cycle_recovery(db)),
-            _ => false,
-        }
-    }
-
     /// Recover from a Salsa cycle by keeping fixed-point iteration monotonic and folding
     /// converged recursive structure into `Type::Recursive`.
     pub(crate) fn cycle_normalized(
@@ -1722,64 +1685,19 @@ impl<'db> Type<'db> {
             |ty, id| {
                 let marker = Type::divergent(db, id);
                 let normalization = RecursiveTypeNormalization::new(marker);
-                // Signature recovery keeps `Divergent` inside signatures instead of folding it
-                // into value-level recursive structure. If another head from the same Salsa cycle
-                // was already wrapped, look through that provisional wrapper for the current head.
-                let ty = match ty {
-                    Type::Recursive(rec)
-                        if rec.binder_id(db) != id
-                            && relevant_head_ids
-                                .iter()
-                                .any(|head_id| *head_id == rec.binder_id(db))
-                            && rec.body(db).is_signature_cycle_body_for_cycle_recovery(db)
-                            && normalization.contains_marker(db, rec.body(db)) =>
-                    {
-                        rec.body(db)
-                    }
-                    _ => ty,
-                };
                 let normalized = ty
                     .recursive_type_normalized_impl(db, normalization)
                     .unwrap_or(marker);
                 let contains_marker = |ty| normalization.contains_marker(db, ty);
-                let body_without_top_level_marker = match normalized {
-                    Type::Union(union) => {
-                        let elements = union.elements(db);
-                        let kept: Vec<_> = elements
-                            .iter()
-                            .copied()
-                            .filter(|element| {
-                                !matches!(
-                                    element,
-                                    Type::Divergent(divergent)
-                                        if divergent.is_placeholder(db) && divergent.id(db) == id
-                                )
-                            })
-                            .collect();
-
-                        if kept.len() == elements.len() || kept.is_empty() {
-                            normalized
-                        } else {
-                            UnionType::from_elements_cycle_recovery(db, kept)
-                        }
-                    }
-                    _ => normalized,
-                };
                 let has_structural_marker = !matches!(
-                    body_without_top_level_marker,
+                    normalized,
                     Type::Divergent(divergent) if divergent.is_placeholder(db)
-                ) && !normalization
-                    .matches_top_level_bodyful_divergent(db, body_without_top_level_marker)
-                    && contains_marker(body_without_top_level_marker);
+                ) && contains_marker(normalized);
 
-                // Function signature cycles stay in `Divergent` form for signature recovery.
-                if has_structural_marker
-                    && !matches!(body_without_top_level_marker, Type::FunctionLiteral(_))
-                    && body_without_top_level_marker.is_recursion_value_like(db)
-                {
-                    Type::implicit_recursive(db, id, body_without_top_level_marker)
+                if has_structural_marker && normalized.is_recursion_value_like(db) {
+                    Type::implicit_recursive(db, id, normalized)
                 } else {
-                    body_without_top_level_marker
+                    normalized
                 }
             },
         )
