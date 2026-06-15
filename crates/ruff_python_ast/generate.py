@@ -807,6 +807,38 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
     }
     """)
 
+    out.append("""
+    /// The root type of an AST node.
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+    #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+    #[repr(u8)]
+    pub enum RootNodeKind {
+    """)
+    for group in ast.groups:
+        out.append(f"""{group.name},""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""{node.name},""")
+    out.append("""
+    }
+
+    impl RootNodeKind {
+        /// All root node kinds in discriminant order.
+        pub const ALL: &'static [Self] = &[
+    """)
+    for group in ast.groups:
+        out.append(f"""Self::{group.name},""")
+    for node in ast.ungrouped_nodes:
+        out.append(f"""Self::{node.name},""")
+    out.append("""
+        ];
+
+        /// Returns the root node kind with the given discriminant.
+        pub fn from_u8(value: u8) -> Option<Self> {
+            Self::ALL.get(usize::from(value)).copied()
+        }
+    }
+    """)
+
     for group in ast.groups:
         out.append(f"""
             impl<'a> From<&'a {group.owned_enum_ty}> for AnyRootNodeRef<'a> {{
@@ -894,6 +926,44 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
 
     out.append("""
         impl<'a> AnyRootNodeRef<'a> {
+            /// Decomposes this reference into its root node kind and a type-erased pointer.
+            pub fn into_raw_parts(self) -> (RootNodeKind, *const ()) {
+                match self {
+    """)
+    for group in ast.groups:
+        out.append(
+            f"""AnyRootNodeRef::{group.name}(node) => (RootNodeKind::{group.name}, std::ptr::from_ref(node).cast()),"""
+        )
+    for node in ast.ungrouped_nodes:
+        out.append(
+            f"""AnyRootNodeRef::{node.name}(node) => (RootNodeKind::{node.name}, std::ptr::from_ref(node).cast()),"""
+        )
+    out.append("""
+                }
+            }
+
+            /// Reconstructs an AST reference from its root node kind and type-erased pointer.
+            ///
+            /// # Safety
+            ///
+            /// `pointer` must be non-null, properly aligned, and point to the root node type
+            /// represented by `kind`. The pointed-to node must live for `'a`.
+            #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
+            pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: *const ()) -> Self {
+                match kind {
+    """)
+    for group in ast.groups:
+        out.append(
+            f"""RootNodeKind::{group.name} => AnyRootNodeRef::{group.name}(unsafe {{ &*pointer.cast::<{group.owned_enum_ty}>() }}),"""
+        )
+    for node in ast.ungrouped_nodes:
+        out.append(
+            f"""RootNodeKind::{node.name} => AnyRootNodeRef::{node.name}(unsafe {{ &*pointer.cast::<{node.ty}>() }}),"""
+        )
+    out.append("""
+                }
+            }
+
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
             where
                 V: crate::visitor::source_order::SourceOrderVisitor<'b> + ?Sized,
