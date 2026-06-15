@@ -522,24 +522,22 @@ fn get_or_create_file<'a>(
         }
     }
 
-    if !paths.contains_key(normalized) {
-        if let Some(parent) = normalized.parent().map(Utf8Path::to_path_buf) {
-            touch_directory(paths, &parent);
-        }
-
-        paths.insert(
-            normalized.to_path_buf(),
-            Entry::File(File {
-                content: Box::default(),
-                last_modified: file_time_now(),
-            }),
-        );
+    if let Some(parent) = normalized.parent().map(Utf8Path::to_path_buf)
+        && !paths.contains_key(normalized)
+    {
+        touch_directory(paths, &parent);
     }
 
-    match paths.get_mut(normalized) {
-        Some(Entry::File(file)) => Ok(file),
-        Some(Entry::Directory(_)) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
-        None => Err(not_found()),
+    let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
+        Entry::File(File {
+            content: Box::default(),
+            last_modified: file_time_now(),
+        })
+    });
+
+    match entry {
+        Entry::File(file) => Ok(file),
+        Entry::Directory(_) => Err(io::Error::from(io::ErrorKind::IsADirectory)),
     }
 }
 
