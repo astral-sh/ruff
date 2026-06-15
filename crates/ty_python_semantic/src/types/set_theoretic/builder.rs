@@ -437,15 +437,6 @@ impl CycleFusionOverlay {
     }
 }
 
-/// Recover a finite shape from a marker-tainted candidate while preserving the marker.
-pub(in crate::types) fn overlay_cycle_marker<'db>(
-    db: &'db dyn Db,
-    marker_candidate: Type<'db>,
-    finite_candidate: Type<'db>,
-) -> Option<Type<'db>> {
-    CycleFusionOverlay::build(db, marker_candidate, finite_candidate)
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LiteralKind<'db> {
     Int,

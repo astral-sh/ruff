@@ -42,7 +42,6 @@ pub(crate) use self::match_pattern::{
 };
 pub(crate) use self::relation_error::{ErrorContext, ErrorContextTree, ParameterDescription};
 use self::set_theoretic::KnownUnion;
-use self::set_theoretic::builder::overlay_cycle_marker;
 pub(crate) use self::set_theoretic::builder::{
     IntersectionBuilder, UnionAccumulator, UnionBuilder,
 };
@@ -1745,23 +1744,19 @@ impl<'db> Type<'db> {
             // result directly. We still ensure monotonicity after the first couple iterations, which
             // still ensures convergence in cases that are prone to oscillation.
             if cycle.iteration() <= crate::TAINTED_CYCLES {
-                if let Some(overlaid) = overlay_cycle_marker(db, self, previous) {
-                    overlaid
-                } else {
-                    let self_degraded_by_overload =
-                        any_over_type(db, self, false, |ty| {
-                            matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
-                        }) && !any_over_type(db, self, false, |ty| ty.is_divergent(db))
-                            && any_over_type(db, previous, false, |ty| ty.is_divergent(db));
-                    // Generally, the precision of type inference improves with each iteration.
-                    // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
-                    // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
+                let self_degraded_by_overload =
+                    any_over_type(db, self, false, |ty| {
+                        matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
+                    }) && !any_over_type(db, self, false, |ty| ty.is_divergent(db))
+                        && any_over_type(db, previous, false, |ty| ty.is_divergent(db));
+                // Generally, the precision of type inference improves with each iteration.
+                // However, overload is an exception; as iterations progress, overload matching may become ambiguous, and a reversal of precision can occur.
+                // This kind of precision degradation can be determined by whether the type contains `DynamicType::AmbiguousOverload`.
 
-                    if self_degraded_by_overload {
-                        UnionType::from_elements_cycle_recovery(db, [previous, self])
-                    } else {
-                        self
-                    }
+                if self_degraded_by_overload {
+                    UnionType::from_elements_cycle_recovery(db, [previous, self])
+                } else {
+                    self
                 }
             } else {
                 // The current type is unioned to the previous type. Unioning in the reverse order can
