@@ -321,7 +321,13 @@ impl<'db> PatternSuccessTypes<'db> {
 /// The pattern produces `Never` for the matched subject and commits no `item` binding, because the
 /// second element prevents the complete sequence pattern from matching.
 struct PatternSuccessResult<'db> {
+    /// The type established while this pattern is being evaluated.
     matched_subject_ty: Type<'db>,
+    /// The type that remains valid after the pattern has finished evaluating.
+    ///
+    /// These differ for mutable sequences: a sequence pattern temporarily establishes its length
+    /// and indexed element types, but later mutation can invalidate those facts.
+    stable_subject_ty: Type<'db>,
     bindings: BTreeMap<ScopedPlaceId, PatternBindingTypes<'db>>,
 }
 
@@ -1342,6 +1348,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 let mut result = pattern.as_deref().map_or_else(
                     || PatternSuccessResult {
                         matched_subject_ty: subject_ty,
+                        stable_subject_ty: subject_ty,
                         bindings: BTreeMap::new(),
                     },
                     |pattern| self.analyze_successful_pattern(pattern, subject_ty),
@@ -1353,7 +1360,7 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     Self::merge_binding(
                         &mut result.bindings,
                         place.into(),
-                        PatternBindingTypes::subject(result.matched_subject_ty),
+                        PatternBindingTypes::subject(result.stable_subject_ty),
                     );
                 }
                 result
@@ -1368,30 +1375,37 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 }
                 PatternSuccessResult {
                     matched_subject_ty: subject_ty,
+                    stable_subject_ty: subject_ty,
                     bindings,
                 }
             }
-            PatternPredicateKind::Value(value) => PatternSuccessResult {
-                matched_subject_ty: self.match_value_pattern_subject_type(*value, subject_ty),
-                bindings: BTreeMap::new(),
-            },
+            PatternPredicateKind::Value(value) => {
+                let matched_subject_ty = self.match_value_pattern_subject_type(*value, subject_ty);
+                PatternSuccessResult {
+                    matched_subject_ty,
+                    stable_subject_ty: matched_subject_ty,
+                    bindings: BTreeMap::new(),
+                }
+            }
             PatternPredicateKind::Class(class_expr, _) => {
                 let class_ty = necessary_match_pattern_type(self.db, pattern);
                 let class =
                     infer_same_file_expression_type(self.db, *class_expr, TypeContext::default())
                         .as_class_literal();
+                let matched_subject_ty =
+                    self.match_class_pattern_subject_type(class, class_ty, subject_ty, false);
                 PatternSuccessResult {
-                    matched_subject_ty: self
-                        .match_class_pattern_subject_type(class, class_ty, subject_ty, false),
+                    matched_subject_ty,
+                    stable_subject_ty: matched_subject_ty,
                     bindings: BTreeMap::new(),
                 }
             }
             PatternPredicateKind::Mapping(_) | PatternPredicateKind::Singleton(_) => {
+                let matched_subject_ty = self
+                    .intersect_types(subject_ty, necessary_match_pattern_type(self.db, pattern));
                 PatternSuccessResult {
-                    matched_subject_ty: self.intersect_types(
-                        subject_ty,
-                        necessary_match_pattern_type(self.db, pattern),
-                    ),
+                    matched_subject_ty,
+                    stable_subject_ty: matched_subject_ty,
                     bindings: BTreeMap::new(),
                 }
             }
@@ -1453,12 +1467,15 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let Some(first_pattern) = patterns.next() else {
             return PatternSuccessResult {
                 matched_subject_ty: Type::Never,
+                stable_subject_ty: Type::Never,
                 bindings: BTreeMap::new(),
             };
         };
         let first = self.analyze_successful_pattern(first_pattern, subject_ty);
         let mut matched_subject_types = UnionBuilder::new(self.db);
         matched_subject_types.add_in_place(first.matched_subject_ty);
+        let mut stable_subject_types = UnionBuilder::new(self.db);
+        stable_subject_types.add_in_place(first.stable_subject_ty);
         // All alternatives bind the same names. Merge by logical place so the case body sees the
         // union even though the semantic walk visits the definitions in order.
         let mut bindings = first.bindings;
@@ -1481,12 +1498,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 .build();
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
+            stable_subject_types.add_in_place(alternative.stable_subject_ty);
             Self::merge_bindings(&mut bindings, alternative.bindings);
             previous_pattern = pattern;
         }
 
         PatternSuccessResult {
             matched_subject_ty: matched_subject_types.build(),
+            stable_subject_ty: stable_subject_types.build(),
             bindings,
         }
     }
@@ -1593,12 +1612,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 analyzer.sequence_pattern_arm(subject_ty, target_len, sequence_ty)?;
             let mut bindings = BTreeMap::new();
             let mut matched_element_types = Vec::with_capacity(kind.patterns.len());
+            let mut stable_element_types = Vec::with_capacity(kind.patterns.len());
             for (pattern, element_ty) in kind.patterns.iter().zip(element_types) {
                 let mut child = analyzer.analyze_successful_pattern(pattern, element_ty);
                 if child.matched_subject_ty.is_never() {
                     return None;
                 }
                 matched_element_types.push(child.matched_subject_ty);
+                stable_element_types.push(child.stable_subject_ty);
                 Self::demote_subject_bindings(&mut child.bindings);
                 Self::merge_bindings(&mut bindings, child.bindings);
             }
@@ -1608,17 +1629,29 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                 narrowed_subject_ty,
                 &matched_element_types,
             );
+            let stable_subject_ty = if subject_ty.exact_tuple_instance_spec(analyzer.db).is_some() {
+                analyzer.intersect_types(
+                    subject_ty,
+                    analyzer.successful_sequence_pattern_type(kind, &stable_element_types),
+                )
+            } else {
+                analyzer.intersect_types(
+                    subject_ty,
+                    sequence_pattern_type_builder(analyzer.db).build(),
+                )
+            };
             Some(PatternSuccessResult {
                 matched_subject_ty,
+                stable_subject_ty,
                 bindings,
             })
         })
     }
 
-    /// Refine a fixed tuple using the types that matched its child patterns.
+    /// Return the type established while a sequence pattern is being evaluated.
     ///
-    /// Mutable sequences keep only the type established before matching the children because a
-    /// later mutation can invalidate facts about individual elements.
+    /// Exact tuples can also use the types established by successful child patterns. For mutable
+    /// sequences, those child types are not retained after the pattern has finished evaluating.
     fn successful_sequence_subject_type(
         &self,
         kind: &SequencePatternPredicateKind<'db>,
@@ -1669,12 +1702,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             return None;
         }
 
-        let tuple = subject_ty
-            .try_iterate(self.db)
-            .or_else(|_| narrowed_subject_ty.try_iterate(self.db))
-            .unwrap_or_else(|error| {
-                Cow::Owned(Tuple::homogeneous(error.fallback_element_type(self.db)))
-            });
+        let tuple = subject_ty.try_iterate(self.db).unwrap_or_else(|error| {
+            let fallback_element_ty = error.fallback_element_type(self.db);
+            Cow::Owned(Tuple::homogeneous(if fallback_element_ty.is_unknown() {
+                Type::object()
+            } else {
+                fallback_element_ty
+            }))
+        });
         let mut unpacker = TupleUnpacker::new(self.db, target_len);
         unpacker.unpack_tuple(tuple.as_ref()).ok()?;
         Some((narrowed_subject_ty, unpacker.into_types().collect()))
@@ -1690,15 +1725,18 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             .into_iter()
             .chunk_by(|(original_subject_ty, _)| *original_subject_ty);
         let mut matched_subject_types = UnionBuilder::new(self.db);
+        let mut stable_subject_types = UnionBuilder::new(self.db);
         let mut bindings = BTreeMap::new();
 
         for (original_subject_ty, arms) in &grouped_arms {
             let mut matched_types = UnionBuilder::new(self.db);
+            let mut stable_types = UnionBuilder::new(self.db);
             let mut arm_bindings = BTreeMap::new();
 
             for (_, filtering_subject_ty) in arms {
                 if let Some(arm) = analyze_arm(self, filtering_subject_ty) {
                     matched_types.add_in_place(arm.matched_subject_ty);
+                    stable_types.add_in_place(arm.stable_subject_ty);
                     Self::merge_bindings(&mut arm_bindings, arm.bindings);
                 }
             }
@@ -1716,10 +1754,14 @@ impl<'db> PatternSuccessAnalyzer<'db> {
             matched_subject_types.add_in_place(
                 self.matched_subject_type_for_original(original_subject_ty, matched_types.build()),
             );
+            stable_subject_types.add_in_place(
+                self.matched_subject_type_for_original(original_subject_ty, stable_types.build()),
+            );
         }
 
         PatternSuccessResult {
             matched_subject_ty: matched_subject_types.build(),
+            stable_subject_ty: stable_subject_types.build(),
             bindings,
         }
     }

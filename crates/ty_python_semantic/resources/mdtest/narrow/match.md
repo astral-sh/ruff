@@ -502,7 +502,6 @@ PartiallyMatchedSequenceT = TypeVar(
     tuple[int],
     tuple[int, int],
 )
-SequenceElementT = TypeVar("SequenceElementT")
 
 def test_match_sequence_alias_preserves_bound_typevar(
     value: BoundSequenceT,
@@ -543,17 +542,6 @@ def test_match_sequence_alias_preserves_typevar_union_member(
         case _:
             raise ValueError
 
-def test_match_sequence_alias_preserves_element_narrowing(
-    value: list[SequenceElementT],
-) -> int:
-    match value:
-        case [int()] as whole:
-            # revealed: SequenceElementT@test_match_sequence_alias_preserves_element_narrowing & int
-            reveal_type(whole[0])
-            return whole[0]
-        case _:
-            return 0
-
 def test_match_sequence_alias_keeps_matched_element_types(
     value: tuple[Literal[1, 2]],
 ) -> None:
@@ -569,13 +557,37 @@ def test_match_starred_sequence_alias_keeps_matched_element_types(
             reveal_type(whole[0])  # revealed: Literal[1]
             reveal_type(whole[-1])  # revealed: Literal[4]
 
-def test_mutable_sequence_alias_does_not_keep_matched_element_types(
-    value: list[Literal[1, 2]],
+def test_mutable_sequence_alias_does_not_keep_index_types(
+    value: list[int | str],
 ) -> None:
     match value:
-        case [1] as whole:
-            whole[0] = 2
-            reveal_type(whole[0])  # revealed: Literal[1, 2]
+        case [int(), str()] as whole:
+            whole.reverse()
+            reveal_type(whole[0])  # revealed: int | str
+
+def test_constructed_mutable_sequence_alias_does_not_keep_length(
+    value: list[int],
+) -> int:  # error: [invalid-return-type]
+    match value.copy():
+        case [_] as whole:
+            whole.append(2)
+            match whole:
+                case [_]:
+                    return 1
+        case _:
+            raise ValueError
+
+def test_nested_mutable_sequence_alias_does_not_keep_length(
+    value: tuple[list[int]],
+) -> int:  # error: [invalid-return-type]
+    match value:
+        case [[_] as inner] as whole:
+            inner.append(2)
+            match whole:
+                case [[_]]:
+                    return 1
+        case _:
+            raise ValueError
 
 def test_match_or_alias_preserves_constrained_typevar(
     value: BoundChoiceT | str,
