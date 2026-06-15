@@ -225,11 +225,11 @@ mod indexed {
         Split {
             base: usize,
             offsets: Box<[u32]>,
-            kinds: Box<[IndexedNodeKind]>,
+            kinds: Box<[RootNodeKind]>,
         },
         Wide {
             addresses: Box<[usize]>,
-            kinds: Box<[IndexedNodeKind]>,
+            kinds: Box<[RootNodeKind]>,
         },
     }
 
@@ -309,12 +309,13 @@ mod indexed {
             }
         }
 
-        fn get(&self, index: usize) -> (usize, IndexedNodeKind) {
+        fn get(&self, index: usize) -> (usize, RootNodeKind) {
             match self {
                 Self::Packed { base, entries } => {
                     let entry = entries[index];
                     let offset = (entry >> Self::KIND_BITS) as usize;
-                    let kind = IndexedNodeKind::from_bits(entry & Self::KIND_MASK);
+                    let kind = RootNodeKind::from_u8((entry & Self::KIND_MASK) as u8)
+                        .expect("packed node kind should be valid");
                     (*base + offset * Self::ALIGNMENT, kind)
                 }
                 Self::Split {
@@ -339,82 +340,7 @@ mod indexed {
         }
     }
 
-    macro_rules! define_indexed_node_kinds {
-        ($($kind:ident => $node:ty),+ $(,)?) => {
-            #[derive(Clone, Copy, Debug, Eq, PartialEq, get_size2::GetSize)]
-            #[repr(u8)]
-            enum IndexedNodeKind {
-                $($kind),+
-            }
-
-            impl IndexedNodeKind {
-                const ALL: &'static [Self] = &[$(Self::$kind),+];
-
-                fn from_bits(bits: u32) -> Self {
-                    Self::ALL[bits as usize]
-                }
-
-                /// Reconstructs the AST reference stored at `address`.
-                ///
-                /// # Safety
-                ///
-                /// `address` must point to the node type represented by `self`, and that node must
-                /// live for `'ast`.
-                unsafe fn node_ref<'ast>(self, address: usize) -> AnyRootNodeRef<'ast> {
-                    match self {
-                        $(Self::$kind => {
-                            // SAFETY: This macro defines both the type-to-kind mapping used while
-                            // collecting nodes and the inverse mapping used here. The indexed AST
-                            // owns the exposed address and cannot move or be dropped during this
-                            // borrow.
-                            let node = unsafe {
-                                &*std::ptr::with_exposed_provenance::<$node>(address)
-                            };
-                            AnyRootNodeRef::from(node)
-                        }),+
-                    }
-                }
-            }
-
-            trait IndexedNode: HasNodeIndex {
-                const KIND: IndexedNodeKind;
-            }
-
-            $(impl IndexedNode for $node {
-                const KIND: IndexedNodeKind = IndexedNodeKind::$kind;
-            })+
-        };
-    }
-
-    define_indexed_node_kinds! {
-        Stmt => Stmt,
-        Expr => Expr,
-        Decorator => Decorator,
-        Comprehension => Comprehension,
-        ExceptHandler => ExceptHandler,
-        Arguments => Arguments,
-        Parameters => Parameters,
-        Parameter => Parameter,
-        ParameterWithDefault => ParameterWithDefault,
-        Keyword => Keyword,
-        Alias => Alias,
-        WithItem => WithItem,
-        TypeParams => TypeParams,
-        TypeParam => TypeParam,
-        MatchCase => MatchCase,
-        Pattern => Pattern,
-        PatternArguments => PatternArguments,
-        PatternKeyword => PatternKeyword,
-        ElifElseClause => ElifElseClause,
-        FString => FString,
-        InterpolatedStringElement => InterpolatedStringElement,
-        TString => TString,
-        StringLiteral => StringLiteral,
-        BytesLiteral => BytesLiteral,
-        Identifier => Identifier,
-    }
-
-    const _: () = assert!(IndexedNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
+    const _: () = assert!(RootNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
 
     /// Ensure the following sub-AST is indexed, using the parent node's index
     /// as a basis for unambiguous AST node indices.
@@ -483,14 +409,16 @@ mod indexed {
 
             // SAFETY: `kind` and `address` were recorded from the same node, and the node is owned
             // by `self.parsed`, so it lives for as long as this borrow of `self`.
-            unsafe { kind.node_ref(address) }
+            unsafe {
+                AnyRootNodeRef::from_raw_parts(kind, std::ptr::with_exposed_provenance(address))
+            }
         }
     }
 
     #[derive(Default)]
     struct CollectedNodes {
         addresses: Vec<usize>,
-        kinds: Vec<IndexedNodeKind>,
+        kinds: Vec<RootNodeKind>,
     }
 
     /// A visitor that collects nodes in source order.
@@ -502,7 +430,11 @@ mod indexed {
     }
 
     impl Visitor {
-        fn visit_node<T: IndexedNode>(&mut self, node: &T) {
+        fn visit_node<'a, T>(&mut self, node: &'a T)
+        where
+            T: HasNodeIndex,
+            AnyRootNodeRef<'a>: From<&'a T>,
+        {
             // Only check on write (the maximum is orders of magnitude less than u32::MAX)
             if self.index > self.max_index {
                 self.overflowed = true;
@@ -511,10 +443,9 @@ mod indexed {
             }
 
             if let Some(nodes) = &mut self.nodes {
-                nodes
-                    .addresses
-                    .push(std::ptr::from_ref(node).expose_provenance());
-                nodes.kinds.push(T::KIND);
+                let (kind, pointer) = AnyRootNodeRef::from(node).into_raw_parts();
+                nodes.addresses.push(pointer.expose_provenance());
+                nodes.kinds.push(kind);
             }
             self.index += 1;
         }
@@ -717,7 +648,7 @@ class C[T](Base, metaclass=Meta):
 
             let node_count = u32::try_from(indexed.index.len())
                 .expect("number of indexed nodes should fit in u32");
-            let mut seen_kinds = vec![false; IndexedNodeKind::ALL.len()];
+            let mut seen_kinds = [false; 1 << IndexedNodes::KIND_BITS];
 
             for raw_index in 0..node_count {
                 let index = NodeIndex::from(raw_index);
@@ -732,39 +663,37 @@ class C[T](Base, metaclass=Meta):
                 assert_eq!(Some(stored_index), index.as_u32());
             }
 
-            for kind in IndexedNodeKind::ALL {
-                assert!(
-                    seen_kinds[usize::from(*kind as u8)],
-                    "fixture does not cover {kind:?}"
+            for kind in RootNodeKind::ALL {
+                let is_indexed = !matches!(
+                    kind,
+                    RootNodeKind::Mod | RootNodeKind::InterpolatedStringFormatSpec
                 );
+                assert_eq!(seen_kinds[usize::from(*kind as u8)], is_indexed);
             }
         }
 
         #[test]
         fn indexed_node_storage_variants() {
-            assert!(IndexedNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
-            for (bits, kind) in IndexedNodeKind::ALL.iter().copied().enumerate() {
+            assert!(RootNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
+            for (bits, kind) in RootNodeKind::ALL.iter().copied().enumerate() {
                 assert_eq!(usize::from(kind as u8), bits);
-                assert_eq!(IndexedNodeKind::from_bits(bits as u32), kind);
+                assert_eq!(RootNodeKind::from_u8(bits as u8), Some(kind));
             }
 
             let alignment = IndexedNodes::ALIGNMENT;
             let compact_max = IndexedNodes::MAX_PACKED_OFFSET;
             let nodes = |addresses| CollectedNodes {
-                kinds: vec![IndexedNodeKind::Stmt, IndexedNodeKind::Identifier],
+                kinds: vec![RootNodeKind::Stmt, RootNodeKind::Identifier],
                 addresses,
             };
 
             let packed =
                 IndexedNodes::from_collected(nodes(vec![0x1000, 0x1000 + compact_max * alignment]));
             assert!(matches!(packed, IndexedNodes::Packed { .. }));
-            assert_eq!(packed.get(0), (0x1000, IndexedNodeKind::Stmt));
+            assert_eq!(packed.get(0), (0x1000, RootNodeKind::Stmt));
             assert_eq!(
                 packed.get(1),
-                (
-                    0x1000 + compact_max * alignment,
-                    IndexedNodeKind::Identifier
-                )
+                (0x1000 + compact_max * alignment, RootNodeKind::Identifier)
             );
 
             let split = IndexedNodes::from_collected(nodes(vec![
@@ -772,19 +701,19 @@ class C[T](Base, metaclass=Meta):
                 0x1000 + (compact_max + 1) * alignment,
             ]));
             assert!(matches!(split, IndexedNodes::Split { .. }));
-            assert_eq!(split.get(0), (0x1000, IndexedNodeKind::Stmt));
+            assert_eq!(split.get(0), (0x1000, RootNodeKind::Stmt));
             assert_eq!(
                 split.get(1),
                 (
                     0x1000 + (compact_max + 1) * alignment,
-                    IndexedNodeKind::Identifier
+                    RootNodeKind::Identifier
                 )
             );
 
             let wide = IndexedNodes::from_collected(nodes(vec![0x1000, 0x1001]));
             assert!(matches!(wide, IndexedNodes::Wide { .. }));
-            assert_eq!(wide.get(0), (0x1000, IndexedNodeKind::Stmt));
-            assert_eq!(wide.get(1), (0x1001, IndexedNodeKind::Identifier));
+            assert_eq!(wide.get(0), (0x1000, RootNodeKind::Stmt));
+            assert_eq!(wide.get(1), (0x1001, RootNodeKind::Identifier));
         }
     }
 }
