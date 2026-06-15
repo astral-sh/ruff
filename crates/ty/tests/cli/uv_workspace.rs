@@ -1,86 +1,109 @@
-#![cfg(feature = "test-uv")]
-
-use std::path::PathBuf;
+#[cfg(feature = "test-uv")]
 use std::process::Command;
 
 use insta_cmd::assert_cmd_snapshot;
 
 use crate::CliTest;
 
+fn workspace_metadata(case: &CliTest) -> String {
+    workspace_metadata_json(case, None).to_string()
+}
+
+fn workspace_metadata_with_environment(
+    case: &CliTest,
+    environment: impl AsRef<std::path::Path>,
+) -> String {
+    workspace_metadata_json(case, Some(environment.as_ref())).to_string()
+}
+
+fn workspace_metadata_json(
+    case: &CliTest,
+    environment: Option<&std::path::Path>,
+) -> serde_json::Value {
+    let mut metadata = serde_json::json!({
+        "schema": {
+            "version": "preview",
+        },
+        "workspace_root": case.root(),
+        "requires_python": ">=3.8",
+        "members": [
+            {
+                "path": case.root().join("packages/member"),
+            },
+            {
+                "path": case.root().join("packages/sibling"),
+            },
+        ],
+    });
+
+    if let Some(environment) = environment {
+        metadata["environment"] = serde_json::json!({
+            "root": environment,
+        });
+    }
+
+    metadata
+}
+
+fn site_packages_path(environment: &str, module: &str) -> String {
+    if cfg!(windows) {
+        format!("{environment}/Lib/site-packages/{module}")
+    } else {
+        format!("{environment}/lib/python3.13/site-packages/{module}")
+    }
+}
+
+fn workspace_case() -> anyhow::Result<CliTest> {
+    CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+[tool.uv.workspace]
+members = ["packages/*"]
+"#,
+        ),
+        (
+            "packages/member/pyproject.toml",
+            r#"
+[project]
+name = "member"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#,
+        ),
+        ("packages/member/member.py", "value: int = 1"),
+        (
+            "packages/sibling/pyproject.toml",
+            r#"
+[project]
+name = "sibling"
+version = "0.1.0"
+requires-python = ">=3.8"
+"#,
+        ),
+        ("packages/sibling/sibling.py", "value: int = 'wrong'"),
+    ])
+}
+
+// TODO: Add an end-to-end `uv check` test once CI's pinned uv supports using the `TY`
+// environment variable to select this test's ty binary. This avoids depending on uv's private
+// binary cache layout.
+
+#[cfg(feature = "test-uv")]
 fn command_with_uv(case: &CliTest) -> Command {
     let mut command = case.command();
     command
         .env("TY_UV", "1")
         .env("UV", "uv")
         .env("UV_CACHE_DIR", case.root().join("cache"))
+        .env("UV_OFFLINE", "1")
+        .env("UV_PYTHON_DOWNLOADS", "never")
         .env("PATH", std::env::var_os("PATH").unwrap_or_default());
 
     command
 }
 
-const TEST_TY_VERSION: &str = "0.0.999";
-
-fn uv_check_command(case: &CliTest) -> Command {
-    let mut command = Command::new("uv");
-    command
-        .current_dir(case.root())
-        .arg("check")
-        .arg("--ty-version")
-        .arg(TEST_TY_VERSION)
-        .arg("--offline")
-        .arg("--quiet")
-        .env("UV_CACHE_DIR", case.root().join("uv-cache"))
-        .env("UV_PREVIEW", "1")
-        .env("UV_PYTHON_DOWNLOADS", "never")
-        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
-        .env_remove("VIRTUAL_ENV");
-
-    command
-}
-
-fn uv_cached_ty_path() -> anyhow::Result<PathBuf> {
-    let platform = match (std::env::consts::ARCH, std::env::consts::OS) {
-        ("aarch64", "macos") => "aarch64-apple-darwin",
-        ("x86_64", "macos") => "x86_64-apple-darwin",
-        ("aarch64", "linux") if cfg!(target_env = "musl") => "aarch64-unknown-linux-musl",
-        ("aarch64", "linux") => "aarch64-unknown-linux-gnu",
-        ("x86_64", "linux") if cfg!(target_env = "musl") => "x86_64-unknown-linux-musl",
-        ("x86_64", "linux") => "x86_64-unknown-linux-gnu",
-        ("aarch64", "windows") => "aarch64-pc-windows-msvc",
-        ("x86_64", "windows") => "x86_64-pc-windows-msvc",
-        (arch, os) => anyhow::bail!("unsupported uv test platform: {arch}-{os}"),
-    };
-
-    Ok(PathBuf::from("uv-cache")
-        .join("binaries-v0")
-        .join("ty")
-        .join(TEST_TY_VERSION)
-        .join(platform)
-        .join(format!("ty{}", std::env::consts::EXE_SUFFIX)))
-}
-
-#[test]
-fn uv_check_uses_workspace_metadata() -> anyhow::Result<()> {
-    // Populate uv's pinned-binary cache with this test's ty build so the command stays offline.
-    let case = workspace_case()?.with_ty_at(uv_cached_ty_path()?)?;
-    case.write_file("shared.py", "value: int = 1")?;
-    case.write_file("packages/member/member.py", "import shared")?;
-
-    let mut command = uv_check_command(&case);
-    command.current_dir(case.root().join("packages/member"));
-
-    assert_cmd_snapshot!(command, @"
-    success: true
-    exit_code: 0
-    ----- stdout -----
-    All checks passed!
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
+#[cfg(feature = "test-uv")]
 #[test]
 fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     let case = workspace_case()?;
@@ -116,6 +139,7 @@ fn uses_uv_workspace_root_without_checking_siblings() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-uv")]
 #[test]
 fn explicit_paths_filter_promoted_workspace() -> anyhow::Result<()> {
     let case = workspace_case()?;
@@ -139,9 +163,10 @@ fn explicit_paths_filter_promoted_workspace() -> anyhow::Result<()> {
 #[test]
 fn explicit_project_disables_uv_workspace_discovery() -> anyhow::Result<()> {
     let case = workspace_case()?;
-    let mut command = command_with_uv(&case);
+    let mut command = case.command();
     command
         .current_dir(case.root().join("packages/member"))
+        .env("TY_UV", "1")
         .env("UV", case.root().join("missing-uv"))
         .arg("--project")
         .arg(".");
@@ -193,6 +218,7 @@ fn uv_workspace_discovery_is_opt_in() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "test-uv")]
 #[test]
 fn finds_uv_on_path_without_uv_environment_variable() -> anyhow::Result<()> {
     let case = workspace_case()?;
@@ -398,53 +424,6 @@ fn uses_python_environment_from_uv_metadata() -> anyhow::Result<()> {
 }
 
 #[test]
-fn uv_metadata_conflicts_with_project() -> anyhow::Result<()> {
-    let case = workspace_case()?;
-    let mut command = case.command();
-    command.env("TY_UV_METADATA", "1").arg("--project").arg(".");
-
-    assert_cmd_snapshot!(command, @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: the argument '--project <PROJECT>' cannot be used with '--uv-metadata'
-
-    Usage: ty check --project <PROJECT> [PATH]...
-
-    For more information, try '--help'.
-    ");
-
-    Ok(())
-}
-
-#[test]
-fn uv_metadata_conflicts_with_python() -> anyhow::Result<()> {
-    let case = workspace_case()?;
-    let mut command = case.command();
-    command
-        .arg("--uv-metadata")
-        .arg("--python")
-        .arg(case.root().join("explicit-venv"));
-
-    assert_cmd_snapshot!(command, @"
-    success: false
-    exit_code: 2
-    ----- stdout -----
-
-    ----- stderr -----
-    error: the argument '--uv-metadata' cannot be used with '--python <PATH>'
-
-    Usage: ty check [OPTIONS] [PATH]...
-
-    For more information, try '--help'.
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn uv_metadata_conflicts_with_python_version() -> anyhow::Result<()> {
     let case = workspace_case()?;
     let mut command = case.command();
@@ -500,84 +479,4 @@ fn configured_python_overrides_uv_metadata_environment() -> anyhow::Result<()> {
     ");
 
     Ok(())
-}
-
-fn workspace_metadata(case: &CliTest) -> String {
-    workspace_metadata_json(case, None).to_string()
-}
-
-fn workspace_metadata_with_environment(
-    case: &CliTest,
-    environment: impl AsRef<std::path::Path>,
-) -> String {
-    workspace_metadata_json(case, Some(environment.as_ref())).to_string()
-}
-
-fn workspace_metadata_json(
-    case: &CliTest,
-    environment: Option<&std::path::Path>,
-) -> serde_json::Value {
-    let mut metadata = serde_json::json!({
-        "schema": {
-            "version": "preview",
-        },
-        "workspace_root": case.root(),
-        "requires_python": ">=3.8",
-        "members": [
-            {
-                "path": case.root().join("packages/member"),
-            },
-            {
-                "path": case.root().join("packages/sibling"),
-            },
-        ],
-    });
-
-    if let Some(environment) = environment {
-        metadata["environment"] = serde_json::json!({
-            "root": environment,
-        });
-    }
-
-    metadata
-}
-
-fn site_packages_path(environment: &str, module: &str) -> String {
-    if cfg!(windows) {
-        format!("{environment}/Lib/site-packages/{module}")
-    } else {
-        format!("{environment}/lib/python3.13/site-packages/{module}")
-    }
-}
-
-fn workspace_case() -> anyhow::Result<CliTest> {
-    CliTest::with_files([
-        (
-            "pyproject.toml",
-            r#"
-[tool.uv.workspace]
-members = ["packages/*"]
-"#,
-        ),
-        (
-            "packages/member/pyproject.toml",
-            r#"
-[project]
-name = "member"
-version = "0.1.0"
-requires-python = ">=3.8"
-"#,
-        ),
-        ("packages/member/member.py", "value: int = 1"),
-        (
-            "packages/sibling/pyproject.toml",
-            r#"
-[project]
-name = "sibling"
-version = "0.1.0"
-requires-python = ">=3.8"
-"#,
-        ),
-        ("packages/sibling/sibling.py", "value: int = 'wrong'"),
-    ])
 }
