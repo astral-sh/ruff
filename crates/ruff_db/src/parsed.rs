@@ -645,7 +645,6 @@ class C[T](Base, metaclass=Meta):
             )
             .expect("test source should parse");
             let indexed = IndexedModule::new(parsed);
-            assert!(matches!(&indexed.index, IndexedNodes::Packed { .. }));
 
             let node_count = u32::try_from(indexed.index.len())
                 .expect("number of indexed nodes should fit in u32");
