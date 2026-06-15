@@ -668,7 +668,8 @@ def _(x: Literal["foo", "bar", 42, b"foo"] | bool | complex):
 
 Enum value patterns use the enum class's actual `__eq__` implementation. Members of an ordinary
 `Enum` compare by identity and cannot equal `None`. Members of `StrEnum` compare equal to string
-literals with the same value:
+literals with the same value. Matching a member against itself is exhaustive whenever its comparison
+behavior is known, even if its underlying value is not:
 
 ```toml
 [environment]
@@ -676,7 +677,7 @@ python-version = "3.11"
 ```
 
 ```py
-from enum import Enum, StrEnum
+from enum import Enum, IntEnum, StrEnum
 from typing import Literal, assert_never
 
 class Color(StrEnum):
@@ -714,6 +715,14 @@ def enum_member_excludes_none(direction: Direction | None) -> None:
     match direction:
         case Direction.NORTH:
             reveal_type(direction)  # revealed: Literal[Direction.NORTH]
+
+class Status(IntEnum):
+    READY = 1
+
+def exact_int_enum_member_is_exhaustive(status: Literal[Status.READY]) -> int:
+    match status:
+        case Status.READY:
+            return 1
 
 class AlwaysEqual(Enum):
     RED = "r"
