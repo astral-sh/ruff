@@ -2,7 +2,7 @@ use std::fmt::{Display, Formatter};
 
 use ruff_python_ast::{
     Expr, ExprBinOp, ExprSubscript, ExprTuple, Operator, ParameterWithDefault, Parameters, Stmt,
-    StmtClassDef, StmtFunctionDef,
+    StmtClassDef, StmtFunctionDef, TypeParam, TypeParams,
 };
 use smallvec::SmallVec;
 
@@ -137,8 +137,10 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         decorator_list,
         name,
         parameters,
+        type_params,
         ..
     } = function;
+    let type_params = type_params.as_deref();
 
     let func_kind = match name.as_str() {
         "__exit__" if !is_async => FuncKind::Sync,
@@ -166,6 +168,7 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
             func_kind,
             parent_class_def,
             parameters.range(),
+            type_params,
         );
         return;
     }
@@ -206,7 +209,12 @@ pub(crate) fn bad_exit_annotation(checker: &Checker, function: &StmtFunctionDef)
         );
     }
 
-    check_positional_args_for_non_overloaded_method(checker, &non_self_positional_args, func_kind);
+    check_positional_args_for_non_overloaded_method(
+        checker,
+        &non_self_positional_args,
+        func_kind,
+        type_params,
+    );
 }
 
 /// Determine whether a "short" argument list (i.e., an argument list with less than four elements)
@@ -252,16 +260,24 @@ fn check_positional_args_for_non_overloaded_method(
     checker: &Checker,
     non_self_positional_params: &[&ParameterWithDefault],
     kind: FuncKind,
+    type_params: Option<&TypeParams>,
 ) {
     // For each argument, define the predicate against which to check the annotation.
-    type AnnotationValidator = fn(&Expr, &SemanticModel) -> bool;
+    type AnnotationValidator<'a> = &'a dyn Fn(&Expr) -> bool;
+
+    let semantic = checker.semantic();
 
     let validations: [(ErrorKind, AnnotationValidator); 3] = [
-        (ErrorKind::FirstArgBadAnnotation, is_base_exception_type),
-        (ErrorKind::SecondArgBadAnnotation, |expr, semantic| {
-            semantic.match_builtin_expr(expr, "BaseException")
+        (ErrorKind::FirstArgBadAnnotation, &|expr| {
+            is_base_exception_type(expr, semantic, type_params)
         }),
-        (ErrorKind::ThirdArgBadAnnotation, is_traceback_type),
+        (ErrorKind::SecondArgBadAnnotation, &|expr| {
+            semantic.match_builtin_expr(expr, "BaseException")
+                || is_base_exception_bound_type_var(expr, semantic, type_params)
+        }),
+        (ErrorKind::ThirdArgBadAnnotation, &|expr| {
+            is_traceback_type(expr, semantic)
+        }),
     ];
 
     for (param, (error_info, predicate)) in
@@ -271,15 +287,13 @@ fn check_positional_args_for_non_overloaded_method(
             continue;
         };
 
-        if is_object_or_unused(annotation, checker.semantic()) {
+        if is_object_or_unused(annotation, semantic) {
             continue;
         }
 
         // If there's an annotation that's not `object` or `Unused`, check that the annotated type
         // matches the predicate.
-        if non_none_annotation_element(annotation, checker.semantic())
-            .is_some_and(|elem| predicate(elem, checker.semantic()))
-        {
+        if non_none_annotation_element(annotation, semantic).is_some_and(predicate) {
             continue;
         }
 
@@ -301,6 +315,7 @@ fn check_positional_args_for_overloaded_method(
     kind: FuncKind,
     parent_class_def: &StmtClassDef,
     parameters_range: TextRange,
+    type_params: Option<&TypeParams>,
 ) {
     fn parameter_annotation_loosely_matches_predicate(
         parameter: &ParameterWithDefault,
@@ -408,11 +423,14 @@ fn check_positional_args_for_overloaded_method(
     // Now check the second:
     if parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[0],
-        |annotation| is_base_exception_type(annotation, semantic),
+        |annotation| is_base_exception_type(annotation, semantic, type_params),
         semantic,
     ) && parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[1],
-        |annotation| semantic.match_builtin_expr(annotation, "BaseException"),
+        |annotation| {
+            semantic.match_builtin_expr(annotation, "BaseException")
+                || is_base_exception_bound_type_var(annotation, semantic, type_params)
+        },
         semantic,
     ) && parameter_annotation_loosely_matches_predicate(
         non_self_positional_args[2],
@@ -510,15 +528,73 @@ fn is_traceback_type(expr: &Expr, semantic: &SemanticModel) -> bool {
         })
 }
 
-/// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]`.
-fn is_base_exception_type(expr: &Expr, semantic: &SemanticModel) -> bool {
+/// Return `true` if the [`Expr`] is, e.g., `Type[BaseException]` or `type[T]`
+/// where `T` is a `TypeVar` bound to `BaseException`.
+fn is_base_exception_type(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    type_params: Option<&TypeParams>,
+) -> bool {
     let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr else {
         return false;
     };
 
     if semantic.match_typing_expr(value, "Type") || semantic.match_builtin_expr(value, "type") {
         semantic.match_builtin_expr(slice, "BaseException")
+            || is_base_exception_bound_type_var(slice, semantic, type_params)
     } else {
         false
     }
+}
+
+/// Return `true` if the [`Expr`] is a `TypeVar` that is bound to `BaseException`.
+///
+/// Both PEP 695-style type parameters (e.g. `def __exit__[T: BaseException](...)`)
+/// and "old-style" `TypeVar`s (e.g. `T = TypeVar("T", bound=BaseException)`) are
+/// recognized. Annotating an `__exit__`/`__aexit__` argument with such a `TypeVar`
+/// is equivalent to annotating it with `BaseException` directly.
+fn is_base_exception_bound_type_var(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    type_params: Option<&TypeParams>,
+) -> bool {
+    let Expr::Name(name) = expr else {
+        return false;
+    };
+
+    // PEP 695 type parameter, e.g. `def __exit__[T: BaseException](...)`.
+    //
+    // Names in annotations are resolved lazily, so `resolve_name` is not reliable
+    // here; instead, match the name directly against the enclosing type parameter
+    // list, which is what the runtime binding would resolve to.
+    if let Some(bound) = type_params.and_then(|type_params| {
+        type_params
+            .iter()
+            .filter_map(TypeParam::as_type_var)
+            .find(|type_var| type_var.name.id == name.id)
+            .and_then(|type_var| type_var.bound.as_deref())
+    }) {
+        return semantic.match_builtin_expr(bound, "BaseException");
+    }
+
+    // "Old-style" `TypeVar`, e.g. `T = TypeVar("T", bound=BaseException)`.
+    if !semantic.seen_typing() {
+        return false;
+    }
+
+    let Some(binding) = semantic
+        .lookup_symbol(name.id.as_str())
+        .map(|id| semantic.binding(id))
+    else {
+        return false;
+    };
+
+    binding
+        .source
+        .map(|node_id| semantic.statement(node_id))
+        .and_then(Stmt::as_assign_stmt)
+        .and_then(|assign| assign.value.as_call_expr())
+        .filter(|call| semantic.match_typing_expr(&call.func, "TypeVar"))
+        .and_then(|call| call.arguments.find_keyword("bound"))
+        .is_some_and(|keyword| semantic.match_builtin_expr(&keyword.value, "BaseException"))
 }

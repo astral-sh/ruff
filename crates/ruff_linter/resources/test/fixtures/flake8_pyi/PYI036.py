@@ -167,3 +167,23 @@ class UnacceptableOverload2:
     @overload
     def __exit__(self, exc_typ: object, exc: Exception, tb: builtins.TracebackType) -> None: ...  # PYI036
     def __exit__(self, exc_typ: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None) -> None: ...
+
+class AcceptablePep695Generic:
+    def __exit__[T: BaseException](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # Okay
+    async def __aexit__[T: BaseException](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # Okay
+
+_ExcT = typing.TypeVar("_ExcT", bound=BaseException)
+
+class AcceptableOldStyleGeneric:
+    def __exit__(
+        self, exc_type: type[_ExcT] | None, exc: _ExcT | None, tb: TracebackType | None
+    ) -> bool: ...  # Okay
+
+class UnacceptableNarrowBoundGeneric:
+    def __exit__[T: ValueError](
+        self, exc_type: type[T] | None, exc: T | None, tb: TracebackType | None, /
+    ) -> bool: ...  # PYI036 (the TypeVar bound is narrower than `BaseException`)
