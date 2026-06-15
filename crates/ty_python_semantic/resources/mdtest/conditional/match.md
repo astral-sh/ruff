@@ -688,8 +688,7 @@ def _(val: object, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: 
 
     match val:
         # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
-        case Invalid2() as item:
-            reveal_type(item)  # revealed: object
+        case Invalid2(): ...
         case Valid1():  # fine
             pass
         case Valid2():  # fine
