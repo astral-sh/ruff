@@ -7464,8 +7464,11 @@ pub enum AnyRootNodeRef<'a> {
     Identifier(&'a crate::Identifier),
 }
 
-/// The root type of an AST node.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+/// The unflattened enum or struct type stored by an [`AnyRootNodeRef`].
+///
+/// Unlike [`NodeKind`], this does not distinguish variants of root enums such as [`Stmt`]
+/// and [`Expr`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 #[repr(u8)]
 pub enum RootNodeKind {
@@ -7537,6 +7540,7 @@ impl RootNodeKind {
 }
 
 impl<'a> From<&'a Mod> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Mod) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Mod(node)
     }
@@ -7573,6 +7577,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ModExpression {
 }
 
 impl<'a> From<&'a Stmt> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Stmt) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Stmt(node)
     }
@@ -7839,6 +7844,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StmtIpyEscapeCommand {
 }
 
 impl<'a> From<&'a Expr> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Expr) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Expr(node)
     }
@@ -8185,6 +8191,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExprIpyEscapeCommand {
 }
 
 impl<'a> From<&'a ExceptHandler> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a ExceptHandler) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ExceptHandler(node)
     }
@@ -8211,6 +8218,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ExceptHandlerExceptHandler {
 }
 
 impl<'a> From<&'a InterpolatedStringElement> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a InterpolatedStringElement) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::InterpolatedStringElement(node)
     }
@@ -8253,6 +8261,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringLiteralEle
 }
 
 impl<'a> From<&'a Pattern> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a Pattern) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Pattern(node)
     }
@@ -8349,6 +8358,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternMatchOr {
 }
 
 impl<'a> From<&'a TypeParam> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a TypeParam) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TypeParam(node)
     }
@@ -8395,6 +8405,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParamParamSpec {
 }
 
 impl<'a> From<&'a crate::InterpolatedStringFormatSpec> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::InterpolatedStringFormatSpec) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::InterpolatedStringFormatSpec(node)
     }
@@ -8411,6 +8422,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::InterpolatedStringFormatSpec
 }
 
 impl<'a> From<&'a crate::PatternArguments> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::PatternArguments) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::PatternArguments(node)
     }
@@ -8427,6 +8439,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternArguments {
 }
 
 impl<'a> From<&'a crate::PatternKeyword> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::PatternKeyword) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::PatternKeyword(node)
     }
@@ -8443,6 +8456,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::PatternKeyword {
 }
 
 impl<'a> From<&'a crate::Comprehension> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Comprehension) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Comprehension(node)
     }
@@ -8459,6 +8473,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Comprehension {
 }
 
 impl<'a> From<&'a crate::Arguments> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Arguments) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Arguments(node)
     }
@@ -8475,6 +8490,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Arguments {
 }
 
 impl<'a> From<&'a crate::Parameters> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Parameters) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Parameters(node)
     }
@@ -8491,6 +8507,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameters {
 }
 
 impl<'a> From<&'a crate::Parameter> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Parameter) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Parameter(node)
     }
@@ -8507,6 +8524,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Parameter {
 }
 
 impl<'a> From<&'a crate::ParameterWithDefault> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::ParameterWithDefault) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ParameterWithDefault(node)
     }
@@ -8523,6 +8541,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ParameterWithDefault {
 }
 
 impl<'a> From<&'a crate::Keyword> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Keyword) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Keyword(node)
     }
@@ -8539,6 +8558,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Keyword {
 }
 
 impl<'a> From<&'a crate::Alias> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Alias) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Alias(node)
     }
@@ -8555,6 +8575,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Alias {
 }
 
 impl<'a> From<&'a crate::WithItem> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::WithItem) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::WithItem(node)
     }
@@ -8571,6 +8592,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::WithItem {
 }
 
 impl<'a> From<&'a crate::MatchCase> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::MatchCase) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::MatchCase(node)
     }
@@ -8587,6 +8609,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::MatchCase {
 }
 
 impl<'a> From<&'a crate::Decorator> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Decorator) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Decorator(node)
     }
@@ -8603,6 +8626,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::Decorator {
 }
 
 impl<'a> From<&'a crate::ElifElseClause> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::ElifElseClause) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::ElifElseClause(node)
     }
@@ -8619,6 +8643,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::ElifElseClause {
 }
 
 impl<'a> From<&'a crate::TypeParams> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::TypeParams) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TypeParams(node)
     }
@@ -8635,6 +8660,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TypeParams {
 }
 
 impl<'a> From<&'a crate::FString> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::FString) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::FString(node)
     }
@@ -8651,6 +8677,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::FString {
 }
 
 impl<'a> From<&'a crate::TString> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::TString) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::TString(node)
     }
@@ -8667,6 +8694,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::TString {
 }
 
 impl<'a> From<&'a crate::StringLiteral> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::StringLiteral) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::StringLiteral(node)
     }
@@ -8683,6 +8711,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::StringLiteral {
 }
 
 impl<'a> From<&'a crate::BytesLiteral> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::BytesLiteral) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::BytesLiteral(node)
     }
@@ -8699,6 +8728,7 @@ impl<'a> TryFrom<AnyRootNodeRef<'a>> for &'a crate::BytesLiteral {
 }
 
 impl<'a> From<&'a crate::Identifier> for AnyRootNodeRef<'a> {
+    #[inline]
     fn from(node: &'a crate::Identifier) -> AnyRootNodeRef<'a> {
         AnyRootNodeRef::Identifier(node)
     }
@@ -8784,6 +8814,7 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
 
 impl<'a> AnyRootNodeRef<'a> {
     /// Decomposes this reference into its root node kind and a type-erased pointer.
+    #[inline]
     pub fn into_raw_parts(self) -> (RootNodeKind, *const ()) {
         match self {
             AnyRootNodeRef::Mod(node) => (RootNodeKind::Mod, std::ptr::from_ref(node).cast()),
@@ -8874,6 +8905,7 @@ impl<'a> AnyRootNodeRef<'a> {
     ///
     /// `pointer` must be non-null, properly aligned, and point to the root node type
     /// represented by `kind`. The pointed-to node must live for `'a`.
+    #[inline]
     #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
     pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: *const ()) -> Self {
         match kind {

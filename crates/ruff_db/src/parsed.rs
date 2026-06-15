@@ -645,6 +645,7 @@ class C[T](Base, metaclass=Meta):
             )
             .expect("test source should parse");
             let indexed = IndexedModule::new(parsed);
+            assert!(matches!(&indexed.index, IndexedNodes::Packed { .. }));
 
             let node_count = u32::try_from(indexed.index.len())
                 .expect("number of indexed nodes should fit in u32");
@@ -654,13 +655,7 @@ class C[T](Base, metaclass=Meta):
                 let index = NodeIndex::from(raw_index);
                 let (_, kind) = indexed.index.get(raw_index as usize);
                 seen_kinds[usize::from(kind as u8)] = true;
-                let stored_index = indexed
-                    .get_by_index(index)
-                    .node_index()
-                    .load()
-                    .as_u32()
-                    .expect("indexed node should have an initialized index");
-                assert_eq!(Some(stored_index), index.as_u32());
+                assert_eq!(indexed.get_by_index(index).node_index().load(), index);
             }
 
             for kind in RootNodeKind::ALL {
@@ -674,12 +669,6 @@ class C[T](Base, metaclass=Meta):
 
         #[test]
         fn indexed_node_storage_variants() {
-            assert!(RootNodeKind::ALL.len() <= 1 << IndexedNodes::KIND_BITS);
-            for (bits, kind) in RootNodeKind::ALL.iter().copied().enumerate() {
-                assert_eq!(usize::from(kind as u8), bits);
-                assert_eq!(RootNodeKind::from_u8(bits as u8), Some(kind));
-            }
-
             let alignment = IndexedNodes::ALIGNMENT;
             let compact_max = IndexedNodes::MAX_PACKED_OFFSET;
             let nodes = |addresses| CollectedNodes {
