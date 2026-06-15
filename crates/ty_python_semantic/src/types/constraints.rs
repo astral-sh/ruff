@@ -1216,6 +1216,35 @@ pub(crate) struct Constraint<'db> {
     pub(crate) bounds: ConstraintBounds<'db>,
 }
 
+/// Returns whether one individual constraint semantically implies another.
+///
+/// Implication checks can themselves construct constraint sets, whose sequent discovery can ask
+/// for more implication checks while applying deferred quantification. Cache this across builders
+/// and use `false` as the cycle value: if proving an implication depends recursively on itself, we
+/// conservatively avoid deriving that sequent.
+#[salsa::tracked(cycle_initial=|_, _, _, _| false, heap_size=get_size2::GetSize::get_heap_size)]
+fn constraint_implies<'db>(
+    db: &'db dyn Db,
+    self_constraint: Constraint<'db>,
+    other_constraint: Constraint<'db>,
+) -> bool {
+    if !self_constraint
+        .typevar
+        .is_same_typevar_as(db, other_constraint.typevar)
+    {
+        return false;
+    }
+
+    other_constraint
+        .bounds
+        .materialized_lower()
+        .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
+        && self_constraint
+            .bounds
+            .materialized_upper()
+            .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+}
+
 /// The explicit lower and upper bounds inferred for a typevar on one constraint path.
 ///
 /// Missing bounds are represented as `None`; callers can materialize them to the logical defaults
@@ -1605,23 +1634,11 @@ impl ConstraintId {
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> bool {
-        let self_constraint = builder.constraint_data(self);
-        let other_constraint = builder.constraint_data(other);
-        if !self_constraint
-            .typevar
-            .is_same_typevar_as(db, other_constraint.typevar)
-        {
-            return false;
-        }
-
-        other_constraint
-            .bounds
-            .materialized_lower()
-            .is_constraint_set_assignable_to(db, self_constraint.bounds.materialized_lower())
-            && self_constraint
-                .bounds
-                .materialized_upper()
-                .is_constraint_set_assignable_to(db, other_constraint.bounds.materialized_upper())
+        constraint_implies(
+            db,
+            builder.constraint_data(self),
+            builder.constraint_data(other),
+        )
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
