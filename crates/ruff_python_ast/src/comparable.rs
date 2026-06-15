@@ -1984,6 +1984,17 @@ impl HashableReal {
         Self::Float(value.to_bits())
     }
 
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "Python converts real components to floats before complex arithmetic"
+    )]
+    fn into_float(self) -> Self {
+        match self {
+            Self::Integer(integer) => Self::from_float(integer as f64),
+            Self::Float(_) => self,
+        }
+    }
+
     fn is_zero(&self) -> bool {
         matches!(self, Self::Integer(0))
     }
@@ -2065,7 +2076,7 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
                     right,
                     ..
                 }) => {
-                    let real = as_number(left)?.into_real()?;
+                    let real = as_number(left)?.into_real()?.into_float();
                     let Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value:
                             Number::Complex {

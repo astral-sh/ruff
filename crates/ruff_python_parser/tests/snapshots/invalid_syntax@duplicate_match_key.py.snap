@@ -8,12 +8,12 @@ input_file: crates/ruff_python_parser/resources/inline/err/duplicate_match_key.p
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..692,
+        range: 0..754,
         body: [
             Match(
                 StmtMatch {
                     node_index: NodeIndex(None),
-                    range: 0..691,
+                    range: 0..753,
                     subject: Name(
                         ExprName {
                             node_index: NodeIndex(None),
@@ -1916,6 +1916,101 @@ Module(
                                 ),
                             ],
                         },
+                        MatchCase {
+                            range: 696..753,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 701..748,
+                                    keys: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 702..718,
+                                                value: Int(
+                                                    9007199254740993,
+                                                ),
+                                            },
+                                        ),
+                                        BinOp(
+                                            ExprBinOp {
+                                                node_index: NodeIndex(None),
+                                                range: 723..744,
+                                                left: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 723..739,
+                                                        value: Int(
+                                                            9007199254740993,
+                                                        ),
+                                                    },
+                                                ),
+                                                op: Add,
+                                                right: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 742..744,
+                                                        value: Complex {
+                                                            real: 0.0,
+                                                            imag: 0.0,
+                                                        },
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 720..721,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 720..721,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 746..747,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 746..747,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 750..753,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 750..753,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
                     ],
                 },
             ),
@@ -2113,6 +2208,7 @@ Module(
 26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
    |                                         ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
 27 |     case {2: 1, 2.0: 2}: ...
+28 |     case {9007199254740993: 1, 9007199254740993 + 0j: 2}: ...
    |
 
 
@@ -2121,4 +2217,5 @@ Module(
 26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
 27 |     case {2: 1, 2.0: 2}: ...
    |                 ^^^ Syntax Error: mapping pattern checks duplicate key `2.0`
+28 |     case {9007199254740993: 1, 9007199254740993 + 0j: 2}: ...
    |

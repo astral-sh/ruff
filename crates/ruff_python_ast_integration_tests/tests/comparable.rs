@@ -98,9 +98,11 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal("2", "2 + 0j")?;
     assert_hashable_equal("1j", "0 + 1j")?;
     assert_hashable_equal("9007199254740992", "9007199254740992.0")?;
+    assert_hashable_equal("9007199254740992", "9007199254740993 + 0j")?;
     assert_hashable_equal("(2,)", "(2.0,)")?;
 
     assert_hashable_unequal("9007199254740993", "9007199254740992.0")?;
+    assert_hashable_unequal("9007199254740993", "9007199254740993 + 0j")?;
     assert_hashable_unequal("18446744073709551615", "18446744073709551616.0")?;
 
     Ok(())
