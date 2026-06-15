@@ -1201,6 +1201,7 @@ impl FlowSnapshot {
     }
 }
 
+/// Identifies a node in the tree of pending reachability constraints.
 #[newtype_index]
 struct PendingReachabilityId;
 
@@ -1210,6 +1211,11 @@ struct PendingReachabilityConstraint {
     constraint: ScopedReachabilityConstraintId,
 }
 
+/// An append-only tree of scope-wide reachability constraints.
+///
+/// Each [`PendingPlaceState`] remembers the last node applied to its place state, so snapshots can
+/// share place states and defer applying subsequent constraints until the place is observed or
+/// changed.
 #[derive(Debug)]
 struct PendingReachability {
     constraints: IndexVec<PendingReachabilityId, PendingReachabilityConstraint>,
@@ -1239,6 +1245,10 @@ impl PendingReachability {
         });
     }
 
+    /// Applies the constraints between the place's last materialized node and `target`.
+    ///
+    /// The place's node must be an ancestor of `target`. After materialization, the place is
+    /// uniquely owned for mutation and records `target` as its last applied node.
     fn materialize<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
@@ -1280,6 +1290,9 @@ impl PendingReachability {
         &pending.state
     }
 
+    /// Combines the constraints after `ancestor` through `target` into a single constraint.
+    ///
+    /// `ancestor` must be an ancestor of `target`.
     fn constraint_between(
         &self,
         ancestor: PendingReachabilityId,
@@ -1301,6 +1314,7 @@ impl PendingReachability {
     }
 }
 
+/// A copy-on-write place state and the last reachability node materialized into it.
 #[derive(Clone, Debug)]
 struct PendingPlaceState {
     state: Rc<PlaceState>,
@@ -1328,6 +1342,11 @@ fn pending_place_state_mut<'a>(
 }
 
 impl PendingReachability {
+    /// Merges an alternative branch's place states into the current control-flow path.
+    ///
+    /// States shared by both branches only need their path constraints merged. States that differ
+    /// are materialized before their bindings and declarations are merged, while places absent
+    /// from the alternative branch are treated as undefined on that path.
     fn merge_place_states<I: Idx>(
         &self,
         current_states: &mut IndexVec<I, PendingPlaceState>,
