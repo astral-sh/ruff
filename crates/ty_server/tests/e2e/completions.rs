@@ -631,8 +631,8 @@ fn documentation_supports_only_plain_text() -> Result<()> {
 
 fn documentation_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
     let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
-    let foo_content = r#"def foo_with_documentation() -> None:
+    let document_path = SystemPath::new("src/foo.py");
+    let document_content = r#"def foo_with_documentation() -> None:
     """
     Example doc comment
     """
@@ -642,14 +642,15 @@ foo_
 "#;
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(foo, foo_content)?
+        .with_file(document_path, document_content)?
         .with_completion_documentation_format(formats)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, foo_content, 1);
+    server.open_text_document(document_path, document_content, 1);
 
-    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 4));
+    let completions =
+        server.completion_request(&server.file_uri(document_path), Position::new(6, 4));
 
     let completion = completions
         .into_iter()

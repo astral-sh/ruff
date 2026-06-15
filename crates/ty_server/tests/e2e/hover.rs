@@ -42,22 +42,22 @@ fn supports_only_plain_text() -> Result<()> {
 
 fn hover_content_format(formats: Vec<MarkupKind>) -> Result<MarkupKind> {
     let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
+    let document_path = SystemPath::new("src/foo.py");
+    let document_content = "\
     x: int = 1
     ";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
-        .with_file(foo, foo_content)?
+        .with_file(document_path, document_content)?
         .with_hover_content_format(formats)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, foo_content, 1);
+    server.open_text_document(document_path, document_content, 1);
 
     let hover = server
-        .hover_request(foo, Position::new(0, 0))
+        .hover_request(document_path, Position::new(0, 0))
         .expect("Expected a hover response");
     let Contents::MarkupContent(markup) = hover.contents else {
         panic!("Expected markup content");
