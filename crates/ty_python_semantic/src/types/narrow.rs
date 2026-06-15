@@ -1780,14 +1780,20 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
+    /// Apply a filtering type without replacing an equivalent original type-variable domain.
     fn typevar_preserving_intersection(
         &self,
         original_ty: Type<'db>,
         filtering_ty: Type<'db>,
     ) -> Type<'db> {
-        let flattened_original_ty = original_ty
-            .flatten_typevars(self.db)
-            .resolve_type_alias(self.db);
+        let flattened_original_ty = self.expand_constrained_typevars(original_ty).map_or_else(
+            || {
+                original_ty
+                    .flatten_typevars(self.db)
+                    .resolve_type_alias(self.db)
+            },
+            |expanded| UnionType::from_elements(self.db, expanded),
+        );
         if original_ty.has_typevar(self.db)
             && filtering_ty.is_equivalent_to(self.db, flattened_original_ty)
         {

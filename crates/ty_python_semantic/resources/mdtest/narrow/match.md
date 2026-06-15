@@ -617,11 +617,13 @@ def test_repeated_constrained_typevar_uses_one_constraint(
         case _:
             raise ValueError
 
-def test_repeated_constrained_typevar_can_match_consistently(
+def test_repeated_constrained_typevar_refines_sibling_capture(
     value: tuple[BoundChoiceT, BoundChoiceT],
 ) -> BoundA:
     match value:
-        case [BoundA() as item, BoundA()]:
+        case [BoundA(), item]:
+            # revealed: BoundChoiceT@test_repeated_constrained_typevar_refines_sibling_capture & BoundA
+            reveal_type(item)
             return item
         case _:
             raise ValueError
