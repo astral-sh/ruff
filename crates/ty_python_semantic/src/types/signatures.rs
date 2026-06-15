@@ -4373,18 +4373,21 @@ pub enum ParameterKind<'db> {
     },
 }
 
+#[derive(Debug, Copy, Clone)]
+struct DefaultPresenceMismatch;
+
 impl<'db> ParameterKind<'db> {
     fn cycle_recovery_merge_default(
         db: &'db dyn Db,
         left: Option<Type<'db>>,
         right: Option<Type<'db>>,
-    ) -> Option<Option<Type<'db>>> {
+    ) -> Result<Option<Type<'db>>, DefaultPresenceMismatch> {
         match (left, right) {
-            (Some(left), Some(right)) => Some(Some(
+            (Some(left), Some(right)) => Ok(Some(
                 UnionType::from_elements_cycle_recovery_without_callable_merge(db, [left, right]),
             )),
-            (None, None) => Some(None),
-            (Some(_), None) | (None, Some(_)) => None,
+            (None, None) => Ok(None),
+            (Some(_), None) | (None, Some(_)) => Err(DefaultPresenceMismatch),
         }
     }
 
@@ -4398,11 +4401,8 @@ impl<'db> ParameterKind<'db> {
                 },
             ) if name == other_name => Some(Self::PositionalOnly {
                 name: name.clone(),
-                default_type: Self::cycle_recovery_merge_default(
-                    db,
-                    *default_type,
-                    *other_default,
-                )?,
+                default_type: Self::cycle_recovery_merge_default(db, *default_type, *other_default)
+                    .ok()?,
             }),
             (
                 Self::PositionalOrKeyword { name, default_type },
@@ -4412,11 +4412,8 @@ impl<'db> ParameterKind<'db> {
                 },
             ) if name == other_name => Some(Self::PositionalOrKeyword {
                 name: name.clone(),
-                default_type: Self::cycle_recovery_merge_default(
-                    db,
-                    *default_type,
-                    *other_default,
-                )?,
+                default_type: Self::cycle_recovery_merge_default(db, *default_type, *other_default)
+                    .ok()?,
             }),
             (
                 Self::KeywordOnly { name, default_type },
@@ -4426,11 +4423,8 @@ impl<'db> ParameterKind<'db> {
                 },
             ) if name == other_name => Some(Self::KeywordOnly {
                 name: name.clone(),
-                default_type: Self::cycle_recovery_merge_default(
-                    db,
-                    *default_type,
-                    *other_default,
-                )?,
+                default_type: Self::cycle_recovery_merge_default(db, *default_type, *other_default)
+                    .ok()?,
             }),
             (Self::Variadic { name }, Self::Variadic { name: other_name })
                 if name == other_name =>
