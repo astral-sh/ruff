@@ -2200,9 +2200,10 @@ impl<'db> Bindings<'db> {
                                 .signature
                                 .parameters()
                                 .positional_only_by_name("cls")
-                                .map_or((None, parameter_types), |(index, _)| {
+                                .map(|(index, _)| {
                                     (parameter_types[index], &parameter_types[index + 1..])
-                                });
+                                })
+                                .unwrap_or((None, parameter_types));
 
                             if let [
                                 init,

@@ -4287,7 +4287,7 @@ impl<'db> Type<'db> {
                             Parameter::positional_only(Some(Name::new_static("cls")))
                                 .with_annotated_type(cls_ty),
                         );
-                        parameters.extend(decorator_factory_parameters.iter().cloned());
+                        parameters.extend_from_slice(&decorator_factory_parameters);
                         parameters
                     };
 
