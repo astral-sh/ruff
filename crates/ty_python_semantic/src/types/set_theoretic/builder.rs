@@ -2208,7 +2208,7 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
-            if let Some(merged) = Self::merge_matching_bodyful_divergent(self.db, ty, element_type)
+            if let Some(merged) = Self::merge_matching_bodyful_divergent(self.db, element_type, ty)
             {
                 to_remove.push(i);
                 ty = merged;
