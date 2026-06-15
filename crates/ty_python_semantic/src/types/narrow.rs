@@ -1353,9 +1353,10 @@ impl<'db> PatternSuccessAnalyzer<'db> {
                     },
                     |pattern| self.analyze_successful_pattern(pattern, subject_ty),
                 );
-                if let Some(place) = name
-                    .as_ref()
-                    .and_then(|name| self.places().symbol_id(name.as_str()))
+                if !result.matched_subject_ty.is_never()
+                    && let Some(place) = name
+                        .as_ref()
+                        .and_then(|name| self.places().symbol_id(name.as_str()))
                 {
                     Self::merge_binding(
                         &mut result.bindings,
