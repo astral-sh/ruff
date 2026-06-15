@@ -13,7 +13,7 @@ use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FilePath};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, FileType, Metadata, Result, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, SystemVirtualPathBuf, WhichResult, WritableSystem,
 };
 use ruff_notebook::{Notebook, NotebookError};
@@ -181,10 +181,6 @@ impl System for LSPSystem {
         self.native_system.is_same_file(first, second)
     }
 
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.native_system.path_exists_case_sensitive(path, prefix)
-    }
-
     fn source_type(&self, path: &SystemPath) -> Option<PySourceType> {
         let document = self.system_path_to_document(path)?;
         Self::source_type_from_document(document, path.extension())
@@ -277,10 +273,6 @@ impl System for LSPSystem {
 
     fn as_any_mut(&mut self) -> &mut dyn Any {
         self
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.native_system.case_sensitivity()
     }
 
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {

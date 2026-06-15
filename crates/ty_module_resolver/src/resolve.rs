@@ -1098,56 +1098,49 @@ fn resolve_name_impl<'a>(
     let python_version = db.python_version();
     let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
+    let mut components = name.components();
+    let root_component = components.next()?;
     let mut stub_name = None;
+    let mut cur_candidates = Vec::new();
 
-    let mut cur_candidates = search_paths
-        .filter_map(|search_path| {
-            // When a builtin module is imported, standard module resolution is bypassed:
-            // the module name always resolves to the stdlib module,
-            // even if there's a module of the same name in the first-party root
-            // (which would normally result in the stdlib module being overridden).
-            // TODO: offer a diagnostic if there is a first-party module of the same name
-            if is_non_shadowable && !search_path.is_standard_library() {
-                return None;
-            }
+    for search_path in search_paths {
+        // When a builtin module is imported, standard module resolution is bypassed:
+        // the module name always resolves to the stdlib module,
+        // even if there's a module of the same name in the first-party root
+        // (which would normally result in the stdlib module being overridden).
+        // TODO: offer a diagnostic if there is a first-party module of the same name
+        if is_non_shadowable && !search_path.is_standard_library() {
+            continue;
+        }
 
-            Some(ModuleResolutionCandidate {
-                path: search_path.to_module_path(),
-                module: ResolvedModule::NamespacePackage,
-                py_typed: PyTyped::Untyped,
-                is_stub_package: false,
-            })
-        })
-        .collect::<Vec<_>>();
-    let mut next_candidates = vec![];
+        let mut candidate = ModuleResolutionCandidate {
+            path: search_path.to_module_path(),
+            module: ResolvedModule::NamespacePackage,
+            py_typed: PyTyped::Untyped,
+            is_stub_package: false,
+        };
 
-    // FIXME?: because we have to search every candidate on each step of this loop,
-    // in theory we can search them all in parallel. However we need to join the parallelism
-    // at the end of each iteration, and after the first iteration in 99% of cases we will have
-    // reduced down to a single candidate, so maybe meh?
-    let mut is_root = true;
-    for component in name.components() {
-        // Search for the next component in every search-path
-        for mut candidate in cur_candidates.drain(..) {
-            // On the first iteration, look for `mypackage-stubs` as well
-            // Optimization: stdlib never has these `-stubs`
-            let stubs_allowed = is_root
-                && context.mode.stubs_allowed()
-                && !candidate.path.search_path().is_standard_library();
-            if stubs_allowed {
-                let stub_name = stub_name.get_or_insert_with(|| format!("{component}-stubs"));
+        if !candidate_may_exist(&context, &candidate, root_component) {
+            continue;
+        }
+
+        // On the first iteration, look for `mypackage-stubs` as well.
+        // Optimization: stdlib never has these `-stubs`.
+        let stubs_allowed = context.mode.stubs_allowed() && !search_path.is_standard_library();
+        if stubs_allowed {
+            let stub_name = stub_name.get_or_insert_with(|| format!("{root_component}-stubs"));
+            if candidate_may_exist(&context, &candidate, stub_name) {
                 let mut stub_candidate = candidate.clone();
                 if resolve_name_in_search_path(&context, &mut stub_candidate, stub_name).is_ok() {
-                    // `mypackage-stubs.py(i)` is not a valid result
+                    // `mypackage-stubs.py(i)` is not a valid result.
                     if matches!(stub_candidate.module, ResolvedModule::Module(_)) {
                         tracing::trace!(
-                            "Search path `{}` contains a module \
-                            named `{stub_name}` but a standalone module isn't a valid stub.",
-                            candidate.path.search_path()
+                            "Search path `{search_path}` contains a module named `{stub_name}` but \
+                             a standalone module isn't a valid stub."
                         );
                     } else {
                         stub_candidate.is_stub_package = true;
-                        next_candidates.push(stub_candidate);
+                        cur_candidates.push(stub_candidate);
                         // Don't break here: we always need to process the non-stub
                         // candidate for the same search path, because sub-packages
                         // within the stubs may override py_typed to partial and fall
@@ -1155,18 +1148,50 @@ fn resolve_name_impl<'a>(
                     }
                 }
             }
+        }
 
-            // On the root iteration when stubs are allowed, we can't break
-            // early because a stub package in a later search path has
-            // priority over a runtime package regardless of search path
-            // ordering. stdlib candidates are exempt since stub packages
-            // don't apply to stdlib modules. Thus, the `break`s below are
-            // guarded by `!stubs_allowed`.
+        // On the root iteration when stubs are allowed, we can't break
+        // early because a stub package in a later search path has
+        // priority over a runtime package regardless of search path
+        // ordering. stdlib candidates are exempt since stub packages
+        // don't apply to stdlib modules. Thus, the `break`s below are
+        // guarded by `!stubs_allowed`.
+        if resolve_name_in_search_path(&context, &mut candidate, root_component).is_err() {
+            if candidate.missing_submodule_is_terminal() && !stubs_allowed {
+                // Everything after this package should be shadowed out by
+                // this failure. But the previous results are still in play
+                // because they would have shadowed this one out anyway.
+                break;
+            }
+            continue;
+        }
 
-            if resolve_name_in_search_path(&context, &mut candidate, component).is_err() {
-                if candidate.missing_submodule_is_terminal() && !stubs_allowed {
+        let shadows_all = candidate.missing_submodule_is_terminal();
+        cur_candidates.push(candidate);
+        if shadows_all && !stubs_allowed {
+            break;
+        }
+    }
+
+    discard_shadowed_namespace_candidates(db, &mut cur_candidates);
+    if cur_candidates.is_empty() {
+        return None;
+    }
+
+    // Stub packages have priority over runtime packages regardless of
+    // search path ordering.
+    cur_candidates.sort_by_key(|candidate| !candidate.is_stub_package);
+
+    let mut next_candidates = Vec::new();
+
+    for component in components {
+        for mut candidate in cur_candidates.drain(..) {
+            if !candidate_may_exist(&context, &candidate, component)
+                || resolve_name_in_search_path(&context, &mut candidate, component).is_err()
+            {
+                if candidate.missing_submodule_is_terminal() {
                     // Everything after this package should be shadowed out by
-                    // this failure But the previous results are still in play
+                    // this failure. But the previous results are still in play
                     // because they would have shadowed this one out anyway.
                     break;
                 }
@@ -1174,78 +1199,85 @@ fn resolve_name_impl<'a>(
             }
             let shadows_all = candidate.missing_submodule_is_terminal();
             next_candidates.push(candidate);
-            if shadows_all && !stubs_allowed {
+            if shadows_all {
                 break;
             }
         }
 
-        // Now that we have several candidates, we need to reject candidates
-        // that are shadowed. There are only two valid situations where we
-        // could proceed into the next iteration with multiple candidates:
-        //
-        // * All candidates are namespace packages.
-        // * At least one candidate is a stub package.
-        //
-        // The existence of a single non-namespace package will shadow
-        // all namespace packages *regardless of search-path order*.
-        //
-        // This is implemented with the `retain` that follows.
-        //
-        // We can't do this "delete all namespace packages" eagerly because we want a
-        // `PyTyped::Partial` regular package to shadow namespace packages after it.
-        // (FIXME: I guess we could just set a flag not to add them...)
-
-        // Note that we intentionally do *not* filter out non-stub
-        // candidates when a stub package is found. Even when a
-        // non-namespace, non-partial stub exists, we keep non-stub
-        // candidates as fallbacks because sub-packages within the
-        // stubs may override py.typed to partial. The stub candidate
-        // is ordered first so it takes priority. The non-stub will
-        // only be used when the stub fails to find a submodule in a
-        // partial sub-package.
-
-        let found_non_namespace = next_candidates
-            .iter()
-            .any(|candidate| !candidate.is_any_namespace_package());
-        next_candidates.retain(|candidate| {
-            // TODO: it might be nice to emit a warning in the case that
-            // we found a legacy namespace package and this candidate is
-            // anything *else*. When that "else" is a regular package or
-            // module, then the logic below will drop the legacy namespace
-            // package under the presumption that regular modules always shadow
-            // _all_ namespace packages, regardless of search path order. But
-            // I suppose there could be a case where we found both a legacy
-            // namespace package and a non-legacy namespace package (and no
-            // regular packages/modules). In that case, this logic currently
-            // retains both candidates.
-
-            // Regular packages and modules both shadow namespace packages
-            // independent of search path order.
-            if found_non_namespace && candidate.is_any_namespace_package() {
-                tracing::trace!(
-                    "Discarding namespace package `{}` \
-                     because a non-namespace entry of the same name was found",
-                    candidate.to_str(db),
-                );
-                return false;
-            }
-            true
-        });
-
-        // Stub packages have priority over runtime packages regardless of
-        // search path ordering.
-        next_candidates.sort_by_key(|c| !c.is_stub_package);
+        discard_shadowed_namespace_candidates(db, &mut next_candidates);
         if next_candidates.is_empty() {
             return None;
         }
 
+        // Stub packages have priority over runtime packages regardless of
+        // search path ordering.
+        next_candidates.sort_by_key(|c| !c.is_stub_package);
+
         // Advance to the next level of candidates while reusing allocations
         // (we used `drain` so cur_candidates is empty)
         std::mem::swap(&mut cur_candidates, &mut next_candidates);
-        is_root = false;
     }
 
     Some(cur_candidates)
+}
+
+fn discard_shadowed_namespace_candidates(
+    db: &dyn Db,
+    candidates: &mut Vec<ModuleResolutionCandidate>,
+) {
+    // Now that we have several candidates, we need to reject candidates
+    // that are shadowed. There are only two valid situations where we
+    // could proceed into the next iteration with multiple candidates:
+    //
+    // * All candidates are namespace packages.
+    // * At least one candidate is a stub package.
+    //
+    // The existence of a single non-namespace package will shadow
+    // all namespace packages *regardless of search-path order*.
+    //
+    // This is implemented with the `retain` that follows.
+    //
+    // We can't do this "delete all namespace packages" eagerly because we want a
+    // `PyTyped::Partial` regular package to shadow namespace packages after it.
+    // (FIXME: I guess we could just set a flag not to add them...)
+
+    let found_non_namespace = candidates
+        .iter()
+        .any(|candidate| !candidate.is_any_namespace_package());
+
+    // Note that we intentionally do *not* filter out non-stub
+    // candidates when a stub package is found. Even when a
+    // non-namespace, non-partial stub exists, we keep non-stub
+    // candidates as fallbacks because sub-packages within the
+    // stubs may override py.typed to partial. The stub candidate
+    // is ordered first so it takes priority. The non-stub will
+    // only be used when the stub fails to find a submodule in a
+    // partial sub-package.
+    candidates.retain(|candidate| {
+        // TODO: it might be nice to emit a warning in the case that
+        // we found a legacy namespace package and this candidate is
+        // anything *else*. When that "else" is a regular package or
+        // module, then the logic below will drop the legacy namespace
+        // package under the presumption that regular modules always shadow
+        // _all_ namespace packages, regardless of search path order. But
+        // I suppose there could be a case where we found both a legacy
+        // namespace package and a non-legacy namespace package (and no
+        // regular packages/modules). In that case, this logic currently
+        // retains both candidates.
+
+        // Regular packages and modules both shadow namespace packages
+        // independent of search path order.
+        if found_non_namespace && candidate.is_any_namespace_package() {
+            tracing::trace!(
+                "Discarding namespace package `{}` because a non-namespace entry of the same name \
+                 was found",
+                candidate.to_str(db),
+            );
+            false
+        } else {
+            true
+        }
+    });
 }
 
 /// Attempts to resolve a module name in a particular search path.
@@ -1319,24 +1351,34 @@ fn resolve_name_in_search_path(
     // ever uses namespace packages, ensure that this check also takes the
     // `VERSIONS` file into consideration.
     if !package_path.search_path().is_standard_library() && package_path.is_directory(context) {
-        if let Some(path) = package_path.to_system_path() {
-            let system = context.db.system();
-            if system.case_sensitivity().is_case_sensitive()
-                || system.path_exists_case_sensitive(
-                    &path,
-                    package_path.search_path().as_system_path().unwrap(),
-                )
-            {
-                candidate.py_typed = package_path
-                    .py_typed(context)
-                    .inherit_parent(candidate.py_typed);
-                candidate.module = ResolvedModule::NamespacePackage;
-                return Ok(());
-            }
-        }
+        candidate.py_typed = package_path
+            .py_typed(context)
+            .inherit_parent(candidate.py_typed);
+        candidate.module = ResolvedModule::NamespacePackage;
+        return Ok(());
     }
 
     Err(())
+}
+
+/// Uses the parent directory's entries to reject candidates that cannot exist without performing
+/// individual file-system probes for every supported module layout.
+fn candidate_may_exist(
+    context: &ResolverContext,
+    candidate: &ModuleResolutionCandidate,
+    module_name: &str,
+) -> bool {
+    let Some(parent) = candidate.path.to_system_path() else {
+        return true;
+    };
+
+    let Ok(listing) = directory_listing(context.db, &parent) else {
+        return false;
+    };
+
+    // Other suffixes are harmless false positives; the normal probes still determine whether the
+    // module exists.
+    listing.contains_name_with_prefix(module_name)
 }
 
 type ResolvedNames = Vec<ModuleResolutionCandidate>;
@@ -1361,19 +1403,6 @@ pub(super) fn resolve_file_module(
             .with_py_extension()
             .and_then(|path| path.to_file(resolver_state))
     })?;
-
-    // For system files, test if the path has the correct casing.
-    // We can skip this step for vendored files or virtual files because
-    // those file systems are case sensitive (we wouldn't get to this point).
-    if let Some(path) = file.path(resolver_state.db).as_system_path() {
-        let system = resolver_state.db.system();
-        if !system.case_sensitivity().is_case_sensitive()
-            && !system
-                .path_exists_case_sensitive(path, module.search_path().as_system_path().unwrap())
-        {
-            return None;
-        }
-    }
 
     Some(file)
 }
@@ -1720,6 +1749,54 @@ mod tests {
             Some(foo_module),
             path_to_module(&db, &FilePath::from(expected_foo_path))
         );
+    }
+
+    #[test]
+    fn missing_modules_do_not_create_file_inputs() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[("other.py", ""), ("package/__init__.py", "")])
+            .build();
+
+        for name in ["missing", "package.missing"] {
+            assert!(
+                resolve_module_confident(&db, &ModuleName::new_static(name).unwrap()).is_none()
+            );
+        }
+
+        for relative_path in [
+            "missing-stubs/__init__.pyi",
+            "missing-stubs/__init__.py",
+            "missing/__init__.pyi",
+            "missing/__init__.py",
+            "missing.pyi",
+            "missing.py",
+            "package/missing/__init__.pyi",
+            "package/missing/__init__.py",
+            "package/missing.pyi",
+            "package/missing.py",
+        ] {
+            assert_eq!(
+                db.files().try_system(&db, &src.join(relative_path)),
+                None,
+                "unexpected point probe for {relative_path}"
+            );
+        }
+    }
+
+    #[test]
+    fn stdlib_precedes_stub_package_in_site_packages() {
+        const TYPESHED: MockedTypeshed = MockedTypeshed {
+            stdlib_files: &[("foo.pyi", "")],
+            versions: "foo: 3.8-",
+        };
+
+        let TestCase { db, stdlib, .. } = TestCaseBuilder::new()
+            .with_mocked_typeshed(TYPESHED)
+            .with_site_packages_files(&[("foo-stubs/__init__.pyi", "")])
+            .build();
+
+        let foo = resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        assert_eq!(foo.file(&db).unwrap().path(&db), &stdlib.join("foo.pyi"));
     }
 
     #[test]
@@ -2259,9 +2336,9 @@ mod tests {
     }
 
     #[test]
-    fn deleting_an_unrelated_file_doesnt_change_module_resolution() {
+    fn deleting_file_from_different_directory_doesnt_change_module_resolution() {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new()
-            .with_src_files(&[("foo.py", "x = 1"), ("bar.py", "x = 2")])
+            .with_src_files(&[("foo.py", "x = 1"), ("other/bar.py", "x = 2")])
             .with_python_version(PythonVersion::PY38)
             .build();
 
@@ -2275,7 +2352,7 @@ mod tests {
             foo_module.kind(&db),
         );
 
-        let bar_path = src.join("bar.py");
+        let bar_path = src.join("other/bar.py");
         let bar = system_path_to_file(&db, &bar_path).expect("bar.py to exist");
 
         db.clear_salsa_events();
@@ -2883,9 +2960,7 @@ not_a_directory
         db.write_file(src.join("main.py"), "print('Hy')")
             .context("Failed to write `main.py`")?;
 
-        // The symlink triggers the slow-path in the `OsSystem`'s
-        // `exists_path_case_sensitive` code because canonicalizing the path
-        // for `a/__init__.py` results in `a-package/__init__.py`
+        // The lexical directory listing must accept the symlink named `a` while rejecting `A`.
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 

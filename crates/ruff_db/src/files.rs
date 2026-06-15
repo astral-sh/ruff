@@ -117,6 +117,7 @@ impl Files {
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),
                     Ok(metadata) if metadata.file_type().is_directory() => builder
+                        .durability(Durability::MEDIUM.max(durability))
                         .status(FileStatus::IsADirectory)
                         .permissions(metadata.permissions())
                         .revision(metadata.revision()),

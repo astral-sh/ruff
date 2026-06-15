@@ -3,7 +3,6 @@ use std::io::Write;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, anyhow};
-use ruff_db::Db as _;
 use ruff_db::files::{File, FileError, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{
@@ -2215,28 +2214,19 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
         "Expected `Lib` module not to exist"
     );
 
-    // Now rename `lib.py` to `Lib.py`
-    if case.db().system().case_sensitivity().is_case_sensitive() {
-        std::fs::rename(
-            case.project_path("lib.py").as_std_path(),
-            case.project_path("Lib.py").as_std_path(),
-        )
-        .context("Failed to rename `lib.py` to `Lib.py`")?;
-    } else {
-        // On case-insensitive file systems, renaming a file to a different casing is a no-op.
-        // Rename to a different name first
-        std::fs::rename(
-            case.project_path("lib.py").as_std_path(),
-            case.project_path("temp.py").as_std_path(),
-        )
-        .context("Failed to rename `lib.py` to `temp.py`")?;
+    // On case-insensitive file systems, renaming a file to a different casing is a no-op.
+    // Rename to a different name first.
+    std::fs::rename(
+        case.project_path("lib.py").as_std_path(),
+        case.project_path("temp.py").as_std_path(),
+    )
+    .context("Failed to rename `lib.py` to `temp.py`")?;
 
-        std::fs::rename(
-            case.project_path("temp.py").as_std_path(),
-            case.project_path("Lib.py").as_std_path(),
-        )
-        .context("Failed to rename `temp.py` to `Lib.py`")?;
-    }
+    std::fs::rename(
+        case.project_path("temp.py").as_std_path(),
+        case.project_path("Lib.py").as_std_path(),
+    )
+    .context("Failed to rename `temp.py` to `Lib.py`")?;
 
     let changes = case.stop_watch(event_for_file("Lib.py"));
     case.apply_changes(&changes, None);

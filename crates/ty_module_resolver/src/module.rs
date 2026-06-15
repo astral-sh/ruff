@@ -134,9 +134,14 @@ fn all_submodule_names_for_package<'db>(
     }
 
     fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
-        system_path_to_file(db, dir.join("__init__.pyi"))
-            .or_else(|_| system_path_to_file(db, dir.join("__init__.py")))
-            .ok()
+        let listing = directory_listing(db, dir).ok()?;
+        if listing.entry_is_file(db, dir, "__init__.pyi") {
+            system_path_to_file(db, dir.join("__init__.pyi")).ok()
+        } else if listing.entry_is_file(db, dir, "__init__.py") {
+            system_path_to_file(db, dir.join("__init__.py")).ok()
+        } else {
+            None
+        }
     }
 
     fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {

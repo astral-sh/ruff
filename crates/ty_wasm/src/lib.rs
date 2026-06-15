@@ -7,7 +7,7 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
@@ -1610,14 +1610,6 @@ impl System for WasmSystem {
         _path: &SystemVirtualPath,
     ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
     }
 
     fn which(&self, _name: &str) -> WhichResult {
