@@ -5,61 +5,17 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        Lpar,
-        0..1,
-    ),
-    (
-        NonLogicalNewline,
-        1..2,
-    ),
-    (
-        String(
-            "a",
-        ),
-        6..9,
-    ),
-    (
-        NonLogicalNewline,
-        9..10,
-    ),
-    (
-        String(
-            "b",
-        ),
-        14..17,
-    ),
-    (
-        NonLogicalNewline,
-        17..18,
-    ),
-    (
-        NonLogicalNewline,
-        18..19,
-    ),
-    (
-        String(
-            "c",
-        ),
-        23..26,
-    ),
-    (
-        String(
-            "d",
-        ),
-        33..36,
-    ),
-    (
-        NonLogicalNewline,
-        36..37,
-    ),
-    (
-        Rpar,
-        37..38,
-    ),
-    (
-        Newline,
-        38..38,
-    ),
+    Lpar 0..1,
+    NonLogicalNewline 1..2,
+    String 6..9,
+    NonLogicalNewline 9..10,
+    String 14..17,
+    NonLogicalNewline 17..18,
+    NonLogicalNewline 18..19,
+    String 23..26,
+    String 33..36,
+    NonLogicalNewline 36..37,
+    Rpar 37..38,
+    Newline 38..38,
 ]
 ```

@@ -243,7 +243,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.check_deprecated(alias, ty.inner);
                     }
                 }
-                self.extend_definition(inferred);
+                self.extend_definition(*definition, inferred);
             }
         }
     }

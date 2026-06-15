@@ -107,6 +107,25 @@ class DoublyInvalid[T](Generic): ...
 reveal_mro(DoublyInvalid)  # revealed: (<class 'DoublyInvalid[Unknown]'>, Unknown, <class 'object'>)
 ```
 
+Legacy type variables also cannot be used to specialize another base class when the class uses PEP
+695 syntax. A PEP 695 type parameter with the same name shadows the legacy type variable.
+
+```py
+K = TypeVar("K")
+
+# error: [invalid-generic-class] "Legacy type variable `K` cannot be used in a PEP 695 class base"
+class Bad[V](dict[K, V]): ...
+class Good[K, V](dict[K, V]): ...
+class Base[T]: ...
+
+# TODO: error: [invalid-generic-class] "Legacy type variable `K` cannot be used in a PEP 695 class base"
+class NormalizedBad[V](Base[K | object]): ...
+
+class Methods[V]:
+    def method(self, value: V, legacy: K) -> V | K:
+        raise NotImplementedError
+```
+
 Generic classes implicitly inherit from `Generic`:
 
 ```py

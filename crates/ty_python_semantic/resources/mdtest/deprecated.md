@@ -91,6 +91,8 @@ class StaticMethodReplacement:
 StaticMethodReplacement.old()  # error: [deprecated] "use replacement directly"
 ```
 
+## Callable-object replacements
+
 `@deprecated` can also wrap other callable objects at runtime, but we currently only preserve the
 deprecation when an inner decorator returns a function literal.
 

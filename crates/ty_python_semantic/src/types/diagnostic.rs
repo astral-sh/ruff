@@ -3006,10 +3006,15 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for step size 0 in slices.
+    /// Checks for a step size of zero in slices when the operation is known to fail.
     ///
     /// ## Why is this bad?
-    /// A slice with a step size of zero will raise a `ValueError` at runtime.
+    /// Python's built-in sequence types raise a `ValueError` when sliced with a step size of zero.
+    ///
+    /// ## Known problems
+    /// This check is not exhaustive. It reports zero-step slices for certain built-in sequence
+    /// types where the operation is known to fail. A custom `__getitem__` implementation can
+    /// accept or reject such a slice, so ty cannot detect every runtime failure.
     ///
     /// ## Examples
     /// ```python

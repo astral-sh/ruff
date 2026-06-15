@@ -1,7 +1,7 @@
 use std::fmt::Formatter;
 use std::str::FromStr;
 
-use ruff_db::files::{File, system_path_to_file, vendored_path_to_file};
+use ruff_db::files::{File, directory_listing, system_path_to_file, vendored_path_to_file};
 use ruff_db::system::SystemPath;
 use ruff_db::vendored::VendoredPath;
 use salsa::Database;
@@ -134,9 +134,14 @@ fn all_submodule_names_for_package<'db>(
     }
 
     fn find_package_init_system(db: &dyn Db, dir: &SystemPath) -> Option<File> {
-        system_path_to_file(db, dir.join("__init__.pyi"))
-            .or_else(|_| system_path_to_file(db, dir.join("__init__.py")))
-            .ok()
+        let listing = directory_listing(db, dir).ok()?;
+        if listing.entry_is_file(db, dir, "__init__.pyi") {
+            system_path_to_file(db, dir.join("__init__.pyi")).ok()
+        } else if listing.entry_is_file(db, dir, "__init__.py") {
+            system_path_to_file(db, dir.join("__init__.py")).ok()
+        } else {
+            None
+        }
     }
 
     fn find_package_init_vendored(db: &dyn Db, dir: &VendoredPath) -> Option<File> {
@@ -166,27 +171,17 @@ fn all_submodule_names_for_package<'db>(
 
     Some(match path.parent()? {
         SystemOrVendoredPathRef::System(parent_directory) => {
-            // Read the revision on the corresponding file root to
-            // register an explicit dependency on this directory
-            // tree. When the revision gets bumped, the cache
-            // that Salsa creates does for this routine will be
-            // invalidated.
-            let root = db.files().expect_root(db, parent_directory);
-            let _ = root.revision(db);
-
-            db.system()
-                .read_directory(parent_directory)
-                .inspect_err(|err| {
+            directory_listing(db, parent_directory)
+                .inspect_err(|error| {
                     tracing::debug!(
                         "Failed to read {parent_directory:?} when looking for \
-                         its possible submodules: {err}"
+                         its possible submodules: {error}"
                     );
                 })
                 .ok()?
-                .flatten()
-                .filter(|entry| {
-                    let ty = entry.file_type();
-                    let path = entry.path();
+                .iter()
+                .filter(|(name, ty)| {
+                    let path = SystemPath::new(name);
                     is_submodule(
                         ty.is_directory(),
                         ty.is_file(),
@@ -194,18 +189,17 @@ fn all_submodule_names_for_package<'db>(
                         path.extension(),
                     )
                 })
-                .filter_map(|entry| {
-                    let stem = entry.path().file_stem()?;
+                .filter_map(|(entry_name, file_type)| {
+                    let relative = SystemPath::new(entry_name);
+                    let stem = relative.file_stem()?;
+                    let path = parent_directory.join(relative);
                     let mut name = module.name(db).clone();
                     name.extend(&ModuleName::new(stem)?);
 
-                    let (kind, file) = if entry.file_type().is_directory() {
-                        (
-                            ModuleKind::Package,
-                            find_package_init_system(db, entry.path())?,
-                        )
+                    let (kind, file) = if file_type.is_directory() {
+                        (ModuleKind::Package, find_package_init_system(db, &path)?)
                     } else {
-                        let file = system_path_to_file(db, entry.path()).ok()?;
+                        let file = system_path_to_file(db, &path).ok()?;
                         (ModuleKind::Module, file)
                     };
                     Some(Module::file_module(

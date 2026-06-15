@@ -4,7 +4,7 @@ use crate::{
         KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
         diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
-        function::OverloadLiteral,
+        function::{FunctionDecorators, OverloadLiteral},
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -33,6 +33,9 @@ pub(crate) fn check_function_definition<'db>(
     };
 
     let last_definition = function_type.literal(db).last_definition;
+    if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
+        return;
+    }
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);

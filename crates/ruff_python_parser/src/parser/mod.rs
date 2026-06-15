@@ -1,16 +1,22 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::str::FromStr;
 
 use bitflags::bitflags;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::token::TokenKind;
-use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
+use ruff_python_ast::{
+    AtomicNodeIndex, Int, IpyEscapeKind, Mod, ModExpression, ModModule, StringFlags,
+};
+use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use thin_vec::ThinVec;
+use unicode_normalization::UnicodeNormalization;
 
 use crate::error::UnsupportedSyntaxError;
 use crate::parser::expression::ExpressionContext;
 use crate::parser::progress::{ParserProgress, TokenId};
 use crate::string::InterpolatedStringKind;
-use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
 use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
@@ -386,15 +392,143 @@ impl<'src> Parser<'src> {
         self.do_bump(kind);
     }
 
-    /// Take the token value from the underlying token source and bump the current token.
-    ///
-    /// # Panics
-    ///
-    /// If the current token is not of the given kind.
-    fn bump_value(&mut self, kind: TokenKind) -> TokenValue {
-        let value = self.tokens.take_value();
-        self.bump(kind);
+    fn bump_name(&mut self) -> Name {
+        let text = self.current_token_text();
+        let name = if !self.tokens.current_flags().is_non_ascii_name() {
+            Name::new(text)
+        } else {
+            normalize_name(text)
+        };
+        self.bump(TokenKind::Name);
+        name
+    }
+
+    fn bump_int(&mut self) -> Int {
+        let text = self.current_token_text();
+        let value = if let Some(digits) =
+            text.strip_prefix("0x").or_else(|| text.strip_prefix("0X"))
+        {
+            Int::from_str_radix(&strip_underscores(digits), 16, text)
+        } else if let Some(digits) = text.strip_prefix("0o").or_else(|| text.strip_prefix("0O")) {
+            Int::from_str_radix(&strip_underscores(digits), 8, text)
+        } else if let Some(digits) = text.strip_prefix("0b").or_else(|| text.strip_prefix("0B")) {
+            Int::from_str_radix(&strip_underscores(digits), 2, text)
+        } else {
+            Int::from_str(&strip_underscores(text))
+        }
+        .expect("lexer validated integer literal");
+        self.bump(TokenKind::Int);
         value
+    }
+
+    fn bump_float(&mut self) -> f64 {
+        let value = f64::from_str(&strip_underscores(self.current_token_text()))
+            .expect("lexer validated float literal");
+        self.bump(TokenKind::Float);
+        value
+    }
+
+    fn bump_complex(&mut self) -> (f64, f64) {
+        let text = self.current_token_text();
+        let value = f64::from_str(&strip_underscores(&text[..text.len() - 1]))
+            .expect("lexer validated complex literal");
+        self.bump(TokenKind::Complex);
+        (0.0, value)
+    }
+
+    fn bump_string_value(&mut self) -> &'src str {
+        let range = self.current_token_range();
+        let flags = self.tokens.current_flags().as_any_string_flags();
+        let value_range = TextRange::new(
+            range.start() + flags.opener_len(),
+            range.end() - flags.closer_len(),
+        );
+        let value = &self.source[value_range];
+        self.bump(TokenKind::String);
+        value
+    }
+
+    fn bump_ipython_escape_command(
+        &mut self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let (value, kind) = self.parse_ipython_escape_command_value(context);
+        self.bump(TokenKind::IpyEscapeCommand);
+        (value, kind)
+    }
+
+    fn current_token_text(&self) -> &'src str {
+        self.src_text(self.current_token_range())
+    }
+
+    fn parse_ipython_escape_command_value(
+        &self,
+        context: IpyEscapeContext,
+    ) -> (Box<str>, IpyEscapeKind) {
+        let raw = self.current_token_text();
+        let initial_kind = if context.is_logical_line_start()
+            && let Ok(kind) = IpyEscapeKind::try_from([
+                raw.as_bytes()[0] as char,
+                raw[1..].chars().next().unwrap_or('\0'),
+            ]) {
+            kind
+        } else {
+            IpyEscapeKind::try_from(raw.as_bytes()[0] as char).expect("IPython escape token")
+        };
+
+        let mut value = String::new();
+        let mut chars = raw[initial_kind.as_str().len()..].chars().peekable();
+        while let Some(c) = chars.next() {
+            match c {
+                '\\' if matches!(chars.peek(), Some('\r' | '\n')) => {
+                    if chars.next() == Some('\r') && matches!(chars.peek(), Some('\n')) {
+                        chars.next();
+                    }
+                }
+                '?' => {
+                    let mut question_count = 1;
+                    while matches!(chars.peek(), Some('?')) {
+                        chars.next();
+                        question_count += 1;
+                    }
+
+                    // At logical-line start, IPython treats one or two terminal `?` after a
+                    // nonempty help or magic command as the command kind. Strict `foo?` syntax
+                    // is parsed separately.
+                    // https://github.com/ipython/ipython/blob/292e3a23459ca965b8c1bfe2c3707044c510209a/IPython/core/inputtransformer2.py#L454-L462
+                    if !context.is_logical_line_start()
+                        || !(initial_kind.is_magic() || initial_kind.is_help())
+                        || question_count > 2
+                        || value.chars().last().is_none_or(is_python_whitespace)
+                        || !matches!(chars.peek(), None | Some('\n' | '\r'))
+                    {
+                        value.extend(std::iter::repeat_n('?', question_count));
+                        continue;
+                    }
+
+                    let kind = if question_count == 1 {
+                        IpyEscapeKind::Help
+                    } else {
+                        IpyEscapeKind::Help2
+                    };
+
+                    // A help suffix replaces a leading help prefix, but takes precedence over a
+                    // magic prefix, which remains part of the value (`%foo?` becomes help for
+                    // `%foo`).
+                    if initial_kind.is_help() {
+                        value = value.trim_start_matches([' ', '?']).to_string();
+                    } else {
+                        value.insert_str(0, initial_kind.as_str());
+                    }
+
+                    return (value.into_boxed_str(), kind);
+                }
+                '\n' | '\r' => break,
+                c => value.push(c),
+            }
+        }
+
+        (value.into_boxed_str(), initial_kind)
     }
 
     /// Bumps the current token assuming it is found in the given token set.
@@ -759,6 +893,31 @@ impl<'src> Parser<'src> {
         self.current_token_id = current_token_id;
         self.prev_token_end = prev_token_end;
         self.recovery_context = recovery_context;
+    }
+}
+
+fn strip_underscores(text: &str) -> Cow<'_, str> {
+    if text.as_bytes().contains(&b'_') {
+        Cow::Owned(text.chars().filter(|&c| c != '_').collect())
+    } else {
+        Cow::Borrowed(text)
+    }
+}
+
+#[cold]
+fn normalize_name(text: &str) -> Name {
+    text.nfkc().collect::<Name>()
+}
+
+#[derive(Copy, Clone)]
+enum IpyEscapeContext {
+    Assignment,
+    LogicalLineStart,
+}
+
+impl IpyEscapeContext {
+    const fn is_logical_line_start(self) -> bool {
+        matches!(self, Self::LogicalLineStart)
     }
 }
 

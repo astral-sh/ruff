@@ -2174,11 +2174,11 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                     self.check_property_instance_pair(db, source_p, target_p)
                 }),
 
-            (Type::PropertyInstance(_), _) => {
-                self.check_type_pair(db, KnownClass::Property.to_instance(db), target)
+            (Type::PropertyInstance(property), _) => {
+                self.check_type_pair(db, property.instance_fallback(db), target)
             }
-            (_, Type::PropertyInstance(_)) => {
-                self.check_type_pair(db, source, KnownClass::Property.to_instance(db))
+            (_, Type::PropertyInstance(property)) => {
+                self.check_type_pair(db, source, property.instance_fallback(db))
             }
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
@@ -2198,17 +2198,24 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             (None | Some(_), None | Some(_)) => self.never(),
         };
 
-        check_optional_methods(source.getter(db), target.getter(db)).and(
+        self.check_type_pair(
             db,
-            self.constraints,
-            || {
-                check_optional_methods(source.setter(db), target.setter(db)).and(
-                    db,
-                    self.constraints,
-                    || check_optional_methods(source.deleter(db), target.deleter(db)),
-                )
-            },
+            source.instance_fallback(db),
+            target.instance_fallback(db),
         )
+        .and(db, self.constraints, || {
+            check_optional_methods(source.getter(db), target.getter(db)).and(
+                db,
+                self.constraints,
+                || {
+                    check_optional_methods(source.setter(db), target.setter(db)).and(
+                        db,
+                        self.constraints,
+                        || check_optional_methods(source.deleter(db), target.deleter(db)),
+                    )
+                },
+            )
+        })
     }
 
     pub(super) fn as_equivalence_checker(&self) -> EquivalenceChecker<'_, 'c, 'db> {
@@ -3124,8 +3131,9 @@ impl<'a, 'c, 'db> DisjointnessChecker<'a, 'c, 'db> {
                 self.check_type_pair(db, newtype.concrete_base_type(db), other)
             }
 
-            (Type::PropertyInstance(_), other) | (other, Type::PropertyInstance(_)) => {
-                self.check_type_pair(db, KnownClass::Property.to_instance(db), other)
+            (Type::PropertyInstance(property), other)
+            | (other, Type::PropertyInstance(property)) => {
+                self.check_type_pair(db, property.instance_fallback(db), other)
             }
 
             (Type::BoundSuper(left), Type::BoundSuper(right)) => self

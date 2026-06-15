@@ -1,4 +1,4 @@
-use ruff_python_ast::Stmt;
+use ruff_python_ast::{Expr, InterpolatedStringElement, IpyEscapeKind, Number, Stmt};
 
 use crate::{Mode, ParseErrorType, ParseOptions, parse, parse_expression, parse_module};
 
@@ -59,6 +59,149 @@ fn test_unicode_aliases() {
     let suite = parse_module(source).unwrap().into_suite();
 
     insta::assert_debug_snapshot!(suite);
+}
+
+#[test]
+fn nfkc_normalizes_names() {
+    let parsed = parse_expression("𝒞").unwrap();
+    let Expr::Name(name) = parsed.expr() else {
+        panic!("expected name expression, got {:?}", parsed.expr());
+    };
+
+    assert_eq!(name.id.as_str(), "C");
+}
+
+#[test]
+fn number_values() {
+    let cases = [
+        ("1E400", Number::Float(f64::INFINITY)),
+        (
+            "1E400J",
+            Number::Complex {
+                real: 0.0,
+                imag: f64::INFINITY,
+            },
+        ),
+        (
+            "123_456_789_123_456_789_123_456_789_123_456_789",
+            Number::Int("123456789123456789123456789123456789".parse().unwrap()),
+        ),
+        (
+            "000_123_456_789_123_456_789_123_456_789_123_456_789J",
+            Number::Complex {
+                real: 0.0,
+                imag: 1.234_567_891_234_567_8e35,
+            },
+        ),
+    ];
+
+    for (source, expected) in cases {
+        let parsed = parse_expression(source).unwrap();
+        let Expr::NumberLiteral(number) = parsed.expr() else {
+            panic!(
+                "expected number expression for {source:?}, got {:?}",
+                parsed.expr()
+            );
+        };
+
+        assert_eq!(number.value, expected, "source: {source:?}");
+    }
+}
+
+#[test]
+fn malformed_radix_literals() {
+    for source in ["0x", "0o", "0b", "0x_", "0x__1"] {
+        assert!(parse_expression(source).is_err(), "source: {source:?}");
+    }
+}
+
+#[test]
+fn interpolated_string_escaped_brace_values() {
+    let cases = [
+        (r"f'\{{1}}'", r"\{1}"),
+        (r"f'\}}'", r"\}"),
+        (r"f'\\{{1}}'", r"\{1}"),
+        (r"f'\\\{{1}}'", r"\\{1}"),
+        (r"t'\{{1}}'", r"\{1}"),
+        (r"t'\}}'", r"\}"),
+        (r"t'\\{{1}}'", r"\{1}"),
+        (r"t'\\\{{1}}'", r"\\{1}"),
+        (r"rf'\{{1}}'", r"\{1}"),
+        (r"rt'\{{1}}'", r"\{1}"),
+    ];
+
+    for (source, expected) in cases {
+        let parsed = parse_expression(source).unwrap();
+        let elements = match parsed.expr() {
+            Expr::FString(string) => &string.as_single_part_fstring().unwrap().elements,
+            Expr::TString(string) => &string.as_single_part_tstring().unwrap().elements,
+            expression => panic!("expected interpolated string for {source:?}, got {expression:?}"),
+        };
+        let [InterpolatedStringElement::Literal(literal)] = &**elements else {
+            panic!("expected one literal element for {source:?}");
+        };
+
+        assert_eq!(&*literal.value, expected, "source: {source:?}");
+    }
+}
+
+#[test]
+fn ipython_escape_command_values() {
+    let cases = [
+        ("?foo?", IpyEscapeKind::Help, "foo"),
+        ("??   foo?", IpyEscapeKind::Help, "foo"),
+        ("??   foo  ?", IpyEscapeKind::Help2, "   foo  ?"),
+        ("?foo??", IpyEscapeKind::Help2, "foo"),
+        ("%foo?", IpyEscapeKind::Help, "%foo"),
+        ("%foo??", IpyEscapeKind::Help2, "%foo"),
+        ("%%foo???", IpyEscapeKind::Magic2, "foo???"),
+        ("!pwd?", IpyEscapeKind::Shell, "pwd?"),
+        ("?? \\\n    foo?", IpyEscapeKind::Help, "foo"),
+        ("?? \\\r    foo?", IpyEscapeKind::Help, "foo"),
+        ("?? \\\r\n    foo?", IpyEscapeKind::Help, "foo"),
+    ];
+
+    for (source, expected_kind, expected_value) in cases {
+        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+            .unwrap()
+            .try_into_module()
+            .unwrap()
+            .into_suite();
+        let [Stmt::IpyEscapeCommand(command)] = suite.as_slice() else {
+            panic!("expected one IPython escape command for {source:?}, got {suite:?}");
+        };
+
+        assert_eq!(command.kind, expected_kind, "source: {source:?}");
+        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+    }
+}
+
+#[test]
+fn ipython_escape_command_expression_values() {
+    let cases = [
+        ("x = !!foo", IpyEscapeKind::Shell, "!foo"),
+        ("x = %%foo", IpyEscapeKind::Magic, "%foo"),
+    ];
+
+    for (source, expected_kind, expected_value) in cases {
+        let suite = parse(source, ParseOptions::from(Mode::Ipython))
+            .unwrap()
+            .try_into_module()
+            .unwrap()
+            .into_suite();
+        let [Stmt::Assign(assign)] = suite.as_slice() else {
+            panic!("expected one assignment for {source:?}, got {suite:?}");
+        };
+        let Expr::IpyEscapeCommand(command) = assign.value.as_ref() else {
+            panic!(
+                "expected an IPython escape command for {source:?}, got {:?}",
+                assign.value
+            );
+        };
+
+        assert_eq!(command.kind, expected_kind, "source: {source:?}");
+        assert_eq!(&*command.value, expected_value, "source: {source:?}");
+    }
 }
 
 #[test]

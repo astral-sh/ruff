@@ -370,6 +370,7 @@ static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "_make"))
 static_assert(has_member(Person, "_asdict"))
 static_assert(has_member(Person, "_replace"))
+static_assert(has_member(Person, "__match_args__"))
 
 def _(person: Person):
     static_assert(has_member(person, "id"))

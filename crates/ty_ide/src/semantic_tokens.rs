@@ -514,6 +514,9 @@ impl<'db> SemanticTokenVisitor<'db> {
                     // Method bound to an instance
                     token_type.add(SemanticTokenType::Method);
                 }
+                Type::Callable(callable) if callable.is_method_like(db) => {
+                    token_type.add(SemanticTokenType::Method);
+                }
                 Type::ModuleLiteral(_) => {
                     // Module accessed as an attribute (e.g., from os import path)
                     token_type.add(SemanticTokenType::Namespace);
@@ -2122,6 +2125,99 @@ t = MyClass.prop          # prop should be property on the class itself
         "t" @ 643..644: Variable [definition]
         "MyClass" @ 647..654: Class
         "prop" @ 655..659: Property [readonly]
+        "#);
+    }
+
+    #[test]
+    fn decorated_method_attribute_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+from collections.abc import Callable
+from typing import Self
+
+def decorate[**P, R](function: Callable[P, R]) -> Callable[P, R]:
+    return function
+
+class C:
+    callback: Callable[[], None] = lambda: None
+
+    @decorate
+    def instance_method(self) -> Self:
+        return self
+
+    def plain_method(self) -> Self:
+        return self
+
+    @classmethod
+    @decorate
+    def class_method(cls) -> None: ...
+
+    @staticmethod
+    @decorate
+    def static_method() -> None: ...
+
+c = C()
+c.instance_method().plain_method().instance_method()
+c.class_method()
+c.static_method()
+c.callback()
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "collections" @ 6..17: Namespace
+        "abc" @ 18..21: Namespace
+        "Callable" @ 29..37: Variable
+        "typing" @ 43..49: Namespace
+        "Self" @ 57..61: Variable
+        "decorate" @ 67..75: Function [definition]
+        "P" @ 78..79: TypeParameter [definition]
+        "R" @ 81..82: TypeParameter [definition]
+        "function" @ 84..92: Parameter [definition]
+        "Callable" @ 94..102: Variable
+        "P" @ 103..104: TypeParameter
+        "R" @ 106..107: TypeParameter
+        "Callable" @ 113..121: Variable
+        "P" @ 122..123: TypeParameter
+        "R" @ 125..126: TypeParameter
+        "function" @ 140..148: Parameter
+        "C" @ 156..157: Class [definition]
+        "callback" @ 163..171: Variable [definition]
+        "Callable" @ 173..181: Variable
+        "None" @ 186..190: BuiltinConstant
+        "None" @ 202..206: BuiltinConstant
+        "decorate" @ 213..221: Decorator
+        "instance_method" @ 230..245: Method [definition]
+        "self" @ 246..250: SelfParameter [definition]
+        "Self" @ 255..259: Variable
+        "self" @ 276..280: SelfParameter
+        "plain_method" @ 290..302: Method [definition]
+        "self" @ 303..307: SelfParameter [definition]
+        "Self" @ 312..316: Variable
+        "self" @ 333..337: SelfParameter
+        "classmethod" @ 344..355: Decorator
+        "decorate" @ 361..369: Decorator
+        "class_method" @ 378..390: Method [definition]
+        "cls" @ 391..394: SelfParameter [definition]
+        "None" @ 399..403: BuiltinConstant
+        "staticmethod" @ 415..427: Decorator
+        "decorate" @ 433..441: Decorator
+        "static_method" @ 450..463: Method [definition]
+        "None" @ 469..473: BuiltinConstant
+        "c" @ 480..481: Variable [definition]
+        "C" @ 484..485: Class
+        "c" @ 488..489: Variable
+        "instance_method" @ 490..505: Method
+        "plain_method" @ 508..520: Method
+        "instance_method" @ 523..538: Method
+        "c" @ 541..542: Variable
+        "class_method" @ 543..555: Method
+        "c" @ 558..559: Variable
+        "static_method" @ 560..573: Method
+        "c" @ 576..577: Variable
+        "callback" @ 578..586: Variable
         "#);
     }
 

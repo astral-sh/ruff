@@ -35,19 +35,41 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
     // any event of that ingredient.
     let query_name = query_name(&query);
 
-    let event = events.iter().find(|event| {
-        if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
-        } else {
-            false
-        }
-    });
+    let event = find_will_execute_event_by_name(db, query_name, None, events);
 
     db.attach(|_| {
         if let Some(will_execute_event) = event {
             panic!(
                 "Expected query {query_name}() not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
             );
+        }
+    });
+}
+
+pub fn assert_function_query_was_not_run_by_name<Db>(
+    db: &Db,
+    query_name: &str,
+    input: Option<salsa::Id>,
+    events: &[salsa::Event],
+) where
+    Db: salsa::Database,
+{
+    let will_execute_event = find_will_execute_event_by_name(db, query_name, input, events);
+
+    db.attach(|_| {
+        if let Some(will_execute_event) = will_execute_event {
+            match input {
+                Some(input) => {
+                    panic!(
+                        "Expected query {query_name}({input:?}) not to have run but it did: {will_execute_event:?}\n\n{events:#?}"
+                    );
+                }
+                None => {
+                    panic!(
+                        "Expected query {query_name} not to have run for any input but it did: {will_execute_event:?}\n\n{events:#?}"
+                    );
+                }
+            }
         }
     });
 }
@@ -87,16 +109,25 @@ where
 {
     let query_name = query_name(&query);
 
-    let event = events.iter().find(|event| {
+    let event = find_will_execute_event_by_name(db, query_name, Some(input.as_id()), events);
+
+    (query_name, event)
+}
+
+pub fn find_will_execute_event_by_name<'a>(
+    db: &dyn salsa::Database,
+    query_name: &str,
+    input: Option<salsa::Id>,
+    events: &'a [salsa::Event],
+) -> Option<&'a salsa::Event> {
+    events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
             db.ingredient_debug_name(database_key.ingredient_index()) == query_name
-                && database_key.key_index() == input.as_id()
+                && input.is_none_or(|input| database_key.key_index() == input)
         } else {
             false
         }
-    });
-
-    (query_name, event)
+    })
 }
 
 fn query_name<Q>(_query: &Q) -> &'static str {

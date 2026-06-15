@@ -15,7 +15,7 @@ impl<'db> Bindings<'db> {
     ) {
         let property_instance =
             |getter: Option<Type<'db>>, setter: Option<Type<'db>>, deleter: Option<Type<'db>>| {
-                Type::PropertyInstance(PropertyInstanceType::new(
+                Type::PropertyInstance(PropertyInstanceType::new_enum_property(
                     db,
                     getter.filter(|ty| !ty.is_none(db)),
                     setter.filter(|ty| !ty.is_none(db)),
@@ -23,6 +23,9 @@ impl<'db> Bindings<'db> {
                 ))
             };
 
+        // TODO: Preserve subclasses of `enum.property`. `PropertyInstanceType` currently records
+        // only a known property class, so this rewrite collapses subclass instances to
+        // `enum.property`.
         for constructor in self.iter_constructor_items_mut() {
             if !constructor
                 .constructed_instance_type()

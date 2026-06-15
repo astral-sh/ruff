@@ -1248,6 +1248,25 @@ reveal_type(Pair(1, 2).second)  # revealed: TypeVar
 
 The following attributes are available on `NamedTuple` classes / instances:
 
+### `__match_args__` before Python 3.10
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from typing import NamedTuple
+
+class Point(NamedTuple):
+    x: int
+
+# error: [unresolved-attribute]
+reveal_type(Point.__match_args__)  # revealed: Unknown
+```
+
+### Other attributes
+
 ```py
 from typing import NamedTuple
 
@@ -1257,6 +1276,7 @@ class Person(NamedTuple):
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person.__slots__)  # revealed: tuple[()]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
@@ -1360,6 +1380,8 @@ class Url(namedtuple("Url", field_names)):
         reveal_type(self.port)  # revealed: Any
         reveal_type(self.unknown)  # revealed: Any
         return self._replace(port=port)
+
+reveal_type(Url.__match_args__)  # revealed: tuple[str, ...]
 ```
 
 ## `collections.namedtuple` attributes
@@ -1372,6 +1394,7 @@ from collections import namedtuple
 Person = namedtuple("Person", ["name", "age"])
 
 reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person.__match_args__)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]

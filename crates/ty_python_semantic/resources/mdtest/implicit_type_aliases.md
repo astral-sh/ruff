@@ -794,6 +794,8 @@ def _(doubly_specialized: MyListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
 
+### Incorrect number of type arguments
+
 Specializing a generic implicit type alias with an incorrect number of type arguments also results
 in an error:
 
@@ -832,6 +834,8 @@ def _(
 ):
     reveal_type(specialized)  # revealed: Unknown
 ```
+
+### Union without a binding context
 
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
 

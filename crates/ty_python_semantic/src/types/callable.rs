@@ -487,6 +487,16 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
     }
 
+    /// Returns `true` if this callable represents a function used as a class member.
+    pub fn is_method_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            self.kind(db),
+            CallableTypeKind::FunctionLike
+                | CallableTypeKind::StaticMethodLike
+                | CallableTypeKind::ClassMethodLike
+        )
+    }
+
     pub(crate) fn into_regular(self, db: &'db dyn Db) -> CallableType<'db> {
         CallableType::new(
             db,

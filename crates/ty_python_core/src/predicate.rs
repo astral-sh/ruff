@@ -11,6 +11,7 @@ use ruff_db::files::File;
 use ruff_index::{FrozenIndexVec, Idx, IndexVec};
 use ruff_python_ast::{Singleton, name::Name};
 
+use crate::ast_ids::ExpressionNodeKey;
 use crate::db::Db;
 use crate::expression::Expression;
 use crate::global_scope;
@@ -130,7 +131,18 @@ pub enum PredicateNode<'db> {
     /// positives.
     IsNonTerminalCall(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
+    SubjectElementPattern(SubjectElementPatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
+}
+
+/// A pattern predicate applied to one expression in a sequence-display subject.
+///
+/// The full pattern determines the predicate's truth value, while `target` selects the subject
+/// occurrence whose aligned pattern constraint should be applied to a binding.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub struct SubjectElementPatternPredicate<'db> {
+    pub pattern: PatternPredicate<'db>,
+    pub target: ExpressionNodeKey,
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]

@@ -1,5 +1,65 @@
 # Changelog
 
+## 0.15.17
+
+Released on 2026-06-11.
+
+### Preview features
+
+- Allow human-readable names in suppression comments ([#25614](https://github.com/astral-sh/ruff/pull/25614))
+- Fix handling of `ignore` comments within a `disable`/`enable` pair ([#25845](https://github.com/astral-sh/ruff/pull/25845))
+- Prioritize human-readable names in CLI output ([#25869](https://github.com/astral-sh/ruff/pull/25869))
+- Respect diagnostic start and parent ranges and trailing comments in `ruff:ignore` suppressions ([#25673](https://github.com/astral-sh/ruff/pull/25673))
+- \[`flake8-async`\] Add `trio.as_safe_channel` to safe decorators (`ASYNC119`) ([#25775](https://github.com/astral-sh/ruff/pull/25775))
+- \[`flake8-pytest-style`\] Also check `pytest_asyncio` fixtures ([#25375](https://github.com/astral-sh/ruff/pull/25375))
+- \[`ruff`\] Ban `pytest` autouse fixtures (`RUF076`) ([#25477](https://github.com/astral-sh/ruff/pull/25477))
+- \[`pyupgrade`\] Add `from __future__ import annotations` automatically (`UP007`, `UP045`) ([#23259](https://github.com/astral-sh/ruff/pull/23259))
+
+### Bug fixes
+
+- Fix diagnostic when `ruff:enable` or `ruff:disable` appears where `ruff:ignore` is expected ([#25700](https://github.com/astral-sh/ruff/pull/25700))
+- \[`pyupgrade`\] Preserve leading empty literals to avoid syntax errors (`UP032`) ([#25491](https://github.com/astral-sh/ruff/pull/25491))
+
+### Rule changes
+
+- \[`flake8-pytest-style`\] Clarify diagnostic message for single parameters (`PT007`) ([#25592](https://github.com/astral-sh/ruff/pull/25592))
+- \[`numpy`\] Drop autofix for `np.in1d` (`NPY201`) ([#25612](https://github.com/astral-sh/ruff/pull/25612))
+- \[`pylint`\] Exempt Python version comparisons (`PLR2004`) ([#25743](https://github.com/astral-sh/ruff/pull/25743))
+
+### Performance
+
+- Reserve AST `Vec`s with correct capacity for common cases ([#25451](https://github.com/astral-sh/ruff/pull/25451))
+
+### Formatter
+
+- Preserve whitespace for Quarto cell option comments ([#25641](https://github.com/astral-sh/ruff/pull/25641))
+
+### CLI
+
+- Allow rule names in `ruff rule` ([#25640](https://github.com/astral-sh/ruff/pull/25640))
+
+### Other changes
+
+- Fix playground diagnostics scrollbars ([#25642](https://github.com/astral-sh/ruff/pull/25642))
+
+### Contributors
+
+- [@SuryanshSS1011](https://github.com/SuryanshSS1011)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@romero-deshaw](https://github.com/romero-deshaw)
+- [@karlhillx](https://github.com/karlhillx)
+- [@carljm](https://github.com/carljm)
+- [@ntBre](https://github.com/ntBre)
+- [@11happy](https://github.com/11happy)
+- [@Kilo59](https://github.com/Kilo59)
+- [@oconnor663](https://github.com/oconnor663)
+- [@LeonidasZhak](https://github.com/LeonidasZhak)
+- [@DavisVaughan](https://github.com/DavisVaughan)
+- [@MeGaGiGaGon](https://github.com/MeGaGiGaGon)
+- [@jonathandung](https://github.com/jonathandung)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@brianmego](https://github.com/brianmego)
+
 ## 0.15.16
 
 Released on 2026-06-04.

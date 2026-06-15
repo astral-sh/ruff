@@ -3704,6 +3704,37 @@ fn output_format_show_fixes(output_format: &str) -> Result<()> {
 }
 
 #[test]
+fn show_fixes_preview() -> Result<()> {
+    let fixture = CliTest::with_file("input.py", "import os  # F401")?;
+
+    assert_cmd_snapshot!(
+        fixture.check_command().args([
+            "--select",
+            "F401",
+            "--fix",
+            "--show-fixes",
+            "--preview",
+            "input.py",
+        ]),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    Fixed 1 error:
+    - input.py:
+        1 × unused-import (F401)
+
+    Found 1 error (1 fixed, 0 remaining).
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn up045_nested_optional_flatten_all() {
     let contents = "\
 from typing import Optional

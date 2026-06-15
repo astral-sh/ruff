@@ -212,7 +212,7 @@ fn fix_unnecessary_dict_comprehension(value: &Expr, generator: &Comprehension) -
         } else {
             Box::from([iterable, value.clone()])
         },
-        keywords: Box::from([]),
+        keywords: std::iter::empty().collect(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
