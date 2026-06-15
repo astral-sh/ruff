@@ -253,7 +253,7 @@ static ISSUE_LINK_TODO_LINE_REGEX_SET: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         r"\s*(http|https)://.*", // issue link
         r"\s*#\d+.*",            // issue code - like "#003"
-        r"\s*[A-Z]+\-?\d+",     // issue code - like "PROJ-123"
+        r"\s*[A-Z]+\-?\d+",      // issue code - like "PROJ-123"
     ])
     .unwrap()
 });
