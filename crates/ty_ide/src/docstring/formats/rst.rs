@@ -118,7 +118,7 @@ impl FieldList {
             }
 
             let Some(field_list) = Self::parse(&mut lines) else {
-                preformatted_blocks.observe_non_preformatted_line(line.text);
+                preformatted_blocks.observe_line_outside_preformatted_block(line.text);
                 lines.next();
                 continue;
             };

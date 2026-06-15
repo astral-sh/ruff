@@ -8,7 +8,7 @@ use super::markdown;
 pub(super) struct PreformattedBlockScanner<'a> {
     active_markdown_fence: Option<markdown::MarkdownFence<'a>>,
     active_doctest: bool,
-    preformatted_block_state: PreformattedBlockState,
+    rest_literal_blocks: RestLiteralBlockScanner,
 }
 
 /// The set of characters that can each be used to denote a block quote.
@@ -27,7 +27,7 @@ impl<'a> PreformattedBlockScanner<'a> {
             return true;
         }
 
-        if self.is_within_preformatted_block(line) {
+        if self.rest_literal_blocks.consume_line(line) {
             return true;
         }
 
@@ -51,89 +51,105 @@ impl<'a> PreformattedBlockScanner<'a> {
         false
     }
 
-    /// Updates internal state that allows us to detect preformatted blocks introduced by reST
-    /// syntax.
-    pub(super) fn observe_non_preformatted_line(&mut self, line: &str) {
-        if matches!(
-            self.preformatted_block_state,
-            PreformattedBlockState::Inactive
-        ) && Self::line_starts_rest_preformatted_block(line.trim_start())
+    /// Updates internal state for a line outside of any active preformatted block.
+    pub(super) fn observe_line_outside_preformatted_block(&mut self, line: &str) {
+        self.rest_literal_blocks.observe_marker_in_line(line);
+    }
+
+    /// Whether or not the given line marks the start of a doctest.
+    fn line_starts_doctest(line: &str) -> bool {
+        line.trim_start_matches(' ').starts_with(">>>")
+    }
+}
+
+/// Recognizes literal blocks introduced by reST syntax.
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
+pub(super) struct RestLiteralBlockScanner {
+    state: RestLiteralBlockState,
+}
+
+impl RestLiteralBlockScanner {
+    /// Updates internal state for a possible reST literal block marker.
+    pub(super) fn observe_marker_in_line(&mut self, line: &str) {
+        self.observe_marker(line, indentation(line));
+    }
+
+    /// Updates internal state for a possible reST literal block marker whose text has already
+    /// been split out from its source line.
+    pub(super) fn observe_marker(&mut self, line: &str, marker_indent: TextSize) {
+        let line = line.trim_start();
+        if matches!(self.state, RestLiteralBlockState::Inactive)
+            && Self::line_starts_literal_block(line)
         {
-            self.preformatted_block_state = PreformattedBlockState::Pending {
-                marker_indent: indentation(line),
-                allows_quoted_literal_block: Self::allows_quoted_literal_block(line.trim_start()),
+            self.state = RestLiteralBlockState::Pending {
+                marker_indent,
+                allows_quoted_literal_block: Self::allows_quoted_literal_block(line),
             };
         }
     }
 
-    /// Whether or not the given line is specifically within a preformatted block
-    /// introduced by reST syntax.
-    fn is_within_preformatted_block(&mut self, line: &str) -> bool {
+    /// Consumes a line if it is inside a reST literal block already observed by `observe_marker`.
+    pub(super) fn consume_line(&mut self, line: &str) -> bool {
         let current_indent = indentation(line);
         let line_is_empty = line.trim_start().is_empty();
 
-        match self.preformatted_block_state {
-            PreformattedBlockState::Active(PreformattedBlockKind::Indented { marker_indent }) => {
+        match self.state {
+            RestLiteralBlockState::Active(RestLiteralBlockKind::Indented { marker_indent }) => {
                 if !line_is_empty && current_indent <= marker_indent {
-                    // We've reached the de-dent that marks the end of the preformatted block.
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
+                    // We've reached the de-dent that marks the end of the literal block.
+                    self.state = RestLiteralBlockState::Inactive;
                     false
                 } else {
                     true
                 }
             }
-            PreformattedBlockState::Active(PreformattedBlockKind::QuotedLiteral {
-                indent,
-                quote,
-            }) => {
+            RestLiteralBlockState::Active(RestLiteralBlockKind::Quoted { indent, quote }) => {
                 if line_is_empty {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
+                    self.state = RestLiteralBlockState::Inactive;
                     false
                 } else if Self::quote_character(line, indent) == Some(quote) {
                     true
                 } else {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
+                    self.state = RestLiteralBlockState::Inactive;
                     false
                 }
             }
-            PreformattedBlockState::Pending {
+            RestLiteralBlockState::Pending {
                 marker_indent,
                 allows_quoted_literal_block,
             } if !line_is_empty => {
                 if current_indent > marker_indent {
-                    // We just entered a new preformatted block.
-                    self.preformatted_block_state =
-                        PreformattedBlockState::Active(PreformattedBlockKind::Indented {
-                            marker_indent,
-                        });
+                    // We just entered a new literal block.
+                    self.state = RestLiteralBlockState::Active(RestLiteralBlockKind::Indented {
+                        marker_indent,
+                    });
                     true
                 } else if allows_quoted_literal_block
                     && let Some(quote) = Self::quote_character(line, marker_indent)
                 {
-                    self.preformatted_block_state =
-                        PreformattedBlockState::Active(PreformattedBlockKind::QuotedLiteral {
-                            indent: marker_indent,
-                            quote,
-                        });
+                    self.state = RestLiteralBlockState::Active(RestLiteralBlockKind::Quoted {
+                        indent: marker_indent,
+                        quote,
+                    });
                     true
                 } else {
-                    self.preformatted_block_state = PreformattedBlockState::Inactive;
+                    self.state = RestLiteralBlockState::Inactive;
                     false
                 }
             }
-            PreformattedBlockState::Pending { .. } | PreformattedBlockState::Inactive => false,
+            RestLiteralBlockState::Pending { .. } | RestLiteralBlockState::Inactive => false,
         }
     }
 
-    /// Whether or not the given line marks the start of a reST preformatted block.
-    fn line_starts_rest_preformatted_block(line: &str) -> bool {
-        let Some(marker) = Self::preformatted_block_marker(line) else {
+    /// Whether or not the given line marks the start of a reST literal block.
+    fn line_starts_literal_block(line: &str) -> bool {
+        let Some(marker) = Self::literal_block_marker(line) else {
             return false;
         };
 
         !matches!(
             marker,
-            PreformattedBlockMarker::Directive(
+            RestLiteralBlockMarker::Directive(
                 "attention"
                     | "caution"
                     | "danger"
@@ -157,8 +173,8 @@ impl<'a> PreformattedBlockScanner<'a> {
         )
     }
 
-    /// Tries to identify a marker that introduces a preformatted block.
-    fn preformatted_block_marker(line: &str) -> Option<PreformattedBlockMarker<'_>> {
+    /// Tries to identify a marker that introduces a reST literal block.
+    fn literal_block_marker(line: &str) -> Option<RestLiteralBlockMarker<'_>> {
         let marker = if let Some(marker) = line.strip_suffix("::") {
             marker
         } else {
@@ -167,23 +183,18 @@ impl<'a> PreformattedBlockScanner<'a> {
         };
 
         if let Some(directive) = marker.strip_prefix(".. ") {
-            Some(PreformattedBlockMarker::Directive(directive))
+            Some(RestLiteralBlockMarker::Directive(directive))
         } else {
-            Some(PreformattedBlockMarker::Paragraph)
+            Some(RestLiteralBlockMarker::Paragraph)
         }
     }
 
-    /// Whether or not the given line marks the start of a doctest.
-    fn line_starts_doctest(line: &str) -> bool {
-        line.trim_start_matches(' ').starts_with(">>>")
-    }
-
-    /// Whether or not a particular preformatted block can contain an unindented quoted literal block.
+    /// Whether or not a particular literal block can contain an unindented quoted literal block.
     fn allows_quoted_literal_block(line: &str) -> bool {
         line.ends_with("::")
             && matches!(
-                Self::preformatted_block_marker(line),
-                Some(PreformattedBlockMarker::Paragraph)
+                Self::literal_block_marker(line),
+                Some(RestLiteralBlockMarker::Paragraph)
             )
     }
 
@@ -200,30 +211,30 @@ impl<'a> PreformattedBlockScanner<'a> {
     }
 }
 
-/// Identifies the syntax that introduced a potential preformatted block.
+/// Identifies the syntax that introduced a potential reST literal block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockMarker<'a> {
+enum RestLiteralBlockMarker<'a> {
     Paragraph,
     Directive(&'a str),
 }
 
-/// Tracks the state of a preformatted block introduced by reST syntax.
+/// Tracks the state of a literal block introduced by reST syntax.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockState {
+enum RestLiteralBlockState {
     #[default]
     Inactive,
     Pending {
         marker_indent: TextSize,
         allows_quoted_literal_block: bool,
     },
-    Active(PreformattedBlockKind),
+    Active(RestLiteralBlockKind),
 }
 
-/// Tracks the type of an active preformatted block.
+/// Tracks the type of an active reST literal block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PreformattedBlockKind {
+enum RestLiteralBlockKind {
     Indented { marker_indent: TextSize },
-    QuotedLiteral { indent: TextSize, quote: char },
+    Quoted { indent: TextSize, quote: char },
 }
 
 fn indentation(line: &str) -> TextSize {
