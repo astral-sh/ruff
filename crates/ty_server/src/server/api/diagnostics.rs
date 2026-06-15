@@ -468,15 +468,9 @@ pub(super) fn to_lsp_diagnostic(
                     encoding,
                 ));
 
-                related_information.extend(
-                    sub_diagnostic
-                        .annotations()
-                        .iter()
-                        .filter(|annotation| !annotation.is_primary())
-                        .filter_map(|annotation| {
-                            annotation_to_related_information(db, annotation, encoding)
-                        }),
-                );
+                related_information.extend(sub_diagnostic.secondary_annotations().filter_map(
+                    |annotation| annotation_to_related_information(db, annotation, encoding),
+                ));
             }
 
             Some(related_information)
@@ -615,5 +609,100 @@ impl DiagnosticData {
                 .unwrap_or_else(|| format!("Fix {}", diagnostic.id())),
             edits: lsp_edits,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use lsp_types::ClientCapabilities;
+    use ruff_db::diagnostic::{
+        Annotation, Diagnostic as TyDiagnostic, DiagnosticId, Severity, Span, SubDiagnostic,
+        SubDiagnosticSeverity,
+    };
+    use ruff_db::files::system_path_to_file;
+    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+    use ruff_python_ast::name::Name;
+    use ruff_text_size::{TextRange, TextSize};
+    use ty_project::{ProjectDatabase, ProjectMetadata};
+
+    use crate::PositionEncoding;
+    use crate::capabilities::ResolvedClientCapabilities;
+    use crate::session::GlobalSettings;
+
+    use super::to_lsp_diagnostic;
+
+    #[test]
+    fn all_annotations_are_related_information() -> anyhow::Result<()> {
+        let path = SystemPath::new("/test.py");
+        let system = TestSystem::default();
+        system.memory_file_system().write_file(path, "abcdef")?;
+
+        let metadata = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
+        let db = ProjectDatabase::use_defaults(metadata, system);
+        let file = system_path_to_file(&db, path).expect("test file to exist");
+        let span = |offset| {
+            Span::from(file).with_range(TextRange::at(TextSize::new(offset), TextSize::new(1)))
+        };
+
+        let mut diagnostic = TyDiagnostic::new(
+            DiagnosticId::lint("synthetic"),
+            Severity::Error,
+            "Synthetic diagnostic",
+        );
+        diagnostic.annotate(Annotation::primary(span(0)).message("Primary annotation"));
+        diagnostic.annotate(Annotation::secondary(span(1)).message("Secondary annotation"));
+        diagnostic.annotate(Annotation::primary(span(2)).message("Additional primary annotation"));
+
+        let mut sub_diagnostic =
+            SubDiagnostic::new(SubDiagnosticSeverity::Info, "Synthetic subdiagnostic");
+        sub_diagnostic.annotate(Annotation::secondary(span(3)).message("Secondary subannotation"));
+        sub_diagnostic.annotate(Annotation::primary(span(4)).message("Primary subannotation"));
+        sub_diagnostic
+            .annotate(Annotation::primary(span(5)).message("Additional primary subannotation"));
+        diagnostic.sub(sub_diagnostic);
+
+        let mut client_capabilities = ClientCapabilities::default();
+        client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .publish_diagnostics
+            .get_or_insert_default()
+            .diagnostics_capabilities
+            .related_information = Some(true);
+
+        let (_, lsp_diagnostic) = to_lsp_diagnostic(
+            &db,
+            &diagnostic,
+            PositionEncoding::UTF8,
+            ResolvedClientCapabilities::new(&client_capabilities),
+            &GlobalSettings::default(),
+        )
+        .expect("diagnostic to have a primary annotation");
+
+        let related_information = lsp_diagnostic
+            .related_information
+            .expect("client supports diagnostic related information");
+        assert_eq!(
+            related_information
+                .iter()
+                .map(|information| information.location.range.start.character)
+                .collect::<Vec<_>>(),
+            [1, 2, 4, 3, 5]
+        );
+        assert_eq!(
+            related_information
+                .iter()
+                .map(|information| information.message.as_str())
+                .collect::<Vec<_>>(),
+            [
+                "Secondary annotation",
+                "Additional primary annotation",
+                "Synthetic subdiagnostic: Primary subannotation",
+                "Secondary subannotation",
+                "Additional primary subannotation",
+            ]
+        );
+
+        Ok(())
     }
 }
