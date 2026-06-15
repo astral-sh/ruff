@@ -915,7 +915,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db,
             target_name.clone(),
             Some(definition),
-            TypeVarKind::ParamSpec,
+            TypeVarKind::LegacyParamSpec,
         );
         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             db, identity, None, variance, default,

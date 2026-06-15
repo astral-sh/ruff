@@ -1240,7 +1240,7 @@ pub enum TypeVarKind {
     /// `typing.Self`
     TypingSelf,
     /// `P = ParamSpec("P")`
-    ParamSpec,
+    LegacyParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
     /// `Alias: typing.TypeAlias = T`
@@ -1249,7 +1249,7 @@ pub enum TypeVarKind {
 
 impl TypeVarKind {
     pub(super) const fn is_paramspec(self) -> bool {
-        matches!(self, Self::ParamSpec | Self::Pep695ParamSpec)
+        matches!(self, Self::LegacyParamSpec | Self::Pep695ParamSpec)
     }
 }
 
