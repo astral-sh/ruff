@@ -835,6 +835,12 @@ fn compare_literal_to_other<'db>(
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
         }
+        Some(KnownComparisonSemantics::Object)
+            if literal_semantics == KnownComparisonSemantics::Object
+                && other.is_disjoint_from(db, literal_type) =>
+        {
+            ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
+        }
         // Inherited builtin comparison semantics do not imply type overlap. For example, a final
         // `int` subclass can compare equal to `1` despite being disjoint from `Literal[1]`.
         Some(_)
