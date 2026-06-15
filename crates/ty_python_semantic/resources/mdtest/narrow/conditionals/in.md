@@ -220,10 +220,10 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
 
 ## Membership and equality
 
-If one member of a union cannot compare equal to any item in the container, we can remove that
-member inside the `if` body. A `TypedDict` cannot compare equal to a string, and a final class with
-the default identity-based equality cannot compare equal to an integer. We retain types such as
-`int` and classes with custom equality when they might still match an item.
+When containment is known to compare items using equality, we can remove a union member that cannot
+compare equal to any item in the container. A `TypedDict` cannot compare equal to a string, and a
+final class with the default identity-based equality cannot compare equal to an integer. We retain
+types such as `int` and classes with custom equality when they might still match an item.
 
 ```py
 from typing import Literal, TypedDict, final
