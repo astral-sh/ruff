@@ -231,8 +231,7 @@ fn normalize_enum_complement_unions<'db>(db: &'db dyn Db, types: &mut Vec<Type<'
 
 struct CycleFusionSummary<'db> {
     recursion_guard: visitor::TypeCollector<'db>,
-    divergent_id: Cell<Option<salsa::Id>>,
-    has_multiple_divergent_ids: Cell<bool>,
+    has_divergent: Cell<bool>,
     has_recursive: Cell<bool>,
     has_type_alias: Cell<bool>,
 }
@@ -241,8 +240,7 @@ impl<'db> CycleFusionSummary<'db> {
     fn collect(db: &'db dyn Db, ty: Type<'db>) -> Self {
         let summary = Self {
             recursion_guard: visitor::TypeCollector::default(),
-            divergent_id: Cell::new(None),
-            has_multiple_divergent_ids: Cell::new(false),
+            has_divergent: Cell::new(false),
             has_recursive: Cell::new(false),
             has_type_alias: Cell::new(false),
         };
@@ -250,18 +248,10 @@ impl<'db> CycleFusionSummary<'db> {
         summary
     }
 
-    fn add_divergent_id(&self, id: salsa::Id) {
-        match self.divergent_id.get() {
-            Some(existing) if existing != id => self.has_multiple_divergent_ids.set(true),
-            Some(_) => {}
-            None => self.divergent_id.set(Some(id)),
-        }
-    }
-
     fn is_finite_cycle_fusion_target(&self) -> bool {
         // Lazy attributes can trigger queries, so this summary is intentionally
         // conservative: aliases and recursive types are not expanded in cycle recovery.
-        self.divergent_id.get().is_none() && !self.has_recursive.get() && !self.has_type_alias.get()
+        !self.has_divergent.get() && !self.has_recursive.get() && !self.has_type_alias.get()
     }
 }
 
@@ -272,7 +262,7 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
 
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
-            Type::Divergent(divergent) => self.add_divergent_id(divergent.id(db)),
+            Type::Divergent(_) => self.has_divergent.set(true),
             Type::Recursive(_) => self.has_recursive.set(true),
             Type::TypeAlias(_) => self.has_type_alias.set(true),
             _ => visitor::walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard),
@@ -288,7 +278,6 @@ impl<'db> TypeVisitor<'db> for CycleFusionSummary<'db> {
 /// must already be available without expanding aliases or recursive types.
 struct CycleFusionOverlay {
     divergent_id: Cell<Option<salsa::Id>>,
-    has_bodyful_marker: Cell<bool>,
     has_multiple_divergent_ids: Cell<bool>,
 }
 
@@ -300,24 +289,12 @@ impl CycleFusionOverlay {
     ) -> Option<Type<'db>> {
         let overlay = Self {
             divergent_id: Cell::new(None),
-            has_bodyful_marker: Cell::new(false),
             has_multiple_divergent_ids: Cell::new(false),
         };
         let overlaid = overlay.overlay_type(db, marker_candidate, finite_candidate);
         let overlaid = overlaid?;
         let marker_id = overlay.single_divergent_id()?;
         Some(Type::cycle_marked(db, marker_id, overlaid))
-    }
-
-    fn add_bodyful_marker_id(&self, id: salsa::Id) {
-        self.has_bodyful_marker.set(true);
-        self.add_divergent_id(id);
-    }
-
-    fn add_placeholder_id(&self, id: salsa::Id) {
-        if !self.has_bodyful_marker.get() {
-            self.add_divergent_id(id);
-        }
     }
 
     fn add_divergent_id(&self, id: salsa::Id) {
@@ -344,7 +321,7 @@ impl CycleFusionOverlay {
         if let Type::Divergent(marked) = marker
             && let Some(body) = marked.body(db)
         {
-            self.add_bodyful_marker_id(marked.binder_id(db));
+            self.add_divergent_id(marked.binder_id(db));
             if let Type::Divergent(finite_marked) = finite
                 && finite_marked.binder_id(db) == marked.binder_id(db)
                 && finite_marked.body(db).is_some()
@@ -356,7 +333,7 @@ impl CycleFusionOverlay {
         if let Type::Divergent(marked) = finite
             && let Some(body) = marked.body(db)
         {
-            self.add_bodyful_marker_id(marked.binder_id(db));
+            self.add_divergent_id(marked.binder_id(db));
             return self.overlay_type(db, marker, body);
         }
 
@@ -366,7 +343,7 @@ impl CycleFusionOverlay {
 
         match marker {
             Type::Divergent(divergent) => {
-                self.add_placeholder_id(divergent.id(db));
+                self.add_divergent_id(divergent.id(db));
                 // A marker leaf can be replaced only by a finite shape that is
                 // already available without expanding aliases or recursive types.
                 CycleFusionSummary::collect(db, finite)
@@ -377,7 +354,7 @@ impl CycleFusionOverlay {
                 let mut elements = Vec::with_capacity(union.elements(db).len() + 1);
                 for element in union.elements(db) {
                     let summary = CycleFusionSummary::collect(db, *element);
-                    if summary.divergent_id.get().is_some() {
+                    if summary.has_divergent.get() {
                         elements.push(self.overlay_type(db, *element, finite)?);
                     } else if summary.is_finite_cycle_fusion_target() {
                         elements.push(*element);
