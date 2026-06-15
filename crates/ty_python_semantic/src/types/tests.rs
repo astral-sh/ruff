@@ -464,7 +464,7 @@ fn cycle_recovery_union_preserves_finite_shape_with_marker() {
 
     assert_eq!(
         recovered.display(&db).to_string(),
-        UnionType::from_elements_cycle_recovery(&db, [int, list_int, list_marker])
+        UnionType::from_elements_cycle_recovery(&db, [int, list_marker, list_int])
             .display(&db)
             .to_string()
     );
