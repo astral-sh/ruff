@@ -7534,8 +7534,39 @@ impl RootNodeKind {
     ];
 
     /// Returns the root node kind with the given discriminant.
+    #[inline]
     pub fn from_u8(value: u8) -> Option<Self> {
-        Self::ALL.get(usize::from(value)).copied()
+        match value {
+            0 => Some(Self::Mod),
+            1 => Some(Self::Stmt),
+            2 => Some(Self::Expr),
+            3 => Some(Self::ExceptHandler),
+            4 => Some(Self::InterpolatedStringElement),
+            5 => Some(Self::Pattern),
+            6 => Some(Self::TypeParam),
+            7 => Some(Self::InterpolatedStringFormatSpec),
+            8 => Some(Self::PatternArguments),
+            9 => Some(Self::PatternKeyword),
+            10 => Some(Self::Comprehension),
+            11 => Some(Self::Arguments),
+            12 => Some(Self::Parameters),
+            13 => Some(Self::Parameter),
+            14 => Some(Self::ParameterWithDefault),
+            15 => Some(Self::Keyword),
+            16 => Some(Self::Alias),
+            17 => Some(Self::WithItem),
+            18 => Some(Self::MatchCase),
+            19 => Some(Self::Decorator),
+            20 => Some(Self::ElifElseClause),
+            21 => Some(Self::TypeParams),
+            22 => Some(Self::FString),
+            23 => Some(Self::TString),
+            24 => Some(Self::StringLiteral),
+            25 => Some(Self::BytesLiteral),
+            26 => Some(Self::Identifier),
+
+            _ => None,
+        }
     }
 }
 
