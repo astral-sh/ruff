@@ -60,25 +60,27 @@ fn check_pep695_function_legacy_typevars<'db>(
         return;
     };
 
-    let legacy_default = type_params
-        .iter()
-        .filter_map(ast::TypeParam::default)
-        .find_map(|default| {
-            find_over_type(db, file_expression_type(default), false, |ty| {
-                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
-                    && matches!(
-                        typevar.kind(db),
-                        TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
-                    )
-                {
-                    Some((typevar, default.range()))
-                } else {
-                    None
-                }
-            })
-        });
-    if let Some((typevar, range)) = legacy_default {
-        report_pep695_function_legacy_typevar(context, typevar, range);
+    let mut has_legacy_default = false;
+    for default in type_params.iter().filter_map(ast::TypeParam::default) {
+        let Some(typevar) = find_over_type(db, file_expression_type(default), false, |ty| {
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                && matches!(
+                    typevar.kind(db),
+                    TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+                )
+            {
+                Some(typevar)
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+
+        report_pep695_function_legacy_typevar(context, typevar, default.range());
+        has_legacy_default = true;
+    }
+    if has_legacy_default {
         return;
     }
 
