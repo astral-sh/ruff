@@ -1996,6 +1996,7 @@ impl HashableReal {
     }
 }
 
+// `2^64`, the exclusive upper bound for values representable as a `u64`.
 const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
 
 impl<'a> From<&'a Expr> for HashableExpr<'a> {
