@@ -367,26 +367,46 @@ struct StubPackageSearchPaths {
     stdlib_offset: usize,
 }
 
+impl StubPackageSearchPaths {
+    fn empty() -> Self {
+        Self {
+            paths: Box::new([]),
+            stdlib_offset: 0,
+        }
+    }
+
+    fn from_search_paths<'a>(
+        db: &dyn Db,
+        search_paths: impl Iterator<Item = &'a SearchPath>,
+    ) -> Self {
+        let mut paths = Vec::new();
+        let mut stdlib_offset = None;
+
+        for search_path in search_paths {
+            if search_path.is_standard_library() {
+                stdlib_offset = Some(paths.len());
+            } else if search_path_may_contain_stub_package(db, search_path) {
+                paths.push(search_path.clone());
+            }
+        }
+
+        let stdlib_offset = stdlib_offset.unwrap_or(paths.len());
+        Self {
+            paths: paths.into_boxed_slice(),
+            stdlib_offset,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.paths.is_empty()
+    }
+}
+
 /// Returns the search paths that may contain a top-level stub package, preserving their
 /// resolution order relative to stdlib.
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 fn stub_package_search_paths(db: &dyn Db) -> StubPackageSearchPaths {
-    let mut paths = Vec::new();
-    let mut stdlib_offset = None;
-
-    for search_path in search_paths(db, ModuleResolveMode::StubsAllowed) {
-        if search_path.is_standard_library() {
-            stdlib_offset = Some(paths.len());
-        } else if search_path_may_contain_stub_package(db, search_path) {
-            paths.push(search_path.clone());
-        }
-    }
-
-    let stdlib_offset = stdlib_offset.unwrap_or(paths.len());
-    StubPackageSearchPaths {
-        paths: paths.into_boxed_slice(),
-        stdlib_offset,
-    }
+    StubPackageSearchPaths::from_search_paths(db, search_paths(db, ModuleResolveMode::StubsAllowed))
 }
 
 fn search_path_may_contain_stub_package(db: &dyn Db, search_path: &SearchPath) -> bool {
@@ -1005,7 +1025,12 @@ struct ModuleNameIngredient<'db> {
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
     let search_paths = search_paths(db, mode);
-    let stub_search_paths = mode.stubs_allowed().then(|| stub_package_search_paths(db));
+    let empty_stub_search_paths = StubPackageSearchPaths::empty();
+    let stub_search_paths = if mode.stubs_allowed() {
+        stub_package_search_paths(db)
+    } else {
+        &empty_stub_search_paths
+    };
     resolve_name_impl(db, name, mode, search_paths, stub_search_paths)
 }
 
@@ -1020,7 +1045,17 @@ fn desperately_resolve_name(
     mode: ModuleResolveMode,
 ) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file);
-    resolve_name_impl(db, name, mode, search_paths.iter().flatten(), None)
+    resolve_name_impl(
+        db,
+        name,
+        mode,
+        search_paths.iter().flatten(),
+        &if mode.stubs_allowed() {
+            StubPackageSearchPaths::from_search_paths(db, search_paths.iter().flatten())
+        } else {
+            StubPackageSearchPaths::empty()
+        },
+    )
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -1165,22 +1200,22 @@ fn resolve_name_impl<'a>(
     name: &ModuleName,
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
-    stub_search_paths: Option<&StubPackageSearchPaths>,
+    stub_search_paths: &StubPackageSearchPaths,
 ) -> Option<ResolvedNames> {
     let python_version = db.python_version();
     let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
     let mut components = name.components();
     let root_component = components.next()?;
-    let stub_name = (!is_non_shadowable && context.mode.stubs_allowed())
+    let stub_name = (!is_non_shadowable && !stub_search_paths.is_empty())
         .then(|| format!("{root_component}-stubs"));
     let mut cur_candidates = Vec::new();
     let mut pending_stub_paths = Vec::new();
 
-    if let Some(paths) = stub_search_paths
-        && let Some(stub_name) = stub_name.as_deref()
-    {
-        let (before_stdlib, after_stdlib) = paths.paths.split_at(paths.stdlib_offset);
+    if let Some(stub_name) = stub_name.as_deref() {
+        let (before_stdlib, after_stdlib) = stub_search_paths
+            .paths
+            .split_at(stub_search_paths.stdlib_offset);
         cur_candidates.extend(before_stdlib.iter().filter_map(|search_path| {
             resolve_stub_package_in_search_path(&context, search_path, stub_name)
         }));
@@ -1205,28 +1240,10 @@ fn resolve_name_impl<'a>(
         }
 
         let is_stdlib = search_path.is_standard_library();
-        let search_path_allows_stubs = stub_name.is_some() && !is_stdlib;
-        // Without the index, a later search path may still provide a higher-priority stub.
-        // With it, only an exact post-stdlib match prevents an early exit before stdlib.
-        let can_stop = match stub_search_paths {
-            Some(_) => is_stdlib || pending_stub_paths.is_empty(),
-            None => !search_path_allows_stubs,
-        };
+        // Only an exact post-stdlib stub package match prevents an early exit before stdlib.
+        let can_stop = is_stdlib || pending_stub_paths.is_empty();
         let mut candidate = ModuleResolutionCandidate::root(search_path);
         let terminal = if candidate_may_exist(&context, &candidate, root_component) {
-            if stub_search_paths.is_none()
-                && search_path_allows_stubs
-                && let Some(stub_name) = stub_name.as_deref()
-                && let Some(stub_candidate) =
-                    resolve_stub_package_in_search_path(&context, search_path, stub_name)
-            {
-                cur_candidates.push(stub_candidate);
-                // Don't break here: we always need to process the non-stub
-                // candidate for the same search path, because sub-packages
-                // within the stubs may override py_typed to partial and fall
-                // through to the runtime package.
-            }
-
             let resolved =
                 resolve_name_in_search_path(&context, &mut candidate, root_component).is_ok();
             let terminal = candidate.missing_submodule_is_terminal();
@@ -1860,6 +1877,25 @@ mod tests {
         assert_eq!(
             foo.file(&db).unwrap().path(&db),
             &src.join("foo-stubs/__init__.pyi")
+        );
+    }
+
+    #[test]
+    fn desperate_resolution_finds_stub_package() {
+        let TestCase { db, src, .. } = TestCaseBuilder::new()
+            .with_src_files(&[
+                ("nested/main.py", ""),
+                ("nested/foo/__init__.py", ""),
+                ("nested/foo-stubs/__init__.pyi", ""),
+            ])
+            .build();
+        let importing_file = system_path_to_file(&db, src.join("nested/main.py")).unwrap();
+
+        let foo =
+            resolve_module(&db, importing_file, &ModuleName::new_static("foo").unwrap()).unwrap();
+        assert_eq!(
+            foo.file(&db).unwrap().path(&db),
+            &src.join("nested/foo-stubs/__init__.pyi")
         );
     }
 
