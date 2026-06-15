@@ -7,7 +7,7 @@ mod version;
 
 use std::fmt::Write;
 use std::io::Read;
-use std::process::{Command as ProcessCommand, ExitCode, Termination};
+use std::process::{ExitCode, Termination};
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -172,10 +172,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let watch = args.watch;
     let exit_zero = args.exit_zero;
-    let dependency_metadata = match dependency_metadata_path.as_deref() {
-        Some(path) => Some(load_dependency_metadata(&system, path)?),
-        None => load_dependency_metadata_from_uv(&system, &project_path),
-    };
     let config_file = args
         .config_file
         .as_ref()
@@ -195,6 +191,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             ProjectMetadata::discover_with_uv_workspace(&project_path, &system, stdin_uv_workspace)?
         }
         None => ProjectMetadata::discover(&project_path, &system)?,
+    };
+
+    let dependency_metadata = match dependency_metadata_path.as_deref() {
+        Some(path) => Some(load_dependency_metadata(&system, path)?),
+        None => project_metadata.uv_dependency_metadata().cloned(),
     };
 
     // Use uv to discover workspace settings without checking sibling workspace members by default.
@@ -279,56 +280,6 @@ fn load_dependency_metadata(system: &dyn System, path: &SystemPath) -> Result<De
         .with_context(|| format!("Failed to load dependency metadata `{path}`"))?;
 
     Ok(metadata)
-}
-
-fn load_dependency_metadata_from_uv(
-    system: &dyn System,
-    project_path: &SystemPath,
-) -> Option<DependencyMetadata> {
-    let workspace_root = project_path
-        .ancestors()
-        .find(|ancestor| system.is_file(&ancestor.join("uv.lock")))?;
-
-    let output = match ProcessCommand::new("uv")
-        .args(["workspace", "metadata", "--locked", "--sync"])
-        .current_dir(workspace_root.as_std_path())
-        .output()
-    {
-        Ok(output) => output,
-        Err(error) => {
-            tracing::debug!("Failed to run `uv workspace metadata --locked --sync`: {error}");
-            return None;
-        }
-    };
-
-    if !output.status.success() {
-        tracing::debug!(
-            "`uv workspace metadata --locked --sync` failed with exit code {:?}: {}",
-            output.status.code(),
-            String::from_utf8_lossy(&output.stderr)
-        );
-        return None;
-    }
-
-    let source = match std::str::from_utf8(&output.stdout) {
-        Ok(source) => source,
-        Err(error) => {
-            tracing::debug!(
-                "`uv workspace metadata --locked --sync` returned non-UTF-8 output: {error}"
-            );
-            return None;
-        }
-    };
-
-    match parse_uv_workspace_metadata(source) {
-        Ok(metadata) => Some(metadata),
-        Err(error) => {
-            tracing::debug!(
-                "Failed to parse `uv workspace metadata --locked --sync` output: {error:#}"
-            );
-            None
-        }
-    }
 }
 
 fn enrich_dependency_metadata(

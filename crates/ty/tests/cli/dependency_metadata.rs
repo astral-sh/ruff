@@ -11,21 +11,21 @@ fn write_uv(case: &CliTest, metadata: &str) -> anyhow::Result<std::path::PathBuf
     case.write_file(
         "bin/uv",
         &format!(
-            r#"
-            #!/bin/sh
-            if [ "$*" != "workspace metadata --locked --sync" ]; then
-                echo "unexpected arguments: $*" >&2
-                exit 2
-            fi
-            cat <<'EOF'
-            {metadata}
-            EOF
-            "#,
+            r#"#!/bin/sh
+if [ "$*" != "workspace metadata --sync" ]; then
+    echo "unexpected arguments: $*" >&2
+    exit 2
+fi
+cat <<'EOF'
+{}
+EOF
+"#,
+            metadata.trim()
         ),
     )?;
     std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
 
-    Ok(bin)
+    Ok(uv)
 }
 
 #[cfg(unix)]
@@ -36,15 +36,14 @@ fn write_failing_uv(case: &CliTest) -> anyhow::Result<std::path::PathBuf> {
     let uv = bin.join("uv");
     case.write_file(
         "bin/uv",
-        r#"
-        #!/bin/sh
-        echo "workspace metadata is unavailable" >&2
-        exit 2
-        "#,
+        r#"#!/bin/sh
+echo "workspace metadata is unavailable" >&2
+exit 2
+"#,
     )?;
     std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
 
-    Ok(bin)
+    Ok(uv)
 }
 
 fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Result<()> {
@@ -71,6 +70,31 @@ fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Resu
     )
 }
 
+fn uv_workspace_metadata(case: &CliTest) -> String {
+    let root = format!("{:?}", case.root().to_str().unwrap());
+    let environment = format!("{:?}", case.root().join(".venv").to_str().unwrap());
+    format!(
+        r#"
+        {{
+          "schema": {{"version": "preview"}},
+          "workspace_root": {root},
+          "environment": {{"root": {environment}}},
+          "requires_python": ">=3.8",
+          "members": [
+            {{"name": "app", "path": {root}, "id": "app"}}
+          ],
+          "resolution": {{
+            "app": {{"name": "app", "dependencies": []}},
+            "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
+          }},
+          "module_owners": {{
+            "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
+          }}
+        }}
+        "#
+    )
+}
+
 #[cfg(unix)]
 #[test]
 fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
@@ -82,32 +106,12 @@ fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let root = format!("{:?}", case.root().to_str().unwrap());
-    let bin = write_uv(
-        &case,
-        &format!(
-            r#"
-            {{
-              "schema": {{"version": "preview"}},
-              "members": [
-                {{"name": "app", "path": {root}, "id": "app"}}
-              ],
-              "resolution": {{
-                "app": {{"name": "app", "dependencies": []}},
-                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
-              }},
-              "module_owners": {{
-                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
-              }}
-            }}
-            "#
-        ),
-    )?;
+    let uv = write_uv(&case, &uv_workspace_metadata(&case))?;
 
     assert_cmd_snapshot!(case.command()
-        .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+        .env("TY_UV", "1")
+        .env("UV", uv), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -126,9 +130,35 @@ fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 #[test]
-fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
+fn dependency_metadata_is_loaded_from_uv_metadata_stdin() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "import requests")?;
+    write_site_package(&case, "requests")?;
+
+    assert_cmd_snapshot!(case.command()
+        .arg("--warn").arg("missing-direct-dependency")
+        .env("TY_UV_METADATA", "1")
+        .pass_stdin(uv_workspace_metadata(&case)), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[missing-direct-dependency]: Third-party import `requests` is used but no direct dependency on `requests` is declared
+     --> test.py:1:8
+      |
+    1 | import requests
+      |        ^^^^^^^^
+      |
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn dependency_metadata_is_not_loaded_without_uv_integration() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("test.py", "import requests"),
         (
@@ -136,32 +166,9 @@ fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let root = format!("{:?}", case.root().to_str().unwrap());
-    let bin = write_uv(
-        &case,
-        &format!(
-            r#"
-            {{
-              "schema": {{"version": "preview"}},
-              "members": [
-                {{"name": "app", "path": {root}, "id": "app"}}
-              ],
-              "resolution": {{
-                "app": {{"name": "app", "dependencies": []}},
-                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
-              }},
-              "module_owners": {{
-                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
-              }}
-            }}
-            "#
-        ),
-    )?;
-
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
-        .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+        .arg("--warn").arg("missing-direct-dependency"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -184,12 +191,13 @@ fn dependency_metadata_uv_failure_does_not_fail_check() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let bin = write_failing_uv(&case)?;
+    let uv = write_failing_uv(&case)?;
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+        .env("TY_UV", "1")
+        .env("UV", uv), @"
     success: true
     exit_code: 0
     ----- stdout -----

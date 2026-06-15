@@ -5,7 +5,10 @@ use pep440_rs::VersionSpecifiers;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use serde::Deserialize;
 use thiserror::Error;
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_static::EnvVars;
+
+use crate::dependency_metadata::parse_uv_workspace_metadata;
 
 use super::pyproject::{ResolveRequiresPythonError, resolve_requires_python_lower_bound};
 use super::python_version::SupportedPythonVersion;
@@ -18,6 +21,7 @@ pub struct UvWorkspace {
     environment: Option<SystemPathBuf>,
     requires_python: Option<RangedValue<SupportedPythonVersion>>,
     configuration_paths: Box<[SystemPathBuf]>,
+    dependency_metadata: Option<DependencyMetadata>,
 }
 
 impl UvWorkspace {
@@ -60,10 +64,10 @@ impl UvWorkspace {
 
     pub fn from_metadata(
         path: &SystemPath,
-        metadata: &[u8],
+        source: &[u8],
         system: &dyn System,
     ) -> Result<Self, UvWorkspaceError> {
-        let metadata = serde_json::from_slice::<WorkspaceMetadata>(metadata)
+        let metadata = serde_json::from_slice::<WorkspaceMetadata>(source)
             .map_err(UvWorkspaceError::InvalidMetadata)?;
 
         if metadata.schema.version != "preview" {
@@ -71,6 +75,16 @@ impl UvWorkspace {
                 metadata.schema.version,
             ));
         }
+
+        let dependency_metadata = match parse_uv_workspace_metadata(source) {
+            Ok(metadata) => Some(metadata),
+            Err(error) => {
+                tracing::debug!(
+                    "Failed to read dependency data from `uv workspace metadata` output: {error:#}"
+                );
+                None
+            }
+        };
 
         let requires_python =
             resolve_requires_python_lower_bound(&RangedValue::cli(metadata.requires_python))
@@ -112,6 +126,7 @@ impl UvWorkspace {
             environment,
             requires_python,
             configuration_paths,
+            dependency_metadata,
         })
     }
 
@@ -129,6 +144,10 @@ impl UvWorkspace {
 
     pub fn requires_python(&self) -> Option<&RangedValue<SupportedPythonVersion>> {
         self.requires_python.as_ref()
+    }
+
+    pub fn dependency_metadata(&self) -> Option<&DependencyMetadata> {
+        self.dependency_metadata.as_ref()
     }
 
     pub(super) fn configuration_paths(&self) -> &[SystemPathBuf] {
