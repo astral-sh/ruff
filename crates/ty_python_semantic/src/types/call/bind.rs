@@ -7092,9 +7092,13 @@ impl<'db> BindingError<'db> {
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
-                    callable_description
-                        .map(|description| format!(" to {description}"))
-                        .unwrap_or_default()
+                    callable_description.map_or_else(String::new, |description| {
+                        if description.kind.is_none() {
+                            format!(" for {description}")
+                        } else {
+                            format!(" to {description}")
+                        }
+                    })
                 ));
                 if matches!(
                     provenance,

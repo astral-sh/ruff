@@ -225,7 +225,7 @@ class E(SubclassFactory):
     def __init__(self, value: int) -> None:
         pass
 
-# TODO should also be - error: [invalid-argument-type] "Argument to `E.__init__` is incorrect: Expected `int`, found `<class 'E'>`"
+# TODO should also be - error: [invalid-argument-type] "Argument for `E.__init__` is incorrect: Expected `int`, found `<class 'E'>`"
 # error: [missing-argument] "No argument provided for required parameter `value` of `E.__init__`"
 E()
 ```
@@ -249,7 +249,7 @@ class ReturnsFactory:
     def __init__(self, value: int) -> None:
         pass
 
-# TODO should be - error: [invalid-argument-type] "Argument to `SelfFactory.__init__` is incorrect: Expected `int`, found `<class 'ReturnsFactory'>`"
+# TODO should be - error: [invalid-argument-type] "Argument for `SelfFactory.__init__` is incorrect: Expected `int`, found `<class 'ReturnsFactory'>`"
 ReturnsFactory()
 ```
 
@@ -1370,8 +1370,8 @@ def _(flag: bool) -> None:
             def __init__(self, x: int, y: int = 1): ...
 
     reveal_type(Foo(1))  # revealed: Foo
-    # error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
-    # error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument for `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
+    # error: [invalid-argument-type] "Argument for `Foo.__init__` is incorrect: Expected `int`, found `Literal["1"]`"
     reveal_type(Foo("1"))  # revealed: Foo
     # error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
     # error: [missing-argument] "No argument provided for required parameter `x` of `Foo.__init__`"
@@ -1473,7 +1473,7 @@ class Foo:
     def __init__(self, x: str) -> None:
         self.x = x
 
-# error: [invalid-argument-type] "Argument to `Foo.__init__` is incorrect: Expected `str`, found `Literal[1]`"
+# error: [invalid-argument-type] "Argument for `Foo.__init__` is incorrect: Expected `str`, found `Literal[1]`"
 Foo(1)
 
 # error: [invalid-argument-type] "Argument to constructor `Foo.__new__` is incorrect: Expected `int`, found `Literal["x"]`"
