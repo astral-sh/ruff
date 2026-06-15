@@ -3175,10 +3175,38 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 
     fn finish(self, db: &'db dyn Db) -> ConstraintBounds<'db> {
-        ConstraintBounds::new(
-            (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower)),
-            (!self.upper.is_empty()).then(|| IntersectionType::from_elements(db, self.upper)),
-        )
+        let lower = (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower));
+        let upper = if self.upper.is_empty() {
+            None
+        } else {
+            // The final upper bound is the intersection of all of the individual upper bounds that
+            // we discovered for this typevar on this path. If those individual upper bounds are
+            // unions, we have to distribute the intersection across those unions in a way that can
+            // blow up the size of the resulting type. Detect that in advance, and fall back on
+            // `Unknown` if so. (`Unknown` is a good conservative fallback because it preserves the
+            // fact that there was an upper bound without forcing a large intersection to be
+            // materialized.)
+            //
+            // This is similar to the upper-bound size heuristic as in `ConstraintId::intersect`,
+            // generalized to all upper bounds collected for this path, and with a larger allowed
+            // size since this is called much less frequently that sequent map elaboration.
+            let estimated_union_size = self.upper.iter().fold(1usize, |size, upper| {
+                size.saturating_mul(upper.union_size(db))
+            });
+            let estimated_intersection_size = self.upper.iter().fold(0usize, |size, upper| {
+                size.saturating_add(upper.intersection_size(db))
+            });
+            let estimated_upper_bound_size =
+                estimated_union_size.saturating_mul(estimated_intersection_size);
+            let max_upper_bound_size = self.upper.len().saturating_mul(4);
+
+            if self.upper.len() > 1 && estimated_upper_bound_size > max_upper_bound_size {
+                Some(Type::unknown())
+            } else {
+                Some(IntersectionType::from_elements(db, self.upper))
+            }
+        };
+        ConstraintBounds::new(lower, upper)
     }
 }
 
