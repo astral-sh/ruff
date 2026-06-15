@@ -153,11 +153,12 @@ impl<'src> Parser<'src> {
         let parsed_expr = self.parse_conditional_expression_or_higher_impl(context);
 
         if self.at(TokenKind::Comma) {
+            let subsequent_context = context.disallow_yield_expressions();
             Expr::Tuple(self.parse_tuple_expression(
                 parsed_expr.expr,
                 start,
                 Parenthesized::No,
-                |p| p.parse_conditional_expression_or_higher_impl(context),
+                |p| p.parse_conditional_expression_or_higher_impl(subsequent_context),
             ))
             .into()
         } else {
@@ -3296,6 +3297,10 @@ impl ExpressionContext {
     pub(super) fn disallow_starred_expressions(self) -> Self {
         let flags = self.0 & !ExpressionContextFlags::ALLOW_STARRED_EXPRESSION;
         ExpressionContext(flags)
+    }
+
+    fn disallow_yield_expressions(self) -> Self {
+        ExpressionContext(self.0 & !ExpressionContextFlags::ALLOW_YIELD_EXPRESSION)
     }
 
     /// Returns a new [`ExpressionContext`] which allows starred expression with the given
