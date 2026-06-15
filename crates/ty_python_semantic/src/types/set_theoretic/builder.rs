@@ -637,10 +637,6 @@ enum RelationSimplification {
     /// interface; opening another protocol interface from that path can form a Salsa
     /// cycle inside the recovery function.
     NoProtocolRelations,
-    /// Skip all relation checks.
-    ///
-    /// Cycle recovery must not introduce fresh query dependencies.
-    NoRelations,
 }
 
 impl RelationSimplification {
@@ -652,7 +648,6 @@ impl RelationSimplification {
                     && !left.contains_cycle_sensitive_type(db)
                     && !right.contains_cycle_sensitive_type(db)
             }
-            RelationSimplification::NoRelations => false,
         }
     }
 
@@ -662,7 +657,6 @@ impl RelationSimplification {
             RelationSimplification::NoProtocolRelations => {
                 !matches!(ty, Type::ProtocolInstance(_)) && !ty.contains_cycle_sensitive_type(db)
             }
-            RelationSimplification::NoRelations => false,
         }
     }
 
@@ -764,9 +758,7 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn without_protocol_relation_simplification(mut self) -> Self {
-        if self.relation_simplification != RelationSimplification::NoRelations {
-            self.relation_simplification = RelationSimplification::NoProtocolRelations;
-        }
+        self.relation_simplification = RelationSimplification::NoProtocolRelations;
         self
     }
 
