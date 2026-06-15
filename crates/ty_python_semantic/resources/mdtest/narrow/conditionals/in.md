@@ -218,6 +218,70 @@ def mutable_global_rhs(x: str | None, unavailable: set[str | None]) -> None:
         reveal_type(x)  # revealed: str | None
 ```
 
+## Membership and equality
+
+If one member of a union cannot compare equal to any item in the container, we can remove that
+member inside the `if` body. A `TypedDict` cannot compare equal to a string, and a final class with
+the default identity-based equality cannot compare equal to an integer. We retain types such as
+`int` and classes with custom equality when they might still match an item.
+
+```py
+from typing import Literal, TypedDict, final
+
+class Payload(TypedDict):
+    value: int
+
+@final
+class Token: ...
+
+@final
+class AlwaysEqual:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def typed_dict(x: Payload | Literal["missing"]):
+    if x in ("missing",):
+        reveal_type(x)  # revealed: Literal["missing"]
+
+def default_equality(x: Token | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1]
+
+def overlapping_union_member(x: int | Literal["missing"]):
+    if x in ("missing", 1):
+        reveal_type(x)  # revealed: Literal["missing"] | int
+
+def custom_equality(x: AlwaysEqual | Literal[1]):
+    if x in (1,):
+        reveal_type(x)  # revealed: Literal[1] | AlwaysEqual
+
+def empty_tuple(x: Payload | Literal["missing"], values: tuple[()]):
+    if x in values:
+        reveal_type(x)  # revealed: Never
+```
+
+## Custom containment methods
+
+Python uses `__contains__` when a class defines it. The method can return `True` for values that the
+class would never produce during iteration, but membership tests are currently narrowed from the
+iterable element type. The result below is therefore too narrow and documents a known limitation:
+
+```py
+from typing import Literal, TypedDict
+
+class Payload(TypedDict):
+    value: int
+
+class ContainsEverything(tuple[Literal["missing"], ...]):
+    def __contains__(self, value: object) -> bool:
+        return True
+
+def custom_contains(x: Payload | Literal["missing"], values: ContainsEverything):
+    if x in values:
+        # TODO: `x` can still be `Payload` because `values.__contains__` always returns `True`.
+        reveal_type(x)  # revealed: Literal["missing"]
+```
+
 ## No present-key narrowing without a `TypedDict`
 
 We only synthesize a key-access protocol for string membership tests on right-hand-side values that
