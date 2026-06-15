@@ -309,7 +309,7 @@ impl<'db> PatternSuccessTypes<'db> {
 
 /// The types produced by one pattern node when that complete node succeeds.
 ///
-/// Bindings are transactional:
+/// Bindings are retained only when the complete pattern succeeds:
 ///
 /// ```python
 /// def f(value: tuple[str, str]) -> None:
