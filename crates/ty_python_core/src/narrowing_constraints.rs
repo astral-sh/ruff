@@ -97,6 +97,10 @@ pub struct NarrowingConstraints {
 }
 
 impl NarrowingConstraints {
+    pub(crate) fn is_empty(&self) -> bool {
+        self.used_interiors.is_empty()
+    }
+
     pub fn get_interior_node(&self, id: ScopedNarrowingConstraint) -> InteriorNode {
         debug_assert!(!id.is_terminal());
         let raw_index = id.0 as usize;
