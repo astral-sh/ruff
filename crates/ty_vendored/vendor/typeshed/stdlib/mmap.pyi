@@ -38,26 +38,27 @@ PAGESIZE: Final[int]
 class mmap:
     """Windows: mmap(fileno, length[, tagname[, access[, offset[, trackfd]]]])
 
-Maps length bytes from the file specified by the file handle fileno,
-and returns a mmap object.  If length is larger than the current size
-of the file, the file is extended to contain length bytes.  If length
-is 0, the maximum length of the map is the current size of the file,
-except that if the file is empty Windows raises an exception (you cannot
-create an empty mapping on Windows).
+    Maps length bytes from the file specified by the file handle fileno,
+    and returns a mmap object.  If length is larger than the current size
+    of the file, the file is extended to contain length bytes.  If length
+    is 0, the maximum length of the map is the current size of the file,
+    except that if the file is empty Windows raises an exception (you cannot
+    create an empty mapping on Windows).
 
-Unix: mmap(fileno, length[, flags[, prot[, access[, offset[, trackfd]]]]])
+    Unix: mmap(fileno, length[, flags[, prot[, access[, offset[, trackfd]]]]])
 
-Maps length bytes from the file specified by the file descriptor fileno,
-and returns a mmap object.  If length is 0, the maximum length of the map
-will be the current size of the file when mmap is called.
-flags specifies the nature of the mapping. MAP_PRIVATE creates a
-private copy-on-write mapping, so changes to the contents of the mmap
-object will be private to this process, and MAP_SHARED creates a mapping
-that's shared with all other processes mapping the same areas of the file.
-The default value is MAP_SHARED.
+    Maps length bytes from the file specified by the file descriptor fileno,
+    and returns a mmap object.  If length is 0, the maximum length of the map
+    will be the current size of the file when mmap is called.
+    flags specifies the nature of the mapping. MAP_PRIVATE creates a
+    private copy-on-write mapping, so changes to the contents of the mmap
+    object will be private to this process, and MAP_SHARED creates a mapping
+    that's shared with all other processes mapping the same areas of the file.
+    The default value is MAP_SHARED.
 
-To map anonymous memory, pass -1 as the fileno (both versions).
-"""
+    To map anonymous memory, pass -1 as the fileno (both versions).
+    """
+
     if sys.platform == "win32":
         if sys.version_info >= (3, 15):
             def __new__(
@@ -111,6 +112,7 @@ To map anonymous memory, pass -1 as the fileno (both versions).
     def write_byte(self, byte: int, /) -> None: ...
     def __len__(self) -> int:
         """Return len(self)."""
+
     closed: bool
     if sys.platform != "win32":
         if sys.version_info >= (3, 15):
@@ -156,8 +158,10 @@ To map anonymous memory, pass -1 as the fileno (both versions).
     def __exit__(self, exc_type: Unused, exc_value: Unused, traceback: Unused, /) -> None: ...
     def __buffer__(self, flags: int, /) -> memoryview:
         """Return a buffer object that exposes the underlying memory of the object."""
+
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
+
     if sys.version_info >= (3, 13):
         def seekable(self) -> Literal[True]: ...
 
