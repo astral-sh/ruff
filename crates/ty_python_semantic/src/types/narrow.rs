@@ -30,8 +30,8 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use super::enums::{enum_member_literals, enum_metadata};
-use super::equality::{evaluate_type_equality, evaluate_type_inequality};
+use super::enums::enum_metadata;
+use super::equality::{evaluate_type_equality, evaluate_type_inequality, may_compare_equal};
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
@@ -86,49 +86,7 @@ fn is_single_valued_union_component<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool
         || ty.is_subtype_of(db, Type::literal_string())
 }
 
-/// Split a finite domain into the single-valued alternatives used by equality and membership
-/// narrowing.
-///
-/// This covers finite multi-valued types that `is_single_valued_union_component` treats as
-/// splittable, such as `bool`, enums, and compact enum complements. `LiteralString` is
-/// intentionally excluded because it is not finite.
-fn finite_single_valued_union_alternatives<'db>(
-    db: &'db dyn Db,
-    ty: Type<'db>,
-) -> Option<Vec<Type<'db>>> {
-    let ty = ty.resolve_type_alias(db);
-
-    match ty {
-        Type::EnumComplement(complement) => complement
-            .has_finite_single_valued_alternatives(db)
-            .then(|| complement.remaining_literal_types(db)),
-        Type::Intersection(intersection) => {
-            let complement = intersection.enum_complement(db)?;
-            complement
-                .has_finite_single_valued_alternatives(db)
-                .then(|| complement.remaining_literal_types(db))
-        }
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
-            Some(vec![Type::bool_literal(true), Type::bool_literal(false)])
-        }
-        Type::NominalInstance(instance)
-            if enum_metadata(db, instance.class_literal(db)).is_some()
-                && !ty.overrides_equality(db) =>
-        {
-            Some(
-                enum_member_literals(db, instance.class_literal(db), None)
-                    .expect("Calling `enum_member_literals` on an enum class")
-                    .collect(),
-            )
-        }
-        _ => None,
-    }
-}
-
-/// Return `true` if `finite_single_valued_union_alternatives` would produce a non-empty list.
-///
-/// Keep this separate from the materializing helper above so boolean probes do not eagerly expand
-/// large enum domains into literal vectors.
+/// Return whether a type has a finite domain whose members can each be treated as single-valued.
 fn has_finite_single_valued_union_alternatives<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
 
@@ -746,59 +704,6 @@ fn merge_constraints_or<'db>(
     }
 }
 
-/// Return `true` if it is possible for any two inhabitants of the given types to
-/// compare equal to each other; otherwise return `false`.
-fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<'db>) -> bool {
-    if !left_ty.is_disjoint_from(db, right_ty) {
-        // If types overlap, they have inhabitants in common; it's definitely possible
-        // for an object to compare equal to itself.
-        return true;
-    }
-
-    if let Some(left_alternatives) = finite_single_valued_union_alternatives(db, left_ty) {
-        return left_alternatives
-            .into_iter()
-            .any(|ty| could_compare_equal(db, ty, right_ty));
-    }
-
-    if let Some(right_alternatives) = finite_single_valued_union_alternatives(db, right_ty) {
-        return right_alternatives
-            .into_iter()
-            .any(|ty| could_compare_equal(db, left_ty, ty));
-    }
-
-    match (left_ty, right_ty) {
-        // In order to be sure a union type cannot compare equal to another type, it
-        // must be true that no element of the union can compare equal to that type.
-        (Type::Union(union), _) => union
-            .elements(db)
-            .iter()
-            .any(|ty| could_compare_equal(db, *ty, right_ty)),
-        (_, Type::Union(union)) => union
-            .elements(db)
-            .iter()
-            .any(|ty| could_compare_equal(db, left_ty, *ty)),
-        (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-            match (left.kind(), right.kind()) {
-                // Boolean literals and int literals are disjoint, and single valued, and yet
-                // `True == 1` and `False == 0`.
-                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
-                | (LiteralValueTypeKind::Int(i), LiteralValueTypeKind::Bool(b)) => {
-                    i64::from(b) == i.as_i64()
-                }
-                _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
-            }
-        }
-        // We assume that tuples use `tuple.__eq__` which only returns True
-        // for other tuples, so they cannot compare equal to non-tuple types.
-        (Type::NominalInstance(instance), _) if instance.tuple_spec(db).is_some() => false,
-        (_, Type::NominalInstance(instance)) if instance.tuple_spec(db).is_some() => false,
-        // Other than the above cases, two single-valued disjoint types cannot compare
-        // equal.
-        _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
-    }
-}
-
 fn is_exact_membership_value_domain<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     let ty = ty.resolve_type_alias(db);
     ty == Type::Never || ty.is_single_valued(db)
@@ -1262,11 +1167,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         builder.try_build()
     }
 
-    // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
-    // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
+    // TODO: Share more of this implementation with equality narrowing once we can prove that
+    // containment uses element-wise equality rather than a custom `__contains__` method.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
         let lhs_ty = lhs_ty.resolve_type_alias(self.db);
 
+        // TODO: Python calls a custom `__contains__` before falling back to iteration. Narrowing
+        // currently uses the iterable element type either way, which can over-narrow when
+        // `__contains__` implements different semantics.
         if is_union_of_single_valued(self.db, lhs_ty) {
             rhs_ty
                 .try_iterate(self.db)
@@ -1290,7 +1198,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         continue;
                     }
                     // Skip types that cannot compare equal to any RHS value.
-                    if !could_compare_equal(self.db, *element, rhs_values) {
+                    if !may_compare_equal(self.db, *element, rhs_values) {
                         continue;
                     }
                     builder = builder.add(*element);
