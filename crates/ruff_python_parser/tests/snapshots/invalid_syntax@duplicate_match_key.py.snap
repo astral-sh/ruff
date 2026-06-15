@@ -974,233 +974,260 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 372..396,
+                            range: 372..449,
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
                                     node_index: NodeIndex(None),
-                                    range: 377..391,
+                                    range: 377..444,
+                                    keys: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 383..407,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 383..407,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x\n    y\n    z\n    ",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: true,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 416..440,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 416..440,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x\n    y\n    z\n    ",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: true,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 409..410,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 409..410,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 442..443,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 442..443,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 446..449,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 446..449,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 454..488,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 459..483,
+                                    keys: [
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 460..463,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 460..463,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 468..471,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 468..471,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 476..479,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 476..479,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 465..466,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 465..466,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 473..474,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 473..474,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 481..482,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 481..482,
+                                                        value: Int(
+                                                            3,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 485..488,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 485..488,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 493..531,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 498..526,
                                     keys: [
                                         NumberLiteral(
                                             ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 378..379,
+                                                range: 499..500,
                                                 value: Int(
-                                                    2,
+                                                    0,
                                                 ),
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 384..387,
-                                                value: Float(
-                                                    2.0,
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 381..382,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 381..382,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 389..390,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 389..390,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 393..396,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 393..396,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 401..478,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 406..473,
-                                    keys: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 412..436,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 412..436,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x\n    y\n    z\n    ",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: true,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 445..469,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 445..469,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x\n    y\n    z\n    ",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: true,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 438..439,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 438..439,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 471..472,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 471..472,
-                                                        value: Int(
-                                                            2,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 475..478,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 475..478,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 483..517,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 488..512,
-                                    keys: [
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 489..492,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 489..492,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 497..500,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 497..500,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
                                             },
                                         ),
                                         StringLiteral(
@@ -1224,23 +1251,38 @@ Module(
                                                 },
                                             },
                                         ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 494..495,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 494..495,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
+                                                range: 513..514,
+                                                value: Int(
+                                                    0,
                                                 ),
                                             },
                                         ),
+                                        StringLiteral(
+                                            ExprStringLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 519..522,
+                                                value: StringLiteralValue {
+                                                    inner: Single(
+                                                        StringLiteral {
+                                                            range: 519..522,
+                                                            node_index: NodeIndex(None),
+                                                            value: "x",
+                                                            flags: StringLiteralFlags {
+                                                                quote_style: Double,
+                                                                prefix: Empty,
+                                                                triple_quoted: false,
+                                                                unclosed: false,
+                                                            },
+                                                        },
+                                                    ),
+                                                },
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
                                         MatchValue(
                                             PatternMatchValue {
                                                 node_index: NodeIndex(None),
@@ -1250,7 +1292,7 @@ Module(
                                                         node_index: NodeIndex(None),
                                                         range: 502..503,
                                                         value: Int(
-                                                            2,
+                                                            1,
                                                         ),
                                                     },
                                                 ),
@@ -1265,111 +1307,6 @@ Module(
                                                         node_index: NodeIndex(None),
                                                         range: 510..511,
                                                         value: Int(
-                                                            3,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                    ],
-                                    rest: None,
-                                },
-                            ),
-                            guard: None,
-                            body: [
-                                Expr(
-                                    StmtExpr {
-                                        node_index: NodeIndex(None),
-                                        range: 514..517,
-                                        value: EllipsisLiteral(
-                                            ExprEllipsisLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 514..517,
-                                            },
-                                        ),
-                                    },
-                                ),
-                            ],
-                        },
-                        MatchCase {
-                            range: 522..560,
-                            node_index: NodeIndex(None),
-                            pattern: MatchMapping(
-                                PatternMatchMapping {
-                                    node_index: NodeIndex(None),
-                                    range: 527..555,
-                                    keys: [
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 528..529,
-                                                value: Int(
-                                                    0,
-                                                ),
-                                            },
-                                        ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 534..537,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 534..537,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                        NumberLiteral(
-                                            ExprNumberLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 542..543,
-                                                value: Int(
-                                                    0,
-                                                ),
-                                            },
-                                        ),
-                                        StringLiteral(
-                                            ExprStringLiteral {
-                                                node_index: NodeIndex(None),
-                                                range: 548..551,
-                                                value: StringLiteralValue {
-                                                    inner: Single(
-                                                        StringLiteral {
-                                                            range: 548..551,
-                                                            node_index: NodeIndex(None),
-                                                            value: "x",
-                                                            flags: StringLiteralFlags {
-                                                                quote_style: Double,
-                                                                prefix: Empty,
-                                                                triple_quoted: false,
-                                                                unclosed: false,
-                                                            },
-                                                        },
-                                                    ),
-                                                },
-                                            },
-                                        ),
-                                    ],
-                                    patterns: [
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 531..532,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 531..532,
-                                                        value: Int(
                                                             1,
                                                         ),
                                                     },
@@ -1379,26 +1316,11 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 node_index: NodeIndex(None),
-                                                range: 539..540,
+                                                range: 516..517,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
-                                                        range: 539..540,
-                                                        value: Int(
-                                                            1,
-                                                        ),
-                                                    },
-                                                ),
-                                            },
-                                        ),
-                                        MatchValue(
-                                            PatternMatchValue {
-                                                node_index: NodeIndex(None),
-                                                range: 545..546,
-                                                value: NumberLiteral(
-                                                    ExprNumberLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 545..546,
+                                                        range: 516..517,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -1409,11 +1331,11 @@ Module(
                                         MatchValue(
                                             PatternMatchValue {
                                                 node_index: NodeIndex(None),
-                                                range: 553..554,
+                                                range: 524..525,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
-                                                        range: 553..554,
+                                                        range: 524..525,
                                                         value: Int(
                                                             2,
                                                         ),
@@ -1430,11 +1352,11 @@ Module(
                                 Expr(
                                     StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 557..560,
+                                        range: 528..531,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 557..560,
+                                                range: 528..531,
                                             },
                                         ),
                                     },
@@ -1442,26 +1364,26 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 565..593,
+                            range: 536..564,
                             node_index: NodeIndex(None),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     node_index: NodeIndex(None),
-                                    range: 570..588,
+                                    range: 541..559,
                                     patterns: [
                                         MatchMapping(
                                             PatternMatchMapping {
                                                 node_index: NodeIndex(None),
-                                                range: 571..587,
+                                                range: 542..558,
                                                 keys: [
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 572..575,
+                                                            range: 543..546,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
-                                                                        range: 572..575,
+                                                                        range: 543..546,
                                                                         node_index: NodeIndex(None),
                                                                         value: "x",
                                                                         flags: StringLiteralFlags {
@@ -1478,11 +1400,11 @@ Module(
                                                     StringLiteral(
                                                         ExprStringLiteral {
                                                             node_index: NodeIndex(None),
-                                                            range: 580..583,
+                                                            range: 551..554,
                                                             value: StringLiteralValue {
                                                                 inner: Single(
                                                                     StringLiteral {
-                                                                        range: 580..583,
+                                                                        range: 551..554,
                                                                         node_index: NodeIndex(None),
                                                                         value: "x",
                                                                         flags: StringLiteralFlags {
@@ -1501,11 +1423,11 @@ Module(
                                                     MatchValue(
                                                         PatternMatchValue {
                                                             node_index: NodeIndex(None),
-                                                            range: 577..578,
+                                                            range: 548..549,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 577..578,
+                                                                    range: 548..549,
                                                                     value: Int(
                                                                         1,
                                                                     ),
@@ -1516,11 +1438,11 @@ Module(
                                                     MatchValue(
                                                         PatternMatchValue {
                                                             node_index: NodeIndex(None),
-                                                            range: 585..586,
+                                                            range: 556..557,
                                                             value: NumberLiteral(
                                                                 ExprNumberLiteral {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 585..586,
+                                                                    range: 556..557,
                                                                     value: Int(
                                                                         2,
                                                                     ),
@@ -1540,11 +1462,11 @@ Module(
                                 Expr(
                                     StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 590..593,
+                                        range: 561..564,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 590..593,
+                                                range: 561..564,
                                             },
                                         ),
                                     },
@@ -1552,41 +1474,41 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 598..636,
+                            range: 569..607,
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
                                     node_index: NodeIndex(None),
-                                    range: 603..631,
+                                    range: 574..602,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
-                                            range: 603..606,
+                                            range: 574..577,
                                             id: Name("Foo"),
                                             ctx: Load,
                                         },
                                     ),
                                     arguments: PatternArguments {
-                                        range: 606..631,
+                                        range: 577..602,
                                         node_index: NodeIndex(None),
                                         patterns: [],
                                         keywords: [
                                             PatternKeyword {
-                                                range: 607..610,
+                                                range: 578..581,
                                                 node_index: NodeIndex(None),
                                                 attr: Identifier {
                                                     id: Name("x"),
-                                                    range: 607..608,
+                                                    range: 578..579,
                                                     node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
                                                         node_index: NodeIndex(None),
-                                                        range: 609..610,
+                                                        range: 580..581,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
-                                                                range: 609..610,
+                                                                range: 580..581,
                                                                 value: Int(
                                                                     1,
                                                                 ),
@@ -1596,26 +1518,26 @@ Module(
                                                 ),
                                             },
                                             PatternKeyword {
-                                                range: 612..630,
+                                                range: 583..601,
                                                 node_index: NodeIndex(None),
                                                 attr: Identifier {
                                                     id: Name("y"),
-                                                    range: 612..613,
+                                                    range: 583..584,
                                                     node_index: NodeIndex(None),
                                                 },
                                                 pattern: MatchMapping(
                                                     PatternMatchMapping {
                                                         node_index: NodeIndex(None),
-                                                        range: 614..630,
+                                                        range: 585..601,
                                                         keys: [
                                                             StringLiteral(
                                                                 ExprStringLiteral {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 615..618,
+                                                                    range: 586..589,
                                                                     value: StringLiteralValue {
                                                                         inner: Single(
                                                                             StringLiteral {
-                                                                                range: 615..618,
+                                                                                range: 586..589,
                                                                                 node_index: NodeIndex(None),
                                                                                 value: "x",
                                                                                 flags: StringLiteralFlags {
@@ -1632,11 +1554,11 @@ Module(
                                                             StringLiteral(
                                                                 ExprStringLiteral {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 623..626,
+                                                                    range: 594..597,
                                                                     value: StringLiteralValue {
                                                                         inner: Single(
                                                                             StringLiteral {
-                                                                                range: 623..626,
+                                                                                range: 594..597,
                                                                                 node_index: NodeIndex(None),
                                                                                 value: "x",
                                                                                 flags: StringLiteralFlags {
@@ -1655,11 +1577,11 @@ Module(
                                                             MatchValue(
                                                                 PatternMatchValue {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 620..621,
+                                                                    range: 591..592,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
                                                                             node_index: NodeIndex(None),
-                                                                            range: 620..621,
+                                                                            range: 591..592,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -1670,11 +1592,11 @@ Module(
                                                             MatchValue(
                                                                 PatternMatchValue {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 628..629,
+                                                                    range: 599..600,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
                                                                             node_index: NodeIndex(None),
-                                                                            range: 628..629,
+                                                                            range: 599..600,
                                                                             value: Int(
                                                                                 2,
                                                                             ),
@@ -1696,11 +1618,11 @@ Module(
                                 Expr(
                                     StmtExpr {
                                         node_index: NodeIndex(None),
-                                        range: 633..636,
+                                        range: 604..607,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
                                                 node_index: NodeIndex(None),
-                                                range: 633..636,
+                                                range: 604..607,
                                             },
                                         ),
                                     },
@@ -1708,46 +1630,46 @@ Module(
                             ],
                         },
                         MatchCase {
-                            range: 641..691,
+                            range: 612..662,
                             node_index: NodeIndex(None),
                             pattern: MatchSequence(
                                 PatternMatchSequence {
                                     node_index: NodeIndex(None),
-                                    range: 646..686,
+                                    range: 617..657,
                                     patterns: [
                                         MatchClass(
                                             PatternMatchClass {
                                                 node_index: NodeIndex(None),
-                                                range: 647..655,
+                                                range: 618..626,
                                                 cls: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
-                                                        range: 647..650,
+                                                        range: 618..621,
                                                         id: Name("Foo"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 arguments: PatternArguments {
-                                                    range: 650..655,
+                                                    range: 621..626,
                                                     node_index: NodeIndex(None),
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
-                                                            range: 651..654,
+                                                            range: 622..625,
                                                             node_index: NodeIndex(None),
                                                             attr: Identifier {
                                                                 id: Name("x"),
-                                                                range: 651..652,
+                                                                range: 622..623,
                                                                 node_index: NodeIndex(None),
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 653..654,
+                                                                    range: 624..625,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
                                                                             node_index: NodeIndex(None),
-                                                                            range: 653..654,
+                                                                            range: 624..625,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -1763,36 +1685,36 @@ Module(
                                         MatchClass(
                                             PatternMatchClass {
                                                 node_index: NodeIndex(None),
-                                                range: 657..685,
+                                                range: 628..656,
                                                 cls: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
-                                                        range: 657..660,
+                                                        range: 628..631,
                                                         id: Name("Foo"),
                                                         ctx: Load,
                                                     },
                                                 ),
                                                 arguments: PatternArguments {
-                                                    range: 660..685,
+                                                    range: 631..656,
                                                     node_index: NodeIndex(None),
                                                     patterns: [],
                                                     keywords: [
                                                         PatternKeyword {
-                                                            range: 661..664,
+                                                            range: 632..635,
                                                             node_index: NodeIndex(None),
                                                             attr: Identifier {
                                                                 id: Name("x"),
-                                                                range: 661..662,
+                                                                range: 632..633,
                                                                 node_index: NodeIndex(None),
                                                             },
                                                             pattern: MatchValue(
                                                                 PatternMatchValue {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 663..664,
+                                                                    range: 634..635,
                                                                     value: NumberLiteral(
                                                                         ExprNumberLiteral {
                                                                             node_index: NodeIndex(None),
-                                                                            range: 663..664,
+                                                                            range: 634..635,
                                                                             value: Int(
                                                                                 1,
                                                                             ),
@@ -1802,26 +1724,26 @@ Module(
                                                             ),
                                                         },
                                                         PatternKeyword {
-                                                            range: 666..684,
+                                                            range: 637..655,
                                                             node_index: NodeIndex(None),
                                                             attr: Identifier {
                                                                 id: Name("y"),
-                                                                range: 666..667,
+                                                                range: 637..638,
                                                                 node_index: NodeIndex(None),
                                                             },
                                                             pattern: MatchMapping(
                                                                 PatternMatchMapping {
                                                                     node_index: NodeIndex(None),
-                                                                    range: 668..684,
+                                                                    range: 639..655,
                                                                     keys: [
                                                                         StringLiteral(
                                                                             ExprStringLiteral {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 669..672,
+                                                                                range: 640..643,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
-                                                                                            range: 669..672,
+                                                                                            range: 640..643,
                                                                                             node_index: NodeIndex(None),
                                                                                             value: "x",
                                                                                             flags: StringLiteralFlags {
@@ -1838,11 +1760,11 @@ Module(
                                                                         StringLiteral(
                                                                             ExprStringLiteral {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 677..680,
+                                                                                range: 648..651,
                                                                                 value: StringLiteralValue {
                                                                                     inner: Single(
                                                                                         StringLiteral {
-                                                                                            range: 677..680,
+                                                                                            range: 648..651,
                                                                                             node_index: NodeIndex(None),
                                                                                             value: "x",
                                                                                             flags: StringLiteralFlags {
@@ -1861,11 +1783,11 @@ Module(
                                                                         MatchValue(
                                                                             PatternMatchValue {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 674..675,
+                                                                                range: 645..646,
                                                                                 value: NumberLiteral(
                                                                                     ExprNumberLiteral {
                                                                                         node_index: NodeIndex(None),
-                                                                                        range: 674..675,
+                                                                                        range: 645..646,
                                                                                         value: Int(
                                                                                             1,
                                                                                         ),
@@ -1876,11 +1798,11 @@ Module(
                                                                         MatchValue(
                                                                             PatternMatchValue {
                                                                                 node_index: NodeIndex(None),
-                                                                                range: 682..683,
+                                                                                range: 653..654,
                                                                                 value: NumberLiteral(
                                                                                     ExprNumberLiteral {
                                                                                         node_index: NodeIndex(None),
-                                                                                        range: 682..683,
+                                                                                        range: 653..654,
                                                                                         value: Int(
                                                                                             2,
                                                                                         ),
@@ -1898,6 +1820,84 @@ Module(
                                             },
                                         ),
                                     ],
+                                },
+                            ),
+                            guard: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 659..662,
+                                        value: EllipsisLiteral(
+                                            ExprEllipsisLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 659..662,
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                        MatchCase {
+                            range: 667..691,
+                            node_index: NodeIndex(None),
+                            pattern: MatchMapping(
+                                PatternMatchMapping {
+                                    node_index: NodeIndex(None),
+                                    range: 672..686,
+                                    keys: [
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 673..674,
+                                                value: Int(
+                                                    2,
+                                                ),
+                                            },
+                                        ),
+                                        NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 679..682,
+                                                value: Float(
+                                                    2.0,
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    patterns: [
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 676..677,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 676..677,
+                                                        value: Int(
+                                                            1,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                        MatchValue(
+                                            PatternMatchValue {
+                                                node_index: NodeIndex(None),
+                                                range: 684..685,
+                                                value: NumberLiteral(
+                                                    ExprNumberLiteral {
+                                                        node_index: NodeIndex(None),
+                                                        range: 684..685,
+                                                        value: Int(
+                                                            2,
+                                                        ),
+                                                    },
+                                                ),
+                                            },
+                                        ),
+                                    ],
+                                    rest: None,
                                 },
                             ),
                             guard: None,
@@ -2020,7 +2020,7 @@ Module(
 11 |     case {-0: 1, False: 2}: ...
    |                  ^^^^^ Syntax Error: mapping pattern checks duplicate key `False`
 12 |     case {1 + 0j: 1, True: 2}: ...
-13 |     case {2: 1, 2.0: 2}: ...
+13 |     case {
    |
 
 
@@ -2029,96 +2029,96 @@ Module(
 11 |     case {-0: 1, False: 2}: ...
 12 |     case {1 + 0j: 1, True: 2}: ...
    |                      ^^^^ Syntax Error: mapping pattern checks duplicate key `True`
-13 |     case {2: 1, 2.0: 2}: ...
-14 |     case {
+13 |     case {
+14 |     """x
    |
 
 
    |
-11 |     case {-0: 1, False: 2}: ...
-12 |     case {1 + 0j: 1, True: 2}: ...
-13 |     case {2: 1, 2.0: 2}: ...
-   |                 ^^^ Syntax Error: mapping pattern checks duplicate key `2.0`
-14 |     case {
-15 |     """x
-   |
-
-
-   |
-17 |       z
-18 |       """: 1,
-19 | /     """x
-20 | |     y
-21 | |     z
-22 | |     """: 2}: ...
+16 |       z
+17 |       """: 1,
+18 | /     """x
+19 | |     y
+20 | |     z
+21 | |     """: 2}: ...
    | |_______^ Syntax Error: mapping pattern checks duplicate key `"""x\n    y\n    z\n    """`
-23 |       case {"x": 1, "x": 2, "x": 3}: ...
-24 |       case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+22 |       case {"x": 1, "x": 2, "x": 3}: ...
+23 |       case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |
 
 
    |
-21 |     z
-22 |     """: 2}: ...
-23 |     case {"x": 1, "x": 2, "x": 3}: ...
+20 |     z
+21 |     """: 2}: ...
+22 |     case {"x": 1, "x": 2, "x": 3}: ...
    |                   ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-25 |     case [{"x": 1, "x": 2}]: ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+24 |     case [{"x": 1, "x": 2}]: ...
    |
 
 
    |
-21 |     z
-22 |     """: 2}: ...
-23 |     case {"x": 1, "x": 2, "x": 3}: ...
+20 |     z
+21 |     """: 2}: ...
+22 |     case {"x": 1, "x": 2, "x": 3}: ...
    |                           ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-25 |     case [{"x": 1, "x": 2}]: ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+24 |     case [{"x": 1, "x": 2}]: ...
    |
 
 
    |
-22 |     """: 2}: ...
-23 |     case {"x": 1, "x": 2, "x": 3}: ...
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+21 |     """: 2}: ...
+22 |     case {"x": 1, "x": 2, "x": 3}: ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |                         ^ Syntax Error: mapping pattern checks duplicate key `0`
-25 |     case [{"x": 1, "x": 2}]: ...
-26 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+24 |     case [{"x": 1, "x": 2}]: ...
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
    |
 
 
    |
-22 |     """: 2}: ...
-23 |     case {"x": 1, "x": 2, "x": 3}: ...
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+21 |     """: 2}: ...
+22 |     case {"x": 1, "x": 2, "x": 3}: ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
    |                               ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
-25 |     case [{"x": 1, "x": 2}]: ...
-26 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+24 |     case [{"x": 1, "x": 2}]: ...
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
    |
 
 
    |
-23 |     case {"x": 1, "x": 2, "x": 3}: ...
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-25 |     case [{"x": 1, "x": 2}]: ...
+22 |     case {"x": 1, "x": 2, "x": 3}: ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+24 |     case [{"x": 1, "x": 2}]: ...
    |                    ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
-26 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
-27 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
    |
 
 
    |
-24 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
-25 |     case [{"x": 1, "x": 2}]: ...
-26 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+23 |     case {0: 1, "x": 1, 0: 2, "x": 2}: ...
+24 |     case [{"x": 1, "x": 2}]: ...
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
    |                              ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
-27 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+27 |     case {2: 1, 2.0: 2}: ...
    |
 
 
    |
-25 |     case [{"x": 1, "x": 2}]: ...
-26 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
-27 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+24 |     case [{"x": 1, "x": 2}]: ...
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
    |                                         ^^^ Syntax Error: mapping pattern checks duplicate key `"x"`
+27 |     case {2: 1, 2.0: 2}: ...
+   |
+
+
+   |
+25 |     case Foo(x=1, y={"x": 1, "x": 2}): ...
+26 |     case [Foo(x=1), Foo(x=1, y={"x": 1, "x": 2})]: ...
+27 |     case {2: 1, 2.0: 2}: ...
+   |                 ^^^ Syntax Error: mapping pattern checks duplicate key `2.0`
    |

@@ -1923,9 +1923,9 @@ enum HashableExprKind<'a> {
     Number(HashableNumber),
     NamedExpr {
         target: ComparableExpr<'a>,
-        value: Box<HashableExpr<'a>>,
+        value: Box<HashableExprKind<'a>>,
     },
-    Tuple(Vec<HashableExpr<'a>>),
+    Tuple(Vec<HashableExprKind<'a>>),
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
@@ -1938,7 +1938,7 @@ impl HashableNumber {
     fn real(real: HashableReal) -> Self {
         Self {
             real,
-            imag: HashableReal::zero(),
+            imag: HashableReal::Integer(0),
         }
     }
 
@@ -1959,124 +1959,67 @@ impl HashableNumber {
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 enum HashableReal {
-    Integer(HashableInteger),
+    Integer(i128),
     Float(u64),
 }
 
 impl HashableReal {
-    fn zero() -> Self {
-        Self::Integer(HashableInteger::zero())
-    }
-
     fn from_int(value: &ast::Int) -> Option<Self> {
-        HashableInteger::from_int(value).map(Self::Integer)
-    }
-
-    fn from_float(value: f64) -> Self {
-        HashableInteger::from_float(value)
-            .map(Self::Integer)
-            .unwrap_or_else(|| Self::Float(value.to_bits()))
-    }
-
-    fn is_zero(&self) -> bool {
-        matches!(self, Self::Integer(integer) if integer.is_zero())
-    }
-
-    fn negate(&mut self) {
-        match self {
-            Self::Integer(integer) => integer.negate(),
-            Self::Float(bits) => *bits ^= 1 << 63,
-        }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct HashableInteger {
-    negative: bool,
-    magnitude: u64,
-}
-
-const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
-
-impl HashableInteger {
-    fn zero() -> Self {
-        Self {
-            negative: false,
-            magnitude: 0,
-        }
-    }
-
-    fn from_u64(value: u64) -> Self {
-        Self {
-            negative: false,
-            magnitude: value,
-        }
-    }
-
-    fn from_int(value: &ast::Int) -> Option<Self> {
-        value.as_u64().map(Self::from_u64)
+        value.as_u64().map(i128::from).map(Self::Integer)
     }
 
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_precision_loss,
-        clippy::cast_sign_loss,
         clippy::float_cmp,
-        reason = "the round-trip check guarantees that the float is exactly representable as a u64"
+        reason = "the round-trip check guarantees that the float is exactly representable as an integer"
     )]
-    fn from_float(value: f64) -> Option<Self> {
-        if !value.is_finite() {
-            return None;
+    fn from_float(value: f64) -> Self {
+        if value.is_finite() && value.abs() < U64_EXCLUSIVE_UPPER_BOUND {
+            let integer = value as i128;
+            if integer as f64 == value {
+                return Self::Integer(integer);
+            }
         }
-
-        let magnitude = value.abs();
-        if magnitude >= U64_EXCLUSIVE_UPPER_BOUND {
-            return None;
-        }
-        let integer = magnitude as u64;
-        if integer as f64 != magnitude {
-            return None;
-        }
-
-        Some(Self {
-            negative: value.is_sign_negative() && integer != 0,
-            magnitude: integer,
-        })
+        Self::Float(value.to_bits())
     }
 
     fn is_zero(&self) -> bool {
-        self.magnitude == 0
+        matches!(self, Self::Integer(0))
     }
 
     fn negate(&mut self) {
-        if !self.is_zero() {
-            self.negative = !self.negative;
+        match self {
+            Self::Integer(integer) => *integer = -*integer,
+            Self::Float(bits) => *bits ^= 1 << 63,
         }
     }
 }
+
+const U64_EXCLUSIVE_UPPER_BOUND: f64 = 18_446_744_073_709_551_616.0;
 
 impl<'a> From<&'a Expr> for HashableExpr<'a> {
     fn from(expr: &'a Expr) -> Self {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
-        fn as_hashable(expr: &Expr) -> HashableExpr<'_> {
+        fn as_hashable(expr: &Expr) -> HashableExprKind<'_> {
             if let Some(constant) = as_hashable_constant(expr) {
                 return constant;
             }
 
-            HashableExpr(match expr {
+            match expr {
                 Expr::Named(named) => HashableExprKind::NamedExpr {
                     target: ComparableExpr::from(&named.target),
                     value: Box::new(as_hashable(&named.value)),
                 },
                 _ => HashableExprKind::Comparable(ComparableExpr::from(expr)),
-            })
+            }
         }
 
         /// Returns a hashable representation if the expression's value is statically known.
-        fn as_hashable_constant(expr: &Expr) -> Option<HashableExpr<'_>> {
+        fn as_hashable_constant(expr: &Expr) -> Option<HashableExprKind<'_>> {
             if let Some(number) = as_number(expr) {
-                return Some(HashableExpr(HashableExprKind::Number(number)));
+                return Some(HashableExprKind::Number(number));
             }
 
             let kind = match expr {
@@ -2092,13 +2035,13 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
                 _ => return None,
             };
 
-            Some(HashableExpr(kind))
+            Some(kind)
         }
 
         fn as_number(expr: &Expr) -> Option<HashableNumber> {
             match expr {
                 Expr::BooleanLiteral(boolean) => Some(HashableNumber::real(HashableReal::Integer(
-                    HashableInteger::from_u64(u64::from(boolean.value)),
+                    i128::from(u8::from(boolean.value)),
                 ))),
                 Expr::NumberLiteral(number) => match &number.value {
                     Number::Int(int) => HashableReal::from_int(int).map(HashableNumber::real),
@@ -2147,6 +2090,6 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
             }
         }
 
-        as_hashable(expr)
+        Self(as_hashable(expr))
     }
 }
