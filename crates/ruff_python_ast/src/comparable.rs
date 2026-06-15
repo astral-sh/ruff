@@ -2126,8 +2126,8 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
         /// Returns a version of the given expression that can be hashed and compared according to
         /// Python  semantics.
         fn as_hashable(expr: &Expr) -> HashableExpr<'_> {
-            if let Some(number) = as_number(expr) {
-                return HashableExpr(HashableExprKind::Number(number));
+            if let Some(constant) = as_hashable_constant(expr) {
+                return constant;
             }
 
             HashableExpr(match expr {
@@ -2135,11 +2135,30 @@ impl<'a> From<&'a Expr> for HashableExpr<'a> {
                     target: ComparableExpr::from(&named.target),
                     value: Box::new(as_hashable(&named.value)),
                 },
-                Expr::Tuple(tuple) => {
-                    HashableExprKind::Tuple(tuple.iter().map(as_hashable).collect())
-                }
                 _ => HashableExprKind::Comparable(ComparableExpr::from(expr)),
             })
+        }
+
+        /// Returns a hashable representation if the expression's value is statically known.
+        fn as_hashable_constant(expr: &Expr) -> Option<HashableExpr<'_>> {
+            if let Some(number) = as_number(expr) {
+                return Some(HashableExpr(HashableExprKind::Number(number)));
+            }
+
+            let kind = match expr {
+                Expr::Tuple(tuple) => HashableExprKind::Tuple(
+                    tuple
+                        .iter()
+                        .map(as_hashable_constant)
+                        .collect::<Option<_>>()?,
+                ),
+                _ if expr.is_literal_expr() => {
+                    HashableExprKind::Comparable(ComparableExpr::from(expr))
+                }
+                _ => return None,
+            };
+
+            Some(HashableExpr(kind))
         }
 
         fn as_number(expr: &Expr) -> Option<HashableNumber> {

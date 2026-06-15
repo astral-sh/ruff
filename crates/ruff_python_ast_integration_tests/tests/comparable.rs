@@ -86,12 +86,25 @@ fn equivalent_numbers_hash_equal() -> Result<(), ParseError> {
     assert_hashable_equal("1j", "0 + 1j")?;
     assert_hashable_equal("18446744073709551616", "1.8446744073709552e19")?;
     assert_hashable_equal("0x10000000000000000", "18446744073709551616")?;
+    assert_hashable_equal("(2,)", "(2.0,)")?;
 
     let integer = parse_expression("9007199254740993")?;
     let float = parse_expression("9007199254740992.0")?;
     assert_ne!(
         HashableExpr::from(integer.expr()),
         HashableExpr::from(float.expr())
+    );
+
+    Ok(())
+}
+
+#[test]
+fn dynamic_tuple_elements_do_not_compare_by_value() -> Result<(), ParseError> {
+    let integer_tuple = parse_expression("(f(), 2)")?;
+    let float_tuple = parse_expression("(f(), 2.0)")?;
+    assert_ne!(
+        HashableExpr::from(integer_tuple.expr()),
+        HashableExpr::from(float_tuple.expr())
     );
 
     Ok(())
