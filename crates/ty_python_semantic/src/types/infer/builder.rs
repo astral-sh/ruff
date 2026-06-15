@@ -5858,6 +5858,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        fn contains_type_form<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+            match ty.resolve_type_alias(db) {
+                Type::TypeForm(_) => true,
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .any(|element| matches!(element.resolve_type_alias(db), Type::TypeForm(_))),
+                _ => false,
+            }
+        }
+
         let db = self.db();
         let constraints = ConstraintSetBuilder::new();
 
@@ -5964,6 +5975,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let default_ty =
                     infer_argument_ty(self, (argument_index, ast_argument, TypeContext::default()));
                 arguments_types.insert_type(argument_index, TypeContext::default(), default_ty);
+
+                if parameter_contexts.is_empty() {
+                    continue;
+                }
+
+                if can_defer_type_context(ast_argument)
+                    && parameter_contexts.iter().all(|parameter_context| {
+                        let context = parameter_context.type_context();
+                        !context.is_typealias()
+                            && context
+                                .annotation
+                                .is_none_or(|annotation| !contains_type_form(db, annotation))
+                    })
+                {
+                    for parameter_context in parameter_contexts {
+                        let inferred_ty = self.apply_type_context(
+                            ast_argument,
+                            default_ty,
+                            parameter_context.type_context(),
+                        );
+                        parameter_context.insert_inferred_type(
+                            arguments_types,
+                            argument_index,
+                            inferred_ty,
+                        );
+                    }
+                    continue;
+                }
 
                 let mut inferred_by_cache_key = FxHashMap::default();
 

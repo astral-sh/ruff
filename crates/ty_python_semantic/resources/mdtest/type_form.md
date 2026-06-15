@@ -425,6 +425,17 @@ def foo(form: TypeForm[int] | TypeForm[str]) -> int | str:
 reveal_type(foo(int))  # revealed: int
 reveal_type(foo(str))  # revealed: str
 foo(float)  # error: [no-matching-overload]
+
+type RecursiveForm = RecursiveForm | TypeForm[int]
+
+@overload
+def consume(value: RecursiveForm, discriminator: int) -> None: ...
+@overload
+def consume(value: RecursiveForm, discriminator: str) -> None: ...
+def consume(value: RecursiveForm, discriminator: int | str) -> None: ...
+
+value: object = object()
+consume(value, 1)
 ```
 
 ## Narrowing to runtime classes
