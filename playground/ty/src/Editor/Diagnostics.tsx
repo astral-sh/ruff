@@ -143,7 +143,8 @@ function Items({
                           { message: annotation.message, location },
                           currentFilePath,
                         )}
-                        onGoTo={diagnosticOnGoTo(location, onGoTo)}
+                        goToLocation={location}
+                        onGoTo={onGoTo}
                       />
                     </li>
                   );
@@ -224,7 +225,8 @@ function SubDiagnosticItem({
             },
             currentFilePath,
           )}
-          onGoTo={diagnosticOnGoTo(primaryLocation, onGoTo)}
+          goToLocation={primaryLocation}
+          onGoTo={onGoTo}
         />
       )}
       {additionalAnnotations.length > 0 ? (
@@ -246,7 +248,8 @@ function SubDiagnosticItem({
                     },
                     currentFilePath,
                   )}
-                  onGoTo={diagnosticOnGoTo(location, onGoTo)}
+                  goToLocation={location}
+                  onGoTo={onGoTo}
                 />
               </li>
             );
@@ -276,13 +279,6 @@ function toDisplayDiagnosticDetail(
               location.path === currentFilePath ? undefined : location.path,
           },
   };
-}
-
-function diagnosticOnGoTo(
-  location: DiagnosticLocation | null,
-  onGoTo: (location: DiagnosticLocation) => void,
-): (() => void) | undefined {
-  return location == null ? undefined : () => onGoTo(location);
 }
 
 export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {

@@ -1,5 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
+use serde::Serialize;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
@@ -43,6 +44,10 @@ fn primary_annotation(
 
 fn property(value: &JsValue, name: &str) -> JsValue {
     js_sys::Reflect::get(value, &JsValue::from_str(name)).unwrap()
+}
+
+fn set_property(value: &JsValue, name: &str, property: &JsValue) {
+    assert!(js_sys::Reflect::set(value, &JsValue::from_str(name), property).unwrap());
 }
 
 #[wasm_bindgen_test]
@@ -157,10 +162,6 @@ fn sub_diagnostics() {
         .unwrap()
         .check("import os\n")
         .unwrap();
-    let diagnostics = js_sys::Array::from(&output);
-    let sub_diagnostics = js_sys::Array::from(&property(&diagnostics.get(0), "subDiagnostics"));
-    assert!(property(&sub_diagnostics.get(0), "location").is_null());
-
     let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
 
     assert_eq!(result[0].message, "`os` imported but unused".to_string());
@@ -183,10 +184,6 @@ fn annotations_preserve_order() {
         .unwrap()
         .check("x = {1, 1}\n")
         .unwrap();
-    let diagnostics = js_sys::Array::from(&output);
-    let annotations = js_sys::Array::from(&property(&diagnostics.get(0), "annotations"));
-    assert!(property(&annotations.get(0), "message").is_null());
-
     let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
 
     assert_eq!(
@@ -219,6 +216,45 @@ fn annotations_preserve_order() {
             }
         ]
     );
+}
+
+#[wasm_bindgen_test]
+fn optional_fields_serialize_as_null() {
+    ruff_wasm::before_main();
+
+    let config = js_sys::JSON::parse(r#"{"select": ["F401"]}"#).unwrap();
+    let workspace = Workspace::new(config, PositionEncoding::Utf8).unwrap();
+
+    let output = workspace.check("x =\n").unwrap();
+    let diagnostics = js_sys::Array::from(&output);
+    assert!(property(&diagnostics.get(0), "fix").is_null());
+
+    let output = workspace.check("import os\n").unwrap();
+    let diagnostics = js_sys::Array::from(&output);
+    let diagnostic = diagnostics.get(0);
+    let fix = property(&diagnostic, "fix");
+    let edits = js_sys::Array::from(&property(&fix, "edits"));
+    assert!(property(&edits.get(0), "content").is_null());
+    let sub_diagnostics = js_sys::Array::from(&property(&diagnostic, "subDiagnostics"));
+    assert!(property(&sub_diagnostics.get(0), "location").is_null());
+    let annotations = js_sys::Array::from(&property(&diagnostic, "annotations"));
+    let annotation = annotations.get(0);
+    assert!(property(&annotation, "message").is_null());
+
+    // Ruff currently gives every fix a help message and every annotation a source location.
+    // Round-trip explicit nulls to cover the nullable WASM contract for those fields anyway.
+    set_property(&fix, "message", &JsValue::NULL);
+    set_property(&annotation, "location", &JsValue::NULL);
+    let messages: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
+    let output = messages
+        .serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+        .unwrap();
+    let diagnostics = js_sys::Array::from(&output);
+    let diagnostic = diagnostics.get(0);
+    let fix = property(&diagnostic, "fix");
+    assert!(property(&fix, "message").is_null());
+    let annotations = js_sys::Array::from(&property(&diagnostic, "annotations"));
+    assert!(property(&annotations.get(0), "location").is_null());
 }
 
 #[wasm_bindgen_test]

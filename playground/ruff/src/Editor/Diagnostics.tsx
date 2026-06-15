@@ -6,7 +6,7 @@ import {
   secondaryAnnotationsWithMessages,
   Theme,
 } from "shared";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { PLAYGROUND_FILE_PATH } from "./SourceEditor";
 
 interface Props {
@@ -64,6 +64,13 @@ function Items({
   diagnostics: Array<Diagnostic>;
   onGoTo(line: number, column: number): void;
 }) {
+  const handleDetailGoTo = useCallback(
+    (location: DiagnosticLocation["start_location"]) => {
+      onGoTo(location.row, location.column);
+    },
+    [onGoTo],
+  );
+
   if (diagnostics.length === 0) {
     return (
       <div className={"flex flex-auto flex-col justify-center  items-center"}>
@@ -109,7 +116,8 @@ function Items({
                   <li key={`annotation-${index}`}>
                     <DiagnosticDetailItem
                       item={toDisplayDiagnosticDetail(annotation)}
-                      onGoTo={diagnosticOnGoTo(annotation.location, onGoTo)}
+                      goToLocation={diagnosticGoToLocation(annotation.location)}
+                      onGoTo={handleDetailGoTo}
                     />
                   </li>
                 ))}
@@ -117,7 +125,10 @@ function Items({
                   <li key={`sub-diagnostic-${index}`}>
                     <DiagnosticDetailItem
                       item={toDisplayDiagnosticDetail(subDiagnostic)}
-                      onGoTo={diagnosticOnGoTo(subDiagnostic.location, onGoTo)}
+                      goToLocation={diagnosticGoToLocation(
+                        subDiagnostic.location,
+                      )}
+                      onGoTo={handleDetailGoTo}
                     />
                   </li>
                 ))}
@@ -152,14 +163,12 @@ function toDisplayDiagnosticDetail(
   };
 }
 
-function diagnosticOnGoTo(
+function diagnosticGoToLocation(
   location: DiagnosticLocation | null,
-  onGoTo: (line: number, column: number) => void,
-): (() => void) | undefined {
+): DiagnosticLocation["start_location"] | null {
   if (location == null || location.path !== PLAYGROUND_FILE_PATH) {
-    return undefined;
+    return null;
   }
 
-  const { row, column } = location.start_location;
-  return () => onGoTo(row, column);
+  return location.start_location;
 }

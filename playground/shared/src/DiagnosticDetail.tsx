@@ -1,3 +1,5 @@
+import { useCallback } from "react";
+
 export interface DiagnosticDetail<Location = DiagnosticDetailLocation> {
   message: string;
   severity?: string;
@@ -10,15 +12,22 @@ export interface DiagnosticDetailLocation {
   displayPath?: string;
 }
 
-export function DiagnosticDetailItem({
+export function DiagnosticDetailItem<GoToLocation>({
   item,
+  goToLocation,
   onGoTo,
 }: {
   item: DiagnosticDetail;
-  onGoTo?: () => void;
+  goToLocation?: GoToLocation | null;
+  onGoTo?: (location: GoToLocation) => void;
 }) {
   const severity = item.severity == null ? null : `${item.severity}: `;
   const location = item.location;
+  const handleGoTo = useCallback(() => {
+    if (goToLocation != null) {
+      onGoTo?.(goToLocation);
+    }
+  }, [goToLocation, onGoTo]);
 
   if (location == null) {
     return (
@@ -41,12 +50,12 @@ export function DiagnosticDetailItem({
     <>
       {severity}
       {item.message}{" "}
-      {onGoTo == null ? (
+      {goToLocation == null || onGoTo == null ? (
         <span className="text-gray-500">{locationLabel}</span>
       ) : (
         <button
           type="button"
-          onClick={onGoTo}
+          onClick={handleGoTo}
           className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
         >
           {locationLabel}
