@@ -186,7 +186,7 @@ pub(crate) fn function_known_decorator_flags<'db>(
 /// function-definition inference.
 #[derive(Debug, Eq, PartialEq, Default, salsa::Update, get_size2::GetSize)]
 pub(crate) struct FunctionDecoratorInference<'db> {
-    expression_types: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expression_types: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
     bindings: Box<[(Definition<'db>, Type<'db>)]>,
     called_functions: Box<[FunctionType<'db>]>,
     known_decorators: FunctionDecorators,
@@ -204,7 +204,7 @@ impl<'db> FunctionDecoratorInference<'db> {
     pub(crate) fn expression_types(
         &self,
     ) -> impl ExactSizeIterator<Item = (ExpressionNodeKey, Type<'db>)> + '_ {
-        self.expression_types.iter().copied()
+        self.expression_types.iter()
     }
 
     pub(crate) fn bindings(
@@ -891,7 +891,7 @@ impl<'db> InferredDeclaration<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -1201,7 +1201,7 @@ impl<'db> DefinitionInference<'db> {
         }
 
         Self {
-            expressions: FrozenMap::default(),
+            expressions: FrozenValueMap::default(),
             types,
             #[cfg(debug_assertions)]
             scope: definition.scope(db),
@@ -1221,10 +1221,9 @@ impl<'db> DefinitionInference<'db> {
         cycle: &salsa::Cycle,
         definition: Definition<'db>,
     ) -> DefinitionInference<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
-        }
+        self.expressions.map_values(|expr, ty| {
+            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+        });
         self.types = std::mem::take(&mut self.types).cycle_normalized(
             db,
             &previous_inference.types,
@@ -1389,7 +1388,7 @@ impl<'db> DefinitionInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ExpressionInference<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
     extra: Option<Box<ExpressionInferenceExtra<'db>>>,
 
@@ -1433,7 +1432,7 @@ impl<'db> ExpressionInference<'db> {
                 cycle_recovery: Some(cycle_recovery),
                 ..ExpressionInferenceExtra::default()
             })),
-            expressions: FrozenMap::default(),
+            expressions: FrozenValueMap::default(),
             #[cfg(debug_assertions)]
             scope,
         }
@@ -1460,10 +1459,8 @@ impl<'db> ExpressionInference<'db> {
             }
         }
 
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
-        }
+        self.expressions
+            .map_values(|expr, ty| ty.cycle_normalized(db, previous.expression_type(expr), cycle));
 
         self
     }
@@ -1540,7 +1537,7 @@ impl<'db> StatementInference<'db> {
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct StatementInferenceInner<'db> {
     /// The types of every expression in this region.
-    expressions: FrozenMap<ExpressionNodeKey, Type<'db>>,
+    expressions: FrozenValueMap<ExpressionNodeKey, Type<'db>>,
 
     /// The scope this region is part of.
     #[cfg(debug_assertions)]
@@ -1595,7 +1592,7 @@ impl<'db> StatementInferenceInner<'db> {
         let _ = scope;
 
         Self {
-            expressions: FrozenMap::default(),
+            expressions: FrozenValueMap::default(),
             bindings: Box::default(),
             declarations: Box::default(),
             #[cfg(debug_assertions)]
@@ -1613,10 +1610,9 @@ impl<'db> StatementInferenceInner<'db> {
         previous_inference: &StatementInferenceInner<'db>,
         cycle: &salsa::Cycle,
     ) -> StatementInferenceInner<'db> {
-        for (expr, ty) in &mut self.expressions {
-            let previous_ty = previous_inference.expression_type(*expr);
-            *ty = ty.cycle_normalized(db, previous_ty, cycle);
-        }
+        self.expressions.map_values(|expr, ty| {
+            ty.cycle_normalized(db, previous_inference.expression_type(expr), cycle)
+        });
         for (binding, binding_ty) in &mut self.bindings {
             if let Some((_, previous_binding)) = previous_inference
                 .bindings
