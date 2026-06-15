@@ -1259,7 +1259,8 @@ impl DivergentApproximation {
             return self.overlay_type_impl(db, body, precise, position);
         }
 
-        if let Some(overlaid) = self.overlay_equal_or_literal_fallback(db, approximation, precise) {
+        if let Some(overlaid) = Self::overlay_equal_or_literal_fallback(db, approximation, precise)
+        {
             return Some(overlaid);
         }
         if self.allow_dynamic_fallback
@@ -1355,7 +1356,7 @@ impl DivergentApproximation {
         precise: Type<'db>,
         position: MarkerPosition,
     ) -> bool {
-        if self.matches_equal_or_literal_fallback(db, approximation, precise) {
+        if Self::matches_equal_or_literal_fallback(db, approximation, precise) {
             return true;
         }
         if self.is_recorded_marker(db, precise) {
@@ -1487,7 +1488,6 @@ impl DivergentApproximation {
     }
 
     fn overlay_equal_or_literal_fallback<'db>(
-        &self,
         db: &'db dyn Db,
         approximation: Type<'db>,
         precise: Type<'db>,
@@ -1505,13 +1505,11 @@ impl DivergentApproximation {
     }
 
     fn matches_equal_or_literal_fallback<'db>(
-        &self,
         db: &'db dyn Db,
         approximation: Type<'db>,
         precise: Type<'db>,
     ) -> bool {
-        self.overlay_equal_or_literal_fallback(db, approximation, precise)
-            .is_some()
+        Self::overlay_equal_or_literal_fallback(db, approximation, precise).is_some()
     }
 }
 
@@ -1538,7 +1536,7 @@ impl<'db> Type<'db> {
             return body;
         }
 
-        if body.is_single_valued(db) {
+        if body.is_definitely_single_valued_without_lazy_typevar_defaults(db) {
             return body.erase_divergent_markers(db);
         }
 
@@ -3537,6 +3535,67 @@ impl<'db> Type<'db> {
                 .enum_complement(db)
                 .is_some_and(|complement| complement.is_single_valued(db)),
             Type::EnumComplement(complement) => complement.is_single_valued(db),
+        }
+    }
+
+    /// Return true only for types that are known to be single-valued without evaluating lazy type
+    /// attributes.
+    fn is_definitely_single_valued_without_lazy_typevar_defaults(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Divergent(divergent) if let Some(marked) = divergent.as_bodyful(db) => marked
+                .inner(db)
+                .is_definitely_single_valued_without_lazy_typevar_defaults(db),
+
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
+
+            Type::FunctionLiteral(..)
+            | Type::WrapperDescriptor(_)
+            | Type::KnownBoundMethod(_)
+            | Type::ModuleLiteral(..)
+            | Type::ClassLiteral(..)
+            | Type::GenericAlias(..)
+            | Type::SpecialForm(..)
+            | Type::KnownInstance(..) => true,
+
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(..)
+                | LiteralValueTypeKind::String(..)
+                | LiteralValueTypeKind::Bytes(..)
+                | LiteralValueTypeKind::Bool(_) => true,
+
+                LiteralValueTypeKind::Enum(..) | LiteralValueTypeKind::LiteralString => false,
+            },
+
+            Type::NominalInstance(instance) => {
+                instance.is_definitely_single_valued_without_lazy_typevar_defaults(db)
+            }
+
+            Type::TypeIs(type_is) => type_is.is_bound(db),
+            Type::TypeGuard(type_guard) => type_guard.is_bound(db),
+
+            Type::Dynamic(_)
+            | Type::Divergent(_)
+            | Type::Recursive(_)
+            | Type::Never
+            | Type::Union(..)
+            | Type::Intersection(_)
+            | Type::EnumComplement(_)
+            | Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::Callable(_)
+            | Type::BoundMethod(_)
+            | Type::BoundSuper(_)
+            | Type::PropertyInstance(_)
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::ProtocolInstance(..)
+            | Type::SubclassOf(..)
+            | Type::TypeAlias(_)
+            | Type::NewTypeInstance(_)
+            | Type::TypeForm(_)
+            | Type::TypeVar(_)
+            | Type::TypedDict(_) => false,
         }
     }
 
@@ -7294,9 +7353,7 @@ impl<'db> Type<'db> {
 
             Type::TypeAlias(alias) => {
                 match type_mapping {
-                    TypeMapping::ReplaceDivergent { .. }
-                    | TypeMapping::ReplaceRecursiveOrigin { .. }
-                    | TypeMapping::EraseDivergentMarkers => {
+                    _ if !type_mapping.should_visit_lazy_typevar_defaults() => {
                         if let Some(specialization) = alias.specialization(db) {
                             let mapped_specialization =
                                 specialization.apply_type_mapping_impl(db, type_mapping, &[], visitor);
@@ -8506,6 +8563,16 @@ pub enum TypeMapping<'a, 'db> {
 }
 
 impl<'db> TypeMapping<'_, 'db> {
+    pub(super) fn should_visit_lazy_typevar_defaults(&self) -> bool {
+        !matches!(
+            self,
+            TypeMapping::ReplaceRecursiveOrigin { .. }
+                | TypeMapping::ReplaceDivergent { .. }
+                | TypeMapping::EraseDivergentMarkers
+                | TypeMapping::EraseDivergentMarker { .. }
+        )
+    }
+
     /// Update the generic context of a [`Signature`] according to the current type mapping
     pub(crate) fn update_signature_generic_context(
         &self,

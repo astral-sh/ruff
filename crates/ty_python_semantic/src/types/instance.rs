@@ -405,6 +405,22 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn is_definitely_single_valued_without_lazy_typevar_defaults(
+        self,
+        db: &'db dyn Db,
+    ) -> bool {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => {
+                tuple.is_definitely_single_valued_without_lazy_typevar_defaults(db)
+            }
+            NominalInstanceInner::Object => false,
+            NominalInstanceInner::SysVersionInfo => true,
+            NominalInstanceInner::NonTuple(class) => {
+                class.known(db).and_then(KnownClass::is_single_valued) == Some(true)
+            }
+        }
+    }
+
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         SubclassOfType::from(db, self.class(db))
     }

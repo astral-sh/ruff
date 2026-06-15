@@ -259,6 +259,14 @@ impl<'db> TupleType<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         self.tuple(db).is_single_valued(db)
     }
+
+    pub(crate) fn is_definitely_single_valued_without_lazy_typevar_defaults(
+        self,
+        db: &'db dyn Db,
+    ) -> bool {
+        self.tuple(db)
+            .is_definitely_single_valued_without_lazy_typevar_defaults(db)
+    }
 }
 
 impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
@@ -769,6 +777,12 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         self.0.iter().all(|ty| ty.is_single_valued(db))
+    }
+
+    fn is_definitely_single_valued_without_lazy_typevar_defaults(&self, db: &'db dyn Db) -> bool {
+        self.0
+            .iter()
+            .all(|ty| ty.is_definitely_single_valued_without_lazy_typevar_defaults(db))
     }
 }
 
@@ -1397,6 +1411,18 @@ impl<'db> Tuple<Type<'db>> {
     pub(crate) fn is_single_valued(&self, db: &'db dyn Db) -> bool {
         match self {
             Tuple::Fixed(tuple) => tuple.is_single_valued(db),
+            Tuple::Variable(_) => false,
+        }
+    }
+
+    pub(crate) fn is_definitely_single_valued_without_lazy_typevar_defaults(
+        &self,
+        db: &'db dyn Db,
+    ) -> bool {
+        match self {
+            Tuple::Fixed(tuple) => {
+                tuple.is_definitely_single_valued_without_lazy_typevar_defaults(db)
+            }
             Tuple::Variable(_) => false,
         }
     }

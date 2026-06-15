@@ -1186,7 +1186,14 @@ impl<'db> BoundTypeVarInstance<'db> {
     ) -> Self {
         let typevar = self.typevar(db);
         let bound_or_constraints = typevar.bound_or_constraints(db);
-        let default = self.default_type(db);
+        let default = if type_mapping.should_visit_lazy_typevar_defaults() {
+            self.default_type(db)
+        } else {
+            typevar._default(db).and_then(|default| match default {
+                TypeVarDefaultEvaluation::Eager(ty) => Some(ty),
+                TypeVarDefaultEvaluation::Lazy => None,
+            })
+        };
 
         if bound_or_constraints.is_none() && default.is_none() {
             return Self::new(
