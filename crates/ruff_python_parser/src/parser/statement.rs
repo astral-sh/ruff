@@ -10,7 +10,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{EXPR_SET, ParsedExpr};
+use crate::parser::expression::{ArgumentsContext, EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, IpyEscapeContext, Parser, RecoveryContext, RecoveryContextKind, WithItemKind,
@@ -2142,9 +2142,14 @@ impl<'src> Parser<'src> {
         // test_ok class_def_arguments
         // class Foo: ...
         // class Foo(): ...
+        // class Foo((base for base in bases)): ...
+        // class Foo(*(base for base in bases)): ...
+
+        // test_err class_def_unparenthesized_generator_argument
+        // class Foo(base for base in bases): ...
         let arguments = self
             .at(TokenKind::Lpar)
-            .then(|| Box::new(self.parse_arguments()));
+            .then(|| Box::new(self.parse_arguments(ArgumentsContext::ClassDefinition)));
 
         self.expect(TokenKind::Colon);
 
