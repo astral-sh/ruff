@@ -34,9 +34,9 @@ struct UvWorkspaceMember {
     id: String,
 }
 
-pub fn parse_uv_workspace_metadata(source: &str) -> Result<DependencyMetadata> {
-    let snapshot: UvWorkspaceMetadata =
-        serde_json::from_str(source).context("Failed to parse dependency metadata JSON")?;
+pub fn parse_uv_workspace_metadata(source: impl AsRef<[u8]>) -> Result<DependencyMetadata> {
+    let snapshot: UvWorkspaceMetadata = serde_json::from_slice(source.as_ref())
+        .context("Failed to parse dependency metadata JSON")?;
 
     if snapshot.schema.version != "preview" {
         bail!(
@@ -244,7 +244,8 @@ mod tests {
     use ty_python_core::program::{FallibleStrategy, Program, ProgramSettings};
     use ty_python_semantic::PythonVersionWithSource;
 
-    use crate::{ProjectMetadata, TestDb};
+    use crate::ProjectMetadata;
+    use crate::db::testing::TestDb;
 
     use super::{enrich_dependency_metadata_with_editables, parse_uv_workspace_metadata};
     use ty_python_semantic::dependency::{

@@ -11,21 +11,21 @@ fn write_uv(case: &CliTest, metadata: &str) -> anyhow::Result<std::path::PathBuf
     case.write_file(
         "bin/uv",
         &format!(
-            r#"
-            #!/bin/sh
-            if [ "$*" != "workspace metadata --locked --sync" ]; then
-                echo "unexpected arguments: $*" >&2
-                exit 2
-            fi
-            cat <<'EOF'
-            {metadata}
-            EOF
-            "#,
+            r#"#!/bin/sh
+if [ "$*" != "workspace metadata --frozen --active" ]; then
+    echo "unexpected arguments: $*" >&2
+    exit 2
+fi
+cat <<'EOF'
+{}
+EOF
+"#,
+            metadata.trim()
         ),
     )?;
     std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
 
-    Ok(bin)
+    Ok(uv)
 }
 
 #[cfg(unix)]
@@ -36,15 +36,14 @@ fn write_failing_uv(case: &CliTest) -> anyhow::Result<std::path::PathBuf> {
     let uv = bin.join("uv");
     case.write_file(
         "bin/uv",
-        r#"
-        #!/bin/sh
-        echo "workspace metadata is unavailable" >&2
-        exit 2
-        "#,
+        r#"#!/bin/sh
+echo "workspace metadata is unavailable" >&2
+exit 2
+"#,
     )?;
     std::fs::set_permissions(&uv, std::fs::Permissions::from_mode(0o755))?;
 
-    Ok(bin)
+    Ok(uv)
 }
 
 fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Result<()> {
@@ -71,6 +70,31 @@ fn write_dependency_metadata(case: &CliTest, dependencies: &str) -> anyhow::Resu
     )
 }
 
+fn uv_workspace_metadata(case: &CliTest) -> String {
+    let root = format!("{:?}", case.root().to_str().unwrap());
+    let environment = format!("{:?}", case.root().join(".venv").to_str().unwrap());
+    format!(
+        r#"
+        {{
+          "schema": {{"version": "preview"}},
+          "workspace_root": {root},
+          "environment": {{"root": {environment}, "python": {{"version": "3.13.0"}}}},
+          "requires_python": ">=3.8",
+          "members": [
+            {{"name": "app", "path": {root}, "id": "app"}}
+          ],
+          "resolution": {{
+            "app": {{"name": "app", "dependencies": []}},
+            "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
+          }},
+          "module_owners": {{
+            "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
+          }}
+        }}
+        "#
+    )
+}
+
 #[cfg(unix)]
 #[test]
 fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
@@ -82,34 +106,14 @@ fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let root = format!("{:?}", case.root().to_str().unwrap());
-    let bin = write_uv(
-        &case,
-        &format!(
-            r#"
-            {{
-              "schema": {{"version": "preview"}},
-              "members": [
-                {{"name": "app", "path": {root}, "id": "app"}}
-              ],
-              "resolution": {{
-                "app": {{"name": "app", "dependencies": []}},
-                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
-              }},
-              "module_owners": {{
-                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
-              }}
-            }}
-            "#
-        ),
-    )?;
+    let uv = write_uv(&case, &uv_workspace_metadata(&case))?;
 
     assert_cmd_snapshot!(case.command()
-        .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
-    success: true
-    exit_code: 0
+        .env("TY_UV", "1")
+        .env("UV", uv), @"
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `requests` is used but no direct dependency on `requests` is declared
      --> test.py:1:8
@@ -126,9 +130,8 @@ fn dependency_metadata_is_loaded_from_uv_workspace() -> anyhow::Result<()> {
     Ok(())
 }
 
-#[cfg(unix)]
 #[test]
-fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
+fn dependency_metadata_is_not_loaded_without_uv_integration() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("test.py", "import requests"),
         (
@@ -136,32 +139,9 @@ fn dependency_metadata_is_not_loaded_without_uv_lock() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let root = format!("{:?}", case.root().to_str().unwrap());
-    let bin = write_uv(
-        &case,
-        &format!(
-            r#"
-            {{
-              "schema": {{"version": "preview"}},
-              "members": [
-                {{"name": "app", "path": {root}, "id": "app"}}
-              ],
-              "resolution": {{
-                "app": {{"name": "app", "dependencies": []}},
-                "requests==2.32.0@registry+https://pypi.org/simple": {{"name": "requests", "dependencies": []}}
-              }},
-              "module_owners": {{
-                "requests": [{{"package_id": "requests==2.32.0@registry+https://pypi.org/simple"}}]
-              }}
-            }}
-            "#
-        ),
-    )?;
-
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
-        .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+        .arg("--warn").arg("missing-direct-dependency"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -184,18 +164,20 @@ fn dependency_metadata_uv_failure_does_not_fail_check() -> anyhow::Result<()> {
             "",
         ),
     ])?;
-    let bin = write_failing_uv(&case)?;
+    let uv = write_failing_uv(&case)?;
 
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
-        .env("PATH", std::env::join_paths([bin, "/usr/bin".into(), "/bin".into()])?), @"
+        .env("TY_UV", "1")
+        .env("UV", uv), @"
     success: true
     exit_code: 0
     ----- stdout -----
     All checks passed!
 
     ----- stderr -----
+    WARN `uv workspace metadata` failed with status exit status: 2: workspace metadata is unavailable
     ");
 
     Ok(())
@@ -287,8 +269,8 @@ fn dependency_metadata_supports_missing_direct_dependency_lint() -> anyhow::Resu
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `requests` is used but no direct dependency on `requests` is declared
      --> test.py:1:8
@@ -301,6 +283,31 @@ fn dependency_metadata_supports_missing_direct_dependency_lint() -> anyhow::Resu
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+#[test]
+fn dependency_metadata_supports_concise_diagnostics() -> anyhow::Result<()> {
+    let case = CliTest::with_file("test.py", "import requests")?;
+    write_site_package(&case, "requests")?;
+    write_dependency_metadata(&case, "[]")?;
+
+    let output = case
+        .command()
+        .arg("--python")
+        .arg(".venv")
+        .arg("--warn")
+        .arg("missing-direct-dependency")
+        .arg("--dependency-metadata")
+        .arg("metadata.json")
+        .arg("--output-format=concise")
+        .output()?;
+
+    assert_eq!(output.status.code(), Some(1));
+    assert!(String::from_utf8(output.stdout)?.contains(
+        "test.py:1:8: warning[missing-direct-dependency] Third-party import `requests` is used but no direct dependency on `requests` is declared"
+    ));
 
     Ok(())
 }
@@ -341,8 +348,8 @@ fn dependency_metadata_infers_editable_module_owners() -> anyhow::Result<()> {
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `lib_module` is used but no direct dependency on `lib-project` is declared
      --> test.py:1:8
@@ -376,8 +383,8 @@ fn dependency_group_dependency_is_reported_in_package_code() -> anyhow::Result<(
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `inline_snapshot` is used but no direct dependency on `inline-snapshot` is declared
      --> src/app/__init__.py:1:8
@@ -436,8 +443,8 @@ fn dependency_group_dependency_does_not_allow_transitive_dependency() -> anyhow:
         .arg("--python").arg(".venv")
         .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `pytest` is used but no direct dependency on `pytest` is declared
      --> tests/test_app.py:1:8
@@ -482,8 +489,8 @@ fn dependency_group_dependency_is_reported_in_editable_package_code() -> anyhow:
         .arg("--warn").arg("missing-direct-dependency")
         .arg("--dependency-metadata").arg("metadata.json")
         .arg("src/app/__init__.py"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `inline_snapshot` is used but no direct dependency on `inline-snapshot` is declared
      --> src/app/__init__.py:1:8
@@ -557,8 +564,8 @@ fn dependency_metadata_applies_with_multiple_overrides() -> anyhow::Result<()> {
     assert_cmd_snapshot!(case.command()
         .arg("--python").arg(".venv")
         .arg("--dependency-metadata").arg("metadata.json"), @"
-    success: true
-    exit_code: 0
+    success: false
+    exit_code: 1
     ----- stdout -----
     warning[missing-direct-dependency]: Third-party import `requests` is used but no direct dependency on `requests` is declared
      --> test.py:1:8

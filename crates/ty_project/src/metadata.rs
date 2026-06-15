@@ -8,6 +8,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_core::program::{FallibleStrategy, MisconfigurationStrategy, ProgramSettings};
+use ty_python_semantic::dependency::DependencyMetadata;
 use ty_static::EnvVars;
 
 use crate::Db;
@@ -454,6 +455,12 @@ impl ProjectMetadata {
 
     pub fn has_uv_workspace(&self) -> bool {
         self.uv_workspace.is_some()
+    }
+
+    pub fn uv_dependency_metadata(&self) -> Option<&DependencyMetadata> {
+        self.uv_workspace
+            .as_ref()
+            .and_then(uv::UvWorkspace::dependency_metadata)
     }
 
     /// Applies lower-precedence options to this project.

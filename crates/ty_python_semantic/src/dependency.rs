@@ -37,7 +37,7 @@ declare_lint! {
     /// ```
     pub(crate) static MISSING_DIRECT_DEPENDENCY = {
         summary: "detects third-party imports without direct dependency declarations",
-        status: LintStatus::preview("0.0.0"),
+        status: LintStatus::stable("0.0.64"),
         default_level: Level::Ignore,
     }
 }
@@ -465,6 +465,9 @@ fn missing_direct_dependency_diagnostic(
             }
             LintSource::Editor => {
                 "rule `missing-direct-dependency` was selected in the editor settings"
+            }
+            LintSource::UvWorkspace => {
+                "rule `missing-direct-dependency` was selected by uv workspace metadata"
             }
         });
     }
