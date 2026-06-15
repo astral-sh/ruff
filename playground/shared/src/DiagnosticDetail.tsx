@@ -1,38 +1,22 @@
-export interface DiagnosticDetail {
+export interface DiagnosticDetail<Location = DiagnosticDetailLocation> {
   message: string;
   severity?: string;
-  location?: DiagnosticDetailLocation;
+  location: Location | null;
 }
 
 export interface DiagnosticDetailLocation {
   line: number;
   column: number;
   displayPath?: string;
+}
+
+export function DiagnosticDetailItem({
+  item,
+  onGoTo,
+}: {
+  item: DiagnosticDetail;
   onGoTo?: () => void;
-}
-
-export interface DiagnosticDetailInput<Location> {
-  message: string;
-  severity?: string;
-  location: Location | null | undefined;
-}
-
-export function createDiagnosticDetail<Location>(
-  item: DiagnosticDetailInput<Location>,
-  createLocation: (location: Location) => DiagnosticDetailLocation,
-): DiagnosticDetail {
-  if (item.location == null) {
-    return { message: item.message, severity: item.severity };
-  }
-
-  return {
-    message: item.message,
-    severity: item.severity,
-    location: createLocation(item.location),
-  };
-}
-
-export function DiagnosticDetailItem({ item }: { item: DiagnosticDetail }) {
+}) {
   const severity = item.severity == null ? null : `${item.severity}: `;
   const location = item.location;
 
@@ -57,12 +41,12 @@ export function DiagnosticDetailItem({ item }: { item: DiagnosticDetail }) {
     <>
       {severity}
       {item.message}{" "}
-      {location.onGoTo == null ? (
+      {onGoTo == null ? (
         <span className="text-gray-500">{locationLabel}</span>
       ) : (
         <button
           type="button"
-          onClick={location.onGoTo}
+          onClick={onGoTo}
           className="cursor-pointer text-gray-500 underline decoration-dotted underline-offset-2 transition-colors hover:text-gray-400 dark:hover:text-gray-400"
         >
           {locationLabel}

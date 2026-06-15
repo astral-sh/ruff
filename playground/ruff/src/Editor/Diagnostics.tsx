@@ -1,8 +1,7 @@
 import type { Diagnostic, DiagnosticLocation } from "ruff_wasm";
 import classNames from "classnames";
 import {
-  type DiagnosticDetailInput,
-  createDiagnosticDetail,
+  type DiagnosticDetail,
   DiagnosticDetailItem,
   secondaryAnnotationsWithMessages,
   Theme,
@@ -109,14 +108,16 @@ function Items({
                 {secondaryAnnotations.map((annotation, index) => (
                   <li key={`annotation-${index}`}>
                     <DiagnosticDetailItem
-                      item={toDisplayDiagnosticDetail(annotation, onGoTo)}
+                      item={toDisplayDiagnosticDetail(annotation)}
+                      onGoTo={diagnosticOnGoTo(annotation.location, onGoTo)}
                     />
                   </li>
                 ))}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
                   <li key={`sub-diagnostic-${index}`}>
                     <DiagnosticDetailItem
-                      item={toDisplayDiagnosticDetail(subDiagnostic, onGoTo)}
+                      item={toDisplayDiagnosticDetail(subDiagnostic)}
+                      onGoTo={diagnosticOnGoTo(subDiagnostic.location, onGoTo)}
                     />
                   </li>
                 ))}
@@ -130,18 +131,35 @@ function Items({
 }
 
 function toDisplayDiagnosticDetail(
-  item: DiagnosticDetailInput<DiagnosticLocation>,
-  onGoTo: (line: number, column: number) => void,
-) {
-  return createDiagnosticDetail(item, (location) => {
-    const { row, column } = location.start_location;
-    const isCurrentFile = location.path === PLAYGROUND_FILE_PATH;
+  item: DiagnosticDetail<DiagnosticLocation>,
+): DiagnosticDetail {
+  const location = item.location;
 
-    return {
-      line: row,
-      column,
-      displayPath: isCurrentFile ? undefined : location.path,
-      onGoTo: isCurrentFile ? () => onGoTo(row, column) : undefined,
-    };
-  });
+  return {
+    message: item.message,
+    severity: item.severity,
+    location:
+      location == null
+        ? null
+        : {
+            line: location.start_location.row,
+            column: location.start_location.column,
+            displayPath:
+              location.path === PLAYGROUND_FILE_PATH
+                ? undefined
+                : location.path,
+          },
+  };
+}
+
+function diagnosticOnGoTo(
+  location: DiagnosticLocation | null,
+  onGoTo: (line: number, column: number) => void,
+): (() => void) | undefined {
+  if (location == null || location.path !== PLAYGROUND_FILE_PATH) {
+    return undefined;
+  }
+
+  const { row, column } = location.start_location;
+  return () => onGoTo(row, column);
 }

@@ -1,5 +1,6 @@
 #![cfg(target_arch = "wasm32")]
 
+use wasm_bindgen::JsValue;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 use ruff_linter::registry::Rule;
@@ -38,6 +39,10 @@ fn primary_annotation(
             end_location,
         }),
     }
+}
+
+fn property(value: &JsValue, name: &str) -> JsValue {
+    js_sys::Reflect::get(value, &JsValue::from_str(name)).unwrap()
 }
 
 #[wasm_bindgen_test]
@@ -152,6 +157,10 @@ fn sub_diagnostics() {
         .unwrap()
         .check("import os\n")
         .unwrap();
+    let diagnostics = js_sys::Array::from(&output);
+    let sub_diagnostics = js_sys::Array::from(&property(&diagnostics.get(0), "subDiagnostics"));
+    assert!(property(&sub_diagnostics.get(0), "location").is_null());
+
     let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
 
     assert_eq!(result[0].message, "`os` imported but unused".to_string());
@@ -174,6 +183,10 @@ fn annotations_preserve_order() {
         .unwrap()
         .check("x = {1, 1}\n")
         .unwrap();
+    let diagnostics = js_sys::Array::from(&output);
+    let annotations = js_sys::Array::from(&property(&diagnostics.get(0), "annotations"));
+    assert!(property(&annotations.get(0), "message").is_null());
+
     let result: Vec<ExpandedMessage> = serde_wasm_bindgen::from_value(output).unwrap();
 
     assert_eq!(

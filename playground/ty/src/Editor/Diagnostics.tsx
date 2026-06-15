@@ -9,8 +9,7 @@ import type {
 } from "ty_wasm";
 import classNames from "classnames";
 import {
-  type DiagnosticDetailInput,
-  createDiagnosticDetail,
+  type DiagnosticDetail,
   DiagnosticDetailItem,
   secondaryAnnotationsWithMessages,
   Theme,
@@ -134,17 +133,21 @@ function Items({
             {secondaryAnnotations.length > 0 ||
             diagnostic.subDiagnostics.length > 0 ? (
               <ul className="pl-3 font-mono text-gray-500 whitespace-pre-wrap">
-                {secondaryAnnotations.map((annotation, index) => (
-                  <li key={`annotation-${index}`}>
-                    <DiagnosticDetailItem
-                      item={toDisplayDiagnosticDetail(
-                        annotation,
-                        currentFilePath,
-                        onGoTo,
-                      )}
-                    />
-                  </li>
-                ))}
+                {secondaryAnnotations.map((annotation, index) => {
+                  const location = annotation.location ?? null;
+
+                  return (
+                    <li key={`annotation-${index}`}>
+                      <DiagnosticDetailItem
+                        item={toDisplayDiagnosticDetail(
+                          { message: annotation.message, location },
+                          currentFilePath,
+                        )}
+                        onGoTo={diagnosticOnGoTo(location, onGoTo)}
+                      />
+                    </li>
+                  );
+                })}
                 {diagnostic.subDiagnostics.map((subDiagnostic, index) => (
                   <li key={`sub-diagnostic-${index}`}>
                     <SubDiagnosticItem
@@ -200,12 +203,13 @@ function SubDiagnosticItem({
   }
 
   const severity = formatSubDiagnosticSeverity(subDiagnostic.severity);
+  const primaryLocation = primaryAnnotation?.location ?? null;
 
   return (
     <>
       {primaryAnnotation == null ? (
         <DiagnosticDetailItem
-          item={{ message: subDiagnostic.message, severity }}
+          item={{ message: subDiagnostic.message, severity, location: null }}
         />
       ) : (
         <DiagnosticDetailItem
@@ -215,34 +219,38 @@ function SubDiagnosticItem({
                 subDiagnostic,
                 primaryAnnotation,
               ),
-              location: primaryAnnotation.location,
+              location: primaryLocation,
               severity,
             },
             currentFilePath,
-            onGoTo,
           )}
+          onGoTo={diagnosticOnGoTo(primaryLocation, onGoTo)}
         />
       )}
       {additionalAnnotations.length > 0 ? (
         <ul className="pl-3">
-          {additionalAnnotations.map((annotation, index) => (
-            <li key={index}>
-              <DiagnosticDetailItem
-                item={toDisplayDiagnosticDetail(
-                  {
-                    message: formatSubDiagnosticAnnotation(
-                      subDiagnostic,
-                      annotation,
-                      false,
-                    ),
-                    location: annotation.location,
-                  },
-                  currentFilePath,
-                  onGoTo,
-                )}
-              />
-            </li>
-          ))}
+          {additionalAnnotations.map((annotation, index) => {
+            const location = annotation.location ?? null;
+
+            return (
+              <li key={index}>
+                <DiagnosticDetailItem
+                  item={toDisplayDiagnosticDetail(
+                    {
+                      message: formatSubDiagnosticAnnotation(
+                        subDiagnostic,
+                        annotation,
+                        false,
+                      ),
+                      location,
+                    },
+                    currentFilePath,
+                  )}
+                  onGoTo={diagnosticOnGoTo(location, onGoTo)}
+                />
+              </li>
+            );
+          })}
         </ul>
       ) : null}
     </>
@@ -250,21 +258,31 @@ function SubDiagnosticItem({
 }
 
 function toDisplayDiagnosticDetail(
-  item: DiagnosticDetailInput<DiagnosticLocation>,
+  item: DiagnosticDetail<DiagnosticLocation>,
   currentFilePath: string | null,
-  onGoTo: (location: DiagnosticLocation) => void,
-) {
-  return createDiagnosticDetail(item, (location) => {
-    const { line, column } = location.range.start;
+): DiagnosticDetail {
+  const location = item.location;
 
-    return {
-      line,
-      column,
-      displayPath:
-        location.path === currentFilePath ? undefined : location.path,
-      onGoTo: () => onGoTo(location),
-    };
-  });
+  return {
+    message: item.message,
+    severity: item.severity,
+    location:
+      location == null
+        ? null
+        : {
+            line: location.range.start.line,
+            column: location.range.start.column,
+            displayPath:
+              location.path === currentFilePath ? undefined : location.path,
+          },
+  };
+}
+
+function diagnosticOnGoTo(
+  location: DiagnosticLocation | null,
+  onGoTo: (location: DiagnosticLocation) => void,
+): (() => void) | undefined {
+  return location == null ? undefined : () => onGoTo(location);
 }
 
 export function formatSubDiagnostic(subDiagnostic: SubDiagnostic): string {

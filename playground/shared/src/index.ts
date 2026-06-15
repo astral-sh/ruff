@@ -9,8 +9,6 @@ export { setupMonaco } from "./setupMonaco";
 export { downloadZip } from "./downloadZip";
 export {
   type DiagnosticDetail,
-  type DiagnosticDetailInput,
-  createDiagnosticDetail,
   DiagnosticDetailItem,
 } from "./DiagnosticDetail";
 export { secondaryAnnotationsWithMessages } from "./diagnostics";

@@ -246,7 +246,7 @@ function diagnosticRelatedInformation(
 
 function diagnosticLocationRelatedInformation(
   message: string,
-  location: DiagnosticLocation | null | undefined,
+  location: DiagnosticLocation | null,
   resource: editor.ITextModel["uri"],
 ): editor.IRelatedInformation[] {
   if (location?.path !== PLAYGROUND_FILE_PATH) {

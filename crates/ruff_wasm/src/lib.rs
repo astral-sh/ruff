@@ -60,8 +60,8 @@ export interface Diagnostic {
 
 export interface DiagnosticAnnotation {
     primary: boolean;
-    message: string | undefined;
-    location: DiagnosticLocation | undefined;
+    message: string | null;
+    location: DiagnosticLocation | null;
 }
 
 export interface SubDiagnostic {
@@ -429,7 +429,9 @@ impl Workspace {
             })
             .collect();
 
-        serde_wasm_bindgen::to_value(&messages).map_err(into_error)
+        messages
+            .serialize(&serde_wasm_bindgen::Serializer::new().serialize_missing_as_null(true))
+            .map_err(into_error)
     }
 
     pub fn format(&self, contents: &str) -> Result<String, Error> {
