@@ -260,7 +260,7 @@ impl Ty {
     }
 }
 
-fn divergent<'db>(db: &'db dyn Db, id_bits: u64) -> Type<'db> {
+fn divergent(db: &dyn Db, id_bits: u64) -> Type<'_> {
     Type::divergent(db, salsa::plumbing::Id::from_bits(id_bits))
 }
 

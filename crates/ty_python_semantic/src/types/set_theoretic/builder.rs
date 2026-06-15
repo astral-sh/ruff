@@ -1958,10 +1958,10 @@ impl<'db> UnionBuilder<'db> {
     fn merge_typed_dict_schemas(
         db: &'db dyn Db,
         left: &TypedDictSchema<'db>,
-        right: &TypedDictSchema<'db>,
+        right: &'db TypedDictSchema<'db>,
     ) -> TypedDictSchema<'db> {
         let mut merged = left.clone();
-        for (name, right_field) in right.iter() {
+        for (name, right_field) in right {
             if let Some(left_field) = merged.get_mut(name) {
                 left_field.declared_ty = Self::merge_cycle_recovery_type(
                     db,
@@ -1998,7 +1998,7 @@ impl<'db> UnionBuilder<'db> {
     fn merge_dynamic_typed_dict_anchor(
         db: &'db dyn Db,
         left: &DynamicTypedDictAnchor<'db>,
-        right: &DynamicTypedDictAnchor<'db>,
+        right: &'db DynamicTypedDictAnchor<'db>,
     ) -> Option<DynamicTypedDictAnchor<'db>> {
         match (left, right) {
             (
