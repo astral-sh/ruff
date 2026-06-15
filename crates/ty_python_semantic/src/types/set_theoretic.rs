@@ -355,7 +355,6 @@ impl<'db> UnionType<'db> {
             .unpack_aliases(false)
             .cycle_recovery(true);
         let mut empty = true;
-        let mut removed_bodyful_marker_id = None;
         for ty in self.elements(db) {
             if normalization.is_nested() {
                 // list[T | Divergent] => list[Divergent]
@@ -380,7 +379,6 @@ impl<'db> UnionType<'db> {
                         .marker_id(db)
                         .is_some_and(|id| marked.binder_id(db) == id)
                 {
-                    removed_bodyful_marker_id = Some(marked.binder_id(db));
                     builder = builder.add(body);
                     empty = false;
                     continue;
@@ -392,15 +390,7 @@ impl<'db> UnionType<'db> {
         if empty {
             builder = builder.add(normalization.marker());
         }
-        let ty = builder.build();
-        if let Some(marker_id) = removed_bodyful_marker_id
-            && !ty.same_divergent_marker(db, normalization.marker())
-            && !normalization.contains_marker(db, ty)
-        {
-            Some(Type::cycle_marked(db, marker_id, ty))
-        } else {
-            Some(ty)
-        }
+        Some(builder.build())
     }
 
     /// Identify some specific unions of known classes, currently the ones that `float` and
