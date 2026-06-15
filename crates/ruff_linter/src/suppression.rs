@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
-use ruff_diagnostics::{Edit, Fix};
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
@@ -42,8 +42,25 @@ enum SuppressionAction {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct SuppressionComment {
-    /// Range containing the entire suppression comment
+    /// Range containing the entire suppression comment.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// import math  # start # ruff:ignore[F401] reason # end
+    ///                      ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
     range: TextRange,
+
+    /// Range of the entire comment token.
+    ///
+    /// For example:
+    ///
+    /// ```py
+    /// import math  # start # ruff:ignore[F401] reason # end
+    ///              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    /// ```
+    token_range: TextRange,
 
     /// The action directive
     action: SuppressionAction,
@@ -59,6 +76,11 @@ impl SuppressionComment {
     /// Return the suppressed codes as strings
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
         self.codes.iter().map(|range| source.slice(range))
+    }
+
+    /// Return whether the comment is nested within a wider comment token.
+    fn is_nested(&self) -> bool {
+        self.token_range != self.range
     }
 }
 
@@ -486,6 +508,10 @@ impl Suppressions {
         highlight_only_code: bool,
         kind: T,
     ) -> Option<DiagnosticGuard<'a, 'b>> {
+        if !context.is_rule_enabled(T::rule()) {
+            return None;
+        }
+
         let first_comment = suppression.comments.first();
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
@@ -493,22 +519,40 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
-            if let Some(second_comment) = suppression.comments.second() {
-                let (second_range, second_range_edit) = Suppressions::delete_codes_or_comment(
-                    locator,
-                    second_comment,
-                    remove_codes,
-                    highlight_only_code,
-                );
-                diagnostic.secondary_annotation("", second_range);
-                diagnostic.set_fix(Fix::safe_edits(edit, [second_range_edit]));
+
+        // It's unsafe to remove an entire nested comment but okay to remove a subset of its codes.
+        let applicability =
+            if first_comment.is_nested() && edit.range().contains_range(first_comment.range) {
+                Applicability::Unsafe
             } else {
-                diagnostic.set_fix(Fix::safe_edit(edit));
-            }
-            return Some(diagnostic);
-        }
-        None
+                Applicability::Safe
+            };
+
+        let mut diagnostic = context.report_custom_diagnostic(kind, range);
+
+        let fix = if let Some(second_comment) = suppression.comments.second() {
+            let (second_range, second_edit) = Suppressions::delete_codes_or_comment(
+                locator,
+                second_comment,
+                remove_codes,
+                highlight_only_code,
+            );
+            diagnostic.secondary_annotation("", second_range);
+            let applicability = if applicability.is_unsafe()
+                || second_comment.is_nested()
+                    && second_edit.range().contains_range(second_comment.range)
+            {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+            Fix::applicable_edits(edit, [second_edit], applicability)
+        } else {
+            Fix::applicable_edit(edit, applicability)
+        };
+        diagnostic.set_fix(fix);
+
+        Some(diagnostic)
     }
 
     fn delete_codes_or_comment(
@@ -594,18 +638,16 @@ impl<'a> SuppressionsBuilder<'a> {
             .comment_ranges()
             .iter()
             .copied()
-            .filter_map(|comment_range| {
-                let mut parser = SuppressionParser::new(self.source, comment_range);
-                match parser.parse_comment() {
-                    Ok(comment) => Some(comment),
-                    Err(ParseError {
-                        kind: ParseErrorKind::NotASuppression,
-                        ..
-                    }) => None,
-                    Err(error) => {
-                        errors.push(error);
-                        None
-                    }
+            .flat_map(|comment_range| SuppressionParser::new(self.source, comment_range))
+            .filter_map(|comment| match comment {
+                Ok(comment) => Some(comment),
+                Err(ParseError {
+                    kind: ParseErrorKind::NotASuppression,
+                    ..
+                }) => None,
+                Err(error) => {
+                    errors.push(error);
+                    None
                 }
             })
             .peekable();
@@ -620,7 +662,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
 
             // Matched suppression comments
-            let (before, after) = tokens.split_at(suppression.range.start());
+            let (before, after) = tokens.split_at(suppression.token_range.start());
 
             let mut count = 0;
             let last_indent = before
@@ -657,46 +699,44 @@ impl<'a> SuppressionsBuilder<'a> {
                         }
                     }
                     TokenKind::Comment => {
-                        let Some(suppression) =
-                            suppressions.next_if(|suppression| suppression.range == token.range())
-                        else {
-                            continue;
-                        };
-
-                        if self.register_standalone_suppression(&suppression, tokens) {
-                            continue;
-                        }
-
-                        let Some(indent) =
-                            indentation_at_offset(suppression.range.start(), self.source)
-                        else {
-                            // trailing suppressions are not supported
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Trailing,
-                                comment: suppression,
-                            });
-                            continue;
-                        };
-
-                        // comment matches current block's indentation, or precedes an indent/dedent token
-                        if indent == current_indent
-                            || after[token_index..]
-                                .iter()
-                                .find(|t| !t.kind().is_trivia())
-                                .is_some_and(|t| {
-                                    matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
-                                })
+                        while let Some(suppression) = suppressions
+                            .next_if(|suppression| suppression.token_range == token.range())
                         {
-                            self.pending.push(PendingSuppressionComment {
-                                indent,
-                                comment: suppression,
-                            });
-                        } else {
-                            // weirdly indented? ¯\_(ツ)_/¯
-                            self.invalid.push(InvalidSuppression {
-                                kind: InvalidSuppressionKind::Indentation,
-                                comment: suppression,
-                            });
+                            if self.register_standalone_suppression(&suppression, tokens) {
+                                continue;
+                            }
+
+                            let Some(indent) =
+                                indentation_at_offset(suppression.range.start(), self.source)
+                            else {
+                                // trailing suppressions are not supported
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Trailing,
+                                    comment: suppression,
+                                });
+                                continue;
+                            };
+
+                            // comment matches current block's indentation, or precedes an indent/dedent token
+                            if indent == current_indent
+                                || after[token_index..]
+                                    .iter()
+                                    .find(|t| !t.kind().is_trivia())
+                                    .is_some_and(|t| {
+                                        matches!(t.kind(), TokenKind::Dedent | TokenKind::Indent)
+                                    })
+                            {
+                                self.pending.push(PendingSuppressionComment {
+                                    indent,
+                                    comment: suppression,
+                                });
+                            } else {
+                                // weirdly indented? ¯\_(ツ)_/¯
+                                self.invalid.push(InvalidSuppression {
+                                    kind: InvalidSuppressionKind::Indentation,
+                                    comment: suppression,
+                                });
+                            }
                         }
                     }
                     _ => {}
@@ -737,7 +777,7 @@ impl<'a> SuppressionsBuilder<'a> {
         match suppression.action {
             SuppressionAction::Ignore => {
                 if is_ruff_ignore_enabled(self.settings) {
-                    let (before, after) = tokens.split_at(suppression.range.start());
+                    let (before, after) = tokens.split_at(suppression.token_range.start());
                     let range = if indentation_at_offset(suppression.range.start(), self.source)
                         .is_some()
                     {
@@ -745,7 +785,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         Self::standalone_comment_range(suppression.range, before, after)
                     } else {
                         // trailing ignore
-                        self.trailing_comment_range(suppression.range, before)
+                        self.trailing_comment_range(suppression.token_range, before)
                     };
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {
@@ -1069,10 +1109,28 @@ impl<'src> SuppressionParser<'src> {
     }
 
     fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
+        let comment_start = self.offset();
+
+        match self.parse_comment_inner(comment_start) {
+            Ok(comment) => Ok(comment),
+            Err(kind) => {
+                self.cursor.eat_while(|c| c != '#');
+                Err(ParseError::new(
+                    kind,
+                    TextRange::new(comment_start, self.offset()),
+                ))
+            }
+        }
+    }
+
+    fn parse_comment_inner(
+        &mut self,
+        comment_start: TextSize,
+    ) -> Result<SuppressionComment, ParseErrorKind> {
         self.cursor.start_token();
 
         if !self.cursor.eat_char('#') {
-            return self.error(ParseErrorKind::CommentWithoutHash);
+            return Err(ParseErrorKind::CommentWithoutHash);
         }
 
         self.eat_whitespace();
@@ -1080,30 +1138,37 @@ impl<'src> SuppressionParser<'src> {
         let action = self.eat_action()?;
         let codes = self.eat_codes()?;
         if codes.is_empty() {
-            return Err(ParseError::new(ParseErrorKind::MissingCodes, self.range));
+            return Err(ParseErrorKind::MissingCodes);
         }
 
         self.eat_whitespace();
-        let reason = TextRange::new(self.offset(), self.range.end());
+
+        let reason_start = self.offset();
+
+        // Consume the comment until its end or until the next "sub-comment" starts.
+        self.cursor.eat_while(|c| c != '#');
+
+        let reason = TextRange::new(reason_start, self.offset());
 
         Ok(SuppressionComment {
-            range: self.range,
+            range: TextRange::new(comment_start, self.offset()),
+            token_range: self.range,
             action,
             codes,
             reason,
         })
     }
 
-    fn eat_action(&mut self) -> Result<SuppressionAction, ParseError> {
+    fn eat_action(&mut self) -> Result<SuppressionAction, ParseErrorKind> {
         if !self.cursor.as_str().starts_with("ruff") {
-            return self.error(ParseErrorKind::NotASuppression);
+            return Err(ParseErrorKind::NotASuppression);
         }
 
         self.cursor.skip_bytes("ruff".len());
         self.eat_whitespace();
 
         if !self.cursor.eat_char(':') {
-            return self.error(ParseErrorKind::NotASuppression);
+            return Err(ParseErrorKind::NotASuppression);
         }
         self.eat_whitespace();
 
@@ -1123,23 +1188,23 @@ impl<'src> SuppressionParser<'src> {
             || self.cursor.as_str().starts_with("isort")
         {
             // alternate suppression variants, ignore for now
-            self.error(ParseErrorKind::NotASuppression)
+            Err(ParseErrorKind::NotASuppression)
         } else {
-            self.error(ParseErrorKind::UnknownAction)
+            Err(ParseErrorKind::UnknownAction)
         }
     }
 
-    fn eat_codes(&mut self) -> Result<SmallVec<[TextRange; 2]>, ParseError> {
+    fn eat_codes(&mut self) -> Result<SmallVec<[TextRange; 2]>, ParseErrorKind> {
         self.eat_whitespace();
         if !self.cursor.eat_char('[') {
-            return self.error(ParseErrorKind::MissingCodes);
+            return Err(ParseErrorKind::MissingCodes);
         }
 
         let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
 
         loop {
             if self.cursor.is_eof() {
-                return self.error(ParseErrorKind::MissingBracket);
+                return Err(ParseErrorKind::MissingBracket);
             }
 
             self.eat_whitespace();
@@ -1150,7 +1215,7 @@ impl<'src> SuppressionParser<'src> {
 
             let code_start = self.offset();
             if !self.eat_word() {
-                return self.error(ParseErrorKind::InvalidCode);
+                return Err(ParseErrorKind::InvalidCode);
             }
 
             codes.push(TextRange::new(code_start, self.offset()));
@@ -1162,9 +1227,9 @@ impl<'src> SuppressionParser<'src> {
                 }
 
                 return if self.cursor.is_eof() {
-                    self.error(ParseErrorKind::MissingBracket)
+                    Err(ParseErrorKind::MissingBracket)
                 } else {
-                    self.error(ParseErrorKind::MissingComma)
+                    Err(ParseErrorKind::MissingComma)
                 };
             }
         }
@@ -1193,9 +1258,17 @@ impl<'src> SuppressionParser<'src> {
     fn offset(&self) -> TextSize {
         self.range.start() + self.range.len() - self.cursor.text_len()
     }
+}
 
-    fn error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
-        Err(ParseError::new(kind, self.range))
+impl Iterator for SuppressionParser<'_> {
+    type Item = Result<SuppressionComment, ParseError>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor.is_eof() {
+            return None;
+        }
+
+        Some(self.parse_comment())
     }
 }
 
@@ -1913,7 +1986,7 @@ def bar():
             ],
             errors: [
                 ParseError {
-                    text: "# ruff: disable  # parse error!",
+                    text: "# ruff: disable  ",
                     kind: MissingCodes,
                 },
             ],
