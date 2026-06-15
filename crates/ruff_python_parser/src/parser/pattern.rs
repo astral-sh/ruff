@@ -146,7 +146,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let ident = self.parse_identifier();
+            let ident = self.parse_match_pattern_target();
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
@@ -210,7 +210,7 @@ impl Parser<'_> {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
+                let identifier = parser.parse_match_pattern_target();
                 if rest.is_some() {
                     parser.add_error(
                         ParseErrorType::OtherError(
@@ -304,6 +304,20 @@ impl Parser<'_> {
             },
             node_index: AtomicNodeIndex::NONE,
         }
+    }
+
+    /// Parses a binding target in an `as` or mapping pattern.
+    fn parse_match_pattern_target(&mut self) -> ast::Identifier {
+        // test_err invalid_match_pattern_target
+        // match value:
+        //     case 1 as _: ...
+        //     case {**_}: ...
+        // after = 1
+        let identifier = self.parse_identifier();
+        if identifier.is_valid() && identifier.id == "_" {
+            self.add_error(ParseErrorType::InvalidMatchPatternTarget, &identifier);
+        }
+        identifier
     }
 
     /// Parses a parenthesized pattern or a sequence pattern.

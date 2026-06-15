@@ -138,7 +138,7 @@ Module(
     },
 )
 ```
-## Semantic Syntax Errors
+## Errors
 
   |
 1 | match value:
