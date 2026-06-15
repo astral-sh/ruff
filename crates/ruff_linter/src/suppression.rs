@@ -537,7 +537,7 @@ impl Suppressions {
                 remove_codes,
                 highlight_only_code,
             );
-            diagnostic.secondary_annotation("", second_range);
+            diagnostic.secondary_annotation_without_message(second_range);
             let applicability = if applicability.is_unsafe()
                 || second_comment.is_nested()
                     && second_edit.range().contains_range(second_comment.range)

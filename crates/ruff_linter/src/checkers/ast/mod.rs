@@ -3738,7 +3738,19 @@ impl DiagnosticGuard<'_, '_> {
         range: impl Ranged,
     ) {
         let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let message = message.into_diagnostic_message();
+        debug_assert!(
+            !message.as_str().is_empty(),
+            "use `secondary_annotation_without_message` for annotations without a message"
+        );
         let ann = Annotation::secondary(span).message(message);
+        self.diagnostic.as_mut().unwrap().annotate(ann);
+    }
+
+    /// Add a secondary annotation without a message at the given range.
+    pub(crate) fn secondary_annotation_without_message(&mut self, range: impl Ranged) {
+        let span = Span::from(self.context.source_file.clone()).with_range(range.range());
+        let ann = Annotation::secondary(span);
         self.diagnostic.as_mut().unwrap().annotate(ann);
     }
 }
