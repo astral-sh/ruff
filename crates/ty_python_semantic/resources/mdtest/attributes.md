@@ -3027,6 +3027,20 @@ class ProjectionNestedForUnpack:
         reveal_type(self.x)  # revealed: list[tuple[int, str]]
 ```
 
+Deeply nested projections are inferred correctly:
+
+```py
+class ProjectionDeepPath:
+    def __init__(self) -> None:
+        self.x = [(((((0,),),),),)]
+
+    def read(self) -> None:
+        for (((((x,),),),),) in self.x:
+            self.x = [(((((x,),),),),)]
+
+        reveal_type(self.x)  # revealed: list[tuple[tuple[tuple[tuple[tuple[int]]]]]]
+```
+
 Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
 the mixed containers:
 

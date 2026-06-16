@@ -86,8 +86,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable { mode } => {
-                value_type.try_cycle_iter_projection().unwrap_or_else(|| {
+            UnpackKind::Iterable { mode } => value_type
+                .try_cycle_iter_projection(self.db())
+                .unwrap_or_else(|| {
                     value_type
                         .try_iterate_with_mode(self.db(), mode)
                         .map(|tuple| tuple.homogeneous_element_type(self.db()))
@@ -99,8 +100,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                             );
                             err.fallback_element_type(self.db())
                         })
-                })
-            }
+                }),
             UnpackKind::ContextManager { mode } => value_type
                 .try_enter_with_mode(self.db(), mode)
                 .unwrap_or_else(|err| {
@@ -212,7 +212,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 if allow_cycle_projection && elts.iter().all(|elt| !elt.is_starred_expr()) {
                     let projected_tys = (0..elts.len())
-                        .map(|index| value_ty.try_cycle_unpack_projection(elts.len(), index))
+                        .map(|index| {
+                            value_ty.try_cycle_unpack_projection(self.db(), elts.len(), index)
+                        })
                         .collect::<Option<Vec<_>>>();
 
                     if let Some(projected_tys) = projected_tys {

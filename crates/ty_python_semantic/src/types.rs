@@ -902,7 +902,7 @@ pub enum Type<'db> {
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
     /// A cycle marker consumed by a query-free projection operation.
-    CycleProjection(CycleProjectionType),
+    CycleProjection(CycleProjectionType<'db>),
     /// The empty set of values
     Never,
     /// A specific function object

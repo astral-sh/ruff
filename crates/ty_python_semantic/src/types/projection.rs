@@ -4,25 +4,28 @@ use super::{DivergentType, KnownClass, TupleSpec, Type, UnionType};
 use crate::Db;
 use crate::types::visitor::any_over_type;
 
-const MAX_CYCLE_PROJECTION_PATH_LEN: usize = 4;
-
 impl<'db> Type<'db> {
-    pub(crate) fn try_cycle_iter_projection(self) -> Option<Self> {
-        self.try_cycle_projection(CycleProjectionOp::IterItem)
+    pub(crate) fn try_cycle_iter_projection(self, db: &'db dyn Db) -> Option<Self> {
+        self.try_cycle_projection(db, CycleProjectionOp::IterItem)
     }
 
-    pub(crate) fn try_cycle_unpack_projection(self, len: usize, index: usize) -> Option<Self> {
-        self.try_cycle_projection(CycleProjectionOp::UnpackExact { len, index })
+    pub(crate) fn try_cycle_unpack_projection(
+        self,
+        db: &'db dyn Db,
+        len: usize,
+        index: usize,
+    ) -> Option<Self> {
+        self.try_cycle_projection(db, CycleProjectionOp::UnpackExact { len, index })
     }
 
-    fn try_cycle_projection(self, op: CycleProjectionOp) -> Option<Self> {
+    fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp) -> Option<Self> {
         match self {
             Type::Divergent(root) => Some(Self::CycleProjection(CycleProjectionType {
                 root,
-                path: CycleProjectionPath::new(op),
+                path: CycleProjectionPath::from_op(db, op),
             })),
             Type::CycleProjection(projection) => {
-                Some(Self::CycleProjection(projection.append(op)?))
+                Some(Self::CycleProjection(projection.append(db, op)))
             }
             _ => None,
         }
@@ -112,7 +115,7 @@ impl<'db> Type<'db> {
     fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        path: CycleProjectionPath,
+        path: CycleProjectionPath<'db>,
         terms: &[ProjectionTerm<'db>],
     ) -> Option<Self> {
         let mut saw_self_reference = false;
@@ -183,7 +186,7 @@ impl<'db> Type<'db> {
     fn collect_projection_component_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        path: CycleProjectionPath,
+        path: CycleProjectionPath<'db>,
         term: Type<'db>,
         saw_self_reference: &mut bool,
         productive_terms: &mut Vec<Type<'db>>,
@@ -219,7 +222,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         root: DivergentType,
         ty: Type<'db>,
-        paths: &mut Vec<CycleProjectionPath>,
+        paths: &mut Vec<CycleProjectionPath<'db>>,
     ) {
         let paths = RefCell::new(paths);
         any_over_type(db, ty, false, |nested| {
@@ -236,8 +239,8 @@ impl<'db> Type<'db> {
     }
 
     fn solved_projection_type(
-        solved_ops: &[(CycleProjectionPath, Type<'db>)],
-        path: CycleProjectionPath,
+        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
+        path: CycleProjectionPath<'db>,
     ) -> Option<Self> {
         solved_ops
             .iter()
@@ -248,7 +251,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(CycleProjectionPath, Type<'db>)],
+        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
     ) -> Option<Self> {
         if !self.mentions_cycle_artifact(db, root) {
             return Some(self);
@@ -351,7 +354,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        path: CycleProjectionPath,
+        path: CycleProjectionPath<'db>,
     ) -> bool {
         any_over_type(db, self, false, |ty| match ty {
             Type::CycleProjection(projection) => {
@@ -393,7 +396,7 @@ impl<'db> ProjectionContainer<'db> {
         &self,
         db: &'db dyn Db,
         root: DivergentType,
-        paths: &mut Vec<CycleProjectionPath>,
+        paths: &mut Vec<CycleProjectionPath<'db>>,
     ) {
         match self {
             Self::FixedTuple { elements } => {
@@ -408,7 +411,7 @@ impl<'db> ProjectionContainer<'db> {
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
-        terms_by_op: &mut [(CycleProjectionPath, Vec<ProjectionTerm<'db>>)],
+        terms_by_op: &mut [(CycleProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
             terms.push(self.project_path(db, *path)?);
@@ -419,7 +422,7 @@ impl<'db> ProjectionContainer<'db> {
     fn project_path(
         &self,
         db: &'db dyn Db,
-        path: CycleProjectionPath,
+        path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
             Self::FixedTuple { elements } => {
@@ -427,7 +430,7 @@ impl<'db> ProjectionContainer<'db> {
             }
             Self::List { element } => KnownClass::List.to_specialized_instance(db, &[*element]),
         };
-        Self::project_type_path(db, ty, path.ops())
+        Self::project_type_path(db, ty, path.ops(db))
     }
 
     fn project_type_path(
@@ -502,7 +505,7 @@ impl<'db> ProjectionContainer<'db> {
         self,
         db: &'db dyn Db,
         root: DivergentType,
-        solved_ops: &[(CycleProjectionPath, Type<'db>)],
+        solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
     ) -> Option<Type<'db>> {
         match self {
             Self::FixedTuple { elements } => {
@@ -539,55 +542,46 @@ impl<'db> ProjectionTerm<'db> {
 
 /// A query-free projection of a cycle root produced while recovering recursive inference.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub struct CycleProjectionType {
+pub struct CycleProjectionType<'db> {
     root: DivergentType,
-    path: CycleProjectionPath,
+    path: CycleProjectionPath<'db>,
 }
 
-impl CycleProjectionType {
+impl<'db> CycleProjectionType<'db> {
     pub(crate) const fn root(self) -> DivergentType {
         self.root
     }
 
-    const fn path(self) -> CycleProjectionPath {
+    const fn path(self) -> CycleProjectionPath<'db> {
         self.path
     }
 
-    fn append(self, op: CycleProjectionOp) -> Option<Self> {
-        Some(Self {
-            root: self.root,
-            path: self.path.append(op)?,
-        })
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-struct CycleProjectionPath {
-    ops: [CycleProjectionOp; MAX_CYCLE_PROJECTION_PATH_LEN],
-    len: u8,
-}
-
-impl CycleProjectionPath {
-    const fn new(op: CycleProjectionOp) -> Self {
+    fn append(self, db: &'db dyn Db, op: CycleProjectionOp) -> Self {
         Self {
-            ops: [op; MAX_CYCLE_PROJECTION_PATH_LEN],
-            len: 1,
+            root: self.root,
+            path: self.path.append(db, op),
         }
     }
+}
 
-    fn append(mut self, op: CycleProjectionOp) -> Option<Self> {
-        let len = usize::from(self.len);
-        if len >= MAX_CYCLE_PROJECTION_PATH_LEN {
-            return None;
-        }
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+struct CycleProjectionPath<'db> {
+    #[returns(deref)]
+    ops: Box<[CycleProjectionOp]>,
+}
 
-        self.ops[len] = op;
-        self.len += 1;
-        Some(self)
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CycleProjectionPath<'_> {}
+
+impl<'db> CycleProjectionPath<'db> {
+    fn from_op(db: &'db dyn Db, op: CycleProjectionOp) -> Self {
+        Self::new_internal(db, vec![op].into_boxed_slice())
     }
 
-    fn ops(&self) -> &[CycleProjectionOp] {
-        &self.ops[..usize::from(self.len)]
+    fn append(self, db: &'db dyn Db, op: CycleProjectionOp) -> Self {
+        let mut ops = self.ops(db).to_vec();
+        ops.push(op);
+        Self::new_internal(db, ops.into_boxed_slice())
     }
 }
 
