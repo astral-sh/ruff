@@ -1230,6 +1230,17 @@ impl DivergentApproximation {
         (!self.invalid_marker.get()).then_some(self.marker_id.get())?
     }
 
+    fn record_single_marker_in_type<'db>(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let mut ids = ty.cycle_recovery_marker_ids(db).into_iter();
+        let Some(id) = ids.next() else {
+            return false;
+        };
+        if ids.next().is_some() {
+            return false;
+        }
+        self.record_marker(id)
+    }
+
     fn overlay_type<'db>(
         &self,
         db: &'db dyn Db,
@@ -1269,6 +1280,12 @@ impl DivergentApproximation {
         {
             return Some(approximation);
         }
+        if self.allow_dynamic_fallback
+            && precise.is_non_divergent_dynamic_fallback(db)
+            && self.record_single_marker_in_type(db, approximation)
+        {
+            return Some(approximation);
+        }
         if self.single_marker_id().is_some() && Self::is_placeholder_marker(db, precise) {
             return Some(approximation);
         }
@@ -1283,6 +1300,7 @@ impl DivergentApproximation {
             Type::Union(union) if position == MarkerPosition::TopLevel => {
                 self.overlay_top_level_union(db, union, precise)
             }
+            Type::Union(union) => self.overlay_nested_union(db, union, precise),
             _ => self.overlay_tuple(db, approximation, precise),
         }
     }
@@ -1318,6 +1336,32 @@ impl DivergentApproximation {
                 .then_some(precise)
             }
         }
+    }
+
+    fn overlay_nested_union<'db>(
+        &self,
+        db: &'db dyn Db,
+        union: UnionType<'db>,
+        precise: Type<'db>,
+    ) -> Option<Type<'db>> {
+        let mut saw_precise = false;
+        for &element in union.elements(db) {
+            if Self::matches_equal_or_literal_fallback(db, element, precise) {
+                saw_precise = true;
+                continue;
+            }
+            if Self::is_placeholder_marker(db, element) {
+                return None;
+            }
+
+            let marker_id = self.single_marker_id().or(self.expected_id);
+            let branch = Self::new(marker_id, self.allow_dynamic_fallback);
+            branch.overlay_type_impl(db, element, precise, MarkerPosition::Nested)?;
+            self.record_marker(branch.single_marker_id()?)
+                .then_some(())?;
+        }
+
+        saw_precise.then_some(precise)
     }
 
     fn overlay_tuple<'db>(

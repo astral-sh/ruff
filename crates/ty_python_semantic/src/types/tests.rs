@@ -357,6 +357,63 @@ fn cycle_recovery_fuses_nested_marker_with_finite_counterpart() {
 }
 
 #[test]
+fn cycle_recovery_folds_nested_union_tainted_tuple_with_dynamic_fallback() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let dynamic_int = Type::Intersection(IntersectionType::new(
+        &db,
+        FxOrderSet::from_iter([Type::any(), int]),
+        NegativeIntersectionElements::default(),
+    ));
+    let marker_tuple = Type::heterogeneous_tuple(&db, [Type::divergent(&db, binder_id), int]);
+    let Type::Union(nested_union) = UnionType::from_elements(&db, [marker_tuple, dynamic_int])
+    else {
+        panic!("expected a nested union");
+    };
+    let approximation = Type::heterogeneous_tuple(&db, [Type::Union(nested_union), int]);
+    let precise = Type::heterogeneous_tuple(&db, [dynamic_int, int]);
+    let recursive_approximation = Type::implicit_recursive(&db, binder_id, approximation);
+
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [approximation, precise]),
+        recursive_approximation
+    );
+    assert_eq!(
+        UnionType::from_elements_cycle_recovery(&db, [precise, approximation]),
+        recursive_approximation
+    );
+}
+
+#[test]
+fn cycle_recovery_does_not_fuse_nested_union_bare_marker_with_dynamic_fallback() {
+    let db = setup_db();
+    let binder_id = Id::from_bits(1);
+    let int = KnownClass::Int.to_instance(&db);
+    let dynamic_int = Type::Intersection(IntersectionType::new(
+        &db,
+        FxOrderSet::from_iter([Type::any(), int]),
+        NegativeIntersectionElements::default(),
+    ));
+    let marker = Type::divergent(&db, binder_id);
+    let Type::Union(nested_union) = UnionType::from_elements(&db, [marker, dynamic_int]) else {
+        panic!("expected a nested union");
+    };
+    let approximation = Type::heterogeneous_tuple(&db, [Type::Union(nested_union), int]);
+    let precise = Type::heterogeneous_tuple(&db, [dynamic_int, int]);
+    let marked_precise = Type::divergent_with_body(&db, binder_id, precise);
+
+    assert_ne!(
+        UnionType::from_elements_cycle_recovery(&db, [approximation, precise]),
+        marked_precise
+    );
+    assert_ne!(
+        UnionType::from_elements_cycle_recovery(&db, [precise, approximation]),
+        marked_precise
+    );
+}
+
+#[test]
 fn cycle_recovery_fuses_bodyful_divergent_subtype_with_supertype() {
     let db = setup_db();
     let binder_id = Id::from_bits(1);

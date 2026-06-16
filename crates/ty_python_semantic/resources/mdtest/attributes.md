@@ -3155,9 +3155,10 @@ reveal_type(NestedLists2().x)  # revealed: list[Divergent]
 ```
 
 During fixpoint iteration, `list.__add__`'s overloads may fail to resolve unambiguously (the
-argument is gradual). Even so, the `Divergent` recursion marker is propagated through the ambiguous
-overload result, guaranteeing the convergence of type inference. Here is the regression test for
-this scenario (<https://github.com/astral-sh/ty/issues/3614>):
+argument is gradual). Even so, the `Divergent` recursion marker is propagated through the recursive
+shape, guaranteeing the convergence of type inference without retaining the ambiguous overload
+fallback. Here is the regression test for this scenario
+(<https://github.com/astral-sh/ty/issues/3614>):
 
 ```py
 from typing import Any
@@ -3172,8 +3173,8 @@ class NestedListsConcat:
         self.x = [self.x] + []
         self.y = [self.y].__add__(y)
 
-reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent] | Unknown
-reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent] | Unknown
+reveal_type(NestedListsConcat().x)  # revealed: list[int] | list[Divergent]
+reveal_type(NestedListsConcat().y)  # revealed: list[int] | list[Divergent]
 ```
 
 ### Builtin types attributes
