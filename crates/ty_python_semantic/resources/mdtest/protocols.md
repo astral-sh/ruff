@@ -1122,21 +1122,45 @@ is currently understood by ty as being equivalent to `object`, much like `Suppor
 `UniversalSet` above:
 
 ```py
-from typing import Hashable
+from typing import Hashable, Protocol
+
+class SupportsHash(Protocol):
+    def __hash__(self) -> int: ...
 
 static_assert(is_equivalent_to(object, Hashable))
 static_assert(is_assignable_to(object, Hashable))
 static_assert(is_subtype_of(object, Hashable))
+
+def check_object_or_hashable(x: object | Hashable):
+    reveal_type(x)  # revealed: object
+
+def check_hashable_or_object(x: Hashable | object):
+    reveal_type(x)  # revealed: object
+
+def check_hashable_or_supports_hash(x: Hashable | SupportsHash):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_universal(x: Hashable | UniversalSet):
+    reveal_type(x)  # revealed: Hashable
 ```
 
 This means that any type considered assignable to `object` (which is all types) is considered by ty
-to be assignable to `Hashable`. This avoids false positives on code like this:
+to be assignable to `Hashable`. However, ty preserves a non-final nominal type in a union with
+`Hashable` instead of discarding it as redundant. A non-final class can have unhashable subclasses,
+so keeping the corresponding union element retains the annotation's more precise description of
+those subclasses. For example, `list[str]` is unhashable but is a subtype of `Sequence[Hashable]`:
 
 ```py
+from collections.abc import Hashable as AbcHashable
 from typing import Sequence
 from ty_extensions import is_disjoint_from
 
 def takes_hashable_or_sequence(x: Hashable | list[Hashable]): ...
+def check_hashable_or_sequence(x: Hashable | Sequence[Hashable]):
+    reveal_type(x)  # revealed: Hashable | Sequence[Hashable]
+
+def check_abc_hashable_or_sequence(x: AbcHashable | Sequence[AbcHashable]):
+    reveal_type(x)  # revealed: Hashable | Sequence[Hashable]
 
 takes_hashable_or_sequence(["foo"])  # fine
 takes_hashable_or_sequence(None)  # fine
@@ -1148,8 +1172,75 @@ static_assert(is_subtype_of(list[Hashable], Sequence[Hashable]))
 static_assert(is_subtype_of(list[str], Sequence[Hashable]))
 ```
 
-but means that ty currently does not detect errors on code like this, which is flagged by other type
-checkers:
+The additional union element is still simplified if it is a final class, because instances of the
+class cannot override their inherited hashability:
+
+```py
+from dataclasses import dataclass
+from typing import final
+
+@final
+class C: ...
+
+@final
+class Unhashable:
+    __hash__: None = None
+
+@final
+class EqOnly:
+    def __eq__(self, other: object, /) -> bool:
+        return False
+
+class EqOnlyBase:
+    def __eq__(self, other: object, /) -> bool:
+        return False
+
+@final
+class EqOnlyChild(EqOnlyBase): ...
+
+@final
+@dataclass
+class UnhashableDataclass: ...
+
+def check_hashable_or_final(x: Hashable | C):
+    reveal_type(x)  # revealed: Hashable
+
+# TODO: Preserve final classes that are known to be unhashable.
+def check_hashable_or_unhashable_final(x: Hashable | Unhashable):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_eq_only(x: Hashable | EqOnly):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_eq_only_child(x: Hashable | EqOnlyChild):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_unhashable_dataclass(x: Hashable | UnhashableDataclass):
+    reveal_type(x)  # revealed: Hashable
+```
+
+The special case is currently limited to nominal instance types:
+
+```py
+from typing import TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class Payload(TypedDict):
+    value: int
+
+# TODO: Preserve non-nominal types that can contain unhashable values.
+def check_hashable_or_typevar(x: Hashable | T):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_typed_dict(x: Hashable | Payload):
+    reveal_type(x)  # revealed: Hashable
+
+def check_hashable_or_protocol(x: Hashable | HasX):
+    reveal_type(x)  # revealed: Hashable
+```
+
+We do not detect errors in cases like the following, which are flagged by other type checkers:
 
 ```py
 def needs_something_hashable(x: Hashable):
