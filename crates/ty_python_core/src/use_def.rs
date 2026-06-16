@@ -1261,7 +1261,7 @@ impl PendingReachability {
             while current != pending.reachability {
                 let event = &self.constraints[current];
                 unapplied.push(event.constraint);
-                debug_assert_ne!(
+                assert_ne!(
                     current, event.parent,
                     "pending reachability must be an ancestor"
                 );
@@ -1304,7 +1304,7 @@ impl PendingReachability {
         while current != ancestor {
             let event = &self.constraints[current];
             constraint = reachability_constraints.add_and_constraint(constraint, event.constraint);
-            debug_assert_ne!(
+            assert_ne!(
                 current, event.parent,
                 "pending reachability must be an ancestor"
             );
