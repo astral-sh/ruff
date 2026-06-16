@@ -165,6 +165,64 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
     )
 }
 
+/// First tree-orchestration cut (feature `libclang`): walk every C++ header /
+/// source file directly in `dir` (non-recursive) as its own translation unit,
+/// dedup classes by fully-qualified name, and return one merged
+/// [`ModelGraph`]. `args` (include dirs, `-std`, …) apply to every TU.
+///
+/// Per-TU **parse** failures ([`WalkError::Parse`] — missing includes,
+/// malformed TU) are skipped: they are expected on a real corpus and the
+/// other files still extract. A **libclang-init** failure
+/// ([`WalkError::Libclang`] — wrong `LIBCLANG_PATH`, or a `Clang` singleton
+/// already active) is non-recoverable — it would make EVERY file skip and
+/// return a misleadingly-empty graph — so it is propagated as `Err` rather
+/// than swallowed (codex P2, PR #13). Output is deterministic: files are
+/// visited in sorted order and the dedup map is a `BTreeMap`, so the model
+/// order is stable.
+///
+/// This is the concrete first step of the corpus-tree orchestration
+/// [`extract`] documents: single directory, caller-supplied include args, no
+/// recursion or auto-include-detection yet. Pair with
+/// [`ruff_spo_triplet::expand`] + [`ruff_spo_triplet::to_ndjson`] for the
+/// first SPO ndjson emission from a real corpus subset.
+#[cfg(feature = "libclang")]
+pub fn extract_dir(dir: &Path, args: &[String]) -> Result<ModelGraph, WalkError> {
+    let mut files: Vec<std::path::PathBuf> = match std::fs::read_dir(dir) {
+        Ok(rd) => rd
+            .filter_map(Result::ok)
+            .map(|e| e.path())
+            .filter(|p| {
+                p.extension()
+                    .and_then(|x| x.to_str())
+                    .is_some_and(|x| matches!(x, "h" | "hpp" | "hh" | "hxx" | "cc" | "cpp" | "cxx"))
+            })
+            .collect(),
+        Err(_) => Vec::new(),
+    };
+    files.sort();
+
+    let mut seen: std::collections::BTreeMap<String, Model> = std::collections::BTreeMap::new();
+    for f in &files {
+        match walk_tu(f, args) {
+            Ok(classes) => {
+                for cls in classes {
+                    seen.entry(cls.qualified_name())
+                        .or_insert_with(|| model_from_class(&cls));
+                }
+            }
+            // Per-TU parse failure (missing includes, malformed TU) is
+            // expected on a real corpus — skip this file, keep going.
+            Err(WalkError::Parse(_)) => {}
+            // libclang-init failure is non-recoverable: every file would skip
+            // and return a misleadingly-empty graph. Surface it (codex P2 #13).
+            Err(e @ WalkError::Libclang(_)) => return Err(e),
+        }
+    }
+    let mut graph = ModelGraph::new(NAMESPACE);
+    graph.models = seen.into_values().collect();
+    Ok(graph)
+}
+
 /// The pure unpacking: build a [`Model`] from a parsed [`CppClass`] by
 /// routing each [`Declaration`] into its typed `Model::*` sibling slot.
 ///
@@ -435,9 +493,9 @@ mod libclang_tests {
     use std::io::Write;
     use std::sync::Mutex;
 
-    use ruff_spo_triplet::expand;
+    use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
 
-    use super::{ModelGraph, NAMESPACE, model_from_class, walk_tu};
+    use super::{ModelGraph, NAMESPACE, extract_dir, model_from_class, walk_tu};
 
     /// `clang::Clang` is a process-singleton — serialize the libclang tests so
     /// cargo's parallel test threads never construct two at once.
@@ -647,6 +705,64 @@ class Recognizer : public Classify {
         assert!(
             !expand(&graph).is_empty(),
             "expected SPO triples from the real header"
+        );
+    }
+
+    /// First **ndjson emission** from a real corpus subset — gated on
+    /// `TESSERACT_SRC`. Walks all of `src/ccutil` via [`extract_dir`], expands
+    /// to SPO triples, serialises to ndjson, and round-trips it. The
+    /// "produce the artifact, then verify it parses back" milestone for the
+    /// C++ machine plane (the ndjson is exactly what the lance-graph SPO store
+    /// consumes).
+    #[test]
+    #[expect(clippy::print_stderr, reason = "diagnostic emission gated on env var")]
+    fn extract_dir_emits_roundtrippable_ndjson_from_ccutil() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping ndjson-emission milestone");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let dir = root.join("src/ccutil");
+        if !dir.is_dir() {
+            eprintln!("{} missing; skipping", dir.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let graph = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
+        let triples = expand(&graph);
+        let ndjson = to_ndjson(&triples);
+        eprintln!(
+            "[ccutil-ndjson] {} classes -> {} triples, {} ndjson bytes",
+            graph.models.len(),
+            triples.len(),
+            ndjson.len()
+        );
+        assert!(
+            graph.models.len() >= 10,
+            "expected many tesseract classes from ccutil, got {}",
+            graph.models.len()
+        );
+        assert!(!triples.is_empty(), "expected SPO triples");
+        // Every model yields at least its rdf:type ObjectType triple.
+        assert!(triples.len() >= graph.models.len());
+        // The emitted ndjson must load back losslessly — the lance-graph SPO
+        // store consumes exactly this.
+        let parsed = from_ndjson(&ndjson).expect("ndjson round-trips");
+        assert_eq!(parsed.len(), triples.len(), "ndjson round-trip is lossless");
+        // Every C++ subject carries the `cpp:` namespace (or `exc:` for raises).
+        assert!(
+            parsed
+                .iter()
+                .all(|t| t.s.starts_with("cpp:") || t.s.starts_with("exc:"))
         );
     }
 }
