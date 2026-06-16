@@ -318,7 +318,7 @@ mod tests {
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r#"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
         error[F401]: `os` imported but unused
          --> fib.py:1:8
           |
@@ -364,7 +364,7 @@ mod tests {
         6 |     x = 1
         7 |     if n == 0:
           |
-        "#);
+        "###);
     }
 
     #[test]
@@ -637,7 +637,7 @@ print()
     fn notebook_output() {
         let (mut env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Full);
         env.show_fix_status(true);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r###"
         error[F401][*]: `os` imported but unused
          --> notebook.ipynb:cell 1:2:8
           |
@@ -667,7 +667,7 @@ print()
           |     ^
           |
         help: Remove assignment to unused variable `x`
-        ");
+        "###);
     }
 
     /// Check notebook handling for multiple annotations in a single diagnostic that span cells.

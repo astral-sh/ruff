@@ -337,7 +337,7 @@ fn to_lsp_diagnostic(
                 ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::Error,
                 ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::Error,
             },
-            diagnostic.id().to_string(),
+            diagnostic.secondary_code_or_id().to_string(),
         )
     };
 
