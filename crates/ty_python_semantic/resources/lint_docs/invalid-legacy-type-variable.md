@@ -11,6 +11,9 @@ There are several requirements that you must follow when creating a legacy `Type
 ```python
 from typing import TypeVar
 
+T = TypeVar("T")  # okay
+T = TypeVar("T")  # error: "Cannot redefine `T` as a type variable"
+
 
 # TypeVar must be immediately assigned to a variable
 # error

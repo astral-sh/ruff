@@ -1097,7 +1097,7 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 
 
 Checks for assignments to class variables from instances
-and assignments to instance variables from its class.
+and assignments to instance-only attributes from their class.
 
 **Why is this bad?**
 
@@ -1114,12 +1114,17 @@ from typing import ClassVar
 
 class C:
     class_var: ClassVar[int] = 1
-    instance_var: int
+
+    def __init__(self):
+        self.instance_var: int = 42
 
 
 C.class_var = 3  # okay
 # Cannot assign to class variable
 C().class_var = 3  # error
+C().instance_var = 56
+# Cannot assign to instance-only variable from class
+C.instance_var = 56  # error
 ```
 
 ## `invalid-attribute-override`
@@ -1469,7 +1474,11 @@ Catching classes that do not inherit from `BaseException` will raise a `TypeErro
 
 
 ```python
-def might_raise() -> None: ...
+import random
+
+
+def might_raise() -> float:
+    return 1 / random.choice([0, 1, 2, 3, 4, 5])
 
 
 try:
@@ -1481,7 +1490,11 @@ except 1:  # error
 Use instead:
 
 ```python
-def might_raise() -> None: ...
+import random
+
+
+def might_raise() -> float:
+    return 1 / random.choice([0, 1, 2, 3, 4, 5])
 
 
 try:
@@ -1791,13 +1804,11 @@ alice = Person(name="Alice", age=30)
 # KeyError: 'height'
 alice["height"]  # error
 
-# typo!
 # error
-bob: Person = {"nickname": "Bob", "age": 30}
+bob: Person = {"nickname": "Bob", "age": 30}  # typo!
 
-# typo!
 # error
-carol = Person(name="Carol", aeg=25)
+carol = Person(name="Carol", aeg=25)  # typo!
 ```
 
 ## `invalid-legacy-positional-parameter`
@@ -1887,6 +1898,9 @@ There are several requirements that you must follow when creating a legacy `Type
 
 ```python
 from typing import TypeVar
+
+T = TypeVar("T")  # okay
+T = TypeVar("T")  # error: "Cannot redefine `T` as a type variable"
 
 
 # TypeVar must be immediately assigned to a variable
@@ -2413,18 +2427,22 @@ def something():
     raise NameError
 
 
+def cause() -> None:
+    pass
+
+
 def f():
     try:
         something()
     except NameError:
-        # error: "Cannot raise object of type"
-        # error: "Cannot use object of type"
-        raise "oops!" from f
+        # error: "Cannot raise object of type `Literal["oops!"]`"
+        # error: "Cannot use object of type `def cause() -> None` as an exception cause"
+        raise "oops!" from cause
 
 
 def g():
     # error: "Cannot raise `NotImplemented`"
-    # error: "Cannot use object of type"
+    # error: "Cannot use object of type `Literal[42]` as an exception cause"
     raise NotImplemented from 42
 ```
 
@@ -2815,6 +2833,8 @@ In some cases, they might raise errors at runtime.
 ```python
 from typing import Annotated
 
+# Int literals are not allowed in this context in type expressions
+a: list[1]  # error
 # `Annotated` expects at least two arguments
 b: Annotated[int]  # error
 ```
@@ -4232,7 +4252,6 @@ class Parent:
     value: int
 
 
-# ty emits a warning here
 class Child(Parent):  # error
     pass
 

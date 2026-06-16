@@ -14,18 +14,22 @@ def something():
     raise NameError
 
 
+def cause() -> None:
+    pass
+
+
 def f():
     try:
         something()
     except NameError:
-        # error: "Cannot raise object of type"
-        # error: "Cannot use object of type"
-        raise "oops!" from f
+        # error: "Cannot raise object of type `Literal["oops!"]`"
+        # error: "Cannot use object of type `def cause() -> None` as an exception cause"
+        raise "oops!" from cause
 
 
 def g():
     # error: "Cannot raise `NotImplemented`"
-    # error: "Cannot use object of type"
+    # error: "Cannot use object of type `Literal[42]` as an exception cause"
     raise NotImplemented from 42
 ```
 

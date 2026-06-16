@@ -13,6 +13,8 @@ In some cases, they might raise errors at runtime.
 ```python
 from typing import Annotated
 
+# Int literals are not allowed in this context in type expressions
+a: list[1]  # error
 # `Annotated` expects at least two arguments
 b: Annotated[int]  # error
 ```

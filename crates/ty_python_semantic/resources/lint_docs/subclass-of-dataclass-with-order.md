@@ -23,7 +23,6 @@ class Parent:
     value: int
 
 
-# ty emits a warning here
 class Child(Parent):  # error
     pass
 

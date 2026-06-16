@@ -26,11 +26,9 @@ alice = Person(name="Alice", age=30)
 # KeyError: 'height'
 alice["height"]  # error
 
-# typo!
 # error
-bob: Person = {"nickname": "Bob", "age": 30}
+bob: Person = {"nickname": "Bob", "age": 30}  # typo!
 
-# typo!
 # error
-carol = Person(name="Carol", aeg=25)
+carol = Person(name="Carol", aeg=25)  # typo!
 ```

@@ -9,7 +9,11 @@ Catching classes that do not inherit from `BaseException` will raise a `TypeErro
 ## Example
 
 ```python
-def might_raise() -> None: ...
+import random
+
+
+def might_raise() -> float:
+    return 1 / random.choice([0, 1, 2, 3, 4, 5])
 
 
 try:
@@ -21,7 +25,11 @@ except 1:  # error
 Use instead:
 
 ```python
-def might_raise() -> None: ...
+import random
+
+
+def might_raise() -> float:
+    return 1 / random.choice([0, 1, 2, 3, 4, 5])
 
 
 try:
