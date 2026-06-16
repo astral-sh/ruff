@@ -5147,6 +5147,10 @@ def match_key(example: EDict):
             case "path":
                 reveal_type(key)  # revealed: Literal["path"]
                 reveal_type(example[key])  # revealed: str
+
+def comprehension_key(example: EDict):
+    values = [example[key] for key in ["path"]]
+    reveal_type(values)  # revealed: list[str]
 ```
 
 ## Narrowing tagged unions of `TypedDict`s from PEP 695 type aliases
