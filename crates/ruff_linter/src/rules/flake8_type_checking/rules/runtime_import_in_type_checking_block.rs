@@ -252,7 +252,9 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
-                    diagnostic.set_fix(fix.clone());
+                    if let Some(fix) = fix.as_ref() {
+                        diagnostic.set_fix(fix.clone());
+                    }
                 }
             }
 
@@ -283,34 +285,40 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
 }
 
 /// Generate a [`Fix`] to quote runtime usages for imports in a type-checking block.
-fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Fix {
-    let quote_reference_edits = filter_contained(
-        imports
-            .iter()
-            .flat_map(|ImportBinding { binding, .. }| {
-                binding.references.iter().filter_map(|reference_id| {
-                    let reference = checker.semantic().reference(*reference_id);
-                    if reference.in_runtime_context() {
-                        Some(quote_annotation(
-                            reference.expression_id()?,
-                            checker.semantic(),
-                            checker.stylist(),
-                            checker.locator(),
-                            checker.default_string_flags(),
-                        ))
-                    } else {
-                        None
-                    }
-                })
-            })
-            .collect::<Vec<_>>(),
-    );
+fn quote_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Option<Fix> {
+    let quote_reference_edits = imports
+        .iter()
+        .flat_map(|ImportBinding { binding, .. }| binding.references.iter())
+        .filter_map(|reference_id| {
+            let reference = checker.semantic().reference(*reference_id);
+            if reference.in_runtime_context() {
+                reference.expression_id()
+            } else {
+                None
+            }
+        })
+        .map(|expression_id| {
+            quote_annotation(
+                expression_id,
+                checker.semantic(),
+                checker.stylist(),
+                checker.locator(),
+                checker.default_string_flags(),
+            )
+        })
+        // Every runtime reference must be quotable. If any one cannot be quoted without
+        // leaving an escape, withhold the whole fix: quoting only some references would
+        // leave the others referring to a name that does not exist at runtime.
+        .collect::<Option<Vec<_>>>()?;
+
+    let quote_reference_edits = filter_contained(quote_reference_edits);
 
     let mut rest = quote_reference_edits.into_iter();
-    let head = rest.next().expect("Expected at least one reference");
-    Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
+    // No runtime reference needs quoting, so there is nothing to fix.
+    let head = rest.next()?;
+    Some(Fix::unsafe_edits(head, rest).isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
-    ))
+    )))
 }
 
 /// Generate a [`Fix`] to remove runtime imports from a type-checking block.

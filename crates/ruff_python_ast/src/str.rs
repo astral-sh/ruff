@@ -48,6 +48,14 @@ impl Quote {
             Self::Double => b'"',
         }
     }
+
+    #[inline]
+    pub const fn as_triple_str(self) -> &'static str {
+        match self {
+            Self::Single => "'''",
+            Self::Double => r#"""""#,
+        }
+    }
 }
 
 impl fmt::Display for Quote {

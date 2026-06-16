@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, TypeAlias, TYPE_CHECKING
+from typing import Dict, Literal, TypeAlias, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Dict
@@ -20,6 +20,7 @@ g: TypeAlias = Foo | Bar  # TC007 x2
 h: TypeAlias = Foo[str]  # TC007
 i: TypeAlias = (Foo |  # TC007 x2 (fix removes comment currently)
     Bar)
+j: TypeAlias = Foo | Literal["\n"]  # TC007 (no fix: quoting would leave a non-quote escape)
 
 type C = Foo   # OK
 type D = Foo | None  # OK

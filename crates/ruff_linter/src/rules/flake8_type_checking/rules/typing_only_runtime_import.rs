@@ -401,7 +401,7 @@ pub(crate) fn typing_only_runtime_import(
         reason = "each statement group produces diagnostics and a fix independently"
     )]
     for ((node_id, import_type), imports) in errors_by_statement {
-        let fix = fix_imports(checker, node_id, &imports).ok();
+        let fix = fix_imports(checker, node_id, &imports).ok().flatten();
 
         for ImportBinding {
             import,
@@ -511,7 +511,15 @@ fn is_exempt(name: &str, exempt_modules: &[&str]) -> bool {
 }
 
 /// Generate a [`Fix`] to remove typing-only imports from a runtime context.
-fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) -> Result<Fix> {
+///
+/// Returns `Ok(None)` when a runtime reference uses an annotation that cannot be
+/// quoted without leaving an escape, since moving the import into a `TYPE_CHECKING`
+/// block would then leave that reference pointing at a name unavailable at runtime.
+fn fix_imports(
+    checker: &Checker,
+    node_id: NodeId,
+    imports: &[ImportBinding],
+) -> Result<Option<Fix>> {
     let statement = checker.semantic().statement(node_id);
     let parent = checker.semantic().parent_statement(node_id);
 
@@ -570,27 +578,35 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
                 .chain(std::iter::once(remove_import_edit)),
         )
     } else {
-        let quote_reference_edits = filter_contained(
-            imports
-                .iter()
-                .flat_map(|ImportBinding { binding, .. }| {
-                    binding.references.iter().filter_map(|reference_id| {
-                        let reference = checker.semantic().reference(*reference_id);
-                        if reference.in_runtime_context() {
-                            Some(quote_annotation(
-                                reference.expression_id()?,
-                                checker.semantic(),
-                                checker.stylist(),
-                                checker.locator(),
-                                checker.default_string_flags(),
-                            ))
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .collect::<Vec<_>>(),
-        );
+        let Some(quote_reference_edits) = imports
+            .iter()
+            .flat_map(|ImportBinding { binding, .. }| binding.references.iter())
+            .filter_map(|reference_id| {
+                let reference = checker.semantic().reference(*reference_id);
+                if reference.in_runtime_context() {
+                    reference.expression_id()
+                } else {
+                    None
+                }
+            })
+            .map(|expression_id| {
+                quote_annotation(
+                    expression_id,
+                    checker.semantic(),
+                    checker.stylist(),
+                    checker.locator(),
+                    checker.default_string_flags(),
+                )
+            })
+            // Every runtime reference must be quotable. If any one cannot be quoted
+            // without leaving an escape, withhold the whole fix: moving the import into
+            // the `TYPE_CHECKING` block would leave the unquoted reference pointing at a
+            // name that no longer exists at runtime.
+            .collect::<Option<Vec<_>>>()
+        else {
+            return Ok(None);
+        };
+        let quote_reference_edits = filter_contained(quote_reference_edits);
         Fix::unsafe_edits(
             type_checking_edit,
             add_import_edit
@@ -600,7 +616,7 @@ fn fix_imports(checker: &Checker, node_id: NodeId, imports: &[ImportBinding]) ->
         )
     };
 
-    Ok(fix.isolate(Checker::isolation(
+    Ok(Some(fix.isolate(Checker::isolation(
         checker.semantic().parent_statement_id(node_id),
-    )))
+    ))))
 }

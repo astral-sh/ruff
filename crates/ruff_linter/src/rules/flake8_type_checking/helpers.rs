@@ -1,8 +1,9 @@
 use std::cmp::Reverse;
 
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::str::Quote;
+use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_ast::visitor::transformer::{Transformer, walk_expr};
 use ruff_python_ast::{self as ast, Decorator, Expr, StringLiteralFlags};
 use ruff_python_codegen::{Generator, Stylist};
@@ -10,7 +11,7 @@ use ruff_python_parser::typing::parse_type_annotation;
 use ruff_python_semantic::{
     Binding, BindingKind, Modules, NodeId, ScopeKind, SemanticModel, analyze,
 };
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::Edit;
 use crate::Locator;
@@ -314,13 +315,17 @@ pub(crate) fn is_singledispatch_implementation(
 /// - When quoting `Series` in `Series[Literal["pd.Timestamp"]]`, we want `"Series[Literal['pd.Timestamp']]"`.
 ///
 /// In general, when expanding a component of a call chain, we want to quote the entire call chain.
+///
+/// Returns `None` when no escape-free forward reference exists, either because the
+/// annotation uses every quote style or because it contains a non-quote escape
+/// (such as `\n`) that no quote style removes. Callers omit the fix in that case.
 pub(crate) fn quote_annotation(
     node_id: NodeId,
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+) -> Option<Edit> {
     let expr = semantic.expression(node_id).expect("Expression not found");
     if let Some(parent_id) = semantic.parent_expression_id(node_id) {
         match semantic.expression(parent_id) {
@@ -363,17 +368,27 @@ pub(crate) fn quote_annotation(
 ///
 /// In most cases you want to call [`quote_annotation`] instead, which provides
 /// that guarantee by expanding the expression before calling into this function.
+///
+/// Returns `None` when no escape-free forward reference exists, either because the
+/// annotation uses every quote style or because it contains a non-quote escape
+/// (such as `\n`) that no quote style removes. Callers omit the fix in that case.
 pub(crate) fn quote_type_expression(
     expr: &Expr,
     semantic: &SemanticModel,
     stylist: &Stylist,
     locator: &Locator,
     flags: StringLiteralFlags,
-) -> Edit {
+) -> Option<Edit> {
     // Quote the entire expression.
     let quote_annotator = QuoteAnnotator::new(semantic, stylist, locator, flags);
-
-    Edit::range_replacement(quote_annotator.into_annotation(expr), expr.range())
+    let annotation = quote_annotator.into_annotation(expr)?;
+    // A leftover backslash is a non-quote escape (such as `\n`) that no quote style
+    // removes. Type checkers reject escape sequences in forward references, so no
+    // valid quoted form exists; decline the fix rather than emit one that ty rejects.
+    if annotation.contains('\\') {
+        return None;
+    }
+    Some(Edit::range_replacement(annotation, expr.range()))
 }
 
 /// Filter out any [`Edit`]s that are completely contained by any other [`Edit`].
@@ -394,6 +409,42 @@ pub(crate) fn filter_contained(edits: Vec<Edit>) -> Vec<Edit> {
         }
     }
     filtered
+}
+
+/// Pick string flags that wrap `annotation` without escaping any quote character.
+///
+/// The fallback order matches Ruff's formatter: the preferred quote, the opposite
+/// quote, triple-quoted preferred, then triple-quoted opposite. Returns `None` when
+/// the annotation contains every quote style, since no wrapper can then avoid an
+/// escape.
+fn flags_avoiding_escape_sequences(
+    annotation: &str,
+    preferred: StringLiteralFlags,
+) -> Option<StringLiteralFlags> {
+    let quote = preferred.quote_style();
+
+    if !annotation.contains(quote.as_char()) {
+        return Some(preferred);
+    }
+
+    let opposite = quote.opposite();
+    if !annotation.contains(opposite.as_char()) {
+        return Some(preferred.with_quote_style(opposite));
+    }
+
+    if !annotation.contains(quote.as_triple_str()) {
+        return Some(preferred.with_triple_quotes(TripleQuotes::Yes));
+    }
+
+    if !annotation.contains(opposite.as_triple_str()) {
+        return Some(
+            preferred
+                .with_quote_style(opposite)
+                .with_triple_quotes(TripleQuotes::Yes),
+        );
+    }
+
+    None
 }
 
 pub(crate) struct QuoteAnnotator<'a> {
@@ -418,20 +469,21 @@ impl<'a> QuoteAnnotator<'a> {
         }
     }
 
-    fn into_annotation(self, expr: &Expr) -> String {
+    fn into_annotation(self, expr: &Expr) -> Option<String> {
         let mut expr_without_forward_references = expr.clone();
         self.visit_expr(&mut expr_without_forward_references);
-        let generator = Generator::from(self.stylist);
-        // we first generate the annotation with the inverse quote, so we can
-        // generate the string literal with the preferred quote
+        // Generate the inner annotation first, so nested strings use the opposite
+        // quote of the wrapper we are about to choose.
         let subgenerator = Generator::new(self.stylist.indentation(), self.stylist.line_ending());
         let annotation = subgenerator.expr(&expr_without_forward_references);
-        generator.expr(&Expr::from(ast::StringLiteral {
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            value: annotation.into_boxed_str(),
-            flags: self.flags,
-        }))
+        // The generator's string path is not triple-quote aware and would escape a
+        // quote character even inside `"""..."""`, which type checkers reject in
+        // forward references, so wrap by hand with a quote style that avoids escaping.
+        // When the annotation already uses every quote style no wrapper can avoid an
+        // escape, so return `None` and let the caller skip the fix.
+        let flags = flags_avoiding_escape_sequences(&annotation, self.flags)?;
+        let quote = flags.quote_str();
+        Some(format!("{quote}{annotation}{quote}"))
     }
 
     fn visit_annotated_slice(&self, slice: &mut Expr) {

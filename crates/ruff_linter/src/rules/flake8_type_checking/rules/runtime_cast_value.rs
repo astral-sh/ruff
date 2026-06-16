@@ -5,7 +5,7 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
-use crate::{AlwaysFixableViolation, Fix};
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unquoted type expressions in `typing.cast()` calls.
@@ -40,20 +40,27 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is safe as long as the type expression doesn't span multiple
-/// lines and includes comments on any of the lines apart from the last one.
+/// This rule's fix is marked as unsafe when the type expression contains a comment,
+/// since quoting it would drop the comment.
+///
+/// No fix is offered when no escape-free forward reference exists, either because the
+/// type expression uses every quote style or because quoting would leave a non-quote
+/// escape sequence (for example `cast(Literal["\n"], ...)`), since type checkers reject
+/// escape sequences in forward references.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct RuntimeCastValue;
 
-impl AlwaysFixableViolation for RuntimeCastValue {
+impl Violation for RuntimeCastValue {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         "Add quotes to type expression in `typing.cast()`".to_string()
     }
 
-    fn fix_title(&self) -> String {
-        "Add quotes".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Add quotes".to_string())
     }
 }
 
@@ -64,13 +71,19 @@ pub(crate) fn runtime_cast_value(checker: &Checker, type_expr: &Expr) {
     }
 
     let mut diagnostic = checker.report_diagnostic(RuntimeCastValue, type_expr.range());
-    let edit = quote_type_expression(
+    let Some(edit) = quote_type_expression(
         type_expr,
         checker.semantic(),
         checker.stylist(),
         checker.locator(),
         checker.default_string_flags(),
-    );
+    ) else {
+        // No escape-free forward reference exists (the type expression uses every quote
+        // style, or quoting would leave a non-quote escape that type checkers reject), so
+        // report the diagnostic without a fix rather than offer a broken one.
+        return;
+    };
+    // Quoting drops any comment inside the type expression, so the fix is unsafe then.
     if checker.comment_ranges().intersects(type_expr.range()) {
         diagnostic.set_fix(Fix::unsafe_edit(edit));
     } else {
