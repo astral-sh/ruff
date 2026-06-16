@@ -1,13 +1,15 @@
 use std::cell::RefCell;
 
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ty_python_core::EvaluationMode;
 
 use super::{
-    DivergentType, DynamicType, KnownClass, StaticClassLiteral, TupleSpec, Type, UnionType,
-    instance::SliceLiteral,
+    DivergentType, DynamicType, KnownClass, MemberLookupPolicy, StaticClassLiteral, TupleSpec,
+    Type, UnionType, call::CallArguments, instance::SliceLiteral,
 };
 use crate::Db;
+use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
@@ -87,10 +89,25 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::from_subscript(db, slice_ty)?;
+        let op = CycleProjectionOp::from_subscript(db, slice_ty).or_else(|| {
+            (!slice_ty.is_instance_of(db, KnownClass::Slice)).then_some(CycleProjectionOp::GetItem)
+        })?;
         self.try_cycle_projection_with_non_cycle(db, op, |ty| {
             ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()
         })
+    }
+
+    pub(crate) fn try_cycle_mapping_view_projection(
+        self,
+        db: &'db dyn Db,
+        method_name: &str,
+    ) -> Option<Self> {
+        let op = CycleProjectionOp::from_mapping_view_method(method_name)?;
+        let item_ty = self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+            ProjectionContainer::mapping_view_item_type_for_type(db, ty, op)
+        })?;
+
+        Some(KnownClass::Iterable.to_specialized_instance(db, &[item_ty]))
     }
 
     pub(crate) fn try_cycle_context_enter_projection(
@@ -532,7 +549,11 @@ impl<'db> ProjectionContainer<'db> {
 
         if let Some((class, specialization)) = ty.class_specialization(db) {
             if let Some(known_class) = class.known(db)
-                && Self::known_container_supports_projection(known_class, specialization.types(db))
+                && Self::known_container_supports_projection(
+                    db,
+                    known_class,
+                    specialization.types(db),
+                )
             {
                 return Some(Self::Known {
                     class: known_class,
@@ -552,12 +573,37 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    fn known_container_supports_projection(class: KnownClass, arguments: &[Type<'db>]) -> bool {
+    fn known_container_supports_projection(
+        db: &'db dyn Db,
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> bool {
         Self::known_container_iter_item_type(class, arguments).is_some()
             || Self::known_container_async_iter_item_type(class, arguments).is_some()
-            || Self::known_container_get_item_type(class, arguments).is_some()
+            || Self::known_container_get_item_type(db, class, arguments).is_some()
             || Self::known_container_slice_type_for_class(class, arguments).is_some()
             || Self::known_container_await_result_type(class, arguments).is_some()
+            || Self::known_container_mapping_view_item_type(
+                db,
+                class,
+                arguments,
+                CycleProjectionOp::MappingKeys,
+            )
+            .is_some()
+            || Self::known_container_mapping_view_item_type(
+                db,
+                class,
+                arguments,
+                CycleProjectionOp::MappingValues,
+            )
+            .is_some()
+            || Self::known_container_mapping_view_item_type(
+                db,
+                class,
+                arguments,
+                CycleProjectionOp::MappingItems,
+            )
+            .is_some()
     }
 
     fn collect_projection_terms(
@@ -639,7 +685,11 @@ impl<'db> ProjectionContainer<'db> {
                 Self::project_get_item_int(db, ty, Some(index))?
             }
             CycleProjectionOp::GetItemInt => Self::project_get_item_int(db, ty, None)?,
+            CycleProjectionOp::GetItem => Self::project_get_item(db, ty)?,
             CycleProjectionOp::SliceStatic(slice) => Self::project_slice_static(db, ty, slice)?,
+            CycleProjectionOp::MappingKeys
+            | CycleProjectionOp::MappingValues
+            | CycleProjectionOp::MappingItems => Self::project_mapping_view_item(db, ty, op)?,
             CycleProjectionOp::ContextEnter { .. } => {
                 return None;
             }
@@ -709,9 +759,13 @@ impl<'db> ProjectionContainer<'db> {
             CycleProjectionOp::GetItemInt => {
                 Self::infer_subscript(db, ty, KnownClass::Int.to_instance(db))?
             }
+            CycleProjectionOp::GetItem => Self::infer_subscript(db, ty, Type::unknown())?,
             CycleProjectionOp::SliceStatic(slice) => {
                 Self::infer_subscript(db, ty, slice.into_type(db))?
             }
+            CycleProjectionOp::MappingKeys
+            | CycleProjectionOp::MappingValues
+            | CycleProjectionOp::MappingItems => Self::project_mapping_view_item(db, ty, op)?,
             CycleProjectionOp::ContextEnter { is_async } => {
                 Self::infer_context_enter(db, ty, is_async)?
             }
@@ -861,7 +915,25 @@ impl<'db> ProjectionContainer<'db> {
         if let Some((class, specialization)) = ty.class_specialization(db)
             && let Some(known_class) = class.known(db)
             && let Some(element) =
-                Self::known_container_get_item_type(known_class, specialization.types(db))
+                Self::known_container_get_item_type(db, known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Homogeneous(element));
+        }
+
+        None
+    }
+
+    fn project_get_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            return Some(ProjectionTerm::Homogeneous(
+                spec.as_ref().homogeneous_element_type(db),
+            ));
+        }
+
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_get_item_type(db, known_class, specialization.types(db))
         {
             return Some(ProjectionTerm::Homogeneous(element));
         }
@@ -875,16 +947,26 @@ impl<'db> ProjectionContainer<'db> {
         slice: StaticSliceProjection,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
-                return None;
+            return match spec.as_ref() {
+                TupleSpec::Fixed(tuple) => {
+                    let elements = tuple
+                        .py_slice(db, slice.start, slice.stop, slice.step)
+                        .ok()?;
+                    Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
+                        db, elements,
+                    )))
+                }
+                TupleSpec::Variable(tuple) => {
+                    let element = UnionType::from_elements_leave_aliases(
+                        db,
+                        tuple
+                            .iter_prefix_elements()
+                            .chain(std::iter::once(tuple.variable()))
+                            .chain(tuple.iter_suffix_elements()),
+                    );
+                    Some(ProjectionTerm::Exact(Type::homogeneous_tuple(db, element)))
+                }
             };
-
-            let elements = tuple
-                .py_slice(db, slice.start, slice.stop, slice.step)
-                .ok()?;
-            return Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
-                db, elements,
-            )));
         }
 
         if let Some((class, specialization)) = ty.class_specialization(db)
@@ -896,6 +978,16 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         None
+    }
+
+    fn project_mapping_view_item(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        view: CycleProjectionOp,
+    ) -> Option<ProjectionTerm<'db>> {
+        Some(ProjectionTerm::Exact(
+            Self::mapping_view_item_type_for_type(db, ty, view)?,
+        ))
     }
 
     fn infer_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
@@ -1110,15 +1202,22 @@ impl<'db> ProjectionContainer<'db> {
     }
 
     fn known_container_get_item_type(
+        db: &'db dyn Db,
         class: KnownClass,
         arguments: &[Type<'db>],
     ) -> Option<Type<'db>> {
-        let index = match class {
-            KnownClass::List | KnownClass::Deque | KnownClass::Sequence => 0,
-            _ => return None,
-        };
-
-        arguments.get(index).copied()
+        match class {
+            KnownClass::List | KnownClass::Deque | KnownClass::Sequence => {
+                arguments.first().copied()
+            }
+            KnownClass::Dict
+            | KnownClass::DefaultDict
+            | KnownClass::OrderedDict
+            | KnownClass::ChainMap
+            | KnownClass::Mapping => arguments.get(1).copied(),
+            KnownClass::Counter => Some(KnownClass::Int.to_instance(db)),
+            _ => None,
+        }
     }
 
     fn known_container_slice_type(
@@ -1142,6 +1241,89 @@ impl<'db> ProjectionContainer<'db> {
             KnownClass::List | KnownClass::Sequence => arguments.first().map(|_| ()),
             _ => None,
         }
+    }
+
+    fn mapping_view_item_type_for_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        view: CycleProjectionOp,
+    ) -> Option<Type<'db>> {
+        if let Some(item) = Self::known_mapping_view_item_type_for_type(db, ty, view) {
+            return Some(item);
+        }
+
+        Self::inferred_mapping_view_item_type_for_type(db, ty, view)
+    }
+
+    fn known_mapping_view_item_type_for_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        view: CycleProjectionOp,
+    ) -> Option<Type<'db>> {
+        let (class, specialization) = ty.class_specialization(db)?;
+        Self::known_container_mapping_view_item_type(
+            db,
+            class.known(db)?,
+            specialization.types(db),
+            view,
+        )
+    }
+
+    fn known_container_mapping_view_item_type(
+        db: &'db dyn Db,
+        class: KnownClass,
+        arguments: &[Type<'db>],
+        view: CycleProjectionOp,
+    ) -> Option<Type<'db>> {
+        let key = arguments.first().copied()?;
+        let value = match class {
+            KnownClass::Dict
+            | KnownClass::DefaultDict
+            | KnownClass::OrderedDict
+            | KnownClass::ChainMap
+            | KnownClass::Mapping => arguments.get(1).copied()?,
+            KnownClass::Counter => KnownClass::Int.to_instance(db),
+            _ => return None,
+        };
+
+        match view {
+            CycleProjectionOp::MappingKeys => Some(key),
+            CycleProjectionOp::MappingValues => Some(value),
+            CycleProjectionOp::MappingItems => Some(Type::heterogeneous_tuple(db, [key, value])),
+            _ => None,
+        }
+    }
+
+    fn inferred_mapping_view_item_type_for_type(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        view: CycleProjectionOp,
+    ) -> Option<Type<'db>> {
+        let method_name = view.mapping_view_method_name()?;
+        let Place::Defined(DefinedPlace {
+            ty: method,
+            definedness: Definedness::AlwaysDefined,
+            ..
+        }) = ty
+            .member_lookup_with_policy(
+                db,
+                Name::new_static(method_name),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+            )
+            .place
+        else {
+            return None;
+        };
+
+        Some(
+            method
+                .try_call(db, &CallArguments::none())
+                .ok()?
+                .return_type(db)
+                .try_iterate(db)
+                .ok()?
+                .homogeneous_element_type(db),
+        )
     }
 }
 
@@ -1318,9 +1500,13 @@ pub(crate) enum CycleProjectionOp {
         suffix: usize,
         index: usize,
     },
+    GetItem,
     GetItemLiteralInt(i64),
     GetItemInt,
     SliceStatic(StaticSliceProjection),
+    MappingKeys,
+    MappingValues,
+    MappingItems,
     ContextEnter {
         is_async: bool,
     },
@@ -1328,6 +1514,24 @@ pub(crate) enum CycleProjectionOp {
 }
 
 impl<'db> CycleProjectionOp {
+    fn from_mapping_view_method(method_name: &str) -> Option<Self> {
+        match method_name {
+            "keys" => Some(Self::MappingKeys),
+            "values" => Some(Self::MappingValues),
+            "items" => Some(Self::MappingItems),
+            _ => None,
+        }
+    }
+
+    const fn mapping_view_method_name(self) -> Option<&'static str> {
+        match self {
+            Self::MappingKeys => Some("keys"),
+            Self::MappingValues => Some("values"),
+            Self::MappingItems => Some("items"),
+            _ => None,
+        }
+    }
+
     fn from_subscript(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
         if let Some(index) = slice_ty.as_int_like_literal() {
             return Some(Self::GetItemLiteralInt(index));

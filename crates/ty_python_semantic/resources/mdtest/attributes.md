@@ -3048,6 +3048,36 @@ class ProjectionDict:
 
         reveal_type(self.x)  # revealed: dict[int, str]
 
+class ProjectionDictKeys:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for key in self.x.keys():
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
+class ProjectionDictValues:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for value in self.x.values():
+            self.x = {0: value}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
+class ProjectionDictItems:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for key, value in self.x.items():
+            self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
 class ProjectionDictValue:
     def __init__(self) -> None:
         self.x = [0]
@@ -3077,6 +3107,46 @@ class ProjectionMapping:
             self.x = {key: ""}
 
         reveal_type(self.x)  # revealed: Mapping[int, str]
+
+class ProjectionMappingValues:
+    def __init__(self, values: Mapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for value in self.x.values():
+            self.x = {0: value}
+
+        reveal_type(self.x)  # revealed: Mapping[int, str]
+
+class ProjectionMappingItems:
+    def __init__(self, values: Mapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for key, value in self.x.items():
+            self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: Mapping[int, str]
+
+class ProjectionDictSubscript:
+    def __init__(self) -> None:
+        self.x = {"key": 0}
+
+    def read(self, key: str) -> None:
+        value = self.x[key]
+        self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: dict[str, int]
+
+class ProjectionMappingSubscript:
+    def __init__(self, values: Mapping[str, int]) -> None:
+        self.x = values
+
+    def read(self, key: str) -> None:
+        value = self.x[key]
+        self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: dict[str, int]
 ```
 
 Indexing and slicing cyclic attributes can recover the consumed item type:
@@ -3141,13 +3211,22 @@ class ProjectionDirectSliceAssignment:
         self.x = self.x[:]
 
         reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionHomogeneousTupleSlice:
+    def __init__(self, values: tuple[int, ...]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        self.x = self.x[1:]
+
+        reveal_type(self.x)  # revealed: tuple[int, ...]
 ```
 
 Projection recovery also works for custom generic containers that define their own iteration
 behavior:
 
 ```py
-from collections.abc import AsyncIterator, Callable, Generator, Iterator
+from collections.abc import AsyncIterator, Callable, Generator, Iterator, Mapping
 from typing import Awaitable, Coroutine, Generic, TypeVar, overload, Any
 
 ProjectionT = TypeVar("ProjectionT")
@@ -3420,6 +3499,36 @@ class ProjectionCustomSlice:
         self.x = self.x[:]
 
         reveal_type(self.x)  # revealed: SliceBox[int]
+
+class ProjectionCustomMapping(Generic[ProjectionT, ProjectionU], Mapping[ProjectionT, ProjectionU]):
+    def __getitem__(self, key: ProjectionT) -> ProjectionU:
+        raise KeyError
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+    def __len__(self) -> int:
+        return 0
+
+class ProjectionCustomMappingValues:
+    def __init__(self, values: ProjectionCustomMapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for value in self.x.values():
+            self.x = {0: value}
+
+        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[int, str]
+
+class ProjectionCustomMappingItems:
+    def __init__(self, values: ProjectionCustomMapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for key, value in self.x.items():
+            self.x = {key: value}
+
+        reveal_type(self.x)  # revealed: ProjectionCustomMapping[int, str] | dict[int, str]
 
 class ContextBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:

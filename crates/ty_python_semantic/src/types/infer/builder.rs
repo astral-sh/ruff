@@ -8913,7 +8913,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let scope = self.scope();
-        let return_ty = bindings.return_type(db);
+        let return_ty = if arguments.args.is_empty()
+            && arguments.keywords.is_empty()
+            && let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
+            && let Some(projected) = self
+                .expression_type(value)
+                .try_cycle_mapping_view_projection(db, attr.id.as_str())
+        {
+            projected
+        } else {
+            bindings.return_type(db)
+        };
 
         let find_narrowed_place = |argument_index: usize| match arguments.args.get(argument_index) {
             None => {
