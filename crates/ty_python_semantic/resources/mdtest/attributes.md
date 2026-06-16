@@ -3023,6 +3023,158 @@ class ProjectionMapping:
         reveal_type(self.x)  # revealed: Mapping[int, str]
 ```
 
+Projection recovery also works for custom generic containers that define their own iteration
+behavior:
+
+```py
+from collections.abc import Iterator
+from typing import Generic, TypeVar, overload, Any
+
+ProjectionT = TypeVar("ProjectionT")
+ProjectionU = TypeVar("ProjectionU")
+
+class Box(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomBox:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        x, = self.x
+        self.x = Box(x)
+
+        reveal_type(self.x)  # revealed: Box[int]
+
+class ProjectionCustomBoxInList:
+    def __init__(self) -> None:
+        self.x = [Box(0)]
+
+    def read(self) -> None:
+        for box in self.x:
+            x, = box
+            self.x = [Box(x)]
+
+        reveal_type(self.x)  # revealed: list[Box[int]]
+
+class ReversedPair(Generic[ProjectionT, ProjectionU]):
+    def __init__(self, first: ProjectionT, second: ProjectionU) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[tuple[ProjectionU, ProjectionT]]:
+        return iter(())
+
+class ProjectionCustomParameterOrder:
+    def __init__(self) -> None:
+        self.x = ReversedPair(0, "")
+
+    def read(self) -> None:
+        for text, number in self.x:
+            self.x = ReversedPair(number, text)
+
+        reveal_type(self.x)  # revealed: ReversedPair[int, str]
+
+class NestedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[tuple[ProjectionT]]:
+        return iter(())
+
+class ProjectionCustomNested:
+    def __init__(self) -> None:
+        self.x = NestedBox(0)
+
+    def read(self) -> None:
+        for (item,) in self.x:
+            self.x = NestedBox(item)
+
+        reveal_type(self.x)  # revealed: NestedBox[int]
+
+class ConstantIterable(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(())
+
+class ProjectionCustomNonGenericItem:
+    def __init__(self) -> None:
+        self.x = ConstantIterable(0)
+
+    def read(self) -> None:
+        x, = self.x
+        self.x = ConstantIterable(x)
+
+        reveal_type(self.x)  # revealed: ConstantIterable[str]
+
+class OverloadedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    @overload
+    def __iter__(self) -> Iterator[int]:
+        ...
+
+    @overload
+    def __iter__(self) -> Iterator[str]:
+        ...
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(())
+
+class ProjectionCustomOverloadedIterator:
+    def __init__(self) -> None:
+        self.x = OverloadedBox(0)
+
+    def read(self, flag: bool) -> None:
+        if flag:
+            x, = self.x
+            self.x = OverloadedBox(x)
+        else:
+            self.x = OverloadedBox("")
+
+        reveal_type(self.x)  # revealed: OverloadedBox[int] | OverloadedBox[str]
+
+class SelfOverloadedBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        pass
+
+    @overload
+    def __iter__(self: "SelfOverloadedBox[int]") -> Iterator[int]:
+        ...
+
+    @overload
+    def __iter__(self: "SelfOverloadedBox[str]") -> Iterator[str]:
+        ...
+
+    def __iter__(self) -> Iterator[Any]:
+        return iter(())
+
+class ProjectionCustomAnyOverload:
+    def __init__(self, value: Any) -> None:
+        self.x = SelfOverloadedBox(value)
+
+    def read(self) -> None:
+        x, = self.x
+        self.x = SelfOverloadedBox(x)
+
+        reveal_type(self.x)  # revealed: SelfOverloadedBox[Any]
+
+class ProjectionCustomRecursiveShape:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        self.x = Box(self.x)
+
+        reveal_type(self.x)  # revealed: Box[Divergent]
+```
+
 Different container wrappers can share the same unpack projection:
 
 ```py

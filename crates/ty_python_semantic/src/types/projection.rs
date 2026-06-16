@@ -1,6 +1,8 @@
 use std::cell::RefCell;
 
-use super::{DivergentType, KnownClass, TupleSpec, Type, UnionType};
+use super::{
+    DivergentType, DynamicType, KnownClass, StaticClassLiteral, TupleSpec, Type, UnionType,
+};
 use crate::Db;
 use crate::types::visitor::any_over_type;
 
@@ -58,13 +60,15 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        self.try_container_projection_cycle_normalized(db, root)
+        let evidence = CycleRecoveryEvidence::from_type(db, root, self);
+        self.try_container_projection_cycle_normalized(db, root, &evidence)
     }
 
     fn try_container_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
         root: DivergentType,
+        evidence: &[CycleRecoveryEvidence<'db>],
     ) -> Option<Self> {
         let mut containers = Vec::new();
         let mut ops = Vec::new();
@@ -89,7 +93,7 @@ impl<'db> Type<'db> {
             .map(|op| (op, Vec::new()))
             .collect::<Vec<_>>();
         for container in &containers {
-            container.collect_projection_terms(db, &mut terms_by_op)?;
+            container.collect_projection_terms(db, root, evidence, &mut terms_by_op)?;
         }
 
         let solved_ops = terms_by_op
@@ -370,6 +374,11 @@ enum ProjectionContainer<'db> {
         class: KnownClass,
         arguments: Vec<Type<'db>>,
     },
+    Custom {
+        class: StaticClassLiteral<'db>,
+        arguments: Vec<Type<'db>>,
+        arm: Type<'db>,
+    },
 }
 
 impl<'db> ProjectionContainer<'db> {
@@ -383,14 +392,24 @@ impl<'db> ProjectionContainer<'db> {
             });
         }
 
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && Self::known_container_iter_item_type(known_class, specialization.types(db)).is_some()
-        {
-            return Some(Self::Known {
-                class: known_class,
-                arguments: specialization.types(db).to_vec(),
-            });
+        if let Some((class, specialization)) = ty.class_specialization(db) {
+            if let Some(known_class) = class.known(db)
+                && Self::known_container_iter_item_type(known_class, specialization.types(db))
+                    .is_some()
+            {
+                return Some(Self::Known {
+                    class: known_class,
+                    arguments: specialization.types(db).to_vec(),
+                });
+            }
+
+            if class.known(db).is_none() && !specialization.types(db).is_empty() {
+                return Some(Self::Custom {
+                    class,
+                    arguments: specialization.types(db).to_vec(),
+                    arm: ty,
+                });
+            }
         }
 
         None
@@ -413,16 +432,23 @@ impl<'db> ProjectionContainer<'db> {
                     Type::collect_projection_ops(db, root, *argument, paths);
                 }
             }
+            Self::Custom { arguments, .. } => {
+                for argument in arguments {
+                    Type::collect_projection_ops(db, root, *argument, paths);
+                }
+            }
         }
     }
 
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
+        root: DivergentType,
+        evidence: &[CycleRecoveryEvidence<'db>],
         terms_by_op: &mut [(CycleProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
-            terms.push(self.project_path(db, *path)?);
+            terms.push(self.project_path(db, root, evidence, *path)?);
         }
         Some(())
     }
@@ -430,6 +456,8 @@ impl<'db> ProjectionContainer<'db> {
     fn project_path(
         &self,
         db: &'db dyn Db,
+        root: DivergentType,
+        evidence: &[CycleRecoveryEvidence<'db>],
         path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
@@ -437,15 +465,25 @@ impl<'db> ProjectionContainer<'db> {
                 Type::heterogeneous_tuple(db, elements.iter().copied())
             }
             Self::Known { class, arguments } => class.to_specialized_instance(db, arguments),
+            Self::Custom { arm, .. } => {
+                return Self::project_custom_path(db, *arm, root, evidence, path);
+            }
         };
-        Self::project_type_path(db, ty, path.ops(db))
+        Self::project_type_path(db, ty, root, evidence, path)
     }
 
     fn project_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        ops: &[CycleProjectionOp],
+        root: DivergentType,
+        evidence: &[CycleRecoveryEvidence<'db>],
+        path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
+        if let Some(term) = Self::project_custom_path(db, ty, root, evidence, path) {
+            return Some(term);
+        }
+
+        let ops = path.ops(db);
         let (&op, tail) = ops.split_first()?;
 
         let projected = match op {
@@ -459,7 +497,48 @@ impl<'db> ProjectionContainer<'db> {
             return Some(projected);
         }
 
-        Self::project_type_path(db, projected.ty(), tail)
+        Self::project_type_path(
+            db,
+            projected.ty(),
+            root,
+            evidence,
+            CycleProjectionPath::from_ops(db, tail.iter().copied()),
+        )
+    }
+
+    fn project_custom_path(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        root: DivergentType,
+        evidence: &[CycleRecoveryEvidence<'db>],
+        path: CycleProjectionPath<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        Self::is_custom_generic_container(db, ty).then_some(())?;
+        evidence.iter().find_map(|fact| {
+            (fact.root.same_marker(root) && fact.arm == ty && fact.path == path)
+                .then_some(fact.term)
+        })
+    }
+
+    fn infer_projection_path(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        ops: &[CycleProjectionOp],
+    ) -> Option<ProjectionTerm<'db>> {
+        let (&op, tail) = ops.split_first()?;
+
+        let projected = match op {
+            CycleProjectionOp::IterItem => Self::infer_iter_item(db, ty)?,
+            CycleProjectionOp::UnpackExact { len, index } => {
+                Self::infer_unpack_exact(db, ty, len, index)?
+            }
+        };
+
+        if tail.is_empty() {
+            return Some(projected);
+        }
+
+        Self::infer_projection_path(db, projected.ty(), tail)
     }
 
     fn project_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
@@ -511,6 +590,30 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
+    fn infer_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        Some(ProjectionTerm::Homogeneous(
+            ty.try_iterate(db).ok()?.homogeneous_element_type(db),
+        ))
+    }
+
+    fn infer_unpack_exact(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        len: usize,
+        index: usize,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db)
+            && let TupleSpec::Fixed(tuple) = spec.as_ref()
+            && tuple.len() == len
+        {
+            return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
+        }
+
+        Some(ProjectionTerm::Homogeneous(
+            ty.try_iterate(db).ok()?.homogeneous_element_type(db),
+        ))
+    }
+
     fn into_type(
         self,
         db: &'db dyn Db,
@@ -536,6 +639,21 @@ impl<'db> ProjectionContainer<'db> {
                     })
                     .collect::<Option<Vec<_>>>()?;
                 Some(class.to_specialized_instance(db, arguments))
+            }
+            Self::Custom {
+                class, arguments, ..
+            } => {
+                let arguments = arguments
+                    .into_iter()
+                    .map(|argument| {
+                        argument.replace_solved_projection_artifacts(db, root, solved_ops)
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+
+                Type::from(class.apply_specialization(db, |generic_context| {
+                    generic_context.specialize(db, arguments)
+                }))
+                .to_instance(db)
             }
         }
     }
@@ -584,6 +702,84 @@ impl<'db> ProjectionTerm<'db> {
             ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
         }
     }
+
+    fn is_ambiguous(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self.ty(), false, |ty| {
+            matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
+        })
+    }
+}
+
+/// Projection facts for custom generic containers in the current cycle candidate.
+#[derive(Debug, Clone, Copy)]
+struct CycleRecoveryEvidence<'db> {
+    root: DivergentType,
+    arm: Type<'db>,
+    path: CycleProjectionPath<'db>,
+    term: ProjectionTerm<'db>,
+}
+
+impl<'db> CycleRecoveryEvidence<'db> {
+    fn from_type(db: &'db dyn Db, root: DivergentType, ty: Type<'db>) -> Vec<Self> {
+        let mut paths = Vec::new();
+        Type::collect_projection_ops(db, root, ty, &mut paths);
+
+        let arms = RefCell::new(Vec::new());
+        any_over_type(db, ty, false, |nested| {
+            if ProjectionContainer::is_custom_generic_container(db, nested) {
+                let mut arms = arms.borrow_mut();
+                if !arms.contains(&nested) {
+                    arms.push(nested);
+                }
+            }
+            false
+        });
+
+        let mut evidence: Vec<Self> = Vec::new();
+        for arm in arms.into_inner() {
+            if arm.same_divergent_marker(Type::Divergent(root)) {
+                continue;
+            }
+
+            for path in &paths {
+                for suffix in path.suffixes(db) {
+                    let Some(term) =
+                        ProjectionContainer::infer_projection_path(db, arm, suffix.ops(db))
+                    else {
+                        continue;
+                    };
+                    if term.is_ambiguous(db) {
+                        continue;
+                    }
+                    if evidence.iter().any(|existing| {
+                        existing.root.same_marker(root)
+                            && existing.arm == arm
+                            && existing.path == suffix
+                            && existing.term.ty() == term.ty()
+                    }) {
+                        continue;
+                    }
+                    evidence.push(Self {
+                        root,
+                        arm,
+                        path: suffix,
+                        term,
+                    });
+                }
+            }
+        }
+
+        evidence
+    }
+}
+
+impl ProjectionContainer<'_> {
+    fn is_custom_generic_container(db: &dyn Db, ty: Type<'_>) -> bool {
+        ty.class_specialization(db)
+            .is_some_and(|(class, specialization)| {
+                class.known(db).is_none() && !specialization.types(db).is_empty()
+            })
+    }
 }
 
 /// A query-free projection of a cycle root produced while recovering recursive inference.
@@ -621,13 +817,22 @@ impl get_size2::GetSize for CycleProjectionPath<'_> {}
 
 impl<'db> CycleProjectionPath<'db> {
     fn from_op(db: &'db dyn Db, op: CycleProjectionOp) -> Self {
-        Self::new_internal(db, vec![op].into_boxed_slice())
+        Self::from_ops(db, [op])
+    }
+
+    fn from_ops(db: &'db dyn Db, ops: impl IntoIterator<Item = CycleProjectionOp>) -> Self {
+        Self::new_internal(db, ops.into_iter().collect::<Vec<_>>().into_boxed_slice())
     }
 
     fn append(self, db: &'db dyn Db, op: CycleProjectionOp) -> Self {
         let mut ops = self.ops(db).to_vec();
         ops.push(op);
         Self::new_internal(db, ops.into_boxed_slice())
+    }
+
+    fn suffixes(self, db: &'db dyn Db) -> impl Iterator<Item = Self> + 'db {
+        (0..self.ops(db).len())
+            .map(move |index| Self::from_ops(db, self.ops(db)[index..].iter().copied()))
     }
 }
 
