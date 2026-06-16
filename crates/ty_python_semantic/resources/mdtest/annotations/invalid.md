@@ -152,8 +152,9 @@ def invalid_binary_operators(
     k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
-    # error: [unsupported-operator] "Operator `&` is not supported between objects of type `Literal[5]` and `Literal[3]`"
     l: 5 & 3,
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    m: ~3,
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
@@ -167,6 +168,7 @@ def invalid_binary_operators(
     reveal_type(j)  # revealed: Unknown
     reveal_type(k)  # revealed: Unknown
     reveal_type(l)  # revealed: Unknown
+    reveal_type(m)  # revealed: Unknown
 ```
 
 ## Error recovery upon encountering invalid AST nodes

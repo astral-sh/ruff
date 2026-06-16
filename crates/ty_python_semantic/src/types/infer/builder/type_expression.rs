@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::Ranged;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
+use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
@@ -131,7 +132,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
-        let annotations_are_deferred = |builder: &Self| {
+        let ignore_runtime_errors = |builder: &Self| {
             builder.deferred_state.is_deferred()
                 || builder.in_stub()
                 || builder.is_in_type_checking_block(builder.scope(), expression)
@@ -222,7 +223,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !annotations_are_deferred(self) {
+                        if !ignore_runtime_errors(self) {
                             let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
@@ -350,7 +351,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 
-                        if !annotations_are_deferred(self) {
+                        if !ignore_runtime_errors(self) {
                             // Infer the operands as values to report the types used by the runtime
                             // operation rather than their interpretation as type expressions.
                             let mut speculative_builder = self.speculate();
@@ -358,13 +359,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 .infer_expression(&binary.left, TypeContext::default());
                             let right_value = speculative_builder
                                 .infer_expression(&binary.right, TypeContext::default());
-                            report_unsupported_binary_operation(
-                                &self.context,
-                                binary,
+                            if Type::try_call_bin_op(
+                                self.db(),
                                 left_value,
-                                right_value,
                                 ast::Operator::BitAnd,
-                            );
+                                right_value,
+                            )
+                            .is_err()
+                            {
+                                report_unsupported_binary_operation(
+                                    &self.context,
+                                    binary,
+                                    left_value,
+                                    right_value,
+                                    ast::Operator::BitAnd,
+                                );
+                            }
                         }
 
                         IntersectionType::from_two_elements(self.db(), left_ty, right_ty)
@@ -585,17 +595,24 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ) => {
                 let operand_ty = self.infer_type_expression(operand);
 
-                if !annotations_are_deferred(self) {
+                if !ignore_runtime_errors(self) {
                     let operand_value = self
                         .speculate()
                         .infer_expression(operand, TypeContext::default());
-                    self.report_unsupported_unary_operator(
-                        unary,
-                        ast::UnaryOp::Invert,
-                        operand_value,
+                    if let Err(error) = operand_value.try_call_dunder(
+                        self.db(),
                         "__invert__",
-                        None,
-                    );
+                        CallArguments::none(),
+                        TypeContext::default(),
+                    ) {
+                        self.report_unsupported_unary_operator(
+                            unary,
+                            ast::UnaryOp::Invert,
+                            operand_value,
+                            "__invert__",
+                            Some(&error),
+                        );
+                    }
                 }
 
                 operand_ty.negate(self.db())
