@@ -250,11 +250,15 @@ fn subject_independent_definite_match_pattern_type<'db>(
     }
 }
 
-/// Return the values in `subject_ty` that are statically guaranteed to match `kind`.
+/// Return values that are statically guaranteed to match `kind`, using `subject_ty` to recognize
+/// cases where the pattern covers a complete subject arm.
 ///
 /// Unlike [`definite_match_pattern_type`], this can recognize guarantees that depend on the
 /// current subject. For example, both `Literal[True]` and `Literal[1]` are guaranteed to match the
-/// value pattern `1` because match value patterns use equality.
+/// value pattern `1` because match value patterns use equality. The returned type can include
+/// values outside `subject_ty`; callers intersect it with the subject before using it for negative
+/// narrowing. Keeping the non-exhaustive part independent of the subject also prevents each case
+/// in a long match statement from embedding all previous negative constraints again.
 pub(crate) fn definite_match_pattern_type_for_subject<'db>(
     db: &'db dyn Db,
     kind: &PatternPredicateKind<'db>,
@@ -282,20 +286,14 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             if equality_truthiness(db, resolved_subject_ty, value_ty) == Truthiness::AlwaysTrue {
                 subject_ty
             } else {
-                IntersectionBuilder::new(db)
-                    .add_positive(subject_ty)
-                    .add_positive(definite_match_pattern_type(db, kind))
-                    .build()
+                definite_match_pattern_type(db, kind)
             }
         }
         PatternPredicateKind::Sequence(kind) => {
             if sequence_pattern_is_exhaustive_for_subject(db, kind, resolved_subject_ty) {
                 subject_ty
             } else {
-                IntersectionBuilder::new(db)
-                    .add_positive(subject_ty)
-                    .add_positive(definite_sequence_pattern_type(db, kind))
-                    .build()
+                definite_sequence_pattern_type(db, kind)
             }
         }
         PatternPredicateKind::Or(patterns) => UnionType::from_elements(
@@ -308,10 +306,7 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             definite_match_pattern_type_for_subject(db, pattern, subject_ty)
         }
         PatternPredicateKind::As(None, _) | PatternPredicateKind::Star(_) => subject_ty,
-        _ => IntersectionBuilder::new(db)
-            .add_positive(subject_ty)
-            .add_positive(definite_match_pattern_type(db, kind))
-            .build(),
+        _ => definite_match_pattern_type(db, kind),
     }
 }
 
