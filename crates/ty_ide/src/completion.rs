@@ -1101,107 +1101,106 @@ impl<'m> ContextCursor<'m> {
     /// Returns keywords when the cursor follows syntax that can only be
     /// continued by those keywords.
     fn incomplete_keywords(&self) -> Option<&'static [&'static str]> {
-        const IN: &[&str] = &["in"];
-        const AS: &[&str] = &["as"];
-        const IF: &[&str] = &["if"];
+        const IN: &[&str] = std::slice::from_ref(&"in");
+        const AS: &[&str] = std::slice::from_ref(&"as");
+        const IF: &[&str] = std::slice::from_ref(&"if");
         const MATCH: &[&str] = &["as", "if"];
         const NONE: &[&str] = &[];
 
-        let preceding_token = |keyword: &str| {
-            let (tokens, start) = match self.typed {
-                Some(typed) if keyword.starts_with(typed) => (
-                    self.tokens_before.get(..self.tokens_before.len() - 1)?,
-                    self.range.start(),
-                ),
-                Some(_) => return None,
-                None => (self.tokens_before, self.offset),
-            };
-            let token = tokens
-                .iter()
-                .rev()
-                .find(|token| !token.kind().is_trivia())?;
-            if token.kind() == TokenKind::Newline
-                || token.end() >= start
-                || self
-                    .parsed
-                    .tokens()
-                    .in_range(TextRange::new(token.end(), start))
-                    .iter()
-                    .any(|token| !token.kind().is_trivia())
-            {
-                return None;
-            }
-            Some(token)
+        let typed_matches = |keywords: &[&str]| {
+            self.typed
+                .is_none_or(|typed| keywords.iter().any(|keyword| keyword.starts_with(typed)))
         };
+        let matches_in = typed_matches(IN);
+        let matches_as = typed_matches(AS);
+        let matches_if = typed_matches(IF);
+        if !matches_in && !matches_as && !matches_if {
+            return None;
+        }
 
-        if let Some(token) = preceding_token("in")
-            && let Some(keywords) = self
-                .covering_node(token.range())
-                .ancestors()
-                .find_map(|node| match node {
-                    ast::AnyNodeRef::StmtFor(stmt) => self
-                        .range_end_position(stmt.target.range(), node, token)
-                        .map(|position| position.select_keywords(IN, NONE)),
-                    ast::AnyNodeRef::Comprehension(comprehension) => self
-                        .range_end_position(comprehension.target.range(), node, token)
-                        .map(|position| position.select_keywords(IN, NONE)),
-                    _ => None,
-                })
+        let (tokens, start) = match self.typed {
+            Some(_) => (
+                self.tokens_before.get(..self.tokens_before.len() - 1)?,
+                self.range.start(),
+            ),
+            None => (self.tokens_before, self.offset),
+        };
+        let token = tokens
+            .iter()
+            .rev()
+            .find(|token| !token.kind().is_trivia())?;
+        if token.kind() == TokenKind::Newline
+            || token.end() >= start
+            || self
+                .parsed
+                .tokens()
+                .in_range(TextRange::new(token.end(), start))
+                .iter()
+                .any(|token| !token.kind().is_trivia())
+        {
+            return None;
+        }
+        let covering_node = self.covering_node(token.range());
+
+        if matches_in
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
+                ast::AnyNodeRef::StmtFor(stmt) => self
+                    .range_end_position(stmt.target.range(), node, token)
+                    .map(|position| position.select_keywords(IN, NONE)),
+                ast::AnyNodeRef::Comprehension(comprehension) => self
+                    .range_end_position(comprehension.target.range(), node, token)
+                    .map(|position| position.select_keywords(IN, NONE)),
+                _ => None,
+            })
         {
             return Some(self.unless_already_present(keywords));
         }
 
-        if let Some(token) = preceding_token("as")
-            && let Some(keywords) = self
-                .covering_node(token.range())
-                .ancestors()
-                .find_map(|node| match node {
-                    ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
-                        let range = item.context_expr.range();
-                        self.range_end_position(range, item.into(), token)
-                            .map(|position| position.select_keywords(AS, NONE))
-                            .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
-                    }),
-                    ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
-                        .type_
-                        .as_deref()
-                        .and_then(|type_| self.range_end_position(type_.range(), node, token))
-                        .map(|position| position.select_keywords(AS, NONE)),
-                    _ => None,
-                })
+        if matches_as
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| match node {
+                ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
+                    let range = item.context_expr.range();
+                    self.range_end_position(range, item.into(), token)
+                        .map(|position| position.select_keywords(AS, NONE))
+                        .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
+                }),
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                    .type_
+                    .as_deref()
+                    .and_then(|type_| self.range_end_position(type_.range(), node, token))
+                    .map(|position| position.select_keywords(AS, NONE)),
+                _ => None,
+            })
         {
             return Some(self.unless_already_present(keywords));
         }
 
-        if let Some(token) = preceding_token("as").or_else(|| preceding_token("if"))
-            && let Some(keywords) = self
-                .covering_node(token.range())
-                .ancestors()
-                .find_map(|node| {
-                    let ast::AnyNodeRef::MatchCase(case) = node else {
-                        return None;
-                    };
-                    match &case.pattern {
-                        ast::Pattern::MatchAs(ast::PatternMatchAs {
-                            pattern: Some(pattern),
-                            name: Some(name),
-                            ..
-                        }) => {
-                            if name.is_valid()
-                                && let Some(position) =
-                                    self.range_end_position(case.pattern.range(), node, token)
-                            {
-                                Some(position.select_keywords(IF, NONE))
-                            } else {
-                                self.range_end_position(pattern.range(), node, token)
-                                    .map(|position| position.select_keywords(MATCH, AS))
-                            }
+        if (matches_as || matches_if)
+            && let Some(keywords) = covering_node.ancestors().find_map(|node| {
+                let ast::AnyNodeRef::MatchCase(case) = node else {
+                    return None;
+                };
+                match &case.pattern {
+                    ast::Pattern::MatchAs(ast::PatternMatchAs {
+                        pattern: Some(pattern),
+                        name: Some(name),
+                        ..
+                    }) => {
+                        if name.is_valid()
+                            && let Some(position) =
+                                self.range_end_position(case.pattern.range(), node, token)
+                        {
+                            Some(position.select_keywords(IF, NONE))
+                        } else {
+                            self.range_end_position(pattern.range(), node, token)
+                                .map(|position| position.select_keywords(MATCH, AS))
                         }
-                        pattern => self
-                            .range_end_position(pattern.range(), node, token)
-                            .map(|position| position.select_keywords(MATCH, AS)),
                     }
-                })
+                    pattern => self
+                        .range_end_position(pattern.range(), node, token)
+                        .map(|position| position.select_keywords(MATCH, AS)),
+                }
+            })
         {
             return Some(self.unless_already_present(keywords));
         }
