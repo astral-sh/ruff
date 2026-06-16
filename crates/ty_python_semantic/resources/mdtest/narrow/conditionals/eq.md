@@ -580,7 +580,30 @@ else:
 ## Union with `Any`
 
 ```py
-from typing import Any, Literal
+import sys
+from enum import Enum, IntEnum
+from typing import Any, Literal, TypeVar
+
+T = TypeVar("T", bound=object)
+RUNTIME_TYPE_VAR = TypeVar("RUNTIME_TYPE_VAR")
+
+class Color(Enum):
+    RED = 1
+    BLUE = 2
+
+class NonReflexive(Enum):
+    VALUE = 1
+
+    def __eq__(self, other: object) -> Literal[False]:
+        return False
+
+    def __ne__(self, other: object) -> Literal[True]:
+        return True
+
+class Marker: ...
+
+class SingleIntEnum(IntEnum):
+    VALUE = 1
 
 def _(x: Any | None, y: Any | None):
     if x != 1:
@@ -604,6 +627,49 @@ def _(x: Literal["foo", "bar"] | Any):
         reveal_type(x)  # revealed: Literal["foo"] | (Any & ~Literal["bar"])
     else:
         reveal_type(x)  # revealed: Literal["bar"] | (Any & ~Literal["foo"])
+
+def _(x: Any):
+    if x != Color.RED:
+        reveal_type(x)  # revealed: Any & ~Literal[Color.RED]
+
+    if x != NonReflexive.VALUE:
+        reveal_type(x)  # revealed: Any
+
+    if x != Marker:
+        reveal_type(x)  # revealed: Any & ~<class 'Marker'>
+
+def _(x: T):
+    if x != Color.RED:
+        reveal_type(x)  # revealed: T@_ & ~Literal[Color.RED]
+
+def _(x: Any, y: T | str):
+    if x != y:
+        reveal_type(x)  # revealed: Any
+
+def _(x: Any, y: Any | str):
+    if x != y:
+        reveal_type(x)  # revealed: Any
+
+def _(x: Any):
+    if x != list[Any]:
+        reveal_type(x)  # revealed: Any & ~<class 'list[Any]'>
+
+def _(x: Any, y: SingleIntEnum):
+    if x == y:
+        pass
+    else:
+        reveal_type(x)  # revealed: Any & ~Literal[SingleIntEnum.VALUE]
+
+def _(x: Any):
+    if x == sys.version_info:
+        pass
+    else:
+        reveal_type(x)  # revealed: Any & ~_version_info
+
+    if x == RUNTIME_TYPE_VAR:
+        pass
+    else:
+        reveal_type(x)  # revealed: Any & ~TypeVar
 ```
 
 ## Booleans and integers

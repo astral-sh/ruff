@@ -402,21 +402,49 @@ fn comparison_result<'db>(
     }
 }
 
-/// Return whether every value represented by `ty` compares equal to every other represented value.
+/// Return whether every value represented by `ty` is known to compare equal to every other value.
 ///
-/// Dynamic and type-variable types are excluded to avoid recursive comparison through the special
-/// cases that call this helper.
+/// Comparison evaluation is reused so this stays aligned with all modeled equality semantics.
+/// Self-comparisons that can decompose into dynamic types or type variables are rejected before
+/// evaluation because those branches call this helper and would otherwise recurse.
 fn all_values_compare_equal<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
     let ty = ty.resolve_type_alias(db);
-    if matches!(ty, Type::Dynamic(_) | Type::TypeVar(_)) {
+
+    // TODO: Avoid recursing into comparison evaluation until we support some kind of fixed point or
+    // cycle detection.
+    if self_comparison_may_cycle(db, ty) {
         return false;
     }
+
     comparison_result(db, ty, ty, ComparisonBranch::Positive, operator)
         == operator.result_from_equality(true)
+}
+
+/// Return whether self-comparison of `ty` may cycle.
+///
+/// Comparison evaluation decomposes unions, positive intersections, and `NewType` bases. Other
+/// types, including generic aliases, are atomic even when their components contain dynamic types
+/// or type variables.
+fn self_comparison_may_cycle<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.resolve_type_alias(db) {
+        Type::Dynamic(_) | Type::TypeVar(_) => true,
+        Type::NewTypeInstance(newtype) => {
+            self_comparison_may_cycle(db, newtype.concrete_base_type(db))
+        }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|element| self_comparison_may_cycle(db, *element)),
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|element| self_comparison_may_cycle(db, *element)),
+        _ => false,
+    }
 }
 
 /// Return whether `ty` is handled by [`builtin_literal_constraint`].
@@ -437,13 +465,23 @@ fn is_builtin_literal_type(db: &dyn Db, ty: Type) -> bool {
     }
 }
 
-/// Return a predicate-shaped constraint for comparison with an `int`, `bool`, `str`, or `bytes`
-/// literal.
+/// Return a constraint for comparison with an `int`, `bool`, `str`, or `bytes` literal.
 ///
-/// Narrowing constraints participate in cyclic inference. Filtering `"B" | "C"` to `"B"` for the
-/// false branch of `x == "C"` can freeze a loop before later iterations widen `x`. Constraining the
-/// target with `~Literal["C"]` instead describes the predicate itself and remains valid as the cycle
-/// reaches its fixed point.
+/// For example:
+///
+/// ```py
+/// x = "B"
+/// if random():
+///     x = "C"
+/// if x != "C":
+///     while random():
+///         reveal_type(x)  # Literal["B", "D"]
+///         x = "D"
+/// ```
+///
+/// At first, `x != "C"` narrows `x` from `"B" | "C"` to `"B"`. The loop later adds `"D"`. If we
+/// record the result as just `"B"`, the type of `x` can never grow to include `"D"`. Recording it as
+/// "anything except `"C"`" (`~Literal["C"]`) rules out `"C"` but still allows the loop to add `"D"`.
 ///
 /// The constraint also follows Python's equality between booleans and integers: `x != 0` excludes
 /// both `Literal[0]` and `Literal[False]`, while `x != 1` excludes `Literal[1]` and `Literal[True]`.
@@ -1014,7 +1052,9 @@ impl KnownComparisonSemantics {
                     .then_some(first)
             }
             Type::NominalInstance(instance)
-                if instance.class(db).is_final(db) || instance.tuple_spec(db).is_some() =>
+                if instance.class(db).is_final(db)
+                    || instance.tuple_spec(db).is_some()
+                    || ty.is_singleton(db) =>
             {
                 Self::of_instance(db, ty, operator)
             }
@@ -1115,10 +1155,8 @@ fn comparison_domain<'db>(
         }
         Type::NominalInstance(instance) => {
             if instance.tuple_spec(db).is_some()
-                || instance
-                    .class(db)
-                    .known(db)
-                    .is_some_and(|known| known == KnownClass::Bool || known.is_singleton())
+                || ty.is_singleton(db)
+                || instance.has_known_class(db, KnownClass::Bool)
                 || target.is_union()
                     && KnownComparisonSemantics::of_type(db, ty, operator).is_some()
             {
