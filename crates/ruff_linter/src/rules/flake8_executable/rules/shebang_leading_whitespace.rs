@@ -28,6 +28,14 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// #!/usr/bin/env python3
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as unsafe because removing the whitespace before
+/// the shebang deletes any blank lines it contains. If a blank line separates
+/// the shebang from a following encoding declaration (e.g., `# -*- coding:
+/// utf-8 -*-`), deleting it moves that declaration onto the second line of the
+/// file, where Python honors it as a magic encoding comment. This can change
+/// how the file is decoded and therefore alter the program's behavior.
+///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
 #[derive(ViolationMetadata)]
@@ -69,6 +77,6 @@ pub(crate) fn shebang_leading_whitespace(
     if let Some(mut diagnostic) =
         context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
     {
-        diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(prefix)));
+        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(prefix)));
     }
 }

@@ -2,12 +2,16 @@
 source: crates/ruff_linter/src/rules/flake8_executable/mod.rs
 ---
 EXE004 [*] Avoid whitespace before shebang
- --> EXE004_1.py:1:1
+ --> EXE004_5.py:1:1
   |
-1 |     #!/usr/bin/python
-  | ^^^^
+1 |
+  | ^
+2 | #!/usr/bin/env python
+3 | # coding: latin-1
   |
 help: Remove whitespace before shebang
-  -     #!/usr/bin/python
-1 + #!/usr/bin/python
+  -
+1 | #!/usr/bin/env python
+2 | # coding: latin-1
+3 | print("hello")
 note: This is an unsafe fix and may change runtime behavior
