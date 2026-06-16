@@ -2063,6 +2063,7 @@ impl<'db> UseDefMapBuilder<'db> {
         symbol: ScopedSymbolId,
     ) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
         self.symbol_states[symbol]
+            .state
             .bindings()
             .iter()
             .map(LiveBinding::binding)

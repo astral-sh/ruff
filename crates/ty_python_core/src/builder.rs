@@ -138,8 +138,19 @@ struct ScopeInfo<'ast> {
 type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
 
 /// Captures cannot be resolved until the enclosing scope is complete because a later binding can
-/// make the name local. Each pending capture remembers the bindings visible when the nested scope
-/// was created and, for lazy scopes, any bindings added afterward.
+/// make the name local. For example, `inner` captures `outer`'s local `value`, even though the
+/// binding appears after `inner` is defined:
+///
+/// ```python
+/// def outer():
+///     def inner():
+///         return value
+///
+///     value = 1
+/// ```
+///
+/// Each pending capture remembers the bindings visible when the nested scope was created and, for
+/// lazy scopes, any bindings added afterward.
 type PendingCaptures = FxHashMap<Name, SmallVec<[PendingCapture; 1]>>;
 
 #[derive(Debug)]
