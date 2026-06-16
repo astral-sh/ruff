@@ -295,11 +295,14 @@ inherits directly from the `Any` special form retains the previous gradual class
 from typing import Any
 from ty_extensions import is_assignable_to, static_assert, TypeOf
 
-def test(x: Any, cls: type[Any]):
+class A: ...
+
+def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     class Foo(x): ...
     class Bar(Any): ...
     class Baz(cls): ...
     class Mixed(Bar, x): ...
+    class UnionDynamic(union_base): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(not is_assignable_to(TypeOf[Foo], type[int]))
@@ -320,10 +323,16 @@ def test(x: Any, cls: type[Any]):
     static_assert(is_assignable_to(TypeOf[Mixed], type[int]))
     static_assert(is_assignable_to(TypeOf[Mixed], type[Any]))
 
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], Any))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type))
+    static_assert(not is_assignable_to(TypeOf[UnionDynamic], type[int]))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[Any]))
+
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
     static_assert(not is_assignable_to(TypeOf[Baz], int))
     static_assert(not is_assignable_to(TypeOf[Mixed], int))
+    static_assert(not is_assignable_to(UnionDynamic, int))
 ```
 
 The direct `Any` base can materialize to any subtype of `type`.
