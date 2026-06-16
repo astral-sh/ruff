@@ -1,5 +1,10 @@
 # `object`
 
+```toml
+[environment]
+python-version = "3.14"
+```
+
 The `object` type represents the set of all Python objects.
 
 ## `object` is a supertype of all types
@@ -64,13 +69,13 @@ static_assert(is_equivalent_to(int | object | None, object))
 
 Intersecting with `object` is equivalent to the original type:
 
-```py
-from ty_extensions import static_assert, is_equivalent_to, Intersection
+```pyi
+from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...
 class Q: ...
 
-static_assert(is_equivalent_to(Intersection[P, object, Q], Intersection[P, Q]))
+static_assert(is_equivalent_to(P & object & Q, P & Q))
 ```
 
 ## `object` is the complement of `Never`

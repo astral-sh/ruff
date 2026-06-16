@@ -72,6 +72,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
     registry.register_lint(&EMPTY_BODY);
+    registry.register_lint(&EXPERIMENTAL_SYNTAX);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
     registry.register_lint(&INDEX_OUT_OF_BOUNDS);
@@ -174,6 +175,15 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION);
     registry.register_lint(&INVALID_SYNTAX_IN_FORWARD_ANNOTATION);
     registry.register_lint(&RAW_STRING_TYPE_ANNOTATION);
+}
+
+declare_lint! {
+    #[doc = include_str!("../../resources/lint_docs/experimental-syntax.md")]
+    pub(crate) static EXPERIMENTAL_SYNTAX = {
+        summary: "detects experimental syntax",
+        status: LintStatus::stable("0.0.50"),
+        default_level: Level::Warn,
+    }
 }
 
 declare_lint! {
