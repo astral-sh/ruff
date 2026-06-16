@@ -1449,14 +1449,42 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         }
     }
 
+    fn contains_unsupported_binding_pattern(pattern: &PatternPredicateKind<'_>) -> bool {
+        match pattern {
+            PatternPredicateKind::Class(..) | PatternPredicateKind::Mapping(_) => true,
+            PatternPredicateKind::Sequence(kind) => kind
+                .patterns
+                .iter()
+                .any(Self::contains_unsupported_binding_pattern),
+            PatternPredicateKind::Or(patterns) => patterns
+                .iter()
+                .any(Self::contains_unsupported_binding_pattern),
+            PatternPredicateKind::As(Some(pattern), _) => {
+                Self::contains_unsupported_binding_pattern(pattern)
+            }
+            _ => false,
+        }
+    }
+
     fn analyze_successful_or_pattern(
         &self,
         patterns: &[PatternPredicateKind<'db>],
         subject_ty: Type<'db>,
     ) -> PatternSuccessResult<'db> {
-        self.analyze_pattern_subject_arms(subject_ty, |analyzer, subject_ty| {
+        let mut result = self.analyze_pattern_subject_arms(subject_ty, |analyzer, subject_ty| {
             Some(analyzer.analyze_successful_or_pattern_arm(patterns, subject_ty))
-        })
+        });
+        if patterns
+            .iter()
+            .any(Self::contains_unsupported_binding_pattern)
+        {
+            // Class and mapping child patterns are not retained yet, so a reachable alternative can
+            // bind a name that is absent from its analysis result. Discard every contribution rather
+            // than infer a type from only the supported alternatives. The class and mapping binding
+            // analysis removes this conservative fallback in the next PR.
+            result.bindings.clear();
+        }
+        result
     }
 
     fn analyze_successful_or_pattern_arm(

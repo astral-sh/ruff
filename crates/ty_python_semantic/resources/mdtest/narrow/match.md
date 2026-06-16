@@ -443,7 +443,32 @@ class Values(list[str]):
 def test_or_binding_keeps_values_that_can_fail_a_class_pattern(value: Values) -> None:
     match value:
         case (HasX() as item) | [item]:
-            reveal_type(item)  # revealed: Values | str
+            # Class child bindings are added by a later change, so this branch cannot yet combine
+            # the supported whole-pattern alias with the sequence capture.
+            reveal_type(item)  # revealed: Unknown
+```
+
+Class and mapping child bindings are added by a later change. Until then, an `or` pattern that mixes
+one of those patterns with a supported alternative falls back to `Unknown` instead of inferring a
+type from only the supported alternative.
+
+```py
+from typing import final
+from ty_extensions import Unknown
+
+@final
+class TextValue:
+    value: str = ""
+
+def class_or_sequence_binding(value: TextValue | tuple[int]) -> None:
+    match value:
+        case TextValue(value=item) | [item]:
+            reveal_type(item)  # revealed: Unknown
+
+def mapping_or_sequence_binding(value: dict[str, str] | tuple[int]) -> None:
+    match value:
+        case {"value": item} | [item]:
+            reveal_type(item)  # revealed: Unknown
 ```
 
 ## Declared pattern captures
@@ -453,6 +478,8 @@ assignment checks as other bindings; the declaration remains the authoritative t
 captured value is incompatible.
 
 ```py
+from typing import Literal
+
 def test_incompatible_declared_capture(subject: int) -> None:
     item: str
     match subject:
@@ -465,14 +492,16 @@ def test_incompatible_declared_star_capture(subject: tuple[int, int]) -> None:
         case [*rest]:  # error: [invalid-assignment]
             reveal_type(rest)  # revealed: list[str]
 
-def test_incompatible_declared_or_capture(subject: int | str) -> None:
+def test_incompatible_declared_or_capture(
+    subject: tuple[Literal[1]] | tuple[Literal["x"]],
+) -> None:
     item: int
     match subject:
         # TODO: Report one error for the logical OR-pattern binding instead of validating each
         # syntactic definition separately.
         # error: [invalid-assignment]
         # error: [invalid-assignment]
-        case (int() as item) | (str() as item):
+        case [1 as item] | ["x" as item]:
             reveal_type(item)  # revealed: int
 
 def test_compatible_declared_alias(subject: object) -> None:
@@ -1413,10 +1442,12 @@ left to right, a later alternative sees only values not matched earlier.
 ```py
 from typing import Literal
 
-def test_match_sequence_or_as_pattern(value: object) -> None:
+def test_match_sequence_or_as_pattern(
+    value: tuple[None] | tuple[Literal[True]],
+) -> None:
     match value:
-        case [int() as item, _] | [str() as item, _]:
-            reveal_type(item)  # revealed: int | str
+        case [None as item] | [True as item]:
+            reveal_type(item)  # revealed: None | Literal[True]
 
 def test_match_ordered_or_capture(value: tuple[int] | str) -> int | str:
     match value:
