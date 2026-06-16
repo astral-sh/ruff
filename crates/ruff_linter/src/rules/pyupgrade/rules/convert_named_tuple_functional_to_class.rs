@@ -237,7 +237,7 @@ fn create_class_def_stmt(typename: &str, body: Suite, base_class: &Expr) -> Stmt
         name: Identifier::new(typename.to_string(), TextRange::default()),
         arguments: Some(Box::new(Arguments {
             args: Box::from([base_class.clone()]),
-            keywords: Box::from([]),
+            keywords: std::iter::empty().collect(),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })),

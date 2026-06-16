@@ -273,6 +273,8 @@ def f(val: str | bytes) -> None:
 reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
+## Overloaded callable with a constrained type variable
+
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
 as a whole to satisfy `Callable[[T], T]`.
 
@@ -299,6 +301,8 @@ result = apply_twice(f, x, y)
 reveal_type(result)
 ```
 
+## Overloaded callable returned by a generic factory
+
 An overloaded callable returned from a generic callable factory should still be assignable to the
 declared generic callable return type.
 
@@ -319,6 +323,40 @@ def singleton(flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[in
         return func
 
     return wrapper
+```
+
+## Multiple occurrences of a higher-order generic callable
+
+If a generic callable is used more than once in a higher-order call, each occurrence should get its
+own fresh typevars. In this example, the outer `partial` call receives a second, independent
+occurrence of `partial` as its first argument, and `drop` as its second argument.
+
+```py
+from typing import Callable, TypeVar
+
+A = TypeVar("A")
+B = TypeVar("B")
+C = TypeVar("C")
+X = TypeVar("X")
+Y = TypeVar("Y")
+
+def partial(c: Callable[[A, B], C], a: A) -> Callable[[B], C]:
+    def inner(b: B) -> C:
+        return c(a, b)
+    return inner
+
+def drop(x: X, y: Y) -> Y:
+    return y
+
+# TODO: revealed: Literal["x"]
+# We are correctly combining the constraint sets from both arguments of the outer
+# `partial(partial, drop)` call: one from passing `partial` as `c`, and one from passing `drop` as
+# `a`. However, we do that after having existentially quantified away the typevars from the generic
+# `partial` when it's used as an argument, so this remains `Unknown` even after generic callable
+# occurrences are freshened.
+reveal_type(partial(partial, drop)(1)("x"))  # revealed: Unknown
+# TODO: revealed: Literal[1]
+reveal_type(partial(partial, drop)("x")(1))  # revealed: Unknown
 ```
 
 ## SymPy one-import MRE scaffold (multi-file)

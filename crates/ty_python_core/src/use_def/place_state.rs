@@ -47,7 +47,7 @@ use ruff_index::newtype_index;
 use smallvec::{SmallVec, smallvec};
 
 use crate::ReachabilityConstraintsBuilder;
-use crate::narrowing_constraints::ScopedNarrowingConstraint;
+use crate::narrowing_constraints::{NarrowingConstraintsBuilder, ScopedNarrowingConstraint};
 use crate::reachability_constraints::ScopedReachabilityConstraintId;
 
 /// A newtype-index for a definition in a particular scope.
@@ -77,7 +77,7 @@ pub(super) struct Declarations {
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -85,10 +85,23 @@ pub(super) struct LiveDeclaration {
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
 
+/// What happens to any preexisting definitions when a new binding of the same place is added.
+/// `AreShadowed` is how normal assignments behave, but we model some features (loop headers,
+/// `nonlocal` writes from nested scopes) as "synthetic" bindings that don't shadow other bindings.
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum PreviousDefinitions {
     AreShadowed,
     AreKept,
+}
+
+/// What will happen to a definition if/when a when a new binding of the same place is added later.
+/// `ShadowThisOne` is how normal assignments behave, and it's also how some "synthetic" bindings
+/// behave (loop headers), but there are other synthetic bindings (nested `nonlocal` writes) that
+/// cannot be shadowed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum FutureDefinitions {
+    ShadowThisOne,
+    DontShadowThisOne,
 }
 
 impl PreviousDefinitions {
@@ -98,6 +111,26 @@ impl PreviousDefinitions {
 }
 
 impl Declarations {
+    pub(super) fn undeclared_reachability_constraint(
+        &self,
+    ) -> Option<ScopedReachabilityConstraintId> {
+        let [
+            LiveDeclaration {
+                declaration: ScopedDefinitionId::UNBOUND,
+                reachability_constraint,
+            },
+        ] = self.live_declarations.as_slice()
+        else {
+            return None;
+        };
+        Some(*reachability_constraint)
+    }
+
+    pub(super) fn is_always_undeclared(&self) -> bool {
+        self.undeclared_reachability_constraint()
+            == Some(ScopedReachabilityConstraintId::ALWAYS_TRUE)
+    }
+
     pub(super) fn undeclared(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
@@ -147,9 +180,8 @@ impl Declarations {
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_declarations` vec remains sorted. If a definition is found in both `a`
-        // and `b`, we compose the constraints from the two paths in an appropriate way
-        // (intersection for narrowing constraints; ternary OR for reachability constraints). If a
-        // definition is found in only one path, it is used as-is.
+        // and `b`, we combine its reachability constraints. If a definition is found in only one
+        // path, it is used as-is.
         let a = a.live_declarations.into_iter();
         let b = b.live_declarations.into_iter();
         for zipped in a.merge_join_by(b, |a, b| a.declaration.cmp(&b.declaration)) {
@@ -167,13 +199,6 @@ impl Declarations {
                     self.live_declarations.push(declaration);
                 }
             }
-        }
-    }
-
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        self.live_declarations.shrink_to_fit();
-        for declaration in &self.live_declarations {
-            reachability_constraints.mark_used(declaration.reachability_constraint);
         }
     }
 }
@@ -203,16 +228,31 @@ pub(super) struct Bindings {
 }
 
 impl Bindings {
+    pub(super) fn is_always_unbound(&self) -> bool {
+        let [binding] = self.live_bindings.as_slice() else {
+            return false;
+        };
+        self.unbound_narrowing_constraint.is_none()
+            && binding.binding() == ScopedDefinitionId::UNBOUND
+            && binding.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
+            && binding.reachability_constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE
+            && binding.can_be_shadowed() == FutureDefinitions::ShadowThisOne
+    }
+
     pub(super) fn unbound_narrowing_constraint(&self) -> ScopedNarrowingConstraint {
         self.unbound_narrowing_constraint
             .unwrap_or(self.live_bindings[0].narrowing_constraint)
     }
 
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
+    pub(super) fn finish(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
         self.live_bindings.shrink_to_fit();
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
-            reachability_constraints.mark_used(binding.narrowing_constraint);
+            narrowing_constraints.mark_used(binding.narrowing_constraint);
         }
     }
 }
@@ -220,14 +260,65 @@ impl Bindings {
 /// One of the live bindings for a single place at some point in control flow.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct LiveBinding {
-    binding: ScopedDefinitionId,
+    binding: PackedDefinitionId,
     narrowing_constraint: ScopedNarrowingConstraint,
     reachability_constraint: ScopedReachabilityConstraintId,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+struct PackedDefinitionId(u32);
+
+impl PackedDefinitionId {
+    // Scope-local definition IDs cannot practically use the high bit, so retain the shadowing
+    // policy there instead of adding a byte plus padding to every `LiveBinding`.
+    const DONT_SHADOW: u32 = 1 << 31;
+    const DEFINITION_MASK: u32 = !Self::DONT_SHADOW;
+
+    fn new(binding: ScopedDefinitionId, can_be_shadowed: FutureDefinitions) -> Self {
+        let binding = binding.as_u32();
+        assert_eq!(
+            binding & Self::DONT_SHADOW,
+            0,
+            "scopes cannot contain more than 2^31 definitions"
+        );
+        Self(
+            binding
+                | match can_be_shadowed {
+                    FutureDefinitions::ShadowThisOne => 0,
+                    FutureDefinitions::DontShadowThisOne => Self::DONT_SHADOW,
+                },
+        )
+    }
+
+    const fn definition(self) -> ScopedDefinitionId {
+        ScopedDefinitionId::from_u32(self.0 & Self::DEFINITION_MASK)
+    }
+
+    const fn can_be_shadowed(self) -> FutureDefinitions {
+        if self.0 & Self::DONT_SHADOW == 0 {
+            FutureDefinitions::ShadowThisOne
+        } else {
+            FutureDefinitions::DontShadowThisOne
+        }
+    }
+}
+
 impl LiveBinding {
+    fn new(
+        binding: ScopedDefinitionId,
+        narrowing_constraint: ScopedNarrowingConstraint,
+        reachability_constraint: ScopedReachabilityConstraintId,
+        can_be_shadowed: FutureDefinitions,
+    ) -> Self {
+        Self {
+            binding: PackedDefinitionId::new(binding, can_be_shadowed),
+            narrowing_constraint,
+            reachability_constraint,
+        }
+    }
+
     pub const fn binding(&self) -> ScopedDefinitionId {
-        self.binding
+        self.binding.definition()
     }
 
     pub const fn narrowing_constraint(&self) -> ScopedNarrowingConstraint {
@@ -237,17 +328,24 @@ impl LiveBinding {
     pub const fn reachability_constraint(&self) -> ScopedReachabilityConstraintId {
         self.reachability_constraint
     }
+
+    const fn can_be_shadowed(&self) -> FutureDefinitions {
+        self.binding.can_be_shadowed()
+    }
 }
+
+static_assertions::assert_eq_size!(LiveBinding, [u32; 3]);
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
 impl Bindings {
     pub(super) fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
-        let initial_binding = LiveBinding {
-            binding: ScopedDefinitionId::UNBOUND,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+        let initial_binding = LiveBinding::new(
+            ScopedDefinitionId::UNBOUND,
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-        };
+            FutureDefinitions::ShadowThisOne,
+        );
         Self {
             unbound_narrowing_constraint: None,
             live_bindings: smallvec![initial_binding],
@@ -262,33 +360,36 @@ impl Bindings {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
-        if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
+        if is_class_scope && is_place_name && self.live_bindings[0].binding().is_unbound() {
             self.unbound_narrowing_constraint = Some(self.live_bindings[0].narrowing_constraint);
         }
-        // The new binding replaces all previous live bindings in this path, and has no
-        // constraints.
+        // If the new binding is a shadowing type, it replaces previous live bindings in this path
+        // (unless they're marked as not shadowable), and has no constraints.
         if previous_definitions.are_shadowed() {
-            self.live_bindings.clear();
+            self.live_bindings
+                .retain(|b| b.can_be_shadowed() == FutureDefinitions::DontShadowThisOne);
         }
-        self.live_bindings.push(LiveBinding {
+        self.live_bindings.push(LiveBinding::new(
             binding,
-            narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
+            ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-        });
+            can_be_shadowed,
+        ));
     }
 
     /// Add given constraint to all live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
     ) {
         for binding in &mut self.live_bindings {
-            binding.narrowing_constraint = reachability_constraints
-                .add_and_constraint(binding.narrowing_constraint, constraint);
+            binding.narrowing_constraint =
+                narrowing_constraints.add_and_constraint(binding.narrowing_constraint, constraint);
         }
     }
 
@@ -309,9 +410,14 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
+    pub(super) fn as_slice(&self) -> &[LiveBinding] {
+        &self.live_bindings
+    }
+
     pub(super) fn merge(
         &mut self,
         b: Self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
         let a = std::mem::take(self);
@@ -320,34 +426,34 @@ impl Bindings {
             .unbound_narrowing_constraint
             .zip(b.unbound_narrowing_constraint)
         {
-            self.unbound_narrowing_constraint =
-                Some(reachability_constraints.add_or_constraint(a, b));
+            self.unbound_narrowing_constraint = Some(narrowing_constraints.add_or_constraint(a, b));
         }
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
-        // `b`, we compose the constraints from the two paths using ternary OR for both narrowing
-        // and reachability constraints. If a definition is found in only one path, it is used
-        // as-is.
+        // `b`, we combine its boolean narrowing constraints and its ternary reachability
+        // constraints. If a definition is found in only one path, it is used as-is.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
-        for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
+        for zipped in a.merge_join_by(b, |a, b| a.binding().cmp(&b.binding())) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
                     // If the same definition is visible through both paths, we OR the narrowing
                     // constraints: the type should be narrowed by whichever path was taken.
-                    let narrowing_constraint = reachability_constraints
+                    let narrowing_constraint = narrowing_constraints
                         .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
 
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
-                    self.live_bindings.push(LiveBinding {
-                        binding: a.binding,
+                    debug_assert_eq!(a.can_be_shadowed(), b.can_be_shadowed());
+                    self.live_bindings.push(LiveBinding::new(
+                        a.binding(),
                         narrowing_constraint,
                         reachability_constraint,
-                    });
+                        a.can_be_shadowed(),
+                    ));
                 }
 
                 EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
@@ -381,6 +487,7 @@ impl PlaceState {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
+        can_be_shadowed: FutureDefinitions,
     ) {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(
@@ -389,17 +496,36 @@ impl PlaceState {
             is_class_scope,
             is_place_name,
             previous_definitions,
+            can_be_shadowed,
         );
     }
 
     /// Add given constraint to all live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,
-        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         constraint: ScopedNarrowingConstraint,
     ) {
         self.bindings
-            .record_narrowing_constraint(reachability_constraints, constraint);
+            .record_narrowing_constraint(narrowing_constraints, constraint);
+    }
+
+    /// Add the given constraint to live bindings that were also present at an earlier use.
+    pub(super) fn record_narrowing_constraint_for_bindings_at_use(
+        &mut self,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
+        constraint: ScopedNarrowingConstraint,
+        bindings_at_use: &Bindings,
+    ) {
+        for binding in &mut self.bindings.live_bindings {
+            if bindings_at_use
+                .iter()
+                .any(|binding_at_use| binding_at_use.binding() == binding.binding())
+            {
+                binding.narrowing_constraint = narrowing_constraints
+                    .add_and_constraint(binding.narrowing_constraint, constraint);
+            }
+        }
     }
 
     /// Add given reachability constraint to all live bindings.
@@ -431,9 +557,11 @@ impl PlaceState {
     pub(super) fn merge(
         &mut self,
         b: PlaceState,
+        narrowing_constraints: &mut NarrowingConstraintsBuilder,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
-        self.bindings.merge(b.bindings, reachability_constraints);
+        self.bindings
+            .merge(b.bindings, narrowing_constraints, reachability_constraints);
         self.declarations
             .merge(b.declarations, reachability_constraints);
     }
@@ -446,9 +574,8 @@ impl PlaceState {
         &self.declarations
     }
 
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        self.declarations.finish(reachability_constraints);
-        self.bindings.finish(reachability_constraints);
+    pub(super) fn into_parts(self) -> (Bindings, Declarations) {
+        (self.bindings, self.declarations)
     }
 }
 
@@ -466,7 +593,7 @@ mod tests {
             .iter()
             .map(|live_binding| {
                 (
-                    live_binding.binding.as_u32(),
+                    live_binding.binding().as_u32(),
                     live_binding.narrowing_constraint,
                 )
             })
@@ -511,14 +638,61 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
 
         assert_bindings(&sym, &[(1, ScopedNarrowingConstraint::ALWAYS_TRUE)]);
     }
 
     #[test]
+    fn future_definitions_can_opt_out_of_shadowing() {
+        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(1),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreKept,
+            FutureDefinitions::DontShadowThisOne,
+        );
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(2),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
+        );
+
+        assert_bindings(
+            &sym,
+            &[
+                (1, ScopedNarrowingConstraint::ALWAYS_TRUE),
+                (2, ScopedNarrowingConstraint::ALWAYS_TRUE),
+            ],
+        );
+
+        sym.record_binding(
+            ScopedDefinitionId::from_u32(3),
+            ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            false,
+            true,
+            PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
+        );
+
+        assert_bindings(
+            &sym,
+            &[
+                (1, ScopedNarrowingConstraint::ALWAYS_TRUE),
+                (3, ScopedNarrowingConstraint::ALWAYS_TRUE),
+            ],
+        );
+    }
+
+    #[test]
     fn record_constraint() {
-        let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
@@ -526,15 +700,17 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        let atom = reachability_constraints.add_atom(ScopedPredicateId::new(0));
-        sym.record_narrowing_constraint(&mut reachability_constraints, atom);
+        let atom = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
+        sym.record_narrowing_constraint(&mut narrowing_constraints, atom);
 
         assert_bindings(&sym, &[(1, atom)]);
     }
 
     #[test]
     fn merge() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
 
         // merging the same definition with the same constraint keeps the constraint
@@ -545,9 +721,10 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        let atom0 = reachability_constraints.add_atom(ScopedPredicateId::new(0));
-        sym1a.record_narrowing_constraint(&mut reachability_constraints, atom0);
+        let atom0 = narrowing_constraints.add_atom(ScopedPredicateId::new(0));
+        sym1a.record_narrowing_constraint(&mut narrowing_constraints, atom0);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym1b.record_binding(
@@ -556,10 +733,15 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        sym1b.record_narrowing_constraint(&mut reachability_constraints, atom0);
+        sym1b.record_narrowing_constraint(&mut narrowing_constraints, atom0);
 
-        sym1a.merge(sym1b, &mut reachability_constraints);
+        sym1a.merge(
+            sym1b,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
         let mut sym1 = sym1a;
         // Same constraint on both sides → OR(atom0, atom0) = atom0
         assert_bindings(&sym1, &[(1, atom0)]);
@@ -572,9 +754,10 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        let atom1 = reachability_constraints.add_atom(ScopedPredicateId::new(1));
-        sym2a.record_narrowing_constraint(&mut reachability_constraints, atom1);
+        let atom1 = narrowing_constraints.add_atom(ScopedPredicateId::new(1));
+        sym2a.record_narrowing_constraint(&mut narrowing_constraints, atom1);
 
         let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym1b.record_binding(
@@ -583,11 +766,16 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        let atom2 = reachability_constraints.add_atom(ScopedPredicateId::new(2));
-        sym1b.record_narrowing_constraint(&mut reachability_constraints, atom2);
+        let atom2 = narrowing_constraints.add_atom(ScopedPredicateId::new(2));
+        sym1b.record_narrowing_constraint(&mut narrowing_constraints, atom2);
 
-        sym2a.merge(sym1b, &mut reachability_constraints);
+        sym2a.merge(
+            sym1b,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
         let sym2 = sym2a;
         // Different constraints: OR(atom1, atom2) produces a new TDD node (not a terminal)
         let merged_constraint = sym2.bindings().iter().next().unwrap().narrowing_constraint;
@@ -604,18 +792,23 @@ mod tests {
             false,
             true,
             PreviousDefinitions::AreShadowed,
+            FutureDefinitions::ShadowThisOne,
         );
-        let atom3 = reachability_constraints.add_atom(ScopedPredicateId::new(3));
-        sym3a.record_narrowing_constraint(&mut reachability_constraints, atom3);
+        let atom3 = narrowing_constraints.add_atom(ScopedPredicateId::new(3));
+        sym3a.record_narrowing_constraint(&mut narrowing_constraints, atom3);
 
         let sym2b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
-        sym3a.merge(sym2b, &mut reachability_constraints);
+        sym3a.merge(
+            sym2b,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
         let sym3 = sym3a;
         let bindings: Vec<_> = sym3
             .bindings()
             .iter()
-            .map(|b| (b.binding.as_u32(), b.narrowing_constraint))
+            .map(|b| (b.binding().as_u32(), b.narrowing_constraint))
             .collect();
         assert_eq!(bindings.len(), 2);
         assert_eq!(bindings[0].0, 0); // unbound
@@ -623,12 +816,16 @@ mod tests {
         assert_eq!(bindings[1].1, atom3);
 
         // merging different definitions keeps them each with their existing constraints
-        sym1.merge(sym3, &mut reachability_constraints);
+        sym1.merge(
+            sym3,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
         let sym = sym1;
         let bindings: Vec<_> = sym
             .bindings()
             .iter()
-            .map(|b| (b.binding.as_u32(), b.narrowing_constraint))
+            .map(|b| (b.binding().as_u32(), b.narrowing_constraint))
             .collect();
         assert_eq!(bindings.len(), 3);
         assert_eq!(bindings[0].0, 0); // unbound
@@ -673,6 +870,7 @@ mod tests {
 
     #[test]
     fn record_declaration_merge() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
         let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
@@ -686,13 +884,18 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
-        sym.merge(sym2, &mut reachability_constraints);
+        sym.merge(
+            sym2,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
 
         assert_declarations(&sym, &["1", "2"]);
     }
 
     #[test]
     fn record_declaration_merge_partial_undeclared() {
+        let mut narrowing_constraints = NarrowingConstraintsBuilder::default();
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
         let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
@@ -702,7 +905,11 @@ mod tests {
 
         let sym2 = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
-        sym.merge(sym2, &mut reachability_constraints);
+        sym.merge(
+            sym2,
+            &mut narrowing_constraints,
+            &mut reachability_constraints,
+        );
 
         assert_declarations(&sym, &["undeclared", "1"]);
     }

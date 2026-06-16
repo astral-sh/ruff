@@ -98,6 +98,7 @@ class Header:
         Python applications, but it can be set to \\r\\n to produce RFC-compliant
         line separators when needed.
         """
+
     __hash__: ClassVar[None]  # type: ignore[assignment]
     def __eq__(self, other: object) -> bool: ...
     def __ne__(self, value: object, /) -> bool: ...

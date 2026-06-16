@@ -10,8 +10,8 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
-use std::collections::BTreeMap;
 use std::slice::Iter;
+use std::sync::Arc;
 
 use itertools::{Either, EitherOrBoth, Itertools};
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -28,18 +28,15 @@ use crate::types::generics::{
 };
 use crate::types::infer::{TypeExpressionFlags, infer_deferred_types};
 use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker,
+    HasRelationToVisitor, IsDisjointVisitor, TypeRelation, TypeRelationChecker, TypeVarEvaluation,
 };
-use crate::types::typed_dict::{
-    UnpackedTypedDictKey, extract_unpacked_typed_dict_keys_from_kwargs_annotation,
-    extract_unpacked_typed_dict_keys_from_value_type,
-};
-use crate::types::typevar::BoundTypeVarIdentity;
+use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_kwargs_annotation;
+use crate::types::typevar::{BoundTypeVarIdentity, max_typevar_freshness_matching_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, ErrorContext,
     ErrorContextTree, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind,
-    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, UnionBuilder,
-    VarianceInferable, infer_complete_scope_types, todo_type,
+    ParamSpecAttrKind, ParameterDescription, SelfBinding, TypeContext, TypeMapping, TypeVarNonce,
+    TypedDictType, UnionBuilder, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -538,6 +535,7 @@ pub(crate) struct SignatureRelationKey<'db> {
     source_definition: Definition<'db>,
     target_definition: Definition<'db>,
     relation: TypeRelation,
+    typevar_evaluation: TypeVarEvaluation,
 }
 
 impl<'db> SignatureRelationKey<'db> {
@@ -545,11 +543,13 @@ impl<'db> SignatureRelationKey<'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
         relation: TypeRelation,
+        typevar_evaluation: TypeVarEvaluation,
     ) -> Option<Self> {
         Some(Self {
             source_definition: source.definition?,
             target_definition: target.definition?,
             relation,
+            typevar_evaluation,
         })
     }
 }
@@ -831,6 +831,65 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn freshen_bound_typevars(&self, db: &'db dyn Db, delta: u32) -> Self {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::FreshenBoundTypeVars {
+                generic_context,
+                delta,
+            },
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    pub(crate) fn max_typevar_freshness_matching_generic_context(
+        &self,
+        db: &'db dyn Db,
+        generic_context: GenericContext<'db>,
+    ) -> Option<TypeVarNonce> {
+        let mut max_freshness = None;
+        let mut update = |freshness| {
+            max_freshness = max_freshness.max(freshness);
+        };
+
+        if let Some(signature_generic_context) = self.generic_context {
+            for typevar in signature_generic_context.variables(db) {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    Type::TypeVar(typevar),
+                    generic_context,
+                ));
+            }
+        }
+
+        for param in &self.parameters {
+            update(max_typevar_freshness_matching_generic_context(
+                db,
+                param.annotated_type(),
+                generic_context,
+            ));
+            if let Some(default_ty) = param.default_type() {
+                update(max_typevar_freshness_matching_generic_context(
+                    db,
+                    default_ty,
+                    generic_context,
+                ));
+            }
+        }
+        update(max_typevar_freshness_matching_generic_context(
+            db,
+            self.return_ty,
+            generic_context,
+        ));
+
+        max_freshness
+    }
+
     pub(crate) fn find_legacy_typevars_impl(
         &self,
         db: &'db dyn Db,
@@ -868,11 +927,13 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         self_type: impl FnOnce() -> Option<Type<'db>>,
     ) {
-        if let Some(first_parameter) = self.parameters.value.first_mut()
+        if let Some(first_parameter) = self.parameters.data.value.first()
             && first_parameter.is_positional()
             && first_parameter.annotated_type.is_unknown()
             && first_parameter.inferred_annotation
             && let Some(self_type) = self_type()
+            && let Some(first_parameter) =
+                Arc::make_mut(&mut self.parameters.data).value.first_mut()
         {
             first_parameter.annotated_type = self_type;
 
@@ -1315,11 +1376,10 @@ impl<'db> Signature<'db> {
                 CallableTypeKind::ParamSpecValue,
                 CallableFunctionProvenance::None,
             ));
-            let param_spec_matches = ConstraintSet::constrain_typevar(
+            let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                 db,
                 constraints,
                 self_bound_typevar,
-                Type::Never,
                 upper,
             );
             let return_types_match = other
@@ -1387,14 +1447,11 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             tvar = typevar.typevar(db).name(db)
         );
 
-        let parameter_variance = |parameter: &Parameter<'db>| match parameter.form {
-            ParameterForm::Type => None,
-            ParameterForm::Value => Some(
-                parameter
-                    .annotated_type()
-                    .with_polarity(TypeVarVariance::Contravariant)
-                    .variance_of(db, typevar),
-            ),
+        let parameter_variance = |parameter: &Parameter<'db>| {
+            parameter
+                .annotated_type()
+                .with_polarity(TypeVarVariance::Contravariant)
+                .variance_of(db, typevar)
         };
 
         let parameter_variances = if let Some((prefix_parameters, paramspec)) =
@@ -1403,7 +1460,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
             Either::Left(
                 prefix_parameters
                     .iter()
-                    .filter_map(parameter_variance)
+                    .map(parameter_variance)
                     .chain(std::iter::once(
                         Type::TypeVar(paramspec)
                             .with_polarity(TypeVarVariance::Contravariant)
@@ -1411,7 +1468,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                     )),
             )
         } else {
-            Either::Right(self.parameters.iter().filter_map(parameter_variance))
+            Either::Right(self.parameters.iter().map(parameter_variance))
         };
 
         itertools::chain(
@@ -1528,7 +1585,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source_overloads: &[Signature<'db>],
         target_overloads: &[Signature<'db>],
     ) -> ConstraintSet<'db, 'c> {
-        if self.relation.is_constraint_set_assignability() {
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let source_is_single_paramspec =
                 CallableSignature::signatures_is_single_paramspec(source_overloads);
@@ -1558,11 +1615,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_tvar,
-                        Type::Never,
                         upper,
                     );
                     let return_types_match = || {
@@ -1611,12 +1667,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_tvar,
                         lower,
-                        Type::object(),
                     );
                     let return_types_match = || {
                         // TODO: Similar to how we do this for unions, we should collect error
@@ -1640,7 +1695,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         match (source_overloads, target_overloads) {
             ([source_signature], [target_signature]) => {
                 // Base case: both callable types contain a single signature.
-                if self.relation.is_constraint_set_assignability()
+                if self.typevar_evaluation == TypeVarEvaluation::Lazy
                     && (source_signature
                         .parameters
                         .as_paramspec_with_prefix()
@@ -1714,18 +1769,35 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         source: &Signature<'db>,
         target: &Signature<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        // If either signature is generic, their typevars should also be considered inferable when
-        // checking whether one signature is a subtype/etc of the other, since we only need to find
-        // one specialization that causes the check to succeed.
-        //
-        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
-        // callable refers to typevars from within the context that defines them. This primarily
-        // comes up when referring to a generic function recursively from within its body:
-        //
-        //     def identity[T](t: T) -> T:
-        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
-        //         # inferable, even though other uses of T in the function body are non-inferable.
-        //         return t
+        // If either signature is generic, freshen that signature's typevars before considering
+        // them inferable for this relation. The relation only needs to find one specialization of
+        // each generic callable that causes the check to succeed, but those callable-local
+        // specializations must not collide with any same-source typevars in the other signature.
+        let freshened_source;
+        let source = if source.generic_context != target.generic_context
+            && let Some(generic_context) = source.generic_context
+            && let Some(delta) = target
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_source = source.freshen_bound_typevars(db, delta);
+            &freshened_source
+        } else {
+            source
+        };
+
+        let freshened_target;
+        let target = if let Some(generic_context) = target.generic_context
+            && let Some(delta) = source
+                .max_typevar_freshness_matching_generic_context(db, generic_context)
+                .map(|freshness| freshness.increment().value())
+        {
+            freshened_target = target.freshen_bound_typevars(db, delta);
+            &freshened_target
+        } else {
+            target
+        };
+
         let source_inferable = source.inferable_typevars(db);
         let target_inferable = target.inferable_typevars(db);
         let inferable = source_inferable.merge(db, target_inferable);
@@ -1754,7 +1826,12 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
         target: &Signature<'db>,
         work: impl FnOnce() -> ConstraintSet<'db, 'c>,
     ) -> ConstraintSet<'db, 'c> {
-        let Some(key) = SignatureRelationKey::from_signatures(source, target, self.relation) else {
+        let Some(key) = SignatureRelationKey::from_signatures(
+            source,
+            target,
+            self.relation,
+            self.typevar_evaluation,
+        ) else {
             return work();
         };
 
@@ -1921,7 +1998,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 .is_never_satisfied(db)
         };
 
-        if self.relation.is_constraint_set_assignability() {
+        if self.typevar_evaluation == TypeVarEvaluation::Lazy {
             let source_paramspec = source.parameters.as_paramspec_with_prefix();
             let target_paramspec = target.parameters.as_paramspec_with_prefix();
 
@@ -1964,12 +2041,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
                     return result;
@@ -1995,11 +2071,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2118,13 +2193,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            target_bound_typevar,
-                            lower,
-                            Type::object(),
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_lower_bound(
+                                db,
+                                self.constraints,
+                                target_bound_typevar,
+                                lower,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else if let Some(target_param) = target_params.next() {
                         let upper = Type::Callable(CallableType::new(
@@ -2143,13 +2218,13 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                             CallableTypeKind::ParamSpecValue,
                             CallableFunctionProvenance::None,
                         ));
-                        let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
-                            db,
-                            self.constraints,
-                            source_bound_typevar,
-                            Type::Never,
-                            upper,
-                        );
+                        let param_spec_prefix_matches =
+                            ConstraintSet::constrain_typevar_upper_bound(
+                                db,
+                                self.constraints,
+                                source_bound_typevar,
+                                upper,
+                            );
                         result.intersect(db, self.constraints, param_spec_prefix_matches);
                     } else {
                         // When the prefixes match exactly, we just relate the remaining tails.
@@ -2178,12 +2253,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
                     return result;
@@ -2316,12 +2390,11 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_lower_bound(
                         db,
                         self.constraints,
                         target_bound_typevar,
                         lower,
-                        Type::object(),
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
 
@@ -2341,11 +2414,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_matches);
@@ -2451,11 +2523,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         CallableTypeKind::ParamSpecValue,
                         CallableFunctionProvenance::None,
                     ));
-                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar(
+                    let param_spec_prefix_matches = ConstraintSet::constrain_typevar_upper_bound(
                         db,
                         self.constraints,
                         source_bound_typevar,
-                        Type::Never,
                         upper,
                     );
                     result.intersect(db, self.constraints, param_spec_prefix_matches);
@@ -2507,9 +2578,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.value[..source.parameters.len().saturating_sub(2)];
+                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
                     let target_prefix_params =
-                        &target.parameters.value[..target.parameters.len().saturating_sub(2)];
+                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
 
                     for (target_index, (source_param, target_param)) in source_prefix_params
                         .iter()
@@ -2534,7 +2605,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Standard,
                 ) => {
                     let source_prefix_params =
-                        &source.parameters.value[..source.parameters.len().saturating_sub(2)];
+                        &source.parameters.as_slice()[..source.parameters.len().saturating_sub(2)];
 
                     for (target_index, param) in source_prefix_params
                         .iter()
@@ -2590,7 +2661,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     ParametersKind::Concatenate(ConcatenateTail::Gradual),
                 ) => {
                     let target_prefix_params =
-                        &target.parameters.value[..target.parameters.len().saturating_sub(2)];
+                        &target.parameters.as_slice()[..target.parameters.len().saturating_sub(2)];
 
                     let mut parameters = ParametersZip {
                         current_source: None,
@@ -2685,7 +2756,7 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                         source.parameters.is_gradual() && target.parameters.is_gradual(),
                     ),
                 ),
-                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
+                TypeRelation::Assignability => result,
             };
         }
 
@@ -3033,6 +3104,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         // If there are still unmatched keyword parameters from `source`, then they should be
         // optional otherwise the subtype relation is invalid.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "any required unmatched keyword parameter makes the relation invalid"
+        )]
         for (_, source_param) in source_keywords {
             if source_param.default_type().is_none() {
                 return self.never();
@@ -3105,7 +3180,7 @@ pub(crate) enum ParametersKind<'db> {
 /// proper. For example, even if this represents a `Gradual` form, the `value` field should still
 /// contain the `*args: Any` and `**kwargs: Any` parameter. A `**kwargs: Unpack[TypedDict]`
 /// parameter is normalized to the keyword-only parameters exposed to callers plus a possible
-/// trailing `**kwargs` parameter for the extra items accepted by open `TypedDict`s.
+/// trailing `**kwargs` parameter for explicit extra items or an open `TypedDict`.
 ///
 /// The `kind` field is used to indicate the specific form of the parameter list which can,
 /// optionally, include additional information such as the bound `ParamSpec` type variable.
@@ -3113,21 +3188,35 @@ pub(crate) enum ParametersKind<'db> {
 // between the `value` and `kind` field, it would be better to structure it such that these
 // invariants are followed at the type level instead.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
+struct ParametersData<'db> {
     // TODO: use SmallVec here once invariance bug is fixed
-    value: Vec<Parameter<'db>>,
+    value: Box<[Parameter<'db>]>,
     kind: ParametersKind<'db>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Parameters<'db> {
+    data: Arc<ParametersData<'db>>,
+}
+
 impl<'db> Parameters<'db> {
+    fn from_parts(value: impl Into<Box<[Parameter<'db>]>>, kind: ParametersKind<'db>) -> Self {
+        Self {
+            data: Arc::new(ParametersData {
+                value: value.into(),
+                kind,
+            }),
+        }
+    }
+
     /// Create a new parameter list from an iterator of parameters.
     ///
     /// The kind of the parameter list is determined based on the provided parameters. Specifically,
     /// if the parameter list contains `*args` and `**kwargs`, then it checks their annotated types
     /// and the presence of other parameter kinds to determine if they represent a gradual form, a
     /// `ParamSpec`, or a `Concatenate` form. `**kwargs: Unpack[TypedDict]` is normalized here by
-    /// synthesizing keyword-only parameters for the unpacked keys and keeping a trailing
-    /// `**kwargs` parameter for extra items on open `TypedDict`s.
+    /// synthesizing keyword-only parameters for the unpacked keys and a possible trailing
+    /// `**kwargs` parameter for explicit extra items or an open `TypedDict`.
     pub(crate) fn new(
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
@@ -3136,13 +3225,13 @@ impl<'db> Parameters<'db> {
         let mut value: Vec<Parameter<'db>> = Vec::with_capacity(parameters.size_hint().0);
 
         for parameter in parameters {
-            if let Some(unpacked_keys) = parameter.unpacked_typed_dict_keys(db) {
+            if let Some(unpacked_typed_dict) = parameter.unpacked_typed_dict(db) {
                 let kwargs_name = parameter
                     .name()
                     .expect("keyword variadic parameter always has a name")
                     .clone();
 
-                for (name, unpacked_key) in unpacked_keys {
+                for (name, field) in unpacked_typed_dict.items(db) {
                     if value
                         .iter()
                         .any(|existing| existing.callable_by_name(name.as_str()))
@@ -3151,20 +3240,22 @@ impl<'db> Parameters<'db> {
                     }
 
                     value.push(
-                        Parameter::keyword_only(name)
-                            .with_annotated_type(unpacked_key.value_ty)
+                        Parameter::keyword_only(name.clone())
+                            .with_annotated_type(field.declared_ty)
                             .with_optional_default_type(
-                                (!unpacked_key.is_required).then_some(Type::unknown()),
+                                (!field.is_required()).then_some(Type::unknown()),
                             )
-                            .with_definition(unpacked_key.definition),
+                            .with_definition(field.first_declaration()),
                     );
                 }
 
-                // TODO: Use the unpacked `TypedDict`'s `extra_items` type instead of `object`.
-                // TODO: Omit `**kwargs` here for closed `TypedDict`s.
-                value.push(
-                    Parameter::keyword_variadic(kwargs_name).with_annotated_type(Type::object()),
-                );
+                if let Some(extra_items) = unpacked_typed_dict.openness(db).effective_extra_items()
+                {
+                    value.push(
+                        Parameter::keyword_variadic(kwargs_name)
+                            .with_annotated_type(extra_items.declared_ty),
+                    );
+                }
             } else {
                 value.push(parameter);
             }
@@ -3245,44 +3336,39 @@ impl<'db> Parameters<'db> {
             }
         }
 
-        value.shrink_to_fit();
-
-        Parameters { value, kind }
+        Self::from_parts(value, kind)
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
-        Self {
-            value: Vec::new(),
-            kind: ParametersKind::Standard,
-        }
+        Self::from_parts(Box::default(), ParametersKind::Standard)
     }
 
     pub(crate) fn as_slice(&self) -> &[Parameter<'db>] {
-        self.value.as_slice()
+        &self.data.value
     }
 
-    pub(crate) const fn kind(&self) -> ParametersKind<'db> {
-        self.kind
+    pub(crate) fn kind(&self) -> ParametersKind<'db> {
+        self.data.kind
     }
 
     /// Returns `true` if the parameters represent a gradual form using `...` as the only parameter
     /// or a `Concatenate` form with `...` as the last argument.
-    pub(crate) const fn is_gradual(&self) -> bool {
+    pub(crate) fn is_gradual(&self) -> bool {
         matches!(
-            self.kind,
+            self.data.kind,
             ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
         )
     }
 
-    pub(crate) const fn is_top(&self) -> bool {
-        matches!(self.kind, ParametersKind::Top)
+    pub(crate) fn is_top(&self) -> bool {
+        matches!(self.data.kind, ParametersKind::Top)
     }
 
     /// Returns `true` if the parameters are a standard parameter list (not gradual, top,
     /// `ParamSpec`, or `Concatenate`).
-    pub(crate) const fn is_standard(&self) -> bool {
-        matches!(self.kind, ParametersKind::Standard)
+    pub(crate) fn is_standard(&self) -> bool {
+        matches!(self.data.kind, ParametersKind::Standard)
     }
 
     /// Returns the bound `ParamSpec` type variable if the parameter list is exactly `P`.
@@ -3290,8 +3376,8 @@ impl<'db> Parameters<'db> {
     /// For either `P` or `Concatenate[<prefix-params>, P]`, use [`as_paramspec_with_prefix`].
     ///
     /// [`as_paramspec_with_prefix`]: Self::as_paramspec_with_prefix
-    pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
-        match self.kind {
+    pub(crate) fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
+        match self.data.kind {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
             _ => None,
         }
@@ -3306,26 +3392,27 @@ impl<'db> Parameters<'db> {
     pub(crate) fn as_paramspec_with_prefix<'a>(
         &'a self,
     ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
-        match self.kind {
+        match self.data.kind {
             ParametersKind::ParamSpec(typevar) => Some((&[], typevar)),
-            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => {
-                Some((&self.value[..self.value.len().saturating_sub(2)], typevar))
-            }
+            ParametersKind::Concatenate(ConcatenateTail::ParamSpec(typevar)) => Some((
+                &self.data.value[..self.data.value.len().saturating_sub(2)],
+                typevar,
+            )),
             _ => None,
         }
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
     pub(crate) fn todo() -> Self {
-        Self {
-            value: vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(todo_type!("todo signature *args")),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     /// Return parameters that represents a gradual form using `...` as the only parameter.
@@ -3334,20 +3421,20 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
-        Self {
-            value: vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
-        Self {
-            value: vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
                     typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
                 )),
@@ -3355,8 +3442,8 @@ impl<'db> Parameters<'db> {
                     Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
                 ),
             ],
-            kind: ParametersKind::ParamSpec(typevar),
-        }
+            ParametersKind::ParamSpec(typevar),
+        )
     }
 
     /// Create a parameter list representing a `Concatenate` form with the given prefix parameters
@@ -3382,10 +3469,7 @@ impl<'db> Parameters<'db> {
             Parameter::keyword_variadic(Name::new_static("kwargs"))
                 .with_annotated_type(kwargs_type),
         ]);
-        Self {
-            value: prefix_params,
-            kind: ParametersKind::Concatenate(concatenate_tail),
-        }
+        Self::from_parts(prefix_params, ParametersKind::Concatenate(concatenate_tail))
     }
 
     /// Return parameters that represents an unknown list of parameters.
@@ -3395,28 +3479,28 @@ impl<'db> Parameters<'db> {
     ///
     /// [`Unknown`]: crate::types::DynamicType::Unknown
     pub(crate) fn unknown() -> Self {
-        Self {
-            value: vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            kind: ParametersKind::Gradual,
-        }
+            ParametersKind::Gradual,
+        )
     }
 
     /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
     /// (accepts any call, so subtype of all other signatures.)
     pub(crate) fn bottom() -> Self {
-        Self {
-            value: vec![
+        Self::from_parts(
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            kind: ParametersKind::Standard,
-        }
+            ParametersKind::Standard,
+        )
     }
 
     /// Return the "top" parameters (infinite union of all possible parameters), which cannot
@@ -3425,17 +3509,17 @@ impl<'db> Parameters<'db> {
     /// and still accepts the empty call `()`; it has to be represented instead as a special
     /// `ParametersKind`.
     pub(crate) fn top() -> Self {
-        Self {
+        Self::from_parts(
             // We always emit `called-top-callable` for any call to the top callable (based on the
             // `kind` below), so we otherwise give it the most permissive signature`(*object,
             // **object)`, so that we avoid emitting any other errors about arity mismatches.
-            value: vec![
+            [
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            kind: ParametersKind::Top,
-        }
+            ParametersKind::Top,
+        )
     }
 
     fn from_parameters(
@@ -3563,7 +3647,7 @@ impl<'db> Parameters<'db> {
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
             && matches!(
-                self.kind,
+                self.data.kind,
                 ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
             )
         {
@@ -3582,22 +3666,21 @@ impl<'db> Parameters<'db> {
         // Parameters are in contravariant position, so we need to flip the type mapping.
         let type_mapping = type_mapping.flip();
 
-        Self {
-            value: self
-                .value
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
-                .collect(),
-            kind: self.kind,
-        }
-    }
+        let value: Box<[_]> = self
+            .data
+            .value
+            .iter()
+            .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+            .collect();
 
+        Self::from_parts(value, self.data.kind)
+    }
     pub(crate) fn len(&self) -> usize {
-        self.value.len()
+        self.data.value.len()
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Parameter<'db>> {
-        self.value.iter()
+        self.data.value.iter()
     }
 
     /// Iterate initial positional parameters, not including variadic parameter, if any.
@@ -3611,7 +3694,7 @@ impl<'db> Parameters<'db> {
 
     /// Return parameter at given index, or `None` if index is out-of-range.
     pub(crate) fn get(&self, index: usize) -> Option<&Parameter<'db>> {
-        self.value.get(index)
+        self.data.value.get(index)
     }
 
     /// Return positional parameter at given index, or `None` if `index` is out of range.
@@ -3709,9 +3792,9 @@ impl<'db> Parameters<'db> {
         };
 
         let mut expanded = Vec::with_capacity(self.len());
-        expanded.extend_from_slice(&self.value[..variadic_index]);
+        expanded.extend_from_slice(&self.data.value[..variadic_index]);
         expanded.extend_from_slice(mapped_signature.parameters().as_slice());
-        expanded.extend_from_slice(&self.value[variadic_index + 2..]);
+        expanded.extend_from_slice(&self.data.value[variadic_index + 2..]);
         Parameters::new(db, expanded)
     }
 }
@@ -3721,7 +3804,7 @@ impl<'db, 'a> IntoIterator for &'a Parameters<'db> {
     type IntoIter = std::slice::Iter<'a, Parameter<'db>>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.value.iter()
+        self.data.value.iter()
     }
 }
 
@@ -3729,7 +3812,7 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
     type Output = Parameter<'db>;
 
     fn index(&self, index: usize) -> &Self::Output {
-        &self.value[index]
+        &self.data.value[index]
     }
 }
 
@@ -3757,7 +3840,6 @@ pub(crate) struct Parameter<'db> {
     annotation_kind: ParameterAnnotationKind,
 
     kind: ParameterKind<'db>,
-    pub(crate) form: ParameterForm,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -3788,7 +3870,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3802,7 +3883,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3813,7 +3893,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::Variadic { name },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3827,7 +3906,6 @@ impl<'db> Parameter<'db> {
                 name,
                 default_type: None,
             },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3838,7 +3916,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: true,
             annotation_kind: ParameterAnnotationKind::Normal,
             kind: ParameterKind::KeywordVariadic { name },
-            form: ParameterForm::Value,
         }
     }
 
@@ -3876,11 +3953,6 @@ impl<'db> Parameter<'db> {
         self
     }
 
-    pub(crate) fn type_form(mut self) -> Self {
-        self.form = ParameterForm::Type;
-        self
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,
@@ -3901,7 +3973,6 @@ impl<'db> Parameter<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
-            form: self.form,
         }
     }
 
@@ -3918,7 +3989,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: self.inferred_annotation,
             annotation_kind: self.annotation_kind,
             kind,
-            form: self.form,
         }
     }
 
@@ -3934,7 +4004,6 @@ impl<'db> Parameter<'db> {
             annotation_kind,
             inferred_annotation,
             kind,
-            form,
         } = self;
 
         let annotated_type = if nested {
@@ -3995,7 +4064,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: *inferred_annotation,
             annotation_kind: *annotation_kind,
             kind,
-            form: *form,
         })
     }
 
@@ -4037,10 +4105,9 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type,
             definition,
-            kind,
-            annotation_kind,
-            form: ParameterForm::Value,
             inferred_annotation,
+            annotation_kind,
+            kind,
         }
     }
 
@@ -4094,18 +4161,13 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Returns the unpacked `TypedDict` keys if this is a `**kwargs: Unpack[TypedDict]`
-    /// parameter.
-    pub(crate) fn unpacked_typed_dict_keys(
-        &self,
-        db: &'db dyn Db,
-    ) -> Option<BTreeMap<Name, UnpackedTypedDictKey<'db>>> {
+    fn unpacked_typed_dict(&self, db: &'db dyn Db) -> Option<TypedDictType<'db>> {
         (self.is_keyword_variadic()
             && matches!(
                 self.annotation_kind,
                 ParameterAnnotationKind::UnpackedTypedDictKwargs
             ))
-        .then(|| extract_unpacked_typed_dict_keys_from_value_type(db, self.annotated_type))
+        .then(|| self.annotated_type.resolve_type_alias(db).as_typed_dict())
         .flatten()
     }
 
@@ -4306,13 +4368,6 @@ impl<'db> ParameterKind<'db> {
     }
 }
 
-/// Whether a parameter is used as a value or a type form.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub(crate) enum ParameterForm {
-    Value,
-    Type,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -4335,7 +4390,6 @@ mod tests {
         assert_eq!(
             signature
                 .parameters
-                .value
                 .iter()
                 .map(ParameterWithoutDefinition::from)
                 .collect::<Vec<_>>(),
@@ -4352,7 +4406,6 @@ mod tests {
         annotation_kind: ParameterAnnotationKind,
         inferred_annotation: bool,
         kind: &'a ParameterKind<'db>,
-        form: ParameterForm,
     }
 
     impl<'a, 'db> From<&'a Parameter<'db>> for ParameterWithoutDefinition<'a, 'db> {
@@ -4363,7 +4416,6 @@ mod tests {
                 annotation_kind,
                 inferred_annotation,
                 kind,
-                form,
             } = parameter;
 
             Self {
@@ -4371,14 +4423,13 @@ mod tests {
                 annotation_kind: *annotation_kind,
                 inferred_annotation: *inferred_annotation,
                 kind,
-                form: *form,
             }
         }
     }
 
     #[track_caller]
     fn assert_params_have_definitions(signature: &Signature<'_>) {
-        for parameter in &signature.parameters.value {
+        for parameter in &signature.parameters {
             assert!(
                 parameter.definition().is_some(),
                 "source-backed parameter should have a definition"
@@ -4480,7 +4531,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -4518,7 +4569,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected one positional-or-keyword parameter");
         };
@@ -4561,7 +4612,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected two positional-or-keyword parameters");
         };
@@ -4605,7 +4656,7 @@ mod tests {
                 kind: ParameterKind::PositionalOrKeyword { name: b_name, .. },
                 ..
             },
-        ] = &sig.parameters.value[..]
+        ] = sig.parameters.as_slice()
         else {
             panic!("expected two positional-or-keyword parameters");
         };

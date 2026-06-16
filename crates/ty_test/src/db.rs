@@ -4,8 +4,8 @@ use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_db::files::{File, Files};
 use ruff_db::system::{
-    CaseSensitivity, DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath,
-    SystemPathBuf, WhichResult, WritableSystem,
+    DbWithWritableSystem, InMemorySystem, OsSystem, System, SystemPath, SystemPathBuf, WhichResult,
+    WritableSystem,
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
@@ -247,8 +247,8 @@ fn mdtest_rule_selection(rules: Option<&Rules>) -> RuleSelection {
     // are ignored by default in mdtests so that their behaviour is covered alongside the default
     // rules.
     //
-    // `missing-override-decorator` is an exception: because it is extremely pedantic we have chosen
-    // to keep it opt-in to minimize churn in unrelated tests.
+    // `missing-override-decorator` is an exception: because it is extremely pedantic we have
+    // chosen to keep it opt-in to minimize churn in unrelated tests.
     let missing_override_decorator = registry
         .get("missing-override-decorator")
         .expect("missing-override-decorator is a known lint rule");
@@ -372,6 +372,15 @@ impl System for MdtestSystem {
         }
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        self.as_system()
+            .is_same_file(&self.normalize_path(first), &self.normalize_path(second))
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.as_system().read_to_string(&self.normalize_path(path))
     }
@@ -393,15 +402,6 @@ impl System for MdtestSystem {
         path: &ruff_db::system::SystemVirtualPath,
     ) -> Result<Notebook, NotebookError> {
         self.as_system().read_virtual_path_to_notebook(path)
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, prefix: &SystemPath) -> bool {
-        self.as_system()
-            .path_exists_case_sensitive(&self.normalize_path(path), &self.normalize_path(prefix))
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        self.as_system().case_sensitivity()
     }
 
     fn which(&self, name: &str) -> WhichResult {

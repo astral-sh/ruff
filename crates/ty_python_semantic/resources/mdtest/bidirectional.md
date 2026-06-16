@@ -16,7 +16,7 @@ python-version = "3.12"
 ## Propagating target type annotation
 
 ```py
-from typing import AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
+from typing import Any, AsyncGenerator, AsyncIterable, Generator, Iterable, Literal
 
 def list1[T](x: T) -> list[T]:
     return [x]
@@ -86,6 +86,39 @@ reveal_type(x)  # revealed: list[int]
 
 x: list[list[int]] = [[1], [2], *([3], [4])]
 reveal_type(x)  # revealed: list[list[int]]
+
+type IntDict = dict[str, int]
+
+unique: set[int] = {1, 2, 3}
+reveal_type(unique)  # revealed: set[int]
+
+mapping: dict[str, int] = {"a": 1, **{"b": 2}}
+reveal_type(mapping)  # revealed: dict[str, int]
+
+def dynamic_mapping() -> Any: ...
+
+dynamic_unpack: dict[str, int] = reveal_type({**dynamic_mapping()})  # revealed: dict[str | Any, int | Any]
+
+alias_mapping: IntDict = {"a": 1}
+reveal_type(alias_mapping)  # revealed: dict[str, int]
+
+optional_mapping: dict[str, int] | None = {"a": 1}
+reveal_type(optional_mapping)  # revealed: dict[str, int]
+
+either: list[int] | list[str] = [1]
+reveal_type(either)  # revealed: list[int]
+
+# A protocol context is not an exact nominal collection context and must use the general path.
+iterable: Iterable[int] = [1]
+reveal_type(iterable)  # revealed: list[int]
+
+bad_list: list[str] = [1]  # error: [invalid-assignment]
+bad_dict: dict[str, int] = {"a": "bad"}  # error: [invalid-assignment]
+
+bad_nested_list: list[list[list[str]]] = [[[1]]]  # error: [invalid-assignment]
+
+# error: [invalid-argument-type] "Argument expression after ** must be a mapping type"
+bad_unpack: dict[str, int] = {**42}
 
 x: list[list[int | str]] = [[1], [2]] * 3
 reveal_type(x)  # revealed: list[list[int | str]]
@@ -222,7 +255,9 @@ d8_mapping_fallback: TypedDictOrMapping = {1: 5.2}
 # error: [missing-typed-dict-key]
 # error: [invalid-key]
 d9_invalid_mapping_key: TypedDictOrMapping = {"y": 5.2}
-d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}  # error: [missing-typed-dict-key]
+# error: [missing-typed-dict-key]
+# error: [invalid-key]
+d10_invalid_mapping_value: TypedDictOrMapping = {1: "bad"}
 
 def takes_td_or_iterable(value: TD | Iterable[int]) -> None:
     pass
@@ -561,6 +596,99 @@ def _(flag: bool):
 
     x2: list[int | None] = f(1) if flag else f(2)
     reveal_type(x2)  # revealed: list[int | None]
+```
+
+## Peer type context for collection literals
+
+When a boolean or conditional expression combines a fresh collection literal with another operand,
+the other operand can provide type context for the literal:
+
+```py
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Literal, TypedDict, reveal_type
+
+type Key = Literal["foo", "bar"]
+
+class Payload(TypedDict):
+    required: int
+
+def from_or(values: list[str] | None) -> None:
+    for value in reveal_type(values or []):  # revealed: list[str]
+        reveal_type(value)  # revealed: str
+
+def from_and(values: list[str]) -> None:
+    reveal_type(values and [])  # revealed: list[str]
+
+def chained_or(first: list[int], second: list[str]) -> None:
+    for value in first or second or []:
+        reveal_type(value)  # revealed: int | str
+
+def from_conditional(values: set[str], allowed: set[str] | None) -> None:
+    filtered = reveal_type(
+        sorted(value for value in values if value not in allowed)  # revealed: list[str]
+        if allowed is not None
+        else []
+    )
+    for value in filtered:
+        reveal_type(value)  # revealed: str
+
+def collection_literal_first(values: list[str], flag: bool) -> None:
+    reveal_type([] if flag else values)  # revealed: list[str]
+
+def non_empty_dict_fallback(values: dict[Key, int] | None) -> None:
+    reveal_type(values or {"foo": 0})  # revealed: dict[Literal["foo", "bar"], int]
+
+def non_empty_set_fallback(values: set[Key] | None) -> None:
+    reveal_type(values or {"foo"})  # revealed: set[Literal["foo", "bar"]]
+
+def preserve_generic[T](value: T) -> T:
+    return value
+
+def preserve_partially_specialized[T](value: list[T | int]) -> list[T | int]:
+    return value
+
+def generic_type_context(values: list[int | str] | None) -> None:
+    reveal_type(preserve_generic(values or []))  # revealed: list[int | str]
+    reveal_type(preserve_partially_specialized(values or []))  # revealed: list[Unknown | int]
+
+def widened_non_empty_fallback(values: list[int] | None) -> None:
+    result = values or ["x"]
+    reveal_type(result)  # revealed: (list[int] & ~AlwaysFalsy) | list[int | str]
+
+def incompatible_collection_kind(values: set[str] | None) -> None:
+    reveal_type(values or [1])  # revealed: (set[str] & ~AlwaysFalsy) | list[int]
+
+def typed_dict_peer_is_only_a_hint(value: Payload | None, flag: bool) -> None:
+    value or {}
+    {} if flag else value
+    value or {"other": 1}
+
+def stored_literal_is_not_fresh(values: dict[Key, int] | None) -> None:
+    fallback = {"foo": 0}
+    reveal_type(fallback)  # revealed: dict[str, int]
+    result = values or fallback
+    reveal_type(result)  # revealed: (dict[Key, int] & ~AlwaysFalsy) | dict[str, int]
+
+@dataclass
+class SortParams[F]:
+    field: F
+    direction: Literal["asc", "desc"] = "desc"
+
+def build_sort_spec[T](
+    sort_params: SortParams[T] | None,
+) -> dict[T, Literal[1, -1]] | None:
+    if not sort_params:
+        return None
+    return {sort_params.field: 1}
+
+type Path = Literal["name", "age", "created"]
+
+def use_sort(value: Mapping[Path, Literal[1, -1]]) -> None: ...
+
+params: SortParams[Path] | None = None
+sort = build_sort_spec(params) or {"name": -1}
+use_sort(sort)
 ```
 
 ## Lambda expressions
@@ -904,6 +1032,28 @@ reveal_type(x14)  # revealed: list[Divergent]
 reveal_type(x15)  # revealed: list[Divergent]
 ```
 
+Collection-use constraints must converge when multiple collection literals are used in a container
+literal. This is a regression test for <https://github.com/astral-sh/ty/issues/3778>.
+
+```py
+from typing import Any
+
+def run(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    return [a.get("x", 0), b.get("x", 0)]
+
+def assigned(cond: bool, d: dict[Any, Any]) -> list[Any]:
+    a = {}
+    b = {}
+    if cond:
+        b = d
+    result: list[Any] = [a.get("x", 0), b.get("x", 0)]
+    return result
+```
+
 ```py
 def _(i):
     x16 = []
@@ -962,6 +1112,20 @@ def _(flag: bool):
 
     # TODO: This should reveal `list[int]`.
     reveal_type(x22)  # revealed: list[Unknown]
+```
+
+```py
+x23 = [None, None, None]
+x23[0] = 1
+x23[1] = "2"
+x23[2] = 3.0
+reveal_type(x23)  # revealed: list[int | str | float | None]
+```
+
+```py
+x24 = {"a": 1}
+x24[1] = "b"
+reveal_type(x24)  # revealed: dict[int | str, str | int]
 ```
 
 ## Multi-inference diagnostics

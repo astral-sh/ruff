@@ -8,7 +8,7 @@ input_file: crates/ruff_python_parser/resources/inline/err/type_parameter_defaul
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..89,
+        range: 0..114,
         body: [
             ClassDef(
                 StmtClassDef {
@@ -176,30 +176,29 @@ Module(
                     ],
                 },
             ),
-            TypeAlias(
-                StmtTypeAlias {
+            FunctionDef(
+                StmtFunctionDef {
                     node_index: NodeIndex(None),
-                    range: 60..88,
-                    name: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 65..70,
-                            id: Name("Alias"),
-                            ctx: Store,
-                        },
-                    ),
+                    range: 60..84,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 64..65,
+                        node_index: NodeIndex(None),
+                    },
                     type_params: Some(
                         TypeParams {
-                            range: 70..82,
+                            range: 65..77,
                             node_index: NodeIndex(None),
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
                                         node_index: NodeIndex(None),
-                                        range: 71..78,
+                                        range: 66..73,
                                         name: Identifier {
                                             id: Name("T"),
-                                            range: 71..72,
+                                            range: 66..67,
                                             node_index: NodeIndex(None),
                                         },
                                         bound: None,
@@ -207,7 +206,7 @@ Module(
                                             Name(
                                                 ExprName {
                                                     node_index: NodeIndex(None),
-                                                    range: 75..78,
+                                                    range: 70..73,
                                                     id: Name("int"),
                                                     ctx: Load,
                                                 },
@@ -218,10 +217,91 @@ Module(
                                 TypeVar(
                                     TypeParamTypeVar {
                                         node_index: NodeIndex(None),
-                                        range: 80..81,
+                                        range: 75..76,
                                         name: Identifier {
                                             id: Name("U"),
-                                            range: 80..81,
+                                            range: 75..76,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: None,
+                                    },
+                                ),
+                            ],
+                        },
+                    ),
+                    parameters: Parameters {
+                        range: 77..79,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 81..84,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 81..84,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+            TypeAlias(
+                StmtTypeAlias {
+                    node_index: NodeIndex(None),
+                    range: 85..113,
+                    name: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 90..95,
+                            id: Name("Alias"),
+                            ctx: Store,
+                        },
+                    ),
+                    type_params: Some(
+                        TypeParams {
+                            range: 95..107,
+                            node_index: NodeIndex(None),
+                            type_params: [
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 96..103,
+                                        name: Identifier {
+                                            id: Name("T"),
+                                            range: 96..97,
+                                            node_index: NodeIndex(None),
+                                        },
+                                        bound: None,
+                                        default: Some(
+                                            Name(
+                                                ExprName {
+                                                    node_index: NodeIndex(None),
+                                                    range: 100..103,
+                                                    id: Name("int"),
+                                                    ctx: Load,
+                                                },
+                                            ),
+                                        ),
+                                    },
+                                ),
+                                TypeVar(
+                                    TypeParamTypeVar {
+                                        node_index: NodeIndex(None),
+                                        range: 105..106,
+                                        name: Identifier {
+                                            id: Name("U"),
+                                            range: 105..106,
                                             node_index: NodeIndex(None),
                                         },
                                         bound: None,
@@ -234,7 +314,7 @@ Module(
                     value: EllipsisLiteral(
                         ExprEllipsisLiteral {
                             node_index: NodeIndex(None),
-                            range: 85..88,
+                            range: 110..113,
                         },
                     ),
                 },
@@ -249,7 +329,7 @@ Module(
 1 | class C[T = int, U]: ...
   |                  ^ Syntax Error: non default type parameter `U` follows default type parameter
 2 | class C[T1, T2 = int, T3, T4]: ...
-3 | type Alias[T = int, U] = ...
+3 | def f[T = int, U](): ...
   |
 
 
@@ -257,7 +337,8 @@ Module(
 1 | class C[T = int, U]: ...
 2 | class C[T1, T2 = int, T3, T4]: ...
   |                       ^^ Syntax Error: non default type parameter `T3` follows default type parameter
-3 | type Alias[T = int, U] = ...
+3 | def f[T = int, U](): ...
+4 | type Alias[T = int, U] = ...
   |
 
 
@@ -265,13 +346,23 @@ Module(
 1 | class C[T = int, U]: ...
 2 | class C[T1, T2 = int, T3, T4]: ...
   |                           ^^ Syntax Error: non default type parameter `T4` follows default type parameter
-3 | type Alias[T = int, U] = ...
+3 | def f[T = int, U](): ...
+4 | type Alias[T = int, U] = ...
   |
 
 
   |
 1 | class C[T = int, U]: ...
 2 | class C[T1, T2 = int, T3, T4]: ...
-3 | type Alias[T = int, U] = ...
+3 | def f[T = int, U](): ...
+  |                ^ Syntax Error: non default type parameter `U` follows default type parameter
+4 | type Alias[T = int, U] = ...
+  |
+
+
+  |
+2 | class C[T1, T2 = int, T3, T4]: ...
+3 | def f[T = int, U](): ...
+4 | type Alias[T = int, U] = ...
   |                     ^ Syntax Error: non default type parameter `U` follows default type parameter
   |

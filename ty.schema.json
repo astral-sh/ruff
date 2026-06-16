@@ -390,16 +390,6 @@
             }
           ]
         },
-        "conflicting-argument-forms": {
-          "title": "detects when an argument is used as both a value and a type form in a call",
-          "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
         "conflicting-declarations": {
           "title": "detects conflicting declarations",
           "description": "## What it does\nChecks whether a variable has been declared as two conflicting types.\n\n## Why is this bad\nA variable with two conflicting declarations likely indicates a mistake.\nMoreover, it could lead to incorrect or ill-defined type inference for\nother code that relies on these variables.\n\n## Examples\n```python\nif b:\n    a: int\nelse:\n    a: str\n\na = 1\n```",
@@ -662,7 +652,7 @@
         },
         "invalid-dataclass": {
           "title": "detects invalid `@dataclass` applications",
-          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,\n`Enum`, or `Protocol` is invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when\n  instantiating the class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support",
+          "description": "## What it does\nChecks for invalid applications of the `@dataclass` decorator.\n\n## Why is this bad?\nApplying `@dataclass` with incompatible arguments raises an exception while creating the\nclass:\n\n- `order=True` with `eq=False`\n- `weakref_slot=True` with `slots=False`\n\nApplying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,\n`Enum`, or `Protocol` is also invalid:\n\n- `NamedTuple` and `TypedDict` classes will raise an exception at runtime when\n  instantiating the class.\n- `Enum` classes with `@dataclass` are [explicitly not supported].\n- `Protocol` classes define interfaces and cannot be instantiated.\n\n## Examples\n```python\nfrom dataclasses import dataclass\nfrom typing import NamedTuple\n\n@dataclass(order=True, eq=False)  # error: [invalid-dataclass]\nclass Ordered: ...\n\n@dataclass  # error: [invalid-dataclass]\nclass Foo(NamedTuple):\n    x: int\n```\n\n[explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support\nSee: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>",
           "default": "error",
           "oneOf": [
             {
@@ -782,7 +772,7 @@
         },
         "invalid-legacy-type-variable": {
           "title": "detects invalid legacy type variables",
-          "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nQ = TypeVar(\"S\")  # error: TypeVar name must match the variable it's assigned to\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for the creation of invalid legacy `TypeVar`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a legacy `TypeVar`.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar(\"T\")  # okay\nT = TypeVar(\"T\")  # error: TypeVars should not be redefined\n\n# error: TypeVar must be immediately assigned to a variable\ndef f(t: TypeVar(\"U\")): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {
@@ -872,7 +862,7 @@
         },
         "invalid-paramspec": {
           "title": "detects invalid ParamSpec usage",
-          "description": "## What it does\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\nP2 = ParamSpec(\"S2\")  # error: ParamSpec name must match the variable it's assigned to\n```\n\n## References\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
+          "description": "## What it does\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\nP2 = ParamSpec()  # error: ParamSpec requires a name\n```\n\n## References\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
           "default": "error",
           "oneOf": [
             {
@@ -982,7 +972,7 @@
         },
         "invalid-type-guard-call": {
           "title": "detects type guard function calls that has no narrowing effect",
-          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f(v: object) -> TypeIs[int]: ...\n\nf()  # Error\nf(*a)  # Error\nf(10)  # Error\n```",
+          "description": "## What it does\nChecks for type guard function calls without a valid target.\n\n## Why is this bad?\nThe first non-keyword non-variadic argument to a type guard function\nis its target and must map to a symbol.\n\nStarred (`is_str(*a)`), literal (`is_str(42)`) and other non-symbol-like\nexpressions are invalid as narrowing targets.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef is_int(value: object = object()) -> TypeIs[int]:\n    return isinstance(value, int)\n\nis_int()  # Error: no positional narrowing target\n\nis_int(value=1)  # Error: narrowing target passed by keyword\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1092,7 +1082,7 @@
         },
         "mismatched-type-name": {
           "title": "detects functional typing definitions whose declared name does not match the assigned variable",
-          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
+          "description": "## What it does\nChecks for functional typing definitions whose declared name does not match\nthe variable they are assigned to.\n\n## Why is this bad?\nConstructors like `TypeVar`, `ParamSpec`, `NewType`, `NamedTuple`,\n`TypedDict`, and `TypeAliasType` all take a name argument that is\nnormally expected to match the assigned variable. A mismatch is usually a\ntypo and makes later diagnostics harder to understand.\n\n## Default level\nThis rule is a warning by default because ty can usually recover and\ncontinue understanding the resulting type.\n\n## Examples\n```python\nfrom typing import NewType, ParamSpec, TypeVar\nfrom typing_extensions import TypedDict\n\nT = TypeVar(\"U\")  # error: [mismatched-type-name]\nP = ParamSpec(\"Q\")  # error: [mismatched-type-name]\nUserId = NewType(\"Id\", int)  # error: [mismatched-type-name]\nMovie = TypedDict(\"Film\", {\"title\": str})  # error: [mismatched-type-name]\n```",
           "default": "warn",
           "oneOf": [
             {
@@ -1113,6 +1103,16 @@
         "missing-override-decorator": {
           "title": "detects methods that override a superclass member without an `@override` annotation",
           "description": "## What it does\nChecks for methods that override a method or attribute in a superclass but are not decorated with `@override`.\n\nThis rule is disabled by default. Enable it to opt in to strict `@override` enforcement for a project.\n\n## Exemptions\nOverriding `__init__`, `__new__`, `__init_subclass__`, or `__post_init__` does not require\n`@override`, even if the method is explicitly declared by a superclass.\n\n## Why is this bad?\nWithout an `@override` annotation, refactors can silently change whether a method is an override.\nRequiring `@override` on every override lets ty report when an intended override stops overriding\nanything, and when a method unexpectedly starts overriding a superclass member.\n\n## Example\n\n```python\nfrom typing import override\n\nclass Parent:\n    def method(self) -> int:\n        return 1\n\nclass Child(Parent):\n    def method(self) -> int:  # Error raised here when the rule is enabled\n        return 2\n\nclass ExplicitChild(Parent):\n    @override\n    def method(self) -> int:  # fine\n        return 2\n```",
+          "default": "ignore",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "missing-type-argument": {
+          "title": "detects generic types used without explicit type parameters in type expressions",
+          "description": "## What it does\nChecks for generic types used without type parameters in type expressions.\n\n## Why is this bad?\nUsing a generic type without specifying its type parameters results in the\ntype parameters being implicitly filled with `Unknown`, reducing the\nprecision of type checking. Explicit type parameters make the intended types\nclear and enable the type checker to catch more errors.\n\n## Examples\n\n```python\nimport re\n\ndef handle(m: re.Match) -> str:  # error: [missing-type-argument]\n    return m.string\n\n# Use explicit type parameters instead:\ndef handle(m: re.Match[str]) -> str:\n    return m.string\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -1522,7 +1522,7 @@
         },
         "zero-stepsize-in-slice": {
           "title": "detects a slice step size of zero",
-          "description": "## What it does\nChecks for step size 0 in slices.\n\n## Why is this bad?\nA slice with a step size of zero will raise a `ValueError` at runtime.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
+          "description": "## What it does\nChecks for a step size of zero in slices when the operation is known to fail.\n\n## Why is this bad?\nPython's built-in sequence types raise a `ValueError` when sliced with a step size of zero.\n\n## Known problems\nThis check is not exhaustive. It reports zero-step slices for certain built-in sequence\ntypes where the operation is known to fail. A custom `__getitem__` implementation can\naccept or reject such a slice, so ty cannot detect every runtime failure.\n\n## Examples\n```python\nl = list(range(10))\nl[1:10:0]  # ValueError: slice step cannot be zero\n```",
           "default": "error",
           "oneOf": [
             {

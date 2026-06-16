@@ -176,6 +176,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetImpliesSubtypeOf(InternedConstraintSet<'db>),
     ConstraintSetSatisfies(InternedConstraintSet<'db>),
     ConstraintSetSatisfiedByAllTypeVars(InternedConstraintSet<'db>),
+    ConstraintSetWithDetailedDisplay(InternedConstraintSet<'db>),
 }
 
 pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -210,7 +211,8 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
         | KnownBoundMethodType::ConstraintSetSatisfies(_)
-        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {}
+        | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+        | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {}
     }
 }
 
@@ -253,7 +255,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
-            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => Some(self),
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+            | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => Some(self),
         }
     }
 
@@ -271,7 +274,8 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
-            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
+            | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+            | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
                 KnownClass::ConstraintSet
             }
         }
@@ -467,6 +471,13 @@ impl<'db> KnownBoundMethodType<'db> {
                     KnownClass::Bool.to_instance(db),
                 )))
             }
+
+            KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::empty(),
+                    KnownClass::ConstraintSet.to_instance(db),
+                )))
+            }
         }
     }
 }
@@ -529,6 +540,10 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             | (
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
                 KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+            )
+            | (
+                KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
+                KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             ) => self.always(),
 
             (
@@ -543,7 +558,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
                 | KnownBoundMethodType::FunctionTypeDunderCall(_)
                 | KnownBoundMethodType::PropertyDunderGet(_)
@@ -555,7 +571,8 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
-                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_),
+                | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
+                | KnownBoundMethodType::ConstraintSetWithDetailedDisplay(_),
             ) => self.never(),
         }
     }

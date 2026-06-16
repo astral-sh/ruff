@@ -63,7 +63,7 @@ impl Violation for ConditionalGlobalOrNonlocal {
     }
 }
 
-/// RUF076
+/// RUF077
 pub(crate) fn conditional_global_or_nonlocal(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let semantic = checker.semantic();
 

@@ -343,9 +343,9 @@ from typing import TypeVar
 class P: ...
 class Q: ...
 
-T = TypeVar("T", P, Q)
+NarrowedT = TypeVar("NarrowedT", P, Q)
 
-def return_narrowed_typevar(x: T) -> T:
+def return_narrowed_typevar(x: NarrowedT) -> NarrowedT:
     if isinstance(x, P):
         return x
     return x
@@ -391,10 +391,41 @@ reveal_type(two_params("a", "b"))  # revealed: Literal["a", "b"]
 reveal_type(two_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+## Recursive generic calls
+
+Recursive occurrences of a generic function should be treated as fresh generic callable occurrences.
+The recursive call's typevars are inferable at the call site, even though the function body's own
+typevars are non-inferable.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+A = TypeVar("A")
+B = TypeVar("B")
+
+def recursive_identity(t: T) -> T:
+    reveal_type(recursive_identity(t))  # revealed: T@recursive_identity
+    return t
+
+def pair(a: A, b: B) -> tuple[A, B]:
+    return (a, b)
+
+def recursive_pair(t: T) -> T:
+    reveal_type(pair(recursive_pair(t), recursive_pair(1)))  # revealed: tuple[T@recursive_pair, Literal[1]]
+    return t
+```
+
+## Union parameter inference
+
 When one of the parameters is a union, we attempt to find the smallest specialization that satisfies
 all of the constraints.
 
 ```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
 def union_param(x: T | None) -> T:
     if x is None:
         raise ValueError
@@ -437,20 +468,20 @@ reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
 ```
 
 ```py
-T_str = TypeVar("T_str", bound=str)
+T_str2 = TypeVar("T_str2", bound=str)
 
-def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
+def accepts_t_or_list_of_t(x: T_str2 | list[T_str2]) -> T_str2:
     raise NotImplementedError
 
 reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
-# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
+# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str2`"
 reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
 
 def _(list_ofstr: list[str], list_of_int: list[int]):
     reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
 
     # TODO: the error message here could be improved by referring to the second union element
-    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str2`"
     reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
 ```
 
@@ -466,6 +497,8 @@ def tuple_param(x: T | S, y: tuple[T, S]) -> tuple[T, S]:
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
+
+## Inference from unions containing generic classes
 
 When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
 the actual argument even for non-final classes.
@@ -676,9 +709,9 @@ def decorated(t: T) -> None:
 ## Attribute access on `Callable`-bounded TypeVars
 
 ```py
-from typing import Callable, Generic, TypeVar
+from typing import Any, Callable, Generic, TypeVar
 
-F = TypeVar("F", bound=Callable)
+F = TypeVar("F", bound=Callable[..., Any])
 
 def my_decorator(f: F) -> None:
     # error: [unresolved-attribute]
@@ -689,7 +722,7 @@ def my_decorator(f: F) -> None:
 class Box(Generic[F]):
     cls: type[F]
 
-def specialized(box: Box[Callable]) -> None:
+def specialized(box: Box[Callable[..., Any]]) -> None:
     # error: [unresolved-attribute]
     box.cls.whatever
 ```
@@ -915,6 +948,8 @@ reveal_type(narrow(1))  # revealed: int
 reveal_type(narrow("hello"))  # revealed: str
 ```
 
+## Incompatible constraint sets
+
 But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
 
 ```py
@@ -929,6 +964,8 @@ def target(x: T) -> T:
 def source(x: U) -> U:
     return target(x)  # error: [invalid-argument-type]
 ```
+
+## Constraint equivalence
 
 We require equivalence rather than mere assignability when matching constraints. Constrained
 TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a

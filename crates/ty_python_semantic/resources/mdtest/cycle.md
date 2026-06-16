@@ -62,7 +62,7 @@ def _(x: JSONValue):
 ```py
 from typing import Generic, TypeVar
 
-B = TypeVar("B", bound="Base")
+B = TypeVar("B", bound="Base")  # error: [missing-type-argument]
 
 class Base(Generic[B]):
     pass
@@ -145,7 +145,7 @@ class C:
 
 ```py
 class Cyclic:
-    def __init__(self, data: str | dict):
+    def __init__(self, data: str | dict):  # error: [missing-type-argument]
         self.data = data
 
     def update(self):
@@ -185,9 +185,9 @@ class B:
 
 ## Function annotation and dynamic `NamedTuple` / `NewType`
 
-This is a regression test for <https://github.com/astral-sh/ty/issues/3485>. Recursive type
-normalization should not force the lazy base of a `NewType` while Salsa is recovering the cycle
-created by the forward reference to `T`.
+This is a regression test for <https://github.com/astral-sh/ty/issues/3485> and
+<https://github.com/astral-sh/ty/issues/3682>. Type traversal during cycle recovery should not force
+the lazy base of a `NewType`.
 
 ```py
 class C:
@@ -206,9 +206,28 @@ from typing import NamedTuple, NewType
 X = NamedTuple("X", [("x", "X")]), None  # error: [invalid-type-form]
 
 list(X)
+min(X)
 T = f()
 
 X = NewType("X", C)
+```
+
+The runtime callable returned by `NewType` also carries the lazy base and must use the same
+cycle-safe traversal.
+
+```py
+class C: ...
+
+def f(): ...
+def g() -> T: ...
+
+g()
+from typing import NamedTuple, NewType
+
+X = NewType("X", C)
+Y = NamedTuple("Y", [("a", "Y")]), X  # error: [invalid-type-form]
+min(Y)
+T = f()
 ```
 
 ## Lazy cached property behind `hasattr`

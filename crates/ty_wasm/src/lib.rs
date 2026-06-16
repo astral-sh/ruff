@@ -7,7 +7,7 @@ use ruff_db::files::{File, FilePath, FileRange, system_path_to_file, vendored_pa
 use ruff_db::source::{SourceText, line_index, source_text};
 use ruff_db::system::walk_directory::WalkDirectoryBuilder;
 use ruff_db::system::{
-    CaseSensitivity, DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
+    DirectoryEntry, MemoryFileSystem, Metadata, System, SystemPath, SystemPathBuf,
     SystemVirtualPath, WhichError, WhichResult, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
@@ -900,6 +900,36 @@ impl Diagnostic {
     }
 
     #[wasm_bindgen]
+    pub fn annotations(&self, workspace: &Workspace) -> Vec<DiagnosticAnnotation> {
+        self.inner
+            .annotations()
+            .iter()
+            .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+            .collect()
+    }
+
+    #[wasm_bindgen(js_name = "subDiagnostics")]
+    pub fn sub_diagnostics(&self, workspace: &Workspace) -> Vec<SubDiagnostic> {
+        self.inner
+            .sub_diagnostics()
+            .iter()
+            .map(|sub_diagnostic| {
+                let annotations = sub_diagnostic
+                    .annotations()
+                    .iter()
+                    .map(|annotation| DiagnosticAnnotation::from_db(workspace, annotation))
+                    .collect();
+
+                SubDiagnostic {
+                    severity: sub_diagnostic.severity().into(),
+                    message: sub_diagnostic.primary_message().to_string(),
+                    annotations,
+                }
+            })
+            .collect()
+    }
+
+    #[wasm_bindgen]
     pub fn id(&self) -> JsString {
         JsString::from(self.inner.id().to_string())
     }
@@ -965,6 +995,55 @@ impl Diagnostic {
             preferred: true,
         })
     }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SubDiagnostic {
+    pub severity: SubDiagnosticSeverity,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub annotations: Vec<DiagnosticAnnotation>,
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DiagnosticAnnotation {
+    pub primary: bool,
+    #[wasm_bindgen(getter_with_clone)]
+    pub message: Option<String>,
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<Location>,
+}
+
+impl DiagnosticAnnotation {
+    fn from_db(workspace: &Workspace, annotation: &diagnostic::Annotation) -> Self {
+        let location = FileRange::try_from(annotation.get_span())
+            .ok()
+            .map(|file_range| Location {
+                path: file_range.file().path(&workspace.db).to_string(),
+                range: Range::from_file_range(
+                    &workspace.db,
+                    file_range,
+                    workspace.position_encoding,
+                ),
+            });
+
+        Self {
+            primary: annotation.is_primary(),
+            message: annotation.get_message().map(ToOwned::to_owned),
+            location,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Location {
+    #[wasm_bindgen(getter_with_clone)]
+    pub path: String,
+    pub range: Range,
 }
 
 fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
@@ -1124,6 +1203,28 @@ impl From<diagnostic::Severity> for Severity {
             diagnostic::Severity::Warning => Self::Warning,
             diagnostic::Severity::Error => Self::Error,
             diagnostic::Severity::Fatal => Self::Fatal,
+        }
+    }
+}
+
+#[wasm_bindgen]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
+pub enum SubDiagnosticSeverity {
+    Help,
+    Info,
+    Warning,
+    Error,
+    Fatal,
+}
+
+impl From<diagnostic::SubDiagnosticSeverity> for SubDiagnosticSeverity {
+    fn from(value: diagnostic::SubDiagnosticSeverity) -> Self {
+        match value {
+            diagnostic::SubDiagnosticSeverity::Help => Self::Help,
+            diagnostic::SubDiagnosticSeverity::Info => Self::Info,
+            diagnostic::SubDiagnosticSeverity::Warning => Self::Warning,
+            diagnostic::SubDiagnosticSeverity::Error => Self::Error,
+            diagnostic::SubDiagnosticSeverity::Fatal => Self::Fatal,
         }
     }
 }
@@ -1487,6 +1588,16 @@ impl System for WasmSystem {
         self.fs.canonicalize(path)
     }
 
+    fn is_same_file(
+        &self,
+        first: &SystemPath,
+        second: &SystemPath,
+    ) -> ruff_db::system::Result<bool> {
+        // The in-memory file system does not support hard links, so canonical paths uniquely
+        // identify files.
+        Ok(self.canonicalize_path(first)? == self.canonicalize_path(second)?)
+    }
+
     fn read_to_string(&self, path: &SystemPath) -> ruff_db::system::Result<String> {
         self.fs.read_to_string(path)
     }
@@ -1511,14 +1622,6 @@ impl System for WasmSystem {
         _path: &SystemVirtualPath,
     ) -> Result<Notebook, ruff_notebook::NotebookError> {
         Err(ruff_notebook::NotebookError::Io(not_found()))
-    }
-
-    fn path_exists_case_sensitive(&self, path: &SystemPath, _prefix: &SystemPath) -> bool {
-        self.path_exists(path)
-    }
-
-    fn case_sensitivity(&self) -> CaseSensitivity {
-        CaseSensitivity::CaseSensitive
     }
 
     fn which(&self, _name: &str) -> WhichResult {

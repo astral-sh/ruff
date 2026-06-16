@@ -139,4 +139,5 @@ if sys.platform != "win32":
         else:
             def prlimit(pid: int, resource: int, limits: tuple[int, int] = ..., /) -> tuple[int, int]:
                 """prlimit(pid, resource, [limits])"""
+
     error = OSError

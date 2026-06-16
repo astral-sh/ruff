@@ -2514,6 +2514,44 @@ fn markdown_formatting_stdin() -> Result<()> {
 }
 
 #[test]
+fn markdown_formatting_quarto_cell_option() -> Result<()> {
+    let test = CliTest::with_files([
+        ("ruff.toml", r#"extension = {qmd="markdown"}"#),
+        (
+            "test.qmd",
+            r#"```{python}
+#| echo: true
+print( 'hello' )
+```
+"#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(
+        test.format_command().args(["--preview", "--diff", "test.qmd"]),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    --- test.qmd
+    +++ test.qmd
+    @@ -1,4 +1,4 @@
+     ```{python}
+     #| echo: true
+    -print( 'hello' )
+    +print("hello")
+     ```
+
+
+    ----- stderr -----
+    1 file would be reformatted
+    "#
+    );
+
+    Ok(())
+}
+
+#[test]
 fn format_mapped_extension_files() -> Result<()> {
     let test = CliTest::with_files([
         (

@@ -5,131 +5,29 @@ expression: lex_jupyter_source(source)
 ## Tokens
 ```
 [
-    (
-        Name(
-            Name("pwd"),
-        ),
-        0..3,
-    ),
-    (
-        Equal,
-        4..5,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "pwd",
-            kind: Shell,
-        },
-        6..10,
-    ),
-    (
-        Newline,
-        10..11,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        11..14,
-    ),
-    (
-        Equal,
-        15..16,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "timeit a = b",
-            kind: Magic,
-        },
-        17..30,
-    ),
-    (
-        Newline,
-        30..31,
-    ),
-    (
-        Name(
-            Name("bar"),
-        ),
-        31..34,
-    ),
-    (
-        Equal,
-        35..36,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "timeit a % 3",
-            kind: Magic,
-        },
-        37..50,
-    ),
-    (
-        Newline,
-        50..51,
-    ),
-    (
-        Name(
-            Name("baz"),
-        ),
-        51..54,
-    ),
-    (
-        Equal,
-        55..56,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "matplotlib         inline",
-            kind: Magic,
-        },
-        57..85,
-    ),
-    (
-        Newline,
-        85..86,
-    ),
-    (
-        Name(
-            Name("qux"),
-        ),
-        86..89,
-    ),
-    (
-        Equal,
-        90..91,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "foo?",
-            kind: Magic,
-        },
-        92..97,
-    ),
-    (
-        Newline,
-        97..98,
-    ),
-    (
-        Name(
-            Name("quux"),
-        ),
-        98..102,
-    ),
-    (
-        Equal,
-        103..104,
-    ),
-    (
-        IpyEscapeCommand {
-            value: "pwd?",
-            kind: Shell,
-        },
-        105..110,
-    ),
-    (
-        Newline,
-        110..110,
-    ),
+    Name 0..3,
+    Equal 4..5,
+    IpyEscapeCommand 6..10,
+    Newline 10..11,
+    Name 11..14,
+    Equal 15..16,
+    IpyEscapeCommand 17..30,
+    Newline 30..31,
+    Name 31..34,
+    Equal 35..36,
+    IpyEscapeCommand 37..50,
+    Newline 50..51,
+    Name 51..54,
+    Equal 55..56,
+    IpyEscapeCommand 57..85,
+    Newline 85..86,
+    Name 86..89,
+    Equal 90..91,
+    IpyEscapeCommand 92..97,
+    Newline 97..98,
+    Name 98..102,
+    Equal 103..104,
+    IpyEscapeCommand 105..110,
+    Newline 110..110,
 ]
 ```

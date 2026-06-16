@@ -94,6 +94,15 @@ def _(x: Single | int):
     else:
         reveal_type(x)  # revealed: int
 
+def _(x: list[int] | Literal[Answer.NO]):
+    if x != Answer.NO:
+        reveal_type(x)  # revealed: list[int]
+
+def _(x: list[int] | Literal[Answer.NO]):
+    if x == Answer.NO:
+        return
+    reveal_type(x)  # revealed: list[int]
+
 class Color(Enum):
     RED = "red"
     GREEN = "green"
@@ -336,4 +345,82 @@ def _(x: Literal["a", "b"] | tuple[int, int]):
     else:
         # tuple type remains in the else branch
         reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
+```
+
+## Narrowing tagged unions of nominal classes by attribute
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+    field_a: int
+
+class B:
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+        reveal_type(x.field_a)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: B
+        reveal_type(x.field_b)  # revealed: str
+
+    if "b" == x.tag:
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A
+
+    if x.tag != "a":
+        reveal_type(x)  # revealed: B
+    else:
+        reveal_type(x)  # revealed: A
+```
+
+Non-literal tag arms are preserved during positive narrowing:
+
+```py
+from typing import Literal
+
+class A:
+    tag: Literal["a"]
+
+class B:
+    tag: str
+
+class C:
+    tag: Literal["c"]
+
+def _(x: A | B | C):
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A | B
+    else:
+        reveal_type(x)  # revealed: B | C
+```
+
+This also works for `NamedTuple` classes:
+
+```py
+from typing import Literal, NamedTuple
+
+class A(NamedTuple):
+    tag: Literal["a"]
+    field_a: int
+
+class B(NamedTuple):
+    tag: Literal["b"]
+    field_b: str
+
+def _(x: A | B):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
+
+    if x.tag == "a":
+        reveal_type(x)  # revealed: A
+    else:
+        reveal_type(x)  # revealed: B
 ```

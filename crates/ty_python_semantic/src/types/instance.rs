@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
-use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -30,7 +29,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, CallableType, ClassBase, ClassLiteral, ErrorContext,
     FindLegacyTypeVarsVisitor, LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 use ty_python_core::definition::Definition;
 
@@ -120,6 +119,13 @@ impl<'db> Type<'db> {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
     }
 
+    pub(crate) const fn sys_version_info() -> Self {
+        // Keep construction query-free: resolving the backing typeshed class here is on the hot
+        // path for projects with many version guards. Resolve it lazily when class behavior is
+        // actually needed instead.
+        Type::NominalInstance(NominalInstanceType(NominalInstanceInner::SysVersionInfo))
+    }
+
     pub(crate) const fn is_nominal_instance(self) -> bool {
         matches!(self, Type::NominalInstance(_))
     }
@@ -181,6 +187,7 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
         NominalInstanceInner::NonTuple(class) => {
             visitor.visit_type(db, class.into());
         }
+        NominalInstanceInner::SysVersionInfo => {}
     }
 }
 
@@ -215,6 +222,9 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
+            NominalInstanceInner::SysVersionInfo => {
+                sys_version_info_class(db).unwrap_or_else(|| ClassType::object(db))
+            }
             NominalInstanceInner::Object => ClassType::object(db),
         }
     }
@@ -230,8 +240,13 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(_) => Some(KnownClass::Tuple),
             NominalInstanceInner::NonTuple(class) => class.known(db),
+            NominalInstanceInner::SysVersionInfo => Some(KnownClass::VersionInfo),
             NominalInstanceInner::Object => Some(KnownClass::Object),
         }
+    }
+
+    pub(super) const fn is_sys_version_info(self) -> bool {
+        matches!(self.0, NominalInstanceInner::SysVersionInfo)
     }
 
     /// Returns whether this is a nominal instance of a particular [`KnownClass`].
@@ -246,6 +261,9 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
+            NominalInstanceInner::SysVersionInfo => {
+                Some(Cow::Owned(TupleSpec::version_info_spec(db)))
+            }
             NominalInstanceInner::NonTuple(class) => {
                 // Avoid an expensive MRO traversal for common stdlib classes.
                 if class
@@ -258,13 +276,6 @@ impl<'db> NominalInstanceType<'db> {
                     .iter_mro(db)
                     .filter_map(ClassBase::into_class)
                     .find_map(|class| match class.known(db)? {
-                        // N.B. this is a pure optimisation: iterating through the MRO would give us
-                        // the correct tuple spec for `sys._version_info`, since we special-case the class
-                        // in `StmtClassLiteral::explicit_bases()` so that it is inferred as inheriting from
-                        // a tuple type with the correct spec for the user's configured Python version and platform.
-                        KnownClass::VersionInfo => {
-                            Some(Cow::Owned(TupleSpec::version_info_spec(db)))
-                        }
                         KnownClass::Tuple => Some(
                             class
                                 .into_generic_alias()
@@ -291,7 +302,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::NonTuple(class) => class.is_generic(),
             NominalInstanceInner::ExactTuple(_) => true,
-            NominalInstanceInner::Object => false,
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => false,
         }
     }
 
@@ -308,7 +319,9 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn own_tuple_spec(&self, db: &'db dyn Db) -> Option<Cow<'db, TupleSpec<'db>>> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => Some(Cow::Borrowed(tuple.tuple(db))),
-            NominalInstanceInner::NonTuple(_) | NominalInstanceInner::Object => None,
+            NominalInstanceInner::NonTuple(_)
+            | NominalInstanceInner::SysVersionInfo
+            | NominalInstanceInner::Object => None,
         }
     }
 
@@ -319,7 +332,9 @@ impl<'db> NominalInstanceType<'db> {
     /// integers or `None`.
     pub(crate) fn slice_literal(self, db: &'db dyn Db) -> Option<SliceLiteral> {
         let class = match self.0 {
-            NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => return None,
+            NominalInstanceInner::ExactTuple(_)
+            | NominalInstanceInner::SysVersionInfo
+            | NominalInstanceInner::Object => return None,
             NominalInstanceInner::NonTuple(class) => class,
         };
         let (class_literal, specialization) = class.static_class_literal(db)?;
@@ -366,6 +381,9 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => Some(Self(NominalInstanceInner::NonTuple(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             ))),
+            NominalInstanceInner::SysVersionInfo => {
+                Some(Self(NominalInstanceInner::SysVersionInfo))
+            }
             NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
         }
     }
@@ -378,6 +396,7 @@ impl<'db> NominalInstanceType<'db> {
             // See:
             // https://docs.python.org/3/reference/expressions.html#parenthesized-forms
             NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => false,
+            NominalInstanceInner::SysVersionInfo => true,
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .map(KnownClass::is_singleton)
@@ -389,6 +408,7 @@ impl<'db> NominalInstanceType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.is_single_valued(db),
             NominalInstanceInner::Object => false,
+            NominalInstanceInner::SysVersionInfo => true,
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
@@ -417,6 +437,7 @@ impl<'db> NominalInstanceType<'db> {
                     class.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 )))
             }
+            NominalInstanceInner::SysVersionInfo => Type::NominalInstance(self),
             NominalInstanceInner::Object => Type::object(),
         }
     }
@@ -435,7 +456,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => {
                 class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
-            NominalInstanceInner::Object => {}
+            NominalInstanceInner::SysVersionInfo | NominalInstanceInner::Object => {}
         }
     }
 }
@@ -482,16 +503,16 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
             }
         }
 
-        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
-        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
-        // out assignability). We don't want generators with different return types to be
-        // assignable to each other. In this case we use the result of the nominal check above.
+        // `Generator` special case: compare the type parameters nominally. Prior to 3.13, its
+        // return type does not appear non-recursively in the protocol; from 3.13 onward,
+        // structurally inferring through `close() -> ReturnT | None` can spuriously infer `None`.
+        // TODO: Remove the Python 3.13+ extension of this special case once
+        // https://github.com/astral-sh/ty/issues/3596 is fixed.
         if let Some(source_protocol) = ty.as_protocol_instance()
             && let Protocol::FromClass(source_class) = source_protocol.inner
             && let Protocol::FromClass(proto_class) = protocol.inner
             && source_class.is_known(db, KnownClass::Generator)
             && proto_class.is_known(db, KnownClass::Generator)
-            && Program::get(db).python_version(db) < PythonVersion::PY313
         {
             return result;
         }
@@ -588,7 +609,7 @@ impl<'c, 'db> DisjointnessChecker<'_, 'c, 'db> {
                 self.constraints,
                 !left
                     .class(db)
-                    .could_coexist_in_mro_with(db, right.class(db), self.constraints),
+                    .could_coexist_in_mro_with_disjointness_checker(db, right.class(db), self),
             )
         })
     }
@@ -616,6 +637,14 @@ enum NominalInstanceInner<'db> {
     /// This variant includes types that are subtypes of "exact tuple" types,
     /// because they represent "all instances of a class that is a tuple subclass".
     NonTuple(ClassType<'db>),
+    /// The singleton `sys.version_info` value.
+    SysVersionInfo,
+}
+
+fn sys_version_info_class(db: &dyn Db) -> Option<ClassType<'_>> {
+    KnownClass::VersionInfo
+        .try_to_class_literal(db)
+        .map(|class| class.default_specialization(db))
 }
 
 pub(crate) struct SliceLiteral {

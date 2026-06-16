@@ -1,6 +1,6 @@
 use crate::ast_node_ref::AstNodeRef;
 use crate::db::Db;
-use crate::scope::{FileScopeId, ScopeId};
+use crate::scope::ScopeId;
 use ruff_db::files::File;
 use ruff_python_ast as ast;
 use salsa;
@@ -32,11 +32,11 @@ pub enum ExpressionKind {
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct Expression<'db> {
-    /// The file in which the expression occurs.
-    pub file: File,
-
     /// The scope in which the expression occurs.
-    pub file_scope: FileScopeId,
+    ///
+    /// Storing the interned scope avoids retaining the file and file-local scope separately, at
+    /// the cost of database lookups when either of those values is needed.
+    pub scope_id: ScopeId<'db>,
 
     /// The expression node.
     #[no_eq]
@@ -64,6 +64,10 @@ impl get_size2::GetSize for Expression<'_> {}
 
 impl<'db> Expression<'db> {
     pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
-        self.file_scope(db).to_scope_id(db, self.file(db))
+        self.scope_id(db)
+    }
+
+    pub fn file(self, db: &'db dyn Db) -> File {
+        self.scope_id(db).file(db)
     }
 }

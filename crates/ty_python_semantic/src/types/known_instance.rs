@@ -6,7 +6,7 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassType, GenericContext,
         InferenceFlags, InvalidTypeExpressionError, KnownClass, StringLiteralType, Type,
-        TypeAliasType, TypeContext, TypeMapping, TypeVarVariance, UnionBuilder,
+        TypeAliasType, TypeContext, TypeMapping, TypeVarNonce, TypeVarVariance, UnionBuilder,
         class::NamedTupleSpec,
         constraints::OwnedConstraintSet,
         generics::{Specialization, walk_generic_context},
@@ -24,14 +24,26 @@ use ty_python_core::{definition::Definition, scope::ScopeId};
 /// mdtests. In theory, that means there's no need for this to be interned; being tracked would be
 /// sufficient. However, we currently think that tracked structs are unsound w.r.t. salsa cycles,
 /// so out of an abundance of caution, we are interning the struct.
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSet<'db> {
     #[returns(ref)]
     pub(super) constraints: OwnedConstraintSet<'db>,
+
+    pub(super) detailed_display: bool,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for InternedConstraintSet<'_> {}
+
+impl<'db> InternedConstraintSet<'db> {
+    pub(super) fn new(db: &'db dyn Db, constraints: OwnedConstraintSet<'db>) -> Self {
+        Self::new_internal(db, constraints, false)
+    }
+
+    pub(super) fn with_detailed_display(self, db: &'db dyn Db) -> Self {
+        Self::new_internal(db, self.constraints(db), true)
+    }
+}
 
 /// A salsa-interned payload for `functools.partial(...)` instances.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -170,7 +182,7 @@ pub(super) fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Size
             visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            visitor.visit_type(db, newtype.concrete_base_type(db));
+            visitor.visit_newtype_instance_type(db, newtype);
         }
         KnownInstanceType::Sentinel(_) => {
             // Nothing to visit
@@ -348,12 +360,19 @@ impl<'db> KnownInstanceType<'db> {
     ) -> Type<'db> {
         match self {
             KnownInstanceType::TypeVar(typevar) => match type_mapping {
-                TypeMapping::BindLegacyTypevars(binding_context) => Type::TypeVar(
-                    BoundTypeVarInstance::new(db, typevar, *binding_context, None),
-                ),
+                TypeMapping::BindLegacyTypevars(binding_context) => {
+                    Type::TypeVar(BoundTypeVarInstance::new(
+                        db,
+                        typevar,
+                        *binding_context,
+                        None,
+                        TypeVarNonce::NONE,
+                    ))
+                }
                 TypeMapping::ApplySpecialization(_)
                 | TypeMapping::ApplySpecializationWithMaterialization { .. }
                 | TypeMapping::Promote(..)
+                | TypeMapping::FreshenBoundTypeVars { .. }
                 | TypeMapping::BindSelf(..)
                 | TypeMapping::ReplaceSelf { .. }
                 | TypeMapping::Materialize(_)

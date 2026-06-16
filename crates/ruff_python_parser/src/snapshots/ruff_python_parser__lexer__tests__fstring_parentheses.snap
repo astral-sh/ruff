@@ -5,205 +5,36 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..2,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        2..3,
-    ),
-    (
-        Rbrace,
-        3..4,
-    ),
-    (
-        FStringEnd,
-        4..5,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        6..8,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "{}",
-        ),
-        8..12,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        12..13,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        14..16,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            " ",
-        ),
-        16..17,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        17..18,
-    ),
-    (
-        Rbrace,
-        18..19,
-    ),
-    (
-        FStringEnd,
-        19..20,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        21..23,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "{",
-        ),
-        23..25,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        25..26,
-    ),
-    (
-        Rbrace,
-        26..27,
-    ),
-    (
-        InterpolatedStringMiddle(
-            "}",
-        ),
-        27..29,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        29..30,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        31..33,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "{{}}",
-        ),
-        33..41,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        41..42,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringStart,
-        43..45,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            " ",
-        ),
-        45..46,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        46..47,
-    ),
-    (
-        Rbrace,
-        47..48,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " {} {",
-        ),
-        48..56,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        56..57,
-    ),
-    (
-        Rbrace,
-        57..58,
-    ),
-    (
-        InterpolatedStringMiddle(
-            "} {{}}  ",
-        ),
-        58..71,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        71..72,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        72..72,
-    ),
+    FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 2..3,
+    Rbrace 3..4,
+    FStringEnd 4..5 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringStart 6..8 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 8..12 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 12..13 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringStart 14..16 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 16..17 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 17..18,
+    Rbrace 18..19,
+    FStringEnd 19..20 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringStart 21..23 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 23..25 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 25..26,
+    Rbrace 26..27,
+    FStringMiddle 27..29 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 29..30 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringStart 31..33 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 33..41 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 41..42 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringStart 43..45 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 45..46 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 46..47,
+    Rbrace 47..48,
+    FStringMiddle 48..56 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 56..57,
+    Rbrace 57..58,
+    FStringMiddle 58..71 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 71..72 (flags = DOUBLE_QUOTES | F_STRING),
+    Newline 72..72,
 ]
 ```

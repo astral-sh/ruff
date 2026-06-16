@@ -193,18 +193,20 @@
 //! [Kleene]: <https://en.wikipedia.org/wiki/Three-valued_logic#Kleene_and_Priest_logics>
 //! [bdd]: https://en.wikipedia.org/wiki/Binary_decision_diagram
 
+use std::cell::RefCell;
+
 use crate::{
     Db,
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, ClassLiteral, IntersectionBuilder, KnownClass, NarrowingConstraint, Type,
-        TypeContext, UnionBuilder, UnionType, enum_metadata, infer_expression_type,
-        infer_narrowing_constraint,
+        CallableTypes, ClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
+        Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
+        enum_metadata, infer_narrowing_constraints, infer_same_file_expression_type,
+        mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
-use ruff_index::IndexSlice;
-use ruff_python_ast as ast;
+use ruff_index::{Idx, IndexSlice};
 use ruff_python_ast::name::Name;
 use ruff_text_size::TextRange;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -212,6 +214,7 @@ use ty_python_core::{
     BindingWithConstraints, DeclarationWithConstraint, DeclarationsIterator, FileScopeId,
     ScopedDefinitionId, SemanticIndex, Truthiness, UseDefMap,
     definition::DefinitionState,
+    narrowing_constraints::{NarrowingConstraints, ScopedNarrowingConstraint},
     place::ScopedPlaceId,
     place_table,
     predicate::{
@@ -219,99 +222,59 @@ use ty_python_core::{
         ScopedPredicateId,
     },
     reachability_constraints::{ReachabilityConstraints, ScopedReachabilityConstraintId},
+    scope::ScopeId,
 };
 
-fn singleton_to_type(db: &dyn Db, singleton: ast::Singleton) -> Type<'_> {
-    let ty = match singleton {
-        ast::Singleton::None => Type::none(db),
-        ast::Singleton::True => Type::bool_literal(true),
-        ast::Singleton::False => Type::bool_literal(false),
-    };
-    debug_assert!(ty.is_singleton(db));
-    ty
-}
-
-fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
-    KnownClass::Mapping.to_instance(db).top_materialization(db)
-}
-
-pub(crate) fn sequence_pattern_type(db: &dyn Db) -> Type<'_> {
-    IntersectionBuilder::new(db)
-        .add_positive(KnownClass::Sequence.to_instance(db).top_materialization(db))
-        // `str`, `bytes`, and `bytearray` are sequences, but Python sequence
-        // patterns explicitly do not match them or their subclasses.
-        .add_negative(KnownClass::Str.to_instance(db))
-        .add_negative(KnownClass::Bytes.to_instance(db))
-        .add_negative(KnownClass::Bytearray.to_instance(db))
-        .build()
-}
-
-/// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
-/// match that pattern.
-fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
-    match kind {
-        PatternPredicateKind::Singleton(singleton) => singleton_to_type(db, *singleton),
-        PatternPredicateKind::Value(value) => {
-            let ty = infer_expression_type(db, *value, TypeContext::default());
-            // Only return the type if it's single-valued. For non-single-valued types
-            // (like `str`), we can't definitively exclude any specific type from
-            // subsequent patterns because the pattern could match any value of that type.
-            if ty.is_single_valued(db) {
-                ty
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Class(class_expr, kind) => {
-            if kind.is_irrefutable() {
-                infer_expression_type(db, *class_expr, TypeContext::default())
-                    .to_instance(db)
-                    .unwrap_or(Type::Never)
-                    .top_materialization(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Mapping(kind) => {
-            if kind.is_irrefutable() {
-                mapping_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Sequence(kind) => {
-            if kind.is_irrefutable() {
-                sequence_pattern_type(db)
-            } else {
-                Type::Never
-            }
-        }
-        PatternPredicateKind::Or(predicates) => {
-            UnionType::from_elements(db, predicates.iter().map(|p| pattern_kind_to_type(db, p)))
-        }
-        PatternPredicateKind::As(pattern, _) => pattern
-            .as_deref()
-            .map(|p| pattern_kind_to_type(db, p))
-            .unwrap_or_else(Type::object),
-        PatternPredicateKind::Unsupported => Type::Never,
-    }
-}
-
-/// Go through the list of previous match cases, and accumulate a union of all types that were already
-/// matched by these patterns.
-fn type_excluded_by_previous_patterns<'db>(
+/// Narrow `subject_ty` by all preceding unguarded match patterns.
+///
+/// Caching each prefix lets the next case reuse the already-normalized subject instead of
+/// rebuilding it from the union of all preceding patterns, which can repeatedly distribute the
+/// same intersections.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_previous_patterns<'db>(
     db: &'db dyn Db,
-    mut predicate: PatternPredicate<'db>,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
 ) -> Type<'db> {
-    let mut builder = UnionBuilder::new(db);
-    while let Some(previous) = predicate.previous_predicate(db) {
-        predicate = *previous;
+    let Some(previous) = predicate.previous_predicate(db) else {
+        return subject_ty;
+    };
+    let previous = *previous;
+    let narrowed_by_previous_patterns =
+        type_narrowed_by_previous_patterns(db, previous, subject_ty);
 
-        if predicate.guard(db).is_none() {
-            builder = builder.add(pattern_kind_to_type(db, predicate.kind(db)));
-        }
+    if previous.guard(db).is_some() {
+        narrowed_by_previous_patterns
+    } else {
+        type_narrowed_by_pattern(db, previous, narrowed_by_previous_patterns)
     }
-    builder.build()
+}
+
+/// Narrow `subject_ty` by a match pattern.
+///
+/// This result is also the preceding-pattern prefix for the next unguarded case.
+#[salsa::tracked(
+    cycle_initial = |_, id, _, _| Type::divergent(id),
+    cycle_fn = |db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+        result.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size = ruff_memory_usage::heap_size
+)]
+fn type_narrowed_by_pattern<'db>(
+    db: &'db dyn Db,
+    predicate: PatternPredicate<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_negative(definite_match_pattern_type(db, predicate.kind(db)))
+        .build()
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.
@@ -376,7 +339,7 @@ fn enum_member_pattern_name<'db>(
     enum_class: ClassLiteral<'db>,
     kind: &PatternPredicateKind<'db>,
 ) -> Option<Name> {
-    let value_ty = pattern_kind_to_type(db, kind);
+    let value_ty = definite_match_pattern_type(db, kind);
     let enum_literal = value_ty.as_enum_literal()?;
     if enum_literal.enum_class(db) != enum_class {
         return None;
@@ -461,6 +424,10 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
 
         let previous_coverage =
             enum_member_pattern_coverage(db, enum_class, previous_predicate.kind(db));
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "set removal is independent of iteration order"
+        )]
         for previous_name in previous_coverage.definitely_matched {
             remaining_names.remove(&previous_name);
         }
@@ -498,7 +465,8 @@ fn analyze_enum_literal_union_pattern_predicate<'db>(
     heap_size = get_size2::GetSize::get_heap_size
 )]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
-    let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
+    let subject_ty =
+        infer_same_file_expression_type(db, predicate.subject(db), TypeContext::default());
 
     if let Some(truthiness) =
         analyze_enum_literal_union_pattern_predicate(db, predicate, subject_ty)
@@ -506,11 +474,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
         return truthiness;
     }
 
-    let narrowed_subject = IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(type_excluded_by_previous_patterns(db, predicate));
-
-    let narrowed_subject_ty = narrowed_subject.clone().build();
+    let narrowed_subject_ty = type_narrowed_by_previous_patterns(db, predicate, subject_ty);
 
     // Consider a case where we match on a subject type of `Self` with an upper bound of `Answer`,
     // where `Answer` is a {YES, NO} enum. After a previous pattern matching on `NO`, the narrowed
@@ -521,9 +485,7 @@ fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'
     // means that subsequent patterns can never match. And we know that if we reach this point,
     // the current pattern will have to match. We return `AlwaysTrue` here, since the call to
     // `analyze_single_pattern_predicate_kind` below would return `Ambiguous` in this case.
-    let next_narrowed_subject_ty = narrowed_subject
-        .add_negative(pattern_kind_to_type(db, predicate.kind(db)))
-        .build();
+    let next_narrowed_subject_ty = type_narrowed_by_pattern(db, predicate, narrowed_subject_ty);
     if !narrowed_subject_ty.is_never() && next_narrowed_subject_ty.is_never() {
         return Truthiness::AlwaysTrue;
     }
@@ -554,16 +516,6 @@ fn accumulate_constraint<'db>(
 }
 
 pub(crate) trait ReachabilityConstraintsExtension<'db> {
-    /// Narrow a type by walking a TDD narrowing constraint.
-    fn narrow_by_constraint(
-        &self,
-        db: &'db dyn Db,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        id: ScopedReachabilityConstraintId,
-        base_ty: Type<'db>,
-        place: ScopedPlaceId,
-    ) -> Type<'db>;
-
     /// Analyze the statically known reachability for a given constraint.
     fn evaluate(
         &self,
@@ -574,47 +526,6 @@ pub(crate) trait ReachabilityConstraintsExtension<'db> {
 }
 
 impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
-    /// Narrow a type by walking a TDD narrowing constraint.
-    ///
-    /// The TDD represents a ternary formula over predicates that encodes which predicates
-    /// hold along a particular control flow path. We walk from root to leaves, accumulating
-    /// narrowing constraints.
-    ///
-    /// At each interior node, we branch based on whether the predicate is true or false:
-    /// - True branch: apply positive narrowing from the predicate
-    /// - False branch: apply negative narrowing from the predicate
-    ///
-    /// The "ambiguous" branch in the TDD is not followed for narrowing purposes, because
-    /// narrowing constraints record which predicates hold along the control flow path.
-    /// The predicates may be statically ambiguous (we can't determine their truthiness
-    /// at analysis time), but they still hold dynamically at runtime and should be used
-    /// for narrowing.
-    ///
-    /// At leaves:
-    /// - `ALWAYS_TRUE` or `AMBIGUOUS`: apply all accumulated narrowing to the base type
-    /// - `ALWAYS_FALSE`: this path is impossible → Never
-    ///
-    /// The final result is the union of all path results.
-    fn narrow_by_constraint(
-        &self,
-        db: &'db dyn Db,
-        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
-        id: ScopedReachabilityConstraintId,
-        base_ty: Type<'db>,
-        place: ScopedPlaceId,
-    ) -> Type<'db> {
-        let mut projector = NarrowingProjector::new(db, self, predicates, place);
-        let projected_root = projector.project(id);
-        let mut context = ProjectedNarrowingContext {
-            db,
-            base_ty,
-            graph: &projector.graph,
-            joins: projector.graph.joins(projected_root),
-            join_cache: FxHashMap::default(),
-        };
-        context.narrow(projected_root, None)
-    }
-
     /// Analyze the statically known reachability for a given constraint.
     fn evaluate(
         &self,
@@ -639,6 +550,26 @@ impl<'db> ReachabilityConstraintsExtension<'db> for ReachabilityConstraints {
             }
         }
     }
+}
+
+pub(crate) fn narrow_type_by_constraint<'db>(
+    db: &'db dyn Db,
+    constraints: &NarrowingConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    id: ScopedNarrowingConstraint,
+    base_ty: Type<'db>,
+    place: ScopedPlaceId,
+) -> Type<'db> {
+    let mut projector = NarrowingProjector::new(db, constraints, predicates, place);
+    let projected_root = projector.project(id);
+    let mut context = ProjectedNarrowingContext {
+        db,
+        base_ty,
+        graph: &projector.graph,
+        joins: projector.graph.joins(projected_root),
+        join_cache: FxHashMap::default(),
+    };
+    context.narrow(projected_root, None)
 }
 
 fn apply_accumulated_narrowing<'db>(
@@ -674,10 +605,11 @@ impl ProjectedNarrowingNodeId {
 struct ProjectedNarrowingNode {
     atom: ScopedPredicateId,
     if_true: ProjectedNarrowingNodeId,
+    if_uncertain: ProjectedNarrowingNodeId,
     if_false: ProjectedNarrowingNodeId,
 }
 
-/// Reduced reachability graph containing only predicates relevant to one place.
+/// Narrowing graph containing only predicates that can narrow one place.
 #[derive(Default)]
 struct ProjectedNarrowingGraph<'db> {
     nodes: Vec<ProjectedNarrowingNode>,
@@ -701,8 +633,44 @@ impl ProjectedNarrowingGraph<'_> {
 
     /// Interns a projected node, collapsing nodes with identical branches.
     fn add_node(&mut self, node: ProjectedNarrowingNode) -> ProjectedNarrowingNodeId {
-        if node.if_true == node.if_false {
+        if node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_TRUE {
+            return ProjectedNarrowingNodeId::ALWAYS_TRUE;
+        }
+        if node.if_true == node.if_false && node.if_true == node.if_uncertain {
             return node.if_true;
+        }
+
+        // Find and absorb cofactors if we can. (See `ty_python_core::narrowing_constraints` for
+        // more details.)
+        // `if_uncertain` contributes to both cofactors. If either cofactor is already true,
+        // then the remaining cofactor can be lifted into `if_uncertain`, avoiding shapes like
+        // `A or (not A and B)`.
+        let when_true = self.or(node.if_true, node.if_uncertain);
+        let when_false = self.or(node.if_false, node.if_uncertain);
+        if when_true == when_false {
+            return when_true;
+        }
+        if when_true == ProjectedNarrowingNodeId::ALWAYS_TRUE
+            && !(node.if_true == ProjectedNarrowingNodeId::ALWAYS_TRUE
+                && node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE)
+        {
+            return self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+                if_uncertain: when_false,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+            });
+        }
+        if when_false == ProjectedNarrowingNodeId::ALWAYS_TRUE
+            && !(node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_false == ProjectedNarrowingNodeId::ALWAYS_TRUE)
+        {
+            return self.add_node(ProjectedNarrowingNode {
+                atom: node.atom,
+                if_true: ProjectedNarrowingNodeId::ALWAYS_FALSE,
+                if_uncertain: when_true,
+                if_false: ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            });
         }
 
         if let Some(cached) = self.node_cache.get(&node) {
@@ -731,7 +699,7 @@ impl ProjectedNarrowingGraph<'_> {
             }
 
             let node = self.node(id);
-            for next in [node.if_true, node.if_false] {
+            for next in [node.if_true, node.if_uncertain, node.if_false] {
                 if !next.is_terminal() {
                     if std::mem::replace(&mut referenced[next.0], true) {
                         joins[next.0] = true;
@@ -744,7 +712,7 @@ impl ProjectedNarrowingGraph<'_> {
         joins
     }
 
-    /// Constructs the canonical disjunction of two projected subgraphs.
+    /// Combines two paths without copying one path into both outcomes of the other's predicate.
     fn or(
         &mut self,
         left: ProjectedNarrowingNodeId,
@@ -777,29 +745,31 @@ impl ProjectedNarrowingGraph<'_> {
         let result = match left_node.atom.cmp(&right_node.atom).reverse() {
             std::cmp::Ordering::Equal => {
                 let if_true = self.or(left_node.if_true, right_node.if_true);
+                let if_uncertain = self.or(left_node.if_uncertain, right_node.if_uncertain);
                 let if_false = self.or(left_node.if_false, right_node.if_false);
                 self.add_node(ProjectedNarrowingNode {
                     atom: left_node.atom,
                     if_true,
+                    if_uncertain,
                     if_false,
                 })
             }
             std::cmp::Ordering::Less => {
-                let if_true = self.or(left_node.if_true, right);
-                let if_false = self.or(left_node.if_false, right);
+                let if_uncertain = self.or(left_node.if_uncertain, right);
                 self.add_node(ProjectedNarrowingNode {
                     atom: left_node.atom,
-                    if_true,
-                    if_false,
+                    if_true: left_node.if_true,
+                    if_uncertain,
+                    if_false: left_node.if_false,
                 })
             }
             std::cmp::Ordering::Greater => {
-                let if_true = self.or(left, right_node.if_true);
-                let if_false = self.or(left, right_node.if_false);
+                let if_uncertain = self.or(left, right_node.if_uncertain);
                 self.add_node(ProjectedNarrowingNode {
                     atom: right_node.atom,
-                    if_true,
-                    if_false,
+                    if_true: right_node.if_true,
+                    if_uncertain,
+                    if_false: right_node.if_false,
                 })
             }
         };
@@ -809,13 +779,13 @@ impl ProjectedNarrowingGraph<'_> {
     }
 }
 
-/// Projects reachability constraints onto the predicates that can narrow one place.
+/// Removes predicates that cannot narrow one place from a narrowing constraint.
 struct NarrowingProjector<'a, 'db> {
     db: &'db dyn Db,
-    constraints: &'a ReachabilityConstraints,
+    constraints: &'a NarrowingConstraints,
     predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
     place: ScopedPlaceId,
-    project_cache: FxHashMap<ScopedReachabilityConstraintId, ProjectedNarrowingNodeId>,
+    project_cache: FxHashMap<ScopedNarrowingConstraint, ProjectedNarrowingNodeId>,
     graph: ProjectedNarrowingGraph<'db>,
 }
 
@@ -823,7 +793,7 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
     /// Creates a projector for narrowing `place`.
     fn new(
         db: &'db dyn Db,
-        constraints: &'a ReachabilityConstraints,
+        constraints: &'a NarrowingConstraints,
         predicates: &'a IndexSlice<ScopedPredicateId, Predicate<'db>>,
         place: ScopedPlaceId,
     ) -> Self {
@@ -849,54 +819,58 @@ impl<'a, 'db> NarrowingProjector<'a, 'db> {
             return cached.clone();
         }
 
-        let predicate = self.predicates[predicate_id];
-        let pos_constraint = infer_narrowing_constraint(self.db, predicate, self.place);
-        let neg_predicate = Predicate {
-            node: predicate.node,
-            is_positive: !predicate.is_positive,
-        };
-        let neg_constraint = infer_narrowing_constraint(self.db, neg_predicate, self.place);
-        let constraints = (pos_constraint, neg_constraint);
+        let constraints =
+            infer_narrowing_constraints(self.db, self.predicates[predicate_id], self.place);
         self.graph
             .predicate_constraints_cache
             .insert(predicate_id, constraints.clone());
         constraints
     }
 
-    /// Projects a reachability node into the reduced narrowing graph.
-    fn project(&mut self, id: ScopedReachabilityConstraintId) -> ProjectedNarrowingNodeId {
-        type Id = ScopedReachabilityConstraintId;
+    /// Projects one constraint node into the graph for this place.
+    fn project(&mut self, id: ScopedNarrowingConstraint) -> ProjectedNarrowingNodeId {
+        type Id = ScopedNarrowingConstraint;
 
         if let Some(cached) = self.project_cache.get(&id) {
             return *cached;
         }
 
         let projected = match id {
-            Id::ALWAYS_TRUE | Id::AMBIGUOUS => ProjectedNarrowingNodeId::ALWAYS_TRUE,
+            Id::ALWAYS_TRUE => ProjectedNarrowingNodeId::ALWAYS_TRUE,
             Id::ALWAYS_FALSE => ProjectedNarrowingNodeId::ALWAYS_FALSE,
             _ => {
                 let node = self.constraints.get_interior_node(id);
-                let predicate = self.predicates[node.atom()];
+                let predicate = self.predicates[node.atom];
 
                 if matches!(predicate.node, PredicateNode::IsNonTerminalCall(_)) {
+                    let if_uncertain = self.project(node.if_uncertain);
                     match analyze_single(self.db, &predicate) {
-                        Truthiness::AlwaysTrue => self.project(node.if_true()),
-                        Truthiness::AlwaysFalse => self.project(node.if_false()),
+                        Truthiness::AlwaysTrue => {
+                            let if_true = self.project(node.if_true);
+                            self.graph.or(if_true, if_uncertain)
+                        }
+                        Truthiness::AlwaysFalse => {
+                            let if_false = self.project(node.if_false);
+                            self.graph.or(if_false, if_uncertain)
+                        }
                         Truthiness::Ambiguous => {
                             unreachable!("`IsNonTerminalCall` predicates should never be Ambiguous")
                         }
                     }
                 } else {
-                    let if_true = self.project(node.if_true());
-                    let if_false = self.project(node.if_false());
-                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom());
+                    let if_true = self.project(node.if_true);
+                    let if_uncertain = self.project(node.if_uncertain);
+                    let if_false = self.project(node.if_false);
+                    let (pos_constraint, neg_constraint) = self.predicate_constraints(node.atom);
 
                     if pos_constraint.is_none() && neg_constraint.is_none() {
-                        self.graph.or(if_true, if_false)
+                        let either = self.graph.or(if_true, if_false);
+                        self.graph.or(either, if_uncertain)
                     } else {
                         self.graph.add_node(ProjectedNarrowingNode {
-                            atom: node.atom(),
+                            atom: node.atom,
                             if_true,
+                            if_uncertain,
                             if_false,
                         })
                     }
@@ -969,20 +943,28 @@ impl<'db> ProjectedNarrowingContext<'_, 'db> {
             let (pos_constraint, neg_constraint) =
                 self.graph.predicate_constraints_cache[&node.atom].clone();
 
-            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            if node.if_true == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
+            {
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 self.narrow(node.if_false, false_accumulated)
-            } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE {
+            } else if node.if_false == ProjectedNarrowingNodeId::ALWAYS_FALSE
+                && node.if_uncertain == ProjectedNarrowingNodeId::ALWAYS_FALSE
+            {
                 let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                 self.narrow(node.if_true, true_accumulated)
             } else {
                 let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow(node.if_true, true_accumulated);
 
+                let uncertain_ty = self.narrow(node.if_uncertain, accumulated.clone());
+
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow(node.if_false, false_accumulated);
 
-                UnionType::from_two_elements(self.db, true_ty, false_ty)
+                let true_or_uncertain =
+                    UnionType::from_two_elements(self.db, true_ty, uncertain_ty);
+                UnionType::from_two_elements(self.db, true_or_uncertain, false_ty)
             }
         }
     }
@@ -995,7 +977,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
 ) -> Truthiness {
     match predicate_kind {
         PatternPredicateKind::Value(value) => {
-            let value_ty = infer_expression_type(db, *value, TypeContext::default());
+            let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
 
             if subject_ty.is_single_valued(db) {
                 Truthiness::from(subject_ty.is_equivalent_to(db, value_ty))
@@ -1004,7 +986,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Singleton(singleton) => {
-            let singleton_ty = singleton_to_type(db, *singleton);
+            let singleton_ty = singleton_pattern_type(db, *singleton);
 
             if subject_ty.is_equivalent_to(db, singleton_ty) {
                 Truthiness::AlwaysTrue
@@ -1026,7 +1008,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         .add_negative(UnionType::from_elements(db, excluded_types.iter()))
                         .build();
 
-                    excluded_types.push(pattern_kind_to_type(db, p));
+                    excluded_types.push(definite_match_pattern_type(db, p));
 
                     analyze_single_pattern_predicate_kind(db, p, narrowed_subject_ty)
                 })
@@ -1046,9 +1028,16 @@ fn analyze_single_pattern_predicate_kind<'db>(
             truthiness
         }
         PatternPredicateKind::Class(class_expr, kind) => {
-            let class_ty = infer_expression_type(db, *class_expr, TypeContext::default())
-                .as_class_literal()
-                .map(|class| Type::instance(db, class.top_materialization(db)));
+            let class_ty =
+                match infer_same_file_expression_type(db, *class_expr, TypeContext::default()) {
+                    Type::ClassLiteral(class) => {
+                        Some(Type::instance(db, class.top_materialization(db)))
+                    }
+                    Type::SpecialForm(SpecialFormType::CollectionsAbcCallable) => {
+                        Some(callable_pattern_type(db))
+                    }
+                    _ => None,
+                };
 
             class_ty.map_or(Truthiness::Ambiguous, |class_ty| {
                 if subject_ty.is_subtype_of(db, class_ty) {
@@ -1082,7 +1071,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
         }
         PatternPredicateKind::Sequence(kind) => {
-            let sequence_ty = sequence_pattern_type(db);
+            let sequence_ty = sequence_pattern_type_builder(db).build();
             if subject_ty.is_subtype_of(db, sequence_ty) {
                 if kind.is_irrefutable() {
                     Truthiness::AlwaysTrue
@@ -1099,7 +1088,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
             .as_deref()
             .map(|p| analyze_single_pattern_predicate_kind(db, p, subject_ty))
             .unwrap_or(Truthiness::AlwaysTrue),
-        PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
+        PatternPredicateKind::MatchStar => Truthiness::Ambiguous,
     }
 }
 
@@ -1108,7 +1097,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
 
     match predicate.node {
         PredicateNode::Expression(test_expr) => {
-            infer_expression_type(db, test_expr, TypeContext::default())
+            infer_same_file_expression_type(db, test_expr, TypeContext::default())
                 .bool(db)
                 .negate_if(!predicate.is_positive)
         }
@@ -1124,7 +1113,7 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             // selection algorithm).
             // Avoiding this on the happy-path is important because these constraints can be
             // very large in number, since we add them on all statement level function calls.
-            let ty = infer_expression_type(db, callable, TypeContext::default());
+            let ty = infer_same_file_expression_type(db, callable, TypeContext::default());
 
             // Short-circuit for well known types that are known not to return `Never` when called.
             // Without the short-circuit, we've seen that threads keep blocking each other
@@ -1162,7 +1151,8 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             } else if all_overloads_return_never {
                 Truthiness::AlwaysFalse
             } else {
-                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                let call_expr_ty =
+                    infer_same_file_expression_type(db, call_expr, TypeContext::default());
                 if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysFalse
                 } else {
@@ -1172,6 +1162,9 @@ fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
             .negate_if(!predicate.is_positive)
         }
         PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
+        PredicateNode::SubjectElementPattern(subject_element) => {
+            analyze_pattern_predicate(db, subject_element.pattern)
+        }
         PredicateNode::StarImportPlaceholder(star_import) => {
             let place_table = place_table(db, star_import.scope(db));
             let symbol = place_table.symbol(star_import.symbol_id(db));
@@ -1246,11 +1239,7 @@ pub(crate) fn binding_reachability<'db, 'map>(
     use_def: &'map UseDefMap<'db>,
     binding: &BindingWithConstraints<'map, 'db>,
 ) -> Truthiness {
-    use_def.reachability_constraints().evaluate(
-        db,
-        use_def.predicates(),
-        binding.reachability_constraint,
-    )
+    evaluate_reachability(db, use_def, binding.reachability_constraint)
 }
 
 pub(crate) fn evaluate_reachability(
@@ -1261,6 +1250,118 @@ pub(crate) fn evaluate_reachability(
     use_def
         .reachability_constraints()
         .evaluate(db, use_def.predicates(), reachability)
+}
+
+/// Inference-local cache for static reachability evaluations.
+///
+/// Place lookup may evaluate the same reachability constraint many times while inferring a single
+/// region: once for declarations, again for bindings, and again while recursively looking up
+/// related places. Those evaluations can in turn infer predicate truthiness, so reusing the result
+/// avoids repeating non-trivial work.
+///
+/// The common case is evaluating constraints from the inferred region's own use-def map. Those
+/// entries are stored in a dense vector indexed by [`ScopedReachabilityConstraintId`]. Constraints
+/// from other use-def maps are less common and are stored separately, keyed by the address of their
+/// [`ReachabilityConstraints`] graph plus the local constraint id. The graph address is part of the
+/// key because scoped constraint ids are only unique within one graph.
+pub(crate) struct ReachabilityEvaluationCache<'db> {
+    primary_scope: ScopeId<'db>,
+    primary_constraints: usize,
+    primary_entries: RefCell<Vec<Option<Truthiness>>>,
+    other_entries: RefCell<FxHashMap<(usize, ScopedReachabilityConstraintId), Truthiness>>,
+}
+
+impl<'db> ReachabilityEvaluationCache<'db> {
+    /// Creates a cache optimized for the use-def map of `primary_scope`.
+    ///
+    /// `primary_constraints` must be the reachability graph for `primary_scope`'s use-def map. The
+    /// cache uses this graph's address to decide whether an evaluation can use the dense primary
+    /// storage or must fall back to the secondary map for another graph.
+    pub(crate) fn new(
+        primary_scope: ScopeId<'db>,
+        primary_constraints: &ReachabilityConstraints,
+    ) -> Self {
+        Self {
+            primary_scope,
+            primary_constraints: std::ptr::from_ref(primary_constraints).addr(),
+            primary_entries: RefCell::new(Vec::new()),
+            other_entries: RefCell::new(FxHashMap::default()),
+        }
+    }
+
+    /// Evaluates `id`, reusing a cached result when possible.
+    ///
+    /// Trivial constraint ids return immediately and are not stored. For interior nodes, the
+    /// predicate determines whether the constraint belongs to the primary scope. A primary-scope
+    /// constraint from the primary graph is cached by dense index; all other constraints are cached
+    /// by graph identity and id.
+    pub(crate) fn evaluate(
+        &self,
+        db: &'db dyn Db,
+        constraints: &ReachabilityConstraints,
+        predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+        id: ScopedReachabilityConstraintId,
+    ) -> Truthiness {
+        match id {
+            ScopedReachabilityConstraintId::ALWAYS_TRUE => return Truthiness::AlwaysTrue,
+            ScopedReachabilityConstraintId::ALWAYS_FALSE => return Truthiness::AlwaysFalse,
+            ScopedReachabilityConstraintId::AMBIGUOUS => return Truthiness::Ambiguous,
+            _ => {}
+        }
+
+        let predicate = predicates[constraints.get_interior_node(id).atom()];
+        let constraints_key = std::ptr::from_ref(constraints).addr();
+        let scope = match predicate.node {
+            PredicateNode::Expression(expression) => expression.scope(db),
+            PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
+                callable.scope(db)
+            }
+            PredicateNode::Pattern(pattern) => pattern.scope(db),
+            PredicateNode::SubjectElementPattern(subject_element) => {
+                subject_element.pattern.scope(db)
+            }
+            PredicateNode::StarImportPlaceholder(star_import) => star_import.scope(db),
+        };
+
+        if scope != self.primary_scope || constraints_key != self.primary_constraints {
+            let key = (constraints_key, id);
+            if let Some(result) = self.other_entries.borrow().get(&key).copied() {
+                return result;
+            }
+
+            let result = constraints.evaluate(db, predicates, id);
+            self.other_entries.borrow_mut().insert(key, result);
+            return result;
+        }
+
+        let index = id.index();
+        if let Some(result) = self.primary_entries.borrow().get(index).copied().flatten() {
+            return result;
+        }
+
+        let result = constraints.evaluate(db, predicates, id);
+        let mut entries = self.primary_entries.borrow_mut();
+        if entries.len() <= index {
+            entries.resize(index + 1, None);
+        }
+        entries[index] = Some(result);
+        result
+    }
+}
+
+/// Evaluates a reachability constraint, optionally using an inference-local cache.
+pub(crate) fn evaluate_reachability_with_cache<'db>(
+    db: &'db dyn Db,
+    cache: Option<&ReachabilityEvaluationCache<'db>>,
+    constraints: &ReachabilityConstraints,
+    predicates: &IndexSlice<ScopedPredicateId, Predicate<'db>>,
+    id: ScopedReachabilityConstraintId,
+) -> Truthiness {
+    if let Some(cache) = cache {
+        cache.evaluate(db, constraints, predicates, id)
+    } else {
+        constraints.evaluate(db, predicates, id)
+    }
 }
 
 pub(crate) trait DeclarationsIteratorExtension<'db> {

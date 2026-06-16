@@ -1608,7 +1608,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 existing_enum.enum_class(db) == new_enum.enum_class(db)
                             })
                     {
-                        if existing_negative == &new_negative {
+                        if existing_negative.as_enum_literal() == Some(new_enum) {
                             return;
                         }
                         continue;
@@ -1632,7 +1632,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         if let Some(existing_enum) = existing_positive.as_enum_literal()
                             && existing_enum.enum_class(db) == new_enum.enum_class(db)
                         {
-                            if existing_positive == &new_negative {
+                            if existing_enum == new_enum {
                                 *self = Self::default();
                                 self.positive.insert(Type::Never);
                             }

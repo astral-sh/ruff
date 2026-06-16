@@ -1,0 +1,49 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/from_import_parenthesized_star.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..18,
+        body: [
+            ImportFrom(
+                StmtImportFrom {
+                    node_index: NodeIndex(None),
+                    range: 0..17,
+                    module: Some(
+                        Identifier {
+                            id: Name("x"),
+                            range: 5..6,
+                            node_index: NodeIndex(None),
+                        },
+                    ),
+                    names: [
+                        Alias {
+                            range: 15..16,
+                            node_index: NodeIndex(None),
+                            name: Identifier {
+                                id: Name("*"),
+                                range: 15..16,
+                                node_index: NodeIndex(None),
+                            },
+                            asname: None,
+                        },
+                    ],
+                    level: 0,
+                    is_lazy: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | from x import (*)
+  |               ^^ Syntax Error: Star import cannot be parenthesized
+  |

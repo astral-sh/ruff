@@ -14,8 +14,7 @@ use crate::types::diagnostic::{
     CALL_NON_CALLABLE, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_KEY,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_IMPLICIT_CALL,
     TypedDictDeleteErrorKind, report_cannot_delete_typed_dict_key,
-    report_invalid_arguments_to_annotated, report_invalid_key_on_typed_dict,
-    report_not_subscriptable,
+    report_invalid_arguments_to_annotated, report_not_subscriptable,
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, bind_typevar};
 use crate::types::infer::builder::annotation_expression::PEP613Policy;
@@ -38,6 +37,29 @@ use ty_python_core::definition::Definition;
 use ty_python_core::place::{PlaceExpr, PlaceExprRef};
 use ty_python_core::scope::FileScopeId;
 
+/// Given a string literal or a union of string literals, return an iterator over the contained
+/// strings, or `None` if the type is neither.
+fn string_literal_values<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<impl Iterator<Item = &'db str> + 'db> {
+    if let Some(literal) = ty.as_string_literal() {
+        Some(Either::Left(std::iter::once(literal.value(db))))
+    } else {
+        let elements = ty.as_union()?.elements(db);
+        elements
+            .iter()
+            .all(|ty| ty.as_string_literal().is_some())
+            .then(|| {
+                Either::Right(
+                    elements
+                        .iter()
+                        .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
+                )
+            })
+    }
+}
+
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     pub(super) fn typed_dict_key_expected_type(&self, ty: Type<'db>) -> Option<Type<'db>> {
         struct TypedDictKeyExpectedType;
@@ -51,6 +73,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ) -> Option<Type<'db>> {
             match ty {
                 Type::TypedDict(typed_dict) => {
+                    if typed_dict.explicit_extra_items(db).is_some() {
+                        return Some(KnownClass::Str.to_instance(db));
+                    }
                     let keys = typed_dict
                         .items(db)
                         .keys()
@@ -329,7 +354,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         InternedType::new(db, argument_ty),
                     ));
                 }
-                SpecialFormType::Callable => {
+                SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable => {
                     let callable = self
                         .infer_callable_type(subscript)
                         .as_callable()
@@ -1172,11 +1197,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     pub(super) fn infer_slice_expression(&mut self, slice: &ast::ExprSlice) -> Type<'db> {
-        enum SliceArg<'db> {
-            Arg(Type<'db>),
-            Unsupported,
-        }
-
         let db = self.db();
 
         let ast::ExprSlice {
@@ -1191,29 +1211,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty_upper = self.infer_optional_expression(upper.as_deref(), TypeContext::default());
         let ty_step = self.infer_optional_expression(step.as_deref(), TypeContext::default());
 
-        let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(ty @ Type::LiteralValue(literal)) if literal.is_int() || literal.is_bool() => {
-                SliceArg::Arg(ty)
-            }
-            Some(ty @ Type::NominalInstance(instance))
-                if instance.has_known_class(db, KnownClass::NoneType) =>
-            {
-                SliceArg::Arg(ty)
-            }
-            None => SliceArg::Arg(Type::none(db)),
-            _ => SliceArg::Unsupported,
-        };
-
-        match (
-            type_to_slice_argument(ty_lower),
-            type_to_slice_argument(ty_upper),
-            type_to_slice_argument(ty_step),
-        ) {
-            (SliceArg::Arg(lower), SliceArg::Arg(upper), SliceArg::Arg(step)) => {
-                KnownClass::Slice.to_specialized_instance(db, &[lower, upper, step])
-            }
-            _ => KnownClass::Slice.to_instance(db),
-        }
+        KnownClass::Slice.to_specialized_instance(
+            db,
+            &[
+                ty_lower.unwrap_or_else(|| Type::none(db)),
+                ty_upper.unwrap_or_else(|| Type::none(db)),
+                ty_step.unwrap_or_else(|| Type::none(db)),
+            ],
+        )
     }
 
     /// Validate a subscript assignment of the form `object[key] = rhs_value`.
@@ -1248,9 +1253,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Record the constraints for the object of the subscript assignment, if the object is an
-        // unconstrained collection literal.
+        // unannotated collection literal.
         if is_valid_assignment
-            && let Some(collection_def) = self.index.unconstrained_collection_binding(object)
+            && let Some(collection_def) = self.index.unannotated_collection_literal(object)
             && let Some((class_literal, _)) = object_ty.class_specialization(db)
         {
             let identity_instance = Type::instance(db, class_literal.identity_specialization(db));
@@ -1336,26 +1341,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         infer_rhs_value: &mut dyn FnMut(&mut Self, TypeContext<'db>) -> Type<'db>,
         emit_diagnostic: bool,
     ) -> bool {
-        /// Given a string literal or a union of string literals, return an iterator over the contained
-        /// strings, or `None`, if the type is neither.
-        fn key_literals<'db>(
-            db: &'db dyn Db,
-            slice_ty: Type<'db>,
-        ) -> Option<impl Iterator<Item = &'db str> + 'db> {
-            if let Some(literal) = slice_ty.as_string_literal() {
-                Some(Either::Left(std::iter::once(literal.value(db))))
-            } else {
-                slice_ty.as_union().map(|union| {
-                    Either::Right(
-                        union
-                            .elements(db)
-                            .iter()
-                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
-                    )
-                })
-            }
-        }
-
         let db = self.db();
 
         let attach_original_type_info = |diagnostic: &mut LintDiagnosticGuard| {
@@ -1451,9 +1436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut valid = true;
                 let slice_ty = infer_slice_ty(self, TypeContext::default());
-                let Some(keys) = key_literals(db, slice_ty) else {
-                    let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
-
+                let Some(keys) = string_literal_values(db, slice_ty) else {
                     // Check if the key has a valid type. We only allow string literals, a union of string literals,
                     // or a dynamic type like `Any`. We can do this by checking assignability to `LiteralString`,
                     // but we need to exclude `LiteralString` itself. This check would technically allow weird key
@@ -1464,6 +1447,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return true;
                     }
 
+                    if slice_ty.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                        && let Some(expected_ty) = typed_dict.arbitrary_key_mutation_type(db)
+                    {
+                        let rhs_value_ty =
+                            infer_rhs_value(self, TypeContext::new(Some(expected_ty)));
+                        if rhs_value_ty.is_assignable_to(db, expected_ty) {
+                            return true;
+                        }
+
+                        if emit_diagnostic
+                            && let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_ASSIGNMENT, rhs_value_node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Cannot assign value of type `{}` to key of type `{}` on TypedDict `{}`",
+                                rhs_value_ty.display(db),
+                                slice_ty.display(db),
+                                object_ty.display(db),
+                            ));
+                            diagnostic.set_primary_message(format_args!(
+                                "Expected value assignable to `{}`",
+                                expected_ty.display(db)
+                            ));
+                            attach_original_type_info(&mut diagnostic);
+                        }
+                        return false;
+                    }
+
+                    let rhs_value_ty = infer_rhs_value(self, TypeContext::default());
                     let assigned_d = rhs_value_ty.display(db);
                     let value_d = object_ty.display(db);
 
@@ -1501,31 +1514,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut infer_rhs_value = MultiInferenceGuard::new(infer_rhs_value);
 
                 for key in keys {
-                    let items = typed_dict.items(db);
-
-                    // Check if the key exists on the `TypedDict`
-                    let Some((_, item)) = items.iter().find(|(name, _)| *name == key) else {
-                        if emit_diagnostic {
-                            report_invalid_key_on_typed_dict(
-                                &self.context,
-                                target.value.as_ref().into(),
-                                target.slice.as_ref().into(),
-                                object_ty,
-                                full_object_ty,
-                                Type::string_literal(db, key),
-                                items,
-                            );
-                        }
-
-                        valid = false;
-                        continue;
-                    };
-
                     // Infer the value with type context.
-                    let value_ty = infer_rhs_value
-                        .infer_silent(self, TypeContext::new(Some(item.declared_ty)));
+                    let item = typed_dict.item(db, key);
+                    let value_ty = infer_rhs_value.infer_silent(
+                        self,
+                        TypeContext::new(item.as_ref().map(|item| item.declared_ty)),
+                    );
 
-                    key_count += 1;
+                    if item.is_some() {
+                        key_count += 1;
+                    }
                     valid &= TypedDictKeyAssignment {
                         context: &self.context,
                         typed_dict,
@@ -1596,7 +1594,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         false
                     }
-                    CallDunderError::CallError(call_error_kind, bindings) => {
+                    CallDunderError::CallError(call_error_kind, bindings, _) => {
                         let slice_ty = bindings.type_for_argument(&call_arguments, 0);
                         let rhs_value_ty = bindings.type_for_argument(&call_arguments, 1);
 
@@ -1810,6 +1808,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ),
 
             _ => {
+                if let Type::TypedDict(typed_dict) = object_ty {
+                    // Known undeclared keys can only refer to explicit extra items, so they can be
+                    // deleted whenever those items are mutable. An arbitrary string key could
+                    // instead refer to any declared field, so deletion is only safe when all
+                    // possible fields are optional and mutable.
+                    let can_delete_extra_literals = typed_dict
+                        .explicit_extra_items(db)
+                        .is_some_and(|extra_items| !extra_items.is_read_only())
+                        && string_literal_values(db, slice_ty).is_some_and(|mut literals| {
+                            literals.all(|literal| !typed_dict.items(db).contains_key(literal))
+                        });
+                    let can_delete_arbitrary_key = slice_ty
+                        .is_assignable_to(db, KnownClass::Str.to_instance(db))
+                        && typed_dict.supports_arbitrary_key_deletion(db);
+                    if can_delete_extra_literals || can_delete_arbitrary_key {
+                        return;
+                    }
+                }
+
                 match object_ty.try_call_dunder(
                     db,
                     "__delitem__",
@@ -1830,7 +1847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 attach_original_type_info(&mut diagnostic);
                             }
                         }
-                        CallDunderError::CallError(call_error_kind, bindings) => {
+                        CallDunderError::CallError(call_error_kind, bindings, _) => {
                             match call_error_kind {
                                 CallErrorKind::NotCallable => {
                                     if let Some(builder) =
@@ -1862,6 +1879,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                                     key,
                                                     Some(field),
                                                     TypedDictDeleteErrorKind::RequiredKey,
+                                                );
+                                            } else if typed_dict
+                                                .explicit_extra_items(db)
+                                                .is_some_and(|extra_items| {
+                                                    extra_items.is_read_only()
+                                                })
+                                            {
+                                                report_cannot_delete_typed_dict_key(
+                                                    &self.context,
+                                                    (&*target.slice).into(),
+                                                    typed_dict,
+                                                    key,
+                                                    None,
+                                                    TypedDictDeleteErrorKind::ReadOnlyExtraItem,
                                                 );
                                             } else {
                                                 // Key doesn't exist.
@@ -1971,9 +2002,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return TypeAndQualifiers::declared(Type::unknown());
         };
 
+        let previous_in_type_alias = self
+            .context
+            .inference_flags
+            .replace(InferenceFlags::IN_TYPE_ALIAS, false);
         for metadata_element in &arguments[1..] {
             self.infer_expression(metadata_element, TypeContext::default());
         }
+        self.context
+            .inference_flags
+            .set(InferenceFlags::IN_TYPE_ALIAS, previous_in_type_alias);
 
         subscript_context.infer(self, first_argument)
     }

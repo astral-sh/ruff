@@ -30,7 +30,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, TypeVarVariance,
     binding_type, protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy, TypedDictType, UnionType};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarKind, TypedDictType, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::source::source_text;
@@ -62,7 +62,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&INVALID_DATACLASS);
-    registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
     registry.register_lint(&CYCLIC_CLASS_DEFINITION);
@@ -116,6 +115,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&UNBOUND_TYPE_VARIABLE);
     registry.register_lint(&MISSING_ARGUMENT);
+    registry.register_lint(&MISSING_TYPE_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_CALLABLE_INIT_SUBCLASS);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -242,32 +242,6 @@ declare_lint! {
         summary: "detects implicit calls to possibly missing methods",
         status: LintStatus::stable("0.0.1-alpha.22"),
         default_level: Level::Warn,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks whether an argument is used as both a value and a type form in a call.
-    ///
-    /// ## Why is this bad?
-    /// Such calls have confusing semantics and often indicate a logic error.
-    ///
-    /// ## Examples
-    /// ```python
-    /// from typing import reveal_type
-    /// from ty_extensions import is_singleton
-    ///
-    /// if flag:
-    ///     f = repr  # Expects a value
-    /// else:
-    ///     f = is_singleton  # Expects a type form
-    ///
-    /// f(int)  # error
-    /// ```
-    pub(crate) static CONFLICTING_ARGUMENT_FORMS = {
-        summary: "detects when an argument is used as both a value and a type form in a call",
-        status: LintStatus::stable("0.0.1-alpha.1"),
-        default_level: Level::Error,
     }
 }
 
@@ -523,8 +497,14 @@ declare_lint! {
     /// Checks for invalid applications of the `@dataclass` decorator.
     ///
     /// ## Why is this bad?
+    /// Applying `@dataclass` with incompatible arguments raises an exception while creating the
+    /// class:
+    ///
+    /// - `order=True` with `eq=False`
+    /// - `weakref_slot=True` with `slots=False`
+    ///
     /// Applying `@dataclass` to a class that inherits from `NamedTuple`, `TypedDict`,
-    /// `Enum`, or `Protocol` is invalid:
+    /// `Enum`, or `Protocol` is also invalid:
     ///
     /// - `NamedTuple` and `TypedDict` classes will raise an exception at runtime when
     ///   instantiating the class.
@@ -536,12 +516,16 @@ declare_lint! {
     /// from dataclasses import dataclass
     /// from typing import NamedTuple
     ///
+    /// @dataclass(order=True, eq=False)  # error: [invalid-dataclass]
+    /// class Ordered: ...
+    ///
     /// @dataclass  # error: [invalid-dataclass]
     /// class Foo(NamedTuple):
     ///     x: int
     /// ```
     ///
     /// [explicitly not supported]: https://docs.python.org/3/howto/enum.html#dataclass-support
+    /// See: <https://docs.python.org/3/library/dataclasses.html#dataclasses.dataclass>
     pub(crate) static INVALID_DATACLASS = {
         summary: "detects invalid `@dataclass` applications",
         status: LintStatus::stable("0.0.12"),
@@ -1417,7 +1401,6 @@ declare_lint! {
     /// from typing import TypeVar
     ///
     /// T = TypeVar("T")  # okay
-    /// Q = TypeVar("S")  # error: TypeVar name must match the variable it's assigned to
     /// T = TypeVar("T")  # error: TypeVars should not be redefined
     ///
     /// # error: TypeVar must be immediately assigned to a variable
@@ -1445,7 +1428,7 @@ declare_lint! {
     /// from typing import ParamSpec
     ///
     /// P1 = ParamSpec("P1")  # okay
-    /// P2 = ParamSpec("S2")  # error: ParamSpec name must match the variable it's assigned to
+    /// P2 = ParamSpec()  # error: ParamSpec requires a name
     /// ```
     ///
     /// ## References
@@ -1519,10 +1502,11 @@ declare_lint! {
     ///
     /// ## Examples
     /// ```python
-    /// from typing import NewType, TypeVar
+    /// from typing import NewType, ParamSpec, TypeVar
     /// from typing_extensions import TypedDict
     ///
     /// T = TypeVar("U")  # error: [mismatched-type-name]
+    /// P = ParamSpec("Q")  # error: [mismatched-type-name]
     /// UserId = NewType("Id", int)  # error: [mismatched-type-name]
     /// Movie = TypedDict("Film", {"title": str})  # error: [mismatched-type-name]
     /// ```
@@ -1874,11 +1858,12 @@ declare_lint! {
     /// ```python
     /// from typing import TypeIs
     ///
-    /// def f(v: object) -> TypeIs[int]: ...
+    /// def is_int(value: object = object()) -> TypeIs[int]:
+    ///     return isinstance(value, int)
     ///
-    /// f()  # Error
-    /// f(*a)  # Error
-    /// f(10)  # Error
+    /// is_int()  # Error: no positional narrowing target
+    ///
+    /// is_int(value=1)  # Error: narrowing target passed by keyword
     /// ```
     pub(crate) static INVALID_TYPE_GUARD_CALL = {
         summary: "detects type guard function calls that has no narrowing effect",
@@ -2025,6 +2010,90 @@ declare_lint! {
         summary: "detects missing required arguments in a call",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for generic types used without type parameters in type expressions.
+    ///
+    /// ## Why is this bad?
+    /// Using a generic type without specifying its type parameters results in the
+    /// type parameters being implicitly filled with `Unknown`, reducing the
+    /// precision of type checking. Explicit type parameters make the intended types
+    /// clear and enable the type checker to catch more errors.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// import re
+    ///
+    /// def handle(m: re.Match) -> str:  # error: [missing-type-argument]
+    ///     return m.string
+    ///
+    /// # Use explicit type parameters instead:
+    /// def handle(m: re.Match[str]) -> str:
+    ///     return m.string
+    /// ```
+    pub(crate) static MISSING_TYPE_ARGUMENT = {
+        summary: "detects generic types used without explicit type parameters in type expressions",
+        status: LintStatus::stable("0.0.45"),
+        default_level: Level::Ignore,
+    }
+}
+
+pub(super) fn report_missing_type_arguments<'db>(
+    context: &InferContext<'db, '_>,
+    ty: Type<'db>,
+    annotation: &ast::Expr,
+) {
+    match ty {
+        Type::ClassLiteral(class) => {
+            let db = context.db();
+
+            let Some(generic_context) = class.generic_context(db) else {
+                return;
+            };
+
+            // Don't warn if all type parameters have defaults (PEP 696).
+            if generic_context
+                .variables(db)
+                .all(|tv| tv.default_type(db).is_some())
+            {
+                return;
+            }
+
+            let required_count = generic_context
+                .variables(db)
+                .filter(|tv| tv.default_type(db).is_none())
+                .count();
+
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                let class_name = class.name(db);
+                if required_count == 1 {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type argument for generic class `{class_name}` \
+                         (expected 1 type argument)"
+                    ));
+                } else {
+                    builder.into_diagnostic(format_args!(
+                        "Missing type arguments for generic class `{class_name}` \
+                         (expected {required_count} type arguments)"
+                    ));
+                }
+            }
+        }
+        Type::SpecialForm(
+            SpecialFormType::TypingCallable | SpecialFormType::CollectionsAbcCallable,
+        ) => {
+            if let Some(builder) = context.report_lint(&MISSING_TYPE_ARGUMENT, annotation) {
+                builder.into_diagnostic(format_args!(
+                    "Missing type arguments for generic type `Callable` \
+                     (expected 2 type arguments)"
+                ));
+            }
+        }
+        _ => {}
     }
 }
 
@@ -2947,10 +3016,15 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for step size 0 in slices.
+    /// Checks for a step size of zero in slices when the operation is known to fail.
     ///
     /// ## Why is this bad?
-    /// A slice with a step size of zero will raise a `ValueError` at runtime.
+    /// Python's built-in sequence types raise a `ValueError` when sliced with a step size of zero.
+    ///
+    /// ## Known problems
+    /// This check is not exhaustive. It reports zero-step slices for certain built-in sequence
+    /// types where the operation is known to fail. A custom `__getitem__` implementation can
+    /// accept or reject such a slice, so ty cannot detect every runtime failure.
     ///
     /// ## Examples
     /// ```python
@@ -4733,7 +4807,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
+        "Special form `Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -4749,6 +4823,20 @@ pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
     let class_display = cls_ty.display(db);
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "`{class_display}` cannot be used in a class pattern because it is not a type"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+}
+
+pub(crate) fn report_too_many_positional_patterns_for_callable_class_pattern<T: Ranged>(
+    context: &InferContext,
+    first_excess_pattern: T,
+    positional_count: usize,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, first_excess_pattern) else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Too many positional subpatterns for `collections.abc.Callable`: expected 0, got {positional_count}"
     ));
     diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
@@ -5135,18 +5223,18 @@ pub(crate) fn report_duplicate_bases(
             class.name(db)
         ),
     );
-    if let Some(first_base) = bases_list[*first_index].source_node() {
-        sub_diagnostic.annotate(Annotation::secondary(context.span(first_base)).message(
-            format_args!("Class `{duplicate_name}` first included in bases list here"),
-        ));
-    }
+    let first_base = bases_list[*first_index].source_node();
+    sub_diagnostic.annotate(
+        Annotation::secondary(context.span(first_base)).message(format_args!(
+            "Class `{duplicate_name}` first included in bases list here"
+        )),
+    );
     for index in later_indices {
-        if let Some(repeated_base) = bases_list[*index].source_node() {
-            sub_diagnostic.annotate(
-                Annotation::primary(context.span(repeated_base))
-                    .message(format_args!("Class `{duplicate_name}` later repeated here")),
-            );
-        }
+        let repeated_base = bases_list[*index].source_node();
+        sub_diagnostic.annotate(
+            Annotation::primary(context.span(repeated_base))
+                .message(format_args!("Class `{duplicate_name}` later repeated here")),
+        );
     }
 
     diagnostic.sub(sub_diagnostic);
@@ -5238,14 +5326,14 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         }
                     }
                 }
-                CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::NotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` attribute, but it is not callable",
                         base_type.display(db)
                     ));
                 }
-                CallDunderError::CallError(CallErrorKind::BindingError, _) => {
+                CallDunderError::CallError(CallErrorKind::BindingError, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
@@ -5257,7 +5345,7 @@ pub(crate) fn report_invalid_or_unsupported_base(
                         `def __mro_entries__(self, bases: tuple[type, ...], /) -> tuple[type, ...]`"
                     );
                 }
-                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _) => {
+                CallDunderError::CallError(CallErrorKind::PossiblyNotCallable, _, _) => {
                     explain_mro_entries(&mut diagnostic);
                     diagnostic.info(format_args!(
                         "Type `{}` has an `__mro_entries__` method, \
@@ -5522,6 +5610,8 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) enum TypedDictDeleteErrorKind {
     /// The key exists but is required (not `NotRequired`)
     RequiredKey,
+    /// The key refers to a read-only extra item.
+    ReadOnlyExtraItem,
     /// The key does not exist in the `TypedDict`
     UnknownKey,
 }
@@ -5544,6 +5634,9 @@ pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
     let mut diagnostic = match error_kind {
         TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
             "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::ReadOnlyExtraItem => builder.into_diagnostic(format_args!(
+            "Cannot delete read-only extra item \"{field_name}\" from TypedDict `{typed_dict_name}`"
         )),
         TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
             "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
@@ -5844,17 +5937,25 @@ pub(crate) fn report_shadowed_type_variable<'db>(
     kind: &str,
     name: &ast::name::Name,
     range: TextRange,
+    type_var_kind: TypeVarKind,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
     let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
+    let typevar_kind = match type_var_kind {
+        TypeVarKind::LegacyTypeVar
+        | TypeVarKind::Pep695TypeVar
+        | TypeVarKind::TypingSelf
+        | TypeVarKind::Pep613Alias => "type variable",
+        TypeVarKind::LegacyParamSpec | TypeVarKind::Pep695ParamSpec => "ParamSpec",
+    };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_concise_message(format_args!(
-        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+        "Generic {kind} `{name}` uses {typevar_kind} `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
         "`{typevar_name}` used in {kind} definition here"
@@ -5867,9 +5968,15 @@ pub(crate) fn report_shadowed_type_variable<'db>(
         Type::FunctionLiteral(function) => function.spans(db).signature,
         _ => return,
     };
-    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "Type variable `{typevar_name}` is bound in this enclosing scope",
-    )));
+    if other_typevar.is_paramspec(db) {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "ParamSpec `{typevar_name}` is bound in this enclosing scope"
+        )));
+    } else {
+        diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+            "Type variable `{typevar_name}` is bound in this enclosing scope"
+        )));
+    }
 }
 
 // I tried refactoring this function to placate Clippy,

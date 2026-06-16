@@ -797,6 +797,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::LazyFutureImport
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
+            | SemanticSyntaxErrorKind::MultipleStarredNamesInSequencePattern
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
@@ -3531,6 +3532,7 @@ impl<'a> LintContext<'a> {
     ///
     /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
     /// sub-diagnostics before the fix title. See its documentation for more details.
+    #[expect(unused)]
     pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
         &'chk self,
         kind: T,

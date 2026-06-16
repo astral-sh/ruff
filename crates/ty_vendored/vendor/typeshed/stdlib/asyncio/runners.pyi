@@ -50,9 +50,11 @@ if sys.version_info >= (3, 11):
 
         def get_loop(self) -> AbstractEventLoop:
             """Return embedded event loop."""
+
         if sys.version_info >= (3, 14):
             def run(self, coro: Awaitable[_T], *, context: Context | None = None) -> _T:
                 """Run code in the embedded event loop."""
+
         else:
             def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
                 """Run a coroutine inside the embedded event loop."""

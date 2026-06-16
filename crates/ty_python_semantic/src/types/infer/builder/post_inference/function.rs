@@ -3,8 +3,12 @@ use crate::{
     types::{
         KnownInstanceType, Signature, Type, TypeVarKind,
         context::InferContext,
-        diagnostic::{INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT},
-        function::OverloadLiteral,
+        diagnostic::{
+            INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_TYPE_VARIABLE_DEFAULT,
+            UNBOUND_TYPE_VARIABLE,
+        },
+        function::{FunctionDecorators, OverloadLiteral},
+        generics::GenericContext,
         infer_definition_types,
         signatures::ReturnCallableTypeVarScope,
         typevar::TypeVarInstance,
@@ -33,11 +37,90 @@ pub(crate) fn check_function_definition<'db>(
     };
 
     let last_definition = function_type.literal(db).last_definition;
+    if last_definition.has_known_decorator(db, FunctionDecorators::NO_TYPE_CHECK) {
+        return;
+    }
     let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Public);
 
     check_legacy_positional_only_convention(context, last_definition, &signature);
+    check_pep695_function_legacy_typevars(context, last_definition, file_expression_type);
     check_legacy_typevar_defaults(context, last_definition, &signature, file_expression_type);
     check_legacy_typevar_ordering(context, last_definition, &signature, file_expression_type);
+}
+
+/// Check that a function using PEP 695 syntax does not also introduce legacy type variables.
+fn check_pep695_function_legacy_typevars<'db>(
+    context: &InferContext<'db, '_>,
+    last_definition: OverloadLiteral<'db>,
+    file_expression_type: &impl Fn(&ast::Expr) -> Type<'db>,
+) {
+    let db = context.db();
+    let node = last_definition.node(db, context.file(), context.module());
+    let Some(type_params) = node.type_params.as_deref() else {
+        return;
+    };
+
+    let mut has_legacy_default = false;
+    for default in type_params.iter().filter_map(ast::TypeParam::default) {
+        let Some(typevar) = find_over_type(db, file_expression_type(default), false, |ty| {
+            if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty
+                && matches!(
+                    typevar.kind(db),
+                    TypeVarKind::LegacyTypeVar
+                        | TypeVarKind::Pep613Alias
+                        | TypeVarKind::LegacyParamSpec
+                )
+            {
+                Some(typevar)
+            } else {
+                None
+            }
+        }) else {
+            continue;
+        };
+
+        report_pep695_function_legacy_typevar(context, typevar, default.range());
+        has_legacy_default = true;
+    }
+    if has_legacy_default {
+        return;
+    }
+
+    let signature = last_definition.raw_signature(db, ReturnCallableTypeVarScope::Lexical);
+    let Some(definition) = signature.definition() else {
+        return;
+    };
+    let Some(legacy_context) = GenericContext::from_function_params(
+        db,
+        definition,
+        signature.parameters(),
+        signature.return_ty,
+    ) else {
+        return;
+    };
+
+    for typevar in legacy_context
+        .variables(db)
+        .map(|typevar| typevar.typevar(db))
+        .filter(|typevar| !typevar.is_self(db))
+    {
+        let range = find_typevar_annotation_range(context, node, typevar, file_expression_type);
+        report_pep695_function_legacy_typevar(context, typevar, range);
+    }
+}
+
+fn report_pep695_function_legacy_typevar<'db>(
+    context: &InferContext<'db, '_>,
+    typevar: TypeVarInstance<'db>,
+    range: TextRange,
+) {
+    let db = context.db();
+    if let Some(builder) = context.report_lint(&UNBOUND_TYPE_VARIABLE, range) {
+        builder.into_diagnostic(format_args!(
+            "Legacy type variable `{}` cannot be used in a function with PEP 695 type parameters",
+            typevar.name(db),
+        ));
+    }
 }
 
 /// Check for invalid applications of the pre-PEP-570 positional-only parameter convention.
@@ -125,7 +208,7 @@ fn check_legacy_typevar_defaults<'db>(
         // by `check_default_for_outer_scope_typevars` in the type parameter scope.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
         ) {
             continue;
         }
@@ -250,7 +333,7 @@ fn check_legacy_typevar_ordering<'db>(
         // Only check legacy TypeVars; PEP 695 ordering is validated by the parser.
         if !matches!(
             typevar.kind(db),
-            TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::ParamSpec
+            TypeVarKind::LegacyTypeVar | TypeVarKind::Pep613Alias | TypeVarKind::LegacyParamSpec
         ) {
             continue;
         }

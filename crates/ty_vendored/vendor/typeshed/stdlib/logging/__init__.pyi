@@ -115,6 +115,7 @@ class Filterer:
         """
         Remove the specified filter from this handler.
         """
+
     if sys.version_info >= (3, 12):
         def filter(self, record: LogRecord) -> bool | LogRecord:
             """
@@ -141,6 +142,7 @@ class Filterer:
                Allow filters to return a LogRecord instead of
                modifying it in place.
             """
+
     else:
         def filter(self, record: LogRecord) -> bool:
             """
@@ -257,6 +259,7 @@ class Logger(Filterer):
         It's useful, for example, when the parent logger is named using
         __name__ rather than a literal string.
         """
+
     if sys.version_info >= (3, 12):
         def getChildren(self) -> set[Logger]: ...
 
@@ -406,6 +409,7 @@ class Logger(Filterer):
         Low-level logging routine which creates a LogRecord and then calls
         all the handlers of this logger to handle the record.
         """
+
     fatal = critical
     def addHandler(self, hdlr: Handler) -> None:
         """
@@ -783,6 +787,7 @@ class Filter:
         children, will have its events allowed through the filter. If no
         name is specified, allow every event.
         """
+
     if sys.version_info >= (3, 12):
         def filter(self, record: LogRecord) -> bool | LogRecord:
             """
@@ -791,6 +796,7 @@ class Filter:
             Returns True if the record should be logged, or False otherwise.
             If deemed appropriate, the record may be modified in-place.
             """
+
     else:
         def filter(self, record: LogRecord) -> bool:
             """
@@ -864,6 +870,7 @@ class LogRecord:
         Return the message for this LogRecord after merging any user-supplied
         arguments with the message.
         """
+
     # Allows setting contextual information on LogRecord objects as per the docs, see #7833
     def __setattr__(self, name: str, value: Any, /) -> None: ...
 
@@ -901,6 +908,7 @@ class LoggerAdapter(Generic[_L]):
             .. versionchanged:: 3.13
                The *merge_extra* argument was added.
             """
+
     else:
         def __init__(self, logger: _L, extra: Mapping[str, object] | None = None) -> None:
             """
@@ -913,6 +921,7 @@ class LoggerAdapter(Generic[_L]):
 
             adapter = LoggerAdapter(someLogger, dict(p1=v1, p2="v2"))
             """
+
     if sys.version_info >= (3, 13):
         merge_extra: bool
 
@@ -1057,6 +1066,7 @@ class LoggerAdapter(Generic[_L]):
         """
         See if the underlying logger has any handlers.
         """
+
     if sys.version_info >= (3, 11):
         def _log(
             self,
@@ -1071,6 +1081,7 @@ class LoggerAdapter(Generic[_L]):
             """
             Low-level log implementation, proxied to allow nested logger adapters.
             """
+
     else:
         def _log(
             self,
@@ -1321,6 +1332,15 @@ def basicConfig(
               created FileHandler, causing it to be used when the file is
               opened in text mode. If not specified, the default value is
               `backslashreplace`.
+    formatter If specified, set this formatter instance for all involved
+              handlers.
+              If not specified, the default is to create and use an instance of
+              `logging.Formatter` based on arguments 'format', 'datefmt' and
+              'style'.
+              When 'formatter' is specified together with any of the three
+              arguments 'format', 'datefmt' and 'style', a `ValueError`
+              is raised to signal that these arguments would lose meaning
+              otherwise.
 
     Note that you could specify a stream created using open(filename, mode)
     rather than passing the filename and mode in. However, it should be
@@ -1343,6 +1363,9 @@ def basicConfig(
 
     .. versionchanged:: 3.9
        Added the ``encoding`` and ``errors`` parameters.
+
+    .. versionchanged:: 3.15
+       Added the ``formatter`` parameter.
     """
 @overload  # handlers is None, filename is passed (but possibly None)
 def basicConfig(
@@ -1432,6 +1455,7 @@ class StreamHandler(Handler, Generic[_StreamT]):
         Returns the old stream, if the stream was changed, or None
         if it wasn't.
         """
+
     if sys.version_info >= (3, 11):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """Represent a PEP 585 generic type

@@ -5,101 +5,21 @@ expression: lex_source(source)
 ## Tokens
 ```
 [
-    (
-        FStringStart,
-        0..2,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        InterpolatedStringMiddle(
-            "normal ",
-        ),
-        2..9,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        9..10,
-    ),
-    (
-        Name(
-            Name("foo"),
-        ),
-        10..13,
-    ),
-    (
-        Rbrace,
-        13..14,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " {another} ",
-        ),
-        14..27,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        27..28,
-    ),
-    (
-        Name(
-            Name("bar"),
-        ),
-        28..31,
-    ),
-    (
-        Rbrace,
-        31..32,
-    ),
-    (
-        InterpolatedStringMiddle(
-            " {",
-        ),
-        32..35,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Lbrace,
-        35..36,
-    ),
-    (
-        Name(
-            Name("three"),
-        ),
-        36..41,
-    ),
-    (
-        Rbrace,
-        41..42,
-    ),
-    (
-        InterpolatedStringMiddle(
-            "}",
-        ),
-        42..44,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        FStringEnd,
-        44..45,
-        TokenFlags(
-            DOUBLE_QUOTES | F_STRING,
-        ),
-    ),
-    (
-        Newline,
-        45..45,
-    ),
+    FStringStart 0..2 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringMiddle 2..9 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 9..10,
+    Name 10..13,
+    Rbrace 13..14,
+    FStringMiddle 14..27 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 27..28,
+    Name 28..31,
+    Rbrace 31..32,
+    FStringMiddle 32..35 (flags = DOUBLE_QUOTES | F_STRING),
+    Lbrace 35..36,
+    Name 36..41,
+    Rbrace 41..42,
+    FStringMiddle 42..44 (flags = DOUBLE_QUOTES | F_STRING),
+    FStringEnd 44..45 (flags = DOUBLE_QUOTES | F_STRING),
+    Newline 45..45,
 ]
 ```

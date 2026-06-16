@@ -23,7 +23,8 @@ class panel:
     def hide(self) -> None:
         """Hide the panel.
 
-        This does not delete the object, it just makes the window on screen invisible.
+        This does not delete the object, it just makes the window on screen
+        invisible.
         """
 
     def move(self, y: int, x: int, /) -> None:
@@ -59,5 +60,6 @@ def top_panel() -> panel:
 def update_panels() -> panel:
     """Updates the virtual screen after changes in the panel stack.
 
-    This does not call curses.doupdate(), so you'll have to do this yourself.
+    This does not call curses.doupdate(), so you'll have to do this
+    yourself.
     """

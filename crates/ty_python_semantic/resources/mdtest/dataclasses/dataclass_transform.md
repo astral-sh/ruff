@@ -167,6 +167,29 @@ class CustomerModel(ModelBase):
 CustomerModel(id=1, name="Test")
 ```
 
+The dataclass-like behavior of a generic class does not depend on its specialization, but the types
+of its synthesized fields do:
+
+```py
+@dataclass_transform(kw_only_default=True)
+class ModelBase[T]: ...
+
+class GenericModel[T](ModelBase[T]):
+    value: T
+
+GenericModel[int](value=1)
+GenericModel[str](value="one")
+
+# error: [too-many-positional-arguments]
+GenericModel[int](1, value=1)
+
+# error: [invalid-argument-type]
+GenericModel[int](value="one")
+
+# error: [invalid-argument-type]
+GenericModel[str](value=1)
+```
+
 ## Arguments to `dataclass_transform`
 
 ### `eq_default`
@@ -2001,14 +2024,15 @@ class WithGenericClassConverter:
     a: list[str] = field(converter=list)
     b: tuple[int, int] = field(converter=duplicate)
 
-# TODO: The input types should ideally be `a: Iterable[str]` and `b: int` here
-# revealed: (self: WithGenericClassConverter, a: Iterable[Unknown], b: Unknown) -> None
+# TODO: The input type for `b` should ideally be `int` here
+# revealed: (self: WithGenericClassConverter, a: Iterable[str], b: Unknown) -> None
 reveal_type(WithGenericClassConverter.__init__)
 
 WithGenericClassConverter(("a", "b", "c"), 1)
 
-# TODO: these should ideally be errors
+# error: [invalid-argument-type]
 WithGenericClassConverter((1, 2, 3), 1)
+# TODO: this should ideally be an error
 WithGenericClassConverter(("a", "b", "c"), "foo")
 ```
 

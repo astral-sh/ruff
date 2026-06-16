@@ -31,7 +31,6 @@ import enum
 import sys
 import types
 from _typeshed import AnnotationForm, StrPath
-from collections import OrderedDict
 from collections.abc import AsyncGenerator, Awaitable, Callable, Coroutine, Generator, Mapping, Sequence, Set as AbstractSet
 from types import (
     AsyncGeneratorType,
@@ -421,7 +420,6 @@ def iscode(object: object) -> TypeIs[CodeType]:
         co_freevars         tuple of names of free variables
         co_posonlyargcount  number of positional only arguments
         co_kwonlyargcount   number of keyword only arguments (not including ** arg)
-        co_lnotab           encoded mapping of line numbers to bytecode indices
         co_name             name with which this code object was defined
         co_names            tuple of names other than arguments and function locals
         co_nlocals          number of local variables
@@ -539,7 +537,13 @@ def getblock(lines: tuple[str, ...]) -> tuple[str, ...]: ...
 def getblock(lines: Sequence[str]) -> Sequence[str]: ...
 
 if sys.version_info >= (3, 15):
-    def getdoc(object: object, *, inherit_class_doc: bool = True, fallback_to_class_doc: bool = True) -> str | None: ...
+    def getdoc(object: object, *, inherit_class_doc: bool = True, fallback_to_class_doc: bool = True) -> str | None:
+        """Get the documentation string for an object.
+
+        All tabs are expanded to spaces.  To clean up docstrings that are
+        indented to line up with blocks of code, any whitespace than can be
+        uniformly removed from the second line onwards is removed.
+        """
 
 else:
     def getdoc(object: object) -> str | None:
@@ -659,6 +663,7 @@ class Signature:
         """Constructs Signature from the given list of Parameter
         objects and 'return_annotation'.  All arguments are optional.
         """
+
     empty = _empty
     @property
     def parameters(self) -> types.MappingProxyType[str, Parameter]: ...
@@ -681,6 +686,7 @@ class Signature:
         Pass 'parameters' and/or 'return_annotation' arguments
         to override them in the new copy.
         """
+
     __replace__ = replace
     if sys.version_info >= (3, 14):
         @classmethod
@@ -722,6 +728,7 @@ class Signature:
             marks. This is useful when the signature was created with the
             STRING format or when ``from __future__ import annotations`` was used.
             """
+
     elif sys.version_info >= (3, 13):
         def format(self, *, max_width: int | None = None) -> str:
             """Create a string representation of the Signature object.
@@ -879,6 +886,7 @@ class Parameter:
         annotation: Any = ...,
     ) -> Self:
         """Creates a customized copy of the Parameter."""
+
     if sys.version_info >= (3, 13):
         __replace__ = replace
 
@@ -903,14 +911,14 @@ class BoundArguments:
     """
 
     __slots__ = ("arguments", "_signature", "__weakref__")
-    arguments: OrderedDict[str, Any]
+    arguments: dict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
     @property
     def kwargs(self) -> dict[str, Any]: ...
     @property
     def signature(self) -> Signature: ...
-    def __init__(self, signature: Signature, arguments: OrderedDict[str, Any]) -> None: ...
+    def __init__(self, signature: Signature, arguments: dict[str, Any]) -> None: ...
     def apply_defaults(self) -> None:
         """Set default values for missing arguments.
 
@@ -1004,7 +1012,24 @@ class FullArgSpec(NamedTuple):
     annotations: dict[str, Any]
 
 if sys.version_info >= (3, 15):
-    def getfullargspec(func: object, *, annotation_format: Format = Format.VALUE) -> FullArgSpec: ...  # noqa: Y011
+    def getfullargspec(func: object, *, annotation_format: Format = Format.VALUE) -> FullArgSpec:  # noqa: Y011
+        """Get the names and default values of a callable object's parameters.
+
+        A FullArgSpec namedtuple is returned, which has the following attributes:
+        'args' is a list of the parameter names.
+        'varargs' and 'varkw' are the names of the * and ** parameters or None.
+        'defaults' is an n-tuple of the default values of the last n parameters.
+        'kwonlyargs' is a list of keyword-only parameter names.
+        'kwonlydefaults' is a dictionary mapping names from kwonlyargs to defaults.
+        'annotations' is a dictionary mapping parameter names to annotations.
+
+        The *annotation_format* parameter controls the format of the annotations.
+        See the annotationlib documentation for details.
+
+        Notable differences from inspect.signature():
+          - the "self" parameter is always reported, even for bound methods
+          - wrapper chains defined by __wrapped__ *not* unwrapped automatically
+        """
 
 else:
     def getfullargspec(func: object) -> FullArgSpec:

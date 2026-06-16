@@ -47,10 +47,6 @@ def cache_from_source(path: StrPath, debug_override: bool, *, optimization: None
     of the argument is taken and verified to be alphanumeric (else ValueError
     is raised).
 
-    The debug_override parameter is deprecated. If debug_override is not None,
-    a True value is the same as setting 'optimization' to the empty string
-    while a False value is equivalent to setting 'optimization' to '1'.
-
     If sys.implementation.cache_tag is None then NotImplementedError is raised.
 
     """
@@ -141,6 +137,7 @@ class PathFinder(importlib.abc.MetaPathFinder):
 
         The search is based on sys.path_hooks and sys.path_importer_cache.
         """
+
     if sys.version_info < (3, 12):
         @classmethod
         @deprecated("Deprecated since Python 3.4; removed in Python 3.12. Use `find_spec()` instead.")

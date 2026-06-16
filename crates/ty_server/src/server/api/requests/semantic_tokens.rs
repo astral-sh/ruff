@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use lsp_types::{SemanticTokens, SemanticTokensParams, SemanticTokensResult, Url};
+use lsp_types::{SemanticTokens, SemanticTokensParams, Uri};
 use ruff_db::source::source_text;
 use ty_project::ProjectDatabase;
 
@@ -15,11 +15,11 @@ use crate::session::client::Client;
 pub(crate) struct SemanticTokensRequestHandler;
 
 impl RequestHandler for SemanticTokensRequestHandler {
-    type RequestType = lsp_types::request::SemanticTokensFullRequest;
+    type RequestType = lsp_types::SemanticTokensRequest;
 }
 
 impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
-    fn document_url(params: &SemanticTokensParams) -> Cow<'_, Url> {
+    fn document_uri(params: &SemanticTokensParams) -> Cow<'_, Uri> {
         Cow::Borrowed(&params.text_document.uri)
     }
 
@@ -28,7 +28,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
         snapshot: &DocumentSnapshot,
         _client: &Client,
         _params: SemanticTokensParams,
-    ) -> crate::server::Result<Option<SemanticTokensResult>> {
+    ) -> crate::server::Result<Option<SemanticTokens>> {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
@@ -50,7 +50,7 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
             && let Some(notebook_document) = db.notebook_document(file)
             && let Some(notebook) = source_text(db, file).as_notebook()
         {
-            let cell_index = notebook_document.cell_index_by_uri(snapshot.url());
+            let cell_index = notebook_document.cell_index_by_uri(snapshot.uri());
 
             cell_range = cell_index.and_then(|index| notebook.cell_range(index));
         }
@@ -65,10 +65,10 @@ impl BackgroundDocumentRequestHandler for SemanticTokensRequestHandler {
                 .supports_multiline_semantic_tokens(),
         );
 
-        Ok(Some(SemanticTokensResult::Tokens(SemanticTokens {
+        Ok(Some(SemanticTokens {
             result_id: None,
             data: lsp_tokens,
-        })))
+        }))
     }
 }
 

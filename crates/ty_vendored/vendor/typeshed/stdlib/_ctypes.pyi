@@ -42,6 +42,7 @@ if sys.platform == "win32":
 
     def CopyComPointer(src: _PointerLike, dst: _PointerLike | _CArgObject) -> int:
         """CopyComPointer(src, dst) -> HRESULT value"""
+
     FUNCFLAG_HRESULT: Final = 0x2
     FUNCFLAG_STDCALL: Final = 0x0
 
@@ -72,6 +73,7 @@ if sys.platform == "win32":
 else:
     def dlclose(handle: int, /) -> None:
         """dlclose a library"""
+
     # The default for flag is RTLD_GLOBAL|RTLD_LOCAL, which is platform dependent.
     def dlopen(name: StrOrBytesPath, flag: int = ..., /) -> int:
         """dlopen(name, flag={RTLD_GLOBAL|RTLD_LOCAL}) open a shared library"""
