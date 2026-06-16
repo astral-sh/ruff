@@ -70,7 +70,8 @@ pub fn completion<'db>(
     match context.kind {
         ContextKind::Keywords(keywords) => {
             for &keyword in keywords {
-                completions.add(CompletionBuilder::keyword(keyword).context_specific(true));
+                completions
+                    .add(CompletionBuilder::keyword(keyword.as_str()).context_specific(true));
             }
         }
         ContextKind::Import(ref import) => {
@@ -659,9 +660,42 @@ struct Context<'m> {
 
 #[derive(Debug)]
 enum ContextKind<'m> {
-    Keywords(&'static [&'static str]),
+    Keywords(&'static [ContextualKeyword]),
     Import(ImportStatement<'m>),
     NonImport(ContextNonImport<'m>),
+}
+
+/// A Python keyword offered only when it is valid in the incomplete syntax at the cursor.
+///
+/// ```python
+/// for item <CURSOR>          # `in`
+/// with resource <CURSOR>     # `as`
+/// match value:
+///     case pattern <CURSOR>  # `as` or `if`
+/// ```
+#[derive(Clone, Copy, Debug)]
+enum ContextualKeyword {
+    As,
+    If,
+    In,
+}
+
+impl ContextualKeyword {
+    const fn as_str(self) -> &'static str {
+        match self {
+            ContextualKeyword::As => "as",
+            ContextualKeyword::If => "if",
+            ContextualKeyword::In => "in",
+        }
+    }
+
+    const fn token_kind(self) -> TokenKind {
+        match self {
+            ContextualKeyword::As => TokenKind::As,
+            ContextualKeyword::If => TokenKind::If,
+            ContextualKeyword::In => TokenKind::In,
+        }
+    }
 }
 
 /// Context for non-import completions.
@@ -790,9 +824,9 @@ impl RangeEndPosition {
     /// ```
     fn select_keywords(
         self,
-        after: &'static [&'static str],
-        inside_parentheses: &'static [&'static str],
-    ) -> &'static [&'static str] {
+        after: &'static [ContextualKeyword],
+        inside_parentheses: &'static [ContextualKeyword],
+    ) -> &'static [ContextualKeyword] {
         match self {
             RangeEndPosition::After => after,
             RangeEndPosition::InsideParentheses => inside_parentheses,
@@ -1032,7 +1066,7 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns the paired closing parentheses surrounding `range`.
+    /// Returns the paired closing parentheses surrounding `range`, from innermost to outermost.
     fn closing_parentheses(
         &self,
         range: TextRange,
@@ -1090,7 +1124,10 @@ impl<'m> ContextCursor<'m> {
     }
 
     /// Returns no keywords if one of `keywords` is already the next non-trivia token.
-    fn unless_already_present(&self, keywords: &'static [&'static str]) -> &'static [&'static str] {
+    fn unless_already_present(
+        &self,
+        keywords: &'static [ContextualKeyword],
+    ) -> &'static [ContextualKeyword] {
         if self
             .tokens_before
             .last()
@@ -1108,7 +1145,10 @@ impl<'m> ContextCursor<'m> {
         else {
             return keywords;
         };
-        if keywords.contains(&&self.source[next.range()]) {
+        if keywords
+            .iter()
+            .any(|keyword| keyword.token_kind() == next.kind())
+        {
             &[]
         } else {
             keywords
@@ -1117,16 +1157,19 @@ impl<'m> ContextCursor<'m> {
 
     /// Returns keywords when the cursor follows syntax that can only be
     /// continued by those keywords.
-    fn incomplete_keywords(&self) -> Option<&'static [&'static str]> {
-        const IN: &[&str] = std::slice::from_ref(&"in");
-        const AS: &[&str] = std::slice::from_ref(&"as");
-        const IF: &[&str] = std::slice::from_ref(&"if");
-        const MATCH: &[&str] = &["as", "if"];
-        const NONE: &[&str] = &[];
+    fn incomplete_keywords(&self) -> Option<&'static [ContextualKeyword]> {
+        const IN: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::In);
+        const AS: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::As);
+        const IF: &[ContextualKeyword] = std::slice::from_ref(&ContextualKeyword::If);
+        const MATCH: &[ContextualKeyword] = &[ContextualKeyword::As, ContextualKeyword::If];
+        const NONE: &[ContextualKeyword] = &[];
 
-        let typed_matches = |keywords: &[&str]| {
-            self.typed
-                .is_none_or(|typed| keywords.iter().any(|keyword| keyword.starts_with(typed)))
+        let typed_matches = |keywords: &[ContextualKeyword]| {
+            self.typed.is_none_or(|typed| {
+                keywords
+                    .iter()
+                    .any(|keyword| keyword.as_str().starts_with(typed))
+            })
         };
         let matches_in = typed_matches(IN);
         let matches_as = typed_matches(AS);
