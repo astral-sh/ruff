@@ -557,7 +557,6 @@ def test_nested_mutable_sequence_alias_does_not_keep_length(
                     return 1
         case _:
             raise ValueError
-
 ```
 
 ## Indirect class patterns
