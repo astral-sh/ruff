@@ -5079,11 +5079,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
-            if *is_async {
-                iterable_type
-                    .iterate(builder.db())
-                    .homogeneous_element_type(builder.db())
-            } else if let Some(element_type) = builder.fixed_length_iterable_element_type(iter) {
+            if let Some(element_type) = builder.fixed_length_iterable_element_type(iter)
+                && !*is_async
+            {
                 element_type
             } else {
                 iterable_type
@@ -5117,23 +5115,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let iterable_type =
                     self.infer_standalone_expression(iterable, TypeContext::default());
 
-                if for_stmt.is_async() {
+                if let Some(element_type) = self.fixed_length_iterable_element_type(iterable)
+                    && !for_stmt.is_async()
+                {
+                    element_type
+                } else {
                     iterable_type
                         .try_iterate_with_mode(
                             self.db(),
                             EvaluationMode::from_is_async(for_stmt.is_async()),
                         )
-                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                        .unwrap_or_else(|err| {
-                            err.report_diagnostic(&self.context, iterable_type, iterable.into());
-                            err.fallback_element_type(self.db())
-                        })
-                } else if let Some(element_type) = self.fixed_length_iterable_element_type(iterable)
-                {
-                    element_type
-                } else {
-                    iterable_type
-                        .try_iterate_with_mode(self.db(), EvaluationMode::Sync)
                         .map(|tuple| tuple.homogeneous_element_type(self.db()))
                         .unwrap_or_else(|err| {
                             err.report_diagnostic(&self.context, iterable_type, iterable.into());
