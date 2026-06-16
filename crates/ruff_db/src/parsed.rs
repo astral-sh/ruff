@@ -224,6 +224,15 @@ mod indexed {
     /// a fat pointer per node. Entries are divided into fixed-size chunks so that unrelated AST
     /// allocations do not force every node into a wider representation. Each chunk starts on a
     /// word boundary in `words`.
+    ///
+    /// # Safety invariant
+    ///
+    /// Every entry preserves the exact exposed address and [`RootNodeKind`] obtained from the same
+    /// [`AnyRootNodeRef`]. Relative entries use lossless address arithmetic and wide entries store
+    /// the full address. The parsed AST is placed in its final [`Arc`] before those addresses are
+    /// collected. Installing the completed index does not move or mutate the parsed AST, and no
+    /// API moves, replaces, or mutably exposes it while the index exists. Lookups pair each stored
+    /// address with `NonNull::with_exposed_provenance` and its original kind.
     #[derive(Debug, Default, get_size2::GetSize)]
     struct IndexedNodes {
         chunks: Box<[IndexChunk]>,
@@ -474,9 +483,10 @@ mod indexed {
             let nodes = visitor
                 .nodes
                 .expect("top-level AST visitor should collect indexed nodes");
+            let index = IndexedNodes::from_collected(nodes);
             Arc::get_mut(&mut inner)
                 .expect("newly created indexed module should have a unique Arc")
-                .index = IndexedNodes::from_collected(nodes);
+                .index = index;
 
             inner
         }
@@ -490,8 +500,9 @@ mod indexed {
             let index = index as usize;
             let (address, kind) = self.index.get(index);
 
-            // SAFETY: `kind` and `address` were recorded from the same node, and the node is owned
-            // by `self.parsed`, so it lives for as long as this borrow of `self`.
+            // SAFETY: By the `IndexedNodes` safety invariant, this is the exact exposed address and
+            // root-node kind recorded from the same node after `parsed` reached its stable address.
+            // `self` keeps the AST alive and immutable for the returned reference's lifetime.
             unsafe {
                 AnyRootNodeRef::from_raw_parts(
                     kind,
