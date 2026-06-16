@@ -218,124 +218,182 @@ mod indexed {
         pub parsed: Parsed<ModModule>,
     }
 
+    #[derive(Debug, Default, get_size2::GetSize)]
+    struct IndexedNodes {
+        /// Fixed-size chunks make lookup O(1) while allowing each region of the AST to use the
+        /// smallest entry width that can represent its addresses.
+        chunks: Box<[IndexChunk]>,
+        words: Box<[u64]>,
+    }
+
     #[derive(Debug, get_size2::GetSize)]
-    enum IndexedNodes {
-        /// The node kind is stored in the low bits and the scaled address offset in the high bits.
-        Packed { base: usize, entries: Box<[u32]> },
-        Split {
-            base: usize,
-            offsets: Box<[u32]>,
-            kinds: Box<[RootNodeKind]>,
-        },
-        Wide {
-            addresses: Box<[usize]>,
-            kinds: Box<[RootNodeKind]>,
-        },
+    struct IndexChunk {
+        base: usize,
+        word_start: u32,
+        entry_bits: u8,
+        entry_count: u8,
+        layout: IndexChunkLayout,
+    }
+
+    #[derive(Copy, Clone, Debug, get_size2::GetSize)]
+    #[repr(u8)]
+    enum IndexChunkLayout {
+        Relative,
+        Wide,
     }
 
     impl IndexedNodes {
         const ALIGNMENT: usize = std::mem::align_of::<AtomicNodeIndex>();
-        const KIND_BITS: u32 = 5;
-        const KIND_MASK: u32 = (1 << Self::KIND_BITS) - 1;
-        const MAX_PACKED_OFFSET: usize = (u32::MAX >> Self::KIND_BITS) as usize;
+        const CHUNK_LEN: usize = 64;
+        const KIND_BITS: u8 = 5;
+        const KIND_MASK: u64 = (1 << Self::KIND_BITS) - 1;
 
         fn from_collected(nodes: CollectedNodes) -> Self {
             let CollectedNodes { addresses, kinds } = nodes;
             debug_assert_eq!(addresses.len(), kinds.len());
 
-            let mut address_iter = addresses.iter().copied();
-            let Some(first) = address_iter.next() else {
-                return Self::default();
-            };
-            let (base, max, aligned) = address_iter.fold(
-                (first, first, first.is_multiple_of(Self::ALIGNMENT)),
-                |(base, max, aligned), address| {
-                    (
-                        base.min(address),
-                        max.max(address),
-                        aligned && address.is_multiple_of(Self::ALIGNMENT),
-                    )
-                },
-            );
+            let mut chunks = Vec::with_capacity(addresses.len().div_ceil(Self::CHUNK_LEN));
+            let mut words = Vec::new();
 
-            if !aligned {
-                return Self::Wide {
-                    addresses: addresses.into_boxed_slice(),
-                    kinds: kinds.into_boxed_slice(),
-                };
+            for (address_chunk, kind_chunk) in addresses
+                .chunks(Self::CHUNK_LEN)
+                .zip(kinds.chunks(Self::CHUNK_LEN))
+            {
+                let base = address_chunk.iter().copied().min().unwrap_or_default();
+                let max = address_chunk.iter().copied().max().unwrap_or_default();
+                let aligned = address_chunk
+                    .iter()
+                    .all(|address| address.is_multiple_of(Self::ALIGNMENT));
+                let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
+                let relative_bits = u8::try_from(offset_bits)
+                    .expect("an address offset cannot require more than u8::MAX bits")
+                    + Self::KIND_BITS;
+                let word_start = u32::try_from(words.len())
+                    .expect("indexed AST bitstream should fit in u32 words");
+
+                if aligned && relative_bits <= 64 {
+                    let entry_count = u8::try_from(address_chunk.len())
+                        .expect("an index chunk contains at most 64 entries");
+                    chunks.push(IndexChunk {
+                        base,
+                        word_start,
+                        entry_bits: relative_bits,
+                        entry_count,
+                        layout: IndexChunkLayout::Relative,
+                    });
+                    for (entry, (&address, &kind)) in
+                        address_chunk.iter().zip(kind_chunk).enumerate()
+                    {
+                        let offset = (address - base) / Self::ALIGNMENT;
+                        let offset = u64::try_from(offset)
+                            .expect("relative address offset was checked to fit in 64 bits");
+                        Self::write_bits(
+                            &mut words,
+                            word_start as usize * 64 + entry * usize::from(relative_bits),
+                            (offset << Self::KIND_BITS) | u64::from(kind as u8),
+                            relative_bits,
+                        );
+                    }
+                } else {
+                    // Wide chunks store one address word per entry followed by packed node kinds.
+                    let entry_count = u8::try_from(address_chunk.len())
+                        .expect("an index chunk contains at most 64 entries");
+                    chunks.push(IndexChunk {
+                        base: 0,
+                        word_start,
+                        entry_bits: Self::KIND_BITS,
+                        entry_count,
+                        layout: IndexChunkLayout::Wide,
+                    });
+                    words.extend(address_chunk.iter().map(|address| {
+                        u64::try_from(*address)
+                            .expect("AST node addresses should fit in a bitstream word")
+                    }));
+                    for (entry, &kind) in kind_chunk.iter().enumerate() {
+                        Self::write_bits(
+                            &mut words,
+                            (word_start as usize + address_chunk.len()) * 64
+                                + entry * usize::from(Self::KIND_BITS),
+                            u64::from(kind as u8),
+                            Self::KIND_BITS,
+                        );
+                    }
+                }
             }
 
-            let max_offset = (max - base) / Self::ALIGNMENT;
+            Self {
+                chunks: chunks.into_boxed_slice(),
+                words: words.into_boxed_slice(),
+            }
+        }
 
-            if max_offset <= Self::MAX_PACKED_OFFSET {
-                Self::Packed {
-                    base,
-                    entries: addresses
-                        .into_iter()
-                        .zip(kinds)
-                        .map(|(address, kind)| {
-                            let offset = u32::try_from((address - base) / Self::ALIGNMENT)
-                                .expect("node offset was checked to fit in packed entry");
-                            (offset << Self::KIND_BITS) | u32::from(kind as u8)
-                        })
-                        .collect(),
-                }
-            } else if u32::try_from(max_offset).is_ok() {
-                Self::Split {
-                    base,
-                    offsets: addresses
-                        .into_iter()
-                        .map(|address| {
-                            u32::try_from((address - base) / Self::ALIGNMENT)
-                                .expect("aligned address span was checked to fit in u32")
-                        })
-                        .collect(),
-                    kinds: kinds.into_boxed_slice(),
-                }
+        fn write_bits(words: &mut Vec<u64>, bit: usize, value: u64, bits: u8) {
+            debug_assert!((1..=64).contains(&bits));
+            let word = bit / 64;
+            let shift = bit % 64;
+            let end = bit + usize::from(bits);
+            words.resize(words.len().max(end.div_ceil(64)), 0);
+            words[word] |= value << shift;
+            if end > (word + 1) * 64 {
+                words[word + 1] |= value >> (64 - shift);
+            }
+        }
+
+        fn read_bits(words: &[u64], bit: usize, bits: u8) -> u64 {
+            debug_assert!((1..=64).contains(&bits));
+            let word = bit / 64;
+            let shift = bit % 64;
+            let low = words[word] >> shift;
+            let value = if shift + usize::from(bits) <= 64 {
+                low
             } else {
-                Self::Wide {
-                    addresses: addresses.into_boxed_slice(),
-                    kinds: kinds.into_boxed_slice(),
-                }
+                low | (words[word + 1] << (64 - shift))
+            };
+            if bits == 64 {
+                value
+            } else {
+                value & ((1 << bits) - 1)
             }
         }
 
         #[cfg(test)]
         fn len(&self) -> usize {
-            match self {
-                Self::Packed { entries, .. } => entries.len(),
-                Self::Split { offsets, .. } => offsets.len(),
-                Self::Wide { addresses, .. } => addresses.len(),
-            }
+            self.chunks
+                .iter()
+                .map(|chunk| usize::from(chunk.entry_count))
+                .sum()
         }
 
         fn get(&self, index: usize) -> (usize, RootNodeKind) {
-            match self {
-                Self::Packed { base, entries } => {
-                    let entry = entries[index];
+            let chunk_index = index / Self::CHUNK_LEN;
+            let entry_index = index % Self::CHUNK_LEN;
+            let chunk = &self.chunks[chunk_index];
+            let words = &self.words[chunk.word_start as usize..];
+
+            match chunk.layout {
+                IndexChunkLayout::Relative => {
+                    let entry = Self::read_bits(
+                        words,
+                        entry_index * usize::from(chunk.entry_bits),
+                        chunk.entry_bits,
+                    );
                     let offset = (entry >> Self::KIND_BITS) as usize;
                     let kind = RootNodeKind::from_u8((entry & Self::KIND_MASK) as u8)
                         .expect("packed node kind should be valid");
-                    (*base + offset * Self::ALIGNMENT, kind)
+                    (chunk.base + offset * Self::ALIGNMENT, kind)
                 }
-                Self::Split {
-                    base,
-                    offsets,
-                    kinds,
-                } => {
-                    let offset = offsets[index] as usize;
-                    (*base + offset * Self::ALIGNMENT, kinds[index])
+                IndexChunkLayout::Wide => {
+                    let address = usize::try_from(words[entry_index])
+                        .expect("stored AST node address should fit in usize");
+                    let kind_bit = usize::from(chunk.entry_count) * 64
+                        + entry_index * usize::from(Self::KIND_BITS);
+                    let kind =
+                        RootNodeKind::from_u8(
+                            Self::read_bits(words, kind_bit, Self::KIND_BITS) as u8
+                        )
+                        .expect("packed node kind should be valid");
+                    (address, kind)
                 }
-                Self::Wide { addresses, kinds } => (addresses[index], kinds[index]),
-            }
-        }
-    }
-
-    impl Default for IndexedNodes {
-        fn default() -> Self {
-            Self::Packed {
-                base: 0,
-                entries: Box::default(),
             }
         }
     }
@@ -667,39 +725,46 @@ class C[T](Base, metaclass=Meta):
         }
 
         #[test]
-        fn indexed_node_storage_variants() {
+        fn indexed_node_storage_layouts() {
             let alignment = IndexedNodes::ALIGNMENT;
-            let compact_max = IndexedNodes::MAX_PACKED_OFFSET;
-            let nodes = |addresses| CollectedNodes {
+            let chunk_distance = 1usize << (usize::BITS - 3);
+            let addresses: Vec<_> = (0..130)
+                .map(|index| {
+                    0x1000
+                        + (index / IndexedNodes::CHUNK_LEN) * chunk_distance
+                        + (index % IndexedNodes::CHUNK_LEN) * alignment
+                })
+                .collect();
+            let kinds: Vec<_> = (0..addresses.len())
+                .map(|index| {
+                    if index.is_multiple_of(2) {
+                        RootNodeKind::Stmt
+                    } else {
+                        RootNodeKind::Identifier
+                    }
+                })
+                .collect();
+            let chunked = IndexedNodes::from_collected(CollectedNodes {
+                addresses: addresses.clone(),
+                kinds: kinds.clone(),
+            });
+
+            assert_eq!(chunked.chunks.len(), 3);
+            assert!(
+                chunked
+                    .chunks
+                    .iter()
+                    .all(|chunk| matches!(chunk.layout, IndexChunkLayout::Relative))
+            );
+            for (index, (&address, &kind)) in addresses.iter().zip(&kinds).enumerate() {
+                assert_eq!(chunked.get(index), (address, kind));
+            }
+
+            let wide = IndexedNodes::from_collected(CollectedNodes {
+                addresses: vec![0x1000, 0x1001],
                 kinds: vec![RootNodeKind::Stmt, RootNodeKind::Identifier],
-                addresses,
-            };
-
-            let packed =
-                IndexedNodes::from_collected(nodes(vec![0x1000, 0x1000 + compact_max * alignment]));
-            assert!(matches!(packed, IndexedNodes::Packed { .. }));
-            assert_eq!(packed.get(0), (0x1000, RootNodeKind::Stmt));
-            assert_eq!(
-                packed.get(1),
-                (0x1000 + compact_max * alignment, RootNodeKind::Identifier)
-            );
-
-            let split = IndexedNodes::from_collected(nodes(vec![
-                0x1000,
-                0x1000 + (compact_max + 1) * alignment,
-            ]));
-            assert!(matches!(split, IndexedNodes::Split { .. }));
-            assert_eq!(split.get(0), (0x1000, RootNodeKind::Stmt));
-            assert_eq!(
-                split.get(1),
-                (
-                    0x1000 + (compact_max + 1) * alignment,
-                    RootNodeKind::Identifier
-                )
-            );
-
-            let wide = IndexedNodes::from_collected(nodes(vec![0x1000, 0x1001]));
-            assert!(matches!(wide, IndexedNodes::Wide { .. }));
+            });
+            assert!(matches!(wide.chunks[0].layout, IndexChunkLayout::Wide));
             assert_eq!(wide.get(0), (0x1000, RootNodeKind::Stmt));
             assert_eq!(wide.get(1), (0x1001, RootNodeKind::Identifier));
         }
