@@ -295,9 +295,10 @@ inherits directly from the `Any` special form retains the previous gradual class
 from typing import Any
 from ty_extensions import is_assignable_to, static_assert, TypeOf
 
-def test(x: Any):
+def test(x: Any, cls: type[Any]):
     class Foo(x): ...
     class Bar(Any): ...
+    class Baz(cls): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(not is_assignable_to(TypeOf[Foo], type[int]))
@@ -308,8 +309,14 @@ def test(x: Any):
     static_assert(is_assignable_to(TypeOf[Bar], type[int]))
     static_assert(is_assignable_to(TypeOf[Bar], type[Any]))
 
+    static_assert(is_assignable_to(TypeOf[Baz], Any))
+    static_assert(is_assignable_to(TypeOf[Baz], type))
+    static_assert(not is_assignable_to(TypeOf[Baz], type[int]))
+    static_assert(is_assignable_to(TypeOf[Baz], type[Any]))
+
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
+    static_assert(not is_assignable_to(TypeOf[Baz], int))
 ```
 
 The direct `Any` base can materialize to any subtype of `type`.

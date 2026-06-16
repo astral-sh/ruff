@@ -116,6 +116,7 @@ fn dynamic_base_kinds<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> (
         let kinds = match base {
             Type::SpecialForm(SpecialFormType::Any) => (true, false),
             Type::Dynamic(_) | Type::SpecialForm(SpecialFormType::Unknown) => (false, true),
+            Type::SubclassOf(subclass_of) if subclass_of.is_dynamic() => (false, true),
             Type::ClassLiteral(ClassLiteral::Static(base)) => dynamic_base_kinds(db, *base),
             Type::GenericAlias(alias) => dynamic_base_kinds(db, alias.origin(db)),
             _ => (false, false),
