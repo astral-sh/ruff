@@ -53,6 +53,30 @@ enum ComparisonResult<'db> {
     Ambiguous,
 }
 
+/// The branch of a comparison for which a narrowing constraint is being computed.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum ComparisonBranch {
+    Positive,
+    Negative,
+}
+
+/// The role of a literal operand in the comparison being evaluated.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum LiteralOperand {
+    Target,
+    Other,
+}
+
+impl From<bool> for ComparisonBranch {
+    fn from(is_positive: bool) -> Self {
+        if is_positive {
+            Self::Positive
+        } else {
+            Self::Negative
+        }
+    }
+}
+
 impl<'db> ComparisonResult<'db> {
     fn from_bool(value: bool) -> Self {
         if value {
@@ -63,10 +87,14 @@ impl<'db> ComparisonResult<'db> {
     }
 
     /// Convert this result into a constraint for a branch with the given truthiness.
-    fn constraint(self, is_positive: bool) -> Option<Type<'db>> {
+    fn constraint(self, branch: ComparisonBranch) -> Option<Type<'db>> {
         match self {
-            ComparisonResult::AlwaysTrue => (!is_positive).then_some(Type::Never),
-            ComparisonResult::AlwaysFalse => is_positive.then_some(Type::Never),
+            ComparisonResult::AlwaysTrue => {
+                (branch == ComparisonBranch::Negative).then_some(Type::Never)
+            }
+            ComparisonResult::AlwaysFalse => {
+                (branch == ComparisonBranch::Positive).then_some(Type::Never)
+            }
             ComparisonResult::CanNarrow(narrowed) => Some(narrowed),
             ComparisonResult::Ambiguous => None,
         }
@@ -96,18 +124,27 @@ pub(super) fn evaluate_type_equality<'db>(
     right: Type<'db>,
     is_positive: bool,
 ) -> Option<Type<'db>> {
-    enum_literal_constraint(db, left, right, ComparisonOperator::Equality, is_positive)
-        .or_else(|| builtin_literal_constraint(db, left, right, is_positive))
-        .or_else(|| {
-            if comparison_domain(db, left, right, ComparisonOperator::Equality)
-                == ComparisonDomain::Known
-            {
-                comparison_result(db, left, right, is_positive, ComparisonOperator::Equality)
-                    .constraint(is_positive)
-            } else {
-                None
-            }
-        })
+    let branch = ComparisonBranch::from(is_positive);
+    let condition_expects_equality =
+        ComparisonOperator::Equality.condition_expects_equality(branch);
+    enum_literal_constraint(
+        db,
+        left,
+        right,
+        ComparisonOperator::Equality,
+        condition_expects_equality,
+    )
+    .or_else(|| builtin_literal_constraint(db, left, right, condition_expects_equality))
+    .or_else(|| {
+        if comparison_domain(db, left, right, ComparisonOperator::Equality)
+            == ComparisonDomain::Known
+        {
+            comparison_result(db, left, right, branch, ComparisonOperator::Equality)
+                .constraint(branch)
+        } else {
+            None
+        }
+    })
 }
 
 /// Return a constraint for `left` in a branch where `left != right` has the given truthiness.
@@ -136,17 +173,20 @@ pub(super) fn evaluate_type_inequality<'db>(
     right: Type<'db>,
     is_positive: bool,
 ) -> Option<Type<'db>> {
+    let branch = ComparisonBranch::from(is_positive);
+    let condition_expects_equality =
+        ComparisonOperator::Inequality.condition_expects_equality(branch);
     enum_literal_constraint(
         db,
         left,
         right,
         ComparisonOperator::Inequality,
-        !is_positive,
+        condition_expects_equality,
     )
-    .or_else(|| builtin_literal_constraint(db, left, right, !is_positive))
+    .or_else(|| builtin_literal_constraint(db, left, right, condition_expects_equality))
     .or_else(|| {
-        comparison_result(db, left, right, is_positive, ComparisonOperator::Inequality)
-            .constraint(is_positive)
+        comparison_result(db, left, right, branch, ComparisonOperator::Inequality)
+            .constraint(branch)
     })
 }
 
@@ -158,7 +198,13 @@ pub(crate) fn equality_truthiness<'db>(
     left: Type<'db>,
     right: Type<'db>,
 ) -> Truthiness {
-    match comparison_result(db, left, right, true, ComparisonOperator::Equality) {
+    match comparison_result(
+        db,
+        left,
+        right,
+        ComparisonBranch::Positive,
+        ComparisonOperator::Equality,
+    ) {
         ComparisonResult::AlwaysTrue => Truthiness::AlwaysTrue,
         ComparisonResult::AlwaysFalse => Truthiness::AlwaysFalse,
         ComparisonResult::CanNarrow(_) | ComparisonResult::Ambiguous => Truthiness::Ambiguous,
@@ -167,23 +213,23 @@ pub(crate) fn equality_truthiness<'db>(
 
 /// Evaluate a comparison recursively, treating `left` as the operand being constrained.
 ///
-/// `is_positive` selects the branch whose constraint is accumulated when either operand expands
+/// `branch` selects the branch whose constraint is accumulated when either operand expands
 /// into multiple alternatives.
 fn comparison_result<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     right: Type<'db>,
-    is_positive: bool,
+    branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let left = left.resolve_type_alias(db);
     let right = right.resolve_type_alias(db);
 
     if let Some(alternatives) = finite_alternatives(db, left, operator) {
-        return evaluate_union_left(db, &alternatives, right, is_positive, operator);
+        return evaluate_union_left(db, &alternatives, right, branch, operator);
     }
     if let Some(alternatives) = finite_alternatives(db, right, operator) {
-        return evaluate_union_right(db, left, &alternatives, is_positive, operator);
+        return evaluate_union_right(db, left, &alternatives, branch, operator);
     }
 
     match (left, right) {
@@ -211,7 +257,7 @@ fn comparison_result<'db>(
         ) => ComparisonResult::Ambiguous,
 
         (Type::Dynamic(_), other) => {
-            if !operator.condition_expects_equality(is_positive) && other.is_single_valued(db) {
+            if !operator.condition_expects_equality(branch) && other.is_single_valued(db) {
                 ComparisonResult::CanNarrow(
                     IntersectionBuilder::new(db)
                         .add_positive(left)
@@ -227,52 +273,44 @@ fn comparison_result<'db>(
         (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
             None => ComparisonResult::Ambiguous,
             Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
-                if !operator.condition_expects_equality(is_positive) && other.is_single_valued(db) {
+                if !operator.condition_expects_equality(branch) && other.is_single_valued(db) {
                     ComparisonResult::CanNarrow(other.negate(db))
                 } else {
                     ComparisonResult::Ambiguous
                 }
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, constraints.as_type(db), other, is_positive, operator)
+                comparison_result(db, constraints.as_type(db), other, branch, operator)
             }
         },
         (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, other, constraints.as_type(db), is_positive, operator)
+                comparison_result(db, other, constraints.as_type(db), branch, operator)
             }
             None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
         },
 
-        (Type::NewTypeInstance(newtype), other) => comparison_result(
-            db,
-            newtype.concrete_base_type(db),
-            other,
-            is_positive,
-            operator,
-        )
-        .discard_narrowing(),
-        (other, Type::NewTypeInstance(newtype)) => comparison_result(
-            db,
-            other,
-            newtype.concrete_base_type(db),
-            is_positive,
-            operator,
-        )
-        .discard_narrowing(),
+        (Type::NewTypeInstance(newtype), other) => {
+            comparison_result(db, newtype.concrete_base_type(db), other, branch, operator)
+                .discard_narrowing()
+        }
+        (other, Type::NewTypeInstance(newtype)) => {
+            comparison_result(db, other, newtype.concrete_base_type(db), branch, operator)
+                .discard_narrowing()
+        }
 
         (Type::Union(union), other) => {
-            evaluate_union_left(db, union.elements(db), other, is_positive, operator)
+            evaluate_union_left(db, union.elements(db), other, branch, operator)
         }
         (other, Type::Union(union)) => {
-            evaluate_union_right(db, other, union.elements(db), is_positive, operator)
+            evaluate_union_right(db, other, union.elements(db), branch, operator)
         }
         (Type::Intersection(intersection), other) => evaluate_intersection_left(
             db,
             Type::Intersection(intersection),
             intersection.positive(db),
             other,
-            is_positive,
+            branch,
             operator,
         ),
 
@@ -285,7 +323,7 @@ fn comparison_result<'db>(
                     right,
                     left_literal.kind(),
                     right_literal.kind(),
-                    operator.condition_expects_equality(is_positive),
+                    operator.condition_expects_equality(branch),
                 ),
             }
         }
@@ -295,18 +333,18 @@ fn comparison_result<'db>(
             Type::LiteralValue(literal),
             literal.kind(),
             other,
-            is_positive,
+            branch,
             operator,
-            true,
+            LiteralOperand::Target,
         ),
         (other, Type::LiteralValue(literal)) => compare_literal_to_other(
             db,
             Type::LiteralValue(literal),
             literal.kind(),
             other,
-            is_positive,
+            branch,
             operator,
-            false,
+            LiteralOperand::Other,
         ),
 
         (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
@@ -541,11 +579,11 @@ fn evaluate_union_left<'db>(
     db: &'db dyn Db,
     elements: &[Type<'db>],
     other: Type<'db>,
-    is_positive: bool,
+    branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
-    evaluate_target_union(db, elements, is_positive, |element| {
-        comparison_result(db, element, other, is_positive, operator)
+    evaluate_target_union(db, elements, branch, |element| {
+        comparison_result(db, element, other, branch, operator)
     })
 }
 
@@ -556,7 +594,7 @@ fn evaluate_union_left<'db>(
 fn evaluate_target_union<'db>(
     db: &'db dyn Db,
     elements: &[Type<'db>],
-    is_positive: bool,
+    branch: ComparisonBranch,
     mut evaluate: impl FnMut(Type<'db>) -> ComparisonResult<'db>,
 ) -> ComparisonResult<'db> {
     if elements.is_empty() {
@@ -573,7 +611,7 @@ fn evaluate_target_union<'db>(
         match evaluate(*element) {
             ComparisonResult::AlwaysTrue => {
                 all_false = false;
-                if is_positive {
+                if branch == ComparisonBranch::Positive {
                     narrowed.push(Some(*element));
                 } else {
                     narrowed.push(None);
@@ -583,7 +621,7 @@ fn evaluate_target_union<'db>(
             }
             ComparisonResult::AlwaysFalse => {
                 all_true = false;
-                if is_positive {
+                if branch == ComparisonBranch::Positive {
                     narrowed.push(None);
                     removed = removed.add(*element);
                     removed_any = true;
@@ -635,16 +673,16 @@ fn evaluate_union_right<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
     elements: &[Type<'db>],
-    is_positive: bool,
+    branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     evaluate_against_results(
         db,
         left,
-        is_positive,
+        branch,
         elements
             .iter()
-            .map(|element| comparison_result(db, left, *element, is_positive, operator)),
+            .map(|element| comparison_result(db, left, *element, branch, operator)),
     )
 }
 
@@ -655,7 +693,7 @@ fn evaluate_union_right<'db>(
 fn evaluate_against_results<'db>(
     db: &'db dyn Db,
     target: Type<'db>,
-    is_positive: bool,
+    branch: ComparisonBranch,
     results: impl IntoIterator<Item = ComparisonResult<'db>>,
 ) -> ComparisonResult<'db> {
     let mut all_true = true;
@@ -668,13 +706,13 @@ fn evaluate_against_results<'db>(
         match result {
             ComparisonResult::AlwaysTrue => {
                 all_false = false;
-                if is_positive {
+                if branch == ComparisonBranch::Positive {
                     builder = builder.add(target);
                 }
             }
             ComparisonResult::AlwaysFalse => {
                 all_true = false;
-                if !is_positive {
+                if branch == ComparisonBranch::Negative {
                     builder = builder.add(target);
                 }
             }
@@ -708,7 +746,7 @@ fn evaluate_intersection_left<'db>(
     original: Type<'db>,
     positive: &crate::FxOrderSet<Type<'db>>,
     other: Type<'db>,
-    is_positive: bool,
+    branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
     let mut any_true = false;
@@ -718,7 +756,7 @@ fn evaluate_intersection_left<'db>(
     let mut builder = IntersectionBuilder::new(db).add_positive(original);
 
     for element in positive {
-        match comparison_result(db, *element, other, is_positive, operator) {
+        match comparison_result(db, *element, other, branch, operator) {
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
@@ -838,9 +876,9 @@ fn compare_literal_to_other<'db>(
     literal_type: Type<'db>,
     literal: LiteralValueTypeKind<'db>,
     other: Type<'db>,
-    is_positive: bool,
+    branch: ComparisonBranch,
     operator: ComparisonOperator,
-    literal_is_target: bool,
+    literal_operand: LiteralOperand,
 ) -> ComparisonResult<'db> {
     if matches!(literal, LiteralValueTypeKind::LiteralString) {
         return match KnownComparisonSemantics::of_type(db, other, operator) {
@@ -854,7 +892,7 @@ fn compare_literal_to_other<'db>(
     else {
         return ComparisonResult::Ambiguous;
     };
-    let condition_expects_equality = operator.condition_expects_equality(is_positive);
+    let condition_expects_equality = operator.condition_expects_equality(branch);
     match KnownComparisonSemantics::of_type(db, other, operator) {
         Some(other_semantics) if literal_semantics != other_semantics => {
             ComparisonResult::from_bool(operator == ComparisonOperator::Inequality)
@@ -868,14 +906,14 @@ fn compare_literal_to_other<'db>(
         // Inherited builtin comparison semantics do not imply type overlap. For example, a final
         // `int` subclass can compare equal to `1` despite being disjoint from `Literal[1]`.
         Some(_)
-            if !literal_is_target
+            if literal_operand == LiteralOperand::Other
                 && literal_type.is_single_valued(db)
                 && !other.is_disjoint_from(db, literal_type) =>
         {
             ComparisonResult::CanNarrow(literal_type.negate_if(db, !condition_expects_equality))
         }
         Some(_) => ComparisonResult::Ambiguous,
-        None if !literal_is_target
+        None if literal_operand == LiteralOperand::Other
             && !condition_expects_equality
             && literal_type.is_single_valued(db) =>
         {
@@ -934,10 +972,11 @@ impl ComparisonOperator {
     }
 
     /// Return whether the selected branch requires the operands to compare equal.
-    const fn condition_expects_equality(self, is_positive: bool) -> bool {
+    const fn condition_expects_equality(self, branch: ComparisonBranch) -> bool {
         matches!(
-            (self, is_positive),
-            (ComparisonOperator::Equality, true) | (ComparisonOperator::Inequality, false)
+            (self, branch),
+            (ComparisonOperator::Equality, ComparisonBranch::Positive)
+                | (ComparisonOperator::Inequality, ComparisonBranch::Negative)
         )
     }
 
