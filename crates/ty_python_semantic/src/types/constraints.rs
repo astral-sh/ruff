@@ -1369,6 +1369,12 @@ impl<'db> UpperBound<'db> {
         self.clauses.iter().copied().any(Type::is_union)
     }
 
+    pub(crate) fn is_satisfied_by(&self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        self.clauses
+            .iter()
+            .all(|clause| ty.is_constraint_set_assignable_to(db, *clause))
+    }
+
     /// Returns the constraints under which `lower` is assignable to every stored upper clause.
     fn when_satisfied_by<'c>(
         &self,
@@ -3666,25 +3672,36 @@ impl<'db> PathBounds<'db> {
     ) -> Result<Option<Type<'db>>, ()> {
         let bound_typevar = path_bound.bound_typevar;
         let lower = path_bound.lower_or_never();
-        let upper = path_bound.upper.materialize_exact(db);
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
-                let bound = bound.top_materialization(db);
-                if !is_possibly_constraint_set_assignable(db, lower, bound) {
-                    // This path does not satisfy the typevar's upper bound, and is
-                    // therefore not a valid specialization.
-                    return Err(());
-                }
+                let declared_upper = bound.top_materialization(db);
 
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
                 if let Some(lower) = path_bound.lower {
+                    if !path_bound.upper.is_satisfied_by(db, lower) {
+                        let when_upper = path_bound.upper.when_satisfied_by(db, builder, lower);
+                        if when_upper.is_never_satisfied(db) {
+                            // This path does not satisfy the accumulated upper bound, and is
+                            // therefore not a valid specialization.
+                            return Err(());
+                        }
+                    }
+
+                    if !is_possibly_constraint_set_assignable(db, lower, declared_upper) {
+                        // This path does not satisfy the typevar's declared upper bound, and is
+                        // therefore not a valid specialization.
+                        return Err(());
+                    }
+
                     return Ok(Some(lower));
                 }
 
                 if path_bound.has_upper() {
-                    return Ok(Some(IntersectionType::from_elements(db, [upper, bound])));
+                    return Ok(path_bound
+                        .upper
+                        .bounded_partial_dnf_witness(db, Some(declared_upper)));
                 }
 
                 Ok(None)
@@ -3698,10 +3715,12 @@ impl<'db> PathBounds<'db> {
                     let when_lower =
                         lower.when_constraint_set_assignable_to_owned(db, constraint_lower);
                     let when_upper =
-                        constraint_upper.when_constraint_set_assignable_to_owned(db, upper);
+                        path_bound
+                            .upper
+                            .when_satisfied_by(db, builder, constraint_upper);
                     let when = builder
                         .load(db, &when_lower)
-                        .and(db, builder, || builder.load(db, &when_upper));
+                        .and(db, builder, || when_upper);
                     !when.is_never_satisfied(db)
                 });
 
@@ -7104,6 +7123,87 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn default_solve_validates_lower_against_accumulated_upper() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let path_bound = PathBound {
+            bound_typevar: t,
+            lower: Some(int),
+            upper: UpperBound::from_clause(str),
+        };
+
+        assert_eq!(
+            PathBounds::default_solve(&db, &builder, &path_bound),
+            Err(())
+        );
+    }
+
+    #[test]
+    fn default_solve_uses_bounded_witness_for_upper_only_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
+        let path_bound = PathBound {
+            bound_typevar: t,
+            lower: None,
+            upper: UpperBound::from_clauses(&db, [int_or_str, str_or_bytes]),
+        };
+
+        assert_eq!(
+            PathBounds::default_solve(&db, &builder, &path_bound),
+            Ok(Some(str))
+        );
+    }
+
+    #[test]
+    fn default_solve_leaves_unbounded_typevar_unsolved_without_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let path_bound = PathBound {
+            bound_typevar: t,
+            lower: None,
+            upper: UpperBound::none(),
+        };
+
+        assert_eq!(
+            PathBounds::default_solve(&db, &builder, &path_bound),
+            Ok(None)
+        );
+    }
+
+    #[test]
+    fn default_solve_leaves_upper_only_typevar_unsolved_without_compact_witness() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let bytearray = known_instance(&db, KnownClass::Bytearray);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let bytes_or_bytearray = UnionType::from_two_elements(&db, bytes, bytearray);
+        let path_bound = PathBound {
+            bound_typevar: t,
+            lower: None,
+            upper: UpperBound::from_clauses(&db, [int_or_str, bytes_or_bytearray]),
+        };
+
+        assert_eq!(
+            PathBounds::default_solve(&db, &builder, &path_bound),
+            Ok(None)
+        );
     }
 
     #[test]

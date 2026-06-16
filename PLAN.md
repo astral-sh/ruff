@@ -539,18 +539,19 @@ Completed early as part of the initial `UpperBound` implementation. Wiring the w
 
 ### Phase 6: Update solution extraction
 
-- [ ] In `PathBounds::default_solve`, when a lower bound exists, keep preferring the lower bound, but first validate `lower <= accumulated_upper` and separately validate declared typevar bounds/constraints using the current declared-bound semantics; invalidate the path with `Err(())` if the chosen lower witness does not satisfy all required bounds.
-- [ ] For bounded typevars with no lower bound, call `bounded_partial_dnf_witness` with the declared upper bound only when there is an explicit accumulated upper or the declared bound is not the default unconstrained `object`; avoid inferring `object` solely from the absence of bounds.
-- [ ] For constrained typevars, preserve exact-constraint selection semantics: zero compatible declared constraints invalidates the path, exactly one compatible declared constraint selects that exact constraint type, and multiple compatible constraints leave the typevar unsolved. Do not return a union of declared constraints.
+- [x] In `PathBounds::default_solve`, when a lower bound exists, keep preferring the lower bound, but first validate `lower <= accumulated_upper` and separately validate declared typevar bounds/constraints using the current declared-bound semantics; invalidate the path with `Err(())` if the chosen lower witness does not satisfy all required bounds.
+- [x] For bounded typevars with no lower bound, call `bounded_partial_dnf_witness` only when there is an explicit accumulated upper bound, passing the declared upper bound as an extra solving-time conjunct. If there is no accumulated upper bound, leave the typevar unsolved for that path even when the declared bound is non-`object`; the declared bound alone is not inference evidence.
+- [x] For constrained typevars, preserve exact-constraint selection semantics: zero compatible declared constraints invalidates the path, exactly one compatible declared constraint selects that exact constraint type, and multiple compatible constraints leave the typevar unsolved. Do not return a union of declared constraints.
     - Preserve current compatibility semantics: a lower bound such as `bool` can make declared constraint `int` compatible, but the selected solution is the exact declared constraint `int`, not `bool`.
-    - Replace the old exact upper materialization check with `upper.when_satisfied_by(db, builder, constraint.top_materialization(db))` / equivalent clause-wise logic for `top_materialization(constraint) <= accumulated_upper`.
-- [ ] Implement `UpperBound::is_satisfied_by` as a clause-wise check: `ty <= each stored upper clause`; an empty upper bound is vacuously satisfied.
+    - Replaced the old exact upper materialization check with `upper.when_satisfied_by(db, builder, constraint.top_materialization(db))` for `top_materialization(constraint) <= accumulated_upper`.
+- [x] Implement `UpperBound::is_satisfied_by` as a clause-wise check: `ty <= each stored upper clause`; an empty upper bound is vacuously satisfied.
 - [x] Implement `UpperBound::when_satisfied_by` for paths that need the constraint set for `lower <= upper_bound`; return `always` for an empty upper bound, otherwise combine `lower <= each stored upper clause` with conjunction.
     - Use `when_constraint_set_assignable_to_owned` for each clause and load the owned result into the caller's builder before combining, rather than using builder-local assignability directly.
-    - Implemented early in Phase 3 for `ConstraintId::intersect`; Phase 6 still needs to wire this helper into default solution extraction.
+    - Implemented early in Phase 3 for `ConstraintId::intersect` and wired into default solution extraction in Phase 6.
 - [x] Make `UpperBound::bounded_partial_dnf_witness` return `Option<Type<'db>>`; `None` means no compact witness was found, and solver code decides the fallback policy.
-- [ ] If default solving needs an upper-only solution and bounded witness generation returns `None`, leave the typevar unsolved for that path with `Ok(None)` rather than inferring `Never`, `Unknown`, or invalidating the path.
-- [ ] Ensure `TypeVarSolution` can remain `solution: Type<'db>` for this iteration.
+- [x] If default solving needs an upper-only solution and bounded witness generation returns `None`, leave the typevar unsolved for that path with `Ok(None)` rather than inferring `Never`, `Unknown`, or invalidating the path.
+- [x] Ensure `TypeVarSolution` can remain `solution: Type<'db>` for this iteration.
+    - Focused test command: `cargo test -p ty_python_semantic types::constraints::tests::`.
 
 ## Checkpoint validation (not a separate phase)
 
@@ -576,6 +577,19 @@ cargo nextest run -p ty_python_semantic
 ```
 
 Also run a memory-limited `jax` ecosystem check before final handoff and compare against the baseline. Do **not** run `jax` without a memory limit.
+
+Final validation completed on 2026-06-16:
+
+- Full `ty_python_semantic` suite:
+    - Command: `CARGO_PROFILE_DEV_OPT_LEVEL=1 INSTA_FORCE_PASS=1 INSTA_UPDATE=always CARGO_PROFILE_DEV_DEBUG="line-tables-only" MDTEST_UPDATE_SNAPSHOTS=1 cargo nextest run -p ty_python_semantic`
+    - Result: 712 passed, 34 skipped.
+- `jax` ecosystem check:
+    - First attempted with `ulimit -v 8388608`; this failed during the profiling `ty` build (`cargo build --package ty --profile profiling` exited 101), before running `jax`.
+    - Successful command: `mkdir -p "$HOME/.pi/tmp" && (ulimit -v 16777216; eco -o "$HOME/.pi/tmp/jax-ecosystem-final.json" jax)`
+    - Result: completed without OOM; `median_time_s: 0.9431438446044922`, diagnostics: 1952, exit status summary: `[{"return_code": 1, "count": 1}]`.
+    - Baseline: `median_time_s: 0.8814291954040527`, diagnostics: 1952, exit status summary: `[{"return_code": 1, "count": 1}]`.
+- `/home/dcreager/bin/jpk run --files PLAN.md crates/ty_python_semantic/src/types/constraints.rs crates/ty_python_semantic/src/types.rs crates/ty_python_semantic/src/types/generics.rs crates/ty_python_semantic/src/types/call/bind.rs crates/ty_python_semantic/src/types/infer/builder.rs`: passed.
+- No `.pending-snap` files found.
 
 ## Open design questions
 
@@ -629,7 +643,7 @@ Also run a memory-limited `jax` ecosystem check before final handoff and compare
 - [x] What checks should default solving use for declared TypeVar bounds/constraints? Preserve current semantics: declared upper bounds use possible assignability to the top materialization; constrained TypeVars keep exact constraint selection semantics, with only accumulated-upper checks rewritten to use factored uppers.
 - [x] How much helper-method API should be decided in advance? Do not decide in-the-weeds helper APIs prematurely; focus the plan on top-level behavior and add narrow helpers only as needed during implementation.
 - [x] What is the first-pass implementation scope? Limit it to path/solution bounds plus the minimal `ConstraintId::intersect` rewrite needed to remove the old size heuristic; do not attempt a broader sequent-map redesign unless a direct correctness blocker appears.
-- [x] Should default solving call upper-only witness extraction when there is no explicit accumulated upper and the declared bound is `object`? No. Return `Ok(None)` to preserve current behavior and avoid inferring `object` solely from absence of bounds.
+- [x] Should default solving call upper-only witness extraction when there is no explicit accumulated upper and only a declared typevar bound? No. Return `Ok(None)` to preserve current behavior; the declared bound constrains valid solutions but is not itself inference evidence.
 
 ## Non-goals for this iteration
 
