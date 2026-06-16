@@ -352,21 +352,6 @@ def narrow_different_equality_implementations(value: FinalObject | FinalInt, oth
         reveal_type(value)  # revealed: FinalObject
 ```
 
-Singleton nominal instances compare equal to themselves when they inherit a known equality
-implementation:
-
-```py
-import sys
-from typing_extensions import assert_never
-
-def narrow_singleton_nominal_instance():
-    value = sys.version_info
-    if value == sys.version_info:
-        reveal_type(value)  # revealed: _version_info
-    else:
-        assert_never(value)
-```
-
 ## Constrained type variables
 
 Equality analysis expands the constraints of a constrained type variable in either operand position.

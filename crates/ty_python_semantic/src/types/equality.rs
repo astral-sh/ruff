@@ -1052,9 +1052,7 @@ impl KnownComparisonSemantics {
                     .then_some(first)
             }
             Type::NominalInstance(instance)
-                if instance.class(db).is_final(db)
-                    || instance.tuple_spec(db).is_some()
-                    || ty.is_singleton(db) =>
+                if instance.class(db).is_final(db) || instance.tuple_spec(db).is_some() =>
             {
                 Self::of_instance(db, ty, operator)
             }
