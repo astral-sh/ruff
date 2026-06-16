@@ -9,6 +9,7 @@ use super::{
 };
 use crate::Db;
 use crate::subscript::{PyIndex, PySlice};
+use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 
 impl<'db> Type<'db> {
@@ -23,6 +24,49 @@ impl<'db> Type<'db> {
         index: usize,
     ) -> Option<Self> {
         self.try_cycle_projection(db, CycleProjectionOp::UnpackExact { len, index })
+    }
+
+    pub(crate) fn try_cycle_star_unpack_prefix_projection(
+        self,
+        db: &'db dyn Db,
+        prefix: usize,
+        suffix: usize,
+        index: usize,
+    ) -> Option<Self> {
+        self.try_cycle_projection(
+            db,
+            CycleProjectionOp::UnpackStarPrefix {
+                prefix,
+                suffix,
+                index,
+            },
+        )
+    }
+
+    pub(crate) fn try_cycle_star_unpack_rest_projection(
+        self,
+        db: &'db dyn Db,
+        prefix: usize,
+        suffix: usize,
+    ) -> Option<Self> {
+        self.try_cycle_projection(db, CycleProjectionOp::UnpackStarRest { prefix, suffix })
+    }
+
+    pub(crate) fn try_cycle_star_unpack_suffix_projection(
+        self,
+        db: &'db dyn Db,
+        prefix: usize,
+        suffix: usize,
+        index: usize,
+    ) -> Option<Self> {
+        self.try_cycle_projection(
+            db,
+            CycleProjectionOp::UnpackStarSuffix {
+                prefix,
+                suffix,
+                index,
+            },
+        )
     }
 
     pub(crate) fn try_cycle_subscript_projection(
@@ -159,6 +203,17 @@ impl<'db> Type<'db> {
     ) -> Option<Self> {
         let mut saw_self_reference = false;
         let mut productive_terms = Vec::new();
+        let wrap_in_list = terms
+            .iter()
+            .any(|term| matches!(term, ProjectionTerm::List(_)));
+
+        if wrap_in_list
+            && terms
+                .iter()
+                .any(|term| !matches!(term, ProjectionTerm::List(_)))
+        {
+            return None;
+        }
 
         for term in terms {
             match *term {
@@ -181,16 +236,37 @@ impl<'db> Type<'db> {
                         &mut productive_terms,
                     );
                 }
+                ProjectionTerm::List(term) => {
+                    Self::collect_homogeneous_projection_component_terms(
+                        db,
+                        root,
+                        term,
+                        &mut saw_self_reference,
+                        &mut productive_terms,
+                    );
+                }
             }
         }
 
         if productive_terms.is_empty() {
-            return (!saw_self_reference).then_some(Type::Never);
+            return (!saw_self_reference).then(|| {
+                if wrap_in_list {
+                    KnownClass::List.to_specialized_instance(db, &[Type::Never])
+                } else {
+                    Type::Never
+                }
+            });
         }
 
-        Some(match productive_terms.as_slice() {
+        let solved = match productive_terms.as_slice() {
             [term] => *term,
             _ => UnionType::from_elements_cycle_recovery(db, productive_terms),
+        };
+
+        Some(if wrap_in_list {
+            KnownClass::List.to_specialized_instance(db, &[solved])
+        } else {
+            solved
         })
     }
 
@@ -311,17 +387,6 @@ impl<'db> Type<'db> {
             return Some(UnionType::from_elements_cycle_recovery(db, elements));
         }
 
-        if let Some(spec) = self.exact_tuple_instance_spec(db) {
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
-                return None;
-            };
-            let elements = tuple
-                .iter_all_elements()
-                .map(|element| element.replace_solved_projection_artifacts(db, root, solved_ops))
-                .collect::<Option<Vec<_>>>()?;
-            return Some(Type::heterogeneous_tuple(db, elements));
-        }
-
         if let Some(container) = ProjectionContainer::from_type(db, self) {
             return container.into_type(db, root, solved_ops);
         }
@@ -402,8 +467,8 @@ impl<'db> Type<'db> {
 
 #[derive(Debug, Clone)]
 enum ProjectionContainer<'db> {
-    FixedTuple {
-        elements: Vec<Type<'db>>,
+    Tuple {
+        spec: TupleSpec<'db>,
     },
     Known {
         class: KnownClass,
@@ -419,11 +484,8 @@ enum ProjectionContainer<'db> {
 impl<'db> ProjectionContainer<'db> {
     fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
-                return None;
-            };
-            return Some(Self::FixedTuple {
-                elements: tuple.iter_all_elements().collect(),
+            return Some(Self::Tuple {
+                spec: spec.as_ref().clone(),
             });
         }
 
@@ -471,9 +533,7 @@ impl<'db> ProjectionContainer<'db> {
         path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         let ty = match self {
-            Self::FixedTuple { elements } => {
-                Type::heterogeneous_tuple(db, elements.iter().copied())
-            }
+            Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Known { class, arguments } => class.to_specialized_instance(db, arguments),
             Self::Custom { arm, .. } => {
                 return Self::project_custom_path(db, *arm, root, evidence, path);
@@ -501,6 +561,31 @@ impl<'db> ProjectionContainer<'db> {
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::project_unpack_exact(db, ty, len, index)?
             }
+            CycleProjectionOp::UnpackStarPrefix {
+                prefix,
+                suffix,
+                index,
+            } => Self::project_star_unpack(
+                db,
+                ty,
+                prefix,
+                suffix,
+                StarUnpackPosition::Prefix(index),
+            )?,
+            CycleProjectionOp::UnpackStarRest { prefix, suffix } => {
+                Self::project_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Rest)?
+            }
+            CycleProjectionOp::UnpackStarSuffix {
+                prefix,
+                suffix,
+                index,
+            } => Self::project_star_unpack(
+                db,
+                ty,
+                prefix,
+                suffix,
+                StarUnpackPosition::Suffix(index),
+            )?,
             CycleProjectionOp::GetItemLiteralInt(index) => {
                 Self::project_get_item_int(db, ty, Some(index))?
             }
@@ -517,7 +602,7 @@ impl<'db> ProjectionContainer<'db> {
 
         Self::project_type_path(
             db,
-            projected.ty(),
+            projected.ty(db),
             root,
             evidence,
             CycleProjectionPath::from_ops(db, tail.iter().copied()),
@@ -550,6 +635,23 @@ impl<'db> ProjectionContainer<'db> {
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::infer_unpack_exact(db, ty, len, index)?
             }
+            CycleProjectionOp::UnpackStarPrefix {
+                prefix,
+                suffix,
+                index,
+            } => {
+                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Prefix(index))?
+            }
+            CycleProjectionOp::UnpackStarRest { prefix, suffix } => {
+                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Rest)?
+            }
+            CycleProjectionOp::UnpackStarSuffix {
+                prefix,
+                suffix,
+                index,
+            } => {
+                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Suffix(index))?
+            }
             CycleProjectionOp::GetItemLiteralInt(index) => {
                 Self::infer_subscript(db, ty, Type::int_literal(index))?
             }
@@ -569,16 +671,13 @@ impl<'db> ProjectionContainer<'db> {
             return Some(projected);
         }
 
-        Self::infer_projection_path(db, projected.ty(), tail)
+        Self::infer_projection_path(db, projected.ty(db), tail)
     }
 
     fn project_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
-                return None;
-            };
             return Some(ProjectionTerm::Homogeneous(
-                UnionType::from_elements_cycle_recovery(db, tuple.iter_all_elements()),
+                spec.as_ref().homogeneous_element_type(db),
             ));
         }
 
@@ -600,12 +699,10 @@ impl<'db> ProjectionContainer<'db> {
         index: usize,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
+            let tuple = spec.as_ref().resize(db, TupleLength::Fixed(len)).ok()?;
+            let Tuple::Fixed(tuple) = tuple else {
                 return None;
             };
-            if tuple.len() != len {
-                return None;
-            }
 
             return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
         }
@@ -619,6 +716,65 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         None
+    }
+
+    fn project_star_unpack(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            return Self::project_star_unpack_tuple(db, spec.as_ref(), prefix, suffix, position);
+        }
+
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_iter_item_type(known_class, specialization.types(db))
+        {
+            return Some(Self::star_unpack_homogeneous(element, position));
+        }
+
+        None
+    }
+
+    fn project_star_unpack_tuple(
+        db: &'db dyn Db,
+        tuple: &TupleSpec<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        let resized = tuple
+            .resize(db, TupleLength::Variable(prefix, suffix))
+            .ok()?;
+        let Tuple::Variable(tuple) = resized else {
+            return None;
+        };
+
+        Some(match position {
+            StarUnpackPosition::Prefix(index) => {
+                ProjectionTerm::Exact(tuple.iter_prefix_elements().nth(index)?)
+            }
+            StarUnpackPosition::Rest => ProjectionTerm::List(tuple.variable()),
+            StarUnpackPosition::Suffix(index) => {
+                ProjectionTerm::Exact(tuple.iter_suffix_elements().nth(index)?)
+            }
+        })
+    }
+
+    const fn star_unpack_homogeneous(
+        element: Type<'db>,
+        position: StarUnpackPosition,
+    ) -> ProjectionTerm<'db> {
+        match position {
+            StarUnpackPosition::Prefix(_) | StarUnpackPosition::Suffix(_) => {
+                ProjectionTerm::Homogeneous(element)
+            }
+            StarUnpackPosition::Rest => ProjectionTerm::List(element),
+        }
     }
 
     fn project_get_item_int(
@@ -635,7 +791,7 @@ impl<'db> ProjectionContainer<'db> {
             }
 
             return Some(ProjectionTerm::Homogeneous(
-                UnionType::from_elements_cycle_recovery(db, tuple.all_elements().iter().copied()),
+                tuple.homogeneous_element_type(db),
             ));
         }
 
@@ -691,16 +847,28 @@ impl<'db> ProjectionContainer<'db> {
         len: usize,
         index: usize,
     ) -> Option<ProjectionTerm<'db>> {
-        if let Some(spec) = ty.exact_tuple_instance_spec(db)
-            && let TupleSpec::Fixed(tuple) = spec.as_ref()
-            && tuple.len() == len
-        {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let tuple = spec.as_ref().resize(db, TupleLength::Fixed(len)).ok()?;
+            let Tuple::Fixed(tuple) = tuple else {
+                return None;
+            };
             return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
         }
 
         Some(ProjectionTerm::Homogeneous(
             ty.try_iterate(db).ok()?.homogeneous_element_type(db),
         ))
+    }
+
+    fn infer_star_unpack(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    ) -> Option<ProjectionTerm<'db>> {
+        let tuple = ty.try_iterate(db).ok()?;
+        Self::project_star_unpack_tuple(db, tuple.as_ref(), prefix, suffix, position)
     }
 
     fn infer_subscript(
@@ -740,16 +908,37 @@ impl<'db> ProjectionContainer<'db> {
         solved_ops: &[(CycleProjectionPath<'db>, Type<'db>)],
     ) -> Option<Type<'db>> {
         match self {
-            Self::FixedTuple { elements } => {
-                let elements = elements
-                    .into_iter()
-                    .map(|element| {
-                        element.replace_solved_projection_artifacts(db, root, solved_ops)
-                    })
-                    .collect::<Option<Vec<_>>>()?;
+            Self::Tuple { spec } => match spec {
+                Tuple::Fixed(tuple) => {
+                    let elements = tuple
+                        .iter_all_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                        })
+                        .collect::<Option<Vec<_>>>()?;
 
-                Some(Type::heterogeneous_tuple(db, elements))
-            }
+                    Some(Type::heterogeneous_tuple(db, elements))
+                }
+                Tuple::Variable(tuple) => {
+                    let prefix = tuple
+                        .iter_prefix_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+                    let variable = tuple
+                        .variable()
+                        .replace_solved_projection_artifacts(db, root, solved_ops)?;
+                    let suffix = tuple
+                        .iter_suffix_elements()
+                        .map(|element| {
+                            element.replace_solved_projection_artifacts(db, root, solved_ops)
+                        })
+                        .collect::<Option<Vec<_>>>()?;
+
+                    Some(Type::tuple(TupleType::mixed(db, prefix, variable, suffix)))
+                }
+            },
             Self::Known { class, arguments } => {
                 let arguments = arguments
                     .into_iter()
@@ -838,17 +1027,21 @@ impl<'db> ProjectionContainer<'db> {
 enum ProjectionTerm<'db> {
     Exact(Type<'db>),
     Homogeneous(Type<'db>),
+    List(Type<'db>),
 }
 
 impl<'db> ProjectionTerm<'db> {
-    const fn ty(self) -> Type<'db> {
+    fn ty(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             ProjectionTerm::Exact(ty) | ProjectionTerm::Homogeneous(ty) => ty,
+            ProjectionTerm::List(element) => {
+                KnownClass::List.to_specialized_instance(db, &[element])
+            }
         }
     }
 
     fn is_ambiguous(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self.ty(), false, |ty| {
+        any_over_type(db, self.ty(db), false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::AmbiguousOverload))
         })
     }
@@ -899,7 +1092,7 @@ impl<'db> CycleRecoveryEvidence<'db> {
                         existing.root.same_marker(root)
                             && existing.arm == arm
                             && existing.path == suffix
-                            && existing.term.ty() == term.ty()
+                            && existing.term.ty(db) == term.ty(db)
                     }) {
                         continue;
                     }
@@ -984,11 +1177,30 @@ impl<'db> CycleProjectionPath<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CycleProjectionOp {
     IterItem,
-    UnpackExact { len: usize, index: usize },
+    UnpackExact {
+        len: usize,
+        index: usize,
+    },
+    UnpackStarPrefix {
+        prefix: usize,
+        suffix: usize,
+        index: usize,
+    },
+    UnpackStarRest {
+        prefix: usize,
+        suffix: usize,
+    },
+    UnpackStarSuffix {
+        prefix: usize,
+        suffix: usize,
+        index: usize,
+    },
     GetItemLiteralInt(i64),
     GetItemInt,
     SliceStatic(StaticSliceProjection),
-    ContextEnter { is_async: bool },
+    ContextEnter {
+        is_async: bool,
+    },
     AwaitResult,
 }
 
@@ -1014,6 +1226,13 @@ impl<'db> CycleProjectionOp {
 
         None
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StarUnpackPosition {
+    Prefix(usize),
+    Rest,
+    Suffix(usize),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]

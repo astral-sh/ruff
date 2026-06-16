@@ -9,7 +9,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use crate::Db;
 use crate::types::infer::{ExpressionInference, FrozenMap};
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, TypeContext, UnionType, infer_expression_types};
 use ty_python_core::ExpressionNodeKey;
 use ty_python_core::scope::ScopeId;
 use ty_python_core::unpack::{UnpackKind, UnpackValue};
@@ -210,24 +210,13 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if allow_cycle_projection && elts.iter().all(|elt| !elt.is_starred_expr()) {
-                    let projected_tys = (0..elts.len())
-                        .map(|index| {
-                            value_ty.try_cycle_unpack_projection(self.db(), elts.len(), index)
-                        })
-                        .collect::<Option<Vec<_>>>();
-
-                    if let Some(projected_tys) = projected_tys {
-                        for (target, projected_ty) in elts.iter().zip(projected_tys) {
-                            self.unpack_inner(
-                                target,
-                                value_expr,
-                                projected_ty,
-                                allow_cycle_projection,
-                            );
-                        }
-                        return;
+                if allow_cycle_projection
+                    && let Some(projected_tys) = self.try_cycle_unpack_projections(value_ty, elts)
+                {
+                    for (target, projected_ty) in elts.iter().zip(projected_tys) {
+                        self.unpack_inner(target, value_expr, projected_ty, allow_cycle_projection);
                     }
+                    return;
                 }
 
                 let target_len = match elts.iter().position(ast::Expr::is_starred_expr) {
@@ -301,6 +290,115 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 self.record_unknown_target_subtree(target);
             }
         }
+    }
+
+    fn try_cycle_unpack_projections(
+        &self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        if let Type::Union(union) = value_ty {
+            let mut saw_cycle_projection = false;
+            let mut target_tys = vec![Vec::new(); targets.len()];
+
+            for element in union.elements(self.db()).iter().copied() {
+                let element_tys = if let Some(projected) =
+                    self.try_cycle_unpack_projections_for_element(element, targets)
+                {
+                    saw_cycle_projection = true;
+                    projected
+                } else {
+                    self.try_normal_unpack_types(element, targets)?
+                };
+
+                for (target_ty, element_ty) in target_tys.iter_mut().zip(element_tys) {
+                    target_ty.push(element_ty);
+                }
+            }
+
+            return saw_cycle_projection.then(|| {
+                target_tys
+                    .into_iter()
+                    .map(|elements| UnionType::from_elements(self.db(), elements))
+                    .collect()
+            });
+        }
+
+        self.try_cycle_unpack_projections_for_element(value_ty, targets)
+    }
+
+    fn try_cycle_unpack_projections_for_element(
+        &self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        match targets.iter().position(ast::Expr::is_starred_expr) {
+            Some(starred_index) => {
+                if targets
+                    .iter()
+                    .skip(starred_index + 1)
+                    .any(ast::Expr::is_starred_expr)
+                {
+                    return None;
+                }
+
+                let prefix = starred_index;
+                let suffix = targets.len() - (starred_index + 1);
+                (0..targets.len())
+                    .map(|index| {
+                        if index < prefix {
+                            value_ty.try_cycle_star_unpack_prefix_projection(
+                                self.db(),
+                                prefix,
+                                suffix,
+                                index,
+                            )
+                        } else if index == starred_index {
+                            value_ty.try_cycle_star_unpack_rest_projection(
+                                self.db(),
+                                prefix,
+                                suffix,
+                            )
+                        } else {
+                            value_ty.try_cycle_star_unpack_suffix_projection(
+                                self.db(),
+                                prefix,
+                                suffix,
+                                index - starred_index - 1,
+                            )
+                        }
+                    })
+                    .collect()
+            }
+            None => (0..targets.len())
+                .map(|index| value_ty.try_cycle_unpack_projection(self.db(), targets.len(), index))
+                .collect(),
+        }
+    }
+
+    fn try_normal_unpack_types(
+        &self,
+        value_ty: Type<'db>,
+        targets: &[ast::Expr],
+    ) -> Option<Vec<Type<'db>>> {
+        let target_len = match targets.iter().position(ast::Expr::is_starred_expr) {
+            Some(starred_index) => {
+                if targets
+                    .iter()
+                    .skip(starred_index + 1)
+                    .any(ast::Expr::is_starred_expr)
+                {
+                    return None;
+                }
+                TupleLength::Variable(starred_index, targets.len() - (starred_index + 1))
+            }
+            None => TupleLength::Fixed(targets.len()),
+        };
+
+        let mut unpacker = TupleUnpacker::new(self.db(), target_len);
+        let tuple = value_ty.try_iterate(self.db()).ok()?;
+        unpacker.unpack_tuple(tuple.as_ref()).ok()?;
+        Some(unpacker.into_types().collect())
     }
 
     pub(crate) fn finish(self) -> UnpackResult<'db> {

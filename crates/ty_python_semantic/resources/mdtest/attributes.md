@@ -2966,6 +2966,62 @@ class ProjectionList:
         reveal_type(self.x)  # revealed: list[int]
 ```
 
+Starred unpacking also recovers the prefix, suffix, and rest element types:
+
+```py
+class ProjectionStarredList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        first, *rest = self.x
+        rest.append(first)
+        self.x = rest
+
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionStarredListSuffix:
+    def __init__(self) -> None:
+        self.x = [0, 1]
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        middle.append(first)
+        middle.append(last)
+        self.x = middle
+
+        reveal_type(first)  # revealed: int
+        reveal_type(middle)  # revealed: list[int]
+        reveal_type(last)  # revealed: int
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionStarredTuple:
+    def __init__(self) -> None:
+        self.x = (0, str(), b"")
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        self.x = (first, middle[0], last)
+
+        reveal_type(first)  # revealed: int
+        reveal_type(middle)  # revealed: list[str]
+        reveal_type(last)  # revealed: bytes
+        reveal_type(self.x)  # revealed: tuple[int, str, bytes]
+
+class ProjectionStarredTupleEmptyRest:
+    def __init__(self) -> None:
+        self.x = (0, b"")
+
+    def read(self) -> None:
+        first, *middle, last = self.x
+        self.x = (first, last)
+
+        reveal_type(middle)  # revealed: list[Never]
+        reveal_type(self.x)  # revealed: tuple[int, bytes]
+```
+
 Projection recovery works for other known generic containers:
 
 ```py
@@ -3114,6 +3170,18 @@ class ProjectionCustomBox:
         x, = self.x
         self.x = Box(x)
 
+        reveal_type(self.x)  # revealed: Box[int]
+
+class ProjectionCustomStarredBox:
+    def __init__(self) -> None:
+        self.x = Box(0)
+
+    def read(self) -> None:
+        first, *rest = self.x
+        self.x = Box(first)
+
+        reveal_type(first)  # revealed: int
+        reveal_type(rest)  # revealed: list[int]
         reveal_type(self.x)  # revealed: Box[int]
 
 class ProjectionCustomBoxInList:
