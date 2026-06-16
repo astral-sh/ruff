@@ -288,8 +288,8 @@ static_assert(not is_assignable_to(type[Any], None))
 
 ### Class-literal types
 
-Class-literal types with a dynamic MRO entry are assignable to any type `T` where `T` is assignable
-to `type`:
+Class-literal types with a dynamically typed base are assignable to any type `T` where `T` is
+assignable to `type`:
 
 ```py
 from typing import Any
@@ -335,7 +335,8 @@ def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     static_assert(is_assignable_to(UnionDynamic, int))
 ```
 
-The dynamic MRO entry can materialize to any subtype of `type`.
+A dynamically typed base could be `int` at runtime, making the new class a subclass of `int`. The
+class object is therefore assignable to `type[int]`, but not to `int`.
 
 ### Nominal instance and subclass-of types
 
