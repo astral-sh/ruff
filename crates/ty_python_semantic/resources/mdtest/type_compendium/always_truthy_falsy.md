@@ -3,6 +3,10 @@
 ```toml
 [environment]
 python-version = "3.14"
+
+[rules]
+# Ignore usage of & and ~ in value expressions
+unsupported-operator = "ignore"
 ```
 
 The types `AlwaysTruthy` and `AlwaysFalsy` describe the set of values that are always truthy or

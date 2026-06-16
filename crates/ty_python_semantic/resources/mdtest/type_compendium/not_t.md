@@ -3,6 +3,10 @@
 ```toml
 [environment]
 python-version = "3.14"
+
+[rules]
+# Ignore usage of & and ~ in value expressions
+unsupported-operator = "ignore"
 ```
 
 The type `~T` is the complement of the type `T`. It describes the set of all values that are *not*

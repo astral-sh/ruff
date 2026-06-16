@@ -3,6 +3,10 @@
 ```toml
 [environment]
 python-version = "3.14"
+
+[rules]
+# Ignore usage of & and ~ in value expressions
+unsupported-operator = "ignore"
 ```
 
 ## Introduction
