@@ -68,6 +68,65 @@ def foo():
 }
 
 #[test]
+fn unused_import_has_unnecessary_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import os
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn module_scope_unused_import_is_reported_when_used_from_another_file() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let package = SystemPath::new("src/pkg/__init__.py");
+    let implementation = SystemPath::new("src/pkg/_impl.py");
+    let consumer = SystemPath::new("src/consumer.py");
+    let package_content = "\
+from ._impl import helper
+";
+    let implementation_content = "\
+def helper(): ...
+";
+    let consumer_content = "\
+import pkg
+pkg.helper()
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(package, package_content)?
+        .with_file(implementation, implementation_content)?
+        .with_file(consumer, consumer_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(package, package_content, 1);
+    let diagnostics = server.document_diagnostic_request(package, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn unreachable_code_has_unnecessary_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -157,6 +216,33 @@ def foo():
 }
 
 #[test]
+fn unreachable_code_suppresses_unused_import_hint() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo():
+    return 0
+    import os
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn workspace_reports_unused_binding_hint_tag() -> Result<()> {
     let _filter = filter_result_id();
 
@@ -166,6 +252,32 @@ fn workspace_reports_unused_binding_hint_tag() -> Result<()> {
 def foo():
     x = 1
     return 0
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Workspace)),
+        )?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let diagnostics = server.workspace_diagnostic_request(None, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn workspace_reports_unused_import_hint_tag() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import os
 ";
 
     let mut server = TestServerBuilder::new()?
