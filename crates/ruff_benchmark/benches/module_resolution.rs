@@ -90,14 +90,9 @@ fn setup_case(n: usize) -> Case {
 fn ty_module_resolver<const PATHS: usize>(bencher: Bencher) {
     bencher
         .with_inputs(|| setup_case(PATHS))
-        .bench_local_values(|case| {
-            let Case {
-                db,
-                importing_file,
-                resolves,
-            } = case;
-            for name in &resolves {
-                black_box(resolve_module(&db, importing_file, name));
+        .bench_local_refs(|case| {
+            for name in &case.resolves {
+                black_box(resolve_module(&case.db, case.importing_file, name));
             }
         });
 }
