@@ -1106,6 +1106,13 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => self.always(),
 
+            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
+            // but this is not true for divergent types (and moving this case any lower down appears to cause
+            // "too many cycle iterations" panics).
+            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
+                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
+            }
+
             // An explicit `Any` base makes instances gradually assignable to any type, while
             // leaving the nominal instance intact so that declared members retain their types.
             (Type::NominalInstance(source), _)
@@ -1119,13 +1126,6 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
                 if source_typevar.is_same_typevar_as(db, target_typevar) =>
             {
                 self.always()
-            }
-
-            // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
-            // but this is not true for divergent types (and moving this case any lower down appears to cause
-            // "too many cycle iterations" panics).
-            (Type::Divergent(_), _) | (_, Type::Divergent(_)) => {
-                ConstraintSet::from_bool(self.constraints, self.is_eager_assignability())
             }
 
             (Type::TypeAlias(source_alias), _) => self.with_recursion_guard(source, target, || {

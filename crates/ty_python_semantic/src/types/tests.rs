@@ -278,6 +278,31 @@ fn divergent_type() {
 }
 
 #[test]
+fn any_subclass_is_not_lazily_assignable_to_divergent() {
+    use crate::place::global_symbol;
+
+    let mut db = setup_db();
+    db.write_dedented(
+        "/src/a.py",
+        r#"
+from typing import Any
+
+class A(Any): ...
+"#,
+    )
+    .unwrap();
+
+    let module = ruff_db::files::system_path_to_file(&db, "/src/a.py").unwrap();
+    let Type::ClassLiteral(class) = global_symbol(&db, module, "A").place.expect_type() else {
+        panic!("Expected `A` to be a class literal");
+    };
+    let instance = Type::instance(&db, class.default_specialization(&db));
+    let divergent = Type::divergent(salsa::plumbing::Id::from_bits(1));
+
+    assert!(!instance.is_constraint_set_assignable_to(&db, divergent));
+}
+
+#[test]
 fn type_alias_variance() {
     use crate::db::tests::TestDb;
     use crate::place::global_symbol;
