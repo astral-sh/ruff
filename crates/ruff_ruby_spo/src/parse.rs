@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 use lib_ruby_parser::{Node, Parser, ParserOptions};
 
 use crate::RubyClass;
+use crate::functions::extract_functions_from_body;
 use crate::walk::walk_class_body;
 
 /// Walk `<source_tree>/app/models/**/*.rb` and parse every file into
@@ -125,6 +126,7 @@ fn collect_classes_with_namespace(node: &Node, ns: &[String], out: &mut Vec<Ruby
             let mut class = RubyClass {
                 name: qualified,
                 declarations: Vec::new(),
+                functions: Vec::new(),
             };
             // STI parent is the explicit superclass when it isn't
             // ApplicationRecord / ActiveRecord::Base / a synthetic root.
@@ -143,6 +145,12 @@ fn collect_classes_with_namespace(node: &Node, ns: &[String], out: &mut Vec<Ruby
             if let Some(body) = &c.body {
                 walk_class_body(body, &mut class.declarations);
             }
+            // D-AR-3.5: method-name + raise/reads/traverses extraction
+            // runs over the same class body. We pass the declarations
+            // (already populated above) so the body walker can filter
+            // `traverses_relation` candidates to declared associations.
+            class.functions =
+                extract_functions_from_body(c.body.as_deref(), &class.declarations);
             out.push(class);
             // A nested class inside a class body is unusual but possible
             // (`class Outer; class Inner; end; end`); the inner one was

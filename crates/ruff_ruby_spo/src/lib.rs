@@ -34,6 +34,7 @@ use ruff_spo_triplet::{
     Function, GemDsl, Model, ModelGraph, ScopeDecl, StiInfo, UsingRef, Validation,
 };
 
+mod functions;
 mod parse;
 mod walk;
 
@@ -60,6 +61,11 @@ pub struct RubyClass {
     /// this into the typed `Model::{associations, validations, …}`
     /// sibling fields the shared IR consumes.
     pub declarations: Vec<Declaration>,
+    /// Method-body extraction (D-AR-3.5): one [`Function`] per `def`
+    /// in the class body. Populated by [`parse::parse_models`] alongside
+    /// `declarations`, then flowed straight onto `Model::functions` by
+    /// [`extract`] below.
+    pub functions: Vec<Function>,
 }
 
 /// One class-body DSL call, discriminated by category.
@@ -120,7 +126,10 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
     for class in &classes {
         let mut model = Model::new(&class.name);
         model.fields = extract_fields(class);
-        model.functions = extract_functions(class);
+        // D-AR-3.5: method-name + raise/reads/traverses extraction
+        // already happened at parse time (see `parse.rs`). The class
+        // carries a populated `Function` vec.
+        model.functions.clone_from(&class.functions);
         for decl in &class.declarations {
             unpack_declaration(&mut model, decl);
         }
@@ -169,16 +178,6 @@ fn unpack_declaration(model: &mut Model, decl: &Declaration) {
 /// The D-AR-4 coverage gate measures *declarations*, not fields, so the
 /// stub is sufficient for ndjson + `expand()` shipment of AR-shape facts.
 fn extract_fields(_class: &RubyClass) -> Vec<Field> {
-    Vec::new()
-}
-
-/// Extract [`Function`]s from a class. **D-AR-3 stub** — returns empty.
-///
-/// The full implementation (D-AR-3.5) will walk `Node::Def` in the
-/// class body and populate `name` / `reads` / `raises` / `traverses`.
-/// See the original scaffold docstring (preserved in git history before
-/// 21c828d) for the Rails→IR mapping notes.
-fn extract_functions(_class: &RubyClass) -> Vec<Function> {
     Vec::new()
 }
 
