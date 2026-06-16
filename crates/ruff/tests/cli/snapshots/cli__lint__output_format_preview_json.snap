@@ -11,6 +11,7 @@ info:
     - "F401,F821"
     - "--target-version"
     - py39
+    - "--preview"
     - input.py
 ---
 success: false
@@ -73,7 +74,7 @@ exit_code: 1
   },
   {
     "cell": null,
-    "code": "invalid-syntax",
+    "code": null,
     "end_location": {
       "column": 6,
       "row": 3
