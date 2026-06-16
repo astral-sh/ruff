@@ -31,6 +31,7 @@
 - `[x]` Performance regression follow-up is implemented and later simplified: local ecosystem runs showed the CI timeout was DateType-specific; the regression minimized to `DateTime.combine(...)` / `DateTime` method expressions in DateType. `is_never_satisfied` uses raw satisfiability because existential quantification preserves satisfiability; protocol context checks only perform expensive satisfiability queries when collecting context; strict constraint-set assignability now uses the owned/cached query path; and protocol interface checks eagerly apply deferred quantification independently for each member, assuming generic protocol members are independent and their callable-local typevars cannot be referenced by other members. The previous extra typevar-mention bookkeeping/pruning implementation has been removed. DateType local ecosystem time is back near `main`.
 - `[x]` JAX OOM follow-up is implemented: sequent-map constraint intersection keeps its local upper-bound intersection size heuristic for the explicit-two-upper-bounds case, and solution generation applies an equivalent heuristic directly in `ConstraintBoundsBuilder::finish`, using a threshold of `4 * number_of_upper_bounds` and falling back to `Unknown` instead of materializing a huge DNF upper bound. Full `ty_python_semantic` tests pass, no pending snapshots were produced, `jpk run --files` passed for the changed files, and a JAX local ecosystem run under `ulimit -v 25000000` completed in 0.954s.
 - `[x]` Constraint-implication cycle-guard follow-up is implemented: individual constraint implication now goes through a Salsa-tracked `constraint_implies` query keyed by semantic `Constraint` data, with `cycle_initial = false` so recursive proof attempts conservatively decline to derive the sequent. The per-builder `cached_constraint_implies` cache remains as a cheap `ConstraintId` memoization layer, and an external pandas mdtest covers the `Series.sum()` / generic-protocol-`self` recursion that motivated the guard.
+- `[x]` Constraint-implication open-bound perf follow-up is implemented: `constraint_implies` now first tries a shallow non-recursive proof (covering exact/default bounds and union/intersection element structure), then declines to perform full semantic implication if any bound mentions another typevar. This preserves obvious open-bound sequents such as equivalent unions with reordered elements, but avoids the `Series.sum()` / pandas `SupportsAdd` ↔ `SupportsRAdd` recursion family. Local direct checks show the minimized `Series.sum()` case dropping from ~106s to ~0.08s, and full `freqtrade scripts` dropping from ~114s to ~5.1s with the same diagnostic count.
 - `[ ]` Out-of-scope TODO for this PR: the returned-callable generic-context inference gap exposed by `partial(partial, drop)` is fixed by a separate feature branch that builds on this one.
 
 ## Background and goal
@@ -55,7 +56,7 @@ That immediate reduction hid the freshened callable type variables from later co
     - Protocol interface checks eagerly apply deferred quantification to each member's constraint set before the normal distributed conjunction, relying on the fact that generic protocol member-local typevars are independent of other members.
     - `ConstraintSet::path_bounds`, `solutions`, and `solutions_with` centralize deferred quantification and optional inferable-only projection before solution extraction.
     - `PathBounds::compute` remains the raw lower-level implementation and should only be reached through `ConstraintSet::path_bounds` for `ConstraintSet` values.
-    - `ConstraintId::implies` delegates to the Salsa-tracked `constraint_implies` query over copied `Constraint` data. This keeps semantic implication checks cached across builders and gives recursive implication proof cycles a conservative `false` cycle value; `ConstraintSetBuilder::cached_constraint_implies` still memoizes per-builder `ConstraintId` pairs on top.
+    - `ConstraintId::implies` delegates to the Salsa-tracked `constraint_implies` query over copied `Constraint` data. This keeps semantic implication checks cached across builders and gives recursive implication proof cycles a conservative `false` cycle value; `ConstraintSetBuilder::cached_constraint_implies` still memoizes per-builder `ConstraintId` pairs on top. Before using recursive semantic assignability, `constraint_implies` now attempts a shallow proof and skips non-obvious open-bound implications whose bounds mention typevars.
 - `crates/ty_python_semantic/src/types/generics.rs`
     - `SpecializationBuilder::solve_pending_with` and `SpecializationBuilder::add_type_mappings_from_constraint_set` now request `SolutionProjection::InferableOnly(self.inferable)` from the centralized constraint-set solution APIs.
 - `crates/ty_python_semantic/src/types/relation.rs`
@@ -70,6 +71,7 @@ That immediate reduction hid the freshened callable type variables from later co
 - Owned/cached constraint sets must preserve deferred-quantification metadata across `into_owned`, `query`, and `load`.
 - Boolean/satisfiability observations need an explicit policy: final user-visible relation checks should preserve today's semantics, but internal combinator short-circuiting must not eagerly erase raw constraints that future construction could use.
 - Sequent discovery's individual-constraint implication checks must be cycle-safe. Applying deferred quantification during an implication proof can construct constraint sets whose sequent discovery asks for the same implication again; recursive proof attempts should conservatively fail to derive that implication rather than exhausting Salsa cycle recovery or producing an unsound sequent.
+- Sequent discovery should avoid recursive semantic implication for open constraints whose bounds mention typevars unless the implication is shallowly obvious. Returning `false` from implication only withholds an optional derived sequent; it is sound to skip non-obvious open-bound cases that can recurse through generic protocol/callable assignability.
 
 ## Resolved design decisions
 
@@ -207,6 +209,22 @@ Each phase should generally become its own jj revision if it can be made clean i
     - `ConstraintSetBuilder::cached_constraint_implies` still caches per-builder `(ConstraintId, ConstraintId)` results; the Salsa query handles cross-builder reuse and cycle recovery.
 - `[x]` Add a regression mdtest in `crates/ty_python_semantic/resources/mdtest/external/pandas.md` with a matching `pandas.lock`.
     - The test checks `pandas.Series.sum()` and documents that the generic protocol `self` annotation used to recurse through constraint-set implication checks while deferred quantification was being applied.
+
+### Follow-up: Skip recursive implication for open constraints
+
+- `[x]` Diagnose the remaining `freqtrade` timeout.
+    - Direct `ty check` (without ecosystem-analyzer's 30s timeout) showed the minimized `from pandas import Series; s.sum()` case finishes in ~106s, so this is a finite but severe slowdown rather than an infinite loop.
+    - Tracing `ConstraintId::implies` showed repeated sequent implication cycles between pandas `Series.__add__` and `Series.__radd__` overloads via `_typeshed.SupportsAdd` and `_typeshed.SupportsRAdd`, with no typevar freshness growth.
+- `[x]` Make `constraint_implies` two-tiered.
+    - First, prove shallow implications without entering relation checking: exact type equality, bottom/top defaults (`Never` and `object`), and simple union/intersection element structure. This keeps useful open-bound sequents such as reordered equivalent unions involving typevars.
+    - If the shallow proof fails and any lower/upper bound in either constraint mentions a typevar, return `false` instead of invoking recursive semantic assignability. This is sound because implication only adds optional derived sequents.
+    - If all bounds are closed, keep the existing semantic lower/upper assignability checks.
+- `[x]` Add focused Rust unit tests for open-bound implication behavior.
+    - Reordered `int | U` / `U | int` bounds still imply each other via the shallow proof.
+    - Non-obvious open bounds such as `bool | U ≤ int | U` are conservatively skipped even though a full semantic proof could derive them.
+- `[x]` Local performance checks with the fix:
+    - Minimized `Series.sum()` direct check: ~0.08s, `All checks passed!`.
+    - Full `freqtrade scripts` direct check: ~5.1s, same 679-diagnostic count as before.
 
 ## Open questions for plan review
 
