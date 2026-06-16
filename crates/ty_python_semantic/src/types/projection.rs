@@ -20,10 +20,8 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Option<Self> {
-        let op = if mode.is_async() {
-            CycleProjectionOp::AsyncIterItem
-        } else {
-            CycleProjectionOp::IterItem
+        let op = CycleProjectionOp::Iter {
+            is_async: mode.is_async(),
         };
         self.try_cycle_projection_with_non_cycle(db, op, |ty| {
             ty.try_iterate_with_mode(db, mode)
@@ -38,7 +36,10 @@ impl<'db> Type<'db> {
         len: usize,
         index: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(db, CycleProjectionOp::UnpackExact { len, index })
+        self.try_cycle_projection(
+            db,
+            CycleProjectionOp::Unpack(CycleUnpackProjection::Exact { len, index }),
+        )
     }
 
     pub(crate) fn try_cycle_star_unpack_prefix_projection(
@@ -50,11 +51,11 @@ impl<'db> Type<'db> {
     ) -> Option<Self> {
         self.try_cycle_projection(
             db,
-            CycleProjectionOp::UnpackStarPrefix {
+            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
                 prefix,
                 suffix,
-                index,
-            },
+                position: StarUnpackPosition::Prefix(index),
+            }),
         )
     }
 
@@ -64,7 +65,14 @@ impl<'db> Type<'db> {
         prefix: usize,
         suffix: usize,
     ) -> Option<Self> {
-        self.try_cycle_projection(db, CycleProjectionOp::UnpackStarRest { prefix, suffix })
+        self.try_cycle_projection(
+            db,
+            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
+                prefix,
+                suffix,
+                position: StarUnpackPosition::Rest,
+            }),
+        )
     }
 
     pub(crate) fn try_cycle_star_unpack_suffix_projection(
@@ -76,11 +84,11 @@ impl<'db> Type<'db> {
     ) -> Option<Self> {
         self.try_cycle_projection(
             db,
-            CycleProjectionOp::UnpackStarSuffix {
+            CycleProjectionOp::Unpack(CycleUnpackProjection::Star {
                 prefix,
                 suffix,
-                index,
-            },
+                position: StarUnpackPosition::Suffix(index),
+            }),
         )
     }
 
@@ -89,9 +97,11 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::from_subscript(db, slice_ty).or_else(|| {
-            (!slice_ty.is_instance_of(db, KnownClass::Slice)).then_some(CycleProjectionOp::GetItem)
+        let subscript = CycleProjectionSubscript::from_type(db, slice_ty).or_else(|| {
+            (!slice_ty.is_instance_of(db, KnownClass::Slice))
+                .then_some(CycleProjectionSubscript::Unknown)
         })?;
+        let op = CycleProjectionOp::Subscript(subscript);
         self.try_cycle_projection_with_non_cycle(db, op, |ty| {
             ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()
         })
@@ -225,7 +235,7 @@ impl<'db> Type<'db> {
             .map(|op| (op, Vec::new()))
             .collect::<Vec<_>>();
         for container in &containers {
-            container.collect_projection_terms(db, root, evidence, &mut terms_by_op)?;
+            container.collect_projection_terms(db, evidence, &mut terms_by_op)?;
         }
 
         let solved_ops = terms_by_op
@@ -576,10 +586,10 @@ impl<'db> ProjectionContainer<'db> {
         class: KnownClass,
         arguments: &[Type<'db>],
     ) -> bool {
-        Self::known_container_iter_item_type(class, arguments).is_some()
-            || Self::known_container_async_iter_item_type(class, arguments).is_some()
+        Self::known_container_iter_item_type(class, arguments, false).is_some()
+            || Self::known_container_iter_item_type(class, arguments, true).is_some()
             || Self::known_container_get_item_type(db, class, arguments).is_some()
-            || Self::known_container_slice_type_for_class(class, arguments).is_some()
+            || Self::known_container_slice_type(db, class, arguments).is_some()
             || Self::known_container_await_result_type(class, arguments).is_some()
             || Self::known_container_method_call0_type(
                 db,
@@ -607,12 +617,11 @@ impl<'db> ProjectionContainer<'db> {
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
-        root: DivergentType,
         evidence: &[CycleRecoveryEvidence<'db>],
         terms_by_op: &mut [(CycleProjectionPath<'db>, Vec<ProjectionTerm<'db>>)],
     ) -> Option<()> {
         for (path, terms) in terms_by_op {
-            terms.push(self.project_path(db, root, evidence, *path)?);
+            terms.push(self.project_path(db, evidence, *path)?);
         }
         Some(())
     }
@@ -620,7 +629,6 @@ impl<'db> ProjectionContainer<'db> {
     fn project_path(
         &self,
         db: &'db dyn Db,
-        root: DivergentType,
         evidence: &[CycleRecoveryEvidence<'db>],
         path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
@@ -628,20 +636,19 @@ impl<'db> ProjectionContainer<'db> {
             Self::Tuple { spec } => Type::tuple(TupleType::new(db, spec)),
             Self::Known { class, arguments } => class.to_specialized_instance(db, arguments),
             Self::Custom { arm, .. } => {
-                return Self::project_custom_path(db, *arm, root, evidence, path);
+                return Self::project_custom_path(db, *arm, evidence, path);
             }
         };
-        Self::project_type_path(db, ty, root, evidence, path)
+        Self::project_type_path(db, ty, evidence, path)
     }
 
     fn project_type_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        root: DivergentType,
         evidence: &[CycleRecoveryEvidence<'db>],
         path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
-        if let Some(term) = Self::project_custom_path(db, ty, root, evidence, path) {
+        if let Some(term) = Self::project_custom_path(db, ty, evidence, path) {
             return Some(term);
         }
 
@@ -649,43 +656,10 @@ impl<'db> ProjectionContainer<'db> {
         let (&op, tail) = ops.split_first()?;
 
         let projected = match op {
-            CycleProjectionOp::IterItem => Self::project_iter_item(db, ty)?,
-            CycleProjectionOp::AsyncIterItem => Self::project_async_iter_item(db, ty)?,
-            CycleProjectionOp::UnpackExact { len, index } => {
-                Self::project_unpack_exact(db, ty, len, index)?
-            }
-            CycleProjectionOp::UnpackStarPrefix {
-                prefix,
-                suffix,
-                index,
-            } => Self::project_star_unpack(
-                db,
-                ty,
-                prefix,
-                suffix,
-                StarUnpackPosition::Prefix(index),
-            )?,
-            CycleProjectionOp::UnpackStarRest { prefix, suffix } => {
-                Self::project_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Rest)?
-            }
-            CycleProjectionOp::UnpackStarSuffix {
-                prefix,
-                suffix,
-                index,
-            } => Self::project_star_unpack(
-                db,
-                ty,
-                prefix,
-                suffix,
-                StarUnpackPosition::Suffix(index),
-            )?,
-            CycleProjectionOp::GetItemLiteralInt(index) => {
-                Self::project_get_item_int(db, ty, Some(index))?
-            }
-            CycleProjectionOp::GetItemInt => Self::project_get_item_int(db, ty, None)?,
-            CycleProjectionOp::GetItem => Self::project_get_item(db, ty)?,
+            CycleProjectionOp::Iter { is_async } => Self::project_iter_item(db, ty, is_async)?,
+            CycleProjectionOp::Unpack(unpack) => Self::project_unpack(db, ty, unpack)?,
+            CycleProjectionOp::Subscript(subscript) => Self::project_subscript(db, ty, subscript)?,
             CycleProjectionOp::CallMethod0(method) => Self::project_method_call0(db, ty, method)?,
-            CycleProjectionOp::SliceStatic(slice) => Self::project_slice_static(db, ty, slice)?,
             CycleProjectionOp::ContextEnter { .. } => {
                 return None;
             }
@@ -699,7 +673,6 @@ impl<'db> ProjectionContainer<'db> {
         Self::project_type_path(
             db,
             projected.ty(db),
-            root,
             evidence,
             CycleProjectionPath::from_ops(db, tail.iter().copied()),
         )
@@ -708,15 +681,13 @@ impl<'db> ProjectionContainer<'db> {
     fn project_custom_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        root: DivergentType,
         evidence: &[CycleRecoveryEvidence<'db>],
         path: CycleProjectionPath<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         Self::is_custom_generic_container(db, ty).then_some(())?;
-        evidence.iter().find_map(|fact| {
-            (fact.root.same_marker(root) && fact.arm == ty && fact.path == path)
-                .then_some(fact.term)
-        })
+        evidence
+            .iter()
+            .find_map(|fact| (fact.arm == ty && fact.path == path).then_some(fact.term))
     }
 
     fn infer_projection_path(
@@ -727,39 +698,10 @@ impl<'db> ProjectionContainer<'db> {
         let (&op, tail) = ops.split_first()?;
 
         let projected = match op {
-            CycleProjectionOp::IterItem => Self::infer_iter_item(db, ty)?,
-            CycleProjectionOp::AsyncIterItem => Self::infer_async_iter_item(db, ty)?,
-            CycleProjectionOp::UnpackExact { len, index } => {
-                Self::infer_unpack_exact(db, ty, len, index)?
-            }
-            CycleProjectionOp::UnpackStarPrefix {
-                prefix,
-                suffix,
-                index,
-            } => {
-                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Prefix(index))?
-            }
-            CycleProjectionOp::UnpackStarRest { prefix, suffix } => {
-                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Rest)?
-            }
-            CycleProjectionOp::UnpackStarSuffix {
-                prefix,
-                suffix,
-                index,
-            } => {
-                Self::infer_star_unpack(db, ty, prefix, suffix, StarUnpackPosition::Suffix(index))?
-            }
-            CycleProjectionOp::GetItemLiteralInt(index) => {
-                Self::infer_subscript(db, ty, Type::int_literal(index))?
-            }
-            CycleProjectionOp::GetItemInt => {
-                Self::infer_subscript(db, ty, KnownClass::Int.to_instance(db))?
-            }
-            CycleProjectionOp::GetItem => Self::infer_subscript(db, ty, Type::unknown())?,
+            CycleProjectionOp::Iter { is_async } => Self::infer_iter_item(db, ty, is_async)?,
+            CycleProjectionOp::Unpack(unpack) => Self::infer_unpack(db, ty, unpack)?,
+            CycleProjectionOp::Subscript(subscript) => Self::infer_subscript(db, ty, subscript)?,
             CycleProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
-            CycleProjectionOp::SliceStatic(slice) => {
-                Self::infer_subscript(db, ty, slice.into_type(db))?
-            }
             CycleProjectionOp::ContextEnter { is_async } => {
                 Self::infer_context_enter(db, ty, is_async)?
             }
@@ -773,8 +715,16 @@ impl<'db> ProjectionContainer<'db> {
         Self::infer_projection_path(db, projected.ty(db), tail)
     }
 
-    fn project_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+    fn project_iter_item(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        is_async: bool,
+    ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            if is_async {
+                return None;
+            }
+
             return Some(ProjectionTerm::Homogeneous(
                 spec.as_ref().homogeneous_element_type(db),
             ));
@@ -782,8 +732,11 @@ impl<'db> ProjectionContainer<'db> {
 
         if let Some((class, specialization)) = ty.class_specialization(db)
             && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_iter_item_type(known_class, specialization.types(db))
+            && let Some(element) = Self::known_container_iter_item_type(
+                known_class,
+                specialization.types(db),
+                is_async,
+            )
         {
             return Some(ProjectionTerm::Homogeneous(element));
         }
@@ -791,16 +744,21 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    fn project_async_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_async_iter_item_type(known_class, specialization.types(db))
-        {
-            return Some(ProjectionTerm::Homogeneous(element));
+    fn project_unpack(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        unpack: CycleUnpackProjection,
+    ) -> Option<ProjectionTerm<'db>> {
+        match unpack {
+            CycleUnpackProjection::Exact { len, index } => {
+                Self::project_unpack_exact(db, ty, len, index)
+            }
+            CycleUnpackProjection::Star {
+                prefix,
+                suffix,
+                position,
+            } => Self::project_star_unpack(db, ty, prefix, suffix, position),
         }
-
-        None
     }
 
     fn project_unpack_exact(
@@ -821,7 +779,7 @@ impl<'db> ProjectionContainer<'db> {
         if let Some((class, specialization)) = ty.class_specialization(db)
             && let Some(known_class) = class.known(db)
             && let Some(element) =
-                Self::known_container_iter_item_type(known_class, specialization.types(db))
+                Self::known_container_iter_item_type(known_class, specialization.types(db), false)
         {
             return Some(ProjectionTerm::Homogeneous(element));
         }
@@ -843,7 +801,7 @@ impl<'db> ProjectionContainer<'db> {
         if let Some((class, specialization)) = ty.class_specialization(db)
             && let Some(known_class) = class.known(db)
             && let Some(element) =
-                Self::known_container_iter_item_type(known_class, specialization.types(db))
+                Self::known_container_iter_item_type(known_class, specialization.types(db), false)
         {
             return Some(Self::star_unpack_homogeneous(element, position));
         }
@@ -888,48 +846,60 @@ impl<'db> ProjectionContainer<'db> {
         }
     }
 
-    fn project_get_item_int(
+    fn project_subscript(
         db: &'db dyn Db,
         ty: Type<'db>,
-        index: Option<i64>,
+        subscript: CycleProjectionSubscript,
     ) -> Option<ProjectionTerm<'db>> {
         if let Some(spec) = ty.exact_tuple_instance_spec(db) {
             let tuple = spec.as_ref();
 
-            if let Some(index) = index {
-                let index = i32::try_from(index).ok()?;
-                return Some(ProjectionTerm::Exact(tuple.py_index(db, index).ok()?));
-            }
-
-            return Some(ProjectionTerm::Homogeneous(
-                tuple.homogeneous_element_type(db),
-            ));
+            return match subscript {
+                CycleProjectionSubscript::LiteralInt(index) => {
+                    let index = i32::try_from(index).ok()?;
+                    Some(ProjectionTerm::Exact(tuple.py_index(db, index).ok()?))
+                }
+                CycleProjectionSubscript::Int | CycleProjectionSubscript::Unknown => Some(
+                    ProjectionTerm::Homogeneous(tuple.homogeneous_element_type(db)),
+                ),
+                CycleProjectionSubscript::StaticSlice(slice) => match tuple {
+                    TupleSpec::Fixed(tuple) => {
+                        let elements = tuple
+                            .py_slice(db, slice.start, slice.stop, slice.step)
+                            .ok()?;
+                        Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
+                            db, elements,
+                        )))
+                    }
+                    TupleSpec::Variable(tuple) => {
+                        let element = UnionType::from_elements_leave_aliases(
+                            db,
+                            tuple
+                                .iter_prefix_elements()
+                                .chain(std::iter::once(tuple.variable()))
+                                .chain(tuple.iter_suffix_elements()),
+                        );
+                        Some(ProjectionTerm::Exact(Type::homogeneous_tuple(db, element)))
+                    }
+                },
+            };
         }
 
         if let Some((class, specialization)) = ty.class_specialization(db)
             && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_get_item_type(db, known_class, specialization.types(db))
         {
-            return Some(ProjectionTerm::Homogeneous(element));
-        }
-
-        None
-    }
-
-    fn project_get_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
-        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            return Some(ProjectionTerm::Homogeneous(
-                spec.as_ref().homogeneous_element_type(db),
-            ));
-        }
-
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(element) =
-                Self::known_container_get_item_type(db, known_class, specialization.types(db))
-        {
-            return Some(ProjectionTerm::Homogeneous(element));
+            return match subscript {
+                CycleProjectionSubscript::LiteralInt(_)
+                | CycleProjectionSubscript::Int
+                | CycleProjectionSubscript::Unknown => {
+                    Self::known_container_get_item_type(db, known_class, specialization.types(db))
+                        .map(ProjectionTerm::Homogeneous)
+                }
+                CycleProjectionSubscript::StaticSlice(_) => {
+                    Self::known_container_slice_type(db, known_class, specialization.types(db))
+                        .map(ProjectionTerm::Exact)
+                }
+            };
         }
 
         None
@@ -957,45 +927,6 @@ impl<'db> ProjectionContainer<'db> {
         ))
     }
 
-    fn project_slice_static(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        slice: StaticSliceProjection,
-    ) -> Option<ProjectionTerm<'db>> {
-        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
-            return match spec.as_ref() {
-                TupleSpec::Fixed(tuple) => {
-                    let elements = tuple
-                        .py_slice(db, slice.start, slice.stop, slice.step)
-                        .ok()?;
-                    Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
-                        db, elements,
-                    )))
-                }
-                TupleSpec::Variable(tuple) => {
-                    let element = UnionType::from_elements_leave_aliases(
-                        db,
-                        tuple
-                            .iter_prefix_elements()
-                            .chain(std::iter::once(tuple.variable()))
-                            .chain(tuple.iter_suffix_elements()),
-                    );
-                    Some(ProjectionTerm::Exact(Type::homogeneous_tuple(db, element)))
-                }
-            };
-        }
-
-        if let Some((class, specialization)) = ty.class_specialization(db)
-            && let Some(known_class) = class.known(db)
-            && let Some(sliced) =
-                Self::known_container_slice_type(db, known_class, specialization.types(db))
-        {
-            return Some(ProjectionTerm::Exact(sliced));
-        }
-
-        None
-    }
-
     fn infer_method_call0(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -1006,18 +937,39 @@ impl<'db> ProjectionContainer<'db> {
         ))
     }
 
-    fn infer_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
-        Some(ProjectionTerm::Homogeneous(
-            ty.try_iterate(db).ok()?.homogeneous_element_type(db),
-        ))
-    }
+    fn infer_iter_item(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        is_async: bool,
+    ) -> Option<ProjectionTerm<'db>> {
+        let mode = if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        };
 
-    fn infer_async_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Homogeneous(
-            ty.try_iterate_with_mode(db, EvaluationMode::Async)
+            ty.try_iterate_with_mode(db, mode)
                 .ok()?
                 .homogeneous_element_type(db),
         ))
+    }
+
+    fn infer_unpack(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        unpack: CycleUnpackProjection,
+    ) -> Option<ProjectionTerm<'db>> {
+        match unpack {
+            CycleUnpackProjection::Exact { len, index } => {
+                Self::infer_unpack_exact(db, ty, len, index)
+            }
+            CycleUnpackProjection::Star {
+                prefix,
+                suffix,
+                position,
+            } => Self::infer_star_unpack(db, ty, prefix, suffix, position),
+        }
     }
 
     fn infer_unpack_exact(
@@ -1035,7 +987,9 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         Some(ProjectionTerm::Homogeneous(
-            ty.try_iterate(db).ok()?.homogeneous_element_type(db),
+            ty.try_iterate_with_mode(db, EvaluationMode::Sync)
+                .ok()?
+                .homogeneous_element_type(db),
         ))
     }
 
@@ -1053,10 +1007,11 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_subscript(
         db: &'db dyn Db,
         ty: Type<'db>,
-        slice_ty: Type<'db>,
+        subscript: CycleProjectionSubscript,
     ) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Exact(
-            ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()?,
+            ty.subscript(db, subscript.slice_type(db), ast::ExprContext::Load)
+                .ok()?,
         ))
     }
 
@@ -1160,45 +1115,40 @@ impl<'db> ProjectionContainer<'db> {
     fn known_container_iter_item_type(
         class: KnownClass,
         arguments: &[Type<'db>],
+        is_async: bool,
     ) -> Option<Type<'db>> {
-        // Keep this to sync iteration; `CycleProjectionOp` does not record the iteration mode.
-        let index = match class {
-            KnownClass::List
-            | KnownClass::Set
-            | KnownClass::FrozenSet
-            | KnownClass::Deque
-            | KnownClass::Iterable
-            | KnownClass::Iterator
-            | KnownClass::Sequence
-            | KnownClass::TyExtensionsIterable
-            | KnownClass::TyExtensionsIterator => 0,
+        let index = if is_async {
+            match class {
+                KnownClass::AsyncGenerator
+                | KnownClass::AsyncGeneratorType
+                | KnownClass::AsyncIterator
+                | KnownClass::TyExtensionsAsyncIterable
+                | KnownClass::TyExtensionsAsyncIterator => 0,
+                _ => return None,
+            }
+        } else {
+            match class {
+                KnownClass::List
+                | KnownClass::Set
+                | KnownClass::FrozenSet
+                | KnownClass::Deque
+                | KnownClass::Iterable
+                | KnownClass::Iterator
+                | KnownClass::Sequence
+                | KnownClass::TyExtensionsIterable
+                | KnownClass::TyExtensionsIterator => 0,
 
-            KnownClass::Dict
-            | KnownClass::DefaultDict
-            | KnownClass::OrderedDict
-            | KnownClass::ChainMap
-            | KnownClass::Counter
-            | KnownClass::Mapping => 0,
+                KnownClass::Dict
+                | KnownClass::DefaultDict
+                | KnownClass::OrderedDict
+                | KnownClass::ChainMap
+                | KnownClass::Counter
+                | KnownClass::Mapping => 0,
 
-            KnownClass::Generator => 0,
+                KnownClass::Generator => 0,
 
-            _ => return None,
-        };
-
-        arguments.get(index).copied()
-    }
-
-    fn known_container_async_iter_item_type(
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> Option<Type<'db>> {
-        let index = match class {
-            KnownClass::AsyncGenerator
-            | KnownClass::AsyncGeneratorType
-            | KnownClass::AsyncIterator
-            | KnownClass::TyExtensionsAsyncIterable
-            | KnownClass::TyExtensionsAsyncIterator => 0,
-            _ => return None,
+                _ => return None,
+            }
         };
 
         arguments.get(index).copied()
@@ -1247,16 +1197,6 @@ impl<'db> ProjectionContainer<'db> {
         };
 
         Some(class.to_specialized_instance(db, &[element]))
-    }
-
-    fn known_container_slice_type_for_class(
-        class: KnownClass,
-        arguments: &[Type<'db>],
-    ) -> Option<()> {
-        match class {
-            KnownClass::List | KnownClass::Sequence => arguments.first().map(|_| ()),
-            _ => None,
-        }
     }
 
     fn known_container_method_call0_type(
@@ -1350,7 +1290,6 @@ impl<'db> ProjectionTerm<'db> {
 /// Projection facts for custom generic containers in the current cycle candidate.
 #[derive(Debug, Clone, Copy)]
 struct CycleRecoveryEvidence<'db> {
-    root: DivergentType,
     arm: Type<'db>,
     path: CycleProjectionPath<'db>,
     term: ProjectionTerm<'db>,
@@ -1389,15 +1328,13 @@ impl<'db> CycleRecoveryEvidence<'db> {
                         continue;
                     }
                     if evidence.iter().any(|existing| {
-                        existing.root.same_marker(root)
-                            && existing.arm == arm
+                        existing.arm == arm
                             && existing.path == suffix
                             && existing.term.ty(db) == term.ty(db)
                     }) {
                         continue;
                     }
                     evidence.push(Self {
-                        root,
                         arm,
                         path: suffix,
                         term,
@@ -1474,7 +1411,7 @@ impl<'db> CycleProjectionPath<'db> {
 }
 
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct CycleProjectionMethodName<'db> {
+struct CycleProjectionMethodName<'db> {
     #[returns(ref)]
     name: Name,
 }
@@ -1492,42 +1429,40 @@ impl<'db> CycleProjectionMethodName<'db> {
 
 /// The projection operations currently preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum CycleProjectionOp<'db> {
-    IterItem,
-    AsyncIterItem,
-    UnpackExact {
-        len: usize,
-        index: usize,
-    },
-    UnpackStarPrefix {
-        prefix: usize,
-        suffix: usize,
-        index: usize,
-    },
-    UnpackStarRest {
-        prefix: usize,
-        suffix: usize,
-    },
-    UnpackStarSuffix {
-        prefix: usize,
-        suffix: usize,
-        index: usize,
-    },
-    GetItem,
+enum CycleProjectionOp<'db> {
+    Iter { is_async: bool },
+    Unpack(CycleUnpackProjection),
+    Subscript(CycleProjectionSubscript),
     CallMethod0(CycleProjectionMethodName<'db>),
-    GetItemLiteralInt(i64),
-    GetItemInt,
-    SliceStatic(StaticSliceProjection),
-    ContextEnter {
-        is_async: bool,
-    },
+    ContextEnter { is_async: bool },
     AwaitResult,
 }
 
-impl<'db> CycleProjectionOp<'db> {
-    fn from_subscript(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum CycleUnpackProjection {
+    Exact {
+        len: usize,
+        index: usize,
+    },
+    Star {
+        prefix: usize,
+        suffix: usize,
+        position: StarUnpackPosition,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum CycleProjectionSubscript {
+    Unknown,
+    Int,
+    LiteralInt(i64),
+    StaticSlice(StaticSliceProjection),
+}
+
+impl CycleProjectionSubscript {
+    fn from_type(db: &dyn Db, slice_ty: Type<'_>) -> Option<Self> {
         if let Some(index) = slice_ty.as_int_like_literal() {
-            return Some(Self::GetItemLiteralInt(index));
+            return Some(Self::LiteralInt(index));
         }
 
         if let Some(slice) = slice_ty
@@ -1535,20 +1470,29 @@ impl<'db> CycleProjectionOp<'db> {
             .and_then(|instance| instance.slice_literal(db))
             && slice.step != Some(0)
         {
-            return Some(Self::SliceStatic(StaticSliceProjection::from(slice)));
+            return Some(Self::StaticSlice(StaticSliceProjection::from(slice)));
         }
 
         if slice_ty.is_instance_of(db, KnownClass::Int)
             || slice_ty.is_instance_of(db, KnownClass::Bool)
         {
-            return Some(Self::GetItemInt);
+            return Some(Self::Int);
         }
 
         None
     }
+
+    fn slice_type(self, db: &dyn Db) -> Type<'_> {
+        match self {
+            Self::Unknown => Type::unknown(),
+            Self::Int => KnownClass::Int.to_instance(db),
+            Self::LiteralInt(index) => Type::int_literal(index),
+            Self::StaticSlice(slice) => slice.into_type(db),
+        }
+    }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum StarUnpackPosition {
     Prefix(usize),
     Rest,
@@ -1556,7 +1500,7 @@ enum StarUnpackPosition {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct StaticSliceProjection {
+struct StaticSliceProjection {
     start: Option<i32>,
     stop: Option<i32>,
     step: Option<i32>,
