@@ -6,16 +6,14 @@ from __future__ import annotations
 
 import asyncio
 import dataclasses
-import json
 import re
 import time
 from asyncio import create_subprocess_exec
 from collections import Counter
 from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
-from functools import cache
 from pathlib import Path
-from subprocess import PIPE, check_output
+from subprocess import PIPE
 from typing import TYPE_CHECKING, Self
 
 from ruff_ecosystem import logger
@@ -59,26 +57,6 @@ PANIC_DIAGNOSTIC_LINE_RE = re.compile(r"^[^:]+: panic: Panicked at ")
 CHECK_VIOLATION_FIX_INDICATOR = " [*]"
 
 GITHUB_MAX_COMMENT_LENGTH = 65536  # characters
-
-
-@cache
-def rule_name_to_code(executable: Path) -> dict[str, str]:
-    rules = json.loads(
-        check_output(
-            [executable, "rule", "--all", "--output-format", "json"],
-            encoding="utf8",
-        )
-    )
-    return {rule["name"]: rule["code"] for rule in rules}
-
-
-def normalize_rule_name(line: str, rule_names: dict[str, str]) -> str:
-    match = CHECK_DIAGNOSTIC_LINE_RE.match(line)
-    if match is None or (code := rule_names.get(match["code"])) is None:
-        return line
-
-    start, end = match.span("code")
-    return f"{line[:start]}{code}{line[end:]}"
 
 
 def markdown_check_result(result: Result) -> str:
@@ -556,15 +534,6 @@ async def compare_check(
         baseline_task.result(),
         comparison_task.result(),
     )
-
-    if options.preview:
-        rule_names = rule_name_to_code(ruff_comparison_executable.resolve())
-        baseline_output = [
-            normalize_rule_name(line, rule_names) for line in baseline_output
-        ]
-        comparison_output = [
-            normalize_rule_name(line, rule_names) for line in comparison_output
-        ]
 
     for line in comparison_output:
         if PANIC_DIAGNOSTIC_LINE_RE.match(line):
