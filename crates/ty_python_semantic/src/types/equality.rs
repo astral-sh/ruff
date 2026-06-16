@@ -5,6 +5,7 @@
 //! methods.
 
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 use crate::{Db, place::PlaceAndQualifiers};
 
@@ -54,7 +55,7 @@ enum ComparisonResult<'db> {
 }
 
 /// The branch of a comparison for which a narrowing constraint is being computed.
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum ComparisonBranch {
     Positive,
     Negative,
@@ -222,229 +223,263 @@ fn comparison_result<'db>(
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
-    let left = left.resolve_type_alias(db);
-    let right = right.resolve_type_alias(db);
+    ComparisonEvaluator::new(db).evaluate(left, right, branch, operator)
+}
 
-    if let Some(alternatives) = finite_alternatives(db, left, operator) {
-        return evaluate_union_left(db, &alternatives, right, branch, operator);
-    }
-    if let Some(alternatives) = finite_alternatives(db, right, operator) {
-        return evaluate_union_right(db, left, &alternatives, branch, operator);
-    }
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+struct ComparisonKey<'db> {
+    left: Type<'db>,
+    right: Type<'db>,
+    branch: ComparisonBranch,
+    operator: ComparisonOperator,
+}
 
-    match (left, right) {
-        (
-            Type::Never
-            | Type::Divergent(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::ProtocolInstance(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeGuard(_)
-            | Type::TypeIs(_),
-            _,
-        )
-        | (
-            _,
-            Type::Never
-            | Type::Divergent(_)
-            | Type::AlwaysFalsy
-            | Type::AlwaysTruthy
-            | Type::ProtocolInstance(_)
-            | Type::DataclassTransformer(_)
-            | Type::TypeGuard(_)
-            | Type::TypeIs(_),
-        ) => ComparisonResult::Ambiguous,
+/// State shared by recursive comparison evaluations.
+struct ComparisonEvaluator<'db> {
+    db: &'db dyn Db,
+    active: FxHashSet<ComparisonKey<'db>>,
+}
 
-        (Type::Dynamic(_), other) => {
-            if !operator.condition_expects_equality(branch)
-                && all_values_compare_equal(db, other, operator)
-            {
-                ComparisonResult::CanNarrow(
-                    IntersectionBuilder::new(db)
-                        .add_positive(left)
-                        .add_negative(other)
-                        .build(),
-                )
-            } else {
-                ComparisonResult::Ambiguous
-            }
+impl<'db> ComparisonEvaluator<'db> {
+    fn new(db: &'db dyn Db) -> Self {
+        Self {
+            db,
+            active: FxHashSet::default(),
         }
-        (_, Type::Dynamic(_)) => ComparisonResult::Ambiguous,
+    }
 
-        (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
-            None => ComparisonResult::Ambiguous,
-            Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+    fn evaluate(
+        &mut self,
+        left: Type<'db>,
+        right: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        let left = left.resolve_type_alias(self.db);
+        let right = right.resolve_type_alias(self.db);
+        let key = ComparisonKey {
+            left,
+            right,
+            branch,
+            operator,
+        };
+
+        // A repeated key means that the result depends on itself. Treating it as ambiguous is
+        // conservative: callers only narrow from definite truthiness or an explicit constraint.
+        if !self.active.insert(key) {
+            return ComparisonResult::Ambiguous;
+        }
+
+        let result = self.evaluate_once(left, right, branch, operator);
+        let removed = self.active.remove(&key);
+        debug_assert!(removed);
+        result
+    }
+
+    fn evaluate_once(
+        &mut self,
+        left: Type<'db>,
+        right: Type<'db>,
+        branch: ComparisonBranch,
+        operator: ComparisonOperator,
+    ) -> ComparisonResult<'db> {
+        let db = self.db;
+
+        if let Some(alternatives) = finite_alternatives(db, left, operator) {
+            return evaluate_union_left(self, &alternatives, right, branch, operator);
+        }
+        if let Some(alternatives) = finite_alternatives(db, right, operator) {
+            return evaluate_union_right(self, left, &alternatives, branch, operator);
+        }
+
+        match (left, right) {
+            (
+                Type::Never
+                | Type::Divergent(_)
+                | Type::AlwaysFalsy
+                | Type::AlwaysTruthy
+                | Type::ProtocolInstance(_)
+                | Type::DataclassTransformer(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_),
+                _,
+            )
+            | (
+                _,
+                Type::Never
+                | Type::Divergent(_)
+                | Type::AlwaysFalsy
+                | Type::AlwaysTruthy
+                | Type::ProtocolInstance(_)
+                | Type::DataclassTransformer(_)
+                | Type::TypeGuard(_)
+                | Type::TypeIs(_),
+            ) => ComparisonResult::Ambiguous,
+
+            (Type::Dynamic(_), other) => {
                 if !operator.condition_expects_equality(branch)
-                    && all_values_compare_equal(db, other, operator)
+                    && all_values_compare_equal(self, other, operator)
                 {
-                    ComparisonResult::CanNarrow(other.negate(db))
+                    ComparisonResult::CanNarrow(
+                        IntersectionBuilder::new(db)
+                            .add_positive(left)
+                            .add_negative(other)
+                            .build(),
+                    )
                 } else {
                     ComparisonResult::Ambiguous
                 }
             }
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, constraints.as_type(db), other, branch, operator)
+            (_, Type::Dynamic(_)) => ComparisonResult::Ambiguous,
+
+            (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
+                None => ComparisonResult::Ambiguous,
+                Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+                    if !operator.condition_expects_equality(branch)
+                        && all_values_compare_equal(self, other, operator)
+                    {
+                        ComparisonResult::CanNarrow(other.negate(db))
+                    } else {
+                        ComparisonResult::Ambiguous
+                    }
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    self.evaluate(constraints.as_type(db), other, branch, operator)
+                }
+            },
+            (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    self.evaluate(other, constraints.as_type(db), branch, operator)
+                }
+                None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+                    ComparisonResult::Ambiguous
+                }
+            },
+
+            (Type::NewTypeInstance(newtype), other) => self
+                .evaluate(newtype.concrete_base_type(db), other, branch, operator)
+                .discard_narrowing(),
+            (other, Type::NewTypeInstance(newtype)) => self
+                .evaluate(other, newtype.concrete_base_type(db), branch, operator)
+                .discard_narrowing(),
+
+            (Type::Union(union), other) => {
+                evaluate_union_left(self, union.elements(db), other, branch, operator)
             }
-        },
-        (other, Type::TypeVar(var)) => match var.typevar(db).bound_or_constraints(db) {
-            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                comparison_result(db, other, constraints.as_type(db), branch, operator)
+            (other, Type::Union(union)) => {
+                evaluate_union_right(self, other, union.elements(db), branch, operator)
             }
-            None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => ComparisonResult::Ambiguous,
-        },
+            (Type::Intersection(intersection), other) => evaluate_intersection_left(
+                self,
+                Type::Intersection(intersection),
+                intersection.positive(db),
+                other,
+                branch,
+                operator,
+            ),
 
-        (Type::NewTypeInstance(newtype), other) => {
-            comparison_result(db, newtype.concrete_base_type(db), other, branch, operator)
-                .discard_narrowing()
-        }
-        (other, Type::NewTypeInstance(newtype)) => {
-            comparison_result(db, other, newtype.concrete_base_type(db), branch, operator)
-                .discard_narrowing()
-        }
-
-        (Type::Union(union), other) => {
-            evaluate_union_left(db, union.elements(db), other, branch, operator)
-        }
-        (other, Type::Union(union)) => {
-            evaluate_union_right(db, other, union.elements(db), branch, operator)
-        }
-        (Type::Intersection(intersection), other) => evaluate_intersection_left(
-            db,
-            Type::Intersection(intersection),
-            intersection.positive(db),
-            other,
-            branch,
-            operator,
-        ),
-
-        (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
-            match known_literal_equality(db, left_literal.kind(), right_literal.kind(), operator) {
-                Some(equal) => operator.result_from_equality(equal),
-                None => narrow_literal_comparison(
+            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
+                match known_literal_equality(
                     db,
-                    left,
-                    right,
                     left_literal.kind(),
                     right_literal.kind(),
-                    operator.condition_expects_equality(branch),
-                ),
+                    operator,
+                ) {
+                    Some(equal) => operator.result_from_equality(equal),
+                    None => narrow_literal_comparison(
+                        db,
+                        left,
+                        right,
+                        left_literal.kind(),
+                        right_literal.kind(),
+                        operator.condition_expects_equality(branch),
+                    ),
+                }
             }
-        }
 
-        (Type::LiteralValue(literal), other) => compare_literal_to_other(
-            db,
-            Type::LiteralValue(literal),
-            literal.kind(),
-            other,
-            branch,
-            operator,
-            LiteralOperand::Target,
-        ),
-        (other, Type::LiteralValue(literal)) => compare_literal_to_other(
-            db,
-            Type::LiteralValue(literal),
-            literal.kind(),
-            other,
-            branch,
-            operator,
-            LiteralOperand::Other,
-        ),
+            (Type::LiteralValue(literal), other) => compare_literal_to_other(
+                db,
+                Type::LiteralValue(literal),
+                literal.kind(),
+                other,
+                branch,
+                operator,
+                LiteralOperand::Target,
+            ),
+            (other, Type::LiteralValue(literal)) => compare_literal_to_other(
+                db,
+                Type::LiteralValue(literal),
+                literal.kind(),
+                other,
+                branch,
+                operator,
+                LiteralOperand::Other,
+            ),
 
-        (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
-        (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
-            match KnownComparisonSemantics::of_type(db, other, operator) {
-                Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
-                Some(_) => operator.result_from_equality(false),
+            (Type::TypedDict(_), Type::TypedDict(_)) => ComparisonResult::Ambiguous,
+            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => {
+                match KnownComparisonSemantics::of_type(db, other, operator) {
+                    Some(KnownComparisonSemantics::Dict) | None => ComparisonResult::Ambiguous,
+                    Some(_) => operator.result_from_equality(false),
+                }
             }
-        }
 
-        (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
-            operator.result_from_equality(left_module.module(db) == right_module.module(db))
-        }
-        (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias))
-            if left_alias == right_alias =>
-        {
-            operator.result_from_equality(true)
-        }
-        (Type::WrapperDescriptor(left_descriptor), Type::WrapperDescriptor(right_descriptor))
-            if left_descriptor == right_descriptor =>
-        {
-            operator.result_from_equality(true)
-        }
-        (
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left_function)),
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
-        )
-        | (
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
-            Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(right_function)),
-        ) if left_function == right_function => operator.result_from_equality(true),
-        (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance))
-            if left_instance == right_instance
-                && left.is_single_valued(db)
-                && operator == ComparisonOperator::Equality =>
-        {
-            ComparisonResult::AlwaysTrue
-        }
-        (left, right)
-            if has_known_identity_comparison_semantics(db, left, operator)
-                && has_known_identity_comparison_semantics(db, right, operator) =>
-        {
-            operator.result_from_equality(left == right)
-        }
+            (Type::ModuleLiteral(left_module), Type::ModuleLiteral(right_module)) => {
+                operator.result_from_equality(left_module.module(db) == right_module.module(db))
+            }
+            (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias))
+                if left_alias == right_alias =>
+            {
+                operator.result_from_equality(true)
+            }
+            (
+                Type::WrapperDescriptor(left_descriptor),
+                Type::WrapperDescriptor(right_descriptor),
+            ) if left_descriptor == right_descriptor => operator.result_from_equality(true),
+            (
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(left_function)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(right_function)),
+            )
+            | (
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(left_function)),
+                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
+                    right_function,
+                )),
+            ) if left_function == right_function => operator.result_from_equality(true),
+            (Type::KnownInstance(left_instance), Type::KnownInstance(right_instance))
+                if left_instance == right_instance
+                    && left.is_single_valued(db)
+                    && operator == ComparisonOperator::Equality =>
+            {
+                ComparisonResult::AlwaysTrue
+            }
+            (left, right)
+                if has_known_identity_comparison_semantics(db, left, operator)
+                    && has_known_identity_comparison_semantics(db, right, operator) =>
+            {
+                operator.result_from_equality(left == right)
+            }
 
-        (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
-            compare_nominal_instances(db, left_instance, right_instance, operator)
-        }
+            (Type::NominalInstance(left_instance), Type::NominalInstance(right_instance)) => {
+                compare_nominal_instances(db, left_instance, right_instance, operator)
+            }
 
-        _ => ComparisonResult::Ambiguous,
+            _ => ComparisonResult::Ambiguous,
+        }
     }
 }
 
 /// Return whether every value represented by `ty` is known to compare equal to every other value.
 ///
 /// Comparison evaluation is reused so this stays aligned with all modeled equality semantics.
-/// Self-comparisons that can decompose into dynamic types or type variables are rejected before
-/// evaluation because those branches call this helper and would otherwise recurse.
+/// Cyclic self-comparisons recover as ambiguous, so only a definite acyclic proof returns true.
 fn all_values_compare_equal<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     ty: Type<'db>,
     operator: ComparisonOperator,
 ) -> bool {
-    let ty = ty.resolve_type_alias(db);
-
-    // TODO: Avoid recursing into comparison evaluation until we support some kind of fixed point or
-    // cycle detection.
-    if self_comparison_may_cycle(db, ty) {
-        return false;
-    }
-
-    comparison_result(db, ty, ty, ComparisonBranch::Positive, operator)
+    evaluator.evaluate(ty, ty, ComparisonBranch::Positive, operator)
         == operator.result_from_equality(true)
-}
-
-/// Return whether self-comparison of `ty` may cycle.
-///
-/// Comparison evaluation decomposes unions, positive intersections, and `NewType` bases. Other
-/// types, including generic aliases, are atomic even when their components contain dynamic types
-/// or type variables.
-fn self_comparison_may_cycle<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
-    match ty.resolve_type_alias(db) {
-        Type::Dynamic(_) | Type::TypeVar(_) => true,
-        Type::NewTypeInstance(newtype) => {
-            self_comparison_may_cycle(db, newtype.concrete_base_type(db))
-        }
-        Type::Union(union) => union
-            .elements(db)
-            .iter()
-            .any(|element| self_comparison_may_cycle(db, *element)),
-        Type::Intersection(intersection) => intersection
-            .positive(db)
-            .iter()
-            .any(|element| self_comparison_may_cycle(db, *element)),
-        _ => false,
-    }
 }
 
 /// Return whether `ty` is handled by [`builtin_literal_constraint`].
@@ -597,14 +632,15 @@ fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralTy
 
 /// Evaluate each alternative of the union being constrained and combine their branch results.
 fn evaluate_union_left<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     elements: &[Type<'db>],
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     evaluate_target_union(db, elements, branch, |element| {
-        comparison_result(db, element, other, branch, operator)
+        evaluator.evaluate(element, other, branch, operator)
     })
 }
 
@@ -689,19 +725,20 @@ fn evaluate_target_union<'db>(
 
 /// Evaluate the target against each alternative of a union on the non-target side.
 fn evaluate_union_right<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     left: Type<'db>,
     elements: &[Type<'db>],
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     evaluate_against_results(
         db,
         left,
         branch,
         elements
             .iter()
-            .map(|element| comparison_result(db, left, *element, branch, operator)),
+            .map(|element| evaluator.evaluate(left, *element, branch, operator)),
     )
 }
 
@@ -761,13 +798,14 @@ fn evaluate_against_results<'db>(
 
 /// Combine compatible comparison results from the positive elements of an intersection target.
 fn evaluate_intersection_left<'db>(
-    db: &'db dyn Db,
+    evaluator: &mut ComparisonEvaluator<'db>,
     original: Type<'db>,
     positive: &crate::FxOrderSet<Type<'db>>,
     other: Type<'db>,
     branch: ComparisonBranch,
     operator: ComparisonOperator,
 ) -> ComparisonResult<'db> {
+    let db = evaluator.db;
     let mut any_true = false;
     let mut any_false = false;
     let mut any_ambiguous = false;
@@ -775,7 +813,7 @@ fn evaluate_intersection_left<'db>(
     let mut builder = IntersectionBuilder::new(db).add_positive(original);
 
     for element in positive {
-        match comparison_result(db, *element, other, branch, operator) {
+        match evaluator.evaluate(*element, other, branch, operator) {
             ComparisonResult::AlwaysTrue => any_true = true,
             ComparisonResult::AlwaysFalse => any_false = true,
             ComparisonResult::CanNarrow(narrowed) => {
@@ -976,7 +1014,7 @@ fn compare_nominal_instances<'db>(
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum ComparisonOperator {
     Equality,
     Inequality,

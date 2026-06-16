@@ -630,8 +630,7 @@ def _(x: T):
 
 def _(x: Any, y: EQUAL_VALUES):
     if x != y:
-        # TODO: This can narrow to `Any & ~EQUAL_VALUES@_` because all constraints compare equal.
-        reveal_type(x)  # revealed: Any
+        reveal_type(x)  # revealed: Any & ~EQUAL_VALUES@_
 
 def _(x: Any, y: T | str):
     if x != y:
