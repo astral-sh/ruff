@@ -154,6 +154,46 @@ pub struct Model {
     /// carried for downstream consumers but produce no triples here.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sti: Option<StiInfo>,
+
+    // ───── C++ machine-plane: 7 sibling Vecs (filled only by ruff_cpp_spo) ─────
+    //
+    // Populated only by the C++ frontend (`ruff_cpp_spo`); the Python/Ruby
+    // frontends leave them at `Default::default()` empty, and
+    // `skip_serializing_if` keeps their ndjson byte-identical. The expander
+    // emits no triples for empty collections, so no other pipeline is
+    // affected.
+    /// Base-class declarations (`class X : public Base`). Expanded as
+    /// `inherits_from` (`CppExtracted`) per base.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bases: Vec<CppBase>,
+    /// Data-member declarations. Expanded as `has_field` (`CppExtracted`)
+    /// plus a structural `(class.field, rdf:type, Property)` classification.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub member_fields: Vec<CppField>,
+    /// Method declarations carrying their C++ property flags (virtual /
+    /// override / pure-virtual / constexpr / noexcept / operator / requires).
+    /// Each method is classified `(class.method, rdf:type, Function)` +
+    /// `(class, has_function, class.method)`; the flags expand to the
+    /// method-property predicates.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub methods: Vec<CppMethod>,
+    /// Template specialisation / instantiation declarations. Expanded as
+    /// `template_specialises` (`CppExtracted`) / `template_instantiates`
+    /// (`Inferred`) per kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub templates: Vec<CppTemplate>,
+    /// `friend class` / `friend fn` declarations. Expanded as `is_friend_of`
+    /// (Structural).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub friends: Vec<CppFriend>,
+    /// Identifiers originating from preprocessor macro expansion. Expanded
+    /// as `uses_macro_expansion` (`Inferred`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub macro_uses: Vec<CppMacroUse>,
+    /// `static_assert` declarations in class scope. Expanded as
+    /// `static_asserts` (`CppExtracted`).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub static_asserts: Vec<CppStaticAssert>,
 }
 
 /// One field / attribute / column.
@@ -478,4 +518,137 @@ pub struct StiInfo {
     /// `self.inheritance_column = "type"` — the column STI dispatches
     /// on (default `"type"` if not overridden).
     pub inheritance_column: Option<String>,
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// C++ machine-plane declarative types (filled only by ruff_cpp_spo)
+// ─────────────────────────────────────────────────────────────────────────
+
+/// One base-class declaration (`class Derived : public Base`).
+///
+/// The expander emits `(class, inherits_from, ns:base)` with the access
+/// specifier and virtual-inheritance flag carried here on the IR but not
+/// in the triple — the object stays a clean base-class IRI for graph
+/// traversal (mirroring how [`AssocDecl::kind`] is carried but not emitted).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppBase {
+    /// Base class name as resolved by the AST (e.g. `Tesseract::Classify`).
+    pub name: String,
+    /// `public` / `protected` / `private` inheritance.
+    pub access: CppAccess,
+    /// `class X : virtual public Base` — virtual (diamond-resolving) base.
+    #[serde(default)]
+    pub virtual_base: bool,
+}
+
+/// C++ access specifiers for inheritance + members.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CppAccess {
+    /// `public` — visible everywhere.
+    Public,
+    /// `protected` — visible to the class and its derivatives.
+    Protected,
+    /// `private` — visible only to the class itself.
+    Private,
+}
+
+/// One data-member declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppField {
+    /// Member name (e.g. `recognizer_`).
+    pub name: String,
+    /// Resolved type, verbatim (e.g. `std::unique_ptr<LSTMRecognizer>`).
+    /// Carried for downstream consumers; not emitted in the triple.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub type_name: String,
+}
+
+/// One method declaration carrying its C++ property flags.
+///
+/// Every method is classified (`rdf:type Function` + `has_function`); each
+/// set flag additionally expands to a method-property predicate. The flags
+/// are not mutually exclusive (a method can be both `constexpr` and
+/// `noexcept`, an `operator` and an `override`).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppMethod {
+    /// Method name (e.g. `Recognize`). For operators, the spelled name
+    /// (e.g. `operator==`); the operator kind is also set in
+    /// [`Self::operator_kind`] so the classification IRI stays stable.
+    pub name: String,
+    /// `virtual ... = 0` pure-virtual declaration → `is_pure_virtual`.
+    #[serde(default)]
+    pub is_pure_virtual: bool,
+    /// `constexpr` / `consteval` marker → `is_constexpr` (the kind rides
+    /// the object slot). `None` for ordinary runtime methods.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub constexpr_kind: Option<ConstexprKind>,
+    /// `noexcept` exception specification → `is_noexcept`.
+    #[serde(default)]
+    pub is_noexcept: bool,
+    /// `override` of a virtual base method → `virtually_overrides`. The
+    /// value is the overridden base-class method tail (`Base.method`),
+    /// emitted under the namespace prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub overrides: Option<String>,
+    /// Operator overload kind (e.g. `operator==`) → `defines_operator`.
+    /// `None` for non-operator methods.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub operator_kind: Option<String>,
+    /// C++20 `requires` clause, verbatim → `requires_concept`. `None` when
+    /// unconstrained.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub requires_clause: Option<String>,
+}
+
+/// `constexpr` vs `consteval` compile-time markers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ConstexprKind {
+    /// `constexpr` — usable in a constant expression.
+    Constexpr,
+    /// `consteval` — an immediate function (MUST run at compile time).
+    Consteval,
+}
+
+/// One template specialisation or instantiation declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppTemplate {
+    /// Explicit specialisation vs materialised instantiation.
+    pub kind: CppTemplateKind,
+    /// Template name + arguments, verbatim (e.g. `GenericVector<int>`).
+    pub name: String,
+}
+
+/// Whether a [`CppTemplate`] is an explicit specialisation or a
+/// materialised instantiation visible in the translation unit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum CppTemplateKind {
+    /// `template <> class Foo<int> { … }` — explicit (partial or full)
+    /// specialisation. Expanded as `template_specialises` (`CppExtracted`).
+    Specialisation,
+    /// `Foo<int>` materialised in this TU. Expanded as
+    /// `template_instantiates` (`Inferred` — single-TU view is incomplete).
+    Instantiation,
+}
+
+/// One `friend class` / `friend fn` declaration.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppFriend {
+    /// The friend class or function name, verbatim.
+    pub name: String,
+}
+
+/// One identifier originating from a preprocessor macro expansion.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppMacroUse {
+    /// The identifier that was produced by the expansion.
+    pub identifier: String,
+    /// The macro it expanded from.
+    pub macro_name: String,
+}
+
+/// One `static_assert` declaration in class scope.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CppStaticAssert {
+    /// The asserted condition, verbatim.
+    pub condition: String,
 }

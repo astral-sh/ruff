@@ -1,0 +1,30 @@
+[package]
+name = "ruff_cpp_spo"
+version = "0.1.0"
+publish = false
+edition = "2024"
+rust-version = "1.86"
+description = "SCAFFOLD: C++ machine-plane frontend for ruff_spo_triplet. Walks a C++ corpus (Tesseract first) via libclang and fills a language-agnostic ModelGraph, which expands to the same SPO triples as the Python/Odoo and Ruby/Rails frontends. The libclang walker is a todo!() stub documented with the exact wiring; the target triple shape is already locked by a passing test. C++ source corpora stay UPSTREAM — never vendored into this repo or into tesseract-rs."
+license = "MIT"
+
+[lib]
+name = "ruff_cpp_spo"
+
+[dependencies]
+ruff_spo_triplet = { workspace = true }
+
+# NOTE — libclang parser, deliberately NOT yet a dependency.
+# The C++ AST parser is the `clang` crate (libclang FFI), the only mature
+# option with semantic resolution (templates, preprocessor, ADL). It is added
+# under a non-default `libclang` feature when the walker lands, so the
+# workspace builds with zero system deps until then (libclang.so is a
+# system-install cost paid only by the actual corpus walk). See `extract` in
+# src/lib.rs for the wiring contract. Adding it early would make `cargo build`
+# probe for libclang.so on every CI run for a stub that does not call it.
+#   [dependencies]
+#   clang = { version = "2", optional = true }
+#   [features]
+#   libclang = ["dep:clang"]
+
+[lints]
+workspace = true

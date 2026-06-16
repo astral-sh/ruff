@@ -247,3 +247,61 @@ The OCR transcode plans this PR rebaselines:
 - `soa-centroid-attention-field-synthesis-v1.md`
 - `ocr-probes-v1.md` (new)
 
+---
+
+## Appendix B — `ruff_cpp_spo` scaffold LANDED (2026-06-16)
+
+The scaffold proposed in §5 is now shipped on branch
+`claude/happy-hamilton-0azlw4` (commit `feat(spo): ruff_cpp_spo — C++
+machine-plane SPO frontend + 13 C++ predicates`). What landed, against the
+open questions in §6:
+
+- **Crate `crates/ruff_cpp_spo/`** — sibling to `ruff_ruby_spo`. `CppClass` +
+  `Declaration` frontend-local union; `model_from_class` unpacks into the
+  typed `Model::*` slots (pure unpacking). `extract()` is a `todo!()`
+  libclang walker with the full wiring contract in its doc comment. Locked-
+  shape test asserts `expand()` for `Tesseract::Recognizer` BEFORE any parser
+  wiring (mirrors `ruff_ruby_spo::tests::locked_shape_expands_to_expected_triples`).
+- **Q3 (predicate landing site) → resolved: land in `ruff_spo_triplet`.**
+  Closed vocab grew 34 → **47** (13 net-new C++ predicates) under a renamed
+  `predicate_count_locked_at_47` gate. The §3 net-new list is the shipped set;
+  the project-specific Tesseract domain predicates (`loads_traineddata`, …)
+  were correctly NOT added to the closed vocab (they belong in an analysis
+  layer above the harvester, per §3).
+- **Q4 (naming) → `ruff_cpp_spo`** (matches the family pattern). Namespace
+  prefix is `cpp` (the language; the C++ machine plane is one graph across
+  Tesseract / LLVM / Boost / …), not the corpus name — deliberately unlike
+  `ruff_ruby_spo`'s corpus-named `openproject`, because this crate is the
+  reusable C++ frontend.
+- **`Provenance::CppExtracted = (0.95, 0.82)`** added. Per-edge overrides
+  match the headstone calibration: `is_friend_of → Structural`;
+  `uses_macro_expansion` + `template_instantiates → Inferred`; the other 10 →
+  `CppExtracted`.
+- **`Model` grew 7 C++ sibling Vecs** (`bases`, `member_fields`, `methods`,
+  `templates`, `friends`, `macro_uses`, `static_asserts`) + the C++ IR types.
+  `skip_serializing_if` keeps the Python/Ruby ndjson byte-identical; sibling
+  crates `ruff_ruby_spo` / `ruff_python_dto_check` pass unchanged.
+- **Iron rules honoured:** `ruff_spo_triplet` stays serde-only (the `clang`
+  dep is documented but NOT yet added — it waits behind a `libclang` feature
+  so the workspace builds with zero system deps until the walker lands); no
+  C++ vendored; no `ValueSchema` variant.
+- **Gates green:** `cargo fmt` + `clippy -D warnings` + `test` (cpp_spo 5,
+  spo_triplet 47).
+
+### Still open (next session, in order)
+
+1. **Q1 — Tesseract release pin (operator decision).** Not needed for the
+   scaffold; needed before the libclang corpus walk. STOP and ask the operator.
+2. **Q2 + libclang walker** — add `clang` under the `libclang` feature, walk
+   `tesseract/src/api/baseapi.h`, match the locked shape. The `extract()` doc
+   comment is the contract.
+3. **First ndjson emission** from a Tesseract subset → load into lance-graph
+   SPO store.
+4. **Q5 — hand-off boundary**: does `ruff_cpp_spo` stop at IR + triples (like
+   `ruff_ruby_spo`) or drive codegen (like `ruff_python_dto_check`)? Current
+   shape stops at IR/triples; `tesseract-rs-ast-dll-codegen-v1` is the
+   separate downstream consumer. Confirm with operator before wiring codegen.
+5. **Gating probes** — `CPP-AST-RT`, `CPP-TEMPLATE-DET`, `CPP-SCHEMA-FIT`
+   (template from `lance-graph/.claude/plans/ocr-probes-v1.md`) before any
+   FINDING-grade fidelity claim.
+

@@ -61,8 +61,10 @@ mod triple;
 pub use expand::expand;
 pub use ir::{
     ActsAs, AssocDecl, AssocKind, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef,
-    Delegation, DslCall, DynMethod, Field, Function, GemDsl, GemKind, Model, ModelGraph,
-    ScopeDecl, ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
+    ConstexprKind, CppAccess, CppBase, CppField, CppFriend, CppMacroUse, CppMethod,
+    CppStaticAssert, CppTemplate, CppTemplateKind, Delegation, DslCall, DynMethod, Field, Function,
+    GemDsl, GemKind, Model, ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef, Validation,
+    ValidationKind,
 };
 pub use ndjson::{ParseError, from_ndjson, to_ndjson};
 pub use triple::{EntityKind, Predicate, Provenance, Triple};

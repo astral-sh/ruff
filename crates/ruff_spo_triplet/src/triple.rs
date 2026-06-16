@@ -38,6 +38,10 @@ pub struct Triple {
 impl Triple {
     /// Construct a triple from typed parts + a provenance tier.
     #[must_use]
+    #[expect(
+        clippy::many_single_char_names,
+        reason = "s/p/o/f/c are Triple's canonical SPO + NARS-truth field names"
+    )]
     pub fn new(s: impl Into<String>, p: Predicate, o: impl Into<String>, prov: Provenance) -> Self {
         let (f, c) = prov.truth();
         Self {
@@ -211,6 +215,70 @@ pub enum Predicate {
     /// `(model, uses_refinement, "<refinement_module>")` — `using
     /// Refinement` declaration.
     UsesRefinement,
+
+    // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
+    //
+    // The 13 net-new predicates for the C++ frontend. Subject conventions
+    // mirror the existing surface: class-scoped facts take the class IRI as
+    // subject (`inherits_from`, `has_field`, `is_friend_of`,
+    // `template_*`, `static_asserts`), method-scoped properties take the
+    // method IRI (`is_pure_virtual`, `is_constexpr`, `is_noexcept`,
+    // `virtually_overrides`, `defines_operator`, `requires_concept`).
+    // Default tier is [`Provenance::CppExtracted`] (declarative C++ surface
+    // is machine-readable from the AST); three per-edge overrides encode the
+    // metaprogramming residual: [`Self::IsFriendOf`] is Structural (purely
+    // declarative), [`Self::UsesMacroExpansion`] and
+    // [`Self::TemplateInstantiates`] are Inferred (macro provenance + single-
+    // TU instantiation visibility are heuristic).
+    /// `(class, inherits_from, base_class)` — single + multiple
+    /// inheritance. One triple per base. The access specifier
+    /// (public/protected/private) and virtual-inheritance flag are carried
+    /// on the IR ([`crate::CppBase`]) but not emitted in the triple — the
+    /// object stays a clean base-class IRI for graph traversal (same
+    /// treatment as [`Self::DeclaresAssociation`] dropping `AssocKind`).
+    InheritsFrom,
+    /// `(class, has_field, class.field)` — a data-member declaration. The
+    /// resolved type is carried on the IR ([`crate::CppField`]); the C++
+    /// member field is also classified `(class.field, rdf:type, Property)`.
+    HasField,
+    /// `(class, template_specialises, "<template><args>")` — explicit
+    /// template specialisation (partial or full).
+    TemplateSpecialises,
+    /// `(class, template_instantiates, "<template><args>")` — a materialised
+    /// instantiation visible in the translation unit. **Default tier is
+    /// `Inferred`**: a single-TU view of instantiations is incomplete by
+    /// construction.
+    TemplateInstantiates,
+    /// `(class.method, virtually_overrides, base.method)` — `override` on a
+    /// virtual base method. Object is the overridden base-class method IRI.
+    VirtuallyOverrides,
+    /// `(class, is_friend_of, friend)` — `friend class` / `friend fn`
+    /// declaration. **Default tier is `Structural`**: purely declarative,
+    /// no inference involved.
+    IsFriendOf,
+    /// `(class.method, defines_operator, "<operator-kind>")` — operator
+    /// overload. The operator kind (e.g. `operator==`) is the object.
+    DefinesOperator,
+    /// `(class, uses_macro_expansion, "<identifier><=<macro>")` — an
+    /// identifier that originates from a preprocessor macro expansion.
+    /// **Default tier is `Inferred`**: macro provenance loses surface info.
+    UsesMacroExpansion,
+    /// `(class.method, is_pure_virtual, "true")` — a `= 0` declaration.
+    IsPureVirtual,
+    /// `(class.method, is_constexpr, "constexpr"|"consteval")` — compile-time
+    /// computable marker. The `consteval` (immediate-function) variant rides
+    /// the object slot, keeping the vocab bounded (same discipline as
+    /// [`Self::HasCallback`] encoding the phase in the object).
+    IsConstexpr,
+    /// `(class.method, is_noexcept, "true")` — an exception specification
+    /// marking the method `noexcept`.
+    IsNoexcept,
+    /// `(class.method, requires_concept, "<requires-clause>")` — a C++20
+    /// `requires` clause constraining the method.
+    RequiresConcept,
+    /// `(class, static_asserts, "<condition>")` — a `static_assert` in
+    /// class scope.
+    StaticAsserts,
 }
 
 impl Predicate {
@@ -254,6 +322,20 @@ impl Predicate {
             Self::AutoStrips => "auto_strips",
             Self::DefinesMethod => "defines_method",
             Self::UsesRefinement => "uses_refinement",
+            // C++ machine-plane 13
+            Self::InheritsFrom => "inherits_from",
+            Self::HasField => "has_field",
+            Self::TemplateSpecialises => "template_specialises",
+            Self::TemplateInstantiates => "template_instantiates",
+            Self::VirtuallyOverrides => "virtually_overrides",
+            Self::IsFriendOf => "is_friend_of",
+            Self::DefinesOperator => "defines_operator",
+            Self::UsesMacroExpansion => "uses_macro_expansion",
+            Self::IsPureVirtual => "is_pure_virtual",
+            Self::IsConstexpr => "is_constexpr",
+            Self::IsNoexcept => "is_noexcept",
+            Self::RequiresConcept => "requires_concept",
+            Self::StaticAsserts => "static_asserts",
         }
     }
 
@@ -261,6 +343,10 @@ impl Predicate {
     /// predicates — callers should treat that as a hard schema error
     /// (the vocabulary is closed).
     #[must_use]
+    #[expect(
+        clippy::should_implement_trait,
+        reason = "closed-vocab parser returns Option (unknown = hard schema error); std::str::FromStr's Result API would force a bogus Err type"
+    )]
     pub fn from_str(s: &str) -> Option<Self> {
         Some(match s {
             // Core 7
@@ -299,6 +385,20 @@ impl Predicate {
             "auto_strips" => Self::AutoStrips,
             "defines_method" => Self::DefinesMethod,
             "uses_refinement" => Self::UsesRefinement,
+            // C++ machine-plane 13
+            "inherits_from" => Self::InheritsFrom,
+            "has_field" => Self::HasField,
+            "template_specialises" => Self::TemplateSpecialises,
+            "template_instantiates" => Self::TemplateInstantiates,
+            "virtually_overrides" => Self::VirtuallyOverrides,
+            "is_friend_of" => Self::IsFriendOf,
+            "defines_operator" => Self::DefinesOperator,
+            "uses_macro_expansion" => Self::UsesMacroExpansion,
+            "is_pure_virtual" => Self::IsPureVirtual,
+            "is_constexpr" => Self::IsConstexpr,
+            "is_noexcept" => Self::IsNoexcept,
+            "requires_concept" => Self::RequiresConcept,
+            "static_asserts" => Self::StaticAsserts,
             _ => return None,
         })
     }
@@ -307,9 +407,10 @@ impl Predicate {
     /// closed-vocab round-trip test and by any consumer that needs to
     /// enumerate the whole surface (e.g. the ndjson validator).
     ///
-    /// **Length invariant:** `ALL.len() == 34` (7 core + 27 AR-shape).
-    /// A new variant added to [`Predicate`] **must** be appended here in
-    /// the same order, or the closed-vocab round-trip test fails.
+    /// **Length invariant:** `ALL.len() == 47` (7 core + 27 AR-shape +
+    /// 13 C++ machine-plane). A new variant added to [`Predicate`] **must**
+    /// be appended here in the same order, or the closed-vocab round-trip
+    /// test fails.
     pub const ALL: &'static [Predicate] = &[
         // Core 7
         Self::RdfType,
@@ -347,6 +448,20 @@ impl Predicate {
         Self::AutoStrips,
         Self::DefinesMethod,
         Self::UsesRefinement,
+        // C++ machine-plane 13
+        Self::InheritsFrom,
+        Self::HasField,
+        Self::TemplateSpecialises,
+        Self::TemplateInstantiates,
+        Self::VirtuallyOverrides,
+        Self::IsFriendOf,
+        Self::DefinesOperator,
+        Self::UsesMacroExpansion,
+        Self::IsPureVirtual,
+        Self::IsConstexpr,
+        Self::IsNoexcept,
+        Self::RequiresConcept,
+        Self::StaticAsserts,
     ];
 
     /// The default provenance tier for this predicate, per the Odoo
@@ -373,13 +488,29 @@ impl Predicate {
             Self::RdfType
             | Self::HasFunction
             | Self::ConcernClassMethods
-            | Self::ConcernIncludedBlock => Provenance::Structural,
+            | Self::ConcernIncludedBlock
+            | Self::IsFriendOf => Provenance::Structural,
             // Body-authoritative (Odoo + Rails declared)
             Self::EmittedBy | Self::DependsOn | Self::Raises => Provenance::Authoritative,
-            // Body-inferred (heuristic by definition)
-            Self::ReadsField | Self::TraversesRelation | Self::DefinesMethod => {
-                Provenance::Inferred
-            }
+            // Body-inferred (heuristic by definition) — including the two
+            // C++ metaprogramming-residual predicates (macro provenance,
+            // single-TU template instantiation visibility).
+            Self::ReadsField
+            | Self::TraversesRelation
+            | Self::DefinesMethod
+            | Self::UsesMacroExpansion
+            | Self::TemplateInstantiates => Provenance::Inferred,
+            // C++ machine-plane declarative surface (the 10 remaining of 13)
+            Self::InheritsFrom
+            | Self::HasField
+            | Self::TemplateSpecialises
+            | Self::VirtuallyOverrides
+            | Self::DefinesOperator
+            | Self::IsPureVirtual
+            | Self::IsConstexpr
+            | Self::IsNoexcept
+            | Self::RequiresConcept
+            | Self::StaticAsserts => Provenance::CppExtracted,
             // OpenProject AR-shape (everything else from the 27)
             Self::DeclaresAssociation
             | Self::ValidatesConstraint
@@ -471,6 +602,15 @@ pub enum Provenance {
     /// as `Authoritative` (the declaration IS the fact), confidence one
     /// notch lower to encode the Ruby metaprogramming residual.
     OpenProjectExtracted,
+    /// C++ machine-plane libclang harvest — `(0.95, 0.82)`. Same frequency
+    /// as `Authoritative` (the C++ declaration IS the fact, resolved by the
+    /// AST), confidence below `OpenProjectExtracted` to encode the deeper
+    /// metaprogramming surface — templates (two-phase lookup, partial
+    /// specialisation), the preprocessor, and ADL each add a layer a static
+    /// AST view does not fully resolve. Initial target per the
+    /// `ruff_cpp_spo` headstone; recalibrate against a Tesseract corpus
+    /// baseline once `CPP-SCHEMA-FIT` runs.
+    CppExtracted,
 }
 
 impl Provenance {
@@ -482,6 +622,7 @@ impl Provenance {
             Self::Authoritative => (0.95, 0.90),
             Self::Inferred => (0.85, 0.75),
             Self::OpenProjectExtracted => (0.95, 0.88),
+            Self::CppExtracted => (0.95, 0.82),
         }
     }
 }
@@ -507,12 +648,12 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_34() {
+    fn predicate_count_locked_at_47() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 27 OpenProject AR-shape = 34. Council review of any
-        // new variant means this number changes — the test must change
-        // with the source.
-        assert_eq!(Predicate::ALL.len(), 34);
+        // Python) + 27 OpenProject AR-shape + 13 C++ machine-plane = 47.
+        // Council review of any new variant means this number changes — the
+        // test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 47);
     }
 
     #[test]
@@ -521,6 +662,24 @@ mod tests {
         assert_eq!(Provenance::Authoritative.truth(), (0.95, 0.90));
         assert_eq!(Provenance::Inferred.truth(), (0.85, 0.75));
         assert_eq!(Provenance::OpenProjectExtracted.truth(), (0.95, 0.88));
+        assert_eq!(Provenance::CppExtracted.truth(), (0.95, 0.82));
+    }
+
+    #[test]
+    #[allow(clippy::float_cmp)] // exact comparison is the assertion's whole point
+    fn cpp_extracted_is_below_open_project_extracted() {
+        // Same frequency as Authoritative / OpenProjectExtracted (the C++
+        // declaration IS the fact), confidence strictly below the Ruby tier
+        // to encode the templates + preprocessor + ADL surface delta.
+        let (auth_f, _) = Provenance::Authoritative.truth();
+        let (op_f, op_c) = Provenance::OpenProjectExtracted.truth();
+        let (cpp_f, cpp_c) = Provenance::CppExtracted.truth();
+        assert_eq!(cpp_f, auth_f, "frequency matches Authoritative");
+        assert_eq!(cpp_f, op_f, "frequency matches OpenProjectExtracted");
+        assert!(
+            cpp_c < op_c,
+            "C++ confidence must be strictly below the Ruby tier"
+        );
     }
 
     #[test]
@@ -583,6 +742,29 @@ mod tests {
         assert_eq!(
             Predicate::RegistersJournalFormatter.default_provenance(),
             Provenance::OpenProjectExtracted
+        );
+        // C++ machine-plane: CppExtracted default + 3 per-edge overrides.
+        assert_eq!(
+            Predicate::InheritsFrom.default_provenance(),
+            Provenance::CppExtracted
+        );
+        assert_eq!(
+            Predicate::IsPureVirtual.default_provenance(),
+            Provenance::CppExtracted
+        );
+        // is_friend_of → Structural (purely declarative).
+        assert_eq!(
+            Predicate::IsFriendOf.default_provenance(),
+            Provenance::Structural
+        );
+        // macro expansion + single-TU instantiation → Inferred.
+        assert_eq!(
+            Predicate::UsesMacroExpansion.default_provenance(),
+            Provenance::Inferred
+        );
+        assert_eq!(
+            Predicate::TemplateInstantiates.default_provenance(),
+            Provenance::Inferred
         );
     }
 
