@@ -8846,87 +8846,105 @@ impl crate::HasNodeIndex for AnyRootNodeRef<'_> {
 impl<'a> AnyRootNodeRef<'a> {
     /// Decomposes this reference into its root node kind and a type-erased pointer.
     #[inline]
-    pub fn into_raw_parts(self) -> (RootNodeKind, *const ()) {
+    pub fn into_raw_parts(self) -> (RootNodeKind, std::ptr::NonNull<()>) {
         match self {
-            AnyRootNodeRef::Mod(node) => (RootNodeKind::Mod, std::ptr::from_ref(node).cast()),
-            AnyRootNodeRef::Stmt(node) => (RootNodeKind::Stmt, std::ptr::from_ref(node).cast()),
-            AnyRootNodeRef::Expr(node) => (RootNodeKind::Expr, std::ptr::from_ref(node).cast()),
-            AnyRootNodeRef::ExceptHandler(node) => {
-                (RootNodeKind::ExceptHandler, std::ptr::from_ref(node).cast())
+            AnyRootNodeRef::Mod(node) => (RootNodeKind::Mod, std::ptr::NonNull::from(node).cast()),
+            AnyRootNodeRef::Stmt(node) => {
+                (RootNodeKind::Stmt, std::ptr::NonNull::from(node).cast())
             }
+            AnyRootNodeRef::Expr(node) => {
+                (RootNodeKind::Expr, std::ptr::NonNull::from(node).cast())
+            }
+            AnyRootNodeRef::ExceptHandler(node) => (
+                RootNodeKind::ExceptHandler,
+                std::ptr::NonNull::from(node).cast(),
+            ),
             AnyRootNodeRef::InterpolatedStringElement(node) => (
                 RootNodeKind::InterpolatedStringElement,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
             AnyRootNodeRef::Pattern(node) => {
-                (RootNodeKind::Pattern, std::ptr::from_ref(node).cast())
+                (RootNodeKind::Pattern, std::ptr::NonNull::from(node).cast())
             }
-            AnyRootNodeRef::TypeParam(node) => {
-                (RootNodeKind::TypeParam, std::ptr::from_ref(node).cast())
-            }
+            AnyRootNodeRef::TypeParam(node) => (
+                RootNodeKind::TypeParam,
+                std::ptr::NonNull::from(node).cast(),
+            ),
             AnyRootNodeRef::InterpolatedStringFormatSpec(node) => (
                 RootNodeKind::InterpolatedStringFormatSpec,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
             AnyRootNodeRef::PatternArguments(node) => (
                 RootNodeKind::PatternArguments,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
             AnyRootNodeRef::PatternKeyword(node) => (
                 RootNodeKind::PatternKeyword,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
-            AnyRootNodeRef::Comprehension(node) => {
-                (RootNodeKind::Comprehension, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::Arguments(node) => {
-                (RootNodeKind::Arguments, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::Parameters(node) => {
-                (RootNodeKind::Parameters, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::Parameter(node) => {
-                (RootNodeKind::Parameter, std::ptr::from_ref(node).cast())
-            }
+            AnyRootNodeRef::Comprehension(node) => (
+                RootNodeKind::Comprehension,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Arguments(node) => (
+                RootNodeKind::Arguments,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Parameters(node) => (
+                RootNodeKind::Parameters,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Parameter(node) => (
+                RootNodeKind::Parameter,
+                std::ptr::NonNull::from(node).cast(),
+            ),
             AnyRootNodeRef::ParameterWithDefault(node) => (
                 RootNodeKind::ParameterWithDefault,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
             AnyRootNodeRef::Keyword(node) => {
-                (RootNodeKind::Keyword, std::ptr::from_ref(node).cast())
+                (RootNodeKind::Keyword, std::ptr::NonNull::from(node).cast())
             }
-            AnyRootNodeRef::Alias(node) => (RootNodeKind::Alias, std::ptr::from_ref(node).cast()),
+            AnyRootNodeRef::Alias(node) => {
+                (RootNodeKind::Alias, std::ptr::NonNull::from(node).cast())
+            }
             AnyRootNodeRef::WithItem(node) => {
-                (RootNodeKind::WithItem, std::ptr::from_ref(node).cast())
+                (RootNodeKind::WithItem, std::ptr::NonNull::from(node).cast())
             }
-            AnyRootNodeRef::MatchCase(node) => {
-                (RootNodeKind::MatchCase, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::Decorator(node) => {
-                (RootNodeKind::Decorator, std::ptr::from_ref(node).cast())
-            }
+            AnyRootNodeRef::MatchCase(node) => (
+                RootNodeKind::MatchCase,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Decorator(node) => (
+                RootNodeKind::Decorator,
+                std::ptr::NonNull::from(node).cast(),
+            ),
             AnyRootNodeRef::ElifElseClause(node) => (
                 RootNodeKind::ElifElseClause,
-                std::ptr::from_ref(node).cast(),
+                std::ptr::NonNull::from(node).cast(),
             ),
-            AnyRootNodeRef::TypeParams(node) => {
-                (RootNodeKind::TypeParams, std::ptr::from_ref(node).cast())
-            }
+            AnyRootNodeRef::TypeParams(node) => (
+                RootNodeKind::TypeParams,
+                std::ptr::NonNull::from(node).cast(),
+            ),
             AnyRootNodeRef::FString(node) => {
-                (RootNodeKind::FString, std::ptr::from_ref(node).cast())
+                (RootNodeKind::FString, std::ptr::NonNull::from(node).cast())
             }
             AnyRootNodeRef::TString(node) => {
-                (RootNodeKind::TString, std::ptr::from_ref(node).cast())
+                (RootNodeKind::TString, std::ptr::NonNull::from(node).cast())
             }
-            AnyRootNodeRef::StringLiteral(node) => {
-                (RootNodeKind::StringLiteral, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::BytesLiteral(node) => {
-                (RootNodeKind::BytesLiteral, std::ptr::from_ref(node).cast())
-            }
-            AnyRootNodeRef::Identifier(node) => {
-                (RootNodeKind::Identifier, std::ptr::from_ref(node).cast())
-            }
+            AnyRootNodeRef::StringLiteral(node) => (
+                RootNodeKind::StringLiteral,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::BytesLiteral(node) => (
+                RootNodeKind::BytesLiteral,
+                std::ptr::NonNull::from(node).cast(),
+            ),
+            AnyRootNodeRef::Identifier(node) => (
+                RootNodeKind::Identifier,
+                std::ptr::NonNull::from(node).cast(),
+            ),
         }
     }
 
@@ -8938,87 +8956,93 @@ impl<'a> AnyRootNodeRef<'a> {
     /// represented by `kind`. The pointed-to node must live for `'a`.
     #[inline]
     #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
-    pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: *const ()) -> Self {
+    pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
         match kind {
-            RootNodeKind::Mod => AnyRootNodeRef::Mod(unsafe { &*pointer.cast::<Mod>() }),
-            RootNodeKind::Stmt => AnyRootNodeRef::Stmt(unsafe { &*pointer.cast::<Stmt>() }),
-            RootNodeKind::Expr => AnyRootNodeRef::Expr(unsafe { &*pointer.cast::<Expr>() }),
+            RootNodeKind::Mod => AnyRootNodeRef::Mod(unsafe { &*pointer.cast::<Mod>().as_ptr() }),
+            RootNodeKind::Stmt => {
+                AnyRootNodeRef::Stmt(unsafe { &*pointer.cast::<Stmt>().as_ptr() })
+            }
+            RootNodeKind::Expr => {
+                AnyRootNodeRef::Expr(unsafe { &*pointer.cast::<Expr>().as_ptr() })
+            }
             RootNodeKind::ExceptHandler => {
-                AnyRootNodeRef::ExceptHandler(unsafe { &*pointer.cast::<ExceptHandler>() })
+                AnyRootNodeRef::ExceptHandler(unsafe { &*pointer.cast::<ExceptHandler>().as_ptr() })
             }
             RootNodeKind::InterpolatedStringElement => {
                 AnyRootNodeRef::InterpolatedStringElement(unsafe {
-                    &*pointer.cast::<InterpolatedStringElement>()
+                    &*pointer.cast::<InterpolatedStringElement>().as_ptr()
                 })
             }
             RootNodeKind::Pattern => {
-                AnyRootNodeRef::Pattern(unsafe { &*pointer.cast::<Pattern>() })
+                AnyRootNodeRef::Pattern(unsafe { &*pointer.cast::<Pattern>().as_ptr() })
             }
             RootNodeKind::TypeParam => {
-                AnyRootNodeRef::TypeParam(unsafe { &*pointer.cast::<TypeParam>() })
+                AnyRootNodeRef::TypeParam(unsafe { &*pointer.cast::<TypeParam>().as_ptr() })
             }
             RootNodeKind::InterpolatedStringFormatSpec => {
                 AnyRootNodeRef::InterpolatedStringFormatSpec(unsafe {
-                    &*pointer.cast::<crate::InterpolatedStringFormatSpec>()
+                    &*pointer
+                        .cast::<crate::InterpolatedStringFormatSpec>()
+                        .as_ptr()
                 })
             }
             RootNodeKind::PatternArguments => AnyRootNodeRef::PatternArguments(unsafe {
-                &*pointer.cast::<crate::PatternArguments>()
+                &*pointer.cast::<crate::PatternArguments>().as_ptr()
             }),
-            RootNodeKind::PatternKeyword => {
-                AnyRootNodeRef::PatternKeyword(unsafe { &*pointer.cast::<crate::PatternKeyword>() })
-            }
-            RootNodeKind::Comprehension => {
-                AnyRootNodeRef::Comprehension(unsafe { &*pointer.cast::<crate::Comprehension>() })
-            }
+            RootNodeKind::PatternKeyword => AnyRootNodeRef::PatternKeyword(unsafe {
+                &*pointer.cast::<crate::PatternKeyword>().as_ptr()
+            }),
+            RootNodeKind::Comprehension => AnyRootNodeRef::Comprehension(unsafe {
+                &*pointer.cast::<crate::Comprehension>().as_ptr()
+            }),
             RootNodeKind::Arguments => {
-                AnyRootNodeRef::Arguments(unsafe { &*pointer.cast::<crate::Arguments>() })
+                AnyRootNodeRef::Arguments(unsafe { &*pointer.cast::<crate::Arguments>().as_ptr() })
             }
-            RootNodeKind::Parameters => {
-                AnyRootNodeRef::Parameters(unsafe { &*pointer.cast::<crate::Parameters>() })
-            }
+            RootNodeKind::Parameters => AnyRootNodeRef::Parameters(unsafe {
+                &*pointer.cast::<crate::Parameters>().as_ptr()
+            }),
             RootNodeKind::Parameter => {
-                AnyRootNodeRef::Parameter(unsafe { &*pointer.cast::<crate::Parameter>() })
+                AnyRootNodeRef::Parameter(unsafe { &*pointer.cast::<crate::Parameter>().as_ptr() })
             }
             RootNodeKind::ParameterWithDefault => AnyRootNodeRef::ParameterWithDefault(unsafe {
-                &*pointer.cast::<crate::ParameterWithDefault>()
+                &*pointer.cast::<crate::ParameterWithDefault>().as_ptr()
             }),
             RootNodeKind::Keyword => {
-                AnyRootNodeRef::Keyword(unsafe { &*pointer.cast::<crate::Keyword>() })
+                AnyRootNodeRef::Keyword(unsafe { &*pointer.cast::<crate::Keyword>().as_ptr() })
             }
             RootNodeKind::Alias => {
-                AnyRootNodeRef::Alias(unsafe { &*pointer.cast::<crate::Alias>() })
+                AnyRootNodeRef::Alias(unsafe { &*pointer.cast::<crate::Alias>().as_ptr() })
             }
             RootNodeKind::WithItem => {
-                AnyRootNodeRef::WithItem(unsafe { &*pointer.cast::<crate::WithItem>() })
+                AnyRootNodeRef::WithItem(unsafe { &*pointer.cast::<crate::WithItem>().as_ptr() })
             }
             RootNodeKind::MatchCase => {
-                AnyRootNodeRef::MatchCase(unsafe { &*pointer.cast::<crate::MatchCase>() })
+                AnyRootNodeRef::MatchCase(unsafe { &*pointer.cast::<crate::MatchCase>().as_ptr() })
             }
             RootNodeKind::Decorator => {
-                AnyRootNodeRef::Decorator(unsafe { &*pointer.cast::<crate::Decorator>() })
+                AnyRootNodeRef::Decorator(unsafe { &*pointer.cast::<crate::Decorator>().as_ptr() })
             }
-            RootNodeKind::ElifElseClause => {
-                AnyRootNodeRef::ElifElseClause(unsafe { &*pointer.cast::<crate::ElifElseClause>() })
-            }
-            RootNodeKind::TypeParams => {
-                AnyRootNodeRef::TypeParams(unsafe { &*pointer.cast::<crate::TypeParams>() })
-            }
+            RootNodeKind::ElifElseClause => AnyRootNodeRef::ElifElseClause(unsafe {
+                &*pointer.cast::<crate::ElifElseClause>().as_ptr()
+            }),
+            RootNodeKind::TypeParams => AnyRootNodeRef::TypeParams(unsafe {
+                &*pointer.cast::<crate::TypeParams>().as_ptr()
+            }),
             RootNodeKind::FString => {
-                AnyRootNodeRef::FString(unsafe { &*pointer.cast::<crate::FString>() })
+                AnyRootNodeRef::FString(unsafe { &*pointer.cast::<crate::FString>().as_ptr() })
             }
             RootNodeKind::TString => {
-                AnyRootNodeRef::TString(unsafe { &*pointer.cast::<crate::TString>() })
+                AnyRootNodeRef::TString(unsafe { &*pointer.cast::<crate::TString>().as_ptr() })
             }
-            RootNodeKind::StringLiteral => {
-                AnyRootNodeRef::StringLiteral(unsafe { &*pointer.cast::<crate::StringLiteral>() })
-            }
-            RootNodeKind::BytesLiteral => {
-                AnyRootNodeRef::BytesLiteral(unsafe { &*pointer.cast::<crate::BytesLiteral>() })
-            }
-            RootNodeKind::Identifier => {
-                AnyRootNodeRef::Identifier(unsafe { &*pointer.cast::<crate::Identifier>() })
-            }
+            RootNodeKind::StringLiteral => AnyRootNodeRef::StringLiteral(unsafe {
+                &*pointer.cast::<crate::StringLiteral>().as_ptr()
+            }),
+            RootNodeKind::BytesLiteral => AnyRootNodeRef::BytesLiteral(unsafe {
+                &*pointer.cast::<crate::BytesLiteral>().as_ptr()
+            }),
+            RootNodeKind::Identifier => AnyRootNodeRef::Identifier(unsafe {
+                &*pointer.cast::<crate::Identifier>().as_ptr()
+            }),
         }
     }
 

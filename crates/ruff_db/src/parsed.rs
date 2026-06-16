@@ -493,7 +493,13 @@ mod indexed {
             // SAFETY: `kind` and `address` were recorded from the same node, and the node is owned
             // by `self.parsed`, so it lives for as long as this borrow of `self`.
             unsafe {
-                AnyRootNodeRef::from_raw_parts(kind, std::ptr::with_exposed_provenance(address))
+                AnyRootNodeRef::from_raw_parts(
+                    kind,
+                    std::ptr::NonNull::with_exposed_provenance(
+                        std::num::NonZeroUsize::new(address)
+                            .expect("recorded AST node address should be non-null"),
+                    ),
+                )
             }
         }
     }
@@ -527,7 +533,7 @@ mod indexed {
 
             if let Some(nodes) = &mut self.nodes {
                 let (kind, pointer) = AnyRootNodeRef::from(node).into_raw_parts();
-                nodes.addresses.push(pointer.expose_provenance());
+                nodes.addresses.push(pointer.as_ptr().expose_provenance());
                 nodes.kinds.push(kind);
             }
             self.index += 1;

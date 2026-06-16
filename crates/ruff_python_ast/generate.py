@@ -933,12 +933,12 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
         impl<'a> AnyRootNodeRef<'a> {
             /// Decomposes this reference into its root node kind and a type-erased pointer.
             #[inline]
-            pub fn into_raw_parts(self) -> (RootNodeKind, *const ()) {
+            pub fn into_raw_parts(self) -> (RootNodeKind, std::ptr::NonNull<()>) {
                 match self {
     """)
     for name, _ in root_nodes:
         out.append(
-            f"""AnyRootNodeRef::{name}(node) => (RootNodeKind::{name}, std::ptr::from_ref(node).cast()),"""
+            f"""AnyRootNodeRef::{name}(node) => (RootNodeKind::{name}, std::ptr::NonNull::from(node).cast()),"""
         )
     out.append("""
                 }
@@ -952,12 +952,12 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             /// represented by `kind`. The pointed-to node must live for `'a`.
             #[inline]
             #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
-            pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: *const ()) -> Self {
+            pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
                 match kind {
     """)
     for name, ty in root_nodes:
         out.append(
-            f"""RootNodeKind::{name} => AnyRootNodeRef::{name}(unsafe {{ &*pointer.cast::<{ty}>() }}),"""
+            f"""RootNodeKind::{name} => AnyRootNodeRef::{name}(unsafe {{ &*pointer.cast::<{ty}>().as_ptr() }}),"""
         )
     out.append("""
                 }
