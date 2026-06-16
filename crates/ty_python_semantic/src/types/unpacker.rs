@@ -87,7 +87,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }
             }
             UnpackKind::Iterable { mode } => value_type
-                .try_cycle_iter_projection(self.db())
+                .try_cycle_iter_projection_with_mode(self.db(), mode)
                 .unwrap_or_else(|| {
                     value_type
                         .try_iterate_with_mode(self.db(), mode)

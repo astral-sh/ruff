@@ -3147,8 +3147,8 @@ Projection recovery also works for custom generic containers that define their o
 behavior:
 
 ```py
-from collections.abc import Callable, Generator, Iterator
-from typing import Generic, TypeVar, overload, Any
+from collections.abc import AsyncIterator, Callable, Generator, Iterator
+from typing import Awaitable, Coroutine, Generic, TypeVar, overload, Any
 
 ProjectionT = TypeVar("ProjectionT")
 ProjectionU = TypeVar("ProjectionU")
@@ -3441,6 +3441,26 @@ class ProjectionCustomContext:
 
         reveal_type(self.x)  # revealed: ContextBox[int]
 
+class AsyncContextBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    async def __aenter__(self) -> ProjectionT:
+        return self.value
+
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomAsyncContext:
+    def __init__(self) -> None:
+        self.x = AsyncContextBox(0)
+
+    async def read(self) -> None:
+        async with self.x as item:
+            self.x = AsyncContextBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncContextBox[int]
+
 class AwaitBox(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
         self.value = value
@@ -3460,6 +3480,73 @@ class ProjectionCustomAwait:
         self.x = AwaitBox(item)
 
         reveal_type(self.x)  # revealed: AwaitBox[int]
+
+async def projection_identity(value: ProjectionT) -> ProjectionT:
+    return value
+
+class ProjectionAwaitable:
+    def __init__(self, value: Awaitable[int]) -> None:
+        self.x = value
+
+    async def read(self) -> None:
+        item = await self.x
+        self.x = projection_identity(item)
+
+        reveal_type(item)  # revealed: int
+        reveal_type(self.x)  # revealed: CoroutineType[Any, Any, int]
+
+class ProjectionCoroutine:
+    def __init__(self, value: Coroutine[Any, Any, int]) -> None:
+        self.x = value
+
+    async def read(self) -> None:
+        item = await self.x
+        self.x = projection_identity(item)
+
+        reveal_type(item)  # revealed: int
+        reveal_type(self.x)  # revealed: CoroutineType[Any, Any, int]
+
+class AsyncBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __aiter__(self) -> AsyncIterator[ProjectionT]:
+        async def gen() -> AsyncIterator[ProjectionT]:
+            if False:
+                yield self.value
+
+        return gen()
+
+class ProjectionCustomAsyncFor:
+    def __init__(self) -> None:
+        self.x = AsyncBox(0)
+
+    async def read(self) -> None:
+        async for item in self.x:
+            self.x = AsyncBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncBox[int]
+
+class AsyncTupleBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __aiter__(self) -> AsyncIterator[tuple[ProjectionT]]:
+        async def gen() -> AsyncIterator[tuple[ProjectionT]]:
+            if False:
+                yield (self.value,)
+
+        return gen()
+
+class ProjectionCustomAsyncForUnpack:
+    def __init__(self) -> None:
+        self.x = AsyncTupleBox(0)
+
+    async def read(self) -> None:
+        async for (item,) in self.x:
+            self.x = AsyncTupleBox(item)
+
+        reveal_type(self.x)  # revealed: AsyncTupleBox[int]
 ```
 
 Different container wrappers can share the same unpack projection:

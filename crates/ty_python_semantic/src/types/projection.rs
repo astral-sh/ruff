@@ -13,8 +13,21 @@ use crate::types::tuple::{Tuple, TupleLength, TupleType};
 use crate::types::visitor::any_over_type;
 
 impl<'db> Type<'db> {
-    pub(crate) fn try_cycle_iter_projection(self, db: &'db dyn Db) -> Option<Self> {
-        self.try_cycle_projection(db, CycleProjectionOp::IterItem)
+    pub(crate) fn try_cycle_iter_projection_with_mode(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Option<Self> {
+        let op = if mode.is_async() {
+            CycleProjectionOp::AsyncIterItem
+        } else {
+            CycleProjectionOp::IterItem
+        };
+        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+            ty.try_iterate_with_mode(db, mode)
+                .ok()
+                .map(|tuple| tuple.homogeneous_element_type(db))
+        })
     }
 
     pub(crate) fn try_cycle_unpack_projection(
@@ -74,7 +87,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         slice_ty: Type<'db>,
     ) -> Option<Self> {
-        self.try_cycle_projection(db, CycleProjectionOp::from_subscript(db, slice_ty)?)
+        let op = CycleProjectionOp::from_subscript(db, slice_ty)?;
+        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+            ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()
+        })
     }
 
     pub(crate) fn try_cycle_context_enter_projection(
@@ -82,16 +98,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Option<Self> {
-        self.try_cycle_projection(
-            db,
-            CycleProjectionOp::ContextEnter {
-                is_async: mode.is_async(),
-            },
-        )
+        let op = CycleProjectionOp::ContextEnter {
+            is_async: mode.is_async(),
+        };
+        self.try_cycle_projection_with_non_cycle(db, op, |ty| ty.try_enter_with_mode(db, mode).ok())
     }
 
     pub(crate) fn try_cycle_await_projection(self, db: &'db dyn Db) -> Option<Self> {
-        self.try_cycle_projection(db, CycleProjectionOp::AwaitResult)
+        self.try_cycle_projection_with_non_cycle(db, CycleProjectionOp::AwaitResult, |ty| {
+            ty.try_await(db).ok()
+        })
     }
 
     fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp) -> Option<Self> {
@@ -105,6 +121,31 @@ impl<'db> Type<'db> {
             }
             _ => None,
         }
+    }
+
+    fn try_cycle_projection_with_non_cycle(
+        self,
+        db: &'db dyn Db,
+        op: CycleProjectionOp,
+        mut project_non_cycle: impl FnMut(Self) -> Option<Self>,
+    ) -> Option<Self> {
+        let Type::Union(union) = self else {
+            return self.try_cycle_projection(db, op);
+        };
+
+        let mut saw_cycle_projection = false;
+        let mut elements = Vec::new();
+
+        for element in union.elements(db).iter().copied() {
+            if let Some(projected) = element.try_cycle_projection(db, op) {
+                saw_cycle_projection = true;
+                elements.push(projected);
+            } else {
+                elements.push(project_non_cycle(element)?);
+            }
+        }
+
+        saw_cycle_projection.then(|| UnionType::from_elements_cycle_recovery(db, elements))
     }
 
     pub(crate) const fn is_cycle_artifact(&self) -> bool {
@@ -491,8 +532,7 @@ impl<'db> ProjectionContainer<'db> {
 
         if let Some((class, specialization)) = ty.class_specialization(db) {
             if let Some(known_class) = class.known(db)
-                && Self::known_container_iter_item_type(known_class, specialization.types(db))
-                    .is_some()
+                && Self::known_container_supports_projection(known_class, specialization.types(db))
             {
                 return Some(Self::Known {
                     class: known_class,
@@ -510,6 +550,14 @@ impl<'db> ProjectionContainer<'db> {
         }
 
         None
+    }
+
+    fn known_container_supports_projection(class: KnownClass, arguments: &[Type<'db>]) -> bool {
+        Self::known_container_iter_item_type(class, arguments).is_some()
+            || Self::known_container_async_iter_item_type(class, arguments).is_some()
+            || Self::known_container_get_item_type(class, arguments).is_some()
+            || Self::known_container_slice_type_for_class(class, arguments).is_some()
+            || Self::known_container_await_result_type(class, arguments).is_some()
     }
 
     fn collect_projection_terms(
@@ -558,6 +606,7 @@ impl<'db> ProjectionContainer<'db> {
 
         let projected = match op {
             CycleProjectionOp::IterItem => Self::project_iter_item(db, ty)?,
+            CycleProjectionOp::AsyncIterItem => Self::project_async_iter_item(db, ty)?,
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::project_unpack_exact(db, ty, len, index)?
             }
@@ -591,9 +640,10 @@ impl<'db> ProjectionContainer<'db> {
             }
             CycleProjectionOp::GetItemInt => Self::project_get_item_int(db, ty, None)?,
             CycleProjectionOp::SliceStatic(slice) => Self::project_slice_static(db, ty, slice)?,
-            CycleProjectionOp::ContextEnter { .. } | CycleProjectionOp::AwaitResult => {
+            CycleProjectionOp::ContextEnter { .. } => {
                 return None;
             }
+            CycleProjectionOp::AwaitResult => Self::project_await_result(db, ty)?,
         };
 
         if tail.is_empty() {
@@ -632,6 +682,7 @@ impl<'db> ProjectionContainer<'db> {
 
         let projected = match op {
             CycleProjectionOp::IterItem => Self::infer_iter_item(db, ty)?,
+            CycleProjectionOp::AsyncIterItem => Self::infer_async_iter_item(db, ty)?,
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::infer_unpack_exact(db, ty, len, index)?
             }
@@ -685,6 +736,18 @@ impl<'db> ProjectionContainer<'db> {
             && let Some(known_class) = class.known(db)
             && let Some(element) =
                 Self::known_container_iter_item_type(known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Homogeneous(element));
+        }
+
+        None
+    }
+
+    fn project_async_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_async_iter_item_type(known_class, specialization.types(db))
         {
             return Some(ProjectionTerm::Homogeneous(element));
         }
@@ -841,6 +904,14 @@ impl<'db> ProjectionContainer<'db> {
         ))
     }
 
+    fn infer_async_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        Some(ProjectionTerm::Homogeneous(
+            ty.try_iterate_with_mode(db, EvaluationMode::Async)
+                .ok()?
+                .homogeneous_element_type(db),
+        ))
+    }
+
     fn infer_unpack_exact(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -899,6 +970,18 @@ impl<'db> ProjectionContainer<'db> {
 
     fn infer_await_result(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Exact(ty.try_await(db).ok()?))
+    }
+
+    fn project_await_result(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(result) =
+                Self::known_container_await_result_type(known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Exact(result));
+        }
+
+        None
     }
 
     fn into_type(
@@ -997,6 +1080,35 @@ impl<'db> ProjectionContainer<'db> {
         arguments.get(index).copied()
     }
 
+    fn known_container_async_iter_item_type(
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        let index = match class {
+            KnownClass::AsyncGenerator
+            | KnownClass::AsyncGeneratorType
+            | KnownClass::AsyncIterator
+            | KnownClass::TyExtensionsAsyncIterable
+            | KnownClass::TyExtensionsAsyncIterator => 0,
+            _ => return None,
+        };
+
+        arguments.get(index).copied()
+    }
+
+    fn known_container_await_result_type(
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        let index = match class {
+            KnownClass::Awaitable => 0,
+            KnownClass::CoroutineType => 2,
+            _ => return None,
+        };
+
+        arguments.get(index).copied()
+    }
+
     fn known_container_get_item_type(
         class: KnownClass,
         arguments: &[Type<'db>],
@@ -1020,6 +1132,16 @@ impl<'db> ProjectionContainer<'db> {
         };
 
         Some(class.to_specialized_instance(db, &[element]))
+    }
+
+    fn known_container_slice_type_for_class(
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<()> {
+        match class {
+            KnownClass::List | KnownClass::Sequence => arguments.first().map(|_| ()),
+            _ => None,
+        }
     }
 }
 
@@ -1177,6 +1299,7 @@ impl<'db> CycleProjectionPath<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum CycleProjectionOp {
     IterItem,
+    AsyncIterItem,
     UnpackExact {
         len: usize,
         index: usize,
