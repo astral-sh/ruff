@@ -342,11 +342,25 @@ impl Expander {
     }
 
     fn delegation(&mut self, model_iri: &str, d: &Delegation) {
+        // Honour Rails' `prefix:` option (codex P2 PR #5):
+        //   delegate :name, :identifier, to: :project, prefix: true
+        //     → exposes `project_name` and `project_identifier` on the
+        //       caller (NOT `name` / `identifier`).
+        //   delegate :name, to: :project, prefix: :owner
+        //     → exposes `owner_name`.
+        // Without honouring this, the graph would record an edge to a
+        // method that doesn't exist (`name`) while queries for the real
+        // method (`project_name`) would miss.
+        let prefix = delegate_prefix(d);
         for method in &d.methods {
+            let exposed = match &prefix {
+                Some(p) => format!("{p}_{method}"),
+                None => method.clone(),
+            };
             self.push(
                 model_iri.to_string(),
                 Predicate::DelegatesTo,
-                format!("{method}=>via:{}", d.to),
+                format!("{exposed}=>via:{}", d.to),
                 Provenance::OpenProjectExtracted,
             );
         }
@@ -468,6 +482,38 @@ impl Expander {
         let _ = sti.abstract_class;
         let _ = &sti.inheritance_column;
     }
+}
+
+/// Resolve Rails' `delegate ..., prefix: <value>` option to the actual
+/// method-name prefix that gets exposed on the caller class.
+///
+/// - `prefix: true` → use `d.to` as the prefix (the most common case).
+/// - `prefix: :owner` / `prefix: "owner"` → use `"owner"` literally.
+/// - `prefix: false` / no `prefix:` option → `None` (no rename).
+fn delegate_prefix(d: &Delegation) -> Option<String> {
+    for (k, v) in &d.options {
+        if k == "prefix" {
+            let trimmed = v.trim();
+            return match trimmed {
+                "true" => Some(d.to.clone()),
+                "false" | "nil" => None,
+                // Strip leading `:` (symbol) or surrounding quotes (string).
+                other => {
+                    let stripped = other
+                        .strip_prefix(':')
+                        .or_else(|| other.strip_prefix('"').and_then(|s| s.strip_suffix('"')))
+                        .or_else(|| other.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
+                        .unwrap_or(other);
+                    if stripped.is_empty() {
+                        None
+                    } else {
+                        Some(stripped.to_string())
+                    }
+                }
+            };
+        }
+    }
+    None
 }
 
 #[cfg(test)]
@@ -830,9 +876,64 @@ mod tests {
 
     #[test]
     fn ar_shape_expands_delegation_to_one_triple_per_method() {
+        // The fixture's `delegate :name, :identifier, to: :project, prefix: "project"`
+        // exposes `project_name` / `project_identifier` (NOT `name` /
+        // `identifier`), per Rails' `prefix:` semantics. Codex P2 PR #5
+        // — the expander now honours the prefix option.
         let triples = expand(&ar_fixture());
-        assert!(triples.iter().any(|t| t.p == "delegates_to" && t.o == "name=>via:project"));
-        assert!(triples.iter().any(|t| t.p == "delegates_to" && t.o == "identifier=>via:project"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "delegates_to" && t.o == "project_name=>via:project"),
+            "delegate :name + prefix: \"project\" → exposes project_name"
+        );
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "delegates_to" && t.o == "project_identifier=>via:project")
+        );
+        // The un-prefixed forms must NOT appear (the original methods
+        // do not exist on the caller class).
+        assert!(
+            !triples
+                .iter()
+                .any(|t| t.p == "delegates_to" && t.o == "name=>via:project"),
+            "un-prefixed name must NOT appear when prefix: is set",
+        );
+    }
+
+    /// **Codex P2 regression (PR #5 r…)** — verify each `prefix:` shape
+    /// (true / symbol / false / absent) maps to the correct exposed
+    /// method name.
+    #[test]
+    fn delegate_prefix_option_shapes() {
+        let cases = [
+            // (prefix-option-value, expected-prefix-or-none)
+            ("true", Some("project".to_string())), // prefix: true → use `to`
+            (":owner", Some("owner".to_string())), // prefix: :owner
+            ("\"owner\"", Some("owner".to_string())), // prefix: "owner"
+            ("false", None),                       // prefix: false → no rename
+            ("nil", None),
+        ];
+        for (opt_value, expected) in cases {
+            let d = crate::ir::Delegation {
+                methods: vec!["name".to_string()],
+                to: "project".to_string(),
+                options: vec![("prefix".to_string(), opt_value.to_string())],
+            };
+            assert_eq!(
+                delegate_prefix(&d),
+                expected,
+                "prefix: {opt_value} should yield {expected:?}",
+            );
+        }
+        // Absent prefix → None.
+        let d = crate::ir::Delegation {
+            methods: vec!["name".to_string()],
+            to: "project".to_string(),
+            options: vec![],
+        };
+        assert_eq!(delegate_prefix(&d), None);
     }
 
     #[test]

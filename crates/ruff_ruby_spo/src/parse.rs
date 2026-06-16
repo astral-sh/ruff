@@ -90,21 +90,40 @@ fn parse_file(src: &str, path: &Path) -> Option<Node> {
 /// discovered, recursing into `module ... end` wrappers and `Begin`
 /// statement blocks.
 fn collect_classes_from_node(node: &Node, out: &mut Vec<RubyClass>) {
+    collect_classes_with_namespace(node, &[], out);
+}
+
+/// Recursive class-discovery walk that threads the enclosing module
+/// namespace through so `module Foo; class Bar < ApplicationRecord;`
+/// yields `name = "Foo::Bar"` (codex P2 r3418* — module namespaces
+/// were being dropped on the floor).
+fn collect_classes_with_namespace(node: &Node, ns: &[String], out: &mut Vec<RubyClass>) {
     match node {
         Node::Begin(b) => {
             for stmt in &b.statements {
-                collect_classes_from_node(stmt, out);
+                collect_classes_with_namespace(stmt, ns, out);
             }
         }
         Node::Module(m) => {
+            let mod_name = const_to_string(&m.name).unwrap_or_default();
+            let mut nested = ns.to_vec();
+            nested.push(mod_name);
             if let Some(body) = &m.body {
-                collect_classes_from_node(body, out);
+                collect_classes_with_namespace(body, &nested, out);
             }
         }
         Node::Class(c) => {
-            let name = const_to_string(&c.name).unwrap_or_default();
+            let local_name = const_to_string(&c.name).unwrap_or_default();
+            // Qualify with the enclosing `module Foo; module Bar; class …`
+            // namespace stack so two same-named inner classes don't
+            // collide in the SPO graph.
+            let qualified = if ns.is_empty() {
+                local_name
+            } else {
+                format!("{}::{local_name}", ns.join("::"))
+            };
             let mut class = RubyClass {
-                name,
+                name: qualified,
                 declarations: Vec::new(),
             };
             // STI parent is the explicit superclass when it isn't
@@ -127,10 +146,10 @@ fn collect_classes_from_node(node: &Node, out: &mut Vec<RubyClass>) {
             out.push(class);
             // A nested class inside a class body is unusual but possible
             // (`class Outer; class Inner; end; end`); the inner one was
-            // walked as part of body — collect_classes_from_node handles
-            // it via the body's Class node arm.
+            // walked as part of body — collect_classes_with_namespace
+            // handles it via the body's Class node arm.
             if let Some(body) = &c.body {
-                collect_nested_classes(body, out);
+                collect_nested_classes(body, ns, out);
             }
         }
         _ => {}
@@ -141,16 +160,18 @@ fn collect_classes_from_node(node: &Node, out: &mut Vec<RubyClass>) {
 /// `class A; class B; end; end`). The walker treats these as siblings
 /// at IR level (flat `ModelGraph::models`), matching what the SPO store
 /// expects.
-fn collect_nested_classes(body: &Node, out: &mut Vec<RubyClass>) {
+fn collect_nested_classes(body: &Node, ns: &[String], out: &mut Vec<RubyClass>) {
     match body {
         Node::Begin(b) => {
             for stmt in &b.statements {
                 if matches!(stmt, Node::Class(_) | Node::Module(_)) {
-                    collect_classes_from_node(stmt, out);
+                    collect_classes_with_namespace(stmt, ns, out);
                 }
             }
         }
-        Node::Class(_) | Node::Module(_) => collect_classes_from_node(body, out),
+        Node::Class(_) | Node::Module(_) => {
+            collect_classes_with_namespace(body, ns, out);
+        }
         _ => {}
     }
 }
