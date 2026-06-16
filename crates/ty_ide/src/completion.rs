@@ -1074,6 +1074,7 @@ impl<'m> ContextCursor<'m> {
     /// continued by those keywords.
     fn incomplete_keywords(&self) -> Option<&'static [&'static str]> {
         const IN: &[&str] = &["in"];
+        const AS: &[&str] = &["as"];
 
         let preceding_token = |keyword: &str| {
             let (tokens, start) = match self.typed {
@@ -1117,6 +1118,27 @@ impl<'m> ContextCursor<'m> {
                         IN,
                         &[],
                     ),
+                    _ => None,
+                })
+        {
+            return Some(self.unless_already_present(keywords));
+        }
+
+        if let Some(token) = preceding_token("as")
+            && let Some(keywords) = self
+                .covering_node(token.range())
+                .ancestors()
+                .find_map(|node| match node {
+                    ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
+                        let range = item.context_expr.range();
+                        self.keywords_after_range(range, item.into(), token, AS, &[])
+                            .or_else(|| self.keywords_after_range(range, node, token, AS, AS))
+                    }),
+                    ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                        handler.type_.as_deref().and_then(|type_| {
+                            self.keywords_after_range(type_.range(), node, token, AS, &[])
+                        })
+                    }
                     _ => None,
                 })
         {
@@ -8058,6 +8080,20 @@ with open('bar') as f<CURSOR>
     }
 
     #[test]
+    fn with_item_suggests_as() {
+        for source in [
+            "with open('bar') <CURSOR>",
+            "with open('bar') a<CURSOR>",
+            "with (open('bar')) <CURSOR>",
+            "with (open('bar') <CURSOR>)",
+            "with (\n    open('bar')  # comment\n    <CURSOR>\n)",
+            "with open('bar') \\\n    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "as");
+        }
+    }
+
+    #[test]
     fn no_completions_in_except_alias() {
         let builder = completion_test_builder(
             "\
@@ -8071,6 +8107,31 @@ except IndexError as f<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn except_handler_suggests_as() {
+        for source in [
+            "\
+try:
+    pass
+except ValueError <CURSOR>",
+            "\
+try:
+    pass
+except ValueError a<CURSOR>",
+            "\
+try:
+    pass
+except (ValueError) <CURSOR>",
+            "\
+try:
+    pass
+except ValueError \\
+    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "as");
+        }
     }
 
     #[test]
@@ -8108,7 +8169,14 @@ match status:
 
     #[test]
     fn no_contextual_keywords_inside_parentheses() {
-        for (source, unexpected) in [("for (foo <CURSOR>) in items: pass", "in")] {
+        for (source, unexpected) in [
+            ("for (foo <CURSOR>) in items: pass", "in"),
+            ("with ((open() <CURSOR>)): pass", "as"),
+            (
+                "try:\n    pass\nexcept (ValueError <CURSOR>) as error: pass",
+                "as",
+            ),
+        ] {
             let builder = completion_test_builder(source);
             assert!(
                 builder
@@ -8178,6 +8246,8 @@ for foo<CURSOR>
         for source in [
             "for foo <CURSOR>in items: pass",
             "[foo for foo <CURSOR>in items]",
+            "with open('bar') <CURSOR>as file: pass",
+            "try:\n    pass\nexcept ValueError <CURSOR>as error: pass",
         ] {
             assert_eq!(
                 completion_test_builder(source).build().snapshot(),
