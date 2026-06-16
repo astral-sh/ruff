@@ -2999,6 +2999,34 @@ class ProjectionIter:
         reveal_type(self.x)  # revealed: list[int]
 ```
 
+Projection recovery works through nested container wrappers:
+
+```py
+class ProjectionNestedWrappedAssignment:
+    def __init__(self) -> None:
+        self.x = [(0,)]
+
+    def read(self) -> None:
+        (x,), = self.x
+        self.x = [(x,)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int]]
+```
+
+Nested for-loop unpacking composes iteration and exact-unpack projections:
+
+```py
+class ProjectionNestedForUnpack:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        for x, y in self.x:
+            self.x = [(x, y)]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
+```
+
 Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
 the mixed containers:
 
