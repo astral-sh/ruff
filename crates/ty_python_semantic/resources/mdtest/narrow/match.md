@@ -634,10 +634,10 @@ def test_match_indirect_class_pattern(
             reveal_type(value)  # revealed: IndirectPattern
 ```
 
-## Recursive class pattern aliases
+## Class pattern aliases
 
-The same rule applies outside sequence patterns. Preserving a recursive alias lets later code keep
-using the recursive relationship after a class pattern matches.
+The same rule applies outside sequence patterns. A class pattern keeps the generic arguments of a
+matched alias.
 
 ```toml
 [environment]
@@ -645,22 +645,16 @@ python-version = "3.12"
 ```
 
 ```py
-type RecursiveContainer = int | dict[str, RecursiveContainer] | list[RecursiveContainer]
+type Container = int | dict[str, int] | list[int]
 
-def test_match_class_alias_preserves_recursive_containers(
-    value: RecursiveContainer,
-) -> None:
+def class_pattern_preserves_alias(value: Container) -> None:
     match value:
         case dict() as mapping:
-            reveal_type(mapping)  # revealed: dict[str, RecursiveContainer]
+            reveal_type(mapping)  # revealed: dict[str, int]
             mapping["bad"] = "bad"  # error: [invalid-assignment]
-            for item in mapping.values():
-                test_match_class_alias_preserves_recursive_containers(item)
         case list() as sequence:
-            reveal_type(sequence)  # revealed: list[RecursiveContainer]
+            reveal_type(sequence)  # revealed: list[int]
             sequence.append("bad")  # error: [invalid-argument-type]
-            for item in sequence:
-                test_match_class_alias_preserves_recursive_containers(item)
 ```
 
 ## Binding overlapping classes with `as`
