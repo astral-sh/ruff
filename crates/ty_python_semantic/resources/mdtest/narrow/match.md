@@ -511,6 +511,34 @@ def test_compatible_declared_alias(subject: object) -> None:
             reveal_type(item)  # revealed: int
 ```
 
+Pattern captures also respect declarations in global, enclosing function, and class scopes:
+
+```py
+global_capture: str
+
+def capture_respects_global_declaration(subject: int) -> None:
+    global global_capture
+    match subject:
+        case global_capture:  # error: [invalid-assignment]
+            reveal_type(global_capture)  # revealed: str
+
+def outer() -> None:
+    nonlocal_capture: str = ""
+
+    def capture_respects_nonlocal_declaration(subject: int) -> None:
+        nonlocal nonlocal_capture
+        match subject:
+            case nonlocal_capture:  # error: [invalid-assignment]
+                reveal_type(nonlocal_capture)  # revealed: str
+
+class CaptureRespectsClassDeclaration:
+    class_capture: str
+
+    match 1:
+        case class_capture:  # error: [invalid-assignment]
+            reveal_type(class_capture)  # revealed: str
+```
+
 ## Binding the whole pattern
 
 Binding an entire pattern with `as` keeps the subject's original type variable. For a tuple,
