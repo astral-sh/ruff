@@ -677,7 +677,7 @@ python-version = "3.11"
 ```
 
 ```py
-from enum import Enum, IntEnum, StrEnum
+from enum import Enum, IntEnum, StrEnum, auto
 from typing import Literal, assert_never
 
 class Color(StrEnum):
@@ -723,6 +723,15 @@ def exact_int_enum_member_is_exhaustive(status: Literal[Status.READY]) -> int:
     match status:
         case Status.READY:
             return 1
+
+class Automatic(StrEnum):
+    GENERATED = auto()
+
+def auto_member_value_is_known(value: Literal["generated"]) -> None:
+    match value:
+        case Automatic.GENERATED:
+            return
+    assert_never(value)
 
 class AlwaysEqual(Enum):
     RED = "r"

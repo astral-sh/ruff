@@ -329,6 +329,122 @@ def narrow_typed_dict(value: Payload | None, other: Payload):
 def narrow_final_object_equality(value: A | B, other: A):
     if value == other:
         reveal_type(value)  # revealed: A
+
+    if value != other:
+        reveal_type(value)  # revealed: A | B
+    else:
+        reveal_type(value)  # revealed: A
+```
+
+Different inherited built-in implementations cannot compare equal:
+
+```py
+from typing import final
+
+@final
+class FinalObject: ...
+
+@final
+class FinalInt(int): ...
+
+def narrow_different_equality_implementations(value: FinalObject | FinalInt, other: FinalObject):
+    if value == other:
+        reveal_type(value)  # revealed: FinalObject
+```
+
+Singleton nominal instances compare equal to themselves when they inherit a known equality
+implementation:
+
+```py
+import sys
+from typing_extensions import assert_never
+
+def narrow_singleton_nominal_instance():
+    value = sys.version_info
+    if value == sys.version_info:
+        reveal_type(value)  # revealed: _version_info
+    else:
+        assert_never(value)
+```
+
+## Constrained type variables
+
+Equality analysis expands the constraints of a constrained type variable in either operand position.
+The resulting constraint is intersected with the type variable, preserving its identity:
+
+```py
+from typing import TypeVar, final
+
+@final
+class ConstraintA: ...
+
+@final
+class ConstraintB: ...
+
+T = TypeVar("T", ConstraintA, ConstraintB)
+
+def constrained_left(value: T | None, other: ConstraintA):
+    if value != other:
+        pass
+    else:
+        reveal_type(value)  # revealed: T@constrained_left & ConstraintA
+
+def constrained_right(value: ConstraintA | None, other: T):
+    if value != other:
+        pass
+    else:
+        reveal_type(value)  # revealed: ConstraintA
+```
+
+## `LiteralString` and string-valued enums
+
+`LiteralString` can be narrowed by comparison with a string-valued enum member that inherits `str`'s
+equality implementation:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import StrEnum
+from typing_extensions import LiteralString
+
+class Color(StrEnum):
+    RED = "red"
+
+def narrow_literal_string_with_enum(value: LiteralString | None):
+    if value == Color.RED:
+        reveal_type(value)  # revealed: Literal["red"]
+    else:
+        reveal_type(value)  # revealed: (LiteralString & ~Literal["red"]) | None
+
+    if Color.RED != value:
+        reveal_type(value)  # revealed: (LiteralString & ~Literal["red"]) | None
+    else:
+        reveal_type(value)  # revealed: Literal["red"]
+```
+
+## Module literals
+
+Modules compare equal only to the same module object:
+
+```py
+import sys
+import typing
+
+def narrow_module_literal(flag: bool):
+    value = sys if flag else typing
+
+    if value == sys:
+        reveal_type(value)  # revealed: <module 'sys'>
+    else:
+        reveal_type(value)  # revealed: <module 'typing'>
+
+    if value != sys:
+        reveal_type(value)  # revealed: <module 'typing'>
+    else:
+        reveal_type(value)  # revealed: <module 'sys'>
 ```
 
 ## Comparisons with user-defined methods
