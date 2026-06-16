@@ -5952,6 +5952,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         let mut speculative_builder = self.speculate();
+        speculative_builder.context.inference_flags |=
+            InferenceFlags::IN_COLLECTION_LITERAL_PEER_CONTEXT;
         let ty = infer_expression(&mut speculative_builder, peer_tcx);
 
         // Peer context is only an inference hint. If it introduces diagnostics, discard it and
@@ -6939,7 +6941,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // We use a forward assignability check (`identity_instance ≤ tcx`) to infer what each
         // typevar maps to in the type context. For example, if the type context is `list[int]` and
         // `collection_instance` is `list[T]`, the check produces `T = int`.
-        let (elt_tcx_constraints, elt_tcx_variance) = {
+        let (mut elt_tcx_constraints, mut elt_tcx_variance) = {
             let mut elt_tcx_constraints: FxHashMap<
                 BoundTypeVarIdentity<'db>,
                 UnionAccumulator<'db>,
@@ -7063,10 +7065,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut pre_inferred_elt_tys = None;
 
-        // Avoid projecting and solving a constraint set when contextual inference has already
-        // provided the complete specialization and every literal element is compatible with it.
-        if !has_dict_unpack
-            && tcx.annotation.is_some()
+        // When contextual inference provides a complete specialization, infer each element once
+        // against that context. Ordinary literals can return the specialization directly when all
+        // elements are compatible. Dictionary unpacking still uses the general solver so that it
+        // preserves gradual types, but reuses these inferred types for compatibility and inference.
+        if tcx.annotation.is_some()
             && let Some(specialization) = generic_context
                 .variables(self.db())
                 .map(|typevar| {
@@ -7090,12 +7093,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Infer the elements once here and retain their types so that a failed fast-path check
             // does not recursively re-infer nested collection literals on the slow path.
             let mut inferred_elts = Vec::with_capacity(elts.len());
+            let mut compatible_typevars = FxHashSet::default();
             let mut compatible = true;
 
             for elts in elts {
                 let mut inferred_elt_tys = [None; N];
-                for (i, elt, elt_tcx) in itertools::izip!(0.., elts, specialization.iter().copied())
-                {
+
+                if let &[None, Some(value_expr)] = elts.as_slice() {
+                    let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
+                    inferred_elt_tys[1] = Some(unpack_ty);
+
+                    if let Some((unpacked_key_ty, unpacked_value_ty)) =
+                        unpack_ty.unpack_keys_and_items(self.db())
+                    {
+                        for (inferred_ty, elt_tcx, typevar) in itertools::izip!(
+                            [unpacked_key_ty, unpacked_value_ty],
+                            specialization.iter().copied(),
+                            generic_context.variables(self.db())
+                        ) {
+                            if inferred_ty.is_assignable_to(self.db(), elt_tcx) {
+                                compatible_typevars.insert(typevar.identity(self.db()));
+                            } else {
+                                compatible = false;
+                            }
+                        }
+                    } else {
+                        compatible = false;
+                    }
+
+                    inferred_elts.push(inferred_elt_tys);
+                    continue;
+                }
+
+                for (i, elt, elt_tcx, typevar) in itertools::izip!(
+                    0..,
+                    elts,
+                    specialization.iter().copied(),
+                    generic_context.variables(self.db())
+                ) {
                     let Some(elt) = elt else { continue };
                     let elt_tcx = if elt.is_starred_expr() && collection_class != KnownClass::Dict {
                         Type::homogeneous_tuple(self.db(), elt_tcx)
@@ -7106,14 +7141,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         infer_elt_expression(self, (i, elt, TypeContext::new(Some(elt_tcx))));
                     inferred_elt_tys[i] = Some(inferred_elt_ty);
 
-                    if !inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                    if inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
+                        compatible_typevars.insert(typevar.identity(self.db()));
+                    } else {
                         compatible = false;
                     }
                 }
                 inferred_elts.push(inferred_elt_tys);
             }
 
-            if compatible {
+            if compatible && !has_dict_unpack {
                 let class_type = collection_alias.origin(self.db()).apply_specialization(
                     self.db(),
                     |generic_context| {
@@ -7124,6 +7161,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Type::from(class_type).to_instance(self.db());
             }
 
+            if !self
+                .inference_flags()
+                .contains(InferenceFlags::IN_COLLECTION_LITERAL_PEER_CONTEXT)
+                && tcx
+                    .annotation
+                    .is_some_and(|ty| !ty.has_unspecialized_type_var(self.db()))
+            {
+                // If none of the expressions corresponding to a type parameter satisfy a concrete
+                // context, that context cannot contribute to the inferred collection type.
+                // Retaining it would produce types that the literal cannot have, such as
+                // `list[int | str]` for `["a"]` in a `list[int]` context. Keep context for
+                // parameters with compatible expressions so that it can still preserve literal
+                // types and `TypedDict` inference in mixed literals. Partial contexts retain all
+                // constraints because the literal elements may provide their unspecialized parts.
+                elt_tcx_constraints.retain(|identity, _| compatible_typevars.contains(identity));
+                elt_tcx_variance.retain(|identity, _| compatible_typevars.contains(identity));
+            }
             pre_inferred_elt_tys = Some(inferred_elts);
         }
 
@@ -7220,7 +7274,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
+                let unpack_ty = pre_inferred_elt_tys
+                    .as_ref()
+                    .and_then(|inferred_elts| inferred_elts[elts_index][1])
+                    .unwrap_or_else(|| infer_elt_expression(self, (1, value_expr, tcx)));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())

@@ -1732,6 +1732,9 @@ bitflags::bitflags! {
         /// Whether we're in a context where `Unpack` can be legal.
         const IN_VALID_UNPACK_CONTEXT = 1 << 10;
 
+        /// Whether a collection literal is being inferred from the type of a peer expression.
+        const IN_COLLECTION_LITERAL_PEER_CONTEXT = 1 << 11;
+
         /// Whether the visitor is currently visiting a type expression.
         const IN_TYPE_EXPRESSION = 1 << 12;
 

@@ -244,11 +244,14 @@ reveal_type(r)  # revealed: dict[int | str, int | str]
 ## Incorrect collection literal assignments are complained about
 
 ```py
-# error: [invalid-assignment] "Object of type `list[str | int]` is not assignable to `list[str]`"
-a: list[str] = [1, 2, 3]
+# error: [invalid-assignment] "Object of type `list[str]` is not assignable to `list[int]`"
+a: list[int] = reveal_type(["a"])  # revealed: list[str]
 
 # error: [invalid-assignment] "Object of type `set[int | str]` is not assignable to `set[int]`"
 b: set[int] = {1, 2, "3"}
+
+# error: [invalid-assignment] "Object of type `dict[str, str]` is not assignable to `dict[int, int]`"
+c: dict[int, int] = reveal_type({**{"a": "b"}})  # revealed: dict[str, str]
 ```
 
 ## Mutually assignable annotated assignments use the declared type
