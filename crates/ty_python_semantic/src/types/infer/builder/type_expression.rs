@@ -8,6 +8,7 @@ use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
     report_invalid_concatenate_last_arg, report_missing_type_arguments,
+    report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -18,10 +19,11 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use ty_python_core::scope::ScopeKind;
 
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeFormType, TypeGuardType,
-    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind,
+    Parameter, Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext,
+    TypeFormType, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType,
+    any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -129,6 +131,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
     /// Infer the type of a type expression without storing the result.
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
+        let annotations_are_deferred = |builder: &Self| {
+            builder.deferred_state.is_deferred()
+                || builder.is_in_type_checking_block(builder.scope(), expression)
+                || builder
+                    .inference_flags()
+                    .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
+        };
+
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-type_expression
         match expression {
             ast::Expr::Name(name) => match name.ctx {
@@ -211,12 +221,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !self.deferred_state.is_deferred()
-                            && !self.is_in_type_checking_block(self.scope(), binary)
-                            && !self
-                                .inference_flags()
-                                .contains(InferenceFlags::IN_PEP_613_ALIAS_FIRST_PASS)
-                        {
+                        if !annotations_are_deferred(self) {
                             let mut speculative_builder = self.speculate();
                             // If the left-hand side of the union is itself a PEP-604 union,
                             // we'll already have checked whether it can be used with `|` in a previous inference step
@@ -339,6 +344,29 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
 
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
+                    }
+                    ast::Operator::BitAnd => {
+                        let left_ty = self.infer_type_expression(&binary.left);
+                        let right_ty = self.infer_type_expression(&binary.right);
+
+                        if !annotations_are_deferred(self) {
+                            // Infer the operands as values to report the types used by the runtime
+                            // operation rather than their interpretation as type expressions.
+                            let mut speculative_builder = self.speculate();
+                            let left_value = speculative_builder
+                                .infer_expression(&binary.left, TypeContext::default());
+                            let right_value = speculative_builder
+                                .infer_expression(&binary.right, TypeContext::default());
+                            report_unsupported_binary_operation(
+                                &self.context,
+                                binary,
+                                left_value,
+                                right_value,
+                                ast::Operator::BitAnd,
+                            );
+                        }
+
+                        IntersectionType::from_two_elements(self.db(), left_ty, right_ty)
                     }
                     // anything else is an invalid annotation:
                     op => {
@@ -545,6 +573,31 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ),
                 );
                 Type::unknown()
+            }
+
+            ast::Expr::UnaryOp(
+                unary @ ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Invert,
+                    operand,
+                    ..
+                },
+            ) => {
+                let operand_ty = self.infer_type_expression(operand);
+
+                if !annotations_are_deferred(self) {
+                    let operand_value = self
+                        .speculate()
+                        .infer_expression(operand, TypeContext::default());
+                    self.report_unsupported_unary_operator(
+                        unary,
+                        ast::UnaryOp::Invert,
+                        operand_value,
+                        "__invert__",
+                        None,
+                    );
+                }
+
+                operand_ty.negate(self.db())
             }
 
             ast::Expr::UnaryOp(unary) => {

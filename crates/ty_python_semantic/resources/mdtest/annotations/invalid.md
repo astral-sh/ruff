@@ -150,7 +150,10 @@ def invalid_binary_operators(
     i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
     j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
     k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
-    l: 5 & 3,  # error: [invalid-type-form] "Invalid binary operator `&` in type annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
+    # error: [unsupported-operator] "Operator `&` is not supported between objects of type `Literal[5]` and `Literal[3]`"
+    l: 5 & 3,
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
