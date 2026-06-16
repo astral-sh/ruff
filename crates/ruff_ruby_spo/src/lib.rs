@@ -655,4 +655,201 @@ end
             "D-AR-4 corpus gate: {class_count} classes, {total_decls} declarations, 0 leaked names",
         );
     }
+
+    // ────────────────── Codex P2 regression tests ──────────────────
+
+    /// **Codex P2 (PR #6)** — `module Foo; class Bar < ApplicationRecord; end; end`
+    /// must yield `name = "Foo::Bar"`, not just `"Bar"`. Otherwise
+    /// distinct namespaced models with the same inner class name
+    /// collide in the SPO graph.
+    #[test]
+    fn module_namespace_qualifies_inner_class_name() {
+        let src = r#"
+module Foo
+  class Bar < ApplicationRecord
+  end
+end
+
+module Foo
+  module Inner
+    class Bar < ApplicationRecord
+    end
+  end
+end
+"#;
+        let classes = extract_from_source(src);
+        let names: Vec<&str> = classes.iter().map(|c| c.name.as_str()).collect();
+        assert!(
+            names.contains(&"Foo::Bar"),
+            "expected Foo::Bar; got {names:?}"
+        );
+        assert!(
+            names.contains(&"Foo::Inner::Bar"),
+            "expected Foo::Inner::Bar; got {names:?}"
+        );
+        // The two `Bar`s must NOT collide.
+        assert_eq!(names.iter().filter(|n| n.ends_with("::Bar")).count(), 2);
+    }
+
+    /// **Codex P2 (PR #6)** — `has_many :items, -> { active }, dependent: :destroy`
+    /// puts the options hash at args[2] (the lambda is args[1]). The
+    /// scoped-association form was silently dropping the options.
+    #[test]
+    fn scoped_association_picks_up_trailing_options() {
+        let src = r#"
+class WorkPackage < ApplicationRecord
+  has_many :items, -> { where(active: true) }, dependent: :destroy, class_name: "Item"
+end
+"#;
+        let classes = extract_from_source(src);
+        let assoc = classes[0]
+            .declarations
+            .iter()
+            .find_map(|d| match d {
+                Declaration::Association(a) => Some(a),
+                _ => None,
+            })
+            .expect("expected an association");
+        assert_eq!(assoc.name, "items");
+        let opt_keys: Vec<&str> =
+            assoc.options.iter().map(|(k, _)| k.as_str()).collect();
+        assert!(
+            opt_keys.contains(&"dependent"),
+            "expected `dependent` in options; got {opt_keys:?}",
+        );
+        assert!(
+            opt_keys.contains(&"class_name"),
+            "expected `class_name` in options; got {opt_keys:?}",
+        );
+    }
+
+    /// **Codex P2 (PR #6)** — `attribute :age, :integer` must NOT emit
+    /// `integer` as a bogus attribute. Only `age` is a real attribute;
+    /// `:integer` is the type metadata.
+    #[test]
+    fn attribute_macro_does_not_emit_type_as_attribute() {
+        let src = r#"
+class M < ApplicationRecord
+  attribute :age, :integer
+  serialize :data, JSON
+  enum :status, { active: 0, archived: 1 }
+end
+"#;
+        let classes = extract_from_source(src);
+        let attrs: Vec<&str> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Attribute(a) => Some(a.name.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(attrs.contains(&"age"), "age must be extracted: {attrs:?}");
+        assert!(attrs.contains(&"data"), "data must be extracted");
+        assert!(attrs.contains(&"status"), "status must be extracted");
+        // The type/class/hash MUST NOT leak as attributes.
+        assert!(
+            !attrs.contains(&"integer"),
+            "bogus `integer` attribute: {attrs:?}"
+        );
+        assert!(
+            !attrs.contains(&"JSON"),
+            "bogus `JSON` attribute: {attrs:?}"
+        );
+    }
+
+    /// **Codex P2 (PR #6)** — `store_accessor :store_key, :a, :b, :c`
+    /// must NOT emit `store_key` as an attribute. Only `:a`, `:b`,
+    /// `:c` are real attributes; `:store_key` is the store column.
+    #[test]
+    fn store_accessor_does_not_emit_store_key_as_attribute() {
+        let src = r#"
+class M < ApplicationRecord
+  store_accessor :preferences, :theme, :language
+  store_attribute :preferences, :font_size, :integer
+end
+"#;
+        let classes = extract_from_source(src);
+        let attrs: Vec<&str> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Attribute(a) => Some(a.name.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(attrs.contains(&"theme"), "theme must be extracted: {attrs:?}");
+        assert!(attrs.contains(&"language"));
+        assert!(attrs.contains(&"font_size"));
+        // Store key MUST NOT leak.
+        assert!(
+            !attrs.contains(&"preferences"),
+            "store key `preferences` leaked: {attrs:?}",
+        );
+        // Type MUST NOT leak.
+        assert!(
+            !attrs.contains(&"integer"),
+            "bogus `integer` attribute: {attrs:?}",
+        );
+    }
+
+    /// **Codex P2 (PR #6)** — `with_options presence: true do; validates :name; end`
+    /// must NOT lose the inner validations. The wrapper block's body
+    /// is recursed into so declarations inside grouping blocks land
+    /// on the model.
+    #[test]
+    fn with_options_grouping_block_recurses_into_body() {
+        let src = r#"
+class M < ApplicationRecord
+  with_options presence: true do
+    validates :name
+    validates :subject
+  end
+end
+"#;
+        let classes = extract_from_source(src);
+        let validations: Vec<&str> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Validation(v) => Some(v.target.as_str()),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            validations.contains(&"name"),
+            "validates :name lost from with_options body: {validations:?}",
+        );
+        assert!(validations.contains(&"subject"));
+    }
+
+    /// **Codex P2 (PR #6)** — Ruby's `alias new_name old_name` keyword
+    /// form parses as `Node::Alias`, NOT as a `Send`. The walker now
+    /// recognises it and emits an `Attribute::Alias` declaration.
+    #[test]
+    fn ruby_alias_keyword_emits_alias_declaration() {
+        let src = r#"
+class M < ApplicationRecord
+  def original; end
+  alias new_method original
+end
+"#;
+        let classes = extract_from_source(src);
+        let aliases: Vec<&str> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Attribute(a)
+                    if matches!(a.kind, ruff_spo_triplet::AttrKind::Alias) =>
+                {
+                    Some(a.name.as_str())
+                }
+                _ => None,
+            })
+            .collect();
+        assert!(
+            aliases.contains(&"new_method=original"),
+            "alias keyword not captured: {aliases:?}",
+        );
+    }
 }

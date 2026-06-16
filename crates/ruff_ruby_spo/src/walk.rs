@@ -40,9 +40,30 @@ fn walk_statement(node: &Node, out: &mut Vec<Declaration>) {
     match node {
         Node::Send(s) if s.recv.is_none() => route_send(&s.method_name, &s.args, out),
         Node::Block(blk) => walk_block(blk, out),
+        // Ruby keyword `alias new orig` parses as Node::Alias, NOT as a
+        // Send; pick up method-alias facts that would otherwise be lost
+        // (codex P2 PR #6 r3418*).
+        Node::Alias(a) => {
+            let new_name = alias_target_name(&a.to);
+            let orig_name = alias_target_name(&a.from);
+            out.push(Declaration::Attribute(ruff_spo_triplet::AttrDecl {
+                kind: ruff_spo_triplet::AttrKind::Alias,
+                name: format!("{new_name}={orig_name}"),
+                options: Vec::new(),
+            }));
+        }
         // Visibility modifiers / `class << self`-wrapped sends / def blocks
         // are not DSL declarations and don't produce Declarations.
         _ => {}
+    }
+}
+
+/// Render the `from` / `to` of a `Node::Alias`. lib-ruby-parser
+/// expresses both as `Node::Sym` for the keyword form.
+fn alias_target_name(node: &Node) -> String {
+    match node {
+        Node::Sym(s) => s.name.to_string_lossy(),
+        _ => render_node(node),
     }
 }
 
@@ -90,6 +111,20 @@ fn walk_block(blk: &lib_ruby_parser::nodes::Block, out: &mut Vec<Declaration>) {
                 target: "<block>".to_string(),
                 options: Vec::new(),
             }));
+        }
+        // Rails grouping blocks — recurse INTO the block body so nested
+        // declarations (`with_options presence: true do; validates :name; end`)
+        // are not silently dropped (codex P2 PR #6 r3418*). Limited to
+        // known grouping idioms to avoid double-counting from arbitrary
+        // blocks (e.g. `5.times do; validates :foo; end` would NOT count
+        // because that's runtime-only).
+        "with_options" => {
+            if let Some(body) = blk.body.as_ref() {
+                walk_class_body(body, out);
+            }
+            // Also record the wrapper call itself so the catch-all
+            // coverage assertion still sees `with_options` somewhere.
+            route_send(s.method_name.as_str(), &s.args, out);
         }
         other => {
             // Generic block: route the call as if it were a bare Send,
@@ -304,7 +339,16 @@ fn emit_assoc(kind: AssocKind, args: &[Node], out: &mut Vec<Declaration>) {
     let Some(name) = args.first().and_then(sym_string) else {
         return;
     };
-    let options = args.get(1).and_then(as_hash_options).unwrap_or_default();
+    // Scan ALL args for the first Hash to capture options (codex P2
+    // PR #6 r3418*). The scoped-association form
+    // `has_many :items, -> { active }, dependent: :destroy` puts the
+    // options hash at args[2], not args[1] (the lambda sits between
+    // the name and the options).
+    let options = args
+        .iter()
+        .skip(1)
+        .find_map(as_hash_options)
+        .unwrap_or_default();
     out.push(Declaration::Association(AssocDecl {
         kind,
         name,
@@ -378,19 +422,58 @@ fn emit_attr(kind: AttrKind, args: &[Node], out: &mut Vec<Declaration>) {
         }
         return;
     }
-    for arg in args {
+    // The arity of "which positional symbol arguments are attribute
+    // names" varies by macro (codex P2 PR #6 r3418*):
+    //   `attribute :age, :integer`            — 1 attr (skip type at args[1])
+    //   `attr_accessor :a, :b, :c`            — N attrs
+    //   `serialize :data, JSON`               — 1 attr (skip class)
+    //   `enum :status, { active: 0 }`         — 1 attr (skip Hash)
+    //   `store_attribute :store, :attr, :int` — 1 attr at args[1] (skip store + type)
+    //   `store_accessor :store, :a, :b, :c`   — N attrs from args[1..] (skip store)
+    //   `define_attribute_method :attr`       — 1 attr
+    //   `undef_method :foo`                   — 1 attr
+    let (skip, take) = attr_arg_window(kind);
+    let options = args
+        .iter()
+        .skip(skip.saturating_add(take))
+        .find_map(as_hash_options)
+        .unwrap_or_default();
+    for arg in args.iter().skip(skip).take(take) {
         let Some(name) = sym_string(arg) else { continue };
-        let options = args
-            .iter().find_map(as_hash_options)
-            .unwrap_or_default();
         out.push(Declaration::Attribute(AttrDecl {
             kind,
             name,
-            options,
+            options: options.clone(),
         }));
-        // One AttrDecl per leading symbol, options replicated; mirrors
-        // Rails' "attr_accessor :a, :b, validates: true" semantics where
-        // the options apply to every named attribute.
+    }
+}
+
+/// `(skip, take)` window into the positional args that carry attribute
+/// names for each [`AttrKind`]. Args outside this window are type /
+/// class / store-key / hash metadata and MUST NOT be treated as
+/// attribute names.
+///
+/// `take == usize::MAX` means "all remaining positional symbol args"
+/// (e.g. `attr_accessor :a, :b, :c`).
+fn attr_arg_window(kind: AttrKind) -> (usize, usize) {
+    match kind {
+        // Single-attr macros — name at args[0], type/class/hash at args[1+].
+        AttrKind::Attribute
+        | AttrKind::Serialize
+        | AttrKind::Enum
+        | AttrKind::DefineAttributeMethod
+        | AttrKind::UndefMethod
+        | AttrKind::AttrReadonly => (0, 1),
+        // Multi-attr macros — every positional symbol is an attribute name.
+        AttrKind::AttrAccessor | AttrKind::AttrReader => (0, usize::MAX),
+        // Store-style: args[0] is the store key (NOT an attribute);
+        // args[1+] is/are the attribute name(s).
+        // `store_attribute :store, :attr, :type` → 1 attr at args[1].
+        // `store_accessor :store, :a, :b, :c`    → N attrs from args[1..].
+        AttrKind::StoreAttribute => (1, 1),
+        AttrKind::StoreAccessor => (1, usize::MAX),
+        // Aliases are handled in the early-return above.
+        AttrKind::AliasAttribute | AttrKind::AliasMethod | AttrKind::Alias => (0, 0),
     }
 }
 
@@ -497,11 +580,18 @@ fn render_node(node: &Node) -> String {
 }
 
 /// Try to interpret a Node as a Hash of `key: value` pairs and render
-/// each pair as `(key, value)` for the `options` slot.
+/// each pair as `(key, value)` for the `options` slot. Accepts both
+/// `Hash { pairs }` (literal `{k: v}` braces) and `Kwargs { pairs }`
+/// (trailing `k: v, k2: v2` keyword arguments — common in Rails macro
+/// calls like `has_many :x, dependent: :destroy`).
 fn as_hash_options(node: &Node) -> Option<Vec<(String, String)>> {
-    let Node::Hash(h) = node else { return None };
+    let pairs = match node {
+        Node::Hash(h) => &h.pairs,
+        Node::Kwargs(k) => &k.pairs,
+        _ => return None,
+    };
     let mut out = Vec::new();
-    for pair_node in &h.pairs {
+    for pair_node in pairs {
         let Node::Pair(p) = pair_node else { continue };
         let key = match p.key.as_ref() {
             Node::Sym(s) => s.name.to_string_lossy(),
