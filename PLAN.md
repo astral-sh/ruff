@@ -190,7 +190,6 @@ impl<'db> UpperBound<'db> {
         &self,
         db: &'db dyn Db,
         declared_upper: Option<Type<'db>>,
-        budget: PartialDnfBudget,
     ) -> Option<Type<'db>>;
 }
 ```
@@ -283,39 +282,51 @@ impl<'db> UpperBound<'db> {
         &self,
         db: &'db dyn Db,
         declared_upper: Option<Type<'db>>,
-        budget: PartialDnfBudget,
     ) -> Option<Type<'db>> {
-        let clauses = self.clauses().chain(declared_upper);
+        let clauses = self.clauses.iter().copied().chain(declared_upper);
 
-        if no_clause_is_a_visible_union(clauses.clone()) {
+        if !clauses.clone().any(Type::is_union) {
             return Some(IntersectionType::from_elements(db, clauses));
         }
 
         // Each candidate is one DNF product term known to satisfy all processed union clauses.
         // The non-union clauses are materialized exactly into the initial candidate; this does
         // not require distributing across a union.
-        let initial = IntersectionType::from_elements(
-            db,
-            clauses.clone().filter(|clause| !clause.is_union()),
-        );
-        let mut frontier = CandidateSet::new(budget.max_terms);
-        frontier.insert(db, Candidate::from_type(initial));
+        let non_union_clauses = clauses.clone().filter(|clause| !clause.is_union());
+        let initial = IntersectionType::from_elements(db, non_union_clauses);
 
-        for union_clause in clauses.filter_map(Type::as_union) {
-            let mut next = CandidateSet::new(budget.max_terms);
+        let mut frontier = vec![initial];
+        let mut next = Vec::new();
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| {
+            // If the new candidate is `Never`, or an existing candidate is broader, the new
+            // narrower candidate adds nothing.
+            if new_ty.is_never()
+                || candidates.iter().any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
+            {
+                return;
+            }
 
-            for candidate in frontier.iter() {
+            // Remove existing candidates made redundant by the new broader candidate.
+            candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
+
+            if candidates.len() < MAX_PARTIAL_DNF_TERMS {
+                candidates.push(new_ty);
+            }
+        };
+
+        let union_clauses = clauses.filter_map(Type::as_union);
+        for union_clause in union_clauses {
+            next.clear();
+
+            for candidate in &frontier {
                 for alt in union_clause.elements(db) {
-                    let refined = candidate.intersect_with_term(db, *alt);
-                    if refined.is_known_never(db) {
-                        continue;
-                    }
-                    next.insert(db, refined);
-                    if next.len() >= budget.max_terms {
+                    let refined = IntersectionType::from_two_elements(db, *candidate, *alt);
+                    insert_candidate(&mut next, refined);
+                    if next.len() >= MAX_PARTIAL_DNF_TERMS {
                         break;
                     }
                 }
-                if next.len() >= budget.max_terms {
+                if next.len() >= MAX_PARTIAL_DNF_TERMS {
                     break;
                 }
             }
@@ -324,13 +335,10 @@ impl<'db> UpperBound<'db> {
                 return None;
             }
 
-            frontier = next;
+            std::mem::swap(&mut frontier, &mut next);
         }
 
-        Some(UnionType::from_elements(
-            db,
-            frontier.iter().map(|candidate| candidate.to_type(db)),
-        ))
+        Some(UnionType::from_elements(db, frontier))
     }
 }
 ```
@@ -338,44 +346,30 @@ impl<'db> UpperBound<'db> {
 Budget shape:
 
 ```rust
-struct PartialDnfBudget {
-    /// Beam width and maximum final union size.
-    max_terms: usize,
-}
+const MAX_PARTIAL_DNF_TERMS: usize = 4;
 ```
 
-Candidate pruning should prefer broader and simpler terms:
+The budget is compile-time configurable only; do not thread a runtime budget parameter through the solver.
+
+Candidate pruning should prefer broader and simpler terms. The implementation keeps candidates as ordinary `Type<'db>` values in local `Vec`s, with a local insertion helper/closure:
 
 ```rust
-impl CandidateSet {
-    fn insert(&mut self, db: &'db dyn Db, new: Candidate<'db>) {
-        let new_ty = new.to_type(db);
-
-        // If an existing candidate is broader, the new narrower candidate adds nothing.
-        if self.items.iter().any(|old| {
-            new_ty.is_constraint_set_assignable_to(db, old.to_type(db))
-        }) {
-            return;
-        }
-
-        // Remove existing candidates made redundant by the new broader candidate.
-        self.items.retain(|old| {
-            !old.to_type(db).is_constraint_set_assignable_to(db, new_ty)
-        });
-
-        self.items.push(new);
+let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| {
+    // If the new candidate is `Never`, or an existing candidate is broader, the new narrower
+    // candidate adds nothing.
+    if new_ty.is_never()
+        || candidates.iter().any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
+    {
+        return;
     }
 
-    fn truncate_to_budget(&mut self, db: &'db dyn Db) {
-        self.items.sort_by_key(|candidate| {
-            (
-                candidate.complexity(db),
-                candidate.source_order_key(),
-            )
-        });
-        self.items.truncate(self.max_terms);
+    // Remove existing candidates made redundant by the new broader candidate.
+    candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
+
+    if candidates.len() < MAX_PARTIAL_DNF_TERMS {
+        candidates.push(new_ty);
     }
-}
+};
 ```
 
 The core invariant:
@@ -393,21 +387,11 @@ Therefore, the final union of candidates satisfies the full upper bound, because
 
 ### Candidate representation
 
-A candidate can initially be represented as a small list/set of positive intersection terms:
-
-```rust
-struct Candidate<'db> {
-    terms: SmallVec<[Type<'db>; 4]>,
-}
-```
-
-`Candidate::object()` has no terms. `candidate.intersect_with_term(db, alt)` appends/prunes a term. `candidate.to_type(db)` can call `IntersectionType::from_elements` over the candidate's terms.
-
-This still performs ordinary intersection construction for a single product term, but avoids constructing the full cross-product union. If even a single product term becomes too expensive, add a candidate-local budget and treat that candidate as unusable.
+Candidates are currently represented directly as ordinary `Type<'db>` values in double-buffered local `Vec`s. Refining a candidate with a union alternative calls `IntersectionType::from_two_elements(db, candidate, alt)`. This still performs ordinary intersection construction for a single product term, but avoids constructing the full cross-product union. If even a single product term becomes too expensive, add a candidate-local limit and treat that candidate as unusable.
 
 ### Fallback policy
 
-If `bounded_partial_dnf_witness` cannot find a non-`Never` witness within budget:
+If `bounded_partial_dnf_witness` cannot find a compact satisfying witness within the compile-time budget:
 
 - `Never` is always a subtype of any upper bound and is therefore sound, but may be overly narrow.
 - `Unknown` honestly represents loss of precision and is gradual, but may not strictly satisfy upper bounds in the same semantic sense as an ordinary static subtype.
@@ -443,29 +427,33 @@ These phases are implementation slices, not a license to defer cleanup or testin
 
 ### Phase 1: Introduce `UpperBound`
 
-- [ ] Add an `UpperBound<'db>` type in or near `constraints.rs`, wrapping `FxOrderSet<Type<'db>>`.
-- [ ] Document the factored-CNF representation and invariants next to the type.
-- [ ] Implement constructors for no explicit upper bound, single clause, and multiple clauses.
-- [ ] Implement explicit-bound checks such as `is_empty` / `has_explicit_bound`.
-- [ ] Add `UpperBound` accessors only as required by load-bearing methods; avoid speculative general-purpose clause accessors.
-- [ ] Implement `UpperBound::add_clause` as the shared accumulation primitive used both during path walking and when adding a declared upper bound during solution extraction.
-- [ ] Keep `UpperBound::add_clause` equivalent to current `ConstraintBoundsBuilder::add_upper`: add/prune one `Type` clause and do not split `Type::Intersection` inputs.
-- [ ] Explicitly elide `object` clauses at the start of `UpperBound::add_clause` before redundancy pruning.
-- [ ] Explicitly collapse `UpperBound` to exactly `[Never]` when adding a `Never` clause.
-- [ ] If `UpperBound` is already `[Never]`, make later non-`Never` additions a no-op.
-- [ ] Comment that the `object`/`Never` fast paths are optimizations and that the general redundancy-pruning loop should also handle them correctly.
-- [ ] Do not shrink `UpperBound` storage during incremental `add_clause` calls; add `UpperBound::shrink_to_fit(&mut self)` and call it before storing in `PathBounds`.
-- [ ] Use `Type::is_redundant_with` for redundant upper-clause pruning, matching existing `ConstraintBoundsBuilder::add_upper` behavior.
-- [ ] Implement exact materialization behind an explicitly named method, using `IntersectionType::from_elements` over the stored clauses only at that explicit boundary.
-- [ ] Implement a guarded production helper such as `UpperBound::materialize_exact_if_no_visible_unions`, returning `None` when any stored clause is a visible top-level union and `Some(Type::object())` for an empty upper bound.
+Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expectations while they are unit-tested but not yet wired into path-bound storage/solution extraction. Remove those expectations as the later phases make the new APIs load-bearing.
+
+- [x] Add an `UpperBound<'db>` type in or near `constraints.rs`, wrapping `FxOrderSet<Type<'db>>`.
+- [x] Document the factored-CNF representation and invariants next to the type.
+- [x] Implement constructors for no explicit upper bound, single clause, and multiple clauses.
+- [x] Implement explicit-bound checks such as `is_empty` / `has_explicit_bound`.
+- [x] Add `UpperBound` accessors only as required by load-bearing methods; avoid speculative general-purpose clause accessors.
+- [x] Implement `UpperBound::add_clause` as the shared accumulation primitive used both during path walking and when adding a declared upper bound during solution extraction.
+- [x] Keep `UpperBound::add_clause` equivalent to current `ConstraintBoundsBuilder::add_upper`: add/prune one `Type` clause and do not split `Type::Intersection` inputs.
+- [x] Explicitly elide `object` clauses at the start of `UpperBound::add_clause` before redundancy pruning.
+- [x] Explicitly collapse `UpperBound` to exactly `[Never]` when adding a `Never` clause.
+- [x] If `UpperBound` is already `[Never]`, make later non-`Never` additions a no-op.
+- [x] Comment that the `object`/`Never` fast paths are optimizations and that the general redundancy-pruning loop should also handle them correctly.
+- [x] Do not shrink `UpperBound` storage during incremental `add_clause` calls; add `UpperBound::shrink_to_fit(&mut self)` and call it before storing in `PathBounds`.
+    - Implemented the shrink helper. The call from `ConstraintBoundsBuilder::finish` is still part of Phase 4, when `PathBounds` starts storing `UpperBound` values.
+- [x] Use `Type::is_redundant_with` for redundant upper-clause pruning, matching existing `ConstraintBoundsBuilder::add_upper` behavior.
+- [x] Implement exact materialization behind an explicitly named method, using `IntersectionType::from_elements` over the stored clauses only at that explicit boundary.
+- [x] Implement a guarded production helper such as `UpperBound::materialize_exact_if_no_visible_unions`, returning `None` when any stored clause is a visible top-level union and `Some(Type::object())` for an empty upper bound.
     - The helper should not resolve aliases; document that hidden alias-expanded unions can still distribute during exact materialization.
-- [ ] Implement union-clause detection using visible top-level `Type::Union` clauses in the stored clause set, relying on ordinary `Type` DNF invariants.
-- [ ] In `UpperBound::bounded_partial_dnf_witness`, account for an optional declared upper bound without mutating the stored `PathBound`: chain the declared upper bound into the conjunctive clauses.
-- [ ] Do not pass constrained TypeVar constraints into `bounded_partial_dnf_witness` as union-like branching clauses; constrained TypeVars require separate exact-constraint selection logic.
-- [ ] In `UpperBound::bounded_partial_dnf_witness`, account for both stored clauses and the optional declared upper when deciding whether exact materialization is safe and when branching over visible union clauses.
+- [x] Implement union-clause detection using visible top-level `Type::Union` clauses in the stored clause set, relying on ordinary `Type` DNF invariants.
+- [x] In `UpperBound::bounded_partial_dnf_witness`, account for an optional declared upper bound without mutating the stored `PathBound`: chain the declared upper bound into the conjunctive clauses.
+- [x] Do not pass constrained TypeVar constraints into `bounded_partial_dnf_witness` as union-like branching clauses; constrained TypeVars require separate exact-constraint selection logic.
+- [x] In `UpperBound::bounded_partial_dnf_witness`, account for both stored clauses and the optional declared upper when deciding whether exact materialization is safe and when branching over visible union clauses.
     - The guarded helper can be used directly only when there is no declared upper, or generalized internally to accept an extra clause iterator.
-- [ ] For union-bearing upper bounds, initialize bounded witness search with exact materialization of all non-union conjunctive clauses, then branch only over visible top-level union clauses.
-- [ ] Add unit tests for `UpperBound` construction, pruning, `object`, `Never`, duplicate clauses, deterministic ordering, exact materialization, and union-clause witness behavior.
+- [x] For union-bearing upper bounds, initialize bounded witness search with exact materialization of all non-union conjunctive clauses, then branch only over visible top-level union clauses.
+- [x] Add unit tests for `UpperBound` construction, pruning, `object`, `Never`, duplicate clauses, deterministic ordering, exact materialization, and union-clause witness behavior.
+    - Focused test command: `cargo test -p ty_python_semantic upper_bound_`.
 
 ### Phase 2: Change `PathBound` to store accumulated bounds directly
 
@@ -514,23 +502,27 @@ These phases are implementation slices, not a license to defer cleanup or testin
 
 ### Phase 5: Add bounded partial DNF witness generation
 
-- [ ] Implement `UpperBound::bounded_partial_dnf_witness`.
-- [ ] Document near the implementation that final witness extraction is an under-approximation used to produce a compact satisfying solution, not an exact materialization of the full factored upper bound.
-- [ ] Implement `PartialDnfBudget` with conservative compile-time constants, starting with `MAX_PARTIAL_DNF_TERMS: usize = 4`; do not add runtime configuration.
-- [ ] Do not add a separate `max_alternatives_per_clause` / scan-cap budget initially; use `max_terms` only, and add a scan cap later only if profiling shows it is necessary.
-- [ ] Implement candidate representation and deterministic insertion-order pruning.
+Completed early as part of the initial `UpperBound` implementation. Wiring the witness into default solution extraction remains in Phase 6.
+
+- [x] Implement `UpperBound::bounded_partial_dnf_witness`.
+- [x] Document near the implementation that final witness extraction is an under-approximation used to produce a compact satisfying solution, not an exact materialization of the full factored upper bound.
+- [x] Implement conservative compile-time budgeting with `MAX_PARTIAL_DNF_TERMS: usize = 4`; do not add runtime configuration or a budget parameter.
+- [x] Do not add a separate `max_alternatives_per_clause` / scan-cap budget initially; use `MAX_PARTIAL_DNF_TERMS` only, and add a scan cap later only if profiling shows it is necessary.
+- [x] Implement candidate representation and deterministic insertion-order pruning.
+    - Candidates are stored directly as `Type<'db>` values in local `Vec`s.
+    - The witness search uses a double-buffered `frontier`/`next` pair with `std::mem::swap` and `clear` to avoid allocating a new next-frontier vector for each union clause.
     - Use redundancy pruning when inserting candidates: discard a new candidate if an existing broader candidate already covers it; remove existing candidates covered by a new broader candidate.
     - Do not add explicit complexity ranking initially; rely on deterministic union-alternative scan order plus redundancy pruning.
-- [ ] Keep up to `max_terms` candidate product terms and return `UnionType::from_elements` over the final frontier rather than stopping at the first valid witness.
-- [ ] When branching on a union clause, scan alternatives in deterministic order and stop once the next frontier reaches `max_terms`; continue past rejected/`Never` refinements until either the frontier is full or the union is exhausted.
-- [ ] Ensure every returned witness satisfies all upper clauses.
-- [ ] Add focused tests:
+- [x] Keep up to `MAX_PARTIAL_DNF_TERMS` candidate product terms and return `UnionType::from_elements` over the final frontier rather than stopping at the first valid witness.
+- [x] When branching on a union clause, scan alternatives in deterministic order and stop once the next frontier reaches `MAX_PARTIAL_DNF_TERMS`; continue past rejected/`Never` refinements until either the frontier is full or the union is exhausted.
+- [x] Ensure every returned witness satisfies all upper clauses.
+- [x] Add focused tests:
     - single-clause upper bound returns that clause or a compact equivalent
     - `(A | B) & (B | C)` can choose `B` when appropriate
     - `(A | B) & (C | D)` chooses a compact non-bottom product term if one exists
-    - large cross-product cases stay within budget
+    - large cross-product cases stay within the compile-time budget
     - `Never` clause behavior
-    - fallback behavior when no candidate survives within budget
+    - fallback behavior when no candidate survives within the compile-time budget
 
 ### Phase 6: Update solution extraction
 
@@ -542,7 +534,7 @@ These phases are implementation slices, not a license to defer cleanup or testin
 - [ ] Implement `UpperBound::is_satisfied_by` as a clause-wise check: `ty <= each stored upper clause`; an empty upper bound is vacuously satisfied.
 - [ ] Implement `UpperBound::when_satisfied_by` for paths that need the constraint set for `lower <= upper_bound`; return `always` for an empty upper bound, otherwise combine `lower <= each stored upper clause` with conjunction.
     - Use `when_constraint_set_assignable_to_owned` for each clause and load the owned result into the caller's builder before combining, rather than using builder-local assignability directly.
-- [ ] Make `UpperBound::bounded_partial_dnf_witness` return `Option<Type<'db>>`; `None` means no compact non-`Never` witness was found, and solver code decides the fallback policy.
+- [x] Make `UpperBound::bounded_partial_dnf_witness` return `Option<Type<'db>>`; `None` means no compact witness was found, and solver code decides the fallback policy.
 - [ ] If default solving needs an upper-only solution and bounded witness generation returns `None`, leave the typevar unsolved for that path with `Ok(None)` rather than inferring `Never`, `Unknown`, or invalidating the path.
 - [ ] Ensure `TypeVarSolution` can remain `solution: Type<'db>` for this iteration.
 
@@ -579,8 +571,8 @@ Also run a memory-limited `jax` ecosystem check before final handoff and compare
 - [x] How should `UpperBound` detect whether it has union clauses? Check for visible top-level `Type::Union` clauses in the stored set; do not resolve aliases or inspect recursively unless later evidence requires it.
 - [x] What should `UpperBound::bounded_partial_dnf_witness` do when there are no union clauses? Return exact materialization. Revisit only if the bounded algorithm can be proven to return the full exact result without a performance penalty.
 - [x] For bounded partial DNF, should non-union clauses be processed as an initial fixed candidate? Yes. Materialize all non-union clauses exactly into the initial candidate, and branch only over union clauses.
-- [x] When branching on a union clause, how many alternatives should bounded partial DNF consider per current candidate? Scan alternatives in deterministic order and stop once the next frontier reaches `max_terms`, while continuing past rejected/`Never` refinements until the frontier is full or the union is exhausted.
-- [x] Should bounded partial DNF return one witness or a bounded union of witnesses? Keep up to `max_terms` product-term candidates and return their union.
+- [x] When branching on a union clause, how many alternatives should bounded partial DNF consider per current candidate? Scan alternatives in deterministic order and stop once the next frontier reaches `MAX_PARTIAL_DNF_TERMS`, while continuing past rejected/`Never` refinements until the frontier is full or the union is exhausted.
+- [x] Should bounded partial DNF return one witness or a bounded union of witnesses? Keep up to `MAX_PARTIAL_DNF_TERMS` product-term candidates and return their union.
 - [x] Should `PathBound` store `ConstraintBounds`? No. Change `PathBound` so it stores the bound typevar plus `lower: Option<Type<'db>>` and `upper: UpperBound<'db>` directly.
 - [x] Should `ConstraintBoundsBuilder::finish` materialize the upper bound? No. It should return a `PathBound` and move the accumulated `UpperBound` into `PathBound.upper`.
 - [x] What exact relation helper should define upper-clause redundancy? Use `Type::is_redundant_with`, matching current `ConstraintBoundsBuilder::add_upper` behavior.
@@ -605,7 +597,7 @@ Also run a memory-limited `jax` ecosystem check before final handoff and compare
 - [x] Should direct constraint construction still split simple upper intersections into separate BDD constraints? Yes. Preserve the existing invariant.
 - [x] Should `ConstraintId::intersect` derive factored upper-bound constraints? No. Keep it as a simple-constraint derivation helper: after combined satisfiability, return `CannotSimplify` for union-bearing merged uppers instead of constructing a factored derived constraint.
 - [x] What are safe default budgets for bounded partial DNF? Use compile-time constants, initially `MAX_PARTIAL_DNF_TERMS: usize = 4`; do not add runtime configuration.
-- [x] Do we need a separate `max_alternatives_per_clause` or scan-cap budget? No, not initially. Use only `max_terms`; add a scan cap later only if profiling shows it is necessary.
+- [x] Do we need a separate `max_alternatives_per_clause` or scan-cap budget? No, not initially. Use only `MAX_PARTIAL_DNF_TERMS`; add a scan cap later only if profiling shows it is necessary.
 - [x] What should `bounded_partial_dnf_witness` return when no compact witness is found? Return `None`; the caller decides fallback policy.
 - [x] What fallback should default solving use when bounded witness generation returns `None`? Leave the typevar unsolved for that path with `Ok(None)`.
 - [x] Should constrained TypeVars keep the current zero/one/multiple compatible-constraint behavior, or should constraints be handled as union-like branching in bounded witness extraction? Keep exact constrained-TypeVar selection semantics: zero compatible constraints invalidates the path, one selects that exact constraint type, multiple leaves unsolved; never infer a union of constraints.

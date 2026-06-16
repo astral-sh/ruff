@@ -111,7 +111,7 @@ use crate::types::{
     BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints, TypeVarVariance,
     UnionType,
 };
-use crate::{Db, FxIndexMap, FxIndexSet};
+use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1264,6 +1264,183 @@ impl<'db> ConstraintBounds<'db> {
         }
     }
 }
+
+/// A factored conjunction of upper-bound clauses accumulated for one typevar.
+///
+/// An empty `UpperBound` represents no explicit upper clauses, which is semantically equivalent to
+/// `object`. Each stored type is one conjunctive upper clause, and a clause may itself be a union.
+/// This keeps bounds such as `(A | B) & (C | D)` factored instead of immediately converting them
+/// to ty's ordinary DNF [`Type`] representation.
+///
+/// Invariants maintained by [`UpperBound::add_clause`]:
+/// - `object` clauses are elided;
+/// - a `Never` clause collapses the whole upper bound to exactly `[Never]`;
+/// - duplicate and redundant supertype clauses are removed;
+/// - clause order remains deterministic based on insertion order after pruning.
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct UpperBound<'db> {
+    clauses: FxOrderSet<Type<'db>>,
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+impl<'db> UpperBound<'db> {
+    pub(crate) fn none() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn from_clause(clause: Type<'db>) -> Self {
+        let clauses = FxOrderSet::from_iter([clause]);
+        Self { clauses }
+    }
+
+    pub(crate) fn from_clauses(
+        db: &'db dyn Db,
+        clauses: impl IntoIterator<Item = Type<'db>>,
+    ) -> Self {
+        let mut upper = Self::none();
+        for clause in clauses {
+            upper.add_clause(db, clause);
+        }
+        upper
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.clauses.is_empty()
+    }
+
+    pub(crate) fn has_explicit_bound(&self) -> bool {
+        !self.is_empty()
+    }
+
+    fn is_never(&self) -> bool {
+        self.clauses.len() == 1 && self.clauses.contains(&Type::Never)
+    }
+
+    pub(crate) fn add_clause(&mut self, db: &'db dyn Db, clause: Type<'db>) {
+        // These `object`/`Never` fast paths are optimizations. The general redundancy-pruning
+        // loop below should also handle them correctly, but spelling them out avoids unnecessary
+        // relation checks and keeps the stored representation canonical.
+        if clause.is_object() || self.is_never() {
+            return;
+        }
+
+        if clause.is_never() {
+            self.clauses.clear();
+            self.clauses.insert(Type::Never);
+            return;
+        }
+
+        // First check if there's an existing upper bound clause that is a subtype of the new type.
+        // If so, adding the new type does nothing to the intersection.
+        if self
+            .clauses
+            .iter()
+            .any(|existing| existing.is_redundant_with(db, clause))
+        {
+            return;
+        }
+
+        // Otherwise remove any existing clauses that are a supertype of the new type, since the
+        // intersection will clip them to the new type.
+        self.clauses
+            .retain(|existing| !clause.is_redundant_with(db, *existing));
+        self.clauses.insert(clause);
+    }
+
+    pub(crate) fn shrink_to_fit(&mut self) {
+        self.clauses.shrink_to_fit();
+    }
+
+    /// Exact conversion to an ordinary [`Type`]. This may be expensive: if any stored clause is a
+    /// union, [`IntersectionType::from_elements`] converts this factored CNF representation into
+    /// ty's ordinary DNF representation by distributing intersections over unions.
+    pub(crate) fn materialize_exact(&self, db: &'db dyn Db) -> Type<'db> {
+        IntersectionType::from_elements(db, self.clauses.iter().copied())
+    }
+
+    /// Exact conversion to an ordinary [`Type`] only when no stored clause is a visible top-level
+    /// union.
+    ///
+    /// This deliberately does not resolve aliases, so alias-expanded hidden unions can still
+    /// distribute during exact materialization.
+    pub(crate) fn materialize_exact_if_no_visible_unions(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<Type<'db>> {
+        (!self.has_visible_union_clause()).then(|| self.materialize_exact(db))
+    }
+
+    fn has_visible_union_clause(&self) -> bool {
+        self.clauses.iter().copied().any(Type::is_union)
+    }
+
+    /// Returns a compact ordinary [`Type`] witness that satisfies this upper bound and, if
+    /// present, an additional declared upper bound.
+    ///
+    /// This is an under-approximation of the full factored upper bound. When disjunctive clauses
+    /// are present, it returns at most [`MAX_PARTIAL_DNF_TERMS`] satisfying DNF product terms
+    /// instead of materializing the full cross product.
+    pub(crate) fn bounded_partial_dnf_witness(
+        &self,
+        db: &'db dyn Db,
+        declared_upper: Option<Type<'db>>,
+    ) -> Option<Type<'db>> {
+        let clauses = self.clauses.iter().copied().chain(declared_upper);
+        if !clauses.clone().any(Type::is_union) {
+            return Some(IntersectionType::from_elements(db, clauses));
+        }
+
+        let non_union_clauses = clauses.clone().filter(|clause| !clause.is_union());
+        let initial = IntersectionType::from_elements(db, non_union_clauses);
+
+        let insert_candidate = |candidates: &mut Vec<Type<'db>>, new_ty: Type<'db>| {
+            if new_ty.is_never()
+                || candidates
+                    .iter()
+                    .any(|old| new_ty.is_constraint_set_assignable_to(db, *old))
+            {
+                return;
+            }
+
+            candidates.retain(|old| !old.is_constraint_set_assignable_to(db, new_ty));
+            if candidates.len() < MAX_PARTIAL_DNF_TERMS {
+                candidates.push(new_ty);
+            }
+        };
+
+        let mut frontier = Vec::new();
+        let mut next = Vec::new();
+        insert_candidate(&mut frontier, initial);
+
+        let union_clauses = clauses.filter_map(Type::as_union);
+        for union_clause in union_clauses {
+            next.clear();
+
+            for candidate in &frontier {
+                for alternative in union_clause.elements(db) {
+                    let refined = IntersectionType::from_two_elements(db, *candidate, *alternative);
+                    insert_candidate(&mut next, refined);
+                    if next.len() >= MAX_PARTIAL_DNF_TERMS {
+                        break;
+                    }
+                }
+                if next.len() >= MAX_PARTIAL_DNF_TERMS {
+                    break;
+                }
+            }
+
+            if next.is_empty() {
+                return None;
+            }
+
+            std::mem::swap(&mut frontier, &mut next);
+        }
+
+        Some(UnionType::from_elements(db, frontier))
+    }
+}
+
+const MAX_PARTIAL_DNF_TERMS: usize = 4;
 
 impl ConstraintId {
     fn new<'db>(
@@ -6683,6 +6860,212 @@ mod tests {
     ) -> ConstraintSet<'db, 'c> {
         let ty = bound.to_instance(db);
         ConstraintSet::constrain_typevar(db, builder, bound_typevar, ty, ty)
+    }
+
+    fn known_instance(db: &dyn Db, class: KnownClass) -> Type<'_> {
+        class.to_instance(db)
+    }
+
+    #[test]
+    fn upper_bound_elides_object_and_tracks_explicit_bounds() {
+        let db = setup_db();
+        let mut upper = UpperBound::none();
+
+        assert!(upper.is_empty());
+        assert!(!upper.has_explicit_bound());
+        assert_eq!(upper.materialize_exact(&db), Type::object());
+        assert_eq!(
+            upper.materialize_exact_if_no_visible_unions(&db),
+            Some(Type::object())
+        );
+
+        upper.add_clause(&db, Type::object());
+        upper.shrink_to_fit();
+        assert!(upper.is_empty());
+        assert!(!upper.has_explicit_bound());
+    }
+
+    #[test]
+    fn upper_bound_prunes_duplicates_and_redundant_supertypes() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let bool = known_instance(&db, KnownClass::Bool);
+        let str = known_instance(&db, KnownClass::Str);
+
+        let mut upper = UpperBound::from_clauses(&db, [int, str, int]);
+        assert_eq!(
+            upper.clauses.iter().copied().collect::<Vec<_>>(),
+            [int, str]
+        );
+
+        // `bool` is narrower than `int`, so it replaces the redundant `int` clause while
+        // preserving the relative order of the remaining clauses.
+        upper.add_clause(&db, bool);
+        assert_eq!(
+            upper.clauses.iter().copied().collect::<Vec<_>>(),
+            [str, bool]
+        );
+
+        upper.add_clause(&db, int);
+        assert_eq!(
+            upper.clauses.iter().copied().collect::<Vec<_>>(),
+            [str, bool]
+        );
+    }
+
+    #[test]
+    fn upper_bound_collapses_never() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+
+        let mut upper = UpperBound::from_clause(int);
+        upper.add_clause(&db, Type::Never);
+        assert_eq!(
+            upper.clauses.iter().copied().collect::<Vec<_>>(),
+            [Type::Never]
+        );
+        assert_eq!(upper.materialize_exact(&db), Type::Never);
+
+        upper.add_clause(&db, int);
+        assert_eq!(
+            upper.clauses.iter().copied().collect::<Vec<_>>(),
+            [Type::Never]
+        );
+    }
+
+    #[test]
+    fn upper_bound_exact_materialization_guards_visible_unions() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+
+        let upper = UpperBound::from_clause(int);
+        assert!(!upper.has_visible_union_clause());
+        assert_eq!(upper.materialize_exact(&db), int);
+        assert_eq!(upper.materialize_exact_if_no_visible_unions(&db), Some(int));
+
+        let union_upper = UpperBound::from_clause(int_or_str);
+        assert!(union_upper.has_visible_union_clause());
+        assert_eq!(
+            union_upper.materialize_exact_if_no_visible_unions(&db),
+            None
+        );
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_returns_single_clause() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let upper = UpperBound::from_clause(int);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, None)
+            .expect("expected a witness");
+
+        assert_eq!(witness, int);
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_handles_union_overlap() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let str_or_bytes = UnionType::from_two_elements(&db, str, bytes);
+        let upper = UpperBound::from_clauses(&db, [int_or_str, str_or_bytes]);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, None)
+            .expect("expected a witness");
+
+        assert_eq!(witness, str);
+        assert!(witness.is_constraint_set_assignable_to(&db, int_or_str));
+        assert!(witness.is_constraint_set_assignable_to(&db, str_or_bytes));
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_finds_product_term() {
+        let db = setup_db();
+        let bool_ty = known_instance(&db, KnownClass::Bool);
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let bool_or_bytes = UnionType::from_two_elements(&db, bool_ty, bytes);
+        let upper = UpperBound::from_clauses(&db, [int_or_str, bool_or_bytes]);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, None)
+            .expect("expected a witness");
+
+        assert_eq!(witness, bool_ty);
+        assert!(witness.is_constraint_set_assignable_to(&db, int_or_str));
+        assert!(witness.is_constraint_set_assignable_to(&db, bool_or_bytes));
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_respects_budget() {
+        let db = setup_db();
+        let bool_ty = known_instance(&db, KnownClass::Bool);
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let bytearray = known_instance(&db, KnownClass::Bytearray);
+        let float = known_instance(&db, KnownClass::Float);
+        let left = UnionType::from_elements(&db, [int, str, bytes, float]);
+        let right = UnionType::from_elements(&db, [bool_ty, str, bytes, bytearray]);
+        let upper = UpperBound::from_clauses(&db, [left, right]);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, None)
+            .expect("expected a witness");
+
+        assert!(witness.union_size(&db) <= MAX_PARTIAL_DNF_TERMS);
+        assert!(witness.is_constraint_set_assignable_to(&db, left));
+        assert!(witness.is_constraint_set_assignable_to(&db, right));
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_materializes_never_clause() {
+        let db = setup_db();
+        let upper = UpperBound::from_clause(Type::Never);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, None)
+            .expect("expected an exact never witness");
+
+        assert_eq!(witness, Type::Never);
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_includes_declared_upper() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let upper = UpperBound::from_clause(int_or_str);
+
+        let witness = upper
+            .bounded_partial_dnf_witness(&db, Some(str))
+            .expect("expected a witness");
+
+        assert_eq!(witness, str);
+    }
+
+    #[test]
+    fn upper_bound_bounded_witness_returns_none_when_no_candidate_survives() {
+        let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let bytearray = known_instance(&db, KnownClass::Bytearray);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let bytes_or_bytearray = UnionType::from_two_elements(&db, bytes, bytearray);
+        let upper = UpperBound::from_clauses(&db, [int_or_str, bytes_or_bytearray]);
+
+        assert_eq!(upper.bounded_partial_dnf_witness(&db, None), None);
     }
 
     #[test]
