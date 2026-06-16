@@ -3767,6 +3767,27 @@ class ProjectionDeepPath:
         reveal_type(self.x)  # revealed: list[tuple[tuple[tuple[tuple[tuple[int]]]]]]
 ```
 
+Recursive aliases with repeated subscripting still converge:
+
+```py
+import typing
+
+_ProjectionTree = dict["str", "_ProjectionTree | list[typing.Any]"]
+
+class ProjectionRecursiveIndex:
+    def __init__(self, search_tree: _ProjectionTree | None = None) -> None:
+        self.search_tree = search_tree or {}
+
+    def find(self, content: str) -> None:
+        node: _ProjectionTree | list[typing.Any]
+        node = self.search_tree
+        for chars in content.split(" "):
+            node = node[chars]
+            assert isinstance(node, dict)
+
+reveal_type(ProjectionRecursiveIndex().search_tree)  # revealed: dict[str, Divergent]
+```
+
 Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
 the mixed containers:
 

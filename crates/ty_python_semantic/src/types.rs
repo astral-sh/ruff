@@ -2219,7 +2219,9 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
-            Type::CycleProjection(_) => Some(self),
+            // Preserve the original cycle root when falling back from an unsolved projection.
+            // The projection path is only useful if `try_projection_cycle_normalized` can solve it.
+            Type::CycleProjection(projection) => Some(Type::Divergent(projection.root(db))),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
