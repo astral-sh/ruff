@@ -105,6 +105,28 @@ pub struct StaticClassLiteral<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StaticClassLiteral<'_> {}
 
+/// Return whether `class` inherits from the `Any` special form and whether it inherits from any
+/// other dynamic base.
+#[salsa::tracked(cycle_initial=|_, _, _| (false, false), heap_size=ruff_memory_usage::heap_size)]
+fn dynamic_base_kinds<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> (bool, bool) {
+    let mut inherits_from_any = false;
+    let mut inherits_from_dynamic_base = false;
+
+    for base in class.explicit_bases(db) {
+        let kinds = match base {
+            Type::SpecialForm(SpecialFormType::Any) => (true, false),
+            Type::Dynamic(_) | Type::SpecialForm(SpecialFormType::Unknown) => (false, true),
+            Type::ClassLiteral(ClassLiteral::Static(base)) => dynamic_base_kinds(db, *base),
+            Type::GenericAlias(alias) => dynamic_base_kinds(db, alias.origin(db)),
+            _ => (false, false),
+        };
+        inherits_from_any |= kinds.0;
+        inherits_from_dynamic_base |= kinds.1;
+    }
+
+    (inherits_from_any, inherits_from_dynamic_base)
+}
+
 #[salsa::tracked]
 impl<'db> StaticClassLiteral<'db> {
     /// Return `true` if this class represents `known_class`
@@ -509,6 +531,20 @@ impl<'db> StaticClassLiteral<'db> {
             return &[];
         }
         explicit_bases_inner(db, self)
+    }
+
+    /// Return whether this class directly or indirectly inherits from the `Any` special form.
+    ///
+    /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
+    /// are normal dynamic bases; only an explicit `Any` base opts a class into dynamic instance
+    /// types.
+    pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
+        self.has_explicit_bases(db) && dynamic_base_kinds(db, self).0
+    }
+
+    /// Return whether this class directly or indirectly has an ordinary dynamic base.
+    pub(crate) fn inherits_from_dynamic_base(self, db: &'db dyn Db) -> bool {
+        self.has_explicit_bases(db) && dynamic_base_kinds(db, self).1
     }
 
     /// Return `Some()` if this class is known to be a [`DisjointBase`], or `None` if it is not.

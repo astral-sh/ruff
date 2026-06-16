@@ -8,8 +8,8 @@ use ty_module_resolver::{ModuleName, file_to_module};
 
 use super::protocol_class::ProtocolInterface;
 use super::{
-    BoundTypeVarInstance, ClassType, DivergentType, KnownClass, MaterializationKind,
-    SubclassOfType, Type, TypeVarVariance,
+    BoundTypeVarInstance, ClassType, DivergentType, IntersectionType, KnownClass,
+    MaterializationKind, SubclassOfType, Type, TypeVarVariance,
 };
 use crate::place::PlaceAndQualifiers;
 use crate::types::constraints::{
@@ -50,7 +50,8 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        match class.class_literal(db) {
+        let class_literal = class.class_literal(db);
+        let instance = match class_literal {
             // Dynamic classes created via `type()` don't have special instance types.
             ClassLiteral::Dynamic(_)
             | ClassLiteral::DynamicNamedTuple(_)
@@ -85,6 +86,14 @@ impl<'db> Type<'db> {
                         ))),
                 }
             }
+        };
+
+        if let ClassLiteral::Static(class_literal) = class_literal
+            && class_literal.inherits_from_any(db)
+        {
+            IntersectionType::from_two_elements(db, instance, Type::any())
+        } else {
+            instance
         }
     }
 

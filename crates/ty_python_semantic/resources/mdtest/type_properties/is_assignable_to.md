@@ -288,8 +288,8 @@ static_assert(not is_assignable_to(type[Any], None))
 
 ### Class-literal types
 
-Class-literal types that inherit from `Any` are assignable to any type `T` where `T` is assignable
-to `type`:
+A class with a base whose type is `Any` is only known to be an instance of `type`. A class that
+inherits directly from the `Any` special form retains the previous gradual class-literal behavior:
 
 ```py
 from typing import Any
@@ -300,7 +300,7 @@ def test(x: Any):
     class Bar(Any): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
-    static_assert(is_assignable_to(TypeOf[Foo], type[int]))
+    static_assert(not is_assignable_to(TypeOf[Foo], type[int]))
     static_assert(is_assignable_to(TypeOf[Foo], type[Any]))
 
     static_assert(is_assignable_to(TypeOf[Bar], Any))
@@ -312,11 +312,12 @@ def test(x: Any):
     static_assert(not is_assignable_to(TypeOf[Bar], int))
 ```
 
-This is because the `Any` element in the MRO could materialize to any subtype of `type`.
+The direct `Any` base can materialize to any subtype of `type`.
 
 ### Nominal instance and subclass-of types
 
-Instances of classes that inherit `Any` are assignable to any non-final type.
+Instances of classes that inherit directly from `Any` are assignable to arbitrary types, including
+final types.
 
 ```py
 from ty_extensions import is_assignable_to, static_assert
@@ -335,7 +336,7 @@ class FinalClass:
 static_assert(is_assignable_to(InheritsAny, Arbitrary))
 static_assert(is_assignable_to(InheritsAny, Any))
 static_assert(is_assignable_to(InheritsAny, object))
-static_assert(not is_assignable_to(InheritsAny, FinalClass))
+static_assert(is_assignable_to(InheritsAny, FinalClass))
 ```
 
 Similar for subclass-of types:

@@ -50,24 +50,26 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`.
 
-`SubclassOfAny` has an unknown superclass, which might be `int`. The assignment to `x` should not be
-allowed, even when the unknown superclass is `int`. The assignment to `y` should be allowed, since
-`Subclass` might have `int` as a superclass, and is therefore assignable to `int`.
+Instances of `SubclassOfAny` have type `SubclassOfAny & Any`. The `SubclassOfAny` element preserves
+the class's known members, while the `Any` element makes its instances assignable to arbitrary
+types. Values of other types are not assignable to `SubclassOfAny`.
 
 ```py
 from typing import Any
 from ty_extensions import reveal_mro
 
 class SubclassOfAny(Any): ...
+class IndirectSubclass(SubclassOfAny): ...
 
 reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
+reveal_type(SubclassOfAny())  # revealed: SubclassOfAny & Any
+reveal_type(IndirectSubclass())  # revealed: IndirectSubclass & Any
 
 x: SubclassOfAny = 1  # error: [invalid-assignment]
 y: int = SubclassOfAny()
 ```
 
-`SubclassOfAny` should not be assignable to a final class though, because `SubclassOfAny` could not
-possibly be a subclass of `FinalClass`:
+This includes final classes:
 
 ```py
 from typing import final
@@ -75,12 +77,34 @@ from typing import final
 @final
 class FinalClass: ...
 
-f: FinalClass = SubclassOfAny()  # error: [invalid-assignment]
+f: FinalClass = SubclassOfAny()
 
 @final
 class OtherFinalClass: ...
 
-f: FinalClass | OtherFinalClass = SubclassOfAny()  # error: [invalid-assignment]
+f: FinalClass | OtherFinalClass = SubclassOfAny()
+```
+
+A class with a base whose type is `Any` or `Unknown` is different. Its instances have the ordinary
+nominal type of the class and are not assignable to arbitrary types:
+
+```py
+from ty_extensions import Unknown
+
+class Arbitrary: ...
+
+def check_dynamic_base(any_base: Any):
+    class FromAnyValue(any_base): ...
+    class IndirectDynamicSubclass(FromAnyValue): ...
+    class FromUnknown(Unknown): ...
+
+    reveal_type(FromAnyValue())  # revealed: FromAnyValue
+    reveal_type(IndirectDynamicSubclass())  # revealed: IndirectDynamicSubclass
+    reveal_type(FromUnknown())  # revealed: FromUnknown
+
+    x: Arbitrary = FromAnyValue()  # error: [invalid-assignment]
+    y: Arbitrary = IndirectDynamicSubclass()  # error: [invalid-assignment]
+    z: Arbitrary = FromUnknown()  # error: [invalid-assignment]
 ```
 
 A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
@@ -118,7 +142,8 @@ def takes_other_protocol(f: OtherProtocol): ...
 takes_other_protocol(SubclassOfAny())
 ```
 
-A subclass of `Any` cannot be assigned to literal types, since those cannot be subclassed:
+A subclass of `Any` is also assignable to literal types through the dynamic element of its instance
+type:
 
 ```py
 from typing import Any, Literal
@@ -126,7 +151,7 @@ from typing import Any, Literal
 class MockAny(Any):
     pass
 
-x: Literal[1] = MockAny()  # error: [invalid-assignment]
+x: Literal[1] = MockAny()
 ```
 
 A use case where subclasses of `Any` come up is in mocking libraries, where the mock object should

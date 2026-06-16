@@ -2171,7 +2171,23 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
 
         source.iter_mro(db).when_any(db, self.constraints, |base| {
             match base {
-                ClassBase::Dynamic(_) | ClassBase::Divergent(_) => match self.relation {
+                ClassBase::Dynamic(_) => match self.relation {
+                    TypeRelation::Subtyping
+                    | TypeRelation::Redundancy { .. }
+                    | TypeRelation::SubtypingAssuming => {
+                        ConstraintSet::from_bool(self.constraints, target.is_object(db))
+                    }
+                    TypeRelation::Assignability => ConstraintSet::from_bool(
+                        self.constraints,
+                        (!source
+                            .class_literal(db)
+                            .as_static()
+                            .is_some_and(|source| source.inherits_from_dynamic_base(db))
+                            && !target.is_final(db))
+                            || target.is_object(db),
+                    ),
+                },
+                ClassBase::Divergent(_) => match self.relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming => {

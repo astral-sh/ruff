@@ -495,7 +495,8 @@ class A4(Any): ...
 class A5(Any): ...
 class A6(Any): ...
 
-reveal_type(W(C[A1, A2, A3, A4, A5, A6]()))  # revealed: W[A1, A2, A3, A4, A5, A6]
+# revealed: W[A1 & Any, A2 & Any, A3 & Any, A4 & Any, A5 & Any, A6 & Any]
+reveal_type(W(C[A1, A2, A3, A4, A5, A6]()))
 ```
 
 ### Identical `__new__` and `__init__` signatures

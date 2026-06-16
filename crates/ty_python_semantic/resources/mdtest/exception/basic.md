@@ -65,8 +65,7 @@ def foo(
         reveal_type(j)  # revealed: ValueError
 ```
 
-We do not emit an `invalid-exception-caught` if a class is caught that has `Any` or `Unknown` in its
-MRO, as the dynamic element in the MRO could materialize to some subclass of `BaseException`:
+A class with an ordinary dynamic base is not assumed to inherit from `BaseException`:
 
 ```py
 from compat import BASE_EXCEPTION_CLASS  # error: [unresolved-import] "Cannot resolve imported module `compat`"
@@ -75,7 +74,7 @@ class Error(BASE_EXCEPTION_CLASS): ...
 
 try:
     pass
-except Error as err:
+except Error as err:  # error: [invalid-exception-caught]
     pass
 ```
 
