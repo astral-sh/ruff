@@ -7133,22 +7133,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // The contextual mappings are still added first below to preserve union ordering.
         let mut inferred_constraints = SmallVec::<[(Type<'db>, Type<'db>); 4]>::new();
         let mut tuple_size_promotion_constraints = TupleSizePromotionConstraints::default();
-        let should_prune_context = !self
+        let mut context_compatibility = (!self
             .inference_flags()
             .contains(InferenceFlags::IN_COLLECTION_LITERAL_PEER_CONTEXT)
             && tcx
                 .annotation
-                .is_some_and(|ty| !ty.has_unspecialized_type_var(self.db()));
-        let mut context_compatibility =
-            should_prune_context.then(FxHashMap::<BoundTypeVarIdentity<'db>, bool>::default);
+                .is_some_and(|ty| !ty.has_unspecialized_type_var(self.db()))
+            && !elt_tcx_constraints.is_empty())
+        .then(FxHashMap::default);
 
         for (elts_index, elts) in elts.iter().enumerate() {
             // An unpacking expression for a dictionary.
             if let &[None, Some(value_expr)] = elts.as_slice() {
-                let unpack_ty = pre_inferred_elt_tys
-                    .as_ref()
-                    .and_then(|inferred_elts| inferred_elts[elts_index][1])
-                    .unwrap_or_else(|| infer_elt_expression(self, (1, value_expr, tcx)));
+                let unpack_ty = infer_elt_expression(self, (1, value_expr, tcx));
 
                 let Some((unpacked_key_ty, unpacked_value_ty)) =
                     unpack_ty.unpack_keys_and_items(self.db())
@@ -7177,10 +7174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let identity = elt_ty.identity(self.db());
                             if let Some(elt_tcx) = elt_tcx_constraints.get(&identity) {
                                 let compatible = inferred_ty.is_assignable_to(self.db(), *elt_tcx);
-                                context_compatibility
-                                    .entry(identity)
-                                    .and_modify(|previous| *previous |= compatible)
-                                    .or_insert(compatible);
+                                *context_compatibility.entry(identity).or_default() |= compatible;
                             }
                         }
                     }
@@ -7238,10 +7232,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(context_compatibility) = &mut context_compatibility
                     && let Some(compatible) = assignable_to_context
                 {
-                    context_compatibility
-                        .entry(elt_ty_identity)
-                        .and_modify(|previous| *previous |= compatible)
-                        .or_insert(compatible);
+                    *context_compatibility.entry(elt_ty_identity).or_default() |= compatible;
                 }
 
                 // Simplify the inference based on a non-covariant declared type.
