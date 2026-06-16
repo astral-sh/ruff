@@ -37,19 +37,24 @@ Important current structures and methods:
 - `ConstraintBounds<'db>` currently stores:
     - `lower: Option<Type<'db>>`
     - `upper: Option<Type<'db>>`
-- `ConstraintBoundsBuilder<'db>` already accumulates upper bounds in a CNF-like form:
+- `ConstraintBoundsBuilder<'db>` still accumulates upper bounds in a temporary CNF-like form:
     - `upper: FxIndexSet<Type<'db>>`
     - each entry is one upper clause
     - `add_upper` prunes redundant clauses
-    - `finish` currently either collapses this to a single `Type` with `IntersectionType::from_elements` or, if the estimated distributed size is too large, falls back to `Unknown`
+    - `finish` currently still collapses this to a single `Type` with `IntersectionType::from_elements` or, if the estimated distributed size is too large, falls back to `Unknown`
+    - `PathBounds::compute` then wraps that finalized upper type in `PathBound.upper: UpperBound<'db>` as a transition step; Phase 4 will preserve the raw factored clauses directly
 - `ConstraintId::intersect` currently has a local upper-bound explosion heuristic:
     - `MAX_UPPER_BOUND_SIZE: usize = 4`
     - estimates cost from `union_size` and `intersection_size`
     - returns `IntersectionResult::CannotSimplify` before constructing a large distributed intersection
-- `PathBounds::compute` uses `ConstraintBoundsBuilder` per typevar per BDD path.
-- `PathBounds::default_solve` chooses solutions from finalized `ConstraintBounds`:
+- `PathBounds::compute` uses `ConstraintBoundsBuilder` per typevar per BDD path and returns named `PathBound` values.
+- `PathBound<'db>` currently stores:
+    - `bound_typevar: BoundTypeVarInstance<'db>`
+    - `lower: Option<Type<'db>>`
+    - `upper: UpperBound<'db>`
+- `PathBounds::default_solve` chooses solutions from finalized `PathBound` values:
     - for bounded typevars, it prefers an explicit lower bound
-    - otherwise it may return the upper bound intersected with the declared bound
+    - otherwise it may return the exact-materialized upper bound intersected with the declared bound
     - for constrained typevars, it filters declared constraints using materialized lower/upper bounds
 - `TypeVarSolution` currently stores `solution: Type<'db>`, so final inferred solutions must still be ordinary `Type`s unless a larger API change is made.
 
@@ -457,20 +462,21 @@ Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expect
 
 ### Phase 2: Change `PathBound` to store accumulated bounds directly
 
-- [ ] Keep `ConstraintBounds<'db>` as the simple per-constraint representation with `upper: Option<Type<'db>>`.
-- [ ] Preserve the existing direct-construction invariant that simple upper intersections are split into separate BDD constraints.
-- [ ] Replace the `PathBound` alias `(BoundTypeVarInstance<'db>, ConstraintBounds<'db>)` with a named `PathBound` struct that stores `bound_typevar`, `lower: Option<Type<'db>>`, and `upper: UpperBound<'db>` directly.
-- [ ] Keep lower-bound finalization unchanged: `PathBound.lower` is still an `Option<Type<'db>>` produced by exact `UnionType::from_elements` over accumulated lower clauses.
-- [ ] Preserve old semantics for missing explicit upper bounds (`object`) via an empty `UpperBound`.
-- [ ] Implement `PathBound` helpers named `variance`, `lower_or_never`, and `has_upper` as needed by solution extraction.
-- [ ] Add `PathBound::exact(db, bound_typevar, ty)` to mimic the old `ConstraintBounds::exact` constructor for old-solver/hash-map fallback paths.
-- [ ] Do not add hidden exact upper materialization helpers to `PathBound`; expose exact upper materialization only as an explicit `UpperBound::materialize_exact` operation, document that it may distribute union clauses, and use it sparingly.
-- [ ] Update solution/path APIs that currently expose `ConstraintBounds` from `PathBounds` to expose `PathBound` instead.
-- [ ] Update `PathBounds::solve_with` and related choose hooks to pass `choose(variance, &path_bound)` while `solve_with` takes `&self`, avoiding hidden clones and avoiding a redundant separate typevar parameter.
-- [ ] Preserve the existing separate `variance` parameter in `PathBounds::solve_with` hooks, computed once from the `PathBound`.
-- [ ] Update higher-level `SpecializationBuilder::build_with` hooks from `Option<ConstraintBounds>` to `Option<&PathBound>`, while keeping the separate typevar parameter for the unmapped-`None` case.
-- [ ] In `solve_hash_map_with` and other old-solver fallback paths that only have an inferred `Type`, construct a temporary `PathBound::exact(...)` and pass `Some(&path_bound)` to the high-level hook.
-- [ ] Keep individual constraint construction APIs (`ConstraintId::new_with_bounds`, `Constraint::new_node_with_bounds`, `ConstraintSet::constrain_typevar_with_bounds`) based on optional ordinary upper `Type`s.
+- [x] Keep `ConstraintBounds<'db>` as the simple per-constraint representation with `upper: Option<Type<'db>>`.
+- [x] Preserve the existing direct-construction invariant that simple upper intersections are split into separate BDD constraints.
+- [x] Replace the `PathBound` alias `(BoundTypeVarInstance<'db>, ConstraintBounds<'db>)` with a named `PathBound` struct that stores `bound_typevar`, `lower: Option<Type<'db>>`, and `upper: UpperBound<'db>` directly.
+- [x] Keep lower-bound finalization unchanged: `PathBound.lower` is still an `Option<Type<'db>>` produced by exact `UnionType::from_elements` over accumulated lower clauses.
+- [x] Preserve old semantics for missing explicit upper bounds (`object`) via an empty `UpperBound`.
+- [x] Implement `PathBound` helpers named `variance`, `lower_or_never`, and `has_upper` as needed by solution extraction.
+- [x] Add `PathBound::exact(bound_typevar, ty)` to mimic the old `ConstraintBounds::exact` constructor for old-solver/hash-map fallback paths.
+- [x] Do not add hidden exact upper materialization helpers to `PathBound`; expose exact upper materialization only as an explicit `UpperBound::materialize_exact` operation, document that it may distribute union clauses, and use it sparingly.
+- [x] Update solution/path APIs that currently expose `ConstraintBounds` from `PathBounds` to expose `PathBound` instead.
+- [x] Update `PathBounds::solve_with` and related choose hooks to pass `choose(variance, &path_bound)` while `solve_with` takes `&self`, avoiding hidden clones and avoiding a redundant separate typevar parameter.
+- [x] Preserve the existing separate `variance` parameter in `PathBounds::solve_with` hooks, computed once from the `PathBound`.
+- [x] Update higher-level `SpecializationBuilder::build_with` hooks from `Option<ConstraintBounds>` to `Option<&PathBound>`, while keeping the separate typevar parameter for the unmapped-`None` case.
+- [x] In `solve_hash_map_with` and other old-solver fallback paths that only have an inferred `Type`, construct a temporary `PathBound::exact(...)` and pass `Some(&path_bound)` to the high-level hook.
+- [x] Keep individual constraint construction APIs (`ConstraintId::new_with_bounds`, `Constraint::new_node_with_bounds`, `ConstraintSet::constrain_typevar_with_bounds`) based on optional ordinary upper `Type`s.
+    - Focused test command: `cargo test -p ty_python_semantic types::constraints::tests::`.
 
 ### Phase 3: Minimal sequent-map construction changes
 

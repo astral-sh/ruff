@@ -602,8 +602,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
 
     /// Computes solutions for each BDD path, using a caller-provided hook to select solutions.
     ///
-    /// The `choose` hook is called for each typevar on each BDD path with the typevar's explicit
-    /// lower and upper bounds. It returns:
+    /// The `choose` hook is called for each typevar on each BDD path with the typevar's variance
+    /// and explicit lower and upper bounds. It returns:
     /// - `Some(ty)` to use `ty` as the solution for this typevar on this path
     /// - `None` to fall back to the default solution selection logic
     ///
@@ -614,8 +614,8 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solutions_with(db, builder, |bound_typevar, _variance, bounds| {
-            PathBounds::default_solve(db, builder, bound_typevar, bounds)
+        self.solutions_with(db, builder, |_variance, path_bound| {
+            PathBounds::default_solve(db, builder, path_bound)
         })
     }
 
@@ -623,11 +623,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         self,
         db: &'db dyn Db,
         builder: &'c ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            ConstraintBounds<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
+        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         self.verify_builder(builder);
         self.node.solutions_with(db, builder, choose)
@@ -1250,19 +1246,6 @@ impl<'db> ConstraintBounds<'db> {
     pub(crate) fn materialized_upper(self) -> Type<'db> {
         self.upper.unwrap_or(Type::object())
     }
-
-    pub(crate) fn materialized(self) -> (Type<'db>, Type<'db>) {
-        (self.materialized_lower(), self.materialized_upper())
-    }
-
-    pub(crate) fn variance(self) -> TypeVarVariance {
-        match (self.lower, self.upper) {
-            (None, Some(_)) => TypeVarVariance::Covariant,
-            (Some(_), None) => TypeVarVariance::Contravariant,
-            (Some(_), Some(_)) => TypeVarVariance::Invariant,
-            (None, None) => TypeVarVariance::Bivariant,
-        }
-    }
 }
 
 /// A factored conjunction of upper-bound clauses accumulated for one typevar.
@@ -1288,6 +1271,11 @@ impl<'db> UpperBound<'db> {
         Self::default()
     }
 
+    /// Creates an upper bound from one explicit clause.
+    ///
+    /// This preserves an explicit `object` clause so callers can distinguish `T <= object` from a
+    /// missing upper bound. Use [`UpperBound::add_clause`] / [`UpperBound::from_clauses`] when
+    /// accumulating clauses that should be canonicalized by redundancy pruning.
     pub(crate) fn from_clause(clause: Type<'db>) -> Self {
         let clauses = FxOrderSet::from_iter([clause]);
         Self { clauses }
@@ -2420,11 +2408,7 @@ impl NodeId {
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            ConstraintBounds<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
+        choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let path_bounds = PathBounds::compute(db, builder, self);
         path_bounds.solve_with(choose)
@@ -3435,7 +3419,54 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 }
 
-type PathBound<'db> = (BoundTypeVarInstance<'db>, ConstraintBounds<'db>);
+/// The explicit lower and upper bounds inferred for one typevar on one BDD path.
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct PathBound<'db> {
+    pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
+    pub(crate) lower: Option<Type<'db>>,
+    pub(crate) upper: UpperBound<'db>,
+}
+
+impl<'db> PathBound<'db> {
+    fn from_constraint_bounds(
+        bound_typevar: BoundTypeVarInstance<'db>,
+        bounds: ConstraintBounds<'db>,
+    ) -> Self {
+        let upper = bounds
+            .upper
+            .map_or_else(UpperBound::none, UpperBound::from_clause);
+        Self {
+            bound_typevar,
+            lower: bounds.lower,
+            upper,
+        }
+    }
+
+    pub(crate) fn exact(bound_typevar: BoundTypeVarInstance<'db>, ty: Type<'db>) -> Self {
+        Self {
+            bound_typevar,
+            lower: Some(ty),
+            upper: UpperBound::from_clause(ty),
+        }
+    }
+
+    pub(crate) fn variance(&self) -> TypeVarVariance {
+        match (self.lower, self.has_upper()) {
+            (None, true) => TypeVarVariance::Covariant,
+            (Some(_), false) => TypeVarVariance::Contravariant,
+            (Some(_), true) => TypeVarVariance::Invariant,
+            (None, false) => TypeVarVariance::Bivariant,
+        }
+    }
+
+    pub(crate) fn lower_or_never(&self) -> Type<'db> {
+        self.lower.unwrap_or(Type::Never)
+    }
+
+    pub(crate) fn has_upper(&self) -> bool {
+        self.upper.has_explicit_bound()
+    }
+}
 
 impl<'db> Type<'db> {
     /// Calculates the [`PathBounds`] that represent the valid solutions for when `self` is
@@ -3555,7 +3586,9 @@ impl<'db> PathBounds<'db> {
 
             let path_bounds = mappings
                 .drain()
-                .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
+                .map(|(bound_typevar, bounds)| {
+                    PathBound::from_constraint_bounds(bound_typevar, bounds.finish(db))
+                })
                 .collect();
             result.push(path_bounds);
         }
@@ -3589,7 +3622,9 @@ impl<'db> PathBounds<'db> {
 
         let path = mappings
             .drain()
-            .map(|(bound_typevar, bounds)| (bound_typevar, bounds.finish(db)))
+            .map(|(bound_typevar, bounds)| {
+                PathBound::from_constraint_bounds(bound_typevar, bounds.finish(db))
+            })
             .collect();
         Some(PathBounds::Constrained(Box::new([path])))
     }
@@ -3599,24 +3634,18 @@ impl<'db> PathBounds<'db> {
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
     ) -> Solutions<'db> {
-        self.solve_with(|bound_typevar, _variance, bounds| {
-            PathBounds::default_solve(db, builder, bound_typevar, bounds)
-        })
+        self.solve_with(|_variance, path_bound| PathBounds::default_solve(db, builder, path_bound))
     }
 
     /// Solves each path by applying a per-typevar solver function, collecting valid solutions.
     ///
-    /// The solver receives the typevar and its explicit lower/upper bounds, and returns:
+    /// The solver receives the path's explicit lower/upper bounds and their variance, and returns:
     /// - `Ok(Some(solution))` to add a solution for this typevar on this path
     /// - `Ok(None)` to leave this typevar unsolved on this path
     /// - `Err(())` to invalidate the entire path
     pub(crate) fn solve_with(
         &self,
-        mut choose: impl FnMut(
-            BoundTypeVarInstance<'db>,
-            TypeVarVariance,
-            ConstraintBounds<'db>,
-        ) -> Result<Option<Type<'db>>, ()>,
+        mut choose: impl FnMut(TypeVarVariance, &PathBound<'db>) -> Result<Option<Type<'db>>, ()>,
     ) -> Solutions<'db> {
         let paths = match self {
             PathBounds::Unsatisfiable => return Solutions::Unsatisfiable,
@@ -3627,12 +3656,12 @@ impl<'db> PathBounds<'db> {
         let mut solutions = Vec::with_capacity(paths.len());
         'paths: for path in paths {
             let mut solution = Vec::with_capacity(path.len());
-            for (bound_typevar, bounds) in path.iter().copied() {
-                let variance = bounds.variance();
+            for path_bound in path {
+                let variance = path_bound.variance();
 
-                match choose(bound_typevar, variance, bounds) {
+                match choose(variance, path_bound) {
                     Ok(Some(ty)) => solution.push(TypeVarSolution {
-                        bound_typevar,
+                        bound_typevar: path_bound.bound_typevar,
                         solution: ty,
                     }),
                     Ok(None) => {}
@@ -3660,10 +3689,11 @@ impl<'db> PathBounds<'db> {
     pub(crate) fn default_solve(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        bounds: ConstraintBounds<'db>,
+        path_bound: &PathBound<'db>,
     ) -> Result<Option<Type<'db>>, ()> {
-        let (lower, upper) = bounds.materialized();
+        let bound_typevar = path_bound.bound_typevar;
+        let lower = path_bound.lower_or_never();
+        let upper = path_bound.upper.materialize_exact(db);
         match bound_typevar.typevar(db).require_bound_or_constraints(db) {
             TypeVarBoundOrConstraints::UpperBound(bound) => {
                 let bound = bound.top_materialization(db);
@@ -3676,11 +3706,11 @@ impl<'db> PathBounds<'db> {
                 // Prefer the lower bound (often the concrete actual type seen) over the
                 // upper bound (which may include TypeVar bounds/constraints). The upper bound
                 // should only be used as a fallback when no concrete type was inferred.
-                if let Some(lower) = bounds.lower {
+                if let Some(lower) = path_bound.lower {
                     return Ok(Some(lower));
                 }
 
-                if let Some(upper) = bounds.upper {
+                if path_bound.has_upper() {
                     return Ok(Some(IntersectionType::from_elements(db, [upper, bound])));
                 }
 
