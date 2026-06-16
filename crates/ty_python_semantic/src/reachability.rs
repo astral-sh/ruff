@@ -202,8 +202,8 @@ use crate::{
     types::{
         CallableTypes, EnumClassLiteral, IntersectionBuilder, NarrowingConstraint, SpecialFormType,
         Type, TypeContext, UnionType, callable_pattern_type, definite_match_pattern_type,
-        definite_match_pattern_type_for_subject, equality_truthiness, expand_type,
-        infer_narrowing_constraints, infer_same_file_expression_type, mapping_pattern_type,
+        equality_truthiness, expand_type, infer_narrowing_constraints,
+        infer_same_file_expression_type, mapping_pattern_type, pattern_fallthrough_type,
         sequence_pattern_type_builder, singleton_pattern_type,
     },
 };
@@ -272,14 +272,7 @@ fn type_narrowed_by_pattern<'db>(
     predicate: PatternPredicate<'db>,
     subject_ty: Type<'db>,
 ) -> Type<'db> {
-    IntersectionBuilder::new(db)
-        .add_positive(subject_ty)
-        .add_negative(definite_match_pattern_type_for_subject(
-            db,
-            predicate.kind(db),
-            subject_ty,
-        ))
-        .build()
+    pattern_fallthrough_type(db, predicate.kind(db), subject_ty)
 }
 
 /// Return the enum class and canonical member names represented by an enum-literal subject type.

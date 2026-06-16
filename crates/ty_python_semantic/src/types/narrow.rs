@@ -15,9 +15,9 @@ use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
     KnownInstanceType, LiteralValueTypeKind, Parameter, Parameters, Signature, SpecialFormType,
     SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext, TypeVarBoundOrConstraints,
-    UnionBuilder, callable_pattern_type, definite_match_pattern_type_for_subject,
-    definite_sequence_pattern_type, exact_sequence_pattern_type, infer_expression_types,
-    mapping_pattern_type, sequence_pattern_type_builder, singleton_pattern_type,
+    UnionBuilder, callable_pattern_type, definite_sequence_pattern_type,
+    exact_sequence_pattern_type, infer_expression_types, mapping_pattern_type,
+    pattern_fallthrough_type, sequence_pattern_type_builder, singleton_pattern_type,
     starred_sequence_pattern_type,
 };
 use ty_python_core::expression::Expression;
@@ -1512,21 +1512,13 @@ impl<'db> PatternSuccessAnalyzer<'db> {
         let mut previous_pattern = first_pattern;
 
         for pattern in patterns {
-            let definitely_matched_ty = if Self::contains_class_pattern(previous_pattern) {
+            remaining_subject_ty = if Self::contains_class_pattern(previous_pattern) {
                 // Attribute extraction can still fail after the runtime class check. The next PR
                 // refines this with subject-aware class-pattern exhaustiveness.
-                Type::Never
+                remaining_subject_ty
             } else {
-                definite_match_pattern_type_for_subject(
-                    self.db,
-                    previous_pattern,
-                    remaining_subject_ty,
-                )
+                pattern_fallthrough_type(self.db, previous_pattern, remaining_subject_ty)
             };
-            remaining_subject_ty = IntersectionBuilder::new(self.db)
-                .add_positive(remaining_subject_ty)
-                .add_negative(definitely_matched_ty)
-                .build();
             let alternative = self.analyze_successful_pattern(pattern, remaining_subject_ty);
             matched_subject_types.add_in_place(alternative.matched_subject_ty);
             stable_subject_types.add_in_place(alternative.stable_subject_ty);

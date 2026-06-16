@@ -2109,6 +2109,75 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
+    fn pattern_binds_any_symbol(
+        pattern: &ast::Pattern,
+        matches: &mut impl FnMut(&str) -> bool,
+    ) -> bool {
+        match pattern {
+            ast::Pattern::MatchValue(_) | ast::Pattern::MatchSingleton(_) => false,
+            ast::Pattern::MatchSequence(pattern) => pattern
+                .patterns
+                .iter()
+                .any(|pattern| Self::pattern_binds_any_symbol(pattern, matches)),
+            ast::Pattern::MatchMapping(pattern) => {
+                pattern
+                    .rest
+                    .as_ref()
+                    .is_some_and(|name| matches(name.as_str()))
+                    || pattern
+                        .patterns
+                        .iter()
+                        .any(|pattern| Self::pattern_binds_any_symbol(pattern, matches))
+            }
+            ast::Pattern::MatchClass(pattern) => pattern
+                .arguments
+                .patterns
+                .iter()
+                .chain(
+                    pattern
+                        .arguments
+                        .keywords
+                        .iter()
+                        .map(|keyword| &keyword.pattern),
+                )
+                .any(|pattern| Self::pattern_binds_any_symbol(pattern, matches)),
+            ast::Pattern::MatchStar(pattern) => pattern
+                .name
+                .as_ref()
+                .is_some_and(|name| matches(name.as_str())),
+            ast::Pattern::MatchAs(pattern) => {
+                pattern
+                    .name
+                    .as_ref()
+                    .is_some_and(|name| matches(name.as_str()))
+                    || pattern
+                        .pattern
+                        .as_deref()
+                        .is_some_and(|pattern| Self::pattern_binds_any_symbol(pattern, matches))
+            }
+            ast::Pattern::MatchOr(pattern) => pattern
+                .patterns
+                .iter()
+                .any(|pattern| Self::pattern_binds_any_symbol(pattern, matches)),
+        }
+    }
+
+    fn pattern_rebinds_subject(
+        &self,
+        pattern: &ast::Pattern,
+        subject_places: &[(ScopedPlaceId, Option<ScopedUseId>)],
+    ) -> bool {
+        let places = self.current_place_table();
+        let mut matches = |name: &str| {
+            places.symbol_id(name).is_some_and(|symbol| {
+                subject_places.iter().any(|(place, _)| {
+                    matches!(place, ScopedPlaceId::Symbol(target) if *target == symbol)
+                })
+            })
+        };
+        Self::pattern_binds_any_symbol(pattern, &mut matches)
+    }
+
     fn create_pattern_predicate(
         &mut self,
         subject: Expression<'db>,
@@ -2146,6 +2215,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern_predicate: PatternPredicate<'db>,
         subject_targets: &[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>)],
         sequence_subject_targets: &[(ScopedPlaceId, ScopedUseId, ExpressionNodeKey)],
+        preserve_subject_bindings: bool,
         is_catchall: bool,
     ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = PredicateOrLiteral::Predicate(Predicate {
@@ -2161,11 +2231,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // predicates are still created normally for proper control flow tracking.
         let predicate_id = if is_catchall {
             ScopedPredicateId::ALWAYS_TRUE
+        } else if !preserve_subject_bindings && sequence_subject_targets.is_empty() {
+            self.record_narrowing_constraint(predicate)
         } else {
             let predicate_id = self.add_predicate(predicate);
-            for (place, bindings) in subject_targets {
-                self.current_use_def_map_mut()
-                    .record_narrowing_constraint_for_bindings(predicate_id, *place, bindings);
+            if preserve_subject_bindings {
+                for (place, bindings) in subject_targets {
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_bindings(predicate_id, *place, bindings);
+                }
             }
             for &(place, use_id, target) in sequence_subject_targets {
                 let subject_element_id =
@@ -3550,8 +3624,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 // A match subject is evaluated once. Retain the bindings read by each place so
                 // that case predicates constrain those values rather than later rebindings.
-                let mut subject_targets =
-                    SmallVec::<[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>); 2]>::new();
                 let subject_places = match_subject_place_expressions(subject)
                     .into_iter()
                     .filter_map(|expression| {
@@ -3561,22 +3633,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         Some((place, self.current_ast_ids().try_use_id(expression)))
                     })
                     .collect::<SmallVec<[_; 2]>>();
-                for (place, use_id) in subject_places {
-                    let bindings = if let Some(use_id) = use_id {
-                        self.current_use_def_map()
-                            .bindings_at_use(use_id)
-                            .map(LiveBinding::binding)
-                            .collect()
-                    } else {
-                        // A named-expression subject creates its target binding instead of
-                        // reading one, so snapshot the binding that was just created.
-                        self.current_use_def_map_mut()
-                            .current_bindings(place)
-                            .map(|binding| LiveBinding::binding(&binding))
-                            .collect()
-                    };
-                    subject_targets.push((place, bindings));
-                }
                 let places = self.current_place_table();
                 let ast_ids = self.current_ast_ids();
                 let mut sequence_subject_targets =
@@ -3622,6 +3678,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         case.guard.as_deref(),
                         previous_pattern,
                     );
+                    let preserve_subject_bindings =
+                        self.pattern_rebinds_subject(&case.pattern, &subject_places);
+                    let mut subject_targets =
+                        SmallVec::<[(ScopedPlaceId, SmallVec<[ScopedDefinitionId; 2]>); 2]>::new();
+                    if preserve_subject_bindings {
+                        for &(place, use_id) in &subject_places {
+                            let bindings = if let Some(use_id) = use_id {
+                                self.current_use_def_map()
+                                    .bindings_at_use(use_id)
+                                    .map(LiveBinding::binding)
+                                    .collect()
+                            } else {
+                                // A named-expression subject creates its target binding instead of
+                                // reading one, so snapshot the binding that was just created.
+                                self.current_use_def_map_mut()
+                                    .current_bindings(place)
+                                    .map(|binding| LiveBinding::binding(&binding))
+                                    .collect()
+                            };
+                            subject_targets.push((place, bindings));
+                        }
+                    }
                     self.current_match_case = Some(CurrentMatchCase::new(
                         &case.pattern,
                         match_pattern_predicate,
@@ -3638,6 +3716,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             match_pattern_predicate,
                             &subject_targets,
                             &sequence_subject_targets,
+                            preserve_subject_bindings,
                             is_catchall,
                         );
                     previous_pattern = Some(match_pattern_predicate);

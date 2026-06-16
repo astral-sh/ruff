@@ -7,6 +7,7 @@ use ty_python_core::predicate::{
 
 use crate::Db;
 use crate::types::callable::{CallableFunctionProvenance, CallableTypeKind};
+use crate::types::equality::evaluate_type_equality;
 use crate::types::signatures::CallableSignature;
 use crate::types::tuple::TupleType;
 use crate::types::{
@@ -312,6 +313,44 @@ pub(crate) fn definite_match_pattern_type_for_subject<'db>(
             .add_positive(definite_match_pattern_type(db, kind))
             .build(),
     }
+}
+
+/// Return the part of `subject_ty` that can reach a later alternative after `kind` fails.
+///
+/// Value patterns use Python equality. Reusing the equality constraint here both accounts for
+/// cross-type equal values and avoids checking every member of a large literal union separately:
+///
+/// ```python
+/// from typing import Literal
+///
+/// def f(value: Literal[True, 1, 2]) -> None:
+///     match value:
+///         case 1:
+///             pass
+///         case other:
+///             reveal_type(other)  # Literal[2]
+/// ```
+pub(crate) fn pattern_fallthrough_type<'db>(
+    db: &'db dyn Db,
+    kind: &PatternPredicateKind<'db>,
+    subject_ty: Type<'db>,
+) -> Type<'db> {
+    if let PatternPredicateKind::Value(value) = kind {
+        let value_ty = infer_same_file_expression_type(db, *value, TypeContext::default());
+        if let Some(constraint) = evaluate_type_equality(db, subject_ty, value_ty, false) {
+            return IntersectionBuilder::new(db)
+                .add_positive(subject_ty)
+                .add_positive(constraint)
+                .build();
+        }
+    }
+
+    IntersectionBuilder::new(db)
+        .add_positive(subject_ty)
+        .add_negative(definite_match_pattern_type_for_subject(
+            db, kind, subject_ty,
+        ))
+        .build()
 }
 
 /// Return the values that are guaranteed to match `kind`.
