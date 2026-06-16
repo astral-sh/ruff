@@ -137,25 +137,16 @@ pub enum Declaration {
 
 /// Top-level entry: walk a C++ corpus **tree** and produce the IR.
 ///
-/// **Still `todo!()` — the per-TU walker has landed; the TREE orchestration
-/// has not.** [`walk_tu`] (feature `libclang`) is the concrete primitive:
-/// it walks ONE translation unit and returns [`CppClass`] definitions
-/// (classes/bases/fields/methods with their flags), already mapped to the
-/// fully-qualified `override` shape PR #9 requires. What remains for
-/// `extract` is orchestrating `walk_tu` over a whole corpus:
-///
-/// 1. Enumerate the corpus TUs (the `tesseract-ocr/tesseract@5.5.0` pin,
-///    per `tesseract-rs/.claude/plans/tesseract-rs-receive-contract-v1.md`
-///    §0) and resolve per-TU include args — the Tesseract + leptonica
-///    include graph is the real work here.
-/// 2. Call [`walk_tu`] per TU, then [`model_from_class`] per returned
-///    [`CppClass`], deduping classes seen across multiple TUs.
-/// 3. Merge into one [`ModelGraph`] and run `CPP-SCHEMA-FIT`
-///    (`.claude/plans/cpp-spo-probes-v1.md`) over the result.
-///
-/// The per-cursor mapping (step that used to live here) is done in
-/// [`walk_tu`]; the pure unpacking ([`model_from_class`]) and the target
-/// triple shape are testable without libclang.
+/// **Still `todo!()` — what's missing now is only per-TU include
+/// auto-detection.** Everything beneath it is done: [`walk_tu`] walks ONE
+/// translation unit, and [`extract_tree`] already does the recursive
+/// enumeration + per-TU walk + cross-TU dedup for a SINGLE caller-supplied
+/// include-arg set. What `extract` adds is resolving the right include args
+/// *per TU automatically* (the `tesseract-ocr/tesseract@5.5.0` + leptonica
+/// include graph — the real remaining work), so a caller can point it at a
+/// corpus root without hand-supplying `-I` flags. Once that lands it is
+/// essentially [`extract_tree`] with auto-derived args, plus the
+/// `CPP-SCHEMA-FIT` coverage gate (`.claude/plans/cpp-spo-probes-v1.md`).
 #[must_use]
 pub fn extract(source_tree: &Path) -> ModelGraph {
     let _ = source_tree;
@@ -181,8 +172,9 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
 /// order is stable.
 ///
 /// This is the concrete first step of the corpus-tree orchestration
-/// [`extract`] documents: single directory, caller-supplied include args, no
-/// recursion or auto-include-detection yet. Pair with
+/// [`extract`] documents: a single directory (non-recursive — see
+/// [`extract_tree`] for the recursive whole-tree walk), caller-supplied
+/// include args, no auto-include-detection yet. Pair with
 /// [`ruff_spo_triplet::expand`] + [`ruff_spo_triplet::to_ndjson`] for the
 /// first SPO ndjson emission from a real corpus subset.
 #[cfg(feature = "libclang")]
@@ -191,18 +183,74 @@ pub fn extract_dir(dir: &Path, args: &[String]) -> Result<ModelGraph, WalkError>
         Ok(rd) => rd
             .filter_map(Result::ok)
             .map(|e| e.path())
-            .filter(|p| {
-                p.extension()
-                    .and_then(|x| x.to_str())
-                    .is_some_and(|x| matches!(x, "h" | "hpp" | "hh" | "hxx" | "cc" | "cpp" | "cxx"))
-            })
+            .filter(|p| is_cpp_source(p))
             .collect(),
         Err(_) => Vec::new(),
     };
     files.sort();
+    walk_files(&files, args)
+}
 
+/// Recursive corpus-tree walk (feature `libclang`): walk every C++ file under
+/// `root` (depth-first, all subdirectories) as its own translation unit, dedup
+/// classes by fully-qualified name across the whole tree, and return one merged
+/// [`ModelGraph`]. `args` apply to every TU.
+///
+/// Same skip/propagate semantics as [`extract_dir`] (per-TU
+/// [`WalkError::Parse`] skipped, [`WalkError::Libclang`] surfaced) and the same
+/// deterministic ordering (files sorted, dedup via `BTreeMap`).
+///
+/// This is the recursive half of the corpus-tree orchestration [`extract`]
+/// documents: the caller still supplies one include-arg set for the whole tree;
+/// `extract` will add per-TU include auto-detection on top.
+#[cfg(feature = "libclang")]
+pub fn extract_tree(root: &Path, args: &[String]) -> Result<ModelGraph, WalkError> {
+    let mut files = Vec::new();
+    collect_cpp_files(root, &mut files);
+    files.sort();
+    walk_files(&files, args)
+}
+
+/// File extensions the walker treats as a C++ translation unit.
+#[cfg(feature = "libclang")]
+fn is_cpp_source(p: &Path) -> bool {
+    p.extension()
+        .and_then(|x| x.to_str())
+        .is_some_and(|x| matches!(x, "h" | "hpp" | "hh" | "hxx" | "cc" | "cpp" | "cxx"))
+}
+
+/// Recursively collect C++ source files under `dir` (depth-first). An unreadable
+/// directory is skipped rather than aborting the walk — a permission error on
+/// one branch must not lose the rest of the corpus.
+#[cfg(feature = "libclang")]
+fn collect_cpp_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
+    let Ok(rd) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in rd.filter_map(Result::ok) {
+        // Use the entry's OWN file type (does NOT follow symlinks). A directory
+        // symlink to an ancestor (`sub/loop -> ..`) would otherwise recurse
+        // forever via `Path::is_dir()`'s follow. Symlinks are skipped — a
+        // source corpus's TUs are real files — which breaks all cycles without
+        // canonicalize bookkeeping (codex P2, PR #14).
+        let Ok(ft) = entry.file_type() else { continue };
+        let path = entry.path();
+        if ft.is_dir() {
+            collect_cpp_files(&path, out);
+        } else if ft.is_file() && is_cpp_source(&path) {
+            out.push(path);
+        }
+    }
+}
+
+/// The shared dedup loop behind [`extract_dir`] / [`extract_tree`]: walk each
+/// file as its own TU, dedup classes by fully-qualified name into a
+/// deterministic `BTreeMap`, skip per-TU [`WalkError::Parse`] failures, and
+/// propagate a non-recoverable [`WalkError::Libclang`] (codex P2, PR #13).
+#[cfg(feature = "libclang")]
+fn walk_files(files: &[std::path::PathBuf], args: &[String]) -> Result<ModelGraph, WalkError> {
     let mut seen: std::collections::BTreeMap<String, Model> = std::collections::BTreeMap::new();
-    for f in &files {
+    for f in files {
         match walk_tu(f, args) {
             Ok(classes) => {
                 for cls in classes {
@@ -210,11 +258,7 @@ pub fn extract_dir(dir: &Path, args: &[String]) -> Result<ModelGraph, WalkError>
                         .or_insert_with(|| model_from_class(&cls));
                 }
             }
-            // Per-TU parse failure (missing includes, malformed TU) is
-            // expected on a real corpus — skip this file, keep going.
             Err(WalkError::Parse(_)) => {}
-            // libclang-init failure is non-recoverable: every file would skip
-            // and return a misleadingly-empty graph. Surface it (codex P2 #13).
             Err(e @ WalkError::Libclang(_)) => return Err(e),
         }
     }
@@ -495,7 +539,7 @@ mod libclang_tests {
 
     use ruff_spo_triplet::{expand, from_ndjson, to_ndjson};
 
-    use super::{ModelGraph, NAMESPACE, extract_dir, model_from_class, walk_tu};
+    use super::{ModelGraph, NAMESPACE, extract_dir, extract_tree, model_from_class, walk_tu};
 
     /// `clang::Clang` is a process-singleton — serialize the libclang tests so
     /// cargo's parallel test threads never construct two at once.
@@ -764,5 +808,86 @@ class Recognizer : public Classify {
                 .iter()
                 .all(|t| t.s.starts_with("cpp:") || t.s.starts_with("exc:"))
         );
+    }
+
+    /// `extract_tree` recurses into subdirectories; `extract_dir` does not.
+    /// Hermetic (writes a small nested temp tree) — proves the recursive walk
+    /// end-to-end without needing the Tesseract corpus.
+    #[test]
+    fn extract_tree_recurses_where_extract_dir_does_not() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join("ruff_cpp_spo_tree_fixture");
+        let sub = base.join("sub");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&sub).expect("mkdir tree");
+        std::fs::write(base.join("top.h"), "namespace T { class Top {}; }").expect("write top");
+        std::fs::write(sub.join("nested.h"), "namespace T { class Nested {}; }")
+            .expect("write nested");
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+        ];
+
+        let tree = extract_tree(&base, &args).expect("libclang init");
+        let tnames: Vec<&str> = tree.models.iter().map(|m| m.name.as_str()).collect();
+        assert!(
+            tnames.contains(&"T::Top"),
+            "tree missing T::Top: {tnames:?}"
+        );
+        assert!(
+            tnames.contains(&"T::Nested"),
+            "extract_tree must recurse into sub/: {tnames:?}"
+        );
+
+        // Non-recursive: extract_dir sees only the top-level file.
+        let dir = extract_dir(&base, &args).expect("libclang init");
+        let dnames: Vec<&str> = dir.models.iter().map(|m| m.name.as_str()).collect();
+        assert!(dnames.contains(&"T::Top"));
+        assert!(
+            !dnames.contains(&"T::Nested"),
+            "extract_dir must NOT recurse: {dnames:?}"
+        );
+
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A directory symlink to an ancestor (`sub/loop -> base`) must NOT send
+    /// `extract_tree` into an unbounded recurse — symlinks are skipped via the
+    /// entry's own file type, not `Path::is_dir()`'s follow (codex P2, PR #14).
+    /// Unix-only (symlink creation).
+    #[cfg(unix)]
+    #[test]
+    fn extract_tree_skips_directory_symlink_cycles() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join("ruff_cpp_spo_symlink_fixture");
+        let sub = base.join("sub");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&sub).expect("mkdir");
+        std::fs::write(base.join("real.h"), "namespace S { class Real {}; }").expect("write");
+        // sub/loop -> base : a cycle that `Path::is_dir()` would follow forever.
+        std::os::unix::fs::symlink(&base, sub.join("loop")).expect("symlink");
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+        ];
+        // Must terminate (no infinite recurse / path exhaustion) AND still find
+        // the real class.
+        let graph = extract_tree(&base, &args).expect("libclang init");
+        assert!(
+            graph.models.iter().any(|m| m.name == "S::Real"),
+            "expected S::Real: {:?}",
+            graph
+                .models
+                .iter()
+                .map(|m| m.name.as_str())
+                .collect::<Vec<_>>()
+        );
+        let _ = std::fs::remove_dir_all(&base);
     }
 }
