@@ -653,6 +653,58 @@ mod tests {
     }
 
     #[test]
+    fn closure_uses_later_shadowing_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 0
+
+                def mid():
+                    def inner():
+                        return x
+
+                    x = 1
+                    return inner
+
+                return mid
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let outer_x_start = TextSize::try_from(source.find("x = 0").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(outer_x_start, outer_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_comprehension_capture_uses_intermediate_rebindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                a = 1
+
+                def inner():
+                    return [a for _ in range(1)]
+
+                a = 2
+                inner()
+                a = 3
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn nonlocal_proxy_scope_still_marks_outer_binding_used() -> anyhow::Result<()> {
         let source = dedent(
             "

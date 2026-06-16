@@ -131,9 +131,41 @@ struct ScopeInfo<'ast> {
     /// Text ranges for `global` and `nonlocal` declarations in this scope, which we use to
     /// populate `nested_global_or_nonlocal_declarations` when we reach end of scope.
     this_scope_global_or_nonlocal_declarations: FxHashMap<Name, TextRange>,
+    /// Free symbol uses from nested scopes that may resolve to this scope.
+    pending_captures: PendingCaptures,
 }
 
 type NestedGlobalOrNonlocalDeclarations = FxHashMap<Name, SmallVec<[NestedDeclaration; 1]>>;
+
+/// Captures cannot be resolved until the enclosing scope is complete because a later binding can
+/// make the name local. Each pending capture remembers the bindings visible when the nested scope
+/// was created and, for lazy scopes, any bindings added afterward.
+type PendingCaptures = FxHashMap<Name, SmallVec<[PendingCapture; 1]>>;
+
+#[derive(Debug)]
+struct PendingCapture {
+    nested_scope: FileScopeId,
+    laziness: ScopeLaziness,
+    binding_definition_ids: SmallVec<[ScopedDefinitionId; 2]>,
+}
+
+#[derive(Debug)]
+struct UnresolvedCapture {
+    /// The scope containing the free symbol use. Retaining this lets final resolution apply class
+    /// scope visibility rules correctly as the capture is propagated outward.
+    nested_scope: FileScopeId,
+    name: Name,
+    laziness: ScopeLaziness,
+}
+
+impl UnresolvedCapture {
+    fn through_scope(mut self, scope_laziness: ScopeLaziness) -> Self {
+        if scope_laziness.is_lazy() {
+            self.laziness = ScopeLaziness::Lazy;
+        }
+        self
+    }
+}
 
 #[derive(Copy, Clone, Debug, get_size2::GetSize)]
 pub struct NestedDeclaration {
@@ -247,8 +279,6 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     generator_functions: FxHashSet<FileScopeId>,
     /// Snapshots of enclosing-scope place states visible from nested scopes.
     enclosing_snapshots: FxHashMap<EnclosingSnapshotKey, ScopedEnclosingSnapshotId>,
-    /// Symbols in lazy enclosing scopes that are actually referenced by a nested scope.
-    used_lazy_captures: FxHashSet<(FileScopeId, ScopedSymbolId)>,
     /// Errors collected by the `semantic_checker`.
     semantic_syntax_errors: RefCell<Vec<SemanticSyntaxError>>,
 
@@ -298,7 +328,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             generator_functions: FxHashSet::default(),
 
             enclosing_snapshots: FxHashMap::default(),
-            used_lazy_captures: FxHashSet::default(),
 
             python_version: Program::get(db).python_version(db),
             source_text: OnceCell::new(),
@@ -481,6 +510,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             narrowing_aliases: saved_aliases,
             nested_global_or_nonlocal_declarations: FxHashMap::default(),
             this_scope_global_or_nonlocal_declarations: FxHashMap::default(),
+            pending_captures: FxHashMap::default(),
         });
     }
 
@@ -544,7 +574,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    fn bound_scope(&self, enclosing_scope: FileScopeId, name: &str) -> Option<FileScopeId> {
+    fn bound_scope(&self, enclosing_scope: FileScopeId, symbol: &Symbol) -> Option<FileScopeId> {
         self.scope_stack
             .iter()
             .rev()
@@ -552,20 +582,115 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .find_map(|scope_info| {
                 let scope_id = scope_info.file_scope_id;
                 let place_table = &self.place_tables[scope_id];
-                let place_id = place_table.symbol_id(name)?;
+                let place_id = place_table.symbol_id(symbol.name())?;
                 place_table.place(place_id).is_bound().then_some(scope_id)
             })
     }
 
-    fn scope_and_descendant_ids(
-        &self,
-        scope_id: FileScopeId,
-    ) -> impl Iterator<Item = FileScopeId> + '_ {
-        let descendants = self.scopes[scope_id].descendants();
+    fn register_pending_capture(&mut self, capture: UnresolvedCapture) {
+        let current_scope = self.current_scope();
+        let binding_definition_ids = self.place_tables[current_scope]
+            .symbol_id(&capture.name)
+            .into_iter()
+            .flat_map(|symbol| {
+                self.use_def_maps[current_scope].symbol_binding_definition_ids(symbol)
+            })
+            .collect();
 
-        std::iter::once(scope_id).chain(
-            (descendants.start.as_u32()..descendants.end.as_u32()).map(FileScopeId::from_u32),
-        )
+        let captures = self
+            .current_scope_info_mut()
+            .pending_captures
+            .entry(capture.name)
+            .or_default();
+
+        if let Some(pending) = captures
+            .iter_mut()
+            .find(|pending| pending.nested_scope == capture.nested_scope)
+        {
+            pending
+                .binding_definition_ids
+                .extend(binding_definition_ids);
+            if capture.laziness.is_lazy() {
+                pending.laziness = ScopeLaziness::Lazy;
+            }
+        } else {
+            captures.push(PendingCapture {
+                nested_scope: capture.nested_scope,
+                laziness: capture.laziness,
+                binding_definition_ids,
+            });
+        }
+    }
+
+    fn record_pending_capture_binding(
+        &mut self,
+        symbol: ScopedSymbolId,
+        definition_id: ScopedDefinitionId,
+    ) {
+        let current_scope = self.current_scope();
+        let name = self.place_tables[current_scope]
+            .symbol(symbol)
+            .name()
+            .clone();
+
+        let Some(captures) = self
+            .current_scope_info_mut()
+            .pending_captures
+            .get_mut(&name)
+        else {
+            return;
+        };
+
+        for capture in captures {
+            if capture.laziness.is_lazy() {
+                capture.binding_definition_ids.push(definition_id);
+            }
+        }
+    }
+
+    fn finish_pending_captures(
+        &mut self,
+        popped_scope_id: FileScopeId,
+        popped_scope_laziness: ScopeLaziness,
+        pending_captures: PendingCaptures,
+    ) -> Vec<UnresolvedCapture> {
+        let mut unresolved = Vec::new();
+
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "capture resolution and usage marking are order-independent"
+        )]
+        for (name, captures) in pending_captures {
+            for capture in captures {
+                if self.resolve_nested_reference_scope(capture.nested_scope, &name)
+                    == Some(popped_scope_id)
+                {
+                    self.use_def_maps[popped_scope_id]
+                        .mark_binding_definitions_used(capture.binding_definition_ids);
+                } else {
+                    unresolved.push(
+                        UnresolvedCapture {
+                            nested_scope: capture.nested_scope,
+                            name: name.clone(),
+                            laziness: capture.laziness,
+                        }
+                        .through_scope(popped_scope_laziness),
+                    );
+                }
+            }
+        }
+
+        for symbol in self.place_tables[popped_scope_id].symbols() {
+            if symbol.is_used() && !symbol.is_local() && !symbol.is_global() {
+                unresolved.push(UnresolvedCapture {
+                    nested_scope: popped_scope_id,
+                    name: symbol.name().clone(),
+                    laziness: popped_scope_laziness,
+                });
+            }
+        }
+
+        unresolved
     }
 
     // Records snapshots of the place states visible from the current lazy scope.
@@ -577,8 +702,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             // We don't record lazy snapshots of attributes or subscripts, because these are difficult to track as they modify.
             for nested_symbol in self.place_tables[popped_scope_id].symbols() {
-                let nested_symbol_name = nested_symbol.name();
-
                 // For the same reason, we don't snapshot bindings owned by `global`/`nonlocal`
                 // forwarding declarations here; `snapshot_enclosing_state` stores only a
                 // constraint for those symbols. Also, if the enclosing scope allows its members to
@@ -593,7 +716,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // Note that even if this place is bound in the popped scope,
                 // it may refer to the enclosing scope bindings
                 // so we also need to snapshot the bindings of the enclosing scope.
-                let Some(enclosed_symbol_id) = enclosing_place_table.symbol_id(nested_symbol_name)
+                let Some(enclosed_symbol_id) =
+                    enclosing_place_table.symbol_id(nested_symbol.name())
                 else {
                     continue;
                 };
@@ -601,7 +725,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 if !enclosing_place.is_bound() {
                     // If the bound scope of a place can be modified from elsewhere, the snapshot will not be recorded.
                     if self
-                        .bound_scope(enclosing_scope_id, nested_symbol_name.as_str())
+                        .bound_scope(enclosing_scope_id, nested_symbol)
                         .is_none_or(|scope| self.scopes[scope].visibility().is_public())
                     {
                         continue;
@@ -694,14 +818,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 {
                     self.use_def_maps[key.enclosing_scope]
                         .update_enclosing_snapshot(*snapshot_id, enclosing_symbol);
-
-                    if self
-                        .used_lazy_captures
-                        .contains(&(key.enclosing_scope, enclosing_symbol))
-                    {
-                        self.use_def_maps[key.enclosing_scope]
-                            .mark_symbol_bindings_used(enclosing_symbol);
-                    }
                 }
             }
         }
@@ -754,52 +870,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             })
     }
 
-    /// Marks outer bindings captured by the popped scope or any descendant scope as used.
-    ///
-    /// For lazy popped scopes, later reassignments can still reach the captured reference, so we
-    /// remember the captured symbol and mark future live bindings in `update_lazy_snapshots`.
-    fn mark_captured_bindings_used(
-        &mut self,
-        popped_scope_id: FileScopeId,
-        popped_scope_laziness: ScopeLaziness,
-    ) {
-        let mut used_captures = Vec::new();
-
-        for free_symbol_scope in self.scope_and_descendant_ids(popped_scope_id) {
-            for free_symbol in self.place_tables[free_symbol_scope].symbols() {
-                if !free_symbol.is_used() || free_symbol.is_local() || free_symbol.is_global() {
-                    continue;
-                }
-
-                let name = free_symbol.name();
-                let Some(enclosing_scope_id) =
-                    self.resolve_nested_reference_scope(free_symbol_scope, name.as_str())
-                else {
-                    continue;
-                };
-                let Some(enclosing_symbol_id) =
-                    self.place_tables[enclosing_scope_id].symbol_id(name)
-                else {
-                    continue;
-                };
-
-                used_captures.push((enclosing_scope_id, enclosing_symbol_id));
-            }
-        }
-
-        used_captures.sort_unstable();
-        used_captures.dedup();
-
-        for (enclosing_scope_id, enclosing_symbol_id) in used_captures {
-            self.use_def_maps[enclosing_scope_id].mark_symbol_bindings_used(enclosing_symbol_id);
-
-            if popped_scope_laziness.is_lazy() {
-                self.used_lazy_captures
-                    .insert((enclosing_scope_id, enclosing_symbol_id));
-            }
-        }
-    }
-
     /// Returns the `NestedGlobalOrNonlocalDeclarations` that are still visible to the enclosing
     /// scope, including those contributed by `global` and `nonlocal` keywords in the popped scope,
     /// but excluding nested `nonlocal`s that resolved to the popped scope.
@@ -811,6 +881,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             narrowing_aliases,
             mut nested_global_or_nonlocal_declarations,
             this_scope_global_or_nonlocal_declarations,
+            pending_captures,
             ..
         } = self
             .scope_stack
@@ -831,7 +902,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         } else {
             self.record_lazy_snapshots(popped_scope_id);
         }
-        self.mark_captured_bindings_used(popped_scope_id, popped_scope_laziness);
+
+        let unresolved_captures =
+            self.finish_pending_captures(popped_scope_id, popped_scope_laziness, pending_captures);
+        if !self.scope_stack.is_empty() {
+            for capture in unresolved_captures {
+                self.register_pending_capture(capture);
+            }
+        }
 
         // If we've popped the module scope, there is no enclosing scope that needs our nested
         // bindings. Short-circuit here and return an empty map.
@@ -1447,6 +1525,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.mark_place_declared(place);
         }
 
+        let definition_id = self.current_use_def_map().next_definition_id();
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
@@ -1473,10 +1552,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        if category.is_binding() {
-            if let Some(id) = place.as_symbol() {
-                self.update_lazy_snapshots(id);
-            }
+        if category.is_binding()
+            && let Some(id) = place.as_symbol()
+        {
+            self.record_pending_capture_binding(id, definition_id);
+            self.update_lazy_snapshots(id);
         }
 
         let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
