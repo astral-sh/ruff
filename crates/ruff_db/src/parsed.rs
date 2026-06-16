@@ -282,22 +282,24 @@ mod indexed {
         const KIND_BITS: u8 = 5;
         const KIND_MASK: u64 = (1 << Self::KIND_BITS) - 1;
 
-        fn from_collected(nodes: CollectedNodes) -> Self {
-            let CollectedNodes { addresses, kinds } = nodes;
-            debug_assert_eq!(addresses.len(), kinds.len());
-
-            let mut chunks = Vec::with_capacity(addresses.len().div_ceil(Self::CHUNK_LEN));
+        fn from_collected(nodes: CollectedNodes<'_>) -> Self {
+            let CollectedNodes { nodes } = nodes;
+            let mut chunks = Vec::with_capacity(nodes.len().div_ceil(Self::CHUNK_LEN));
             let mut words = Vec::new();
 
-            for (address_chunk, kind_chunk) in addresses
-                .chunks(Self::CHUNK_LEN)
-                .zip(kinds.chunks(Self::CHUNK_LEN))
-            {
-                let base = address_chunk.iter().copied().min().unwrap_or_default();
-                let max = address_chunk.iter().copied().max().unwrap_or_default();
-                let aligned = address_chunk
-                    .iter()
-                    .all(|address| address.is_multiple_of(Self::ALIGNMENT));
+            for node_chunk in nodes.chunks(Self::CHUNK_LEN) {
+                let (base, max, aligned) =
+                    node_chunk
+                        .iter()
+                        .fold((usize::MAX, 0, true), |(base, max, aligned), node| {
+                            let (_, pointer) = node.into_raw_parts();
+                            let address = pointer.as_ptr().expose_provenance();
+                            (
+                                base.min(address),
+                                max.max(address),
+                                aligned && address.is_multiple_of(Self::ALIGNMENT),
+                            )
+                        });
                 let offset_bits = usize::BITS - ((max - base) / Self::ALIGNMENT).leading_zeros();
                 let relative_bits = u8::try_from(offset_bits)
                     .expect("an address offset cannot require more than u8::MAX bits")
@@ -306,7 +308,7 @@ mod indexed {
                     .expect("indexed AST bitstream should fit in u32 words");
 
                 if aligned && relative_bits <= 64 {
-                    let entry_count = u8::try_from(address_chunk.len())
+                    let entry_count = u8::try_from(node_chunk.len())
                         .expect("an index chunk contains at most 64 entries");
                     chunks.push(IndexChunk {
                         base,
@@ -315,9 +317,9 @@ mod indexed {
                         entry_count,
                         layout: IndexChunkLayout::Relative,
                     });
-                    for (entry, (&address, &kind)) in
-                        address_chunk.iter().zip(kind_chunk).enumerate()
-                    {
+                    for (entry, node) in node_chunk.iter().enumerate() {
+                        let (kind, pointer) = node.into_raw_parts();
+                        let address = pointer.as_ptr().expose_provenance();
                         let offset = (address - base) / Self::ALIGNMENT;
                         let offset = u64::try_from(offset)
                             .expect("relative address offset was checked to fit in 64 bits");
@@ -330,7 +332,7 @@ mod indexed {
                     }
                 } else {
                     // Wide chunks store one address word per entry followed by packed node kinds.
-                    let entry_count = u8::try_from(address_chunk.len())
+                    let entry_count = u8::try_from(node_chunk.len())
                         .expect("an index chunk contains at most 64 entries");
                     chunks.push(IndexChunk {
                         base: 0,
@@ -339,14 +341,16 @@ mod indexed {
                         entry_count,
                         layout: IndexChunkLayout::Wide,
                     });
-                    words.extend(address_chunk.iter().map(|address| {
-                        u64::try_from(*address)
+                    words.extend(node_chunk.iter().map(|node| {
+                        let (_, pointer) = node.into_raw_parts();
+                        u64::try_from(pointer.as_ptr().expose_provenance())
                             .expect("AST node addresses should fit in a bitstream word")
                     }));
-                    for (entry, &kind) in kind_chunk.iter().enumerate() {
+                    for (entry, node) in node_chunk.iter().enumerate() {
+                        let (kind, _) = node.into_raw_parts();
                         Self::write_bits(
                             &mut words,
-                            (word_start as usize + address_chunk.len()) * 64
+                            (word_start as usize + node_chunk.len()) * 64
                                 + entry * usize::from(Self::KIND_BITS),
                             u64::from(kind as u8),
                             Self::KIND_BITS,
@@ -516,24 +520,23 @@ mod indexed {
     }
 
     #[derive(Default)]
-    struct CollectedNodes {
-        addresses: Vec<usize>,
-        kinds: Vec<RootNodeKind>,
+    struct CollectedNodes<'ast> {
+        nodes: Vec<AnyRootNodeRef<'ast>>,
     }
 
     /// A visitor that collects nodes in source order.
-    struct Visitor {
+    struct Visitor<'ast> {
         index: u32,
         max_index: u32,
-        nodes: Option<CollectedNodes>,
+        nodes: Option<CollectedNodes<'ast>>,
         overflowed: bool,
     }
 
-    impl Visitor {
-        fn visit_node<'a, T>(&mut self, node: &'a T)
+    impl<'ast> Visitor<'ast> {
+        fn visit_node<T>(&mut self, node: &'ast T)
         where
             T: HasNodeIndex,
-            AnyRootNodeRef<'a>: From<&'a T>,
+            AnyRootNodeRef<'ast>: From<&'ast T>,
         {
             // Only check on write (the maximum is orders of magnitude less than u32::MAX)
             if self.index > self.max_index {
@@ -543,15 +546,13 @@ mod indexed {
             }
 
             if let Some(nodes) = &mut self.nodes {
-                let (kind, pointer) = AnyRootNodeRef::from(node).into_raw_parts();
-                nodes.addresses.push(pointer.as_ptr().expose_provenance());
-                nodes.kinds.push(kind);
+                nodes.nodes.push(AnyRootNodeRef::from(node));
             }
             self.index += 1;
         }
     }
 
-    impl<'a> SourceOrderVisitor<'a> for Visitor {
+    impl<'a> SourceOrderVisitor<'a> for Visitor<'a> {
         #[inline]
         fn visit_stmt(&mut self, stmt: &'a Stmt) {
             self.visit_node(stmt);
@@ -752,14 +753,16 @@ class C[T](Base, metaclass=Meta):
                 overflowed: false,
             };
             AnyNodeRef::from(indexed.parsed.syntax()).visit_source_order(&mut visitor);
-            let CollectedNodes { addresses, kinds } = visitor
+            let CollectedNodes { nodes } = visitor
                 .nodes
                 .expect("test visitor should collect indexed nodes");
 
-            assert_eq!(indexed.index.len(), addresses.len());
+            assert_eq!(indexed.index.len(), nodes.len());
             let mut seen_kinds = [false; 1 << IndexedNodes::KIND_BITS];
 
-            for (raw_index, (address, kind)) in addresses.into_iter().zip(kinds).enumerate() {
+            for (raw_index, expected_node) in nodes.into_iter().enumerate() {
+                let (kind, pointer) = expected_node.into_raw_parts();
+                let address = pointer.as_ptr().expose_provenance();
                 let index = NodeIndex::from(
                     u32::try_from(raw_index).expect("node index should fit in u32"),
                 );
