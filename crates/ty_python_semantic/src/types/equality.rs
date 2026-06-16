@@ -257,7 +257,9 @@ fn comparison_result<'db>(
         ) => ComparisonResult::Ambiguous,
 
         (Type::Dynamic(_), other) => {
-            if !operator.condition_expects_equality(branch) && other.is_single_valued(db) {
+            if !operator.condition_expects_equality(branch)
+                && all_values_compare_equal(db, other, operator)
+            {
                 ComparisonResult::CanNarrow(
                     IntersectionBuilder::new(db)
                         .add_positive(left)
@@ -273,7 +275,9 @@ fn comparison_result<'db>(
         (Type::TypeVar(var), other) => match var.typevar(db).bound_or_constraints(db) {
             None => ComparisonResult::Ambiguous,
             Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
-                if !operator.condition_expects_equality(branch) && other.is_single_valued(db) {
+                if !operator.condition_expects_equality(branch)
+                    && all_values_compare_equal(db, other, operator)
+                {
                     ComparisonResult::CanNarrow(other.negate(db))
                 } else {
                     ComparisonResult::Ambiguous
@@ -396,6 +400,23 @@ fn comparison_result<'db>(
 
         _ => ComparisonResult::Ambiguous,
     }
+}
+
+/// Return whether every value represented by `ty` compares equal to every other represented value.
+///
+/// Dynamic and type-variable types are excluded to avoid recursive comparison through the special
+/// cases that call this helper.
+fn all_values_compare_equal<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    operator: ComparisonOperator,
+) -> bool {
+    let ty = ty.resolve_type_alias(db);
+    if matches!(ty, Type::Dynamic(_) | Type::TypeVar(_)) {
+        return false;
+    }
+    comparison_result(db, ty, ty, ComparisonBranch::Positive, operator)
+        == operator.result_from_equality(true)
 }
 
 /// Return whether `ty` is handled by [`builtin_literal_constraint`].

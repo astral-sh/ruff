@@ -286,15 +286,22 @@ def _(answer: CoupledInequality):
 
 ## Known built-in equality behavior
 
-`bool`, `LiteralString`, and `TypedDict` have known built-in equality behavior. Comparing two values
-with the same known behavior can therefore eliminate `None`:
+`bool`, `LiteralString`, `TypedDict`, and final classes that inherit `object.__eq__` have known
+built-in equality behavior. Comparing two values with the same known behavior can therefore
+eliminate disjoint union elements:
 
 ```py
-from typing import TypedDict
+from typing import TypedDict, final
 from typing_extensions import LiteralString
 
 class Payload(TypedDict):
     value: int
+
+@final
+class A: ...
+
+@final
+class B: ...
 
 def narrow_bool(value: bool | None, other: bool):
     if value == other:
@@ -318,6 +325,10 @@ def narrow_typed_dict(value: Payload | None, other: Payload):
         reveal_type(value)  # revealed: Payload
     else:
         reveal_type(value)  # revealed: Payload | None
+
+def narrow_final_object_equality(value: A | B, other: A):
+    if value == other:
+        reveal_type(value)  # revealed: A
 ```
 
 ## Comparisons with user-defined methods
