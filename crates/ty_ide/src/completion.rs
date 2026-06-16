@@ -43,7 +43,7 @@ pub fn completion<'db>(
     };
     let model = SemanticModel::new(db, file);
 
-    if context.cursor.is_in_string() {
+    if !matches!(context.kind, ContextKind::Keywords(_)) && context.cursor.is_in_string() {
         let Some(string_expr) = context.cursor.enclosing_string_literal_expr() else {
             return vec![];
         };
@@ -68,6 +68,11 @@ pub fn completion<'db>(
         query,
     );
     match context.kind {
+        ContextKind::Keywords(keywords) => {
+            for &keyword in keywords {
+                completions.add(CompletionBuilder::keyword(keyword).context_specific(true));
+            }
+        }
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
         }
@@ -654,6 +659,7 @@ struct Context<'m> {
 
 #[derive(Debug)]
 enum ContextKind<'m> {
+    Keywords(&'static [&'static str]),
     Import(ImportStatement<'m>),
     NonImport(ContextNonImport<'m>),
 }
@@ -675,11 +681,15 @@ impl<'m> Context<'m> {
         offset: TextSize,
     ) -> Option<Context<'m>> {
         let cursor = ContextCursor::new(parsed, source, offset);
-        if cursor.is_in_no_completions_place() {
+        if cursor.is_in_comment() {
             return None;
         }
 
-        let kind = if let Some(import) = ImportStatement::detect(db, file, &cursor) {
+        let kind = if let Some(keywords) = cursor.incomplete_keywords() {
+            ContextKind::Keywords(keywords)
+        } else if cursor.is_in_definition_place() {
+            return None;
+        } else if let Some(import) = ImportStatement::detect(db, file, &cursor) {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
@@ -699,7 +709,7 @@ impl<'m> Context<'m> {
         capabilities: CompletionCapabilities,
     ) -> CollectionContext<'db> {
         match self.kind {
-            ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Keywords(_) | ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
                 let complete_callable_parentheses = settings.complete_function_parentheses
@@ -832,11 +842,6 @@ impl<'m> ContextCursor<'m> {
     /// Convenience method for `covering_node(cursor.parsed.syntax().into(), ...)`.
     fn covering_node(&self, range: TextRange) -> CoveringNode<'m> {
         covering_node(self.parsed.syntax().into(), range)
-    }
-
-    /// Whether the last token is in a place where we should not provide completions.
-    fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_definition_place()
     }
 
     /// Whether the last token is within a comment or not.
@@ -995,6 +1000,130 @@ impl<'m> ContextCursor<'m> {
             }
             _ => false,
         })
+    }
+
+    /// Returns the last closing parenthesis surrounding `range`, if any.
+    fn closing_parenthesis(&self, range: TextRange, parent: AnyNodeRef) -> Option<&Token> {
+        let right_parentheses = self
+            .parsed
+            .tokens()
+            .in_range(TextRange::new(range.end(), parent.end()))
+            .iter()
+            .filter(|token| !token.kind().is_trivia())
+            .take_while(|token| token.kind() == TokenKind::Rpar);
+        let left_parentheses = self
+            .parsed
+            .tokens()
+            .before(range.start())
+            .iter()
+            .rev()
+            .filter(|token| !token.kind().is_trivia())
+            .take_while(|token| token.kind() == TokenKind::Lpar);
+
+        right_parentheses
+            .zip(left_parentheses)
+            .last()
+            .map(|(right, _)| right)
+    }
+
+    /// Returns the keywords that can follow `range` at the cursor position.
+    fn keywords_after_range(
+        &self,
+        range: TextRange,
+        parent: AnyNodeRef,
+        token: &Token,
+        keywords: &'static [&'static str],
+        parenthesized_keywords: &'static [&'static str],
+    ) -> Option<&'static [&'static str]> {
+        let range_ends_at_token = range.contains_range(token.range()) && range.end() == token.end();
+        match self.closing_parenthesis(range, parent) {
+            Some(right) if right.range() == token.range() => Some(keywords),
+            Some(_) if range_ends_at_token => Some(parenthesized_keywords),
+            None if range_ends_at_token => Some(keywords),
+            _ => None,
+        }
+    }
+
+    /// Returns no keywords if one of `keywords` is already the next non-trivia token.
+    fn unless_already_present(&self, keywords: &'static [&'static str]) -> &'static [&'static str] {
+        if self
+            .tokens_before
+            .last()
+            .is_some_and(|token| token.end() > self.offset)
+        {
+            return keywords;
+        }
+
+        let Some(next) = self
+            .parsed
+            .tokens()
+            .after(self.offset)
+            .iter()
+            .find(|token| !token.kind().is_trivia())
+        else {
+            return keywords;
+        };
+        if keywords.contains(&&self.source[next.range()]) {
+            &[]
+        } else {
+            keywords
+        }
+    }
+
+    /// Returns keywords when the cursor follows syntax that can only be
+    /// continued by those keywords.
+    fn incomplete_keywords(&self) -> Option<&'static [&'static str]> {
+        const IN: &[&str] = &["in"];
+
+        let preceding_token = |keyword: &str| {
+            let (tokens, start) = match self.typed {
+                Some(typed) if keyword.starts_with(typed) => (
+                    self.tokens_before.get(..self.tokens_before.len() - 1)?,
+                    self.range.start(),
+                ),
+                Some(_) => return None,
+                None => (self.tokens_before, self.offset),
+            };
+            let token = tokens
+                .iter()
+                .rev()
+                .find(|token| !token.kind().is_trivia())?;
+            if token.kind() == TokenKind::Newline
+                || token.end() >= start
+                || self
+                    .parsed
+                    .tokens()
+                    .in_range(TextRange::new(token.end(), start))
+                    .iter()
+                    .any(|token| !token.kind().is_trivia())
+            {
+                return None;
+            }
+            Some(token)
+        };
+
+        if let Some(token) = preceding_token("in")
+            && let Some(keywords) = self
+                .covering_node(token.range())
+                .ancestors()
+                .find_map(|node| match node {
+                    ast::AnyNodeRef::StmtFor(stmt) => {
+                        self.keywords_after_range(stmt.target.range(), node, token, IN, &[])
+                    }
+                    ast::AnyNodeRef::Comprehension(comprehension) => self.keywords_after_range(
+                        comprehension.target.range(),
+                        node,
+                        token,
+                        IN,
+                        &[],
+                    ),
+                    _ => None,
+                })
+        {
+            return Some(self.unless_already_present(keywords));
+        }
+
+        None
     }
 
     /// Returns the expected type when the cursor sits inside
@@ -7978,6 +8107,21 @@ match status:
     }
 
     #[test]
+    fn no_contextual_keywords_inside_parentheses() {
+        for (source, unexpected) in [("for (foo <CURSOR>) in items: pass", "in")] {
+            let builder = completion_test_builder(source);
+            assert!(
+                builder
+                    .build()
+                    .completions()
+                    .iter()
+                    .all(|completion| completion.name != unexpected),
+                "Expected completions for `{source}` to not include `{unexpected}`",
+            );
+        }
+    }
+
+    #[test]
     fn no_completions_in_empty_for_variable_binding() {
         let builder = completion_test_builder(
             "\
@@ -8001,6 +8145,45 @@ for foo<CURSOR>
             builder.build().snapshot(),
             @"<No completions found>",
         );
+    }
+
+    #[test]
+    fn for_target_suggests_in() {
+        for source in [
+            "for foo <CURSOR>",
+            "for foo i<CURSOR>",
+            "for foo in<CURSOR>",
+            "for (foo) <CURSOR>",
+            "for foo \\\n    <CURSOR>",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "in");
+        }
+    }
+
+    #[test]
+    fn comprehension_target_suggests_in() {
+        for source in [
+            "[x for x <CURSOR>]",
+            "(x for x <CURSOR>)",
+            "{x for x <CURSOR>}",
+            "{x: x for x <CURSOR>}",
+            "[x async for x <CURSOR>]",
+        ] {
+            assert_eq!(completion_test_builder(source).build().snapshot(), "in");
+        }
+    }
+
+    #[test]
+    fn no_completions_before_existing_contextual_keyword() {
+        for source in [
+            "for foo <CURSOR>in items: pass",
+            "[foo for foo <CURSOR>in items]",
+        ] {
+            assert_eq!(
+                completion_test_builder(source).build().snapshot(),
+                "<No completions found>"
+            );
+        }
     }
 
     #[test]
