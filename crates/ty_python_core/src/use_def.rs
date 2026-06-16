@@ -1278,6 +1278,11 @@ impl PendingReachability {
         Rc::make_mut(&mut pending.state)
     }
 
+    /// Returns the materialized place state for immutable access.
+    ///
+    /// Call this instead of [`Self::materialize`] when the state will only be read. If the pending
+    /// constraints are already materialized, this preserves the shared [`Rc`] instead of making
+    /// the state uniquely owned.
     fn materialize_ref<'a>(
         &self,
         pending: &'a mut PendingPlaceState,
