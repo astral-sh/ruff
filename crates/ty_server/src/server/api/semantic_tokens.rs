@@ -1,11 +1,9 @@
 use lsp_types::SemanticToken;
 use ruff_db::source::{line_index, source_text};
-use ruff_source_file::OneIndexed;
-use ruff_text_size::{Ranged, TextRange};
-use ty_ide::{SemanticTokenModifier, SemanticTokenType};
+use ruff_text_size::TextRange;
 use ty_project::ProjectDatabase;
 
-use crate::document::{PositionEncoding, ToRangeExt};
+use crate::document::PositionEncoding;
 
 /// Common logic for generating semantic tokens, either for full document or a specific range.
 /// If no range is provided, the entire file is processed.
@@ -18,28 +16,33 @@ pub(crate) fn generate_semantic_tokens(
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
 
-    // Notebooks require cell-local coordinate conversion, which is an LSP-server concern.
-    // For regular files, we can use the shared encoder from ty_ide.
+    let mut tokens =
+        ty_ide::encoded_semantic_tokens(db, file, range, encoding.into(), multiline_token_support)
+            .into_iter()
+            .map(convert_semantic_token)
+            .collect::<Vec<_>>();
+
     if source.as_notebook().is_some() {
-        generate_semantic_tokens_notebook(
-            db,
-            file,
-            range,
-            encoding,
-            multiline_token_support,
-        )
-    } else {
-        ty_ide::encoded_semantic_tokens(
-            db,
-            file,
-            range,
-            encoding.into(),
-            multiline_token_support,
-        )
-        .into_iter()
-        .map(convert_semantic_token)
-        .collect()
+        if let (Some(range), Some(first)) = (range, tokens.first_mut()) {
+            let line_index = line_index(db, file);
+            let cell_start_global_line = u32::try_from(
+                line_index
+                    .source_location(range.start(), source.as_str(), encoding.into())
+                    .line
+                    .to_zero_indexed(),
+            )
+            .unwrap_or(0);
+
+            // [Note]:
+            // 1. `ty_server` constrains `range` to the current cell's global offset at the request level.
+            // 2. Notebook responses must use cell-local coordinates.
+            // 3. `SemanticToken` uses delta encoding, so only the first token's `delta_line` (relative to line 0)
+            //    needs adjustment. All subsequent relative deltas remain correct because every token shifts by the same offset.
+            first.delta_line -= cell_start_global_line;
+        }
     }
+
+    tokens
 }
 
 fn convert_semantic_token(token: ty_ide::EncodedSemanticToken) -> SemanticToken {
@@ -49,129 +52,5 @@ fn convert_semantic_token(token: ty_ide::EncodedSemanticToken) -> SemanticToken 
         length: token.length,
         token_type: token.token_type,
         token_modifiers_bitset: token.token_modifiers_bitset,
-    }
-}
-
-fn generate_semantic_tokens_notebook(
-    db: &ProjectDatabase,
-    file: ruff_db::files::File,
-    range: Option<TextRange>,
-    encoding: PositionEncoding,
-    multiline_token_support: bool,
-) -> Vec<SemanticToken> {
-    let source = source_text(db, file);
-    let line_index = line_index(db, file);
-    let semantic_token_data = ty_ide::semantic_tokens(db, file, range);
-
-    let mut encoder = Encoder {
-        tokens: Vec::with_capacity(semantic_token_data.len()),
-        prev_line: 0,
-        prev_start: 0,
-    };
-
-    for token in &*semantic_token_data {
-        let Some(lsp_range) = token
-            .range()
-            .to_lsp_range(db, file, encoding)
-            .map(|lsp_range| lsp_range.local_range())
-        else {
-            continue;
-        };
-
-        if lsp_range.start.line == lsp_range.end.line {
-            let len = lsp_range.end.character - lsp_range.start.character;
-            encoder.push_token_at(lsp_range.start, len, token.token_type, token.modifiers);
-        } else if multiline_token_support {
-            // If the client supports multiline-tokens,
-            // compute the length of the entire range.
-            let mut len = 0;
-
-            for line in lsp_range.start.line..lsp_range.end.line {
-                let line_len = line_index.line_len(
-                    OneIndexed::from_zero_indexed(line as usize),
-                    &source,
-                    encoding.into(),
-                );
-
-                len += u32::try_from(line_len).unwrap();
-            }
-
-            // Subtract the first line because we added the length from the beginning.
-            len -= lsp_range.start.character;
-            // We didn't compute the length of the last line, add it now.
-            len += lsp_range.end.character;
-
-            encoder.push_token_at(lsp_range.start, len, token.token_type, token.modifiers);
-        } else {
-            // Multiline token but the client only supports single line tokens
-            // Push a token for each line.
-            for line in lsp_range.start.line..=lsp_range.end.line {
-                let start_character = if line == lsp_range.start.line {
-                    lsp_range.start.character
-                } else {
-                    0
-                };
-
-                let start = lsp_types::Position {
-                    line,
-                    character: start_character,
-                };
-
-                let end = if line == lsp_range.end.line {
-                    lsp_range.end.character
-                } else {
-                    let line_len = line_index.line_len(
-                        OneIndexed::from_zero_indexed(line as usize),
-                        &source,
-                        encoding.into(),
-                    );
-                    u32::try_from(line_len).unwrap()
-                };
-
-                let len = end - start.character;
-
-                encoder.push_token_at(start, len, token.token_type, token.modifiers);
-            }
-        }
-    }
-
-    encoder.tokens
-}
-
-struct Encoder {
-    tokens: Vec<SemanticToken>,
-    prev_line: u32,
-    prev_start: u32,
-}
-
-impl Encoder {
-    fn push_token_at(
-        &mut self,
-        start: lsp_types::Position,
-        length: u32,
-        ty: SemanticTokenType,
-        modifiers: SemanticTokenModifier,
-    ) {
-        // LSP semantic tokens are encoded as deltas
-        let delta_line = start.line - self.prev_line;
-        let delta_start = if delta_line == 0 {
-            start.character - self.prev_start
-        } else {
-            start.character
-        };
-
-        let token_type = ty as u32;
-        let token_modifiers = modifiers.bits();
-
-        self.tokens.push(SemanticToken {
-            delta_line,
-            delta_start,
-            length,
-            token_type,
-            token_modifiers_bitset: token_modifiers,
-        });
-
-        self.prev_line = start.line;
-        self.prev_start = start.character;
     }
 }
