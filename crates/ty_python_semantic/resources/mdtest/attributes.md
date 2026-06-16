@@ -2933,6 +2933,39 @@ class ProjectionTuple:
         reveal_type(self.x)  # revealed: tuple[int]
 ```
 
+The same recovery works for multiple tuple elements:
+
+```py
+class ProjectionTuplePair:
+    def __init__(self) -> None:
+        self.x = (0, "")
+
+    def read(self, items) -> None:
+        x, y = self.x
+        while x < len(items):
+            self.x = (x, y)
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+```
+
+For a homogeneous list, unpack projections recover the list's element type:
+
+```py
+class ProjectionList:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self, items) -> None:
+        x, = self.x
+        while x < len(items):
+            if x:
+                x += 1
+                break
+            self.x = [x]
+
+        reveal_type(self.x)  # revealed: list[int]
+```
+
 If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
 
 ```py
