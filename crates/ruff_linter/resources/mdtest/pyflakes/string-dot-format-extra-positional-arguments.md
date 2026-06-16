@@ -17,7 +17,7 @@ print("{x}".format("!"))  # snapshot: string-dot-format-extra-positional-argumen
 ```
 
 ```snapshot
-error[string-dot-format-extra-positional-arguments]: `.format` call has unused arguments at position(s): 0
+error[F523]: `.format` call has unused arguments at position(s): 0
  --> src/mdtest_snippet.py:1:7
   |
 1 | print("{{".format("!"))  # snapshot: string-dot-format-extra-positional-arguments
@@ -29,7 +29,7 @@ help: Remove extra positional arguments at position(s): 0
 2 | print("{x}".format("!"))  # snapshot: string-dot-format-extra-positional-arguments
 
 
-error[string-dot-format-extra-positional-arguments]: `.format` call has unused arguments at position(s): 0
+error[F523]: `.format` call has unused arguments at position(s): 0
  --> src/mdtest_snippet.py:2:7
   |
 2 | print("{x}".format("!"))  # snapshot: string-dot-format-extra-positional-arguments

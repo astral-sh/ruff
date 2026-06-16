@@ -36,7 +36,7 @@ def foo(): ...
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:4:1
   |
 4 | "{x}".format(x=foo())  # snapshot: f-string
@@ -61,7 +61,7 @@ an opening parenthesis, or a comment. A leading empty literal is left in place i
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:1:1
   |
 1 | "" "{}".format(x)  # snapshot: f-string
@@ -80,7 +80,7 @@ help: Convert to f-string
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:2:1
   |
 2 | "a" "" "{}".format(x)  # snapshot: f-string
@@ -103,7 +103,7 @@ x = ("" "{}").format(value)  # snapshot: f-string
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:3:5
   |
 3 | x = ("" "{}").format(value)  # snapshot: f-string
@@ -130,7 +130,7 @@ foo(
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:5:5
   |
 5 | /     ""  # snapshot: f-string
@@ -156,7 +156,7 @@ y = ("" "").format(value)  # snapshot: f-string
 ```
 
 ```snapshot
-error[f-string]: Use f-string instead of `format` call
+error[UP032]: Use f-string instead of `format` call
  --> src/mdtest_snippet.py:9:5
   |
 9 | y = ("" "").format(value)  # snapshot: f-string

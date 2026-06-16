@@ -22,7 +22,7 @@ def my_scoped_autouse_fixture():
 ```
 
 ```snapshot
-error[pytest-fixture-autouse]: Avoid using `autouse=True` in `pytest.fixture` decorators
+error[RUF076]: Avoid using `autouse=True` in `pytest.fixture` decorators
  --> src/mdtest_snippet.py:4:17
   |
 4 | @pytest.fixture(autouse=True)  # snapshot: pytest-fixture-autouse

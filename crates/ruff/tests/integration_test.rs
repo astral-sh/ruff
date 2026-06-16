@@ -920,7 +920,7 @@ fn full_output_preview() {
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -949,7 +949,7 @@ preview = true
     success: false
     exit_code: 1
     ----- stdout -----
-    E741 Ambiguous variable name: `l`
+    ambiguous-variable-name: Ambiguous variable name: `l`
      --> -:1:1
       |
     1 | l = 1
@@ -2430,7 +2430,7 @@ select = ["RUF017"]
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
@@ -2471,7 +2471,7 @@ unfixable = ["RUF"]
     success: false
     exit_code: 1
     ----- stdout -----
-    RUF017 Avoid quadratic list summation
+    quadratic-list-summation: Avoid quadratic list summation
      --> -:3:1
       |
     1 | x = [1, 2, 3]
