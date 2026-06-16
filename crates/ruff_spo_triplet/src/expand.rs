@@ -665,12 +665,6 @@ impl Expander {
     }
 }
 
-/// Resolve Rails' `delegate ..., prefix: <value>` option to the actual
-/// method-name prefix that gets exposed on the caller class.
-///
-/// - `prefix: true` → use `d.to` as the prefix (the most common case).
-/// - `prefix: :owner` / `prefix: "owner"` → use `"owner"` literally.
-/// - `prefix: false` / no `prefix:` option → `None` (no rename).
 /// Resolve the Rails type annotation from `AttrDecl::options`.
 ///
 /// The extractor stores the type-positional Sym (e.g. the `:integer`
@@ -1528,9 +1522,8 @@ mod tests {
         });
         g.models.push(wp);
         let triples = expand(&g);
-        let has = |s: &str, p: &str, o: &str| {
-            triples.iter().any(|t| t.s == s && t.p == p && t.o == o)
-        };
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
         assert!(has(
             "openproject:WorkPackage",
             "has_attribute",

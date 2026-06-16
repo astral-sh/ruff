@@ -221,7 +221,7 @@ pub enum Predicate {
     /// `:decimal`). Authoritative-grade because the type symbol is a
     /// machine-readable AST literal. Downstream consumers
     /// (e.g. `op-surreal-ast::from_triples`) map the rails-type
-    /// string to a SurrealQL `Kind` variant.
+    /// string to a `SurrealQL` `Kind` variant.
     FieldType,
 
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
