@@ -2883,10 +2883,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                             let star_import_predicate = self.add_predicate(star_import.into());
 
-                            let associated_member_ids = self.place_tables[self.current_scope()]
+                            let scope = self.current_scope();
+                            let associated_member_ids = self.place_tables[scope]
                                 .associated_place_ids(ScopedPlaceId::Symbol(symbol_id));
-                            let pre_definition = self
-                                .current_use_def_map()
+                            let pre_definition = self.use_def_maps[scope]
                                 .single_symbol_snapshot(symbol_id, associated_member_ids);
 
                             let pre_definition_reachability =
