@@ -50,8 +50,9 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`.
 
-Instances of `SubclassOfAny` retain their nominal type and declared members, but are gradually
-assignable to arbitrary types. Values of other types are not assignable to `SubclassOfAny`.
+Instances of direct and indirect subclasses of `Any` retain their nominal type and declared members,
+but are gradually assignable to arbitrary types. This assignability is one-way: an arbitrary value
+is not assignable to either subclass.
 
 ```py
 from typing import Any
@@ -61,11 +62,14 @@ class SubclassOfAny(Any): ...
 class IndirectSubclass(SubclassOfAny): ...
 
 reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
+reveal_mro(IndirectSubclass)  # revealed: (<class 'IndirectSubclass'>, <class 'SubclassOfAny'>, Any, <class 'object'>)
 reveal_type(SubclassOfAny())  # revealed: SubclassOfAny
 reveal_type(IndirectSubclass())  # revealed: IndirectSubclass
 
-x: SubclassOfAny = 1  # error: [invalid-assignment]
-y: int = SubclassOfAny()
+not_a_direct_instance: SubclassOfAny = 1  # error: [invalid-assignment]
+not_an_indirect_instance: IndirectSubclass = 1  # error: [invalid-assignment]
+direct_as_int: int = SubclassOfAny()
+indirect_as_int: int = IndirectSubclass()
 ```
 
 This includes final classes:
@@ -124,27 +128,33 @@ x: FinalClass = B()
 y: Literal[1] = B()
 ```
 
-A class with a base whose type is `Any` or `Unknown` is different. Its instances retain the ordinary
-nominal type of the class, but the dynamic MRO entry makes them gradually assignable to non-final
-types:
+A base expression whose inferred type is `Any` or `Unknown` does not count as explicitly inheriting
+from `Any`. The dynamic MRO entry makes instances assignable to non-final classes, but unlike an
+explicit `Any` base, not to final or literal types:
 
 ```py
+from typing import Any, Literal, final
 from ty_extensions import Unknown
 
 class Arbitrary: ...
 
-def check_dynamic_base(any_base: Any):
-    class FromAnyValue(any_base): ...
-    class IndirectDynamicSubclass(FromAnyValue): ...
-    class FromUnknown(Unknown): ...
+@final
+class FinalClass: ...
 
-    reveal_type(FromAnyValue())  # revealed: FromAnyValue
-    reveal_type(IndirectDynamicSubclass())  # revealed: IndirectDynamicSubclass
-    reveal_type(FromUnknown())  # revealed: FromUnknown
+def check_dynamic_base(base: Any):
+    class DynamicBase(base): ...
+    class IndirectSubclass(DynamicBase): ...
 
-    x: int = FromAnyValue()
-    y: Arbitrary = IndirectDynamicSubclass()
-    z: Arbitrary = FromUnknown()
+    reveal_type(DynamicBase())  # revealed: DynamicBase
+    ordinary: Arbitrary = IndirectSubclass()
+    final: FinalClass = DynamicBase()  # error: [invalid-assignment]
+    literal: Literal[1] = DynamicBase()  # error: [invalid-assignment]
+
+class FromUnknown(Unknown): ...
+
+reveal_type(FromUnknown())  # revealed: FromUnknown
+ordinary_unknown: Arbitrary = FromUnknown()
+final_unknown: FinalClass = FromUnknown()  # error: [invalid-assignment]
 ```
 
 A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:
