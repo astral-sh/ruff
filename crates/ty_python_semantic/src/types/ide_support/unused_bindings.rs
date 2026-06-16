@@ -559,6 +559,69 @@ mod tests {
     }
 
     #[test]
+    fn closure_use_does_not_mark_shadowed_binding_used() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 1
+                x = 2
+
+                def inner():
+                    return x
+
+                return inner
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let first_x_start = TextSize::try_from(source.find("x = 1").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(first_x_start, first_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn skips_binding_captured_by_comprehension_in_nested_function() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer() -> None:
+                a = 1
+
+                def inner() -> list[int]:
+                    return [a + x for x in [1, 2, 3]]
+
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_parameter_captured_by_nested_comprehension() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def foo(i: int):
+                def bar():
+                    return [[k for k in range(i)] for _ in range(2)]
+
+                return bar
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
     fn closure_uses_nearest_shadowed_binding() -> anyhow::Result<()> {
         let source = dedent(
             "
@@ -586,6 +649,58 @@ mod tests {
                 name: Name::new("x"),
             }]
         );
+        Ok(())
+    }
+
+    #[test]
+    fn closure_uses_later_shadowing_binding() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                x = 0
+
+                def mid():
+                    def inner():
+                        return x
+
+                    x = 1
+                    return inner
+
+                return mid
+            ",
+        );
+
+        let bindings = collect_unused_bindings(&source)?;
+        let outer_x_start = TextSize::try_from(source.find("x = 0").unwrap()).unwrap();
+        assert_eq!(
+            bindings,
+            vec![UnusedBinding {
+                range: TextRange::new(outer_x_start, outer_x_start + TextSize::new(1)),
+                name: Name::new("x"),
+            }]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_comprehension_capture_uses_intermediate_rebindings() -> anyhow::Result<()> {
+        let source = dedent(
+            "
+            def outer():
+                a = 1
+
+                def inner():
+                    return [a for _ in range(1)]
+
+                a = 2
+                inner()
+                a = 3
+                return inner
+            ",
+        );
+
+        let names = collect_unused_names(&source)?;
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 

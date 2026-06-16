@@ -2058,17 +2058,20 @@ impl<'db> UseDefMapBuilder<'db> {
         debug_assert_eq!(use_id, new_use);
     }
 
-    pub(super) fn mark_enclosing_snapshot_bindings_used(
-        &mut self,
-        snapshot_id: ScopedEnclosingSnapshotId,
-    ) {
-        let Some(EnclosingSnapshot::Bindings(bindings)) = self.enclosing_snapshots.get(snapshot_id)
-        else {
-            return;
-        };
+    pub(super) fn symbol_binding_definition_ids(
+        &self,
+        symbol: ScopedSymbolId,
+    ) -> impl Iterator<Item = ScopedDefinitionId> + '_ {
+        self.symbol_states[symbol]
+            .bindings()
+            .iter()
+            .map(LiveBinding::binding)
+    }
 
-        let binding_definition_ids: Vec<ScopedDefinitionId> =
-            bindings.iter().map(LiveBinding::binding).collect();
+    pub(super) fn mark_binding_definitions_used(
+        &mut self,
+        binding_definition_ids: impl IntoIterator<Item = ScopedDefinitionId>,
+    ) {
         self.mark_definition_ids_used(binding_definition_ids);
     }
 
