@@ -2160,7 +2160,7 @@ impl<'db> Type<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        if nested && self.same_divergent_marker(div) {
+        if nested && self.same_divergent_marker(db, div) {
             return None;
         }
         match self {

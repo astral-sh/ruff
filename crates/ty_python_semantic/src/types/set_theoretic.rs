@@ -369,7 +369,7 @@ impl<'db> UnionType<'db> {
             if nested {
                 // list[T | Divergent] => list[Divergent]
                 let ty = ty.recursive_type_normalized_impl(db, div, nested)?;
-                if ty.same_divergent_marker(div) {
+                if ty.same_divergent_marker(db, div) {
                     return Some(ty);
                 }
                 builder = builder.add(ty);
@@ -377,7 +377,7 @@ impl<'db> UnionType<'db> {
             } else {
                 // `Divergent` in a union type does not mean true divergence, so we skip it if not nested.
                 // e.g. T | Divergent == T | (T | (T | (T | ...))) == T
-                if (*ty).same_divergent_marker(div) {
+                if (*ty).same_divergent_marker(db, div) {
                     builder = builder.recursively_defined(RecursivelyDefined::Yes);
                     continue;
                 }

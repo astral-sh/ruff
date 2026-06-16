@@ -603,7 +603,7 @@ impl<'db> BoundSuperType<'db> {
             Type::Never => SuperOwnerKind::Dynamic(DynamicType::Unknown),
             Type::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
             Type::Divergent(divergent) => SuperOwnerKind::Divergent(divergent),
-            Type::CycleProjection(projection) => SuperOwnerKind::Divergent(projection.root()),
+            Type::CycleProjection(projection) => SuperOwnerKind::Divergent(projection.root(db)),
             Type::ClassLiteral(class) => SuperOwnerKind::Resolved(Self::resolve_class_super_owner(
                 db,
                 pivot_class,
