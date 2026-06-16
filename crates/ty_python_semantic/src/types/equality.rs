@@ -1031,12 +1031,6 @@ impl KnownComparisonSemantics {
         instance: Type<'db>,
         operator: ComparisonOperator,
     ) -> Option<Self> {
-        if let Some(nominal) = instance.as_nominal_instance()
-            && enum_metadata(db, nominal.class_literal(db)).is_some()
-        {
-            return Self::of_enum(db, instance, operator);
-        }
-
         let class = instance.to_meta_type(db);
         let dunder = lookup_dunder(db, class, operator.dunder());
 
@@ -1061,59 +1055,6 @@ impl KnownComparisonSemantics {
             }
         }
         None
-    }
-
-    /// Return an enum's inherited scalar or identity comparison implementation.
-    ///
-    /// Custom enum comparison methods make the result unknown.
-    fn of_enum<'db>(
-        db: &'db dyn Db,
-        instance: Type<'db>,
-        operator: ComparisonOperator,
-    ) -> Option<Self> {
-        let base_semantics = if instance.is_subtype_of(db, KnownClass::Str.to_instance(db)) {
-            Self::Str
-        } else if instance.is_subtype_of(db, KnownClass::Int.to_instance(db)) {
-            Self::Int
-        } else if instance.is_subtype_of(db, KnownClass::Bytes.to_instance(db)) {
-            Self::Bytes
-        } else {
-            Self::Object
-        };
-
-        let class = instance.to_meta_type(db);
-        let has_custom_dunder = |name| {
-            let dunder = class.member_lookup_with_policy(
-                db,
-                Name::new_static(name),
-                MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK
-                    | MemberLookupPolicy::MRO_NO_INT_OR_STR_LOOKUP,
-            );
-            if dunder.place.is_undefined() {
-                return false;
-            }
-            if base_semantics == Self::Bytes
-                && dunder == lookup_dunder(db, KnownClass::Bytes.to_class_literal(db), name)
-            {
-                return false;
-            }
-            true
-        };
-
-        match operator {
-            ComparisonOperator::Equality => {
-                (!has_custom_dunder("__eq__")).then_some(base_semantics)
-            }
-            ComparisonOperator::Inequality => {
-                if has_custom_dunder("__ne__")
-                    || (base_semantics == Self::Object && has_custom_dunder("__eq__"))
-                {
-                    None
-                } else {
-                    Some(base_semantics)
-                }
-            }
-        }
     }
 }
 
