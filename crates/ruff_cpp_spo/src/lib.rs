@@ -228,10 +228,16 @@ fn collect_cpp_files(dir: &Path, out: &mut Vec<std::path::PathBuf>) {
         return;
     };
     for entry in rd.filter_map(Result::ok) {
+        // Use the entry's OWN file type (does NOT follow symlinks). A directory
+        // symlink to an ancestor (`sub/loop -> ..`) would otherwise recurse
+        // forever via `Path::is_dir()`'s follow. Symlinks are skipped — a
+        // source corpus's TUs are real files — which breaks all cycles without
+        // canonicalize bookkeeping (codex P2, PR #14).
+        let Ok(ft) = entry.file_type() else { continue };
         let path = entry.path();
-        if path.is_dir() {
+        if ft.is_dir() {
             collect_cpp_files(&path, out);
-        } else if is_cpp_source(&path) {
+        } else if ft.is_file() && is_cpp_source(&path) {
             out.push(path);
         }
     }
@@ -845,6 +851,43 @@ class Recognizer : public Classify {
             "extract_dir must NOT recurse: {dnames:?}"
         );
 
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    /// A directory symlink to an ancestor (`sub/loop -> base`) must NOT send
+    /// `extract_tree` into an unbounded recurse — symlinks are skipped via the
+    /// entry's own file type, not `Path::is_dir()`'s follow (codex P2, PR #14).
+    /// Unix-only (symlink creation).
+    #[cfg(unix)]
+    #[test]
+    fn extract_tree_skips_directory_symlink_cycles() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let base = std::env::temp_dir().join("ruff_cpp_spo_symlink_fixture");
+        let sub = base.join("sub");
+        let _ = std::fs::remove_dir_all(&base);
+        std::fs::create_dir_all(&sub).expect("mkdir");
+        std::fs::write(base.join("real.h"), "namespace S { class Real {}; }").expect("write");
+        // sub/loop -> base : a cycle that `Path::is_dir()` would follow forever.
+        std::os::unix::fs::symlink(&base, sub.join("loop")).expect("symlink");
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+        ];
+        // Must terminate (no infinite recurse / path exhaustion) AND still find
+        // the real class.
+        let graph = extract_tree(&base, &args).expect("libclang init");
+        assert!(
+            graph.models.iter().any(|m| m.name == "S::Real"),
+            "expected S::Real: {:?}",
+            graph
+                .models
+                .iter()
+                .map(|m| m.name.as_str())
+                .collect::<Vec<_>>()
+        );
         let _ = std::fs::remove_dir_all(&base);
     }
 }
