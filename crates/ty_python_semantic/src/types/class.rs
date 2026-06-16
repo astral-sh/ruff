@@ -2179,11 +2179,9 @@ impl<'c, 'db> TypeRelationChecker<'_, 'c, 'db> {
                     }
                     TypeRelation::Assignability => ConstraintSet::from_bool(
                         self.constraints,
-                        (!source
-                            .class_literal(db)
-                            .as_static()
-                            .is_some_and(|source| source.inherits_from_dynamic_base(db))
-                            && !target.is_final(db))
+                        (!source.class_literal(db).as_static().is_some_and(|source| {
+                            source.inherits_from_dynamic_base(db) && !source.inherits_from_any(db)
+                        }) && !target.is_final(db))
                             || target.is_object(db),
                     ),
                 },

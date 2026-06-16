@@ -299,6 +299,7 @@ def test(x: Any, cls: type[Any]):
     class Foo(x): ...
     class Bar(Any): ...
     class Baz(cls): ...
+    class Mixed(Bar, x): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
     static_assert(not is_assignable_to(TypeOf[Foo], type[int]))
@@ -314,9 +315,15 @@ def test(x: Any, cls: type[Any]):
     static_assert(not is_assignable_to(TypeOf[Baz], type[int]))
     static_assert(is_assignable_to(TypeOf[Baz], type[Any]))
 
+    static_assert(is_assignable_to(TypeOf[Mixed], Any))
+    static_assert(is_assignable_to(TypeOf[Mixed], type))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[int]))
+    static_assert(is_assignable_to(TypeOf[Mixed], type[Any]))
+
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
     static_assert(not is_assignable_to(TypeOf[Baz], int))
+    static_assert(not is_assignable_to(TypeOf[Mixed], int))
 ```
 
 The direct `Any` base can materialize to any subtype of `type`.
