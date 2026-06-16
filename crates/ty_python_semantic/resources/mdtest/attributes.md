@@ -2966,6 +2966,63 @@ class ProjectionList:
         reveal_type(self.x)  # revealed: list[int]
 ```
 
+Projection recovery works for other known generic containers:
+
+```py
+from collections import deque
+from collections.abc import Mapping
+
+class ProjectionSet:
+    def __init__(self) -> None:
+        self.x = {0}
+
+    def read(self) -> None:
+        x, = self.x
+        self.x = {x}
+
+        reveal_type(self.x)  # revealed: set[int]
+
+class ProjectionDict:
+    def __init__(self) -> None:
+        self.x = {0: ""}
+
+    def read(self) -> None:
+        for key in self.x:
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: dict[int, str]
+
+class ProjectionDictValue:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        x, = self.x
+        self.x = {"value": x}
+
+        reveal_type(self.x)  # revealed: dict[str, int | str]
+
+class ProjectionDeque:
+    def __init__(self, values: deque[int]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for item in self.x:
+            self.x = deque([item])
+
+        reveal_type(self.x)  # revealed: deque[int]
+
+class ProjectionMapping:
+    def __init__(self, values: Mapping[int, str]) -> None:
+        self.x = values
+
+    def read(self) -> None:
+        for key in self.x:
+            self.x = {key: ""}
+
+        reveal_type(self.x)  # revealed: Mapping[int, str]
+```
+
 Different container wrappers can share the same unpack projection:
 
 ```py

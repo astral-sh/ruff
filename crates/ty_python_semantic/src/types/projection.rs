@@ -283,12 +283,8 @@ impl<'db> Type<'db> {
             return Some(Type::heterogeneous_tuple(db, elements));
         }
 
-        if let Some(specialization) = self.known_specialization(db, KnownClass::List) {
-            let [element] = specialization.types(db) else {
-                return None;
-            };
-            let element = element.replace_solved_projection_artifacts(db, root, solved_ops)?;
-            return Some(KnownClass::List.to_specialized_instance(db, &[element]));
+        if let Some(container) = ProjectionContainer::from_type(db, self) {
+            return container.into_type(db, root, solved_ops);
         }
 
         let mut paths = Vec::new();
@@ -367,8 +363,13 @@ impl<'db> Type<'db> {
 
 #[derive(Debug, Clone)]
 enum ProjectionContainer<'db> {
-    FixedTuple { elements: Vec<Type<'db>> },
-    List { element: Type<'db> },
+    FixedTuple {
+        elements: Vec<Type<'db>>,
+    },
+    Known {
+        class: KnownClass,
+        arguments: Vec<Type<'db>>,
+    },
 }
 
 impl<'db> ProjectionContainer<'db> {
@@ -382,11 +383,14 @@ impl<'db> ProjectionContainer<'db> {
             });
         }
 
-        if let Some(specialization) = ty.known_specialization(db, KnownClass::List) {
-            let [element] = specialization.types(db) else {
-                return None;
-            };
-            return Some(Self::List { element: *element });
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && Self::known_container_iter_item_type(known_class, specialization.types(db)).is_some()
+        {
+            return Some(Self::Known {
+                class: known_class,
+                arguments: specialization.types(db).to_vec(),
+            });
         }
 
         None
@@ -404,7 +408,11 @@ impl<'db> ProjectionContainer<'db> {
                     Type::collect_projection_ops(db, root, *element, paths);
                 }
             }
-            Self::List { element } => Type::collect_projection_ops(db, root, *element, paths),
+            Self::Known { arguments, .. } => {
+                for argument in arguments {
+                    Type::collect_projection_ops(db, root, *argument, paths);
+                }
+            }
         }
     }
 
@@ -428,7 +436,7 @@ impl<'db> ProjectionContainer<'db> {
             Self::FixedTuple { elements } => {
                 Type::heterogeneous_tuple(db, elements.iter().copied())
             }
-            Self::List { element } => KnownClass::List.to_specialized_instance(db, &[*element]),
+            Self::Known { class, arguments } => class.to_specialized_instance(db, arguments),
         };
         Self::project_type_path(db, ty, path.ops(db))
     }
@@ -464,11 +472,12 @@ impl<'db> ProjectionContainer<'db> {
             ));
         }
 
-        if let Some(specialization) = ty.known_specialization(db, KnownClass::List) {
-            let [element] = specialization.types(db) else {
-                return None;
-            };
-            return Some(ProjectionTerm::Homogeneous(*element));
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_iter_item_type(known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Homogeneous(element));
         }
 
         None
@@ -491,11 +500,12 @@ impl<'db> ProjectionContainer<'db> {
             return Some(ProjectionTerm::Exact(tuple.iter_all_elements().nth(index)?));
         }
 
-        if let Some(specialization) = ty.known_specialization(db, KnownClass::List) {
-            let [element] = specialization.types(db) else {
-                return None;
-            };
-            return Some(ProjectionTerm::Homogeneous(*element));
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_iter_item_type(known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Homogeneous(element));
         }
 
         None
@@ -518,11 +528,47 @@ impl<'db> ProjectionContainer<'db> {
 
                 Some(Type::heterogeneous_tuple(db, elements))
             }
-            Self::List { element } => {
-                let element = element.replace_solved_projection_artifacts(db, root, solved_ops)?;
-                Some(KnownClass::List.to_specialized_instance(db, &[element]))
+            Self::Known { class, arguments } => {
+                let arguments = arguments
+                    .into_iter()
+                    .map(|argument| {
+                        argument.replace_solved_projection_artifacts(db, root, solved_ops)
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+                Some(class.to_specialized_instance(db, arguments))
             }
         }
+    }
+
+    fn known_container_iter_item_type(
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        // Keep this to sync iteration; `CycleProjectionOp` does not record the iteration mode.
+        let index = match class {
+            KnownClass::List
+            | KnownClass::Set
+            | KnownClass::FrozenSet
+            | KnownClass::Deque
+            | KnownClass::Iterable
+            | KnownClass::Iterator
+            | KnownClass::Sequence
+            | KnownClass::TyExtensionsIterable
+            | KnownClass::TyExtensionsIterator => 0,
+
+            KnownClass::Dict
+            | KnownClass::DefaultDict
+            | KnownClass::OrderedDict
+            | KnownClass::ChainMap
+            | KnownClass::Counter
+            | KnownClass::Mapping => 0,
+
+            KnownClass::Generator => 0,
+
+            _ => return None,
+        };
+
+        arguments.get(index).copied()
     }
 }
 
