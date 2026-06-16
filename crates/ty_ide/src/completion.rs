@@ -770,6 +770,25 @@ struct ContextCursor<'m> {
     covering_node: CoveringNode<'m>,
 }
 
+/// The cursor position relative to an AST range and its surrounding parentheses.
+enum RangeEndPosition {
+    After,
+    InsideParentheses,
+}
+
+impl RangeEndPosition {
+    fn keywords(
+        self,
+        after: &'static [&'static str],
+        inside_parentheses: &'static [&'static str],
+    ) -> &'static [&'static str] {
+        match self {
+            RangeEndPosition::After => after,
+            RangeEndPosition::InsideParentheses => inside_parentheses,
+        }
+    }
+}
+
 impl<'m> ContextCursor<'m> {
     /// Returns information about the context of the cursor.
     fn new(
@@ -1026,20 +1045,18 @@ impl<'m> ContextCursor<'m> {
             .map(|(right, _)| right)
     }
 
-    /// Returns the keywords that can follow `range` at the cursor position.
-    fn keywords_after_range(
+    /// Returns the cursor position after `range`, accounting for surrounding parentheses.
+    fn range_end_position(
         &self,
         range: TextRange,
         parent: AnyNodeRef,
         token: &Token,
-        keywords: &'static [&'static str],
-        parenthesized_keywords: &'static [&'static str],
-    ) -> Option<&'static [&'static str]> {
+    ) -> Option<RangeEndPosition> {
         let range_ends_at_token = range.contains_range(token.range()) && range.end() == token.end();
         match self.closing_parenthesis(range, parent) {
-            Some(right) if right.range() == token.range() => Some(keywords),
-            Some(_) if range_ends_at_token => Some(parenthesized_keywords),
-            None if range_ends_at_token => Some(keywords),
+            Some(right) if right.range() == token.range() => Some(RangeEndPosition::After),
+            Some(_) if range_ends_at_token => Some(RangeEndPosition::InsideParentheses),
+            None if range_ends_at_token => Some(RangeEndPosition::After),
             _ => None,
         }
     }
@@ -1077,6 +1094,7 @@ impl<'m> ContextCursor<'m> {
         const AS: &[&str] = &["as"];
         const IF: &[&str] = &["if"];
         const MATCH: &[&str] = &["as", "if"];
+        const NONE: &[&str] = &[];
 
         let preceding_token = |keyword: &str| {
             let (tokens, start) = match self.typed {
@@ -1110,16 +1128,12 @@ impl<'m> ContextCursor<'m> {
                 .covering_node(token.range())
                 .ancestors()
                 .find_map(|node| match node {
-                    ast::AnyNodeRef::StmtFor(stmt) => {
-                        self.keywords_after_range(stmt.target.range(), node, token, IN, &[])
-                    }
-                    ast::AnyNodeRef::Comprehension(comprehension) => self.keywords_after_range(
-                        comprehension.target.range(),
-                        node,
-                        token,
-                        IN,
-                        &[],
-                    ),
+                    ast::AnyNodeRef::StmtFor(stmt) => self
+                        .range_end_position(stmt.target.range(), node, token)
+                        .map(|position| position.keywords(IN, NONE)),
+                    ast::AnyNodeRef::Comprehension(comprehension) => self
+                        .range_end_position(comprehension.target.range(), node, token)
+                        .map(|position| position.keywords(IN, NONE)),
                     _ => None,
                 })
         {
@@ -1133,14 +1147,15 @@ impl<'m> ContextCursor<'m> {
                 .find_map(|node| match node {
                     ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
                         let range = item.context_expr.range();
-                        self.keywords_after_range(range, item.into(), token, AS, &[])
-                            .or_else(|| self.keywords_after_range(range, node, token, AS, AS))
+                        self.range_end_position(range, item.into(), token)
+                            .map(|position| position.keywords(AS, NONE))
+                            .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
                     }),
-                    ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
-                        handler.type_.as_deref().and_then(|type_| {
-                            self.keywords_after_range(type_.range(), node, token, AS, &[])
-                        })
-                    }
+                    ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
+                        .type_
+                        .as_deref()
+                        .and_then(|type_| self.range_end_position(type_.range(), node, token))
+                        .map(|position| position.keywords(AS, NONE)),
                     _ => None,
                 })
         {
@@ -1162,22 +1177,18 @@ impl<'m> ContextCursor<'m> {
                             ..
                         }) => {
                             if name.is_valid()
-                                && let Some(keywords) = self.keywords_after_range(
-                                    case.pattern.range(),
-                                    node,
-                                    token,
-                                    IF,
-                                    &[],
-                                )
+                                && let Some(position) =
+                                    self.range_end_position(case.pattern.range(), node, token)
                             {
-                                Some(keywords)
+                                Some(position.keywords(IF, NONE))
                             } else {
-                                self.keywords_after_range(pattern.range(), node, token, MATCH, AS)
+                                self.range_end_position(pattern.range(), node, token)
+                                    .map(|position| position.keywords(MATCH, AS))
                             }
                         }
-                        pattern => {
-                            self.keywords_after_range(pattern.range(), node, token, MATCH, AS)
-                        }
+                        pattern => self
+                            .range_end_position(pattern.range(), node, token)
+                            .map(|position| position.keywords(MATCH, AS)),
                     }
                 })
         {
