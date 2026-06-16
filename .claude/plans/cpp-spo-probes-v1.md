@@ -131,3 +131,38 @@ CPP-SCHEMA-FIT (real corpus) → CPP-AST-RT → CPP-TEMPLATE-DET
   until `CPP-SCHEMA-FIT` (real corpus) is green — a harvester that silently
   drops constructs would produce an incomplete IR, and every downstream Rust
   file generated from it would inherit the gap.
+
+---
+
+## Update — 2026-06-16 (walker landed, first real-corpus walk RUN)
+
+The libclang walker (`ruff_cpp_spo::walk_tu`, feature `libclang`) is now
+implemented and tested against **real libclang-18**. Status moves:
+
+- **`CPP-SCHEMA-FIT` — hermetic half: GREEN** (unchanged). Plus a new
+  **real-corpus smoke RUN**: walking `tesseract-ocr/tesseract@5.5.0`
+  `src/ccutil/unicharset.h` extracted **16 `tesseract::` classes**
+  (`UNICHARSET`, `UNICHAR`, `TessBaseAPI`, `PageIterator`, `CHAR_FRAGMENT`,
+  …) after filtering system-header classes. (Before the system-header filter
+  the same TU surfaced 235 classes — 219 of them std/libc internals; the
+  filter is mandatory and now in the walker.) The **full** `CPP-SCHEMA-FIT`
+  (coverage % + histogram over a representative corpus subset, with real
+  per-TU include resolution) is still PENDING — the smoke proves the
+  pipeline, not the coverage bar.
+- **`CPP-AST-RT` — still PENDING.** The per-TU walk is deterministic in
+  principle (no RNG), but the byte-identical-rerun + JSON-dump-path-parity
+  measurement has NOT been run yet.
+- **`CPP-TEMPLATE-DET` — still PENDING + not yet emitted.** The walker does
+  not populate templates yet (walker follow-up; IR + predicates exist).
+
+### Walker scope vs. follow-ups (as landed)
+
+Extracted from real parsing today: classes/structs (namespace + nested
+qualification), bases (access + virtual), member fields, methods with
+pure-virtual / noexcept / fully-qualified-`override` / operator flags →
+exercises `inherits_from`, `has_field`, `has_function`, `rdf:type`,
+`virtually_overrides`, `defines_operator`, `is_pure_virtual`, `is_noexcept`.
+**Walker follow-ups** (predicates + IR already shipped in PR #8; only the
+walker doesn't populate them): `constexpr`/`consteval` + `requires` (need a
+token pass — not in the high-level `clang` API), templates, `friend`,
+macro-expansion provenance, `static_assert`. None require a vocab change.
