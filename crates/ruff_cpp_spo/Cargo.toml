@@ -31,5 +31,11 @@ clang = { version = "2", optional = true, default-features = false, features = [
 # Enables the real libclang walker (`walk_tu`). Off by default.
 libclang = ["dep:clang"]
 
+# The harvest example needs the libclang walker; `required-features` keeps a
+# plain `cargo build --all-targets` (no features) from trying to compile it.
+[[example]]
+name = "harvest_unicharset"
+required-features = ["libclang"]
+
 [lints]
 workspace = true
