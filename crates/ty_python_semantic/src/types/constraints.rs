@@ -1216,6 +1216,28 @@ pub(crate) struct Constraint<'db> {
     pub(crate) bounds: ConstraintBounds<'db>,
 }
 
+fn constraint_mentions_bound_typevar<'db>(
+    db: &'db dyn Db,
+    builder: &ConstraintSetBuilder<'db>,
+    constraint: ConstraintId,
+    bound_typevar: BoundTypeVarIdentity<'db>,
+) -> bool {
+    let mentions_typevar = |ty: Type<'db>| match ty {
+        Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+        _ => false,
+    };
+    let constraint = builder.constraint_data(constraint);
+    constraint.typevar.identity(db) == bound_typevar
+        || constraint
+            .bounds
+            .lower
+            .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
+        || constraint
+            .bounds
+            .upper
+            .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
+}
+
 /// The explicit lower and upper bounds inferred for a typevar on one constraint path.
 ///
 /// Missing bounds are represented as `None`; callers can materialize them to the logical defaults
@@ -2741,6 +2763,19 @@ impl NodeId {
         builder: &ConstraintSetBuilder<'db>,
         bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
+        let mut bound_typevars: SmallVec<[_; 8]> = bound_typevars.into_iter().collect();
+        // Existential quantifiers commute, so remove the typevars that appear in the most
+        // constraints first. That tends to shrink the BDD earlier and leaves absent typevars for
+        // the cheap no-op path in `exists_one`.
+        bound_typevars.sort_by_key(|bound_typevar| {
+            let mut matching_constraints = 0usize;
+            self.for_each_unique_constraint(builder, &mut |constraint, _| {
+                if constraint_mentions_bound_typevar(db, builder, constraint, *bound_typevar) {
+                    matching_constraints += 1;
+                }
+            });
+            std::cmp::Reverse(matching_constraints)
+        });
         bound_typevars
             .into_iter()
             .fold(self, |abstracted, bound_typevar| {
@@ -3789,41 +3824,29 @@ impl InteriorNode {
         }
         drop(storage);
 
-        let mentions_typevar = |ty: Type<'db>| match ty {
-            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
-            _ => false,
-        };
+        // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound that
+        // mentions `bound_typevar`. The sequent map ensures that derived facts are propagated for
+        // nested typevar references, using the variance of the typevar's position to determine the
+        // correct substitution.
+        let mut should_remove =
+            |constraint| constraint_mentions_bound_typevar(db, builder, constraint, bound_typevar);
+
+        let mut removes_any_constraint = false;
+        self.node()
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                removes_any_constraint |= should_remove(constraint);
+            });
+        // Quantifying a typevar that doesn't appear in the BDD is a no-op. Avoid the full
+        // path-sensitive abstraction, which can be expensive on large BDDs.
+        if !removes_any_constraint {
+            let result = self.node();
+            let mut storage = builder.storage.borrow_mut();
+            storage.exists_one_cache.insert(key, result);
+            return result;
+        }
+
         let mut path = self.path_assignments(builder);
-        let result = self.abstract_one_inner(
-            db,
-            builder,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
-            // that mentions `bound_typevar`. The sequent map ensures that derived facts are
-            // propagated for nested typevar references, using the variance of the typevar's
-            // position to determine the correct substitution.
-            &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                if constraint.typevar.identity(db) == bound_typevar {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .lower
-                    .is_some_and(|lower| any_over_type(db, lower, false, mentions_typevar))
-                {
-                    return true;
-                }
-                if constraint
-                    .bounds
-                    .upper
-                    .is_some_and(|upper| any_over_type(db, upper, false, mentions_typevar))
-                {
-                    return true;
-                }
-                false
-            },
-            &mut path,
-        );
+        let result = self.abstract_one_inner(db, builder, &mut should_remove, &mut path);
 
         let mut storage = builder.storage.borrow_mut();
         storage.exists_one_cache.insert(key, result);
@@ -3836,37 +3859,43 @@ impl InteriorNode {
         builder: &ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'db>,
     ) -> NodeId {
-        let mut path = self.path_assignments(builder);
         let is_bare_inferable_typevar = |ty: Type<'db>| {
             ty.as_typevar()
                 .is_some_and(|bound_typevar| bound_typevar.is_inferable(db, inferable))
         };
-        self.abstract_one_inner(
-            db,
-            builder,
-            // We only want to keep constraints on inferable typevars. If the constraint's typevar
-            // is itself inferable, we keep it. We also need to keep some constraints in
-            // non-inferable typevars, if their lower or upper bound is a bare inferable typevar.
-            // This ensure that our quantification logic does not depend on typevar ordering.
-            //
-            // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
-            // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we
-            // only checked the inferability of the constrained typevar, we would keep the first
-            // encoding but remove the second.
-            &mut |constraint| {
-                let constraint = builder.constraint_data(constraint);
-                !constraint.typevar.is_inferable(db, inferable)
-                    && !constraint
-                        .bounds
-                        .lower
-                        .is_some_and(is_bare_inferable_typevar)
-                    && !constraint
-                        .bounds
-                        .upper
-                        .is_some_and(is_bare_inferable_typevar)
-            },
-            &mut path,
-        )
+        // We only want to keep constraints on inferable typevars. If the constraint's typevar is
+        // itself inferable, we keep it. We also need to keep some constraints in non-inferable
+        // typevars, if their lower or upper bound is a bare inferable typevar. This ensures that
+        // our quantification logic does not depend on typevar ordering.
+        //
+        // For example, `I ≤ N` (where I is inferable and N is non-inferable) could be encoded
+        // either as `Never ≤ I ≤ N` or `I ≤ N ≤ object`, depending on typevar ordering. If we only
+        // checked the inferability of the constrained typevar, we would keep the first encoding but
+        // remove the second.
+        let mut should_remove = |constraint| {
+            let constraint = builder.constraint_data(constraint);
+            !constraint.typevar.is_inferable(db, inferable)
+                && !constraint
+                    .bounds
+                    .lower
+                    .is_some_and(is_bare_inferable_typevar)
+                && !constraint
+                    .bounds
+                    .upper
+                    .is_some_and(is_bare_inferable_typevar)
+        };
+
+        let mut removes_any_constraint = false;
+        self.node()
+            .for_each_unique_constraint(builder, &mut |constraint, _| {
+                removes_any_constraint |= should_remove(constraint);
+            });
+        if !removes_any_constraint {
+            return self.node();
+        }
+
+        let mut path = self.path_assignments(builder);
+        self.abstract_one_inner(db, builder, &mut should_remove, &mut path)
     }
 
     fn abstract_one_inner<'db>(
@@ -7023,6 +7052,21 @@ mod tests {
         // iff(T, ¬T) == false
         let negated = tdd.negate(&db, &builder);
         assert!(tdd.iff(&db, &builder, negated).is_never_satisfied(&db));
+    }
+
+    #[test]
+    fn deferred_quantification_of_absent_typevar_is_noop() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let u_deferred = create_typevar_set(&db, u);
+        let builder = ConstraintSetBuilder::new();
+        let t_int = create_constraint(&db, &builder, t, KnownClass::Int)
+            .with_deferred_quantification(&db, &builder, u_deferred);
+
+        let applied = t_int.apply_deferred_quantification(&db, &builder);
+
+        assert_eq!(applied.node, t_int.node);
     }
 
     #[test]
