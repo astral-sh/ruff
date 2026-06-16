@@ -9,9 +9,10 @@
 use std::collections::BTreeSet;
 
 use crate::ir::{
-    ActsAs, AssocDecl, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef, Delegation, DslCall,
-    DynMethod, GemDsl, GemKind, Model, ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef,
-    Validation, ValidationKind,
+    ActsAs, AssocDecl, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef, ConstexprKind,
+    CppBase, CppField, CppFriend, CppMacroUse, CppMethod, CppStaticAssert, CppTemplate,
+    CppTemplateKind, Delegation, DslCall, DynMethod, GemDsl, GemKind, Model, ModelGraph, ScopeDecl,
+    ScopeKind, StiInfo, UsingRef, Validation, ValidationKind,
 };
 use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 
@@ -251,6 +252,30 @@ impl Expander {
         if let Some(sti) = &model.sti {
             self.sti(&model_iri, sti);
         }
+
+        // ───── C++ machine-plane ─────
+
+        for base in &model.bases {
+            self.cpp_base(ns, &model_iri, base);
+        }
+        for field in &model.member_fields {
+            self.cpp_field(&model_iri, field);
+        }
+        for method in &model.methods {
+            self.cpp_method(ns, &model_iri, method);
+        }
+        for tpl in &model.templates {
+            self.cpp_template(&model_iri, tpl);
+        }
+        for fr in &model.friends {
+            self.cpp_friend(&model_iri, fr);
+        }
+        for mu in &model.macro_uses {
+            self.cpp_macro_use(&model_iri, mu);
+        }
+        for sa in &model.static_asserts {
+            self.cpp_static_assert(&model_iri, sa);
+        }
     }
 
     fn association(&mut self, model_iri: &str, a: &AssocDecl) {
@@ -308,10 +333,9 @@ impl Expander {
             ConcernKind::IncludedBlock => (Predicate::ConcernIncludedBlock, Provenance::Structural),
         };
         let o = match cr.kind {
-            ConcernKind::ClassMethodsBlock | ConcernKind::IncludedBlock => cr
-                .body_ref
-                .clone()
-                .unwrap_or_else(|| "<block>".to_string()),
+            ConcernKind::ClassMethodsBlock | ConcernKind::IncludedBlock => {
+                cr.body_ref.clone().unwrap_or_else(|| "<block>".to_string())
+            }
             _ => cr.module.clone(),
         };
         self.push(model_iri.to_string(), pred, o, prov);
@@ -482,6 +506,150 @@ impl Expander {
         let _ = sti.abstract_class;
         let _ = &sti.inheritance_column;
     }
+
+    // ───── C++ machine-plane arms ─────
+
+    fn cpp_base(&mut self, ns: &str, model_iri: &str, base: &CppBase) {
+        // Access specifier + virtual-inheritance flag are carried on the IR
+        // (CppBase) but NOT emitted — the object stays a clean base-class
+        // IRI for graph traversal (mirrors `association` dropping AssocKind).
+        let _ = base.access;
+        let _ = base.virtual_base;
+        self.push(
+            model_iri.to_string(),
+            Predicate::InheritsFrom,
+            format!("{ns}:{}", base.name),
+            Provenance::CppExtracted,
+        );
+    }
+
+    fn cpp_field(&mut self, model_iri: &str, field: &CppField) {
+        let field_iri = format!("{model_iri}.{}", field.name);
+        // Structural classification, then the ownership edge.
+        self.push(
+            field_iri.clone(),
+            Predicate::RdfType,
+            EntityKind::Property.iri().to_string(),
+            Provenance::Structural,
+        );
+        let _ = &field.type_name; // carried on IR for catalog consumers
+        self.push(
+            model_iri.to_string(),
+            Predicate::HasField,
+            field_iri,
+            Provenance::CppExtracted,
+        );
+    }
+
+    fn cpp_method(&mut self, ns: &str, model_iri: &str, method: &CppMethod) {
+        let method_iri = format!("{model_iri}.{}", method.name);
+        // Universal classification — same shape the core 7 give a Function.
+        self.push(
+            method_iri.clone(),
+            Predicate::RdfType,
+            EntityKind::Function.iri().to_string(),
+            Provenance::Structural,
+        );
+        self.push(
+            model_iri.to_string(),
+            Predicate::HasFunction,
+            method_iri.clone(),
+            Provenance::Structural,
+        );
+        // Property flags → method-property predicates.
+        if method.is_pure_virtual {
+            self.push(
+                method_iri.clone(),
+                Predicate::IsPureVirtual,
+                "true".to_string(),
+                Provenance::CppExtracted,
+            );
+        }
+        if let Some(kind) = method.constexpr_kind {
+            let marker = match kind {
+                ConstexprKind::Constexpr => "constexpr",
+                ConstexprKind::Consteval => "consteval",
+            };
+            self.push(
+                method_iri.clone(),
+                Predicate::IsConstexpr,
+                marker.to_string(),
+                Provenance::CppExtracted,
+            );
+        }
+        if method.is_noexcept {
+            self.push(
+                method_iri.clone(),
+                Predicate::IsNoexcept,
+                "true".to_string(),
+                Provenance::CppExtracted,
+            );
+        }
+        if let Some(base_method) = &method.overrides {
+            self.push(
+                method_iri.clone(),
+                Predicate::VirtuallyOverrides,
+                format!("{ns}:{base_method}"),
+                Provenance::CppExtracted,
+            );
+        }
+        if let Some(op) = &method.operator_kind {
+            self.push(
+                method_iri.clone(),
+                Predicate::DefinesOperator,
+                op.clone(),
+                Provenance::CppExtracted,
+            );
+        }
+        if let Some(req) = &method.requires_clause {
+            // Last potential use of `method_iri` — move, don't clone.
+            self.push(
+                method_iri,
+                Predicate::RequiresConcept,
+                req.clone(),
+                Provenance::CppExtracted,
+            );
+        }
+    }
+
+    fn cpp_template(&mut self, model_iri: &str, tpl: &CppTemplate) {
+        let (pred, prov) = match tpl.kind {
+            CppTemplateKind::Specialisation => {
+                (Predicate::TemplateSpecialises, Provenance::CppExtracted)
+            }
+            CppTemplateKind::Instantiation => {
+                (Predicate::TemplateInstantiates, Provenance::Inferred)
+            }
+        };
+        self.push(model_iri.to_string(), pred, tpl.name.clone(), prov);
+    }
+
+    fn cpp_friend(&mut self, model_iri: &str, fr: &CppFriend) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::IsFriendOf,
+            fr.name.clone(),
+            Provenance::Structural,
+        );
+    }
+
+    fn cpp_macro_use(&mut self, model_iri: &str, mu: &CppMacroUse) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::UsesMacroExpansion,
+            format!("{}<={}", mu.identifier, mu.macro_name),
+            Provenance::Inferred,
+        );
+    }
+
+    fn cpp_static_assert(&mut self, model_iri: &str, sa: &CppStaticAssert) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::StaticAsserts,
+            sa.condition.clone(),
+            Provenance::CppExtracted,
+        );
+    }
 }
 
 /// Resolve Rails' `delegate ..., prefix: <value>` option to the actual
@@ -519,7 +687,10 @@ fn delegate_prefix(d: &Delegation) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{AssocKind, Field, Function, Model};
+    use crate::ir::{
+        AssocKind, CppAccess, CppBase, CppField, CppFriend, CppMacroUse, CppMethod,
+        CppStaticAssert, CppTemplate, CppTemplateKind, Field, Function, Model,
+    };
 
     /// A minimal account_move-shaped graph mirroring the Odoo fixture used
     /// in `lance_graph::graph::spo::action_emitter`.
@@ -816,7 +987,8 @@ mod tests {
     #[test]
     fn ar_shape_emits_declares_association() {
         let triples = expand(&ar_fixture());
-        let has = |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
         assert!(has(
             "openproject:WorkPackage",
             "declares_association",
@@ -832,14 +1004,26 @@ mod tests {
     #[test]
     fn ar_shape_emits_validates_and_normalizes() {
         let triples = expand(&ar_fixture());
-        assert!(triples.iter().any(|t| t.p == "validates_constraint" && t.o == "subject"));
-        assert!(triples.iter().any(|t| t.p == "normalizes_attribute" && t.o == "email"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "validates_constraint" && t.o == "subject")
+        );
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "normalizes_attribute" && t.o == "email")
+        );
     }
 
     #[test]
     fn ar_shape_emits_callback_with_phase_in_object() {
         let triples = expand(&ar_fixture());
-        assert!(triples.iter().any(|t| t.p == "has_callback" && t.o == "before_save:set_default_status"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "has_callback" && t.o == "before_save:set_default_status")
+        );
     }
 
     #[test]
@@ -856,8 +1040,13 @@ mod tests {
     #[test]
     fn ar_shape_concern_blocks_carry_structural_truth() {
         let triples = expand(&ar_fixture());
-        let truth =
-            |p: &str| triples.iter().find(|t| t.p == p).map(|t| (t.f, t.c)).unwrap();
+        let truth = |p: &str| {
+            triples
+                .iter()
+                .find(|t| t.p == p)
+                .map(|t| (t.f, t.c))
+                .unwrap()
+        };
         assert_eq!(truth("concern_class_methods"), (1.0, 1.0));
         assert_eq!(truth("concern_included_block"), (1.0, 1.0));
     }
@@ -948,18 +1137,38 @@ mod tests {
     #[test]
     fn ar_shape_emits_acts_as_with_variant_and_options() {
         let triples = expand(&ar_fixture());
-        assert!(triples.iter().any(|t| t.p == "acts_as" && t.o.starts_with("list:")));
-        assert!(triples.iter().any(|t| t.p == "acts_as" && t.o == "watchable"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "acts_as" && t.o.starts_with("list:"))
+        );
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "acts_as" && t.o == "watchable")
+        );
     }
 
     #[test]
     fn ar_shape_routes_dsl_calls_by_name() {
         let triples = expand(&ar_fixture());
         // Promoted predicates carry just the args (not the name).
-        assert!(triples.iter().any(|t| t.p == "registers_journal_formatter" && t.o == ":diff,:custom"));
-        assert!(triples.iter().any(|t| t.p == "registers_journal_formatted_fields" && t.o == ":subject"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "registers_journal_formatter" && t.o == ":diff,:custom")
+        );
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "registers_journal_formatted_fields" && t.o == ":subject")
+        );
         // Catch-all carries name(args).
-        assert!(triples.iter().any(|t| t.p == "has_dsl_call" && t.o == "activity_provider_for(:work_packages)"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "has_dsl_call" && t.o == "activity_provider_for(:work_packages)")
+        );
     }
 
     #[test]
@@ -982,9 +1191,17 @@ mod tests {
     #[test]
     fn ar_shape_emits_refinement_and_sti() {
         let triples = expand(&ar_fixture());
-        assert!(triples.iter().any(|t| t.p == "uses_refinement" && t.o == "OpenProject::DateRange"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "uses_refinement" && t.o == "OpenProject::DateRange")
+        );
         // STI → includes_module to parent.
-        assert!(triples.iter().any(|t| t.p == "includes_module" && t.o == "Issue"));
+        assert!(
+            triples
+                .iter()
+                .any(|t| t.p == "includes_module" && t.o == "Issue")
+        );
     }
 
     #[test]
@@ -1044,6 +1261,221 @@ mod tests {
                 "AR-shape predicate `{p}` was not emitted by the fixture — \
                  D-AR-2 expand match arm missing",
             );
+        }
+    }
+
+    // ────────────────── C++ machine-plane tests ──────────────────
+
+    /// A `Tesseract::Recognizer`-shaped model exercising every C++ match
+    /// arm. The expand half of the `CppClass → Triple` round-trip the
+    /// `ruff_cpp_spo` locked-shape test mirrors.
+    fn cpp_fixture() -> ModelGraph {
+        let mut rec = Model::new("Tesseract::Recognizer");
+        rec.bases.push(CppBase {
+            name: "Tesseract::Classify".to_string(),
+            access: CppAccess::Public,
+            virtual_base: false,
+        });
+        rec.member_fields.push(CppField {
+            name: "recognizer_".to_string(),
+            type_name: "std::unique_ptr<LSTMRecognizer>".to_string(),
+        });
+        rec.methods.push(CppMethod {
+            name: "Recognize".to_string(),
+            is_pure_virtual: false,
+            constexpr_kind: None,
+            is_noexcept: true,
+            overrides: Some("Classify.Recognize".to_string()),
+            operator_kind: None,
+            requires_clause: None,
+        });
+        rec.methods.push(CppMethod {
+            name: "Clear".to_string(),
+            is_pure_virtual: true,
+            constexpr_kind: None,
+            is_noexcept: false,
+            overrides: None,
+            operator_kind: None,
+            requires_clause: None,
+        });
+        rec.methods.push(CppMethod {
+            name: "kMaxRating".to_string(),
+            is_pure_virtual: false,
+            constexpr_kind: Some(ConstexprKind::Constexpr),
+            is_noexcept: false,
+            overrides: None,
+            operator_kind: None,
+            requires_clause: None,
+        });
+        rec.methods.push(CppMethod {
+            name: "operator==".to_string(),
+            is_pure_virtual: false,
+            constexpr_kind: None,
+            is_noexcept: false,
+            overrides: None,
+            operator_kind: Some("operator==".to_string()),
+            requires_clause: Some("std::equality_comparable<T>".to_string()),
+        });
+        rec.templates.push(CppTemplate {
+            kind: CppTemplateKind::Specialisation,
+            name: "GenericVector<int>".to_string(),
+        });
+        rec.templates.push(CppTemplate {
+            kind: CppTemplateKind::Instantiation,
+            name: "GenericVector<float>".to_string(),
+        });
+        rec.friends.push(CppFriend {
+            name: "TessdataManager".to_string(),
+        });
+        rec.macro_uses.push(CppMacroUse {
+            identifier: "BOOL_MEMBER".to_string(),
+            macro_name: "INT_MEMBER".to_string(),
+        });
+        rec.static_asserts.push(CppStaticAssert {
+            condition: "sizeof(int) == 4".to_string(),
+        });
+        ModelGraph {
+            namespace: "cpp".to_string(),
+            models: vec![rec],
+        }
+    }
+
+    #[test]
+    fn cpp_classifies_class_fields_and_methods() {
+        let triples = expand(&cpp_fixture());
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        // Class + member + method classification (reuses the core arms).
+        assert!(has(
+            "cpp:Tesseract::Recognizer",
+            "rdf:type",
+            "ogit:ObjectType"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer.recognizer_",
+            "rdf:type",
+            "ogit:Property"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer.Recognize",
+            "rdf:type",
+            "ogit:Function"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer",
+            "has_function",
+            "cpp:Tesseract::Recognizer.Recognize"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer",
+            "has_field",
+            "cpp:Tesseract::Recognizer.recognizer_"
+        ));
+    }
+
+    #[test]
+    fn cpp_emits_inheritance_as_clean_base_iri() {
+        let triples = expand(&cpp_fixture());
+        assert!(triples.iter().any(|t| {
+            t.s == "cpp:Tesseract::Recognizer"
+                && t.p == "inherits_from"
+                && t.o == "cpp:Tesseract::Classify"
+        }));
+    }
+
+    #[test]
+    fn cpp_emits_every_method_property_predicate() {
+        let triples = expand(&cpp_fixture());
+        let has = |p: &str, o: &str| triples.iter().any(|t| t.p == p && t.o == o);
+        assert!(has("is_noexcept", "true"));
+        assert!(has("is_pure_virtual", "true"));
+        assert!(has("is_constexpr", "constexpr"));
+        assert!(has("virtually_overrides", "cpp:Classify.Recognize"));
+        assert!(has("defines_operator", "operator=="));
+        assert!(has("requires_concept", "std::equality_comparable<T>"));
+    }
+
+    #[test]
+    fn cpp_emits_templates_friends_macros_static_asserts() {
+        let triples = expand(&cpp_fixture());
+        let has = |p: &str, o: &str| triples.iter().any(|t| t.p == p && t.o == o);
+        assert!(has("template_specialises", "GenericVector<int>"));
+        assert!(has("template_instantiates", "GenericVector<float>"));
+        assert!(has("is_friend_of", "TessdataManager"));
+        assert!(has("uses_macro_expansion", "BOOL_MEMBER<=INT_MEMBER"));
+        assert!(has("static_asserts", "sizeof(int) == 4"));
+    }
+
+    #[test]
+    fn cpp_truth_tiers_match_calibration() {
+        let triples = expand(&cpp_fixture());
+        let truth = |p: &str| triples.iter().find(|t| t.p == p).map(|t| (t.f, t.c));
+        // CppExtracted default
+        assert_eq!(truth("inherits_from"), Some((0.95, 0.82)));
+        assert_eq!(truth("has_field"), Some((0.95, 0.82)));
+        // Structural per-edge override
+        assert_eq!(truth("is_friend_of"), Some((1.0, 1.0)));
+        // Inferred per-edge overrides
+        assert_eq!(truth("uses_macro_expansion"), Some((0.85, 0.75)));
+        assert_eq!(truth("template_instantiates"), Some((0.85, 0.75)));
+    }
+
+    /// Every C++ machine-plane predicate fires from the fixture — the C++
+    /// analog of `ar_shape_emits_every_ar_predicate`.
+    #[test]
+    fn cpp_emits_every_cpp_predicate() {
+        let triples = expand(&cpp_fixture());
+        let seen: BTreeSet<&str> = triples.iter().map(|t| t.p.as_str()).collect();
+        for p in [
+            "inherits_from",
+            "has_field",
+            "template_specialises",
+            "template_instantiates",
+            "virtually_overrides",
+            "is_friend_of",
+            "defines_operator",
+            "uses_macro_expansion",
+            "is_pure_virtual",
+            "is_constexpr",
+            "is_noexcept",
+            "requires_concept",
+            "static_asserts",
+        ] {
+            assert!(
+                seen.contains(p),
+                "C++ predicate `{p}` was not emitted by the fixture — expand arm missing",
+            );
+        }
+    }
+
+    /// The Python/Ruby fixtures must emit ZERO C++ predicates — the C++
+    /// sibling Vecs default empty, so no cross-language leakage occurs.
+    #[test]
+    fn non_cpp_fixtures_emit_no_cpp_predicates() {
+        let cpp_predicates = [
+            "inherits_from",
+            "has_field",
+            "template_specialises",
+            "template_instantiates",
+            "virtually_overrides",
+            "is_friend_of",
+            "defines_operator",
+            "uses_macro_expansion",
+            "is_pure_virtual",
+            "is_constexpr",
+            "is_noexcept",
+            "requires_concept",
+            "static_asserts",
+        ];
+        for graph in [fixture(), ar_fixture()] {
+            let triples = expand(&graph);
+            for t in &triples {
+                assert!(
+                    !cpp_predicates.contains(&t.p.as_str()),
+                    "non-C++ fixture leaked C++ predicate `{}`",
+                    t.p,
+                );
+            }
         }
     }
 }
