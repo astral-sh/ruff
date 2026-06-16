@@ -2914,6 +2914,25 @@ class C:
 reveal_type(C().x)  # revealed: int
 ```
 
+Unpacking a cyclic fixed-length tuple attribute and assigning it back to the same shape should
+preserve the productive element type:
+
+```py
+class ProjectionTuple:
+    def __init__(self) -> None:
+        self.x = (0,)
+
+    def read(self, items) -> None:
+        x, = self.x
+        while x < len(items):
+            if x:
+                x += 1
+                break
+            self.x = (x,)
+
+        reveal_type(self.x)  # revealed: tuple[int]
+```
+
 If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
 
 ```py

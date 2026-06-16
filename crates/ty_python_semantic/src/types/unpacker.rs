@@ -73,6 +73,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
 
         let value_type = value_inference.expression_type(value_expr);
+        let allow_cycle_projection = matches!(value.kind(), UnpackKind::Assign);
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -105,7 +106,12 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 }),
         };
 
-        self.unpack_inner(target, value_expr.into(), value_type);
+        self.unpack_inner(
+            target,
+            value_expr.into(),
+            value_type,
+            allow_cycle_projection,
+        );
     }
 
     /// In regular tuple assignments like `a, b = 1, 2` {or even `a, (b, c) = 1, (2, 3)`}, map each
@@ -186,16 +192,32 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         target: &ast::Expr,
         value_expr: AnyNodeRef<'_>,
         value_ty: Type<'db>,
+        allow_cycle_projection: bool,
     ) {
         match target {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
                 self.targets.insert(target.into(), value_ty);
             }
             ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                self.unpack_inner(value, value_expr, value_ty);
+                self.unpack_inner(value, value_expr, value_ty, allow_cycle_projection);
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+                if allow_cycle_projection
+                    && elts.iter().all(|elt| !elt.is_starred_expr())
+                    && let Some(root) = value_ty.as_divergent()
+                {
+                    for (index, target) in elts.iter().enumerate() {
+                        self.unpack_inner(
+                            target,
+                            value_expr,
+                            Type::cycle_unpack_projection(root, elts.len(), index),
+                            allow_cycle_projection,
+                        );
+                    }
+                    return;
+                }
+
                 let target_len = match elts.iter().position(ast::Expr::is_starred_expr) {
                     Some(starred_index) => {
                         TupleLength::Variable(starred_index, elts.len() - (starred_index + 1))
@@ -257,7 +279,7 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 // We constructed unpacker above using the length of elts, so the zip should
                 // consume the same number of elements from each.
                 for (target, value_ty) in elts.iter().zip(unpacker.into_types()) {
-                    self.unpack_inner(target, value_expr, value_ty);
+                    self.unpack_inner(target, value_expr, value_ty, allow_cycle_projection);
                 }
             }
             _ => {

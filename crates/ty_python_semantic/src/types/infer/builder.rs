@@ -2800,7 +2800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 false
             }
 
-            Type::Dynamic(..) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(..) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
             }
@@ -3564,6 +3564,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Type::Dynamic(..)
             | Type::Divergent(_)
+            | Type::CycleProjection(_)
             | Type::Never
             | Type::ModuleLiteral(..)
             | Type::BoundSuper(..) => true,
@@ -3616,6 +3617,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeAlias(..)
                 | Type::Dynamic(..)
                 | Type::Divergent(_)
+                | Type::CycleProjection(_)
                 | Type::Never
                 | Type::ModuleLiteral(..)
                 | Type::BoundSuper(..) => return None,
@@ -5413,6 +5415,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // All other types cannot have a callable kind propagated to them.
                 Type::Dynamic(_)
                 | Type::Divergent(_)
+                | Type::CycleProjection(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
                 | Type::BoundMethod(_)
@@ -10313,7 +10316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         match (op, operand_type) {
             (ast::UnaryOp::Invert | ast::UnaryOp::UAdd | ast::UnaryOp::USub, Type::Dynamic(_))
-            | (_, Type::Divergent(_)) => operand_type,
+            | (_, Type::Divergent(_) | Type::CycleProjection(_)) => operand_type,
             (_, Type::Never) => Type::Never,
 
             (_, Type::TypeAlias(alias)) => {

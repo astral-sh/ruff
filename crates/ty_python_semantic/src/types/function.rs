@@ -1870,6 +1870,7 @@ fn is_instance_truthiness<'db>(
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Divergent(_)
+        | Type::CycleProjection(_)
         | Type::Never
         | Type::TypedDict(_) => {
             // We could probably try to infer more precise types in some of these cases, but it's unclear

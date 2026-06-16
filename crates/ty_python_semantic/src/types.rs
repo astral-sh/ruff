@@ -899,6 +899,8 @@ pub enum Type<'db> {
     Dynamic(DynamicType<'db>),
     /// A cycle marker used during recursive type inference.
     Divergent(DivergentType),
+    /// A cycle marker consumed by a query-free projection operation.
+    CycleProjection(CycleProjectionType),
     /// The empty set of values
     Never,
     /// A specific function object
@@ -1046,8 +1048,23 @@ impl<'db> Type<'db> {
         Self::Divergent(DivergentType::new(id))
     }
 
+    pub(crate) const fn cycle_unpack_projection(
+        root: DivergentType,
+        len: usize,
+        index: usize,
+    ) -> Self {
+        Self::CycleProjection(CycleProjectionType {
+            root,
+            op: CycleProjectionOp::UnpackExact { len, index },
+        })
+    }
+
     pub(crate) const fn is_divergent(&self) -> bool {
         matches!(self, Type::Divergent(_))
+    }
+
+    pub(crate) const fn is_cycle_artifact(&self) -> bool {
+        matches!(self, Type::Divergent(_) | Type::CycleProjection(_))
     }
 
     pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
@@ -1062,6 +1079,11 @@ impl<'db> Type<'db> {
     fn same_divergent_marker(self, other: Type<'db>) -> bool {
         match (self, other) {
             (Type::Divergent(left), Type::Divergent(right)) => left.same_marker(right),
+            (Type::CycleProjection(left), Type::Divergent(right))
+            | (Type::Divergent(right), Type::CycleProjection(left)) => left.root.same_marker(right),
+            (Type::CycleProjection(left), Type::CycleProjection(right)) => {
+                left.root.same_marker(right.root)
+            }
             _ => false,
         }
     }
@@ -1317,11 +1339,12 @@ impl<'db> Type<'db> {
                     materialization: None,
                     ..
                 })
+                | Type::CycleProjection(_)
         )
     }
 
     const fn is_non_divergent_dynamic(&self) -> bool {
-        self.is_dynamic() && !self.is_divergent()
+        self.is_dynamic() && !self.is_cycle_artifact()
     }
 
     /// Returns `true` if this type is an awaitable that should be awaited before being discarded.
@@ -1854,6 +1877,7 @@ impl<'db> Type<'db> {
             Type::Divergent(_) => (*self)
                 .negated_divergent()
                 .expect("matched `Type::Divergent` above"),
+            Type::CycleProjection(_) => *self,
 
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
 
@@ -1925,6 +1949,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_) => false,
             Type::EnumComplement(complement) => complement.is_spellable(db),
             Type::Divergent(_)
+            | Type::CycleProjection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -1958,6 +1983,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::EnumComplement(_)
             | Type::Divergent(_)
+            | Type::CycleProjection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::BoundMethod(_)
@@ -2130,8 +2156,213 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
         cycle.head_ids().fold(self, |ty, id| {
-            ty.recursive_type_normalized_impl(db, Type::divergent(id), false)
+            let div = Type::divergent(id);
+            let ty = ty
+                .try_projection_cycle_normalized(db, div.as_divergent().unwrap())
+                .unwrap_or(ty);
+            ty.recursive_type_normalized_impl(db, div, false)
                 .unwrap_or(Type::divergent(id))
+        })
+    }
+
+    fn try_projection_cycle_normalized(self, db: &'db dyn Db, root: DivergentType) -> Option<Self> {
+        if !self.contains_cycle_projection_for_root(db, root) {
+            return None;
+        }
+
+        self.try_fixed_tuple_projection_cycle_normalized(db, root)
+    }
+
+    fn try_fixed_tuple_projection_cycle_normalized(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+    ) -> Option<Self> {
+        let mut tuple_len = None;
+        let mut component_terms: Vec<Vec<Type<'db>>> = Vec::new();
+        let mut saw_tuple = false;
+
+        for element in self.top_level_projection_union_elements(db) {
+            if element.same_divergent_marker(Type::Divergent(root)) {
+                continue;
+            }
+
+            let spec = element.exact_tuple_instance_spec(db)?;
+            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
+                return None;
+            };
+
+            let len = tuple.len();
+            match tuple_len {
+                Some(existing_len) if existing_len != len => return None,
+                Some(_) => {}
+                None => {
+                    tuple_len = Some(len);
+                    component_terms.resize_with(len, Vec::new);
+                }
+            }
+
+            for (terms, element_ty) in component_terms.iter_mut().zip(tuple.iter_all_elements()) {
+                terms.push(element_ty);
+            }
+            saw_tuple = true;
+        }
+
+        if !saw_tuple {
+            return None;
+        }
+
+        let len = tuple_len?;
+        let solved_elements = component_terms
+            .iter()
+            .enumerate()
+            .map(|(index, terms)| {
+                Self::solve_projection_component(
+                    db,
+                    root,
+                    CycleProjectionOp::UnpackExact { len, index },
+                    terms,
+                )
+            })
+            .collect::<Option<Vec<_>>>()?;
+
+        Some(Type::heterogeneous_tuple(db, solved_elements))
+    }
+
+    fn top_level_projection_union_elements(self, db: &'db dyn Db) -> Vec<Self> {
+        match self {
+            Type::Union(union) => union.elements(db).to_vec(),
+            _ => vec![self],
+        }
+    }
+
+    fn solve_projection_component(
+        db: &'db dyn Db,
+        root: DivergentType,
+        op: CycleProjectionOp,
+        terms: &[Type<'db>],
+    ) -> Option<Self> {
+        let mut saw_self_reference = false;
+        let mut productive_terms = Vec::new();
+
+        for term in terms {
+            Self::collect_projection_component_terms(
+                db,
+                root,
+                op,
+                *term,
+                &mut saw_self_reference,
+                &mut productive_terms,
+            )?;
+        }
+
+        if productive_terms.is_empty() {
+            return (!saw_self_reference).then_some(Type::Never);
+        }
+
+        Some(match productive_terms.as_slice() {
+            [term] => *term,
+            _ => UnionType::from_elements_cycle_recovery(db, productive_terms),
+        })
+    }
+
+    fn collect_projection_component_terms(
+        db: &'db dyn Db,
+        root: DivergentType,
+        op: CycleProjectionOp,
+        term: Type<'db>,
+        saw_self_reference: &mut bool,
+        productive_terms: &mut Vec<Type<'db>>,
+    ) -> Option<()> {
+        if let Type::Union(union) = term {
+            for element in union.elements(db) {
+                Self::collect_projection_component_terms(
+                    db,
+                    root,
+                    op,
+                    *element,
+                    saw_self_reference,
+                    productive_terms,
+                )?;
+            }
+            return Some(());
+        }
+
+        if term.mentions_nonmatching_cycle_projection(db, root, op) {
+            return None;
+        }
+
+        if term.mentions_cycle_artifact(db, root) {
+            *saw_self_reference = true;
+            return Some(());
+        }
+
+        Self::add_productive_projection_term(db, term, productive_terms);
+        Some(())
+    }
+
+    fn add_productive_projection_term(
+        db: &'db dyn Db,
+        term: Type<'db>,
+        productive_terms: &mut Vec<Type<'db>>,
+    ) {
+        if productive_terms
+            .iter()
+            .any(|existing| Self::projection_term_absorbs(db, *existing, term))
+        {
+            return;
+        }
+
+        productive_terms.retain(|existing| !Self::projection_term_absorbs(db, term, *existing));
+        productive_terms.push(term);
+    }
+
+    fn projection_term_absorbs(
+        db: &'db dyn Db,
+        possible_base: Type<'db>,
+        possible_subtype: Type<'db>,
+    ) -> bool {
+        if possible_base == possible_subtype {
+            return true;
+        }
+
+        let Type::Intersection(intersection) = possible_subtype else {
+            return false;
+        };
+
+        if intersection.positive(db).is_empty() {
+            possible_base == Type::object()
+        } else {
+            intersection.positive(db).contains(&possible_base)
+        }
+    }
+
+    fn contains_cycle_projection_for_root(self, db: &'db dyn Db, root: DivergentType) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::CycleProjection(projection) => projection.root().same_marker(root),
+            _ => false,
+        })
+    }
+
+    fn mentions_cycle_artifact(self, db: &'db dyn Db, root: DivergentType) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::Divergent(divergent) => divergent.same_marker(root),
+            Type::CycleProjection(projection) => projection.root().same_marker(root),
+            _ => false,
+        })
+    }
+
+    fn mentions_nonmatching_cycle_projection(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        op: CycleProjectionOp,
+    ) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::CycleProjection(projection) => {
+                projection.root().same_marker(root) && projection.op() != op
+            }
+            _ => false,
         })
     }
 
@@ -2216,6 +2447,7 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, div, true)
                 .map(|ty| TypeFormType::from_type_expression(db, ty)),
             Type::Divergent(_) => Some(self),
+            Type::CycleProjection(_) => Some(self),
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
                 // TODO: Normalize TypedDicts
@@ -2324,7 +2556,7 @@ impl<'db> Type<'db> {
     /// for more complicated types that are actually singletons.
     pub(crate) fn is_singleton(self, db: &'db dyn Db) -> bool {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => false,
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => false,
 
             Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
@@ -2514,6 +2746,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::CycleProjection(_)
             | Type::Never
             | Type::Union(..)
             | Type::AlwaysTruthy
@@ -2571,7 +2804,9 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) if policy.require_concrete() => Some(Place::Undefined.into()),
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(Place::bound(self).into()),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+                Some(Place::bound(self).into())
+            }
 
             Type::ClassLiteral(class) if class.is_typed_dict(db) => {
                 Some(class.typed_dict_member(db, None, name, policy))
@@ -2881,7 +3116,9 @@ impl<'db> Type<'db> {
                 enums::instance_member_for_enum_complement(db, *complement, name)
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Place::bound(self).into(),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+                Place::bound(self).into()
+            }
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
@@ -3565,7 +3802,9 @@ impl<'db> Type<'db> {
                     enums::member_lookup_for_enum_complement(db, complement, name_str, policy)
                 }
 
-                Type::Dynamic(..) | Type::Divergent(_) | Type::Never => Place::bound(this).into(),
+                Type::Dynamic(..) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+                    Place::bound(this).into()
+                }
 
                 Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
                     Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
@@ -4480,7 +4719,7 @@ impl<'db> Type<'db> {
 
             // Dynamic types are callable, and the return type is the same dynamic type. Similarly,
             // `Never` is always callable and returns `Never`.
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => {
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
                 Binding::single(self, Signature::dynamic(self)).into()
             }
 
@@ -5603,7 +5842,9 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
-            Type::Dynamic(_) | Type::Divergent(_) | Type::Never => Some(self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never => {
+                Some(self)
+            }
             Type::ClassLiteral(class) => Some(Type::instance(db, class.default_specialization(db))),
             Type::GenericAlias(alias) => Some(Type::instance(db, ClassType::from(alias))),
             Type::SubclassOf(subclass_of_ty) => Some(subclass_of_ty.to_instance(db)),
@@ -5850,7 +6091,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::Dynamic(_) | Type::Divergent(_) => Ok(*self),
+            Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) => Ok(*self),
 
             Type::NominalInstance(instance) => match instance.known_class(db) {
                 Some(KnownClass::NoneType) => Ok(Type::none(db)),
@@ -5933,7 +6174,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
             Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
-            Type::Divergent(_) => self,
+            Type::Divergent(_) | Type::CycleProjection(_) => self,
             // TODO intersections
             Type::Intersection(intersection) => {
                 if let Some(alternatives) = intersection.finite_alternative_union(db) {
@@ -6382,6 +6623,7 @@ impl<'db> Type<'db> {
                 }
                 _ => self,
             },
+            Type::CycleProjection(_) => self,
 
             Type::Never
             | Type::AlwaysTruthy
@@ -6463,7 +6705,7 @@ impl<'db> Type<'db> {
                     typevars.insert(bound_typevar);
                 }
             }
-            Type::Divergent(_) => {}
+            Type::Divergent(_) | Type::CycleProjection(_) => {}
 
             Type::FunctionLiteral(function) => {
                 visitor.visit(self, || {
@@ -6882,7 +7124,8 @@ impl<'db> Type<'db> {
             Self::AlwaysFalsy => Type::SpecialForm(SpecialFormType::AlwaysFalsy).definition(db),
 
             // These types have no definition
-            Self::Dynamic(
+            Self::CycleProjection(_)
+            | Self::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoUnpack
                 | DynamicType::TodoStarredExpression
@@ -7245,6 +7488,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             Type::TypeAlias(alias) => alias.variance_of(db, typevar),
             Type::Dynamic(_)
             | Type::Divergent(_)
+            | Type::CycleProjection(_)
             | Type::Never
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -7560,6 +7804,29 @@ impl DivergentType {
     const fn materialization_kind(self) -> Option<MaterializationKind> {
         self.materialization
     }
+}
+
+/// A query-free projection of a cycle root produced while recovering recursive inference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct CycleProjectionType {
+    root: DivergentType,
+    op: CycleProjectionOp,
+}
+
+impl CycleProjectionType {
+    pub(crate) const fn root(self) -> DivergentType {
+        self.root
+    }
+
+    pub(crate) const fn op(self) -> CycleProjectionOp {
+        self.op
+    }
+}
+
+/// The projection operations currently preserved through cycle recovery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum CycleProjectionOp {
+    UnpackExact { len: usize, index: usize },
 }
 
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq, salsa::Update, get_size2::GetSize)]

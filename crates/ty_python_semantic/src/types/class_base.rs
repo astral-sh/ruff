@@ -121,6 +121,7 @@ impl<'db> ClassBase<'db> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
             Type::Divergent(divergent) => Some(Self::Divergent(divergent)),
+            Type::CycleProjection(projection) => Some(Self::Divergent(projection.root())),
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
