@@ -218,19 +218,29 @@ mod indexed {
         pub parsed: Parsed<ModModule>,
     }
 
+    /// Compact storage for the address and [`RootNodeKind`] of every indexed AST node.
+    ///
+    /// This stores the information needed to reconstruct an [`AnyRootNodeRef`] without retaining
+    /// a fat pointer per node. Entries are divided into fixed-size chunks so that unrelated AST
+    /// allocations do not force every node into a wider representation. Each chunk starts on a
+    /// word boundary in `words`.
     #[derive(Debug, Default, get_size2::GetSize)]
     struct IndexedNodes {
-        /// Fixed-size chunks make lookup O(1) while allowing each region of the AST to use the
-        /// smallest entry width that can represent its addresses.
         chunks: Box<[IndexChunk]>,
         words: Box<[u64]>,
     }
 
+    /// Describes the entries for one consecutive group of node indices.
     #[derive(Debug, get_size2::GetSize)]
     struct IndexChunk {
+        /// Minimum node address in a relative chunk; unused for a wide chunk.
         base: usize,
+        /// Index of this chunk's first word in [`IndexedNodes::words`].
         word_start: u32,
+        /// Number of bits per packed entry.
         entry_bits: u8,
+        /// Number of entries, which is only less than [`IndexedNodes::CHUNK_LEN`] in the last
+        /// chunk.
         entry_count: u8,
         layout: IndexChunkLayout,
     }
@@ -238,7 +248,22 @@ mod indexed {
     #[derive(Copy, Clone, Debug, get_size2::GetSize)]
     #[repr(u8)]
     enum IndexChunkLayout {
+        /// Packs each scaled address offset together with its root-node kind:
+        ///
+        /// ```text
+        /// | address offset | root-node kind |
+        ///   entry_bits - 5       5 bits
+        /// ```
+        ///
+        /// The original address is `base + address_offset * ALIGNMENT`. Entries may cross `u64`
+        /// boundaries and the unused bits at the end of the chunk are padding.
         Relative,
+        /// Stores full addresses followed by a packed stream of root-node kinds:
+        ///
+        /// ```text
+        /// | address 0 | ... | address n - 1 | kind 0 | ... | kind n - 1 |
+        ///     64 bits           64 bits        5 bits          5 bits
+        /// ```
         Wide,
     }
 
