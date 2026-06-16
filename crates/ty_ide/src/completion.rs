@@ -772,12 +772,23 @@ struct ContextCursor<'m> {
 
 /// The cursor position relative to an AST range and its surrounding parentheses.
 enum RangeEndPosition {
+    /// The cursor follows the complete range, including any surrounding parentheses.
     After,
+    /// The cursor follows the AST range but precedes a surrounding closing parenthesis.
     InsideParentheses,
 }
 
 impl RangeEndPosition {
-    fn keywords(
+    /// Selects the keywords valid at this position.
+    ///
+    /// `after` applies after the complete, possibly parenthesized range, while
+    /// `inside_parentheses` applies before its closing parenthesis. For example:
+    ///
+    /// ```python
+    /// case (400 <CURSOR>)  # `as`
+    /// case (400) <CURSOR>  # `as` or `if`
+    /// ```
+    fn select_keywords(
         self,
         after: &'static [&'static str],
         inside_parentheses: &'static [&'static str],
@@ -1130,10 +1141,10 @@ impl<'m> ContextCursor<'m> {
                 .find_map(|node| match node {
                     ast::AnyNodeRef::StmtFor(stmt) => self
                         .range_end_position(stmt.target.range(), node, token)
-                        .map(|position| position.keywords(IN, NONE)),
+                        .map(|position| position.select_keywords(IN, NONE)),
                     ast::AnyNodeRef::Comprehension(comprehension) => self
                         .range_end_position(comprehension.target.range(), node, token)
-                        .map(|position| position.keywords(IN, NONE)),
+                        .map(|position| position.select_keywords(IN, NONE)),
                     _ => None,
                 })
         {
@@ -1148,14 +1159,14 @@ impl<'m> ContextCursor<'m> {
                     ast::AnyNodeRef::StmtWith(stmt) => stmt.items.iter().find_map(|item| {
                         let range = item.context_expr.range();
                         self.range_end_position(range, item.into(), token)
-                            .map(|position| position.keywords(AS, NONE))
+                            .map(|position| position.select_keywords(AS, NONE))
                             .or_else(|| self.range_end_position(range, node, token).map(|_| AS))
                     }),
                     ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => handler
                         .type_
                         .as_deref()
                         .and_then(|type_| self.range_end_position(type_.range(), node, token))
-                        .map(|position| position.keywords(AS, NONE)),
+                        .map(|position| position.select_keywords(AS, NONE)),
                     _ => None,
                 })
         {
@@ -1180,15 +1191,15 @@ impl<'m> ContextCursor<'m> {
                                 && let Some(position) =
                                     self.range_end_position(case.pattern.range(), node, token)
                             {
-                                Some(position.keywords(IF, NONE))
+                                Some(position.select_keywords(IF, NONE))
                             } else {
                                 self.range_end_position(pattern.range(), node, token)
-                                    .map(|position| position.keywords(MATCH, AS))
+                                    .map(|position| position.select_keywords(MATCH, AS))
                             }
                         }
                         pattern => self
                             .range_end_position(pattern.range(), node, token)
-                            .map(|position| position.keywords(MATCH, AS)),
+                            .map(|position| position.select_keywords(MATCH, AS)),
                     }
                 })
         {
