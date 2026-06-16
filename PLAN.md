@@ -43,10 +43,11 @@ Important current structures and methods:
     - `add_upper` prunes redundant clauses
     - `finish` currently still collapses this to a single `Type` with `IntersectionType::from_elements` or, if the estimated distributed size is too large, falls back to `Unknown`
     - `PathBounds::compute` then wraps that finalized upper type in `PathBound.upper: UpperBound<'db>` as a transition step; Phase 4 will preserve the raw factored clauses directly
-- `ConstraintId::intersect` currently has a local upper-bound explosion heuristic:
-    - `MAX_UPPER_BOUND_SIZE: usize = 4`
-    - estimates cost from `union_size` and `intersection_size`
-    - returns `IntersectionResult::CannotSimplify` before constructing a large distributed intersection
+- `ConstraintId::intersect` now uses a transient `UpperBound` for merged-upper reasoning:
+    - it checks combined range satisfiability clause-wise before punting on union-bearing uppers
+    - it returns `IntersectionResult::Disjoint` for unsatisfiable merged ranges
+    - it returns `IntersectionResult::CannotSimplify` for satisfiable union-bearing merged uppers instead of constructing a distributed intersection
+    - the old `MAX_UPPER_BOUND_SIZE` heuristic has been removed
 - `PathBounds::compute` uses `ConstraintBoundsBuilder` per typevar per BDD path and returns named `PathBound` values.
 - `PathBound<'db>` currently stores:
     - `bound_typevar: BoundTypeVarInstance<'db>`
@@ -157,10 +158,11 @@ Invariants to maintain:
 
 - An empty `UpperBound` represents no explicit upper clauses; materializing it yields `object`.
 - Each stored type is one CNF upper clause. Clauses may themselves be union types.
-- No `object` clauses, since they are redundant; `UpperBound::add_clause` should explicitly elide `object` before redundancy pruning.
+- An explicit `object` clause is preserved when it is the only upper clause, so callers can distinguish `T <= object` from a missing upper bound.
+- `object` is still redundant with any other upper clause; the general redundancy-pruning logic should drop an existing `object` when a narrower clause is added and ignore a new `object` when another clause already exists.
 - A `Never` clause means the entire upper bound is `Never`; `UpperBound::add_clause` should explicitly collapse the stored clauses to exactly `[Never]`.
 - If `UpperBound` is already `[Never]`, adding any later non-`Never` clause is a no-op.
-- Add a comment around these `object`/`Never` fast paths noting that they are optimizations; the general redundancy-pruning loop should also handle them correctly.
+- Add a comment around the `Never` fast path noting that it is an optimization; the general redundancy-pruning loop should also handle it correctly. Also comment that `object` intentionally uses the general redundancy-pruning path so an explicit lone `object` clause is preserved.
 - Duplicate clauses are removed.
 - Redundant supertype clauses are removed using `Type::is_redundant_with`, matching the current `ConstraintBoundsBuilder::add_upper` behavior:
     - if existing clause `E` is narrower than new clause `N` (`E <= N`), then `N` adds nothing.
@@ -441,10 +443,10 @@ Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expect
 - [x] Add `UpperBound` accessors only as required by load-bearing methods; avoid speculative general-purpose clause accessors.
 - [x] Implement `UpperBound::add_clause` as the shared accumulation primitive used both during path walking and when adding a declared upper bound during solution extraction.
 - [x] Keep `UpperBound::add_clause` equivalent to current `ConstraintBoundsBuilder::add_upper`: add/prune one `Type` clause and do not split `Type::Intersection` inputs.
-- [x] Explicitly elide `object` clauses at the start of `UpperBound::add_clause` before redundancy pruning.
+- [x] Preserve an explicit `object` clause when it is the only upper clause, while treating `object` as redundant with other existing clauses via redundancy pruning.
 - [x] Explicitly collapse `UpperBound` to exactly `[Never]` when adding a `Never` clause.
 - [x] If `UpperBound` is already `[Never]`, make later non-`Never` additions a no-op.
-- [x] Comment that the `object`/`Never` fast paths are optimizations and that the general redundancy-pruning loop should also handle them correctly.
+- [x] Comment that the `Never` fast path is an optimization and that `object` intentionally goes through the general redundancy-pruning path so lone explicit `object` clauses are preserved.
 - [x] Do not shrink `UpperBound` storage during incremental `add_clause` calls; add `UpperBound::shrink_to_fit(&mut self)` and call it before storing in `PathBounds`.
     - Implemented the shrink helper. The call from `ConstraintBoundsBuilder::finish` is still part of Phase 4, when `PathBounds` starts storing `UpperBound` values.
 - [x] Use `Type::is_redundant_with` for redundant upper-clause pruning, matching existing `ConstraintBoundsBuilder::add_upper` behavior.
@@ -480,21 +482,22 @@ Temporary note: `UpperBound` and bounded-witness helpers have `dead_code` expect
 
 ### Phase 3: Minimal sequent-map construction changes
 
-- [ ] Rewrite `ConstraintId::intersect` as a simple-constraint derivation helper:
+- [x] Rewrite `ConstraintId::intersect` as a simple-constraint derivation helper:
     - merge optional ordinary upper `Type`s into a transient `UpperBound` only for reasoning;
     - always perform the combined range satisfiability check (`lower <= merged_upper`) before punting;
     - if the transient merged upper is union-bearing, return `Disjoint` if the range is unsatisfiable and `CannotSimplify` otherwise;
     - only return `Simplified` when the merged range can be represented as one simple per-constraint `ConstraintBounds` value.
-- [ ] Remove the existing `MAX_UPPER_BOUND_SIZE` heuristic once union-bearing uppers are handled by the `Disjoint`/`CannotSimplify` branch.
-- [ ] Remove or update obsolete comments about the sequent-map heuristic in the same change that removes the heuristic.
-- [ ] Rework satisfiability checks from `lower <= materialized_upper` to `UpperBound::when_satisfied_by` or clause-wise boolean checks as appropriate.
-- [ ] Leave deeper sequent-map implication logic intact unless implementation reveals a direct correctness blocker for the factored path-bound change.
-- [ ] Audit sequent-map helpers that substitute or derive upper bounds only as needed to confirm the first-pass scope:
+- [x] Remove the existing `MAX_UPPER_BOUND_SIZE` heuristic once union-bearing uppers are handled by the `Disjoint`/`CannotSimplify` branch.
+- [x] Remove or update obsolete comments about the sequent-map heuristic in the same change that removes the heuristic.
+- [x] Rework satisfiability checks from `lower <= materialized_upper` to `UpperBound::when_satisfied_by` or clause-wise boolean checks as appropriate.
+- [x] Leave deeper sequent-map implication logic intact unless implementation reveals a direct correctness blocker for the factored path-bound change.
+- [x] Audit sequent-map helpers that substitute or derive upper bounds only as needed to confirm the first-pass scope:
     - `add_mutual_sequents_for_different_typevars`
     - `add_mutual_sequents_for_same_typevars`
     - `add_nested_typevar_sequents`
     - `add_concrete_sequents`
-- [ ] Add tests that exercise combining constraints with large union upper clauses without hitting DNF explosion.
+- [x] Add tests that exercise combining constraints with large union upper clauses without hitting DNF explosion.
+    - Focused test command: `cargo test -p ty_python_semantic types::constraints::tests::`.
 
 ### Phase 4: Preserve factored upper bounds through path extraction
 
@@ -538,8 +541,9 @@ Completed early as part of the initial `UpperBound` implementation. Wiring the w
     - Preserve current compatibility semantics: a lower bound such as `bool` can make declared constraint `int` compatible, but the selected solution is the exact declared constraint `int`, not `bool`.
     - Replace the old exact upper materialization check with `upper.when_satisfied_by(db, builder, constraint.top_materialization(db))` / equivalent clause-wise logic for `top_materialization(constraint) <= accumulated_upper`.
 - [ ] Implement `UpperBound::is_satisfied_by` as a clause-wise check: `ty <= each stored upper clause`; an empty upper bound is vacuously satisfied.
-- [ ] Implement `UpperBound::when_satisfied_by` for paths that need the constraint set for `lower <= upper_bound`; return `always` for an empty upper bound, otherwise combine `lower <= each stored upper clause` with conjunction.
+- [x] Implement `UpperBound::when_satisfied_by` for paths that need the constraint set for `lower <= upper_bound`; return `always` for an empty upper bound, otherwise combine `lower <= each stored upper clause` with conjunction.
     - Use `when_constraint_set_assignable_to_owned` for each clause and load the owned result into the caller's builder before combining, rather than using builder-local assignability directly.
+    - Implemented early in Phase 3 for `ConstraintId::intersect`; Phase 6 still needs to wire this helper into default solution extraction.
 - [x] Make `UpperBound::bounded_partial_dnf_witness` return `Option<Type<'db>>`; `None` means no compact witness was found, and solver code decides the fallback policy.
 - [ ] If default solving needs an upper-only solution and bounded witness generation returns `None`, leave the typevar unsolved for that path with `Ok(None)` rather than inferring `Never`, `Unknown`, or invalidating the path.
 - [ ] Ensure `TypeVarSolution` can remain `solution: Type<'db>` for this iteration.
@@ -586,9 +590,9 @@ Also run a memory-limited `jax` ecosystem check before final handoff and compare
 - [x] Should `UpperBound::when_satisfied_by` use builder-local per-clause assignability or owned/Salsa-cached per-clause assignability? Use owned/Salsa-cached assignability and load each owned result into the caller's builder; expected Salsa reuse should dominate.
 - [x] What should `UpperBound::when_satisfied_by` return for an empty upper bound? Return `ConstraintSet::always(builder)`; callers can separately check for a missing/empty upper bound when needed.
 - [x] What should `UpperBound::is_satisfied_by` return for an empty upper bound? Return `true`; `object` is the top type, so all types are assignable to it by definition.
-- [x] Should `UpperBound::add_clause` elide `object` clauses explicitly or via redundancy pruning? Explicitly elide `object` before redundancy pruning.
+- [x] Should `UpperBound::add_clause` elide `object` clauses explicitly or via redundancy pruning? Use redundancy pruning. Preserve an explicit `object` clause when the upper bound is otherwise empty; drop or ignore `object` only when another clause makes it redundant.
 - [x] Should `UpperBound::add_clause` collapse to exactly `[Never]` when adding `Never`? Yes.
-- [x] If `UpperBound` is already `[Never]`, should later non-`Never` additions be a no-op? Yes. Add comments explaining that the `object`/`Never` fast paths are optimizations and the general redundancy-pruning loop should also handle them correctly.
+- [x] If `UpperBound` is already `[Never]`, should later non-`Never` additions be a no-op? Yes. Add comments explaining that the `Never` fast path is an optimization and the general redundancy-pruning loop should also handle it correctly.
 - [x] Should `UpperBound::add_clause` shrink storage after removals? No. Avoid shrink/grow churn during accumulation; shrink once during `ConstraintBoundsBuilder::finish` before storing in cached `PathBounds`.
 - [x] Should `UpperBound`'s final shrink method consume `self` or mutate `&mut self`? Use an explicit `shrink_to_fit(&mut self)` method; a consuming finish method would still rely on callers remembering to invoke it.
 - [x] Should `PathBound` have a shrink helper, or should `ConstraintBoundsBuilder::finish` call `upper.shrink_to_fit()` directly? Call `upper.shrink_to_fit()` directly before constructing `PathBound`; add a `PathBound` helper only if future fields need it.

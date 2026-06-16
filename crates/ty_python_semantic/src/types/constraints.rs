@@ -1256,7 +1256,8 @@ impl<'db> ConstraintBounds<'db> {
 /// to ty's ordinary DNF [`Type`] representation.
 ///
 /// Invariants maintained by [`UpperBound::add_clause`]:
-/// - `object` clauses are elided;
+/// - an `object` clause is preserved if it is the only explicit upper clause;
+/// - an `object` clause is treated as redundant once any narrower clause is present;
 /// - a `Never` clause collapses the whole upper bound to exactly `[Never]`;
 /// - duplicate and redundant supertype clauses are removed;
 /// - clause order remains deterministic based on insertion order after pruning.
@@ -1305,10 +1306,10 @@ impl<'db> UpperBound<'db> {
     }
 
     pub(crate) fn add_clause(&mut self, db: &'db dyn Db, clause: Type<'db>) {
-        // These `object`/`Never` fast paths are optimizations. The general redundancy-pruning
-        // loop below should also handle them correctly, but spelling them out avoids unnecessary
-        // relation checks and keeps the stored representation canonical.
-        if clause.is_object() || self.is_never() {
+        // This `Never` fast path is an optimization. The general redundancy-pruning loop below
+        // should also handle it correctly, but spelling it out avoids unnecessary relation checks
+        // and keeps the stored representation canonical.
+        if self.is_never() {
             return;
         }
 
@@ -1318,6 +1319,12 @@ impl<'db> UpperBound<'db> {
             return;
         }
 
+        // Do not special-case `object` here. An explicit `object` clause should be preserved when
+        // it is the only clause, so `T <= object` remains distinguishable from a missing upper
+        // bound. If another clause already exists, the general redundancy check below treats
+        // `object` as redundant; if a narrower clause is added later, the retain step removes the
+        // existing `object` clause.
+        //
         // First check if there's an existing upper bound clause that is a subtype of the new type.
         // If so, adding the new type does nothing to the intersection.
         if self
@@ -1360,6 +1367,19 @@ impl<'db> UpperBound<'db> {
 
     fn has_visible_union_clause(&self) -> bool {
         self.clauses.iter().copied().any(Type::is_union)
+    }
+
+    /// Returns the constraints under which `lower` is assignable to every stored upper clause.
+    fn when_satisfied_by<'c>(
+        &self,
+        db: &'db dyn Db,
+        builder: &'c ConstraintSetBuilder<'db>,
+        lower: Type<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.clauses.iter().when_all(db, builder, |clause| {
+            let when_clause = lower.when_constraint_set_assignable_to_owned(db, *clause);
+            builder.load(db, &when_clause)
+        })
     }
 
     /// Returns a compact ordinary [`Type`] witness that satisfies this upper bound and, if
@@ -1794,29 +1814,8 @@ impl ConstraintId {
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> IntersectionResult<'db> {
-        /// TODO: For now, we treat some upper bounds as unsimplifiable if they become "too big".
-        /// When intersecting constraints, the upper bounds are also intersected together. If the
-        /// lhs and rhs upper bounds are unions of intersections (e.g. `(a & b) | (c & d)`), then
-        /// intersecting them together will require distributing across every pair of union
-        /// elements. That can quickly balloon in size. We are looking at a better representation
-        /// that would let us model this case more directly, but for now, we punt.
-        const MAX_UPPER_BOUND_SIZE: usize = 4;
-
         let self_constraint = builder.constraint_data(self);
         let other_constraint = builder.constraint_data(other);
-        let self_upper = self_constraint.bounds.materialized_upper();
-        let other_upper = other_constraint.bounds.materialized_upper();
-        let estimated_upper_bound_size = self_upper
-            .union_size(db)
-            .saturating_mul(other_upper.union_size(db))
-            .saturating_mul(
-                self_upper
-                    .intersection_size(db)
-                    .saturating_add(other_upper.intersection_size(db)),
-            );
-        if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
-            return IntersectionResult::CannotSimplify;
-        }
 
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = match (self_constraint.bounds.lower, other_constraint.bounds.lower) {
@@ -1824,13 +1823,14 @@ impl ConstraintId {
             (Some(lower), None) | (None, Some(lower)) => Some(lower),
             (None, None) => None,
         };
-        let upper = match (self_constraint.bounds.upper, other_constraint.bounds.upper) {
-            (Some(left), Some(right)) => Some(IntersectionType::from_two_elements(db, left, right)),
-            (Some(upper), None) | (None, Some(upper)) => Some(upper),
-            (None, None) => None,
-        };
+        let mut merged_upper = UpperBound::none();
+        if let Some(upper) = self_constraint.bounds.upper {
+            merged_upper.add_clause(db, upper);
+        }
+        if let Some(upper) = other_constraint.bounds.upper {
+            merged_upper.add_clause(db, upper);
+        }
         let effective_lower = lower.unwrap_or(Type::Never);
-        let effective_upper = upper.unwrap_or(Type::object());
 
         // If `lower ≰ upper` for every possible assignment of typevars, then the intersection is
         // empty, since there is no type that is both greater than `lower`, and less than `upper`.
@@ -1838,17 +1838,22 @@ impl ConstraintId {
         // rather than a universal check ("is `lower ≤ upper` for *all* assignments?"), because the
         // bounds may mention typevars — e.g., `Sequence[int] ≤ A ≤ Sequence[T]` is satisfiable
         // when `int ≤ T`, even though it's not universally true for all `T`.
-        let when = effective_lower.when_constraint_set_assignable_to_owned(db, effective_upper);
-        let is_never_satisfied = when.query(|_builder, when| when.is_never_satisfied(db));
-        if is_never_satisfied {
+        let when = merged_upper.when_satisfied_by(db, builder, effective_lower);
+        if when.is_never_satisfied(db) {
             return IntersectionResult::Disjoint;
         }
 
-        // We do not create lower bounds that are unions, or upper bounds that are intersections,
-        // since those can be broken apart into BDDs over simpler constraints.
-        if lower.is_some_and(Type::is_union)
-            || upper.is_some_and(|upper| upper.is_nontrivial_intersection(db))
-        {
+        // We do not create lower bounds that are unions, or upper bounds that are factored
+        // intersections, since those can be broken apart into BDDs over simpler constraints. If the
+        // merged upper contains a union clause, keep any useful disjointness result from above but
+        // do not try to derive a factored upper-bound constraint.
+        if lower.is_some_and(Type::is_union) || merged_upper.has_visible_union_clause() {
+            return IntersectionResult::CannotSimplify;
+        }
+
+        let upper = (!merged_upper.is_empty()).then(|| merged_upper.materialize_exact(db));
+
+        if upper.is_some_and(|upper| upper.is_nontrivial_intersection(db)) {
             return IntersectionResult::CannotSimplify;
         }
 
@@ -3412,10 +3417,38 @@ impl<'db> ConstraintBoundsBuilder<'db> {
     }
 
     fn finish(self, db: &'db dyn Db) -> ConstraintBounds<'db> {
-        ConstraintBounds::new(
-            (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower)),
-            (!self.upper.is_empty()).then(|| IntersectionType::from_elements(db, self.upper)),
-        )
+        let lower = (!self.lower.is_empty()).then(|| UnionType::from_elements(db, self.lower));
+        let upper = if self.upper.is_empty() {
+            None
+        } else {
+            // The final upper bound is the intersection of all of the individual upper bounds that
+            // we discovered for this typevar on this path. If those individual upper bounds are
+            // unions, we have to distribute the intersection across those unions in a way that can
+            // blow up the size of the resulting type. Detect that in advance, and fall back on
+            // `Unknown` if so. (`Unknown` is a good conservative fallback because it preserves the
+            // fact that there was an upper bound without forcing a large intersection to be
+            // materialized.)
+            //
+            // This temporary solution-extraction heuristic remains until path extraction stores
+            // the accumulated clauses as a factored `UpperBound` directly. Use a larger allowed
+            // size here since this is called much less frequently than sequent map elaboration.
+            let estimated_union_size = self.upper.iter().fold(1usize, |size, upper| {
+                size.saturating_mul(upper.union_size(db))
+            });
+            let estimated_intersection_size = self.upper.iter().fold(0usize, |size, upper| {
+                size.saturating_add(upper.intersection_size(db))
+            });
+            let estimated_upper_bound_size =
+                estimated_union_size.saturating_mul(estimated_intersection_size);
+            let max_upper_bound_size = self.upper.len().saturating_mul(4);
+
+            if self.upper.len() > 1 && estimated_upper_bound_size > max_upper_bound_size {
+                Some(Type::unknown())
+            } else {
+                Some(IntersectionType::from_elements(db, self.upper))
+            }
+        };
+        ConstraintBounds::new(lower, upper)
     }
 }
 
@@ -6897,8 +6930,9 @@ mod tests {
     }
 
     #[test]
-    fn upper_bound_elides_object_and_tracks_explicit_bounds() {
+    fn upper_bound_tracks_explicit_object_until_redundant() {
         let db = setup_db();
+        let int = known_instance(&db, KnownClass::Int);
         let mut upper = UpperBound::none();
 
         assert!(upper.is_empty());
@@ -6911,8 +6945,15 @@ mod tests {
 
         upper.add_clause(&db, Type::object());
         upper.shrink_to_fit();
-        assert!(upper.is_empty());
-        assert!(!upper.has_explicit_bound());
+        assert!(!upper.is_empty());
+        assert!(upper.has_explicit_bound());
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::object()]));
+
+        upper.add_clause(&db, int);
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([int]));
+
+        upper.add_clause(&db, Type::object());
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([int]));
     }
 
     #[test]
@@ -6923,24 +6964,15 @@ mod tests {
         let str = known_instance(&db, KnownClass::Str);
 
         let mut upper = UpperBound::from_clauses(&db, [int, str, int]);
-        assert_eq!(
-            upper.clauses.iter().copied().collect::<Vec<_>>(),
-            [int, str]
-        );
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([int, str]));
 
         // `bool` is narrower than `int`, so it replaces the redundant `int` clause while
         // preserving the relative order of the remaining clauses.
         upper.add_clause(&db, bool);
-        assert_eq!(
-            upper.clauses.iter().copied().collect::<Vec<_>>(),
-            [str, bool]
-        );
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
 
         upper.add_clause(&db, int);
-        assert_eq!(
-            upper.clauses.iter().copied().collect::<Vec<_>>(),
-            [str, bool]
-        );
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([str, bool]));
     }
 
     #[test]
@@ -6950,17 +6982,11 @@ mod tests {
 
         let mut upper = UpperBound::from_clause(int);
         upper.add_clause(&db, Type::Never);
-        assert_eq!(
-            upper.clauses.iter().copied().collect::<Vec<_>>(),
-            [Type::Never]
-        );
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
         assert_eq!(upper.materialize_exact(&db), Type::Never);
 
         upper.add_clause(&db, int);
-        assert_eq!(
-            upper.clauses.iter().copied().collect::<Vec<_>>(),
-            [Type::Never]
-        );
+        assert_eq!(upper.clauses, FxOrderSet::from_iter([Type::Never]));
     }
 
     #[test]
@@ -7133,6 +7159,29 @@ mod tests {
         let storage = builder.storage.borrow();
         assert_eq!(storage.single_sequent_cache.len(), single_sequents);
         assert_eq!(storage.pair_sequent_cache.len(), pair_sequents);
+    }
+
+    #[test]
+    fn constraint_intersection_detects_disjoint_union_upper_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let builder = ConstraintSetBuilder::new();
+        let int = known_instance(&db, KnownClass::Int);
+        let str = known_instance(&db, KnownClass::Str);
+        let bytes = known_instance(&db, KnownClass::Bytes);
+        let bytearray = known_instance(&db, KnownClass::Bytearray);
+        let int_or_str = UnionType::from_two_elements(&db, int, str);
+        let bytes_or_bytearray = UnionType::from_two_elements(&db, bytes, bytearray);
+        let left = ConstraintId::new_with_bounds(&db, &builder, t, Some(int), Some(int_or_str));
+        let right = ConstraintId::new_with_bounds(&db, &builder, t, None, Some(bytes_or_bytearray));
+
+        // Check satisfiability against each upper clause before punting on the union-bearing
+        // merged upper bound. The old size heuristic returned `CannotSimplify` here before
+        // discovering that `int` cannot satisfy the second upper clause.
+        assert!(matches!(
+            left.intersect(&db, &builder, right),
+            IntersectionResult::Disjoint
+        ));
     }
 
     #[test]
