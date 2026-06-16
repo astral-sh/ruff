@@ -2984,6 +2984,21 @@ class ProjectionMixedContainer:
         reveal_type(self.x)  # revealed: list[int] | tuple[int]
 ```
 
+For-loop iteration creates a projection for the item type:
+
+```py
+class ProjectionIter:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        for item in self.x:
+            self.x = [item]
+            reveal_type(item)  # revealed: int
+
+        reveal_type(self.x)  # revealed: list[int]
+```
+
 Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
 the mixed containers:
 

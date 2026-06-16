@@ -73,7 +73,10 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
         }
 
         let value_type = value_inference.expression_type(value_expr);
-        let allow_cycle_projection = matches!(value.kind(), UnpackKind::Assign);
+        let allow_cycle_projection = matches!(
+            value.kind(),
+            UnpackKind::Assign | UnpackKind::Iterable { .. }
+        );
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -83,17 +86,21 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                     value_type
                 }
             }
-            UnpackKind::Iterable { mode } => value_type
-                .try_iterate_with_mode(self.db(), mode)
-                .map(|tuple| tuple.homogeneous_element_type(self.db()))
-                .unwrap_or_else(|err| {
-                    err.report_diagnostic(
-                        &self.context,
-                        value_type,
-                        value.as_any_node_ref(self.db(), self.module()),
-                    );
-                    err.fallback_element_type(self.db())
-                }),
+            UnpackKind::Iterable { mode } => {
+                value_type.try_cycle_iter_projection().unwrap_or_else(|| {
+                    value_type
+                        .try_iterate_with_mode(self.db(), mode)
+                        .map(|tuple| tuple.homogeneous_element_type(self.db()))
+                        .unwrap_or_else(|err| {
+                            err.report_diagnostic(
+                                &self.context,
+                                value_type,
+                                value.as_any_node_ref(self.db(), self.module()),
+                            );
+                            err.fallback_element_type(self.db())
+                        })
+                })
+            }
             UnpackKind::ContextManager { mode } => value_type
                 .try_enter_with_mode(self.db(), mode)
                 .unwrap_or_else(|err| {
@@ -203,19 +210,22 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                if allow_cycle_projection
-                    && elts.iter().all(|elt| !elt.is_starred_expr())
-                    && let Some(root) = value_ty.as_divergent()
-                {
-                    for (index, target) in elts.iter().enumerate() {
-                        self.unpack_inner(
-                            target,
-                            value_expr,
-                            Type::cycle_unpack_projection(root, elts.len(), index),
-                            allow_cycle_projection,
-                        );
+                if allow_cycle_projection && elts.iter().all(|elt| !elt.is_starred_expr()) {
+                    let projected_tys = (0..elts.len())
+                        .map(|index| value_ty.try_cycle_unpack_projection(elts.len(), index))
+                        .collect::<Option<Vec<_>>>();
+
+                    if let Some(projected_tys) = projected_tys {
+                        for (target, projected_ty) in elts.iter().zip(projected_tys) {
+                            self.unpack_inner(
+                                target,
+                                value_expr,
+                                projected_ty,
+                                allow_cycle_projection,
+                            );
+                        }
+                        return;
                     }
-                    return;
                 }
 
                 let target_len = match elts.iter().position(ast::Expr::is_starred_expr) {

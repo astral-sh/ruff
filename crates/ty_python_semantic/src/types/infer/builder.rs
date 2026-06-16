@@ -5122,7 +5122,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             let iterable_type = builder.infer_standalone_expression(iter, tcx);
-            if !*is_async
+            if let Some(element_type) = iterable_type.try_cycle_iter_projection() {
+                element_type
+            } else if !*is_async
                 && let Some(element_type) = builder
                     .fixed_length_iterable_element_type(iter, |expr| builder.expression_type(expr))
             {
@@ -5159,7 +5161,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let iterable_type =
                     self.infer_standalone_expression(iterable, TypeContext::default());
 
-                if !for_stmt.is_async()
+                if let Some(projected) = iterable_type.try_cycle_iter_projection() {
+                    projected
+                } else if !for_stmt.is_async()
                     && let Some(element_type) = self
                         .fixed_length_iterable_element_type(iterable, |expr| {
                             self.expression_type(expr)
