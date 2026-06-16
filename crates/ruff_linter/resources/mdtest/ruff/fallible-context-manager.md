@@ -22,7 +22,7 @@ def bad():
 ```
 
 ```snapshot
-error[RUF075]: Context manager does not catch exceptions
+error[fallible-context-manager]: Context manager does not catch exceptions
  --> src/mdtest_snippet.py:7:5
   |
 7 |     yield  # snapshot: fallible-context-manager

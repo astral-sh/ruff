@@ -24,7 +24,7 @@ except:
 ```
 
 ```snapshot
-error[PLW0717]: Try clause contains too many statements (6 > 5)
+error[too-many-statements-in-try-clause]: Try clause contains too many statements (6 > 5)
  --> src/mdtest_snippet.py:2:1
   |
 2 | try:

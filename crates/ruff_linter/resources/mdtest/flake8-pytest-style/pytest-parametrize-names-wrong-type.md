@@ -22,7 +22,7 @@ def test_single_element_tuple_and_variable_mix(param):
 ```
 
 ```snapshot
-error[PT006]: Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+error[pytest-parametrize-names-wrong-type]: Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
  --> src/mdtest_snippet.py:5:26
   |
 5 | @pytest.mark.parametrize(("param",), [(1,), variable])  # snapshot: pytest-parametrize-names-wrong-type

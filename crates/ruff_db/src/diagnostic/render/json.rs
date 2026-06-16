@@ -6,9 +6,7 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{
-    ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig, Severity,
-};
+use crate::diagnostic::{ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
@@ -98,13 +96,11 @@ pub(super) fn diagnostic_to_json<'a>(
         },
     });
 
-    // In preview, the locations and filename can be optional
-    // and the severity is displayed.
+    // In preview, the locations and filename can be optional.
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code().map(|code| code.as_str()),
             name: diagnostic.id().as_str(),
-            severity: diagnostic.severity(),
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -118,7 +114,6 @@ pub(super) fn diagnostic_to_json<'a>(
         JsonDiagnostic {
             code: Some(diagnostic.secondary_code_or_id()),
             name: diagnostic.id().as_str(),
-            severity: Severity::Error,
             url: diagnostic.documentation_url(),
             message: diagnostic.concise_message(),
             fix,
@@ -230,7 +225,6 @@ pub(crate) struct JsonDiagnostic<'a> {
     cell: Option<OneIndexed>,
     code: Option<&'a str>,
     name: &'a str,
-    severity: Severity,
     end_location: Option<JsonLocation>,
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
@@ -328,7 +322,6 @@ mod tests {
             "message": "main diagnostic message",
             "name": "test-diagnostic",
             "noqa_row": null,
-            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]
@@ -361,7 +354,6 @@ mod tests {
             "message": "main diagnostic message",
             "name": "test-diagnostic",
             "noqa_row": null,
-            "severity": "error",
             "url": "https://docs.astral.sh/ruff/rules/test-diagnostic"
           }
         ]

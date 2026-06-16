@@ -35,7 +35,6 @@ expression: env.render_diagnostics(&diagnostics)
     "message": "`os` imported but unused",
     "name": "unused-import",
     "noqa_row": 2,
-    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
@@ -70,7 +69,6 @@ expression: env.render_diagnostics(&diagnostics)
     "message": "`math` imported but unused",
     "name": "unused-import",
     "noqa_row": 2,
-    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-import"
   },
   {
@@ -105,7 +103,6 @@ expression: env.render_diagnostics(&diagnostics)
     "message": "Local variable `x` is assigned to but never used",
     "name": "unused-variable",
     "noqa_row": 4,
-    "severity": "error",
     "url": "https://docs.astral.sh/ruff/rules/unused-variable"
   }
 ]

@@ -253,7 +253,7 @@ impl<'a> ResolvedDiagnostic<'a> {
             // need a colon.
             diag.id().to_string()
         } else {
-            diag.secondary_code_or_id().to_string()
+            diag.inner.id.to_string()
         };
 
         let level = if config.hide_severity {

@@ -100,17 +100,12 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
-                let id = if self.config.preview {
-                    diag.id().as_str()
-                } else {
-                    diag.secondary_code_or_id()
-                };
                 write!(
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
                     id = fmt_styled(
-                        fmt_with_hyperlink(id, diag.documentation_url(), &stylesheet),
+                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
                         stylesheet.emphasis
                     )
                 )?;
@@ -145,10 +140,10 @@ mod tests {
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        fib.py:1:8: error[F401] `os` imported but unused
-        fib.py:6:5: error[F841] Local variable `x` is assigned to but never used
-        undef.py:1:4: error[F821] Undefined name `a`
-        fib.py:12:16: error[F821] Undefined name `fibonaccii`
+        fib.py:1:8: error[unused-import] `os` imported but unused
+        fib.py:6:5: error[unused-variable] Local variable `x` is assigned to but never used
+        undef.py:1:4: error[undefined-name] Undefined name `a`
+        fib.py:12:16: error[undefined-name] Undefined name `fibonaccii`
         ");
     }
 
@@ -206,9 +201,9 @@ mod tests {
     fn notebook_output() {
         let (env, diagnostics) = create_notebook_diagnostics(DiagnosticFormat::Concise);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
-        notebook.ipynb:cell 1:2:8: error[F401] `os` imported but unused
-        notebook.ipynb:cell 2:2:8: error[F401] `math` imported but unused
-        notebook.ipynb:cell 3:4:5: error[F841] Local variable `x` is assigned to but never used
+        notebook.ipynb:cell 1:2:8: error[unused-import] `os` imported but unused
+        notebook.ipynb:cell 2:2:8: error[unused-import] `math` imported but unused
+        notebook.ipynb:cell 3:4:5: error[unused-variable] Local variable `x` is assigned to but never used
         ");
     }
 

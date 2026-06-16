@@ -14,7 +14,7 @@ use ruff_linter::fs::relativize_path;
 use ruff_linter::logging::LogLevel;
 use ruff_linter::message::{EmitterContext, render_diagnostics};
 use ruff_linter::notify_user;
-use ruff_linter::preview::{is_human_readable_names_enabled, is_warning_severity_enabled};
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::flags::{self};
 use ruff_linter::settings::types::{OutputFormat, PreviewMode, UnsafeFixes};
 
@@ -237,7 +237,7 @@ impl Printer {
 
         let config = DisplayDiagnosticConfig::new("ruff")
             .preview(preview.is_enabled())
-            .hide_severity(!is_warning_severity_enabled(preview))
+            .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
             .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
             .with_fix_applicability(self.unsafe_fixes.required_applicability())
@@ -411,7 +411,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
             let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview.is_enabled())
-                .hide_severity(!is_warning_severity_enabled(preview))
+                .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability())
