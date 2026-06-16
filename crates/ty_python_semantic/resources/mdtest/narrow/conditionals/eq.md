@@ -241,7 +241,8 @@ def _(answer: AmbiguousEnum):
 ```
 
 `==` and `!=` must use the semantics of their respective dunder methods. In particular, a custom
-`__ne__` method does not affect narrowing based on `__eq__`:
+`__ne__` method does not affect narrowing based on `__eq__`. Conversely, a custom `__eq__` method
+affects narrowing based on both operators because the default `__ne__` delegates to `__eq__`:
 
 ```py
 from enum import Enum
@@ -263,6 +264,24 @@ def _(answer: IndependentEquality):
         reveal_type(answer)  # revealed: IndependentEquality
     else:
         reveal_type(answer)  # revealed: IndependentEquality
+
+class CoupledInequality(Enum):
+    NO = 0
+    YES = 1
+
+    def __eq__(self, other: object) -> bool:
+        return True
+
+def _(answer: CoupledInequality):
+    if answer == CoupledInequality.NO:
+        reveal_type(answer)  # revealed: CoupledInequality
+    else:
+        reveal_type(answer)  # revealed: CoupledInequality
+
+    if answer != CoupledInequality.NO:
+        reveal_type(answer)  # revealed: CoupledInequality
+    else:
+        reveal_type(answer)  # revealed: CoupledInequality
 ```
 
 ## Known built-in equality behavior
