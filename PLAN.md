@@ -244,6 +244,39 @@ Each phase should generally become its own jj revision if it can be made clean i
     - `freqtrade/plugins/pairlist/VolumePairList.py` direct check: ~4.9s → ~2.8s.
     - Full `freqtrade scripts` direct check: ~5.1s → ~3.0s, same 679-diagnostic count.
     - Local `eco freqtrade`: ~3.0s, no timeout.
+- `[ ]` Remaining known perf gap: `freqtrade` is still slower than `main` because a real pandas `Series.__radd__` deferred quantification remains path-sensitive and expensive. Addressing that likely requires a deeper abstraction algorithm improvement, not just a no-op guard.
+
+### Potential deeper abstraction algorithm improvements
+
+The remaining slowdown is in deferred existential abstraction (`∃T. P`) of constraint BDDs. The current `exists_one` implementation is path-sensitive: it walks each BDD path with `PathAssignments`, removes constraints mentioning the quantified typevar, preserves derived facts about remaining typevars via the sequent map, and rebuilds each branch. This is correct, but expensive for pandas-style overload/protocol/callable constraint sets because a single quantified typevar can force traversal of a large BDD with many alternatives.
+
+Potential follow-up options:
+
+1. **Precompute affected constraints for each abstraction.**
+    - Build an `FxHashSet<ConstraintId>` (or dense bitset) of constraints that mention the quantified typevar(s), then make `should_remove` a cheap lookup instead of repeatedly calling `any_over_type` while traversing.
+    - This is a low-risk constant-factor improvement, and can share the same scan used for the current no-op guard.
+    - **Recommendation:** Do this first if profiling still shows meaningful time in type-walking predicates; it is simple and unlikely to affect semantics, but it will not solve path explosion by itself.
+1. **Support-aware subtree pruning.**
+    - Cache or compute, for each BDD subtree, which constraints/typevars appear below it. During abstraction, if no constraint in a subtree can mention the quantified typevar and no derived facts from removed ancestors need to be applied there, return that subtree unchanged instead of descending.
+    - This targets the same class of wasted traversal as the no-op guard, but at subtree granularity.
+    - The subtlety is path-sensitive derived facts: if removing an ancestor constraint derives a fact about a remaining typevar, that fact may still need to be conjoined into an otherwise-unaffected subtree.
+    - **Recommendation:** Promising, but only after carefully specifying when an unaffected subtree is safe to reuse. Start with pruning before any removed ancestor has produced derived facts, or thread an explicit “pending derived facts” state into the traversal.
+1. **Abstract multiple deferred typevars in one pass.**
+    - Instead of repeatedly running `exists_one` for `∃T1. ∃T2. ... P`, build one removal predicate for all deferred typevars and perform one path-sensitive abstraction pass.
+    - Existential quantifiers commute, so this should preserve the effective formula if derived-fact preservation is generalized from “one removed typevar” to “this set of removed typevars”.
+    - This avoids repeated full traversals and should help cases where several callable-local typevars are deferred together.
+    - **Recommendation:** This is the best candidate for a larger algorithmic fix. It should preserve soundness if the abstraction pass records all derived constraints that do not themselves mention any removed typevar. It will need focused tests for cross-typevar constraints such as `I ≤ N` encodings and for nested substitutions.
+1. **Dense `PathAssignments` representation.**
+    - Perf still shows substantial time in `PathAssignments::add_assignment` and `FxIndexMap`/`IndexMap` lookups. Since `ConstraintId`s are dense builder-local IDs, path assignments could use a dense tri-state vector/bitset plus a separate ordered log for rollback and source-order iteration.
+    - This improves the hot constants in path walking without changing the abstraction algorithm.
+    - **Recommendation:** Worth considering after algorithmic pruning/multi-abstraction, or if perf reports remain dominated by assignment lookup. A quick prototype replacing `FxIndexMap` with a plain `Vec` was slower, so this needs a real dense-index design rather than a linear scan.
+1. **Lazy/projected solving without materializing the abstracted BDD.**
+    - For solution extraction, traverse the raw BDD and solve while treating deferred typevars as projected away, rather than constructing `∃D. P` as a new BDD first.
+    - This could avoid large intermediate BDDs entirely, but it couples solution generation to quantification semantics and would be more invasive.
+    - **Recommendation:** Keep this as a longer-term design option. It may be the right end state if BDD materialization remains expensive, but it has the highest implementation and correctness risk.
+
+Avoid heuristic fixes that simply drop derived facts during abstraction. Unlike optional implication sequents, existential abstraction is part of the formula's semantics: constraints between deferred and remaining typevars can carry real information that must be preserved for sound and precise solving.
+
 ## Open questions for plan review
 
 - `[x]` Should deferred quantification be represented directly as `InferableTypeVars<'db>`, or should we introduce a distinct `DeferredQuantification` type for clarity even if it wraps the same ordered set of `BoundTypeVarIdentity<'db>`? Resolved: use `InferableTypeVars<'db>` directly, with explicit deferred-quantification field/helper names and a TODO about possible future renaming.
