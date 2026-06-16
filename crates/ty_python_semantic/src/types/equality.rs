@@ -613,13 +613,11 @@ fn evaluate_target_union<'db>(
 
     let removed = removed_any.then(|| removed.build());
     let mut builder = UnionBuilder::new(db);
-    for (original, narrowed) in elements.iter().zip(narrowed) {
+    for narrowed in narrowed {
         let Some(mut narrowed) = narrowed else {
             continue;
         };
-        if original.is_dynamic()
-            && let Some(removed) = removed
-        {
+        if let Some(removed) = removed {
             narrowed = IntersectionBuilder::new(db)
                 .add_positive(narrowed)
                 .add_negative(removed)
