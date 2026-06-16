@@ -143,7 +143,11 @@ pub enum Declaration {
 ///    child cursor (base specifier → [`Declaration::Base`], field →
 ///    [`Declaration::Field`], method → [`Declaration::Method`] with its
 ///    `virtual`/`override`/`= 0`/`constexpr`/`noexcept`/operator/`requires`
-///    flags read from the cursor, etc.).
+///    flags read from the cursor, etc.). For an `override`, set
+///    [`ruff_spo_triplet::CppMethod::overrides`] to the **fully-qualified**
+///    base method (clang's `get_overridden_cursors()` spelling,
+///    `Namespace::Base.method`), so the `virtually_overrides` edge joins the
+///    base class's own method node (codex P2, PR #8).
 /// 3. Call [`model_from_class`] per class and push into the [`ModelGraph`].
 /// 4. The output MUST match the locked shape asserted in
 ///    [`tests::locked_shape_expands_to_expected_triples`] for the
@@ -217,7 +221,7 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Classify.Recognize".to_string()),
+            overrides: Some("Tesseract::Classify.Recognize".to_string()),
             operator_kind: None,
             requires_clause: None,
         });
@@ -287,7 +291,7 @@ mod tests {
         assert!(has(
             "cpp:Tesseract::Recognizer.Recognize",
             "virtually_overrides",
-            "cpp:Classify.Recognize"
+            "cpp:Tesseract::Classify.Recognize"
         ));
         assert!(has(
             "cpp:Tesseract::Recognizer.Clear",

@@ -249,8 +249,10 @@ pub enum Predicate {
     /// `Inferred`**: a single-TU view of instantiations is incomplete by
     /// construction.
     TemplateInstantiates,
-    /// `(class.method, virtually_overrides, base.method)` — `override` on a
-    /// virtual base method. Object is the overridden base-class method IRI.
+    /// `(class.method, virtually_overrides, ns:Namespace::Base.method)` —
+    /// `override` on a virtual base method. Object is the **fully-qualified**
+    /// base-method IRI so it joins the base class's own method node (carried
+    /// fully-qualified on `CppMethod::overrides`; codex P2, PR #8).
     VirtuallyOverrides,
     /// `(class, is_friend_of, friend)` — `friend class` / `friend fn`
     /// declaration. **Default tier is `Structural`**: purely declarative,

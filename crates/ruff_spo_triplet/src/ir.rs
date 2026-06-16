@@ -586,8 +586,11 @@ pub struct CppMethod {
     #[serde(default)]
     pub is_noexcept: bool,
     /// `override` of a virtual base method → `virtually_overrides`. The
-    /// value is the overridden base-class method tail (`Base.method`),
-    /// emitted under the namespace prefix.
+    /// value is the **fully-qualified** overridden base method
+    /// (`Namespace::Base.method`), so the emitted `{ns}:` IRI joins the base
+    /// class's own method node. A bare `Base.method` would dangle for any
+    /// namespaced base (the base class is modeled as `{ns}:Namespace::Base`)
+    /// — codex P2, PR #8.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub overrides: Option<String>,
     /// Operator overload kind (e.g. `operator==`) → `defines_operator`.
