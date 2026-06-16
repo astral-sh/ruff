@@ -1,10 +1,16 @@
+//! Equality and inequality reasoning for type narrowing and reachability.
+//!
+//! This module evaluates comparisons with statically known Python semantics, producing branch
+//! constraints and definite truthiness while remaining conservative around custom comparison
+//! methods.
+
 use ruff_python_ast::name::Name;
 
 use crate::{Db, place::PlaceAndQualifiers};
 
 use super::{
     EnumLiteralType, IntersectionBuilder, KnownBoundMethodType, KnownClass, LiteralValueTypeKind,
-    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder,
+    MemberLookupPolicy, Truthiness, Type, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
     enums::{enum_member_literals, enum_metadata},
 };
 
@@ -67,6 +73,11 @@ impl<'db> ComparisonResult<'db> {
     }
 
     /// Preserve definite truthiness while discarding a conditional narrowing result.
+    ///
+    /// This is necessary when a comparison is evaluated through a runtime-equivalent type whose
+    /// static identity must be preserved. For example, a `NewType` instance has the comparison
+    /// behavior of its concrete base type, but a constraint derived for that base type cannot be
+    /// applied to the distinct `NewType`.
     fn discard_narrowing(self) -> Self {
         match self {
             ComparisonResult::CanNarrow(_) => ComparisonResult::Ambiguous,
@@ -395,10 +406,11 @@ fn builtin_literal_constraint<'db>(
             }
             builder.build()
         }
-        LiteralValueTypeKind::Bool(value) => UnionBuilder::new(db)
-            .add(Type::LiteralValue(right))
-            .add(Type::int_literal(i64::from(value)))
-            .build(),
+        LiteralValueTypeKind::Bool(value) => UnionType::from_two_elements(
+            db,
+            Type::LiteralValue(right),
+            Type::int_literal(i64::from(value)),
+        ),
         LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_) => {
             Type::LiteralValue(right)
         }
@@ -503,6 +515,7 @@ fn enum_literal_constraint<'db>(
     Some(equal_to_right.negate_if(db, !condition_expects_equality))
 }
 
+/// Return whether every possible value of `ty` belongs to the same enum as `right`.
 fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralType<'db>) -> bool {
     match ty.resolve_type_alias(db) {
         Type::LiteralValue(literal) => matches!(
@@ -523,6 +536,7 @@ fn is_same_enum_domain<'db>(db: &'db dyn Db, ty: Type<'db>, right: EnumLiteralTy
     }
 }
 
+/// Evaluate each alternative of the union being constrained and combine their branch results.
 fn evaluate_union_left<'db>(
     db: &'db dyn Db,
     elements: &[Type<'db>],
@@ -616,6 +630,7 @@ fn evaluate_target_union<'db>(
     ComparisonResult::CanNarrow(builder.build())
 }
 
+/// Evaluate the target against each alternative of a union on the non-target side.
 fn evaluate_union_right<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -687,6 +702,7 @@ fn evaluate_against_results<'db>(
     }
 }
 
+/// Combine compatible comparison results from the positive elements of an intersection target.
 fn evaluate_intersection_left<'db>(
     db: &'db dyn Db,
     original: Type<'db>,
@@ -756,6 +772,10 @@ fn finite_alternatives<'db>(
     }
 }
 
+/// Return a constraint for literal pairs whose equality cannot be decided statically.
+///
+/// This primarily handles `LiteralString`, which can be constrained by a concrete string literal
+/// or a string-valued enum member without having a single statically known runtime value.
 fn narrow_literal_comparison<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
@@ -809,6 +829,10 @@ fn narrow_literal_string_against_enum<'db>(
     ComparisonResult::CanNarrow(narrowed)
 }
 
+/// Compare a literal with a non-literal type using their known runtime comparison semantics.
+///
+/// A literal on the non-target side can constrain the target only when the types overlap; matching
+/// comparison implementations alone do not establish that the literal inhabits the target type.
 fn compare_literal_to_other<'db>(
     db: &'db dyn Db,
     literal_type: Type<'db>,
@@ -861,6 +885,10 @@ fn compare_literal_to_other<'db>(
     }
 }
 
+/// Compare nominal instances when their inherited comparison implementations are known.
+///
+/// The result is definite only when the implementations cannot compare equal, or when both types
+/// denote the same singleton.
 fn compare_nominal_instances<'db>(
     db: &'db dyn Db,
     left_instance: super::NominalInstanceType<'db>,
@@ -905,6 +933,7 @@ impl ComparisonOperator {
         }
     }
 
+    /// Return whether the selected branch requires the operands to compare equal.
     const fn condition_expects_equality(self, is_positive: bool) -> bool {
         matches!(
             (self, is_positive),
@@ -975,6 +1004,7 @@ impl KnownComparisonSemantics {
         }
     }
 
+    /// Return the builtin comparison implementation used by a literal value.
     fn of_literal<'db>(
         db: &'db dyn Db,
         literal: LiteralValueTypeKind<'db>,
@@ -992,6 +1022,9 @@ impl KnownComparisonSemantics {
         }
     }
 
+    /// Return the builtin comparison implementation inherited by an instance.
+    ///
+    /// Returns `None` when lookup finds custom comparison behavior.
     fn of_instance<'db>(
         db: &'db dyn Db,
         instance: Type<'db>,
@@ -1029,6 +1062,9 @@ impl KnownComparisonSemantics {
         None
     }
 
+    /// Return an enum's inherited scalar or identity comparison implementation.
+    ///
+    /// Custom enum comparison methods make the result unknown.
     fn of_enum<'db>(
         db: &'db dyn Db,
         instance: Type<'db>,
@@ -1157,6 +1193,7 @@ fn has_known_identity_comparison_semantics<'db>(
     }
 }
 
+/// Look up a comparison method without falling back to `object`.
 fn lookup_dunder<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
