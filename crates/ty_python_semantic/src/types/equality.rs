@@ -459,44 +459,6 @@ fn builtin_literal_constraint<'db>(
         return Some(equal_to_right.negate(db));
     }
 
-    if matches!(
-        right.kind(),
-        LiteralValueTypeKind::String(_) | LiteralValueTypeKind::Bytes(_)
-    ) && let Type::Union(union) = left.resolve_type_alias(db)
-    {
-        let mut excluded = UnionBuilder::new(db);
-        let mut has_dynamic = false;
-
-        for element in union.elements(db) {
-            match element.resolve_type_alias(db) {
-                Type::LiteralValue(left) => {
-                    match known_literal_equality(
-                        db,
-                        left.kind(),
-                        right.kind(),
-                        ComparisonOperator::Equality,
-                    ) {
-                        Some(true) => {}
-                        Some(false) => excluded = excluded.add(*element),
-                        None => return None,
-                    }
-                }
-                Type::Dynamic(_) => has_dynamic = true,
-                Type::Intersection(intersection)
-                    if !intersection.positive(db).is_empty()
-                        && intersection.positive(db).iter().all(Type::is_dynamic) =>
-                {
-                    has_dynamic = true;
-                }
-                _ => return None,
-            }
-        }
-
-        if has_dynamic {
-            return excluded.try_build().map(|excluded| excluded.negate(db));
-        }
-    }
-
     match left.resolve_type_alias(db) {
         Type::Union(union) => union
             .elements(db)
