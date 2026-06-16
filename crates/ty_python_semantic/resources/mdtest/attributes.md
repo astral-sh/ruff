@@ -3027,11 +3027,13 @@ Projection recovery also works for custom generic containers that define their o
 behavior:
 
 ```py
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Generic, TypeVar, overload, Any
 
 ProjectionT = TypeVar("ProjectionT")
 ProjectionU = TypeVar("ProjectionU")
+ProjectionCovariantT = TypeVar("ProjectionCovariantT", covariant=True)
+ProjectionContravariantT = TypeVar("ProjectionContravariantT", contravariant=True)
 
 class Box(Generic[ProjectionT]):
     def __init__(self, value: ProjectionT) -> None:
@@ -3164,6 +3166,86 @@ class ProjectionCustomAnyOverload:
         self.x = SelfOverloadedBox(x)
 
         reveal_type(self.x)  # revealed: SelfOverloadedBox[Any]
+
+class InvariantProjectionBox(Generic[ProjectionT]):
+    value: ProjectionT
+
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __iter__(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomInvariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: InvariantProjectionBox[object],
+        str_box: InvariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        item, = self.x
+        if update:
+            self.x = InvariantProjectionBox(item)
+
+        reveal_type(self.x)  # revealed: InvariantProjectionBox[object] | InvariantProjectionBox[str]
+
+class CovariantProjectionBox(Generic[ProjectionCovariantT]):
+    def __init__(self, value: ProjectionCovariantT) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[ProjectionCovariantT]:
+        return iter(())
+
+class ProjectionCustomCovariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: CovariantProjectionBox[object],
+        str_box: CovariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        item, = self.x
+        if update:
+            self.x = CovariantProjectionBox(item)
+
+        reveal_type(self.x)  # revealed: CovariantProjectionBox[object]
+
+class ContravariantProjectionBox(Generic[ProjectionContravariantT]):
+    def __init__(self, callback: Callable[[ProjectionContravariantT], None]) -> None:
+        pass
+
+    def __iter__(self) -> Iterator[Callable[[ProjectionContravariantT], None]]:
+        return iter(())
+
+class ProjectionCustomContravariant:
+    def __init__(
+        self,
+        flag: bool,
+        object_box: ContravariantProjectionBox[object],
+        str_box: ContravariantProjectionBox[str],
+    ) -> None:
+        if flag:
+            self.x = object_box
+        else:
+            self.x = str_box
+
+    def read(self, update: bool) -> None:
+        callback, = self.x
+        if update:
+            self.x = ContravariantProjectionBox(callback)
+
+        reveal_type(self.x)  # revealed: ContravariantProjectionBox[str & Unknown]
 
 class ProjectionCustomRecursiveShape:
     def __init__(self) -> None:
