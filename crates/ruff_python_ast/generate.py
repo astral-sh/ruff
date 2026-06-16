@@ -948,19 +948,25 @@ def write_root_anynoderef(out: list[str], ast: Ast) -> None:
             ///
             /// # Safety
             ///
-            /// `pointer` must be non-null, properly aligned, and point to the root node type
-            /// represented by `kind`. The pointed-to node must live for `'a`.
+            /// - `pointer` must be properly aligned for and point to the exact root node type
+            ///   represented by `kind`.
+            /// - The pointer's provenance must permit reads of a complete, initialized, and valid
+            ///   value of that type.
+            /// - The pointed-to value must not be moved, dropped, or accessed mutably for `'a`.
             #[inline]
             #[expect(unsafe_code, reason = "reconstructs a type-erased AST reference")]
             pub unsafe fn from_raw_parts(kind: RootNodeKind, pointer: std::ptr::NonNull<()>) -> Self {
-                match kind {
+                let pointer = pointer.as_ptr();
+                // SAFETY: The caller guarantees that `pointer` is readable as the exact root node
+                // type selected by `kind` and remains valid and immutable for `'a`.
+                unsafe { match kind {
     """)
     for name, ty in root_nodes:
         out.append(
-            f"""RootNodeKind::{name} => AnyRootNodeRef::{name}(unsafe {{ &*pointer.cast::<{ty}>().as_ptr() }}),"""
+            f"""RootNodeKind::{name} => AnyRootNodeRef::{name}(&*pointer.cast::<{ty}>()),"""
         )
     out.append("""
-                }
+                }}
             }
 
             pub fn visit_source_order<'b, V>(self, visitor: &mut V)
