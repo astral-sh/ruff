@@ -800,8 +800,8 @@ def test(x: Status | int):
 
 ## Union with tuple and `Literal`
 
-We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
-tuples. So they are excluded from the narrowed type when disjoint from the RHS values.
+A built-in tuple cannot compare equal to a string literal, so the tuple arm is excluded from the
+narrowed type.
 
 ```py
 from typing import Literal
