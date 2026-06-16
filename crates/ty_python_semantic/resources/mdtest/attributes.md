@@ -3023,11 +3023,75 @@ class ProjectionMapping:
         reveal_type(self.x)  # revealed: Mapping[int, str]
 ```
 
+Indexing and slicing cyclic attributes can recover the consumed item type:
+
+```py
+class ProjectionTupleIndex:
+    def __init__(self) -> None:
+        self.x = (0, str())
+
+    def read(self) -> None:
+        x = self.x[0]
+        self.x = (x, str())
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+
+class ProjectionTupleIndexFromEnd:
+    def __init__(self) -> None:
+        self.x = (int(), "")
+
+    def read(self) -> None:
+        text = self.x[-1]
+        self.x = (int(), text)
+
+        reveal_type(self.x)  # revealed: tuple[int, str]
+
+class ProjectionListIndex:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self, index: int) -> None:
+        item = self.x[index]
+        self.x = [item]
+
+        reveal_type(self.x)  # revealed: list[int]
+
+class ProjectionNestedIndex:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        number = self.x[0][0]
+        self.x = [(number, "")]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
+
+class ProjectionSliceThenIndex:
+    def __init__(self) -> None:
+        self.x = [(0, "")]
+
+    def read(self) -> None:
+        values = self.x[:]
+        number = values[0][0]
+        self.x = [(number, "")]
+
+        reveal_type(self.x)  # revealed: list[tuple[int, str]]
+
+class ProjectionDirectSliceAssignment:
+    def __init__(self) -> None:
+        self.x = [0]
+
+    def read(self) -> None:
+        self.x = self.x[:]
+
+        reveal_type(self.x)  # revealed: list[int]
+```
+
 Projection recovery also works for custom generic containers that define their own iteration
 behavior:
 
 ```py
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator, Iterator
 from typing import Generic, TypeVar, overload, Any
 
 ProjectionT = TypeVar("ProjectionT")
@@ -3255,6 +3319,79 @@ class ProjectionCustomRecursiveShape:
         self.x = Box(self.x)
 
         reveal_type(self.x)  # revealed: Box[Divergent]
+
+class IndexBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __getitem__(self, index: int) -> ProjectionT:
+        return self.value
+
+class ProjectionCustomGetItem:
+    def __init__(self) -> None:
+        self.x = IndexBox(0)
+
+    def read(self) -> None:
+        item = self.x[0]
+        self.x = IndexBox(item)
+
+        reveal_type(self.x)  # revealed: IndexBox[int]
+
+class SliceBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __getitem__(self, index: slice) -> "SliceBox[ProjectionT]":
+        return self
+
+class ProjectionCustomSlice:
+    def __init__(self) -> None:
+        self.x = SliceBox(0)
+
+    def read(self) -> None:
+        self.x = self.x[:]
+
+        reveal_type(self.x)  # revealed: SliceBox[int]
+
+class ContextBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __enter__(self) -> ProjectionT:
+        return self.value
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        return None
+
+class ProjectionCustomContext:
+    def __init__(self) -> None:
+        self.x = ContextBox(0)
+
+    def read(self) -> None:
+        with self.x as item:
+            self.x = ContextBox(item)
+
+        reveal_type(self.x)  # revealed: ContextBox[int]
+
+class AwaitBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def __await__(self) -> Generator[None, None, ProjectionT]:
+        async def inner() -> ProjectionT:
+            return self.value
+
+        return inner().__await__()
+
+class ProjectionCustomAwait:
+    def __init__(self) -> None:
+        self.x = AwaitBox(0)
+
+    async def read(self) -> None:
+        item = await self.x
+        self.x = AwaitBox(item)
+
+        reveal_type(self.x)  # revealed: AwaitBox[int]
 ```
 
 Different container wrappers can share the same unpack projection:
@@ -3469,8 +3606,7 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-# TODO: should be `list[Sub] | list[Base]`
-reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Divergent]
+reveal_type(C3(Sub()).x)  # revealed: list[Sub] | list[Base]
 ```
 
 And cycles between many attributes:

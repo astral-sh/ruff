@@ -40,6 +40,10 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         mode: EvaluationMode,
     ) -> Result<Type<'db>, ContextManagerError<'db>> {
+        if let Some(projection) = self.try_cycle_context_enter_projection(db, mode) {
+            return Ok(projection);
+        }
+
         let (enter_method, exit_method) = match mode {
             EvaluationMode::Async => ("__aenter__", "__aexit__"),
             EvaluationMode::Sync => ("__enter__", "__exit__"),

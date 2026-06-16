@@ -9127,6 +9127,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             tcx.map(|tcx| KnownClass::Awaitable.to_specialized_instance(self.db(), &[tcx])),
         );
 
+        if let Some(projection) = expr_type.try_cycle_await_projection(self.db()) {
+            return projection;
+        }
+
         expr_type.try_await(self.db()).unwrap_or_else(|err| {
             err.report_diagnostic(&self.context, expr_type, value.as_ref().into());
             Type::unknown()

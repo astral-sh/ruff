@@ -1,9 +1,14 @@
 use std::cell::RefCell;
 
+use ruff_python_ast as ast;
+use ty_python_core::EvaluationMode;
+
 use super::{
     DivergentType, DynamicType, KnownClass, StaticClassLiteral, TupleSpec, Type, UnionType,
+    instance::SliceLiteral,
 };
 use crate::Db;
+use crate::subscript::{PyIndex, PySlice};
 use crate::types::visitor::any_over_type;
 
 impl<'db> Type<'db> {
@@ -18,6 +23,31 @@ impl<'db> Type<'db> {
         index: usize,
     ) -> Option<Self> {
         self.try_cycle_projection(db, CycleProjectionOp::UnpackExact { len, index })
+    }
+
+    pub(crate) fn try_cycle_subscript_projection(
+        self,
+        db: &'db dyn Db,
+        slice_ty: Type<'db>,
+    ) -> Option<Self> {
+        self.try_cycle_projection(db, CycleProjectionOp::from_subscript(db, slice_ty)?)
+    }
+
+    pub(crate) fn try_cycle_context_enter_projection(
+        self,
+        db: &'db dyn Db,
+        mode: EvaluationMode,
+    ) -> Option<Self> {
+        self.try_cycle_projection(
+            db,
+            CycleProjectionOp::ContextEnter {
+                is_async: mode.is_async(),
+            },
+        )
+    }
+
+    pub(crate) fn try_cycle_await_projection(self, db: &'db dyn Db) -> Option<Self> {
+        self.try_cycle_projection(db, CycleProjectionOp::AwaitResult)
     }
 
     fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp) -> Option<Self> {
@@ -70,16 +100,18 @@ impl<'db> Type<'db> {
         root: DivergentType,
         evidence: &[CycleRecoveryEvidence<'db>],
     ) -> Option<Self> {
+        let elements = self.top_level_projection_union_elements(db);
         let mut containers = Vec::new();
         let mut ops = Vec::new();
 
-        for element in self.top_level_projection_union_elements(db) {
+        for element in &elements {
+            Self::collect_projection_ops(db, root, *element, &mut ops);
+
             if element.same_divergent_marker(Type::Divergent(root)) {
                 continue;
             }
 
-            let container = ProjectionContainer::from_type(db, element)?;
-            container.collect_projection_ops(db, root, &mut ops);
+            let container = ProjectionContainer::from_type(db, *element)?;
             containers.push(container);
         }
 
@@ -101,12 +133,15 @@ impl<'db> Type<'db> {
             .map(|(op, terms)| Some((*op, Self::solve_projection_terms(db, root, *op, terms)?)))
             .collect::<Option<Vec<_>>>()?;
 
-        let containers = containers
+        let elements = elements
             .into_iter()
-            .map(|container| container.into_type(db, root, &solved_ops))
+            .filter(|element| {
+                !matches!(element, Type::Divergent(divergent) if divergent.same_marker(root))
+            })
+            .map(|element| element.replace_solved_projection_artifacts(db, root, &solved_ops))
             .collect::<Option<Vec<_>>>()?;
 
-        Some(UnionType::from_elements_cycle_recovery(db, containers))
+        Some(UnionType::from_elements_cycle_recovery(db, elements))
     }
 
     fn top_level_projection_union_elements(self, db: &'db dyn Db) -> Vec<Self> {
@@ -415,31 +450,6 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    fn collect_projection_ops(
-        &self,
-        db: &'db dyn Db,
-        root: DivergentType,
-        paths: &mut Vec<CycleProjectionPath<'db>>,
-    ) {
-        match self {
-            Self::FixedTuple { elements } => {
-                for element in elements {
-                    Type::collect_projection_ops(db, root, *element, paths);
-                }
-            }
-            Self::Known { arguments, .. } => {
-                for argument in arguments {
-                    Type::collect_projection_ops(db, root, *argument, paths);
-                }
-            }
-            Self::Custom { arguments, .. } => {
-                for argument in arguments {
-                    Type::collect_projection_ops(db, root, *argument, paths);
-                }
-            }
-        }
-    }
-
     fn collect_projection_terms(
         &self,
         db: &'db dyn Db,
@@ -491,6 +501,14 @@ impl<'db> ProjectionContainer<'db> {
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::project_unpack_exact(db, ty, len, index)?
             }
+            CycleProjectionOp::GetItemLiteralInt(index) => {
+                Self::project_get_item_int(db, ty, Some(index))?
+            }
+            CycleProjectionOp::GetItemInt => Self::project_get_item_int(db, ty, None)?,
+            CycleProjectionOp::SliceStatic(slice) => Self::project_slice_static(db, ty, slice)?,
+            CycleProjectionOp::ContextEnter { .. } | CycleProjectionOp::AwaitResult => {
+                return None;
+            }
         };
 
         if tail.is_empty() {
@@ -532,6 +550,19 @@ impl<'db> ProjectionContainer<'db> {
             CycleProjectionOp::UnpackExact { len, index } => {
                 Self::infer_unpack_exact(db, ty, len, index)?
             }
+            CycleProjectionOp::GetItemLiteralInt(index) => {
+                Self::infer_subscript(db, ty, Type::int_literal(index))?
+            }
+            CycleProjectionOp::GetItemInt => {
+                Self::infer_subscript(db, ty, KnownClass::Int.to_instance(db))?
+            }
+            CycleProjectionOp::SliceStatic(slice) => {
+                Self::infer_subscript(db, ty, slice.into_type(db))?
+            }
+            CycleProjectionOp::ContextEnter { is_async } => {
+                Self::infer_context_enter(db, ty, is_async)?
+            }
+            CycleProjectionOp::AwaitResult => Self::infer_await_result(db, ty)?,
         };
 
         if tail.is_empty() {
@@ -590,6 +621,64 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
+    fn project_get_item_int(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        index: Option<i64>,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let tuple = spec.as_ref();
+
+            if let Some(index) = index {
+                let index = i32::try_from(index).ok()?;
+                return Some(ProjectionTerm::Exact(tuple.py_index(db, index).ok()?));
+            }
+
+            return Some(ProjectionTerm::Homogeneous(
+                UnionType::from_elements_cycle_recovery(db, tuple.all_elements().iter().copied()),
+            ));
+        }
+
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(element) =
+                Self::known_container_get_item_type(known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Homogeneous(element));
+        }
+
+        None
+    }
+
+    fn project_slice_static(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        slice: StaticSliceProjection,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
+                return None;
+            };
+
+            let elements = tuple
+                .py_slice(db, slice.start, slice.stop, slice.step)
+                .ok()?;
+            return Some(ProjectionTerm::Exact(Type::heterogeneous_tuple(
+                db, elements,
+            )));
+        }
+
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(sliced) =
+                Self::known_container_slice_type(db, known_class, specialization.types(db))
+        {
+            return Some(ProjectionTerm::Exact(sliced));
+        }
+
+        None
+    }
+
     fn infer_iter_item(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Homogeneous(
             ty.try_iterate(db).ok()?.homogeneous_element_type(db),
@@ -612,6 +701,36 @@ impl<'db> ProjectionContainer<'db> {
         Some(ProjectionTerm::Homogeneous(
             ty.try_iterate(db).ok()?.homogeneous_element_type(db),
         ))
+    }
+
+    fn infer_subscript(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        slice_ty: Type<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        Some(ProjectionTerm::Exact(
+            ty.subscript(db, slice_ty, ast::ExprContext::Load).ok()?,
+        ))
+    }
+
+    fn infer_context_enter(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        is_async: bool,
+    ) -> Option<ProjectionTerm<'db>> {
+        let mode = if is_async {
+            EvaluationMode::Async
+        } else {
+            EvaluationMode::Sync
+        };
+
+        Some(ProjectionTerm::Exact(
+            ty.try_enter_with_mode(db, mode).ok()?,
+        ))
+    }
+
+    fn infer_await_result(db: &'db dyn Db, ty: Type<'db>) -> Option<ProjectionTerm<'db>> {
+        Some(ProjectionTerm::Exact(ty.try_await(db).ok()?))
     }
 
     fn into_type(
@@ -687,6 +806,31 @@ impl<'db> ProjectionContainer<'db> {
         };
 
         arguments.get(index).copied()
+    }
+
+    fn known_container_get_item_type(
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        let index = match class {
+            KnownClass::List | KnownClass::Deque | KnownClass::Sequence => 0,
+            _ => return None,
+        };
+
+        arguments.get(index).copied()
+    }
+
+    fn known_container_slice_type(
+        db: &'db dyn Db,
+        class: KnownClass,
+        arguments: &[Type<'db>],
+    ) -> Option<Type<'db>> {
+        let element = match class {
+            KnownClass::List | KnownClass::Sequence => arguments.first().copied()?,
+            _ => return None,
+        };
+
+        Some(class.to_specialized_instance(db, &[element]))
     }
 }
 
@@ -841,4 +985,67 @@ impl<'db> CycleProjectionPath<'db> {
 pub(crate) enum CycleProjectionOp {
     IterItem,
     UnpackExact { len: usize, index: usize },
+    GetItemLiteralInt(i64),
+    GetItemInt,
+    SliceStatic(StaticSliceProjection),
+    ContextEnter { is_async: bool },
+    AwaitResult,
+}
+
+impl<'db> CycleProjectionOp {
+    fn from_subscript(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
+        if let Some(index) = slice_ty.as_int_like_literal() {
+            return Some(Self::GetItemLiteralInt(index));
+        }
+
+        if let Some(slice) = slice_ty
+            .as_nominal_instance()
+            .and_then(|instance| instance.slice_literal(db))
+            && slice.step != Some(0)
+        {
+            return Some(Self::SliceStatic(StaticSliceProjection::from(slice)));
+        }
+
+        if slice_ty.is_instance_of(db, KnownClass::Int)
+            || slice_ty.is_instance_of(db, KnownClass::Bool)
+        {
+            return Some(Self::GetItemInt);
+        }
+
+        None
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct StaticSliceProjection {
+    start: Option<i32>,
+    stop: Option<i32>,
+    step: Option<i32>,
+}
+
+impl StaticSliceProjection {
+    fn into_type(self, db: &dyn Db) -> Type<'_> {
+        let type_for_bound = |bound: Option<i32>| {
+            bound.map_or_else(|| Type::none(db), |index| Type::int_literal(index.into()))
+        };
+
+        KnownClass::Slice.to_specialized_instance(
+            db,
+            &[
+                type_for_bound(self.start),
+                type_for_bound(self.stop),
+                type_for_bound(self.step),
+            ],
+        )
+    }
+}
+
+impl From<SliceLiteral> for StaticSliceProjection {
+    fn from(slice: SliceLiteral) -> Self {
+        Self {
+            start: slice.start,
+            stop: slice.stop,
+            step: slice.step,
+        }
+    }
 }

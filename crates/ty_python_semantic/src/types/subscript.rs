@@ -539,6 +539,12 @@ impl<'db> Type<'db> {
 
         let value_ty = self;
 
+        if expr_context == ast::ExprContext::Load
+            && let Some(projection) = value_ty.try_cycle_subscript_projection(db, slice_ty)
+        {
+            return Ok(projection);
+        }
+
         let inferred = match (value_ty, slice_ty) {
             (Type::Dynamic(_) | Type::Divergent(_) | Type::CycleProjection(_) | Type::Never, _) => {
                 Some(Ok(value_ty))
