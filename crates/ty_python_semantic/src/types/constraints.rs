@@ -1995,17 +1995,76 @@ impl ConstraintId {
         std::cmp::Reverse(self.index())
     }
 
-    /// Returns whether this constraint implies another — i.e., whether every type that
-    /// satisfies this constraint also satisfies `other`.
+    /// Returns whether this constraint is proven to imply another.
     ///
-    /// This is used to simplify how we display constraint sets, by removing redundant constraints
-    /// from a clause.
+    /// This is used to derive optional sequents and to simplify how we display constraint sets by
+    /// removing redundant constraints from a clause. It is intentionally conservative: `false`
+    /// means "not proven", not "semantically false".
+    ///
+    /// We first try a shallow non-recursive assignability check. If that fails, we only perform a
+    /// full semantic assignability check when none of the bounds mention typevars. Bounds that do
+    /// mention typevars can cause us to recurse back into sequent discovery, which can cause
+    /// performance blowups for some complex types. Because we only use this method to add optional
+    /// derived sequents, we conservatively avoid deriving non-obvious and expensive implications
+    /// involving typevar bounds.
+    ///
+    /// These checks can themselves construct constraint sets, whose sequent discovery can in turn
+    /// ask for more implication checks. That introduces potential cycles. We salsa-track the
+    /// semantic assignability check both to break those cycles and to amortize the cost of that
+    /// check across multiple type inference checks.
     fn implies<'db>(
         self,
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         other: Self,
     ) -> bool {
+        const MAX_SHALLOW_ASSIGNABILITY_DEPTH: u8 = 8;
+
+        /// Returns whether `source` is obviously assignable to `target`, using only shallow
+        /// structural facts. This is intentionally incomplete: `false` means "not proven", not
+        /// "not assignable".
+        fn shallowly_assignable_to<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+            depth: u8,
+        ) -> bool {
+            if source == target || source.is_never() || target.is_object() {
+                return true;
+            }
+            if depth == 0 {
+                return false;
+            }
+
+            match (source, target) {
+                (Type::Union(source_union), _) => source_union
+                    .elements(db)
+                    .iter()
+                    .all(|&element| shallowly_assignable_to(db, element, target, depth - 1)),
+
+                (_, Type::Union(target_union)) => target_union
+                    .elements(db)
+                    .iter()
+                    .any(|&element| shallowly_assignable_to(db, source, element, depth - 1)),
+
+                (Type::Intersection(source_intersection), _) => source_intersection
+                    .positive(db)
+                    .iter()
+                    .any(|&element| shallowly_assignable_to(db, element, target, depth - 1)),
+
+                (_, Type::Intersection(target_intersection))
+                    if target_intersection.negative(db).is_empty() =>
+                {
+                    target_intersection
+                        .positive(db)
+                        .iter()
+                        .all(|&element| shallowly_assignable_to(db, source, element, depth - 1))
+                }
+
+                _ => false,
+            }
+        }
+
         #[salsa::tracked(
             returns(copy),
             cycle_initial=|_, _, _, _| false,
@@ -2022,6 +2081,43 @@ impl ConstraintId {
             {
                 return false;
             }
+
+            if shallowly_assignable_to(
+                db,
+                other_constraint.bounds.materialized_lower(),
+                self_constraint.bounds.materialized_lower(),
+                MAX_SHALLOW_ASSIGNABILITY_DEPTH,
+            ) && shallowly_assignable_to(
+                db,
+                self_constraint.bounds.materialized_upper(),
+                other_constraint.bounds.materialized_upper(),
+                MAX_SHALLOW_ASSIGNABILITY_DEPTH,
+            ) {
+                return true;
+            }
+
+            // The full semantic implication check can recursively construct constraint sets and
+            // derive more sequents. That's useful when none of the bounds mention typevars, but
+            // bounds that do mention typevars can reference protocol-local typevars whose
+            // assignability checks recurse back into sequent discovery. Since implication checks
+            // only add optional derived sequents, conservatively decline to derive non-obvious
+            // implications involving typevar bounds.
+            let constraint_mentions_typevar = |constraint: Constraint<'db>| {
+                constraint
+                    .bounds
+                    .lower
+                    .is_some_and(|lower| any_over_type(db, lower, false, Type::is_type_var))
+                    || constraint
+                        .bounds
+                        .upper
+                        .is_some_and(|upper| any_over_type(db, upper, false, Type::is_type_var))
+            };
+            if constraint_mentions_typevar(self_constraint)
+                || constraint_mentions_typevar(other_constraint)
+            {
+                return false;
+            }
+
             other_constraint
                 .bounds
                 .materialized_lower()
@@ -7672,6 +7768,45 @@ mod tests {
                 Some(&false)
             );
         });
+    }
+
+    #[test]
+    fn constraint_implications_preserve_shallow_typevar_bound_proofs() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let int = KnownClass::Int.to_instance(&db);
+        let u_ty = Type::TypeVar(u);
+        let builder = ConstraintSetBuilder::new();
+
+        let left_upper = UnionType::from_elements(&db, [int, u_ty]);
+        let right_upper = UnionType::from_elements(&db, [u_ty, int]);
+        let left = ConstraintId::new(&db, &builder, t, Type::Never, left_upper);
+        let right = ConstraintId::new(&db, &builder, t, Type::Never, right_upper);
+
+        assert!(builder.cached_constraint_implies(&db, left, right));
+        assert!(builder.cached_constraint_implies(&db, right, left));
+    }
+
+    #[test]
+    fn constraint_implications_skip_non_obvious_typevar_bounds() {
+        let db = setup_db();
+        let t = create_typevar(&db, "T");
+        let u = create_typevar(&db, "U");
+        let bool_ty = KnownClass::Bool.to_instance(&db);
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let u_ty = Type::TypeVar(u);
+        let builder = ConstraintSetBuilder::new();
+
+        let bool_or_u = UnionType::from_elements(&db, [bool_ty, u_ty]);
+        let int_or_u = UnionType::from_elements(&db, [int_ty, u_ty]);
+        let left = ConstraintId::new(&db, &builder, t, Type::Never, bool_or_u);
+        let right = ConstraintId::new(&db, &builder, t, Type::Never, int_or_u);
+
+        // This implication is semantically true because `bool` is a subtype of `int`, but proving
+        // that requires semantic reasoning about a bound that mentions another typevar. For sequent
+        // discovery, conservatively skip such non-obvious implications involving typevar bounds.
+        assert!(!builder.cached_constraint_implies(&db, left, right));
     }
 
     #[track_caller]
