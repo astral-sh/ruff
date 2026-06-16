@@ -97,17 +97,15 @@ impl<'db> Type<'db> {
         })
     }
 
-    pub(crate) fn try_cycle_mapping_view_projection(
+    pub(crate) fn try_cycle_method_call_projection(
         self,
         db: &'db dyn Db,
-        method_name: &str,
+        method_name: &Name,
     ) -> Option<Self> {
-        let op = CycleProjectionOp::from_mapping_view_method(method_name)?;
-        let item_ty = self.try_cycle_projection_with_non_cycle(db, op, |ty| {
-            ProjectionContainer::mapping_view_item_type_for_type(db, ty, op)
-        })?;
-
-        Some(KnownClass::Iterable.to_specialized_instance(db, &[item_ty]))
+        let op = CycleProjectionOp::CallMethod0(CycleProjectionMethodName::new(db, method_name));
+        self.try_cycle_projection_with_non_cycle(db, op, |ty| {
+            ProjectionContainer::infer_method_call0_type_for_type(db, ty, method_name)
+        })
     }
 
     pub(crate) fn try_cycle_context_enter_projection(
@@ -127,7 +125,7 @@ impl<'db> Type<'db> {
         })
     }
 
-    fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp) -> Option<Self> {
+    fn try_cycle_projection(self, db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Option<Self> {
         match self {
             Type::Divergent(root) => Some(Self::CycleProjection(CycleProjectionType {
                 root,
@@ -143,7 +141,7 @@ impl<'db> Type<'db> {
     fn try_cycle_projection_with_non_cycle(
         self,
         db: &'db dyn Db,
-        op: CycleProjectionOp,
+        op: CycleProjectionOp<'db>,
         mut project_non_cycle: impl FnMut(Self) -> Option<Self>,
     ) -> Option<Self> {
         let Type::Union(union) = self else {
@@ -583,25 +581,25 @@ impl<'db> ProjectionContainer<'db> {
             || Self::known_container_get_item_type(db, class, arguments).is_some()
             || Self::known_container_slice_type_for_class(class, arguments).is_some()
             || Self::known_container_await_result_type(class, arguments).is_some()
-            || Self::known_container_mapping_view_item_type(
+            || Self::known_container_method_call0_type(
                 db,
                 class,
                 arguments,
-                CycleProjectionOp::MappingKeys,
+                &Name::new_static("keys"),
             )
             .is_some()
-            || Self::known_container_mapping_view_item_type(
+            || Self::known_container_method_call0_type(
                 db,
                 class,
                 arguments,
-                CycleProjectionOp::MappingValues,
+                &Name::new_static("values"),
             )
             .is_some()
-            || Self::known_container_mapping_view_item_type(
+            || Self::known_container_method_call0_type(
                 db,
                 class,
                 arguments,
-                CycleProjectionOp::MappingItems,
+                &Name::new_static("items"),
             )
             .is_some()
     }
@@ -686,10 +684,8 @@ impl<'db> ProjectionContainer<'db> {
             }
             CycleProjectionOp::GetItemInt => Self::project_get_item_int(db, ty, None)?,
             CycleProjectionOp::GetItem => Self::project_get_item(db, ty)?,
+            CycleProjectionOp::CallMethod0(method) => Self::project_method_call0(db, ty, method)?,
             CycleProjectionOp::SliceStatic(slice) => Self::project_slice_static(db, ty, slice)?,
-            CycleProjectionOp::MappingKeys
-            | CycleProjectionOp::MappingValues
-            | CycleProjectionOp::MappingItems => Self::project_mapping_view_item(db, ty, op)?,
             CycleProjectionOp::ContextEnter { .. } => {
                 return None;
             }
@@ -726,7 +722,7 @@ impl<'db> ProjectionContainer<'db> {
     fn infer_projection_path(
         db: &'db dyn Db,
         ty: Type<'db>,
-        ops: &[CycleProjectionOp],
+        ops: &[CycleProjectionOp<'db>],
     ) -> Option<ProjectionTerm<'db>> {
         let (&op, tail) = ops.split_first()?;
 
@@ -760,12 +756,10 @@ impl<'db> ProjectionContainer<'db> {
                 Self::infer_subscript(db, ty, KnownClass::Int.to_instance(db))?
             }
             CycleProjectionOp::GetItem => Self::infer_subscript(db, ty, Type::unknown())?,
+            CycleProjectionOp::CallMethod0(method) => Self::infer_method_call0(db, ty, method)?,
             CycleProjectionOp::SliceStatic(slice) => {
                 Self::infer_subscript(db, ty, slice.into_type(db))?
             }
-            CycleProjectionOp::MappingKeys
-            | CycleProjectionOp::MappingValues
-            | CycleProjectionOp::MappingItems => Self::project_mapping_view_item(db, ty, op)?,
             CycleProjectionOp::ContextEnter { is_async } => {
                 Self::infer_context_enter(db, ty, is_async)?
             }
@@ -941,6 +935,28 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
+    fn project_method_call0(
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        method: CycleProjectionMethodName<'db>,
+    ) -> Option<ProjectionTerm<'db>> {
+        if let Some((class, specialization)) = ty.class_specialization(db)
+            && let Some(known_class) = class.known(db)
+            && let Some(return_ty) = Self::known_container_method_call0_type(
+                db,
+                known_class,
+                specialization.types(db),
+                method.name(db),
+            )
+        {
+            return Some(ProjectionTerm::Exact(return_ty));
+        }
+
+        Some(ProjectionTerm::Exact(
+            Self::infer_method_call0_type_for_type(db, ty, method.name(db))?,
+        ))
+    }
+
     fn project_slice_static(
         db: &'db dyn Db,
         ty: Type<'db>,
@@ -980,13 +996,13 @@ impl<'db> ProjectionContainer<'db> {
         None
     }
 
-    fn project_mapping_view_item(
+    fn infer_method_call0(
         db: &'db dyn Db,
         ty: Type<'db>,
-        view: CycleProjectionOp,
+        method: CycleProjectionMethodName<'db>,
     ) -> Option<ProjectionTerm<'db>> {
         Some(ProjectionTerm::Exact(
-            Self::mapping_view_item_type_for_type(db, ty, view)?,
+            Self::infer_method_call0_type_for_type(db, ty, method.name(db))?,
         ))
     }
 
@@ -1243,37 +1259,21 @@ impl<'db> ProjectionContainer<'db> {
         }
     }
 
-    fn mapping_view_item_type_for_type(
+    fn known_container_method_call0_type(
         db: &'db dyn Db,
-        ty: Type<'db>,
-        view: CycleProjectionOp,
+        class: KnownClass,
+        arguments: &[Type<'db>],
+        method_name: &Name,
     ) -> Option<Type<'db>> {
-        if let Some(item) = Self::known_mapping_view_item_type_for_type(db, ty, view) {
-            return Some(item);
-        }
-
-        Self::inferred_mapping_view_item_type_for_type(db, ty, view)
-    }
-
-    fn known_mapping_view_item_type_for_type(
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        view: CycleProjectionOp,
-    ) -> Option<Type<'db>> {
-        let (class, specialization) = ty.class_specialization(db)?;
-        Self::known_container_mapping_view_item_type(
-            db,
-            class.known(db)?,
-            specialization.types(db),
-            view,
-        )
+        let item = Self::known_container_mapping_view_item_type(db, class, arguments, method_name)?;
+        Some(KnownClass::Iterable.to_specialized_instance(db, &[item]))
     }
 
     fn known_container_mapping_view_item_type(
         db: &'db dyn Db,
         class: KnownClass,
         arguments: &[Type<'db>],
-        view: CycleProjectionOp,
+        method_name: &Name,
     ) -> Option<Type<'db>> {
         let key = arguments.first().copied()?;
         let value = match class {
@@ -1286,20 +1286,19 @@ impl<'db> ProjectionContainer<'db> {
             _ => return None,
         };
 
-        match view {
-            CycleProjectionOp::MappingKeys => Some(key),
-            CycleProjectionOp::MappingValues => Some(value),
-            CycleProjectionOp::MappingItems => Some(Type::heterogeneous_tuple(db, [key, value])),
+        match method_name.as_str() {
+            "keys" => Some(key),
+            "values" => Some(value),
+            "items" => Some(Type::heterogeneous_tuple(db, [key, value])),
             _ => None,
         }
     }
 
-    fn inferred_mapping_view_item_type_for_type(
+    fn infer_method_call0_type_for_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        view: CycleProjectionOp,
+        method_name: &Name,
     ) -> Option<Type<'db>> {
-        let method_name = view.mapping_view_method_name()?;
         let Place::Defined(DefinedPlace {
             ty: method,
             definedness: Definedness::AlwaysDefined,
@@ -1307,7 +1306,7 @@ impl<'db> ProjectionContainer<'db> {
         }) = ty
             .member_lookup_with_policy(
                 db,
-                Name::new_static(method_name),
+                method_name.clone(),
                 MemberLookupPolicy::NO_INSTANCE_FALLBACK,
             )
             .place
@@ -1319,10 +1318,7 @@ impl<'db> ProjectionContainer<'db> {
             method
                 .try_call(db, &CallArguments::none())
                 .ok()?
-                .return_type(db)
-                .try_iterate(db)
-                .ok()?
-                .homogeneous_element_type(db),
+                .return_type(db),
         )
     }
 }
@@ -1439,7 +1435,7 @@ impl<'db> CycleProjectionType<'db> {
         self.path
     }
 
-    fn append(self, db: &'db dyn Db, op: CycleProjectionOp) -> Self {
+    fn append(self, db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Self {
         Self {
             root: self.root,
             path: self.path.append(db, op),
@@ -1450,22 +1446,22 @@ impl<'db> CycleProjectionType<'db> {
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
 struct CycleProjectionPath<'db> {
     #[returns(deref)]
-    ops: Box<[CycleProjectionOp]>,
+    ops: Box<[CycleProjectionOp<'db>]>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for CycleProjectionPath<'_> {}
 
 impl<'db> CycleProjectionPath<'db> {
-    fn from_op(db: &'db dyn Db, op: CycleProjectionOp) -> Self {
+    fn from_op(db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Self {
         Self::from_ops(db, [op])
     }
 
-    fn from_ops(db: &'db dyn Db, ops: impl IntoIterator<Item = CycleProjectionOp>) -> Self {
+    fn from_ops(db: &'db dyn Db, ops: impl IntoIterator<Item = CycleProjectionOp<'db>>) -> Self {
         Self::new_internal(db, ops.into_iter().collect::<Vec<_>>().into_boxed_slice())
     }
 
-    fn append(self, db: &'db dyn Db, op: CycleProjectionOp) -> Self {
+    fn append(self, db: &'db dyn Db, op: CycleProjectionOp<'db>) -> Self {
         let mut ops = self.ops(db).to_vec();
         ops.push(op);
         Self::new_internal(db, ops.into_boxed_slice())
@@ -1477,9 +1473,26 @@ impl<'db> CycleProjectionPath<'db> {
     }
 }
 
+#[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) struct CycleProjectionMethodName<'db> {
+    #[returns(ref)]
+    name: Name,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CycleProjectionMethodName<'_> {}
+
+impl<'db> CycleProjectionMethodName<'db> {
+    fn new(db: &'db dyn Db, name: &Name) -> Self {
+        let mut name = name.clone();
+        name.shrink_to_fit();
+        Self::new_internal(db, name)
+    }
+}
+
 /// The projection operations currently preserved through cycle recovery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum CycleProjectionOp {
+pub(crate) enum CycleProjectionOp<'db> {
     IterItem,
     AsyncIterItem,
     UnpackExact {
@@ -1501,37 +1514,17 @@ pub(crate) enum CycleProjectionOp {
         index: usize,
     },
     GetItem,
+    CallMethod0(CycleProjectionMethodName<'db>),
     GetItemLiteralInt(i64),
     GetItemInt,
     SliceStatic(StaticSliceProjection),
-    MappingKeys,
-    MappingValues,
-    MappingItems,
     ContextEnter {
         is_async: bool,
     },
     AwaitResult,
 }
 
-impl<'db> CycleProjectionOp {
-    fn from_mapping_view_method(method_name: &str) -> Option<Self> {
-        match method_name {
-            "keys" => Some(Self::MappingKeys),
-            "values" => Some(Self::MappingValues),
-            "items" => Some(Self::MappingItems),
-            _ => None,
-        }
-    }
-
-    const fn mapping_view_method_name(self) -> Option<&'static str> {
-        match self {
-            Self::MappingKeys => Some("keys"),
-            Self::MappingValues => Some("values"),
-            Self::MappingItems => Some("items"),
-            _ => None,
-        }
-    }
-
+impl<'db> CycleProjectionOp<'db> {
     fn from_subscript(db: &'db dyn Db, slice_ty: Type<'db>) -> Option<Self> {
         if let Some(index) = slice_ty.as_int_like_literal() {
             return Some(Self::GetItemLiteralInt(index));

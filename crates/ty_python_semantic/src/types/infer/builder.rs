@@ -8918,7 +8918,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
             && let Some(projected) = self
                 .expression_type(value)
-                .try_cycle_mapping_view_projection(db, attr.id.as_str())
+                .try_cycle_method_call_projection(db, &attr.id)
         {
             projected
         } else {

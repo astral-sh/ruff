@@ -3500,6 +3500,40 @@ class ProjectionCustomSlice:
 
         reveal_type(self.x)  # revealed: SliceBox[int]
 
+class MethodBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def unwrap(self) -> ProjectionT:
+        return self.value
+
+class ProjectionCustomMethodCall:
+    def __init__(self) -> None:
+        self.x = MethodBox(0)
+
+    def read(self) -> None:
+        item = self.x.unwrap()
+        self.x = MethodBox(item)
+
+        reveal_type(self.x)  # revealed: MethodBox[int]
+
+class ViewBox(Generic[ProjectionT]):
+    def __init__(self, value: ProjectionT) -> None:
+        self.value = value
+
+    def view(self) -> Iterator[ProjectionT]:
+        return iter(())
+
+class ProjectionCustomMethodFor:
+    def __init__(self) -> None:
+        self.x = ViewBox(0)
+
+    def read(self) -> None:
+        for item in self.x.view():
+            self.x = ViewBox(item)
+
+        reveal_type(self.x)  # revealed: ViewBox[int]
+
 class ProjectionCustomMapping(Generic[ProjectionT, ProjectionU], Mapping[ProjectionT, ProjectionU]):
     def __getitem__(self, key: ProjectionT) -> ProjectionU:
         raise KeyError
