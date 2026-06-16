@@ -1285,7 +1285,7 @@ mod tests {
             is_pure_virtual: false,
             constexpr_kind: None,
             is_noexcept: true,
-            overrides: Some("Classify.Recognize".to_string()),
+            overrides: Some("Tesseract::Classify.Recognize".to_string()),
             operator_kind: None,
             requires_clause: None,
         });
@@ -1390,7 +1390,10 @@ mod tests {
         assert!(has("is_noexcept", "true"));
         assert!(has("is_pure_virtual", "true"));
         assert!(has("is_constexpr", "constexpr"));
-        assert!(has("virtually_overrides", "cpp:Classify.Recognize"));
+        assert!(has(
+            "virtually_overrides",
+            "cpp:Tesseract::Classify.Recognize"
+        ));
         assert!(has("defines_operator", "operator=="));
         assert!(has("requires_concept", "std::equality_comparable<T>"));
     }
