@@ -427,12 +427,19 @@ These phases are implementation slices, not a license to defer cleanup or testin
 
 ### Phase 0: Baseline and reproducer
 
-- [ ] Confirm the current worktree is based on `dcreager/deferred-quantification`.
-- [ ] Build ty in debug mode.
-- [ ] Reproduce or at least baseline the `jax` regression with an explicit memory limit.
+- [x] Confirm the current worktree is based on `dcreager/deferred-quantification`.
+    - Verified with `jj log -r 'dcreager/deferred-quantification..@'`: the current stack is on top of `dcreager/deferred-quantification`, with only the plan/baseline working revisions above it (plus one empty intermediate revision).
+- [x] Build ty in debug mode.
+    - Command: `cargo build --bin ty`
+    - Result: succeeded in the dev profile.
+- [x] Reproduce or at least baseline the `jax` regression with an explicit memory limit.
     - Do **not** run `jax` without a memory limit.
-    - Record the exact command, memory limit, and observed behavior in this plan.
-- [ ] Identify or create a smaller mdtest/unit test if feasible. Do not block the core implementation on perfect minimization.
+    - Command: `mkdir -p "$HOME/.pi/tmp" && (ulimit -v 8388608; eco -o "$HOME/.pi/tmp/jax-ecosystem-baseline.json" jax)`
+    - Memory limit: `ulimit -v 8388608` (8 GiB virtual memory) applied to the `eco` process and its children.
+    - Result: completed without being OOM-killed; `eco` reported `jax: 0.8814291954040527`, and the JSON report records `median_time_s: 0.8814291954040527` with ty exit status 1 for diagnostics.
+    - Output report: `$HOME/.pi/tmp/jax-ecosystem-baseline.json`.
+- [x] Identify or create a smaller mdtest/unit test if feasible. Do not block the core implementation on perfect minimization.
+    - No smaller standalone reproducer was identified during baseline setup. The implementation phases below include focused unit/mdtest coverage for factored upper bounds, sequent-map union-upper handling, and bounded witness extraction.
 
 ### Phase 1: Introduce `UpperBound`
 
