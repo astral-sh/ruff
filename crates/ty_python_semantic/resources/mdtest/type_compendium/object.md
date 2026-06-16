@@ -3,10 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-# Ignore usage of & and ~ in value expressions
-unsupported-operator = "ignore"
 ```
 
 The `object` type represents the set of all Python objects.
@@ -73,7 +69,7 @@ static_assert(is_equivalent_to(int | object | None, object))
 
 Intersecting with `object` is equivalent to the original type:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...

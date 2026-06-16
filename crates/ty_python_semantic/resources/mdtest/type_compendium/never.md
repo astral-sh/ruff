@@ -3,10 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-# Ignore usage of & and ~ in value expressions
-unsupported-operator = "ignore"
 ```
 
 `Never` represents the empty set of values.
@@ -125,7 +121,7 @@ static_assert(is_equivalent_to(P | Never | Q | None, P | Q | None))
 
 Intersecting with `Never` results in `Never`:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 
@@ -140,7 +136,7 @@ static_assert(is_equivalent_to(P & Never & Q, Never))
 `object` describes the set of all possible values, while `Never` describes the empty set. The two
 types are complements of each other:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 from typing_extensions import Never
 

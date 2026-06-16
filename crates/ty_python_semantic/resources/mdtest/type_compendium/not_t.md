@@ -3,10 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-# Ignore usage of & and ~ in value expressions
-unsupported-operator = "ignore"
 ```
 
 The type `~T` is the complement of the type `T`. It describes the set of all values that are *not*
@@ -16,7 +12,7 @@ in `T`.
 
 `~T` is disjoint from `T`:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_disjoint_from
 
 class T: ...
@@ -31,7 +27,7 @@ static_assert(is_disjoint_from(~T, S))
 Together, `T` and `~T` describe the set of all values. So the union of both types is equivalent to
 `object`:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 
 class T: ...
@@ -43,7 +39,7 @@ static_assert(is_equivalent_to(T | ~T, object))
 
 If `S <: T`, then `~T <: ~S`:, similar to how negation in logic reverses the order of `<=`:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_subtype_of
 
 class T: ...
@@ -57,7 +53,7 @@ static_assert(is_subtype_of(~T, ~S))
 
 Assignability relationships are similarly reversed:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_assignable_to
 from typing import Any
 
@@ -76,7 +72,7 @@ static_assert(is_assignable_to(~(Any & S), ~(Any & T)))
 
 If two types `P` and `Q` are disjoint, then `P` must be a subtype of `~Q`, and vice versa:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_subtype_of, is_disjoint_from
 from typing import final
 
@@ -97,7 +93,7 @@ static_assert(is_subtype_of(Q, ~P))
 Given two unrelated types `P` and `Q`, we can demonstrate De-Morgan's laws in the context of
 set-theoretic types:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 
 class P: ...
@@ -106,13 +102,13 @@ class Q: ...
 
 The negation of a union is the intersection of the negations:
 
-```py
+```pyi
 static_assert(is_equivalent_to(~(P | Q), ~P & ~Q))
 ```
 
 Conversely, the negation of an intersection is the union of the negations:
 
-```py
+```pyi
 static_assert(is_equivalent_to(~(P & Q), ~P | ~Q))
 ```
 
@@ -121,7 +117,7 @@ static_assert(is_equivalent_to(~(P & Q), ~P | ~Q))
 `Any` represents an unknown set of values. So `~Any` also represents an unknown set of values. The
 two gradual types are equivalent:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to
 from typing import Any
 

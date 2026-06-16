@@ -3,10 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-# Ignore usage of & and ~ in value expressions
-unsupported-operator = "ignore"
 ```
 
 ## Introduction
@@ -81,7 +77,7 @@ The intersection `Any & T` of `Any` with a fully static type `T` describes an un
 that is *no larger than* the set of values described by `T`. It represents an unknown fully-static
 type with *upper bound* `T`:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
 from typing import Any
 
@@ -96,14 +92,14 @@ static_assert(is_assignable_to(Medium, Any & Medium))
 `Any & Medium` is no larger than `Medium`, so we cannot assign `Big` to it. There is no possible
 materialization of `Any & Medium` that would make it as big as `Big`:
 
-```py
+```pyi
 static_assert(not is_assignable_to(Big, Any & Medium))
 ```
 
 `Any & Never` represents an "unknown" fully-static type which is no larger than `Never`. There is no
 such fully-static type, except for `Never` itself. So `Any & Never` is equivalent to `Never`:
 
-```py
+```pyi
 from typing_extensions import Never
 
 static_assert(is_equivalent_to(Any & Never, Never))

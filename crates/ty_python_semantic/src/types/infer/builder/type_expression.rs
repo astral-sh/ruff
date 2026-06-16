@@ -133,6 +133,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_type_expression_no_store(&mut self, expression: &ast::Expr) -> Type<'db> {
         let annotations_are_deferred = |builder: &Self| {
             builder.deferred_state.is_deferred()
+                || builder.in_stub()
                 || builder.is_in_type_checking_block(builder.scope(), expression)
                 || builder
                     .inference_flags()

@@ -3,10 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-# Ignore usage of & and ~ in value expressions
-unsupported-operator = "ignore"
 ```
 
 The types `AlwaysTruthy` and `AlwaysFalsy` describe the set of values that are always truthy or
@@ -69,7 +65,7 @@ Finally, we can also define the type `AmbiguousTruthiness = Truthy & Falsy`, whi
 of values that can be truthy *and* falsy. This intersection is not empty. In the following, we give
 examples for values that belong to these three types:
 
-```py
+```pyi
 from ty_extensions import static_assert, is_equivalent_to, is_disjoint_from, AlwaysTruthy, AlwaysFalsy
 from typing_extensions import Never
 from random import choice
