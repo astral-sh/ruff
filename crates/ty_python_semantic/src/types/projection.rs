@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 use super::{DivergentType, KnownClass, TupleSpec, Type, UnionType};
 use crate::Db;
 use crate::types::visitor::any_over_type;
@@ -41,94 +43,51 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        self.try_fixed_tuple_projection_cycle_normalized(db, root)
-            .or_else(|| self.try_list_projection_cycle_normalized(db, root))
+        self.try_container_projection_cycle_normalized(db, root)
     }
 
-    fn try_fixed_tuple_projection_cycle_normalized(
+    fn try_container_projection_cycle_normalized(
         self,
         db: &'db dyn Db,
         root: DivergentType,
     ) -> Option<Self> {
-        let mut tuple_len = None;
-        let mut component_terms: Vec<Vec<Type<'db>>> = Vec::new();
-        let mut saw_tuple = false;
+        let mut containers = Vec::new();
+        let mut ops = Vec::new();
 
         for element in self.top_level_projection_union_elements(db) {
             if element.same_divergent_marker(Type::Divergent(root)) {
                 continue;
             }
 
-            let spec = element.exact_tuple_instance_spec(db)?;
-            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
-                return None;
-            };
-
-            let len = tuple.len();
-            match tuple_len {
-                Some(existing_len) if existing_len != len => return None,
-                Some(_) => {}
-                None => {
-                    tuple_len = Some(len);
-                    component_terms.resize_with(len, Vec::new);
-                }
-            }
-
-            for (terms, element_ty) in component_terms.iter_mut().zip(tuple.iter_all_elements()) {
-                terms.push(element_ty);
-            }
-            saw_tuple = true;
+            let container = ProjectionContainer::from_type(db, element)?;
+            container.collect_projection_ops(db, root, &mut ops);
+            containers.push(container);
         }
 
-        if !saw_tuple {
+        if containers.is_empty() || ops.is_empty() {
             return None;
         }
 
-        let len = tuple_len?;
-        let solved_elements = component_terms
+        let mut terms_by_op = ops
             .iter()
-            .enumerate()
-            .map(|(index, terms)| {
-                Self::solve_projection_component(
-                    db,
-                    root,
-                    CycleProjectionOp::UnpackExact { len, index },
-                    terms,
-                )
-            })
+            .copied()
+            .map(|op| (op, Vec::new()))
+            .collect::<Vec<_>>();
+        for container in &containers {
+            container.collect_projection_terms(&mut terms_by_op);
+        }
+
+        let solved_ops = terms_by_op
+            .iter()
+            .map(|(op, terms)| Some((*op, Self::solve_projection_terms(db, root, *op, terms)?)))
             .collect::<Option<Vec<_>>>()?;
 
-        Some(Type::heterogeneous_tuple(db, solved_elements))
-    }
+        let containers = containers
+            .into_iter()
+            .map(|container| container.into_type(db, root, &solved_ops))
+            .collect::<Option<Vec<_>>>()?;
 
-    fn try_list_projection_cycle_normalized(
-        self,
-        db: &'db dyn Db,
-        root: DivergentType,
-    ) -> Option<Self> {
-        let mut element_terms = Vec::new();
-        let mut saw_list = false;
-
-        for element in self.top_level_projection_union_elements(db) {
-            if element.same_divergent_marker(Type::Divergent(root)) {
-                continue;
-            }
-
-            let specialization = element.known_specialization(db, KnownClass::List)?;
-            let [element_ty] = specialization.types(db) else {
-                return None;
-            };
-
-            element_terms.push(*element_ty);
-            saw_list = true;
-        }
-
-        if !saw_list {
-            return None;
-        }
-
-        let element_ty = Self::solve_homogeneous_projection_component(db, root, &element_terms)?;
-        Some(KnownClass::List.to_specialized_instance(db, &[element_ty]))
+        Some(UnionType::from_elements_cycle_recovery(db, containers))
     }
 
     fn top_level_projection_union_elements(self, db: &'db dyn Db) -> Vec<Self> {
@@ -138,22 +97,37 @@ impl<'db> Type<'db> {
         }
     }
 
-    fn solve_homogeneous_projection_component(
+    fn solve_projection_terms(
         db: &'db dyn Db,
         root: DivergentType,
-        terms: &[Type<'db>],
+        op: CycleProjectionOp,
+        terms: &[ProjectionTerm<'db>],
     ) -> Option<Self> {
         let mut saw_self_reference = false;
         let mut productive_terms = Vec::new();
 
         for term in terms {
-            Self::collect_homogeneous_projection_component_terms(
-                db,
-                root,
-                *term,
-                &mut saw_self_reference,
-                &mut productive_terms,
-            );
+            match *term {
+                ProjectionTerm::Exact(term) => {
+                    Self::collect_projection_component_terms(
+                        db,
+                        root,
+                        op,
+                        term,
+                        &mut saw_self_reference,
+                        &mut productive_terms,
+                    )?;
+                }
+                ProjectionTerm::Homogeneous(term) => {
+                    Self::collect_homogeneous_projection_component_terms(
+                        db,
+                        root,
+                        term,
+                        &mut saw_self_reference,
+                        &mut productive_terms,
+                    );
+                }
+            }
         }
 
         if productive_terms.is_empty() {
@@ -194,36 +168,6 @@ impl<'db> Type<'db> {
         Self::add_productive_projection_term(db, term, productive_terms);
     }
 
-    fn solve_projection_component(
-        db: &'db dyn Db,
-        root: DivergentType,
-        op: CycleProjectionOp,
-        terms: &[Type<'db>],
-    ) -> Option<Self> {
-        let mut saw_self_reference = false;
-        let mut productive_terms = Vec::new();
-
-        for term in terms {
-            Self::collect_projection_component_terms(
-                db,
-                root,
-                op,
-                *term,
-                &mut saw_self_reference,
-                &mut productive_terms,
-            )?;
-        }
-
-        if productive_terms.is_empty() {
-            return (!saw_self_reference).then_some(Type::Never);
-        }
-
-        Some(match productive_terms.as_slice() {
-            [term] => *term,
-            _ => UnionType::from_elements_cycle_recovery(db, productive_terms),
-        })
-    }
-
     fn collect_projection_component_terms(
         db: &'db dyn Db,
         root: DivergentType,
@@ -257,6 +201,47 @@ impl<'db> Type<'db> {
 
         Self::add_productive_projection_term(db, term, productive_terms);
         Some(())
+    }
+
+    fn collect_projection_ops(
+        db: &'db dyn Db,
+        root: DivergentType,
+        ty: Type<'db>,
+        ops: &mut Vec<CycleProjectionOp>,
+    ) {
+        let ops = RefCell::new(ops);
+        any_over_type(db, ty, false, |nested| {
+            if let Type::CycleProjection(projection) = nested
+                && projection.root().same_marker(root)
+            {
+                let mut ops = ops.borrow_mut();
+                if !ops.contains(&projection.op()) {
+                    ops.push(projection.op());
+                }
+            }
+            false
+        });
+    }
+
+    fn solved_projection_type(
+        solved_ops: &[(CycleProjectionOp, Type<'db>)],
+        op: CycleProjectionOp,
+    ) -> Option<Self> {
+        solved_ops
+            .iter()
+            .find_map(|(candidate, ty)| (*candidate == op).then_some(*ty))
+    }
+
+    fn union_solved_projection_types(
+        db: &'db dyn Db,
+        solved_ops: &[(CycleProjectionOp, Type<'db>)],
+    ) -> Option<Self> {
+        let types = solved_ops.iter().map(|(_, ty)| *ty).collect::<Vec<_>>();
+        Some(match types.as_slice() {
+            [] => return None,
+            [ty] => *ty,
+            _ => UnionType::from_elements_cycle_recovery(db, types),
+        })
     }
 
     fn add_productive_projection_term(
@@ -323,6 +308,118 @@ impl<'db> Type<'db> {
             _ => false,
         })
     }
+}
+
+#[derive(Debug, Clone)]
+enum ProjectionContainer<'db> {
+    FixedTuple { elements: Vec<Type<'db>> },
+    List { element: Type<'db> },
+}
+
+impl<'db> ProjectionContainer<'db> {
+    fn from_type(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
+        if let Some(spec) = ty.exact_tuple_instance_spec(db) {
+            let TupleSpec::Fixed(tuple) = spec.as_ref() else {
+                return None;
+            };
+            return Some(Self::FixedTuple {
+                elements: tuple.iter_all_elements().collect(),
+            });
+        }
+
+        if let Some(specialization) = ty.known_specialization(db, KnownClass::List) {
+            let [element] = specialization.types(db) else {
+                return None;
+            };
+            return Some(Self::List { element: *element });
+        }
+
+        None
+    }
+
+    fn collect_projection_ops(
+        &self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        ops: &mut Vec<CycleProjectionOp>,
+    ) {
+        match self {
+            Self::FixedTuple { elements } => {
+                for element in elements {
+                    Type::collect_projection_ops(db, root, *element, ops);
+                }
+            }
+            Self::List { element } => Type::collect_projection_ops(db, root, *element, ops),
+        }
+    }
+
+    fn collect_projection_terms(
+        &self,
+        terms_by_op: &mut [(CycleProjectionOp, Vec<ProjectionTerm<'db>>)],
+    ) {
+        match self {
+            Self::FixedTuple { elements } => {
+                let len = elements.len();
+                for (index, element) in elements.iter().copied().enumerate() {
+                    let op = CycleProjectionOp::UnpackExact { len, index };
+                    if let Some((_, terms)) = terms_by_op
+                        .iter_mut()
+                        .find(|(candidate, _)| *candidate == op)
+                    {
+                        terms.push(ProjectionTerm::Exact(element));
+                    }
+                }
+            }
+            Self::List { element } => {
+                for (_, terms) in terms_by_op.iter_mut() {
+                    terms.push(ProjectionTerm::Homogeneous(*element));
+                }
+            }
+        }
+    }
+
+    fn into_type(
+        self,
+        db: &'db dyn Db,
+        root: DivergentType,
+        solved_ops: &[(CycleProjectionOp, Type<'db>)],
+    ) -> Option<Type<'db>> {
+        match self {
+            Self::FixedTuple { elements } => {
+                let len = elements.len();
+                let elements = elements
+                    .into_iter()
+                    .enumerate()
+                    .map(|(index, element)| {
+                        let op = CycleProjectionOp::UnpackExact { len, index };
+                        if let Some(ty) = Type::solved_projection_type(solved_ops, op) {
+                            Some(ty)
+                        } else if element.mentions_cycle_artifact(db, root) {
+                            None
+                        } else {
+                            Some(element)
+                        }
+                    })
+                    .collect::<Option<Vec<_>>>()?;
+
+                Some(Type::heterogeneous_tuple(db, elements))
+            }
+            Self::List { element } => {
+                let element = if element.mentions_cycle_artifact(db, root) {
+                    Type::union_solved_projection_types(db, solved_ops)?
+                } else {
+                    element
+                };
+                Some(KnownClass::List.to_specialized_instance(db, &[element]))
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ProjectionTerm<'db> {
+    Exact(Type<'db>),
+    Homogeneous(Type<'db>),
 }
 
 /// A query-free projection of a cycle root produced while recovering recursive inference.
