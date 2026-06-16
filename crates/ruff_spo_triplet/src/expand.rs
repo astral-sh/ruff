@@ -8,12 +8,16 @@
 
 use std::collections::BTreeSet;
 
-use crate::ir::ModelGraph;
+use crate::ir::{
+    ActsAs, AssocDecl, AttrDecl, AttrKind, Callback, ConcernKind, ConcernRef, Delegation, DslCall,
+    DynMethod, GemDsl, GemKind, Model, ModelGraph, ScopeDecl, ScopeKind, StiInfo, UsingRef,
+    Validation, ValidationKind,
+};
 use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 
 /// Expand a [`ModelGraph`] into canonical SPO triples.
 ///
-/// # Emission rules (per model)
+/// # Emission rules — core 7 (per model)
 ///
 /// 1. `(ns:model, rdf:type, ogit:ObjectType)` — Structural.
 /// 2. For each field: `(ns:model.field, rdf:type, ogit:Property)` — Structural.
@@ -37,6 +41,54 @@ use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 /// per-hop link triples; this crate does NOT pre-split them, keeping the
 /// emitter source-faithful.
 ///
+/// # Emission rules — `OpenProject` AR-shape (per model)
+///
+/// 9.  For each `associations[i]`:
+///     `(ns:model, declares_association, ns:model.<rel>)` — `OpenProjectExtracted`.
+/// 10. For each `validations[i]`:
+///     - kind ≠ Normalizes → `(ns:model, validates_constraint, <target>)` — `OpenProjectExtracted`.
+///     - kind == Normalizes → `(ns:model, normalizes_attribute, <target>)` — `OpenProjectExtracted`.
+/// 11. For each `callbacks[i]`:
+///     `(ns:model, has_callback, "<phase>:<target>")` — `OpenProjectExtracted`.
+/// 12. For each `concerns[i]` (by kind):
+///     - Include → `includes_module`, Extend → `extends_module`,
+///       Prepend → `prepends_module` — `OpenProjectExtracted`.
+///     - `ClassMethodsBlock` → `concern_class_methods`, `IncludedBlock` →
+///       `concern_included_block` — Structural (block declarations are
+///       structural-by-construction).
+/// 13. For each `attributes[i]` (by kind):
+///     - Attribute / `AttrAccessor` / `AttrReader` / `AttrReadonly` /
+///       `StoreAttribute` / `StoreAccessor` / Serialize / Enum /
+///       `DefineAttributeMethod` → `(ns:model, has_attribute, <name>)` —
+///       `OpenProjectExtracted`.
+///     - `AliasAttribute` → `aliases_attribute`.
+///     - `AliasMethod` / Alias → `aliases_method`.
+///     - `UndefMethod` → `column_override` (marks a column as undefined).
+/// 14. For each `delegations[i]`, expand one triple per delegated method:
+///     `(ns:model, delegates_to, "<method>=>via:<to>")` — `OpenProjectExtracted`.
+/// 15. For each `scopes[i]` (by kind):
+///     - Scope → `has_scope`, `DefaultScope` → `has_default_scope`,
+///       Scopes (OP plural) → `has_scope` (one triple per name).
+/// 16. For each `acts_as[i]`:
+///     `(ns:model, acts_as, "<variant>[:<options>]")` — `OpenProjectExtracted`.
+/// 17. For each `dsl_calls[i]`, route by name:
+///     - `register_journal_formatter` → `registers_journal_formatter`,
+///     - `register_journal_formatted_fields` → `registers_journal_formatted_fields`,
+///     - everything else → `has_dsl_call` (catch-all).
+/// 18. For each `gem_dsl[i]` (by gem):
+///     - `MountUploader` → `mounts_uploader`, `HasPaperTrail` →
+///       `has_paper_trail`, `HasClosureTree` → `has_closure_tree`,
+///       `CounterCulture` → `counter_cultures`, `AutoStripAttributes` →
+///       `auto_strips`.
+/// 19. For each `dynamic_methods[i]`:
+///     `(ns:model, defines_method, "<name_expr>=<body_ref>")` — Inferred
+///     (per-edge, since dynamism is the whole reason for the variant).
+/// 20. For each `refinements[i]`:
+///     `(ns:model, uses_refinement, <refinement_module>)` — `OpenProjectExtracted`.
+/// 21. If `sti.is_some()`: emit `(ns:model, includes_module, <parent>)`
+///     for `sti.inherits_from` — `OpenProjectExtracted`. The
+///     `abstract_class` / `inheritance_column` fields are metadata only.
+///
 /// # Determinism
 ///
 /// The returned Vec is sorted by `(s, p, o)` and de-duplicated. Truth
@@ -47,64 +99,68 @@ use crate::triple::{EntityKind, Predicate, Provenance, Triple};
 /// one identity; [`crate::ndjson`] round-trips assume a clean IR.
 #[must_use]
 pub fn expand(graph: &ModelGraph) -> Vec<Triple> {
-    let ns = &graph.namespace;
-    let mut set: BTreeSet<(String, String, String)> = BTreeSet::new();
-    let mut triples: Vec<Triple> = Vec::new();
-
-    let push = |triples: &mut Vec<Triple>,
-                set: &mut BTreeSet<(String, String, String)>,
-                s: String,
-                p: Predicate,
-                o: String,
-                prov: Provenance| {
-        let key = (s.clone(), p.as_str().to_string(), o.clone());
-        if set.insert(key) {
-            triples.push(Triple::new(s, p, o, prov));
-        }
-    };
-
+    let mut exp = Expander::new();
     for model in &graph.models {
+        exp.model(&graph.namespace, model);
+    }
+    exp.finish()
+}
+
+struct Expander {
+    triples: Vec<Triple>,
+    set: BTreeSet<(String, String, String)>,
+}
+
+impl Expander {
+    fn new() -> Self {
+        Self {
+            triples: Vec::new(),
+            set: BTreeSet::new(),
+        }
+    }
+
+    fn push(&mut self, s: String, p: Predicate, o: String, prov: Provenance) {
+        let key = (s.clone(), p.as_str().to_string(), o.clone());
+        if self.set.insert(key) {
+            self.triples.push(Triple::new(s, p, o, prov));
+        }
+    }
+
+    fn finish(mut self) -> Vec<Triple> {
+        self.triples.sort_by(|a, b| a.key().cmp(&b.key()));
+        self.triples
+    }
+
+    fn model(&mut self, ns: &str, model: &Model) {
         let model_iri = format!("{ns}:{}", model.name);
 
         // 1. model rdf:type ObjectType
-        push(
-            &mut triples,
-            &mut set,
+        self.push(
             model_iri.clone(),
             Predicate::RdfType,
             EntityKind::ObjectType.iri().to_string(),
             Provenance::Structural,
         );
 
-        // 2. fields
+        // 2 + 4 + 5. fields
         for field in &model.fields {
             let field_iri = format!("{model_iri}.{}", field.name);
-            push(
-                &mut triples,
-                &mut set,
+            self.push(
                 field_iri.clone(),
                 Predicate::RdfType,
                 EntityKind::Property.iri().to_string(),
                 Provenance::Structural,
             );
-
-            // 4. emitted_by
             if let Some(fn_name) = &field.emitted_by {
-                push(
-                    &mut triples,
-                    &mut set,
+                self.push(
                     field_iri.clone(),
                     Predicate::EmittedBy,
                     format!("{model_iri}.{fn_name}"),
                     Provenance::Authoritative,
                 );
             }
-
-            // 5. depends_on (dotted path, source-faithful)
             for dep in &field.depends_on {
-                push(
-                    &mut triples,
-                    &mut set,
+                self.push(
                     field_iri.clone(),
                     Predicate::DependsOn,
                     format!("{model_iri}.{dep}"),
@@ -116,27 +172,20 @@ pub fn expand(graph: &ModelGraph) -> Vec<Triple> {
         // 3 + 6 + 7 + 8. functions
         for func in &model.functions {
             let fn_iri = format!("{model_iri}.{}", func.name);
-            push(
-                &mut triples,
-                &mut set,
+            self.push(
                 fn_iri.clone(),
                 Predicate::RdfType,
                 EntityKind::Function.iri().to_string(),
                 Provenance::Structural,
             );
-            push(
-                &mut triples,
-                &mut set,
+            self.push(
                 model_iri.clone(),
                 Predicate::HasFunction,
                 fn_iri.clone(),
                 Provenance::Structural,
             );
-
             for read in &func.reads {
-                push(
-                    &mut triples,
-                    &mut set,
+                self.push(
                     fn_iri.clone(),
                     Predicate::ReadsField,
                     format!("{model_iri}.{read}"),
@@ -144,9 +193,7 @@ pub fn expand(graph: &ModelGraph) -> Vec<Triple> {
                 );
             }
             for exc in &func.raises {
-                push(
-                    &mut triples,
-                    &mut set,
+                self.push(
                     fn_iri.clone(),
                     Predicate::Raises,
                     format!("exc:{exc}"),
@@ -154,9 +201,7 @@ pub fn expand(graph: &ModelGraph) -> Vec<Triple> {
                 );
             }
             for rel in &func.traverses {
-                push(
-                    &mut triples,
-                    &mut set,
+                self.push(
                     fn_iri.clone(),
                     Predicate::TraversesRelation,
                     format!("{model_iri}.{rel}"),
@@ -164,16 +209,271 @@ pub fn expand(graph: &ModelGraph) -> Vec<Triple> {
                 );
             }
         }
+
+        // ───── OpenProject AR-shape ─────
+
+        for assoc in &model.associations {
+            self.association(&model_iri, assoc);
+        }
+        for v in &model.validations {
+            self.validation(&model_iri, v);
+        }
+        for cb in &model.callbacks {
+            self.callback(&model_iri, cb);
+        }
+        for cr in &model.concerns {
+            self.concern(&model_iri, cr);
+        }
+        for a in &model.attributes {
+            self.attribute(&model_iri, a);
+        }
+        for d in &model.delegations {
+            self.delegation(&model_iri, d);
+        }
+        for s in &model.scopes {
+            self.scope(&model_iri, s);
+        }
+        for aa in &model.acts_as {
+            self.acts_as(&model_iri, aa);
+        }
+        for dc in &model.dsl_calls {
+            self.dsl_call(&model_iri, dc);
+        }
+        for g in &model.gem_dsl {
+            self.gem_dsl(&model_iri, g);
+        }
+        for dm in &model.dynamic_methods {
+            self.dynamic_method(&model_iri, dm);
+        }
+        for r in &model.refinements {
+            self.refinement(&model_iri, r);
+        }
+        if let Some(sti) = &model.sti {
+            self.sti(&model_iri, sti);
+        }
     }
 
-    triples.sort_by(|a, b| a.key().cmp(&b.key()));
-    triples
+    fn association(&mut self, model_iri: &str, a: &AssocDecl) {
+        // The kind (belongs_to / has_many / …) is recoverable from the
+        // model graph but not emitted as part of the triple — the
+        // predicate identifies the declaration class; the (possibly many)
+        // options remain on the IR for downstream consumers that need
+        // them (e.g. an OpenProject-specific catalog mapper).
+        let _ = a.options;
+        let _ = a.kind; // not consumed by the triple; semantic = "any AR assoc"
+        // AssocKind is encoded implicitly: BelongsTo vs HasMany etc.
+        // produce the same predicate. Frontends that want to disambiguate
+        // emit a sibling `has_dsl_call{name = kind_str, args = …}` triple.
+        self.push(
+            model_iri.to_string(),
+            Predicate::DeclaresAssociation,
+            format!("{model_iri}.{}", a.name),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn validation(&mut self, model_iri: &str, v: &Validation) {
+        let pred = match v.kind {
+            ValidationKind::Normalizes => Predicate::NormalizesAttribute,
+            ValidationKind::Validates
+            | ValidationKind::Validate
+            | ValidationKind::ValidatesAssociated
+            | ValidationKind::ValidatesEach => Predicate::ValidatesConstraint,
+        };
+        self.push(
+            model_iri.to_string(),
+            pred,
+            v.target.clone(),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn callback(&mut self, model_iri: &str, cb: &Callback) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::HasCallback,
+            format!("{}:{}", cb.phase, cb.target),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn concern(&mut self, model_iri: &str, cr: &ConcernRef) {
+        let (pred, prov) = match cr.kind {
+            ConcernKind::Include => (Predicate::IncludesModule, Provenance::OpenProjectExtracted),
+            ConcernKind::Extend => (Predicate::ExtendsModule, Provenance::OpenProjectExtracted),
+            ConcernKind::Prepend => (Predicate::PrependsModule, Provenance::OpenProjectExtracted),
+            ConcernKind::ClassMethodsBlock => {
+                (Predicate::ConcernClassMethods, Provenance::Structural)
+            }
+            ConcernKind::IncludedBlock => (Predicate::ConcernIncludedBlock, Provenance::Structural),
+        };
+        let o = match cr.kind {
+            ConcernKind::ClassMethodsBlock | ConcernKind::IncludedBlock => cr
+                .body_ref
+                .clone()
+                .unwrap_or_else(|| "<block>".to_string()),
+            _ => cr.module.clone(),
+        };
+        self.push(model_iri.to_string(), pred, o, prov);
+    }
+
+    fn attribute(&mut self, model_iri: &str, a: &AttrDecl) {
+        let pred = match a.kind {
+            AttrKind::AliasAttribute => Predicate::AliasesAttribute,
+            AttrKind::AliasMethod | AttrKind::Alias => Predicate::AliasesMethod,
+            AttrKind::UndefMethod => Predicate::ColumnOverride,
+            AttrKind::Attribute
+            | AttrKind::AttrAccessor
+            | AttrKind::AttrReader
+            | AttrKind::AttrReadonly
+            | AttrKind::StoreAttribute
+            | AttrKind::StoreAccessor
+            | AttrKind::Serialize
+            | AttrKind::Enum
+            | AttrKind::DefineAttributeMethod => Predicate::HasAttribute,
+        };
+        let _ = a.options; // not emitted; carried on IR for catalog consumers
+        self.push(
+            model_iri.to_string(),
+            pred,
+            a.name.clone(),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn delegation(&mut self, model_iri: &str, d: &Delegation) {
+        for method in &d.methods {
+            self.push(
+                model_iri.to_string(),
+                Predicate::DelegatesTo,
+                format!("{method}=>via:{}", d.to),
+                Provenance::OpenProjectExtracted,
+            );
+        }
+    }
+
+    fn scope(&mut self, model_iri: &str, s: &ScopeDecl) {
+        match s.kind {
+            ScopeKind::Scope => {
+                self.push(
+                    model_iri.to_string(),
+                    Predicate::HasScope,
+                    format!("{}={}", s.name, s.body_ref),
+                    Provenance::OpenProjectExtracted,
+                );
+            }
+            ScopeKind::DefaultScope => {
+                self.push(
+                    model_iri.to_string(),
+                    Predicate::HasDefaultScope,
+                    s.body_ref.clone(),
+                    Provenance::OpenProjectExtracted,
+                );
+            }
+            ScopeKind::Scopes => {
+                // OP plural form: one HasScope per name; body_ref carries
+                // a placeholder (the plural form has no per-scope lambda).
+                self.push(
+                    model_iri.to_string(),
+                    Predicate::HasScope,
+                    format!("{}={}", s.name, s.body_ref),
+                    Provenance::OpenProjectExtracted,
+                );
+            }
+        }
+    }
+
+    fn acts_as(&mut self, model_iri: &str, aa: &ActsAs) {
+        let obj = if aa.options.is_empty() {
+            aa.variant.clone()
+        } else {
+            let opts = aa
+                .options
+                .iter()
+                .map(|(k, v)| format!("{k}={v}"))
+                .collect::<Vec<_>>()
+                .join(",");
+            format!("{}:{}", aa.variant, opts)
+        };
+        self.push(
+            model_iri.to_string(),
+            Predicate::ActsAs,
+            obj,
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn dsl_call(&mut self, model_iri: &str, dc: &DslCall) {
+        let pred = match dc.name.as_str() {
+            "register_journal_formatter" => Predicate::RegistersJournalFormatter,
+            "register_journal_formatted_fields" => Predicate::RegistersJournalFormattedFields,
+            _ => Predicate::HasDslCall,
+        };
+        let obj = match pred {
+            Predicate::HasDslCall => format!("{}({})", dc.name, dc.args),
+            _ => dc.args.clone(),
+        };
+        self.push(
+            model_iri.to_string(),
+            pred,
+            obj,
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn gem_dsl(&mut self, model_iri: &str, g: &GemDsl) {
+        let pred = match g.gem {
+            GemKind::MountUploader => Predicate::MountsUploader,
+            GemKind::HasPaperTrail => Predicate::HasPaperTrail,
+            GemKind::HasClosureTree => Predicate::HasClosureTree,
+            GemKind::CounterCulture => Predicate::CounterCultures,
+            GemKind::AutoStripAttributes => Predicate::AutoStrips,
+        };
+        self.push(
+            model_iri.to_string(),
+            pred,
+            g.args.clone(),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn dynamic_method(&mut self, model_iri: &str, dm: &DynMethod) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::DefinesMethod,
+            format!("{}={}", dm.name_expr, dm.body_ref),
+            Provenance::Inferred,
+        );
+    }
+
+    fn refinement(&mut self, model_iri: &str, r: &UsingRef) {
+        self.push(
+            model_iri.to_string(),
+            Predicate::UsesRefinement,
+            r.refinement_module.clone(),
+            Provenance::OpenProjectExtracted,
+        );
+    }
+
+    fn sti(&mut self, model_iri: &str, sti: &StiInfo) {
+        if let Some(parent) = &sti.inherits_from {
+            self.push(
+                model_iri.to_string(),
+                Predicate::IncludesModule,
+                parent.clone(),
+                Provenance::OpenProjectExtracted,
+            );
+        }
+        // abstract_class / inheritance_column carried on IR only.
+        let _ = sti.abstract_class;
+        let _ = &sti.inheritance_column;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ir::{Field, Function, Model};
+    use crate::ir::{AssocKind, Field, Function, Model};
 
     /// A minimal account_move-shaped graph mirroring the Odoo fixture used
     /// in `lance_graph::graph::spo::action_emitter`.
@@ -193,6 +493,7 @@ mod tests {
                     raises: vec!["UserError".to_string()],
                     traverses: vec!["line_ids".to_string()],
                 }],
+                ..Default::default()
             }],
         }
     }
@@ -298,5 +599,350 @@ mod tests {
     fn empty_graph_yields_no_triples() {
         let g = ModelGraph::new("openproject");
         assert!(expand(&g).is_empty());
+    }
+
+    // ────────────────── OpenProject AR-shape tests ──────────────────
+
+    /// A fully-populated WorkPackage-shaped model exercising every AR-shape
+    /// match arm. This is the [`crate::expand`] half of the
+    /// `Declaration → Triple` round-trip the council gate asks for.
+    fn ar_fixture() -> ModelGraph {
+        let mut wp = Model::new("WorkPackage");
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::BelongsTo,
+            name: "project".to_string(),
+            options: vec![("class_name".to_string(), "Project".to_string())],
+        });
+        wp.associations.push(AssocDecl {
+            kind: AssocKind::HasMany,
+            name: "time_entries".to_string(),
+            options: vec![],
+        });
+        wp.validations.push(Validation {
+            kind: ValidationKind::Validates,
+            target: "subject".to_string(),
+            options: vec![("presence".to_string(), "true".to_string())],
+        });
+        wp.validations.push(Validation {
+            kind: ValidationKind::Normalizes,
+            target: "email".to_string(),
+            options: vec![],
+        });
+        wp.callbacks.push(Callback {
+            phase: "before_save".to_string(),
+            target: "set_default_status".to_string(),
+            options: vec![],
+        });
+        wp.concerns.push(ConcernRef {
+            kind: ConcernKind::Include,
+            module: "Acts::Customizable".to_string(),
+            body_ref: None,
+        });
+        wp.concerns.push(ConcernRef {
+            kind: ConcernKind::Extend,
+            module: "Pagination::Model".to_string(),
+            body_ref: None,
+        });
+        wp.concerns.push(ConcernRef {
+            kind: ConcernKind::Prepend,
+            module: "Overrides".to_string(),
+            body_ref: None,
+        });
+        wp.concerns.push(ConcernRef {
+            kind: ConcernKind::ClassMethodsBlock,
+            module: "WorkPackage".to_string(),
+            body_ref: Some("methods.rb:42-58".to_string()),
+        });
+        wp.concerns.push(ConcernRef {
+            kind: ConcernKind::IncludedBlock,
+            module: "WorkPackage".to_string(),
+            body_ref: Some("methods.rb:60-72".to_string()),
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::Attribute,
+            name: "estimated_hours".to_string(),
+            options: vec![("type".to_string(), "decimal".to_string())],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::AttrAccessor,
+            name: "virtual_flag".to_string(),
+            options: vec![],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::AliasAttribute,
+            name: "title=subject".to_string(),
+            options: vec![],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::AliasMethod,
+            name: "title=subject".to_string(),
+            options: vec![],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::UndefMethod,
+            name: "deprecated_column".to_string(),
+            options: vec![],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::Serialize,
+            name: "preferences".to_string(),
+            options: vec![("serializer".to_string(), "JSON".to_string())],
+        });
+        wp.delegations.push(Delegation {
+            methods: vec!["name".to_string(), "identifier".to_string()],
+            to: "project".to_string(),
+            options: vec![("prefix".to_string(), "project".to_string())],
+        });
+        wp.scopes.push(ScopeDecl {
+            kind: ScopeKind::Scope,
+            name: "open".to_string(),
+            body_ref: "wp.rb:120".to_string(),
+        });
+        wp.scopes.push(ScopeDecl {
+            kind: ScopeKind::DefaultScope,
+            name: String::new(),
+            body_ref: "wp.rb:130".to_string(),
+        });
+        wp.scopes.push(ScopeDecl {
+            kind: ScopeKind::Scopes,
+            name: "by_priority".to_string(),
+            body_ref: "<plural>".to_string(),
+        });
+        wp.acts_as.push(ActsAs {
+            variant: "list".to_string(),
+            options: vec![("scope".to_string(), ":project_id".to_string())],
+        });
+        wp.acts_as.push(ActsAs {
+            variant: "watchable".to_string(),
+            options: vec![],
+        });
+        wp.dsl_calls.push(DslCall {
+            name: "register_journal_formatter".to_string(),
+            args: ":diff,:custom".to_string(),
+        });
+        wp.dsl_calls.push(DslCall {
+            name: "register_journal_formatted_fields".to_string(),
+            args: ":subject".to_string(),
+        });
+        wp.dsl_calls.push(DslCall {
+            name: "activity_provider_for".to_string(),
+            args: ":work_packages".to_string(),
+        });
+        wp.gem_dsl.push(GemDsl {
+            gem: GemKind::MountUploader,
+            args: ":attachments=AttachmentUploader".to_string(),
+        });
+        wp.gem_dsl.push(GemDsl {
+            gem: GemKind::HasPaperTrail,
+            args: "on: [:update]".to_string(),
+        });
+        wp.gem_dsl.push(GemDsl {
+            gem: GemKind::HasClosureTree,
+            args: String::new(),
+        });
+        wp.gem_dsl.push(GemDsl {
+            gem: GemKind::CounterCulture,
+            args: ":project=>:work_packages_count".to_string(),
+        });
+        wp.gem_dsl.push(GemDsl {
+            gem: GemKind::AutoStripAttributes,
+            args: ":subject,:description".to_string(),
+        });
+        wp.dynamic_methods.push(DynMethod {
+            name_expr: ":custom_for_#{field}".to_string(),
+            body_ref: "wp.rb:200-210".to_string(),
+        });
+        wp.refinements.push(UsingRef {
+            refinement_module: "OpenProject::DateRange".to_string(),
+        });
+        wp.sti = Some(StiInfo {
+            inherits_from: Some("Issue".to_string()),
+            abstract_class: false,
+            inheritance_column: Some("type".to_string()),
+        });
+
+        ModelGraph {
+            namespace: "openproject".to_string(),
+            models: vec![wp],
+        }
+    }
+
+    #[test]
+    fn ar_shape_emits_declares_association() {
+        let triples = expand(&ar_fixture());
+        let has = |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        assert!(has(
+            "openproject:WorkPackage",
+            "declares_association",
+            "openproject:WorkPackage.project"
+        ));
+        assert!(has(
+            "openproject:WorkPackage",
+            "declares_association",
+            "openproject:WorkPackage.time_entries"
+        ));
+    }
+
+    #[test]
+    fn ar_shape_emits_validates_and_normalizes() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "validates_constraint" && t.o == "subject"));
+        assert!(triples.iter().any(|t| t.p == "normalizes_attribute" && t.o == "email"));
+    }
+
+    #[test]
+    fn ar_shape_emits_callback_with_phase_in_object() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "has_callback" && t.o == "before_save:set_default_status"));
+    }
+
+    #[test]
+    fn ar_shape_emits_concern_composition_per_kind() {
+        let triples = expand(&ar_fixture());
+        let has = |p: &str, o: &str| triples.iter().any(|t| t.p == p && t.o == o);
+        assert!(has("includes_module", "Acts::Customizable"));
+        assert!(has("extends_module", "Pagination::Model"));
+        assert!(has("prepends_module", "Overrides"));
+        assert!(has("concern_class_methods", "methods.rb:42-58"));
+        assert!(has("concern_included_block", "methods.rb:60-72"));
+    }
+
+    #[test]
+    fn ar_shape_concern_blocks_carry_structural_truth() {
+        let triples = expand(&ar_fixture());
+        let truth =
+            |p: &str| triples.iter().find(|t| t.p == p).map(|t| (t.f, t.c)).unwrap();
+        assert_eq!(truth("concern_class_methods"), (1.0, 1.0));
+        assert_eq!(truth("concern_included_block"), (1.0, 1.0));
+    }
+
+    #[test]
+    fn ar_shape_emits_attributes_per_kind() {
+        let triples = expand(&ar_fixture());
+        let has = |p: &str, o: &str| triples.iter().any(|t| t.p == p && t.o == o);
+        assert!(has("has_attribute", "estimated_hours"));
+        assert!(has("has_attribute", "virtual_flag"));
+        assert!(has("has_attribute", "preferences"));
+        assert!(has("aliases_attribute", "title=subject"));
+        assert!(has("aliases_method", "title=subject"));
+        assert!(has("column_override", "deprecated_column"));
+    }
+
+    #[test]
+    fn ar_shape_expands_delegation_to_one_triple_per_method() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "delegates_to" && t.o == "name=>via:project"));
+        assert!(triples.iter().any(|t| t.p == "delegates_to" && t.o == "identifier=>via:project"));
+    }
+
+    #[test]
+    fn ar_shape_emits_scopes_per_kind() {
+        let triples = expand(&ar_fixture());
+        let has = |p: &str, o: &str| triples.iter().any(|t| t.p == p && t.o == o);
+        assert!(has("has_scope", "open=wp.rb:120"));
+        assert!(has("has_default_scope", "wp.rb:130"));
+        assert!(has("has_scope", "by_priority=<plural>"));
+    }
+
+    #[test]
+    fn ar_shape_emits_acts_as_with_variant_and_options() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "acts_as" && t.o.starts_with("list:")));
+        assert!(triples.iter().any(|t| t.p == "acts_as" && t.o == "watchable"));
+    }
+
+    #[test]
+    fn ar_shape_routes_dsl_calls_by_name() {
+        let triples = expand(&ar_fixture());
+        // Promoted predicates carry just the args (not the name).
+        assert!(triples.iter().any(|t| t.p == "registers_journal_formatter" && t.o == ":diff,:custom"));
+        assert!(triples.iter().any(|t| t.p == "registers_journal_formatted_fields" && t.o == ":subject"));
+        // Catch-all carries name(args).
+        assert!(triples.iter().any(|t| t.p == "has_dsl_call" && t.o == "activity_provider_for(:work_packages)"));
+    }
+
+    #[test]
+    fn ar_shape_emits_gem_dsl_per_gem() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "mounts_uploader"));
+        assert!(triples.iter().any(|t| t.p == "has_paper_trail"));
+        assert!(triples.iter().any(|t| t.p == "has_closure_tree"));
+        assert!(triples.iter().any(|t| t.p == "counter_cultures"));
+        assert!(triples.iter().any(|t| t.p == "auto_strips"));
+    }
+
+    #[test]
+    fn ar_shape_defines_method_uses_inferred_per_edge() {
+        let triples = expand(&ar_fixture());
+        let t = triples.iter().find(|t| t.p == "defines_method").unwrap();
+        assert_eq!((t.f, t.c), (0.85, 0.75));
+    }
+
+    #[test]
+    fn ar_shape_emits_refinement_and_sti() {
+        let triples = expand(&ar_fixture());
+        assert!(triples.iter().any(|t| t.p == "uses_refinement" && t.o == "OpenProject::DateRange"));
+        // STI → includes_module to parent.
+        assert!(triples.iter().any(|t| t.p == "includes_module" && t.o == "Issue"));
+    }
+
+    #[test]
+    fn ar_shape_op_extracted_triples_carry_calibrated_truth() {
+        let triples = expand(&ar_fixture());
+        // declares_association uses OpenProjectExtracted
+        let t = triples
+            .iter()
+            .find(|t| t.p == "declares_association")
+            .unwrap();
+        assert_eq!((t.f, t.c), (0.95, 0.88));
+    }
+
+    /// Coverage proof for D-AR-2: every predicate the AR-shape declares
+    /// fires from this fixture. The expansion covers all of the new
+    /// predicates except `reads_field` and `traverses_relation` (those
+    /// are part of the core 7 and need a populated `Function` IR which
+    /// this fixture intentionally omits).
+    #[test]
+    fn ar_shape_emits_every_ar_predicate() {
+        let triples = expand(&ar_fixture());
+        let predicates_seen: BTreeSet<&str> = triples.iter().map(|t| t.p.as_str()).collect();
+        for p in [
+            // OpenProjectExtracted defaults
+            "declares_association",
+            "validates_constraint",
+            "normalizes_attribute",
+            "has_callback",
+            "includes_module",
+            "extends_module",
+            "prepends_module",
+            "has_attribute",
+            "aliases_attribute",
+            "aliases_method",
+            "column_override",
+            "delegates_to",
+            "has_scope",
+            "has_default_scope",
+            "acts_as",
+            "registers_journal_formatter",
+            "registers_journal_formatted_fields",
+            "has_dsl_call",
+            "mounts_uploader",
+            "has_paper_trail",
+            "has_closure_tree",
+            "counter_cultures",
+            "auto_strips",
+            "uses_refinement",
+            // Inferred (per-edge override)
+            "defines_method",
+            // Structural (block markers)
+            "concern_class_methods",
+            "concern_included_block",
+        ] {
+            assert!(
+                predicates_seen.contains(p),
+                "AR-shape predicate `{p}` was not emitted by the fixture — \
+                 D-AR-2 expand match arm missing",
+            );
+        }
     }
 }

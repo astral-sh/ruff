@@ -63,10 +63,10 @@ pub fn from_ndjson(ndjson: &str) -> Result<Vec<Triple>, ParseError> {
             return Err(ParseError {
                 line: i + 1,
                 message: format!(
-                    "unknown predicate `{}` (not in the closed vocabulary); \
-                     valid predicates: rdf:type, has_function, emitted_by, \
-                     depends_on, reads_field, raises, traverses_relation",
-                    t.p
+                    "unknown predicate `{}` (not in the closed vocabulary of \
+                     {} predicates — see `Predicate::ALL` for the full list)",
+                    t.p,
+                    Predicate::ALL.len()
                 ),
             });
         }
@@ -80,7 +80,7 @@ pub fn from_ndjson(ndjson: &str) -> Result<Vec<Triple>, ParseError> {
 pub struct ParseError {
     /// 1-based line number of the offending line.
     pub line: usize,
-    /// The underlying serde_json error message.
+    /// The underlying `serde_json` error message.
     pub message: String,
 }
 
@@ -170,18 +170,11 @@ mod tests {
     }
 
     /// Every canonical predicate must parse cleanly — guards against
-    /// `from_str` drifting away from the `to_ndjson` writer.
+    /// `from_str` drifting away from the `to_ndjson` writer. Iterates the
+    /// full `Predicate::ALL` surface (7 core + 27 `OpenProject` AR-shape).
     #[test]
     fn every_canonical_predicate_parses() {
-        for p in [
-            Predicate::RdfType,
-            Predicate::HasFunction,
-            Predicate::EmittedBy,
-            Predicate::DependsOn,
-            Predicate::ReadsField,
-            Predicate::Raises,
-            Predicate::TraversesRelation,
-        ] {
+        for p in Predicate::ALL {
             let line = format!(
                 "{{\"s\":\"x\",\"p\":\"{}\",\"o\":\"y\",\"f\":1.0,\"c\":1.0}}\n",
                 p.as_str()
