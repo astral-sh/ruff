@@ -336,6 +336,19 @@ pub enum ClassLiteral<'db> {
     DynamicEnum(DynamicEnumLiteral<'db>),
 }
 
+/// Return whether `class` inherits from the `Any` special form.
+#[salsa::tracked(cycle_initial=|_, _, _| false, heap_size=ruff_memory_usage::heap_size)]
+fn inherits_from_any_inner<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    class.explicit_bases(db).iter().any(|base| match base {
+        Type::SpecialForm(SpecialFormType::Any) => true,
+        Type::ClassLiteral(base) => inherits_from_any_inner(db, *base),
+        Type::GenericAlias(alias) => {
+            inherits_from_any_inner(db, ClassLiteral::Static(alias.origin(db)))
+        }
+        _ => false,
+    })
+}
+
 impl<'db> ClassLiteral<'db> {
     /// Return a `ClassLiteral` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
@@ -393,6 +406,15 @@ impl<'db> ClassLiteral<'db> {
     /// Returns an iterator over the MRO.
     pub(crate) fn iter_mro(self, db: &'db dyn Db) -> MroIterator<'db> {
         MroIterator::new(db, self, None)
+    }
+
+    /// Return whether this class directly or indirectly inherits from the `Any` special form.
+    ///
+    /// This deliberately does not consider bases whose inferred type is `Any` or `Unknown`. Those
+    /// are normal dynamic bases; only an explicit `Any` base makes instances assignable to
+    /// arbitrary types.
+    pub(crate) fn inherits_from_any(self, db: &'db dyn Db) -> bool {
+        inherits_from_any_inner(db, self)
     }
 
     /// Returns the metaclass of this class.

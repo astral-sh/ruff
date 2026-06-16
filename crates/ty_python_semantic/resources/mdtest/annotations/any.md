@@ -84,6 +84,28 @@ class OtherFinalClass: ...
 f: FinalClass | OtherFinalClass = SubclassOfAny()
 ```
 
+This behavior is preserved through dynamically created subclasses:
+
+```py
+from typing import Any, final
+from ty_extensions import reveal_mro
+
+class A(Any): ...
+
+B = type("B", (A,), {})
+
+class C(B): ...
+
+@final
+class FinalClass: ...
+
+reveal_mro(B)  # revealed: (<class 'B'>, <class 'A'>, Any, <class 'object'>)
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, Any, <class 'object'>)
+
+b: FinalClass = B()
+c: FinalClass = C()
+```
+
 A class with a base whose type is `Any` or `Unknown` is different. Its instances retain the ordinary
 nominal type of the class, but the dynamic MRO entry makes them gradually assignable to non-final
 types:

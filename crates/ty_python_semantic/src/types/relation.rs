@@ -1110,11 +1110,7 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // leaving the nominal instance intact so that declared members retain their types.
             (Type::NominalInstance(source), _)
                 if self.relation.is_assignability()
-                    && source
-                        .class(db)
-                        .class_literal(db)
-                        .as_static()
-                        .is_some_and(|class| class.inherits_from_any(db)) =>
+                    && source.class(db).class_literal(db).inherits_from_any(db) =>
             {
                 self.always()
             }
