@@ -170,11 +170,15 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
 /// dedup classes by fully-qualified name, and return one merged
 /// [`ModelGraph`]. `args` (include dirs, `-std`, …) apply to every TU.
 ///
-/// Files that fail to parse are **skipped** (libclang tolerates missing
-/// includes and still yields a partial AST; a file that cannot parse at all is
-/// silently omitted rather than aborting the whole directory). Output is
-/// deterministic — files are visited in sorted order and the dedup map is a
-/// `BTreeMap`, so the model order is stable.
+/// Per-TU **parse** failures ([`WalkError::Parse`] — missing includes,
+/// malformed TU) are skipped: they are expected on a real corpus and the
+/// other files still extract. A **libclang-init** failure
+/// ([`WalkError::Libclang`] — wrong `LIBCLANG_PATH`, or a `Clang` singleton
+/// already active) is non-recoverable — it would make EVERY file skip and
+/// return a misleadingly-empty graph — so it is propagated as `Err` rather
+/// than swallowed (codex P2, PR #13). Output is deterministic: files are
+/// visited in sorted order and the dedup map is a `BTreeMap`, so the model
+/// order is stable.
 ///
 /// This is the concrete first step of the corpus-tree orchestration
 /// [`extract`] documents: single directory, caller-supplied include args, no
@@ -182,8 +186,7 @@ pub fn extract(source_tree: &Path) -> ModelGraph {
 /// [`ruff_spo_triplet::expand`] + [`ruff_spo_triplet::to_ndjson`] for the
 /// first SPO ndjson emission from a real corpus subset.
 #[cfg(feature = "libclang")]
-#[must_use]
-pub fn extract_dir(dir: &Path, args: &[String]) -> ModelGraph {
+pub fn extract_dir(dir: &Path, args: &[String]) -> Result<ModelGraph, WalkError> {
     let mut files: Vec<std::path::PathBuf> = match std::fs::read_dir(dir) {
         Ok(rd) => rd
             .filter_map(Result::ok)
@@ -200,16 +203,24 @@ pub fn extract_dir(dir: &Path, args: &[String]) -> ModelGraph {
 
     let mut seen: std::collections::BTreeMap<String, Model> = std::collections::BTreeMap::new();
     for f in &files {
-        if let Ok(classes) = walk_tu(f, args) {
-            for cls in classes {
-                seen.entry(cls.qualified_name())
-                    .or_insert_with(|| model_from_class(&cls));
+        match walk_tu(f, args) {
+            Ok(classes) => {
+                for cls in classes {
+                    seen.entry(cls.qualified_name())
+                        .or_insert_with(|| model_from_class(&cls));
+                }
             }
+            // Per-TU parse failure (missing includes, malformed TU) is
+            // expected on a real corpus — skip this file, keep going.
+            Err(WalkError::Parse(_)) => {}
+            // libclang-init failure is non-recoverable: every file would skip
+            // and return a misleadingly-empty graph. Surface it (codex P2 #13).
+            Err(e @ WalkError::Libclang(_)) => return Err(e),
         }
     }
     let mut graph = ModelGraph::new(NAMESPACE);
     graph.models = seen.into_values().collect();
-    graph
+    Ok(graph)
 }
 
 /// The pure unpacking: build a [`Model`] from a parsed [`CppClass`] by
@@ -726,7 +737,7 @@ class Recognizer : public Classify {
             format!("-I{}", root.join("src/ccutil").display()),
             format!("-I{}", root.join("include").display()),
         ];
-        let graph = extract_dir(&dir, &args);
+        let graph = extract_dir(&dir, &args).expect("libclang init (LIBCLANG_PATH set)");
         let triples = expand(&graph);
         let ndjson = to_ndjson(&triples);
         eprintln!(
