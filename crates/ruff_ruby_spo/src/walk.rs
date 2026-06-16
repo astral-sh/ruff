@@ -433,11 +433,27 @@ fn emit_attr(kind: AttrKind, args: &[Node], out: &mut Vec<Declaration>) {
     //   `define_attribute_method :attr`       — 1 attr
     //   `undef_method :foo`                   — 1 attr
     let (skip, take) = attr_arg_window(kind);
-    let options = args
+    let mut options = args
         .iter()
         .skip(skip.saturating_add(take))
         .find_map(as_hash_options)
         .unwrap_or_default();
+    // D-AR-5.2: pull the Rails static type annotation out of the
+    // positional sym that sits right after the attribute name (or
+    // after the store key + attr name for store_attribute), and store
+    // it as `options[("type", "<rails_type>")]` so the expander can
+    // emit a `field_type` triple. `attribute :age, :integer` puts the
+    // type at the slot right after the take-window; `serialize :data,
+    // JSON` and `store_attribute :store, :attr, :integer` follow the
+    // same pattern (single-attr-then-type macros only).
+    if attr_has_positional_type(kind) {
+        let type_idx = skip.saturating_add(take);
+        if let Some(arg) = args.get(type_idx) {
+            if let Some(t) = sym_string(arg) {
+                options.push(("type".to_string(), t));
+            }
+        }
+    }
     for arg in args.iter().skip(skip).take(take) {
         let Some(name) = sym_string(arg) else { continue };
         out.push(Declaration::Attribute(AttrDecl {
@@ -446,6 +462,14 @@ fn emit_attr(kind: AttrKind, args: &[Node], out: &mut Vec<Declaration>) {
             options: options.clone(),
         }));
     }
+}
+
+/// `attribute :age, :integer` and `store_attribute :store, :attr, :type`
+/// carry the Rails static type as a positional Sym AFTER the attribute
+/// name. Multi-attr macros (`attr_accessor :a, :b`) and meta-attr
+/// macros (`Serialize`, `Enum`) have no such slot.
+fn attr_has_positional_type(kind: AttrKind) -> bool {
+    matches!(kind, AttrKind::Attribute | AttrKind::StoreAttribute)
 }
 
 /// `(skip, take)` window into the positional args that carry attribute
