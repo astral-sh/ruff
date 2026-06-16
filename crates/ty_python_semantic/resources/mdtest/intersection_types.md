@@ -1388,9 +1388,6 @@ Intersection types can also be written using the `&` and `~` operators, without 
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-experimental-syntax = "ignore"
 ```
 
 ```py
@@ -1431,9 +1428,6 @@ negation type:
 ```toml
 [environment]
 python-version = "3.13"
-
-[rules]
-experimental-syntax = "ignore"
 ```
 
 ```py
@@ -1457,9 +1451,6 @@ The operators can be used on Python 3.13 if annotations are deferred using a fut
 ```toml
 [environment]
 python-version = "3.13"
-
-[rules]
-experimental-syntax = "ignore"
 ```
 
 ```py

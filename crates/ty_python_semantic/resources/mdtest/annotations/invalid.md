@@ -150,11 +150,9 @@ def invalid_binary_operators(
     i: 1 << 2,  # error: [invalid-type-form] "Invalid binary operator `<<` in type annotation"
     j: 4 >> 42,  # error: [invalid-type-form] "Invalid binary operator `>>` in type annotation"
     k: 5 ^ 3,  # error: [invalid-type-form] "Invalid binary operator `^` in type annotation"
-    # error: [experimental-syntax] "Intersection type syntax is experimental"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     l: 5 & 3,
-    # error: [experimental-syntax] "Negation type syntax is experimental"
     # error: [invalid-type-form] "Int literals are not allowed in this context in a parameter annotation"
     m: ~3,
 ):

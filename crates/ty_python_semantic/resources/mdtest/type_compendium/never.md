@@ -3,9 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-experimental-syntax = "ignore"
 ```
 
 `Never` represents the empty set of values.

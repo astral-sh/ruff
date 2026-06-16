@@ -3,9 +3,6 @@
 ```toml
 [environment]
 python-version = "3.14"
-
-[rules]
-experimental-syntax = "ignore"
 ```
 
 The `object` type represents the set of all Python objects.
