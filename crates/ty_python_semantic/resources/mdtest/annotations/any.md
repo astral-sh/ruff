@@ -84,8 +84,9 @@ class OtherFinalClass: ...
 f: FinalClass | OtherFinalClass = SubclassOfAny()
 ```
 
-A class with a base whose type is `Any` or `Unknown` is different. Its instances have the ordinary
-nominal type of the class and are not assignable to arbitrary types:
+A class with a base whose type is `Any` or `Unknown` is different. Its instances retain the ordinary
+nominal type of the class, but the dynamic MRO entry makes them gradually assignable to non-final
+types:
 
 ```py
 from ty_extensions import Unknown
@@ -101,9 +102,9 @@ def check_dynamic_base(any_base: Any):
     reveal_type(IndirectDynamicSubclass())  # revealed: IndirectDynamicSubclass
     reveal_type(FromUnknown())  # revealed: FromUnknown
 
-    x: Arbitrary = FromAnyValue()  # error: [invalid-assignment]
-    y: Arbitrary = IndirectDynamicSubclass()  # error: [invalid-assignment]
-    z: Arbitrary = FromUnknown()  # error: [invalid-assignment]
+    x: int = FromAnyValue()
+    y: Arbitrary = IndirectDynamicSubclass()
+    z: Arbitrary = FromUnknown()
 ```
 
 A subclass of `Any` can also be assigned to arbitrary `Callable` and `Protocol` types:

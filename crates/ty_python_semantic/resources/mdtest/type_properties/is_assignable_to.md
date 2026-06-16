@@ -288,8 +288,8 @@ static_assert(not is_assignable_to(type[Any], None))
 
 ### Class-literal types
 
-A class with a base whose type is `Any` is only known to be an instance of `type`. A class that
-inherits directly from the `Any` special form retains the previous gradual class-literal behavior:
+Class-literal types with a dynamic MRO entry are assignable to any type `T` where `T` is assignable
+to `type`:
 
 ```py
 from typing import Any
@@ -305,7 +305,7 @@ def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
     class UnionDynamic(union_base): ...
     static_assert(is_assignable_to(TypeOf[Foo], Any))
     static_assert(is_assignable_to(TypeOf[Foo], type))
-    static_assert(not is_assignable_to(TypeOf[Foo], type[int]))
+    static_assert(is_assignable_to(TypeOf[Foo], type[int]))
     static_assert(is_assignable_to(TypeOf[Foo], type[Any]))
 
     static_assert(is_assignable_to(TypeOf[Bar], Any))
@@ -315,7 +315,7 @@ def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
 
     static_assert(is_assignable_to(TypeOf[Baz], Any))
     static_assert(is_assignable_to(TypeOf[Baz], type))
-    static_assert(not is_assignable_to(TypeOf[Baz], type[int]))
+    static_assert(is_assignable_to(TypeOf[Baz], type[int]))
     static_assert(is_assignable_to(TypeOf[Baz], type[Any]))
 
     static_assert(is_assignable_to(TypeOf[Mixed], Any))
@@ -325,17 +325,17 @@ def test(x: Any, cls: type[Any], union_base: TypeOf[A] | Any):
 
     static_assert(is_assignable_to(TypeOf[UnionDynamic], Any))
     static_assert(is_assignable_to(TypeOf[UnionDynamic], type))
-    static_assert(not is_assignable_to(TypeOf[UnionDynamic], type[int]))
+    static_assert(is_assignable_to(TypeOf[UnionDynamic], type[int]))
     static_assert(is_assignable_to(TypeOf[UnionDynamic], type[Any]))
 
     static_assert(not is_assignable_to(TypeOf[Foo], int))
     static_assert(not is_assignable_to(TypeOf[Bar], int))
     static_assert(not is_assignable_to(TypeOf[Baz], int))
     static_assert(not is_assignable_to(TypeOf[Mixed], int))
-    static_assert(not is_assignable_to(UnionDynamic, int))
+    static_assert(is_assignable_to(UnionDynamic, int))
 ```
 
-The direct `Any` base can materialize to any subtype of `type`.
+The dynamic MRO entry can materialize to any subtype of `type`.
 
 ### Nominal instance and subclass-of types
 
