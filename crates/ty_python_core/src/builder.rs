@@ -1825,7 +1825,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
             match node {
                 ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
-                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                node if is_if_type_checking(node) => Some(true),
                 ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                     value: ast::Number::Int(n),
                     ..
