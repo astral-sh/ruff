@@ -1032,8 +1032,12 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns the last closing parenthesis surrounding `range`, if any.
-    fn closing_parenthesis(&self, range: TextRange, parent: AnyNodeRef) -> Option<&Token> {
+    /// Returns the paired closing parentheses surrounding `range`.
+    fn closing_parentheses(
+        &self,
+        range: TextRange,
+        parent: AnyNodeRef,
+    ) -> impl Iterator<Item = &Token> {
         let right_parentheses = self
             .parsed
             .tokens()
@@ -1052,7 +1056,6 @@ impl<'m> ContextCursor<'m> {
 
         right_parentheses
             .zip(left_parentheses)
-            .last()
             .map(|(right, _)| right)
     }
 
@@ -1064,12 +1067,26 @@ impl<'m> ContextCursor<'m> {
         token: &Token,
     ) -> Option<RangeEndPosition> {
         let range_ends_at_token = range.contains_range(token.range()) && range.end() == token.end();
-        match self.closing_parenthesis(range, parent) {
-            Some(right) if right.range() == token.range() => Some(RangeEndPosition::After),
-            Some(_) if range_ends_at_token => Some(RangeEndPosition::InsideParentheses),
-            None if range_ends_at_token => Some(RangeEndPosition::After),
-            _ => None,
+        let mut closing_parentheses = self.closing_parentheses(range, parent).peekable();
+        let position = |inside_parentheses| {
+            if inside_parentheses {
+                RangeEndPosition::InsideParentheses
+            } else {
+                RangeEndPosition::After
+            }
+        };
+
+        if range_ends_at_token {
+            return Some(position(closing_parentheses.peek().is_some()));
         }
+
+        while let Some(right) = closing_parentheses.next() {
+            if right.range() == token.range() {
+                return Some(position(closing_parentheses.peek().is_some()));
+            }
+        }
+
+        None
     }
 
     /// Returns no keywords if one of `keywords` is already the next non-trivia token.
@@ -8258,6 +8275,12 @@ match status:
                 "\
 match status:
     case (400 <CURSOR>)",
+                "as",
+            ),
+            (
+                "\
+match status:
+    case ((400) <CURSOR>)",
                 "as",
             ),
             (
