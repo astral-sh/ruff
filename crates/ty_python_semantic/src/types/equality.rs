@@ -995,9 +995,7 @@ impl KnownComparisonSemantics {
                     .then_some(first)
             }
             Type::NominalInstance(instance)
-                if instance.class(db).is_final(db)
-                    || instance.tuple_spec(db).is_some()
-                    || enum_metadata(db, instance.class_literal(db)).is_some() =>
+                if instance.class(db).is_final(db) || instance.tuple_spec(db).is_some() =>
             {
                 Self::of_instance(db, ty, operator)
             }
