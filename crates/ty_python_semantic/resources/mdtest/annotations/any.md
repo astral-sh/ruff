@@ -50,9 +50,8 @@ y: Any = "not an Any"  # error: [invalid-assignment]
 
 The spec allows you to define subclasses of `Any`.
 
-Instances of `SubclassOfAny` have type `SubclassOfAny & Any`. The `SubclassOfAny` element preserves
-the class's known members, while the `Any` element makes its instances assignable to arbitrary
-types. Values of other types are not assignable to `SubclassOfAny`.
+Instances of `SubclassOfAny` retain their nominal type and declared members, but are gradually
+assignable to arbitrary types. Values of other types are not assignable to `SubclassOfAny`.
 
 ```py
 from typing import Any
@@ -62,8 +61,8 @@ class SubclassOfAny(Any): ...
 class IndirectSubclass(SubclassOfAny): ...
 
 reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
-reveal_type(SubclassOfAny())  # revealed: SubclassOfAny & Any
-reveal_type(IndirectSubclass())  # revealed: IndirectSubclass & Any
+reveal_type(SubclassOfAny())  # revealed: SubclassOfAny
+reveal_type(IndirectSubclass())  # revealed: IndirectSubclass
 
 x: SubclassOfAny = 1  # error: [invalid-assignment]
 y: int = SubclassOfAny()

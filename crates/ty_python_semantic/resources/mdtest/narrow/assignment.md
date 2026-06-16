@@ -317,12 +317,12 @@ class Mock(Any): ...
 f = F()
 reveal_type(f.e)  # revealed: E
 f.e = Mock()
-reveal_type(f.e)  # revealed: Mock & Any
+reveal_type(f.e)  # revealed: Mock
 
 f2 = F()
 reveal_type(f2.e.d)  # revealed: D
 f2.e.d = Mock()
-reveal_type(f2.e.d)  # revealed: Mock & Any
+reveal_type(f2.e.d)  # revealed: Mock
 ```
 
 ## Invalid assignments are not used for narrowing

@@ -1106,6 +1106,19 @@ impl<'a, 'c, 'db> TypeRelationChecker<'a, 'c, 'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => self.always(),
 
+            // An explicit `Any` base makes instances gradually assignable to any type, while
+            // leaving the nominal instance intact so that declared members retain their types.
+            (Type::NominalInstance(source), _)
+                if self.relation.is_assignability()
+                    && source
+                        .class(db)
+                        .class_literal(db)
+                        .as_static()
+                        .is_some_and(|class| class.inherits_from_any(db)) =>
+            {
+                self.always()
+            }
+
             (Type::TypeVar(source_typevar), Type::TypeVar(target_typevar))
                 if source_typevar.is_same_typevar_as(db, target_typevar) =>
             {

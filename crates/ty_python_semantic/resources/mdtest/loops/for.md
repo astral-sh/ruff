@@ -1351,9 +1351,9 @@ class Bar(Any): ...
 
 reveal_mro(Bar)  # revealed: (<class 'Bar'>, Any, <class 'object'>)
 
-# TODO: the first assertion should pass
+# TODO: these should pass
 static_assert(is_assignable_to(TypeOf[Bar], Iterable[Any]))  # error: [static-assert-error]
-static_assert(is_assignable_to(type[Bar], Iterable[Any]))
+static_assert(is_assignable_to(type[Bar], Iterable[Any]))  # error: [static-assert-error]
 
 # TODO: should not error
 # error: [not-iterable]
