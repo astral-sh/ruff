@@ -29,12 +29,12 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This rule's fix is marked as unsafe because removing the whitespace before
-/// the shebang deletes any blank lines it contains. If a blank line separates
-/// the shebang from a following encoding declaration (e.g., `# -*- coding:
-/// utf-8 -*-`), deleting it moves that declaration onto the second line of the
-/// file, where Python honors it as a magic encoding comment. This can change
-/// how the file is decoded and therefore alter the program's behavior.
+/// This rule's fix is marked as unsafe when the whitespace before the shebang
+/// contains a newline. Deleting the newline shifts the following lines up,
+/// which can move an encoding declaration onto the second line, where Python
+/// honors it as a magic encoding comment (PEP 263) and may change how the file
+/// is decoded. When the whitespace contains no newline, the shebang is already
+/// on the first line and the fix is safe.
 ///
 /// ## References
 /// - [Python documentation: Executable Python Scripts](https://docs.python.org/3/tutorial/appendix.html#executable-python-scripts)
@@ -77,6 +77,21 @@ pub(crate) fn shebang_leading_whitespace(
     if let Some(mut diagnostic) =
         context.report_diagnostic_if_enabled(ShebangLeadingWhitespace, prefix)
     {
-        diagnostic.set_fix(Fix::unsafe_edit(Edit::range_deletion(prefix)));
+        // The fix is only unsafe when the leading whitespace contains a newline:
+        // deleting it shifts the following lines up, which can move an encoding
+        // declaration onto the second line, where Python honors it as a magic
+        // encoding comment (PEP 263) and may change how the file is decoded.
+        // Without a newline the shebang is already on the first line and the fix
+        // moves no other lines, so it is safe.
+        let fix = if locator
+            .up_to(range.start())
+            .chars()
+            .any(|c| matches!(c, '\r' | '\n'))
+        {
+            Fix::unsafe_edit(Edit::range_deletion(prefix))
+        } else {
+            Fix::safe_edit(Edit::range_deletion(prefix))
+        };
+        diagnostic.set_fix(fix);
     }
 }

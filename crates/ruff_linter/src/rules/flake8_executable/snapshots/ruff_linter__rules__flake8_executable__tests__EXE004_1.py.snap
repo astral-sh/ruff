@@ -10,4 +10,3 @@ EXE004 [*] Avoid whitespace before shebang
 help: Remove whitespace before shebang
   -     #!/usr/bin/python
 1 + #!/usr/bin/python
-note: This is an unsafe fix and may change runtime behavior
