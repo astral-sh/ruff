@@ -1448,11 +1448,13 @@ impl<'db> Specialization<'db> {
         typevars: &mut FxOrderSet<BoundTypeVarInstance<'db>>,
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
-        for ty in self.types(db) {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        if let Some(tuple) = self.tuple_inner(db) {
+            tuple.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+        } else {
+            for ty in self.types(db) {
+                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+            }
         }
-        // A tuple's specialization will include all of its element types, so we don't need to also
-        // look in `self.tuple`.
     }
 }
 
