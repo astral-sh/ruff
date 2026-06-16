@@ -45,9 +45,12 @@ use crate::rules::flake8_tidy_imports::settings::Strictness;
 /// - `lint.flake8-tidy-imports.ban-relative-imports`
 ///
 /// ## Fix safety
-/// This fix is marked as unsafe if it may remove comments associated
-/// with the import statement. The fix is only applied when the absolute module
-/// path can be reliably determined.
+/// When available, this rule's fix is always marked as unsafe because Ruff
+/// infers the absolute import path from the file's location and configured
+/// package roots, while Python resolves relative imports from the module's
+/// runtime package. If those differ, the rewritten import can fail or resolve
+/// to a different module. The fix may also remove comments attached to the
+/// import statement.
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
