@@ -2,6 +2,7 @@ use std::path::Path;
 
 use js_sys::Error;
 use ruff_db::diagnostic;
+use ruff_linter::preview::is_human_readable_names_enabled;
 use ruff_linter::settings::types::PythonVersion;
 use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
@@ -398,8 +399,16 @@ impl Workspace {
                     })
                     .collect();
 
+                let code = if !is_human_readable_names_enabled(self.settings.linter.preview)
+                    && let Some(code) = msg.secondary_code()
+                {
+                    code.as_str()
+                } else {
+                    msg.id().as_str()
+                };
+
                 ExpandedMessage {
-                    code: msg.secondary_code_or_id().to_string(),
+                    code: code.to_string(),
                     message: msg.concise_message().to_string(),
                     annotations,
                     sub_diagnostics,
