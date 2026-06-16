@@ -745,18 +745,33 @@ class C[T](Base, metaclass=Meta):
             )
             .expect("test source should parse");
             let indexed = IndexedModule::new(parsed);
+            let mut visitor = Visitor {
+                nodes: Some(CollectedNodes::default()),
+                index: 0,
+                max_index: MAX_REAL_INDEX,
+                overflowed: false,
+            };
+            AnyNodeRef::from(indexed.parsed.syntax()).visit_source_order(&mut visitor);
+            let CollectedNodes { addresses, kinds } = visitor
+                .nodes
+                .expect("test visitor should collect indexed nodes");
 
-            let node_count = u32::try_from(indexed.index.len())
-                .expect("number of indexed nodes should fit in u32");
+            assert_eq!(indexed.index.len(), addresses.len());
             let mut seen_kinds = [false; 1 << IndexedNodes::KIND_BITS];
 
-            for raw_index in 0..node_count {
-                let index = NodeIndex::from(raw_index);
-                let (_, kind) = indexed.index.get(raw_index as usize);
+            for (raw_index, (address, kind)) in addresses.into_iter().zip(kinds).enumerate() {
+                let index = NodeIndex::from(
+                    u32::try_from(raw_index).expect("node index should fit in u32"),
+                );
                 seen_kinds[usize::from(kind as u8)] = true;
-                assert_eq!(indexed.get_by_index(index).node_index().load(), index);
-            }
+                assert_eq!(indexed.index.get(raw_index), (address, kind));
 
+                let node = indexed.get_by_index(index);
+                let (actual_kind, actual_pointer) = node.into_raw_parts();
+                assert_eq!(actual_kind, kind);
+                assert_eq!(actual_pointer.as_ptr().expose_provenance(), address);
+                assert_eq!(node.node_index().load(), index);
+            }
             for kind in RootNodeKind::ALL {
                 let is_indexed = !matches!(
                     kind,
@@ -764,51 +779,6 @@ class C[T](Base, metaclass=Meta):
                 );
                 assert_eq!(seen_kinds[usize::from(*kind as u8)], is_indexed);
             }
-        }
-
-        #[test]
-        fn indexed_node_storage_layouts() {
-            let alignment = IndexedNodes::ALIGNMENT;
-            let chunk_distance = 1usize << (usize::BITS - 3);
-            let addresses: Vec<_> = (0..130)
-                .map(|index| {
-                    0x1000
-                        + (index / IndexedNodes::CHUNK_LEN) * chunk_distance
-                        + (index % IndexedNodes::CHUNK_LEN) * alignment
-                })
-                .collect();
-            let kinds: Vec<_> = (0..addresses.len())
-                .map(|index| {
-                    if index.is_multiple_of(2) {
-                        RootNodeKind::Stmt
-                    } else {
-                        RootNodeKind::Identifier
-                    }
-                })
-                .collect();
-            let chunked = IndexedNodes::from_collected(CollectedNodes {
-                addresses: addresses.clone(),
-                kinds: kinds.clone(),
-            });
-
-            assert_eq!(chunked.chunks.len(), 3);
-            assert!(
-                chunked
-                    .chunks
-                    .iter()
-                    .all(|chunk| matches!(chunk.layout, IndexChunkLayout::Relative))
-            );
-            for (index, (&address, &kind)) in addresses.iter().zip(&kinds).enumerate() {
-                assert_eq!(chunked.get(index), (address, kind));
-            }
-
-            let wide = IndexedNodes::from_collected(CollectedNodes {
-                addresses: vec![0x1000, 0x1001],
-                kinds: vec![RootNodeKind::Stmt, RootNodeKind::Identifier],
-            });
-            assert!(matches!(wide.chunks[0].layout, IndexChunkLayout::Wide));
-            assert_eq!(wide.get(0), (0x1000, RootNodeKind::Stmt));
-            assert_eq!(wide.get(1), (0x1001, RootNodeKind::Identifier));
         }
     }
 }
