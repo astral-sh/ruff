@@ -225,3 +225,25 @@ Architectural invariants to respect (per the established `ruff_spo_triplet` etho
 ---
 
 _Authored by an external session (`AdaWorldAPI/bardioc` `session_01VysoWJ6vsyg3wEGc5v7T5v`). Posted under `.claude/handovers/` so the session that owns this repo can pick up with grounded context. No code, no PR — design-spec and evaluation only._
+
+---
+
+## Appendix A — post-#500 corrections (added 2026-06-16)
+
+`AdaWorldAPI/lance-graph` **PR #500** (open at time of this addendum: *"rebaseline #497 OCR plans to #498 + gating probes (5-specialist framing)"*) introduces three disciplines that `ruff_cpp_spo` should absorb from the start:
+
+1. **"Ride existing presets — no new enum variant"** is now an enforced contract test (`ocr::tests::ocr_schema_fit_rides_existing_preset_no_new_variant`). The substrate-session pattern: the OCR plans wanted to add `ValueSchema::Ocr`; #500 caught it and required OCR to ride `Full` / `Compressed` instead, or mint a class. Apply to `ruff_cpp_spo`: do not propose a `ValueSchema::Cpp`. C++ rides existing presets, with class-resolved `ClassView::value_schema` per classid (per `lance-graph` #496's classid→ClassView discipline).
+
+2. **5-specialist drift-catching framing** — `cascade-architect` / `family-codec-smith` / `palette-engineer` / `dto-soa-savant` / `truth-architect` review merged plans against the post-current-substrate state and flag drift. The 5-specialist pass on #497 caught two showstoppers in the OCR plans (`"reversible without a hash" is false in code`; `"Morton-tile stacked-pyramid perturbation-shader cascade" does not exist — 0 hits, purged from 3 deliverables`). Apply to `ruff_cpp_spo`: anticipate a 5-specialist pass before shipping; pre-empt by grounding every claim against the actually-shipped substrate.
+
+3. **Gating probes pattern** — `lance-graph/.claude/plans/ocr-probes-v1.md` specs 4 gating probes (OCR-RT, OCR-DET, OCR-POST, OCR-SCHEMA) before any of the big claims (`int8-exact LSTM`, `bit-reproducible diff`, `~200k-LOC 1:1 layout`) become FINDING-grade. Apply to `ruff_cpp_spo`: spec equivalent gating probes (e.g. `CPP-AST-RT` = libclang AST round-trip; `CPP-TEMPLATE-DET` = template-instantiation determinism; `CPP-SCHEMA-FIT` = predicate vocab coverage on Tesseract baseline) before claiming the harvester is faithful.
+
+Also relevant: **#500 propagates `HelixResidue` 48 B → 6 B everywhere** — across 7 plan docs + `crates/lance-graph-contract/src/ocr.rs`. The width is now uniformly 6 B = the stored `Signed360` place index, never 48 B. Any downstream artifact (including `ruff_cpp_spo` outputs that reference helix tenant width) should pin 6 B.
+
+The OCR transcode plans this PR rebaselines:
+- `ocr-canonical-soa-integration-v1.md`
+- `tesseract-rs-ast-dll-codegen-v1.md` (**the direct downstream consumer of `ruff_cpp_spo` IR**)
+- `tesseract-rs-transcode-master-v1.md`
+- `soa-centroid-attention-field-synthesis-v1.md`
+- `ocr-probes-v1.md` (new)
+
