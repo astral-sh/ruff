@@ -2984,6 +2984,62 @@ class ProjectionMixedContainer:
         reveal_type(self.x)  # revealed: list[int] | tuple[int]
 ```
 
+Narrowing that reduces the unpacked value to an ordinary union element is preserved when rebuilding
+the mixed containers:
+
+```py
+class ProjectionMixedContainerNoneNarrowing:
+    def __init__(self, value: int | None) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        x, = self.x
+        while items:
+            if x is None:
+                break
+            self.x = (x,)
+            break
+
+        reveal_type(self.x)  # revealed: list[int | None] | tuple[int]
+```
+
+TODO: negative predicate constraints are currently widened when rebuilding a mixed container. The
+tuple arm below could be `tuple[~str]`; for now, recovery produces `tuple[object]`.
+
+```py
+from typing_extensions import TypeIs
+from ty_extensions import Not
+
+def is_str(value: object) -> TypeIs[str]:
+    return isinstance(value, str)
+
+def assert_not_str(value: Not[str]) -> None:
+    pass
+
+class ProjectionMixedContainerNegativePredicate:
+    def __init__(self, value: object) -> None:
+        self.x = [value]
+
+    def read(self, items: list[object]) -> None:
+        x, = self.x
+        while items:
+            if is_str(x):
+                break
+            reveal_type(x)  # revealed: ~str
+            self.x = (x,)
+            break
+
+        # TODO: it would be nice if this were `list[object] | tuple[~str]`.
+        reveal_type(self.x)  # revealed: list[object] | tuple[object]
+        if isinstance(self.x, tuple):
+            y, = self.x
+            # TODO: it would be nice if this were `~str`.
+            reveal_type(y)  # revealed: object
+            # TODO: it would be nice if this did not produce an error.
+            # error: [invalid-argument-type]
+            assert_not_str(y)
+```
+
 If the only assignment to a name is cyclic, we infer `Divergent` for that attribute:
 
 ```py
