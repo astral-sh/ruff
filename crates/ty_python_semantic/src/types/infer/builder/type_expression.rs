@@ -6,10 +6,10 @@ use ruff_text_size::Ranged;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::types::call::CallArguments;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE, UNSUPPORTED_OPERATOR,
-    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
-    report_invalid_concatenate_last_arg, report_missing_type_arguments,
-    report_unsupported_binary_operation,
+    self, EXPERIMENTAL_SYNTAX, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNBOUND_TYPE_VARIABLE,
+    UNSUPPORTED_OPERATOR, report_invalid_argument_number_to_special_form,
+    report_invalid_arguments_to_callable, report_invalid_concatenate_last_arg,
+    report_missing_type_arguments, report_unsupported_binary_operation,
 };
 use crate::types::infer::builder::subscript::AnnotatedExprContext;
 use crate::types::infer::{InferenceFlags, TypeExpressionFlags};
@@ -348,6 +348,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
                     ast::Operator::BitAnd => {
+                        if let Some(builder) =
+                            self.context.report_lint(&EXPERIMENTAL_SYNTAX, binary)
+                        {
+                            builder.into_diagnostic("Intersection type syntax is experimental");
+                        }
+
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
 
@@ -593,6 +599,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ..
                 },
             ) => {
+                if let Some(builder) = self.context.report_lint(&EXPERIMENTAL_SYNTAX, unary) {
+                    builder.into_diagnostic("Negation type syntax is experimental");
+                }
+
                 let operand_ty = self.infer_type_expression(operand);
 
                 if !ignore_runtime_errors(self) {

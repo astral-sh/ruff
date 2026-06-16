@@ -500,6 +500,16 @@
             }
           ]
         },
+        "experimental-syntax": {
+          "title": "detects experimental syntax",
+          "description": "## What it does\n\nChecks for experimental syntax that is not part of the Python typing specification.\n\n## Why is this bad?\n\nExperimental syntax is specific to ty. It may be rejected by other type checkers and may never be\nstandardized, or be subject to breaking changes.\n\n## Examples\n\n```toml\n[environment]\npython-version = \"3.14\"\n```\n\n```python\nclass A: ...\n\n\nclass B: ...\n\n\ndef f(value: A & B) -> None: ...  # error: [experimental-syntax]\ndef g(value: ~A) -> None: ...  # error: [experimental-syntax]\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "final-on-non-method": {
           "title": "detects `@final` applied to non-method functions",
           "description": "## What it does\n\nChecks for `@final` decorators applied to non-method functions.\n\n## Why is this bad?\n\nThe `@final` decorator is only meaningful on methods and classes.\nApplying it to a module-level function or a nested function has no\neffect and is likely a mistake.\n\n## Example\n\n```python\nfrom typing import final\n\n\n# @final is not allowed on non-method functions\n@final  # error\ndef my_function() -> int:\n    return 0\n```",

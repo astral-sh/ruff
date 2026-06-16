@@ -1395,11 +1395,20 @@ class A: ...
 class B: ...
 class C: ...
 
-def _(a_and_b: A & B, i1: A & B | C, i2: A | B & C, not_a: ~A) -> None:
+def _(
+    a_and_b: A & B,  # error: [experimental-syntax] "Intersection type syntax is experimental"
+    i1: A & B | C,  # error: [experimental-syntax] "Intersection type syntax is experimental"
+    i2: A | B & C,  # error: [experimental-syntax] "Intersection type syntax is experimental"
+    not_a: ~A,  # error: [experimental-syntax] "Negation type syntax is experimental"
+    # error: [experimental-syntax] "Intersection type syntax is experimental"
+    # error: [experimental-syntax] "Intersection type syntax is experimental"
+    nested: A & B & C,
+) -> None:
     reveal_type(a_and_b)  # revealed: A & B
     reveal_type(i1)  # revealed: (A & B) | C
     reveal_type(i2)  # revealed: A | (B & C)
     reveal_type(not_a)  # revealed: ~A
+    reveal_type(nested)  # revealed: A & B & C
 ```
 
 The `&` and `~` operators cannot be used in value positions, since that would lead to a runtime
@@ -1428,8 +1437,10 @@ class A: ...
 class B: ...
 
 def _(
+    # error: [experimental-syntax] "Intersection type syntax is experimental"
     # error: [unsupported-operator] "Operator `&` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
     a_and_b: A & B,
+    # error: [experimental-syntax] "Negation type syntax is experimental"
     # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'A'>`"
     not_a: ~A,
 ) -> None:
@@ -1444,6 +1455,9 @@ The operators can be used on Python 3.13 if annotations are deferred using a fut
 ```toml
 [environment]
 python-version = "3.13"
+
+[rules]
+experimental-syntax = "ignore"
 ```
 
 ```py
