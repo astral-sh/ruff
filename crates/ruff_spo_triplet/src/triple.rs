@@ -215,6 +215,14 @@ pub enum Predicate {
     /// `(model, uses_refinement, "<refinement_module>")` — `using
     /// Refinement` declaration.
     UsesRefinement,
+    /// `(model.field, field_type, "<rails_type>")` — the static type
+    /// annotation from a Rails `attribute :name, :type` declaration
+    /// (e.g. `:integer`, `:string`, `:boolean`, `:datetime`,
+    /// `:decimal`). Authoritative-grade because the type symbol is a
+    /// machine-readable AST literal. Downstream consumers
+    /// (e.g. `op-surreal-ast::from_triples`) map the rails-type
+    /// string to a SurrealQL `Kind` variant.
+    FieldType,
 
     // ───── C++ machine-plane (libclang harvest — ruff_cpp_spo) ─────
     //
@@ -324,6 +332,7 @@ impl Predicate {
             Self::AutoStrips => "auto_strips",
             Self::DefinesMethod => "defines_method",
             Self::UsesRefinement => "uses_refinement",
+            Self::FieldType => "field_type",
             // C++ machine-plane 13
             Self::InheritsFrom => "inherits_from",
             Self::HasField => "has_field",
@@ -387,6 +396,7 @@ impl Predicate {
             "auto_strips" => Self::AutoStrips,
             "defines_method" => Self::DefinesMethod,
             "uses_refinement" => Self::UsesRefinement,
+            "field_type" => Self::FieldType,
             // C++ machine-plane 13
             "inherits_from" => Self::InheritsFrom,
             "has_field" => Self::HasField,
@@ -450,6 +460,7 @@ impl Predicate {
         Self::AutoStrips,
         Self::DefinesMethod,
         Self::UsesRefinement,
+        Self::FieldType,
         // C++ machine-plane 13
         Self::InheritsFrom,
         Self::HasField,
@@ -537,7 +548,8 @@ impl Predicate {
             | Self::HasClosureTree
             | Self::CounterCultures
             | Self::AutoStrips
-            | Self::UsesRefinement => Provenance::OpenProjectExtracted,
+            | Self::UsesRefinement
+            | Self::FieldType => Provenance::OpenProjectExtracted,
         }
     }
 }
@@ -650,12 +662,12 @@ mod tests {
     }
 
     #[test]
-    fn predicate_count_locked_at_47() {
+    fn predicate_count_locked_at_48() {
         // The exact count is part of the schema contract: 7 core (Odoo
-        // Python) + 27 OpenProject AR-shape + 13 C++ machine-plane = 47.
-        // Council review of any new variant means this number changes — the
-        // test must change with the source.
-        assert_eq!(Predicate::ALL.len(), 47);
+        // Python) + 28 OpenProject AR-shape (D-AR-5.2 added `field_type`)
+        // + 13 C++ machine-plane = 48. Council review of any new variant
+        // means this number changes — the test must change with the source.
+        assert_eq!(Predicate::ALL.len(), 48);
     }
 
     #[test]

@@ -356,13 +356,26 @@ impl Expander {
             | AttrKind::Enum
             | AttrKind::DefineAttributeMethod => Predicate::HasAttribute,
         };
-        let _ = a.options; // not emitted; carried on IR for catalog consumers
         self.push(
             model_iri.to_string(),
             pred,
             a.name.clone(),
             Provenance::OpenProjectExtracted,
         );
+        // D-AR-5.2: emit `(model.field, field_type, "<rails_type>")`
+        // when the AttrDecl carries an explicit type annotation. The
+        // Rails AST literal (`attribute :age, :integer` →
+        // `options[("type", "integer")]`) is the static type signal
+        // the downstream Schema consumer needs to upgrade `Kind::Any`
+        // into a concrete SurrealQL kind.
+        if let Some(rails_type) = field_type_from_options(&a.options) {
+            self.push(
+                format!("{model_iri}.{}", a.name),
+                Predicate::FieldType,
+                rails_type,
+                Provenance::OpenProjectExtracted,
+            );
+        }
     }
 
     fn delegation(&mut self, model_iri: &str, d: &Delegation) {
@@ -658,6 +671,17 @@ impl Expander {
 /// - `prefix: true` → use `d.to` as the prefix (the most common case).
 /// - `prefix: :owner` / `prefix: "owner"` → use `"owner"` literally.
 /// - `prefix: false` / no `prefix:` option → `None` (no rename).
+/// Resolve the Rails type annotation from `AttrDecl::options`.
+///
+/// The extractor stores the type-positional Sym (e.g. the `:integer`
+/// in `attribute :age, :integer`) as `options = [("type", "integer")]`.
+/// Returns `None` when no explicit type is recorded.
+fn field_type_from_options(options: &[(String, String)]) -> Option<String> {
+    options
+        .iter()
+        .find_map(|(k, v)| (k == "type" && !v.is_empty()).then(|| v.clone()))
+}
+
 fn delegate_prefix(d: &Delegation) -> Option<String> {
     for (k, v) in &d.options {
         if k == "prefix" {
@@ -1480,5 +1504,49 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// **D-AR-5.2** — when an `AttrDecl` carries a type annotation in
+    /// its `options` (key="type"), the expander emits a companion
+    /// `field_type` triple alongside the `has_attribute` one. The
+    /// triple's subject is the field IRI (`ns:model.field`) so the
+    /// downstream Schema consumer can apply the type to the right
+    /// `FieldDefinition`.
+    #[test]
+    fn ar_shape_emits_field_type_for_typed_attribute() {
+        let mut g = ModelGraph::new("openproject");
+        let mut wp = Model::new("WorkPackage");
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::Attribute,
+            name: "estimated_hours".to_string(),
+            options: vec![("type".to_string(), "decimal".to_string())],
+        });
+        wp.attributes.push(AttrDecl {
+            kind: AttrKind::Attribute,
+            name: "subject".to_string(),
+            options: vec![], // no type annotation
+        });
+        g.models.push(wp);
+        let triples = expand(&g);
+        let has = |s: &str, p: &str, o: &str| {
+            triples.iter().any(|t| t.s == s && t.p == p && t.o == o)
+        };
+        assert!(has(
+            "openproject:WorkPackage",
+            "has_attribute",
+            "estimated_hours"
+        ));
+        assert!(has(
+            "openproject:WorkPackage.estimated_hours",
+            "field_type",
+            "decimal"
+        ));
+        // No `field_type` triple for the untyped attribute.
+        assert!(
+            !triples
+                .iter()
+                .any(|t| t.p == "field_type" && t.o.contains("subject")),
+            "untyped attribute must not emit field_type",
+        );
     }
 }

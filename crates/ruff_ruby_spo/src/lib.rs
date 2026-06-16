@@ -851,4 +851,51 @@ end
             "alias keyword not captured: {aliases:?}",
         );
     }
+
+    /// **D-AR-5.2** — `attribute :age, :integer` puts `:integer` as a
+    /// Sym at args[1]. The walker now lifts it into the AttrDecl
+    /// `options` as `("type", "integer")` so the expander can emit a
+    /// `field_type` triple.
+    #[test]
+    fn attribute_macro_extracts_positional_type_into_options() {
+        let src = r#"
+class M < ApplicationRecord
+  attribute :age, :integer
+  attribute :name, :string, default: ""
+  store_attribute :prefs, :font_size, :integer
+  attribute :no_type
+end
+"#;
+        let classes = extract_from_source(src);
+        let attrs: Vec<(&str, Option<&str>)> = classes[0]
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                Declaration::Attribute(a) => Some((
+                    a.name.as_str(),
+                    a.options
+                        .iter()
+                        .find(|(k, _)| k == "type")
+                        .map(|(_, v)| v.as_str()),
+                )),
+                _ => None,
+            })
+            .collect();
+        assert!(
+            attrs.contains(&("age", Some("integer"))),
+            "age must carry `integer` type; got {attrs:?}",
+        );
+        assert!(
+            attrs.contains(&("name", Some("string"))),
+            "name must carry `string` type",
+        );
+        assert!(
+            attrs.contains(&("font_size", Some("integer"))),
+            "store_attribute's attr must carry `integer` type",
+        );
+        assert!(
+            attrs.contains(&("no_type", None)),
+            "untyped attribute must carry no type option",
+        );
+    }
 }
