@@ -585,6 +585,7 @@ from enum import Enum, IntEnum
 from typing import Any, Literal, TypeVar
 
 T = TypeVar("T", bound=object)
+EQUAL_VALUES = TypeVar("EQUAL_VALUES", Literal[0], Literal[False])
 RUNTIME_TYPE_VAR = TypeVar("RUNTIME_TYPE_VAR")
 
 class Color(Enum):
@@ -641,6 +642,11 @@ def _(x: Any):
 def _(x: T):
     if x != Color.RED:
         reveal_type(x)  # revealed: T@_ & ~Literal[Color.RED]
+
+def _(x: Any, y: EQUAL_VALUES):
+    if x != y:
+        # TODO: This can narrow to `Any & ~EQUAL_VALUES@_` because all constraints compare equal.
+        reveal_type(x)  # revealed: Any
 
 def _(x: Any, y: T | str):
     if x != y:
