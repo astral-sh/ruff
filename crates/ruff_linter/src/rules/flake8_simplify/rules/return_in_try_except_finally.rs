@@ -34,7 +34,7 @@ use crate::checkers::ast::Checker;
 ///     except Exception:
 ///         return_value = "An exception occurred"
 ///     finally:
-///         return_value = -1
+///         print("Done")  # Cleanup runs without overwriting the return value.
 ///     return return_value
 /// ```
 ///
