@@ -30,9 +30,12 @@
 //!   `Model::{bases, member_fields, methods, templates, friends, …}`
 //!   sibling slots the shared IR consumes. **Pure unpacking** — no
 //!   semantic transform, no re-parsing.
-//! - [`extract`] is the top-level corpus walker. It is a `todo!()` stub
-//!   today (see its docs for the libclang wiring contract); the target
-//!   triple shape is already locked by [`tests::locked_shape_expands_to_expected_triples`].
+//! - `walk_tu` (feature `libclang`) walks ONE translation unit via real
+//!   libclang and returns [`CppClass`] definitions (classes/bases/fields/
+//!   methods with their flags, system-header classes filtered out).
+//!   [`extract`] — the corpus-TREE orchestration over `walk_tu` — remains
+//!   `todo!()` (per-TU include resolution + cross-TU dedup). The target
+//!   triple shape is locked by [`tests::locked_shape_expands_to_expected_triples`].
 //!
 //! # Iron rules this frontend respects
 //!
@@ -51,6 +54,11 @@ use ruff_spo_triplet::{
     CppBase, CppField, CppFriend, CppMacroUse, CppMethod, CppStaticAssert, CppTemplate, Model,
     ModelGraph,
 };
+
+#[cfg(feature = "libclang")]
+mod clang_walker;
+#[cfg(feature = "libclang")]
+pub use clang_walker::{WalkError, walk_tu};
 
 /// The namespace prefix for C++ machine-plane subjects/objects.
 ///
@@ -127,41 +135,33 @@ pub enum Declaration {
     StaticAssert(CppStaticAssert),
 }
 
-/// Top-level entry: walk a C++ corpus and produce the IR.
+/// Top-level entry: walk a C++ corpus **tree** and produce the IR.
 ///
-/// **`todo!()` stub — the libclang walker is the next deliverable.** The
-/// wiring contract for the session that picks this up:
+/// **Still `todo!()` — the per-TU walker has landed; the TREE orchestration
+/// has not.** [`walk_tu`] (feature `libclang`) is the concrete primitive:
+/// it walks ONE translation unit and returns [`CppClass`] definitions
+/// (classes/bases/fields/methods with their flags), already mapped to the
+/// fully-qualified `override` shape PR #9 requires. What remains for
+/// `extract` is orchestrating `walk_tu` over a whole corpus:
 ///
-/// 1. Add the `clang` crate under a non-default `libclang` feature (see
-///    `Cargo.toml`). The system `libclang.so` is the cost of admission for
-///    semantic C++ resolution (templates, preprocessor, ADL) — the only
-///    parser family that can satisfy the C++ predicates faithfully.
-/// 2. Walk each translation unit (start with `tesseract/src/api/baseapi.h`).
-///    For each `EntityKind::ClassDecl` / `StructDecl` cursor, build a
-///    [`CppClass`]: its `namespace` from the enclosing namespace cursors,
-///    its `name` from the cursor spelling, and one [`Declaration`] per
-///    child cursor (base specifier → [`Declaration::Base`], field →
-///    [`Declaration::Field`], method → [`Declaration::Method`] with its
-///    `virtual`/`override`/`= 0`/`constexpr`/`noexcept`/operator/`requires`
-///    flags read from the cursor, etc.). For an `override`, set
-///    [`ruff_spo_triplet::CppMethod::overrides`] to the **fully-qualified**
-///    base method (clang's `get_overridden_cursors()` spelling,
-///    `Namespace::Base.method`), so the `virtually_overrides` edge joins the
-///    base class's own method node (codex P2, PR #8).
-/// 3. Call [`model_from_class`] per class and push into the [`ModelGraph`].
-/// 4. The output MUST match the locked shape asserted in
-///    [`tests::locked_shape_expands_to_expected_triples`] for the
-///    `Tesseract::Recognizer` representative class.
+/// 1. Enumerate the corpus TUs (the `tesseract-ocr/tesseract@5.5.0` pin,
+///    per `tesseract-rs/.claude/plans/tesseract-rs-receive-contract-v1.md`
+///    §0) and resolve per-TU include args — the Tesseract + leptonica
+///    include graph is the real work here.
+/// 2. Call [`walk_tu`] per TU, then [`model_from_class`] per returned
+///    [`CppClass`], deduping classes seen across multiple TUs.
+/// 3. Merge into one [`ModelGraph`] and run `CPP-SCHEMA-FIT`
+///    (`.claude/plans/cpp-spo-probes-v1.md`) over the result.
 ///
-/// Until step 1 lands, this panics with a pointer to the contract. The
-/// pure unpacking ([`model_from_class`]) and the target triple shape are
-/// already testable without libclang.
+/// The per-cursor mapping (step that used to live here) is done in
+/// [`walk_tu`]; the pure unpacking ([`model_from_class`]) and the target
+/// triple shape are testable without libclang.
 #[must_use]
 pub fn extract(source_tree: &Path) -> ModelGraph {
     let _ = source_tree;
     todo!(
-        "wire the `clang` crate libclang walker per the `extract` doc \
-         contract — emit one CppClass per class cursor, then model_from_class"
+        "orchestrate `walk_tu` over the corpus tree (per-TU include args + \
+         cross-TU dedup) — the per-TU walker itself is done; see the doc"
     )
 }
 
@@ -427,5 +427,226 @@ mod tests {
                 && t.p == "inherits_from"
                 && t.o == "cpp:Tesseract::Classify"
         }));
+    }
+}
+
+#[cfg(all(test, feature = "libclang"))]
+mod libclang_tests {
+    use std::io::Write;
+    use std::sync::Mutex;
+
+    use ruff_spo_triplet::expand;
+
+    use super::{ModelGraph, NAMESPACE, model_from_class, walk_tu};
+
+    /// `clang::Clang` is a process-singleton — serialize the libclang tests so
+    /// cargo's parallel test threads never construct two at once.
+    static CLANG_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Hermetic libclang walk: write a small self-contained C++ TU (no
+    /// includes), walk it via real libclang, and assert the extracted shape +
+    /// the SPO triples it expands to. This is the libclang analog of
+    /// `ruff_ruby_spo`'s synthetic-fixture test — it proves the walker
+    /// end-to-end without needing the Tesseract corpus or its include graph.
+    ///
+    /// Run: `LIBCLANG_PATH=/usr/lib/llvm-18/lib cargo test -p ruff_cpp_spo \
+    ///       --features libclang`.
+    #[test]
+    fn walk_extracts_classes_bases_methods_fields_from_real_cpp() {
+        const SRC: &str = r"
+namespace Tesseract {
+class Classify {
+ public:
+  virtual int Recognize(int x) noexcept;
+  virtual void Clear() = 0;
+};
+class Recognizer : public Classify {
+ public:
+  int Recognize(int x) noexcept override;
+  bool operator==(const Recognizer& other) const;
+ private:
+  int recognizer_;
+};
+}
+";
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let dir = std::env::temp_dir();
+        let path = dir.join("ruff_cpp_spo_hermetic_fixture.cpp");
+        {
+            let mut f = std::fs::File::create(&path).expect("create fixture");
+            f.write_all(SRC.as_bytes()).expect("write fixture");
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+        ];
+        let classes = walk_tu(&path, &args).expect("libclang walk");
+        let _ = std::fs::remove_file(&path);
+
+        let find = |q: &str| {
+            classes
+                .iter()
+                .find(|c| c.qualified_name() == q)
+                .unwrap_or_else(|| panic!("class {q} not found; got {:?}", names(&classes)))
+        };
+        let recognizer = find("Tesseract::Recognizer");
+        let classify = find("Tesseract::Classify");
+
+        // Base specifier (access + qualified base name).
+        let base = recognizer
+            .declarations
+            .iter()
+            .find_map(|d| match d {
+                super::Declaration::Base(b) => Some(b),
+                _ => None,
+            })
+            .expect("Recognizer has a base");
+        assert_eq!(base.name, "Tesseract::Classify");
+        assert!(matches!(base.access, ruff_spo_triplet::CppAccess::Public));
+
+        // Field.
+        assert!(
+            recognizer.declarations.iter().any(|d| matches!(
+                d, super::Declaration::Field(f) if f.name == "recognizer_"
+            )),
+            "field recognizer_ missing"
+        );
+
+        // Methods: override target FQ, noexcept, operator, pure-virtual.
+        let methods: Vec<&ruff_spo_triplet::CppMethod> = recognizer
+            .declarations
+            .iter()
+            .filter_map(|d| match d {
+                super::Declaration::Method(m) => Some(m),
+                _ => None,
+            })
+            .collect();
+        let recognize = methods
+            .iter()
+            .find(|m| m.name == "Recognize")
+            .expect("Recognize method");
+        assert!(recognize.is_noexcept, "Recognize should be noexcept");
+        assert_eq!(
+            recognize.overrides.as_deref(),
+            Some("Tesseract::Classify.Recognize"),
+            "override target must be the fully-qualified base method"
+        );
+        let op = methods
+            .iter()
+            .find(|m| m.operator_kind.is_some())
+            .expect("operator== method");
+        assert_eq!(op.operator_kind.as_deref(), Some("operator=="));
+
+        let clear = classify
+            .declarations
+            .iter()
+            .find_map(|d| match d {
+                super::Declaration::Method(m) if m.name == "Clear" => Some(m),
+                _ => None,
+            })
+            .expect("Clear method");
+        assert!(clear.is_pure_virtual, "Clear should be pure-virtual");
+
+        // End-to-end: the walked classes expand to the expected triples.
+        let mut graph = ModelGraph::new(NAMESPACE);
+        graph.models.push(model_from_class(recognizer));
+        graph.models.push(model_from_class(classify));
+        let triples = expand(&graph);
+        let has =
+            |s: &str, p: &str, o: &str| triples.iter().any(|t| t.s == s && t.p == p && t.o == o);
+        assert!(has(
+            "cpp:Tesseract::Recognizer",
+            "inherits_from",
+            "cpp:Tesseract::Classify"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer.Recognize",
+            "virtually_overrides",
+            "cpp:Tesseract::Classify.Recognize"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer.Recognize",
+            "is_noexcept",
+            "true"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer",
+            "has_field",
+            "cpp:Tesseract::Recognizer.recognizer_"
+        ));
+        assert!(has(
+            "cpp:Tesseract::Recognizer.operator==",
+            "defines_operator",
+            "operator=="
+        ));
+        assert!(has(
+            "cpp:Tesseract::Classify.Clear",
+            "is_pure_virtual",
+            "true"
+        ));
+    }
+
+    fn names(classes: &[super::CppClass]) -> Vec<String> {
+        classes
+            .iter()
+            .map(super::CppClass::qualified_name)
+            .collect()
+    }
+
+    /// Real-corpus smoke (the `CPP-SCHEMA-FIT` kernel) — gated on
+    /// `TESSERACT_SRC` so CI without the corpus skips it, mirroring
+    /// `ruff_ruby_spo`'s `OPENPROJECT_PATH` gate. Walks a real Tesseract
+    /// header; tolerates the unresolved generated/leptonica includes (libclang
+    /// still surfaces the class decls), and asserts non-trivial extraction.
+    ///
+    /// Run: `TESSERACT_SRC=/path/to/tesseract LIBCLANG_PATH=/usr/lib/llvm-18/lib \
+    ///       cargo test -p ruff_cpp_spo --features libclang -- --nocapture`.
+    #[test]
+    #[expect(
+        clippy::print_stderr,
+        reason = "diagnostic emission gated on env var (real-corpus smoke)"
+    )]
+    fn walk_real_tesseract_header_when_corpus_present() {
+        let _guard = CLANG_LOCK
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let Ok(src_root) = std::env::var("TESSERACT_SRC") else {
+            eprintln!("TESSERACT_SRC unset; skipping real-corpus smoke");
+            return;
+        };
+        let root = std::path::Path::new(&src_root);
+        let header = root.join("src/ccutil/unicharset.h");
+        if !header.exists() {
+            eprintln!("{} missing; skipping", header.display());
+            return;
+        }
+        let args = [
+            "-std=c++17".to_string(),
+            "-x".to_string(),
+            "c++".to_string(),
+            format!("-I{}", root.join("src/ccutil").display()),
+            format!("-I{}", root.join("include").display()),
+        ];
+        let classes = walk_tu(&header, &args).expect("walk real Tesseract header");
+        eprintln!(
+            "[tesseract-smoke] {} classes from unicharset.h: {:?}",
+            classes.len(),
+            names(&classes)
+        );
+        assert!(
+            !classes.is_empty(),
+            "expected >=1 class from unicharset.h even with unresolved includes"
+        );
+        let mut graph = ModelGraph::new(NAMESPACE);
+        for c in &classes {
+            graph.models.push(model_from_class(c));
+        }
+        assert!(
+            !expand(&graph).is_empty(),
+            "expected SPO triples from the real header"
+        );
     }
 }
